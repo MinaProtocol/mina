@@ -184,11 +184,10 @@ module Data = struct
       let in_seed_update_range (slot : t) =
         let ck = Constants.(c * k |> UInt32.of_int) in
         let open UInt32.Infix in
-        ck <= slot && slot < ck * UInt32.of_int 2
+        slot < ck * UInt32.of_int 2
 
       let in_seed_update_range_var (slot : Unpacked.var) =
         let open Snark_params.Tick in
-        let open Snark_params.Tick.Let_syntax in
         let uint32_msb x =
           List.init 32 ~f:(fun i ->
               UInt32.Infix.((x lsr Int.sub 31 i) land UInt32.one = UInt32.one)
@@ -197,15 +196,12 @@ module Data = struct
         in
         let ( < ) = Bitstring_checked.lt_value in
         let ck = Constants.(c * k) |> UInt32.of_int in
-        let ck_bitstring = uint32_msb ck
-        and ck_times_2 = uint32_msb UInt32.(Infix.(of_int 2 * ck)) in
+        let ck_times_2 = uint32_msb UInt32.(Infix.(of_int 2 * ck)) in
         let slot_msb =
           Bitstring_lib.Bitstring.Msb_first.of_lsb_first
             (Unpacked.var_to_bits slot)
         in
-        let%bind slot_gte_ck = slot_msb < ck_bitstring >>| Boolean.not
-        and slot_lt_ck_times_2 = slot_msb < ck_times_2 in
-        Boolean.(slot_gte_ck && slot_lt_ck_times_2)
+        slot_msb < ck_times_2
 
       let gen =
         let open Quickcheck.Let_syntax in
