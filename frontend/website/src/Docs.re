@@ -52,6 +52,7 @@ module Styles = {
           ...Style.Body.basicStyles,
         ],
       ),
+      selector("ul", [margin2(~v=`rem(1.), ~h=`zero)]),
       selector(
         "code",
         [Style.Typeface.pragmataPro, color(Style.Colors.midnight)],
