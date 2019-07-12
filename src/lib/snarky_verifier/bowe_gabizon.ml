@@ -5,7 +5,12 @@ module type Inputs_intf = sig
   include Inputs.S
 
   val hash :
-    a:G1.t -> b:G2.t -> c:G1.t -> delta_prime:G2.t -> (G1.t, _) Impl.Checked.t
+       ?message:Impl.Boolean.var array
+    -> a:G1.t
+    -> b:G2.t
+    -> c:G1.t
+    -> delta_prime:G2.t
+    -> (G1.t, _) Impl.Checked.t
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -17,6 +22,20 @@ module Make (Inputs : Inputs_intf) = struct
     type ('g1, 'g2, 'fqk) t_ =
       {query_base: 'g1; query: 'g1 list; delta: 'g2; alpha_beta: 'fqk}
     [@@deriving fields]
+
+    let to_hlist {query_base; query; delta; alpha_beta} =
+      Snarky.H_list.[query_base; query; delta; alpha_beta]
+
+    let of_hlist : (unit, _ -> _ -> _ -> _ -> unit) Snarky.H_list.t -> _ =
+     fun Snarky.H_list.[query_base; query; delta; alpha_beta] ->
+      {query_base; query; delta; alpha_beta}
+
+    let typ ~input_size =
+      let spec =
+        Data_spec.[G1.typ; Typ.list ~length:input_size G1.typ; G2.typ; Fqk.typ]
+      in
+      Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
     include Summary.Make (Inputs)
 
@@ -88,7 +107,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~value_of_hlist:of_hlist
   end
 
-  let verify (vk : (_, _, _) Verification_key.t_)
+  let verify ?message (vk : (_, _, _) Verification_key.t_)
       (vk_precomp : Verification_key.Precomputation.t) inputs
       {Proof.a; b; c; delta_prime; z} =
     let%bind acc =
@@ -110,7 +129,7 @@ module Make (Inputs : Inputs_intf) = struct
         ; (Pos, G1_precomputation.create a, b) ]
       >>= final_exponentiation >>= Fqk.equal vk.alpha_beta
     and test2 =
-      let%bind ys = hash ~a ~b ~c ~delta_prime in
+      let%bind ys = hash ?message ~a ~b ~c ~delta_prime in
       batch_miller_loop
         [ (Pos, G1_precomputation.create ys, delta_prime_pc)
         ; (Neg, G1_precomputation.create z, vk_precomp.delta) ]

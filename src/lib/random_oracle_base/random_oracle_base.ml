@@ -4,18 +4,6 @@ open Module_version
 module Digest = struct
   open Fold_lib
 
-  let fold_bits s =
-    { Fold.fold=
-        (fun ~init ~f ->
-          let n = 8 * String.length s in
-          let rec go acc i =
-            if i = n then acc
-            else
-              let b = (Char.to_int s.[i / 8] lsr (i mod 8)) land 1 = 1 in
-              go (f acc b) (i + 1)
-          in
-          go init 0 ) }
-
   module Stable = struct
     module V1 = struct
       module T = struct
@@ -24,16 +12,15 @@ module Digest = struct
 
       include T
 
-      let version_byte = Base58_check.Version_bytes.random_oracle_base
+      module Base58_check = Base58_check.Make (struct
+        let version_byte = Base58_check.Version_bytes.random_oracle_base
+      end)
 
-      let to_yojson s = `String (Base58_check.encode ~version_byte ~payload:s)
+      let to_yojson s = `String (Base58_check.encode s)
 
       let of_yojson = function
         | `String s -> (
-          try
-            let vb, decoded = Base58_check.decode_exn s in
-            if Char.equal vb version_byte then Ok decoded
-            else Error "of_yojson: unexpected version byte"
+          try Ok (Base58_check.decode_exn s)
           with exn ->
             Error
               (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn)) )
@@ -55,6 +42,18 @@ module Digest = struct
     module Registrar = Registration.Make (Module_decl)
     module Registered_V1 = Registrar.Register (V1)
   end
+
+  let fold_bits s =
+    { Fold.fold=
+        (fun ~init ~f ->
+          let n = 8 * String.length s in
+          let rec go acc i =
+            if i = n then acc
+            else
+              let b = (Char.to_int s.[i / 8] lsr (i mod 8)) land 1 = 1 in
+              go (f acc b) (i + 1)
+          in
+          go init 0 ) }
 
   let to_bits = Blake2.string_to_bits
 

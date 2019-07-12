@@ -50,7 +50,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -79,59 +79,69 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
-    #build-macos:
-    #    macos:
-    #        xcode: "10.1.0"
-    #    working_directory: /Users/distiller/coda
-    #    environment:
-    #        HOMEBREW_LOGS: /Users/distiller/homebrew.log
-    #        OPAMYES: 1
-    #    steps:
-    #        - run:
-    #            name: Make /nix paths
-    #            command: |
-    #                sudo mkdir /nix
-    #                sudo chown distiller /nix
-    #        - checkout
-    #        - restore_cache:
-    #              keys:
-    #                  - homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
-    #                  - homebrew-v1-
-    #        - restore_cache:
-    #              keys:
-    #                  - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-    #                  - opam-v3-
-    #        - run: git submodule sync && git submodule update --init --recursive
-    #        - run:
-    #              name: Download Deps -- make macos-setup-download
-    #              command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
-    #        - run:
-    #              name: Compile Deps -- make macos-setup-compile
-    #              command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
-    #        - save_cache:
-    #              key: homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
-    #              paths:
-    #                  - "/usr/local/Homebrew"
-    #                  - "/Users/distiller/Library/Caches/Homebrew"
-    #        - save_cache:
-    #              key: opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-    #              paths:
-    #                  - "/Users/distiller/.opam"
-    #        - run:
-    #              name: Build OCaml
-    #              command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
-    #        - run:
-    #              name: Record Constraint System Digests
-    #              command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
-    #        - run:
-    #              name: Run all tests (on master)
-    #              command: echo "FIXME Tests not yet working on mac"
+    build-macos:
+       macos:
+           xcode: "10.2.1"
+       working_directory: /Users/distiller/coda
+       environment:
+           HOMEBREW_LOGS: /Users/distiller/homebrew.log
+           OPAMYES: 1
+       steps:
+           - run:
+               name: Make /nix paths
+               command: |
+                   sudo mkdir /nix
+                   sudo chown distiller /nix
+           - checkout
+           - restore_cache:
+                 keys:
+                     - homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
+                     - homebrew-v1-
+           - restore_cache:
+                 keys:
+                     - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                     - opam-v3-
+           - run: git submodule sync && git submodule update --init --recursive
+           - run:
+                 name: Download Deps -- make macos-setup-download
+                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
+           - run:
+                 name: Compile Deps -- make macos-setup-compile
+                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
+           - save_cache:
+                 key: homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
+                 paths:
+                     - "/usr/local/Homebrew"
+                     - "/Users/distiller/Library/Caches/Homebrew"
+           - save_cache:
+                 key: opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                 paths:
+                     - "/Users/distiller/.opam"
+           - run:
+                 name: Build OCaml
+                 command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                 no_output_timeout: 1h
+                 environment: 
+                  DUNE_PROFILE: testnet_postake_medium_curves
+           - run:
+                 name: Record Constraint System Digests
+                 command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
+           - run:
+                 name: Run all tests (on master)
+                 command: echo "FIXME Tests not yet working on mac"
+           - run: 
+                 name: Publish to Artifactory
+                 command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
+        {%- if profile == "testnet_postake_medium_curves" %}
+        resource_class: xlarge
+        {%- else %}
         resource_class: large
+        {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -170,23 +180,23 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && dune runtest --profile={{profile}} -j8'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
             - store_artifacts:
-                path: core*
+                path: core_dumps
     {%- endfor %}
 
     {%- for profile in test_permutations.keys() | sort %}
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -210,6 +220,7 @@ workflows:
                     only: master
             - tracetool
             - build-wallet
+            - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}

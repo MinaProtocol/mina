@@ -175,7 +175,8 @@ module Types = struct
 
       let num_accounts = int_option_entry "Global Number of Accounts"
 
-      let block_count = int_option_entry "Block Count"
+      let blockchain_length =
+        int_option_entry "The Total Number of Blocks in the Blockchain"
 
       let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
 
@@ -229,7 +230,7 @@ module Types = struct
 
     type t =
       { num_accounts: int option
-      ; block_count: int option
+      ; blockchain_length: int option
       ; uptime_secs: int
       ; ledger_merkle_root: string option
       ; staged_ledger_hash: string option
@@ -255,7 +256,7 @@ module Types = struct
         let get field = Field.get field s
       end) in
       let open M in
-      Fields.to_list ~sync_status ~num_accounts ~block_count ~uptime_secs
+      Fields.to_list ~sync_status ~num_accounts ~blockchain_length ~uptime_secs
         ~ledger_merkle_root ~staged_ledger_hash ~state_hash ~commit_id
         ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkeys
         ~histograms ~consensus_time_best_tip ~consensus_time_now
@@ -482,6 +483,17 @@ module Stop_tracing = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
+end
+
+module Set_staking = struct
+  type query = Keypair.Stable.Latest.t list [@@deriving bin_io]
+
+  type response = unit [@@deriving bin_io]
+
+  type error = unit
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Set_staking" ~version:0 ~bin_query ~bin_response
 end
 
 module Visualization = struct

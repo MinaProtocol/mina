@@ -137,6 +137,19 @@ let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let trust_system = config.trust_system in
   Trust_system.reset trust_system ip_address
 
+let replace_proposers keys pks =
+  let kps =
+    List.filter_map pks ~f:(fun pk ->
+        let open Option.Let_syntax in
+        let%map kps =
+          Coda_lib.wallets keys |> Secrets.Wallets.find ~needle:pk
+        in
+        (kps, pk) )
+  in
+  Coda_lib.replace_propose_keypairs keys
+    (Keypair.And_compressed_pk.Set.of_list kps) ;
+  kps |> List.map ~f:snd
+
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
   include Receipt.Chain_hash.Stable.V1
@@ -202,7 +215,7 @@ let start_time = Time_ns.now ()
 
 type active_state_fields =
   { num_accounts: int option
-  ; block_count: int option
+  ; blockchain_length: int option
   ; ledger_merkle_root: string option
   ; staged_ledger_hash: string option
   ; state_hash: string option
@@ -225,7 +238,9 @@ let get_status ~flag t =
   let run_snark_worker = Option.is_some (Coda_lib.snark_worker_key t) in
   let propose_pubkeys = Coda_lib.propose_public_keys t in
   let consensus_mechanism = Consensus.name in
-  let consensus_time_now = Consensus.time_hum (Core_kernel.Time.now ()) in
+  let consensus_time_now =
+    Consensus.time_hum (Block_time.now (Coda_lib.config t).time_controller)
+  in
   let consensus_configuration = Consensus.Configuration.t in
   let r = Perf_histograms.report in
   let histograms =
@@ -264,16 +279,15 @@ let get_status ~flag t =
     let open Participating_state.Let_syntax in
     let%bind ledger = Coda_lib.best_ledger t in
     let ledger_merkle_root =
-      Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t] |> Sexp.to_string
+      Ledger.merkle_root ledger |> Ledger_hash.to_string
     in
     let num_accounts = Ledger.num_accounts ledger in
     let%bind state = Coda_lib.best_protocol_state t in
-    let state_hash =
-      Protocol_state.hash state |> [%sexp_of: State_hash.t] |> Sexp.to_string
-    in
+    let state_hash = Protocol_state.hash state |> State_hash.to_string in
     let consensus_state = state |> Protocol_state.consensus_state in
-    let block_count =
-      Length.to_int @@ Consensus.Data.Consensus_state.length consensus_state
+    let blockchain_length =
+      Length.to_int
+      @@ Consensus.Data.Consensus_state.blockchain_length consensus_state
     in
     let%bind sync_status =
       Coda_incremental.Status.stabilize () ;
@@ -297,7 +311,7 @@ let get_status ~flag t =
     in
     ( sync_status
     , { num_accounts= Some num_accounts
-      ; block_count= Some block_count
+      ; blockchain_length= Some blockchain_length
       ; ledger_merkle_root= Some ledger_merkle_root
       ; staged_ledger_hash= Some staged_ledger_hash
       ; state_hash= Some state_hash
@@ -305,7 +319,7 @@ let get_status ~flag t =
   in
   let ( sync_status
       , { num_accounts
-        ; block_count
+        ; blockchain_length
         ; ledger_merkle_root
         ; staged_ledger_hash
         ; state_hash
@@ -316,7 +330,7 @@ let get_status ~flag t =
     | `Bootstrapping ->
         ( `Bootstrap
         , { num_accounts= None
-          ; block_count= None
+          ; blockchain_length= None
           ; ledger_merkle_root= None
           ; staged_ledger_hash= None
           ; state_hash= None
@@ -324,7 +338,7 @@ let get_status ~flag t =
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
-  ; block_count
+  ; blockchain_length
   ; uptime_secs
   ; ledger_merkle_root
   ; staged_ledger_hash

@@ -31,14 +31,13 @@ let of_bigstring_exn = Binable.of_bigstring (module Stable.Latest)
 
 let to_bigstring = Binable.to_bigstring (module Stable.Latest)
 
-let version_byte = Base58_check.Version_bytes.private_key
+module Base58_check = Base58_check.Make (struct
+  let version_byte = Base58_check.Version_bytes.private_key
+end)
 
 let to_base58_check t =
-  let payload = to_bigstring t |> Bigstring.to_string in
-  Base58_check.encode ~version_byte ~payload
+  Base58_check.encode (to_bigstring t |> Bigstring.to_string)
 
 let of_base58_check_exn s =
-  let vb, decoded = Base58_check.decode_exn s in
-  if not (Char.equal vb version_byte) then
-    failwith "of.encode_exn: unexpected version byte" ;
+  let decoded = Base58_check.decode_exn s in
   decoded |> Bigstring.of_string |> of_bigstring_exn

@@ -11,22 +11,21 @@ module Stable = struct
       let to_string = Binable.to_string (module Tock_backend.Proof)
 
       let of_string = Binable.of_string (module Tock_backend.Proof)
+
+      let version_byte = Base58_check.Version_bytes.proof
     end
 
     include T
     include Sexpable.Of_stringable (T)
+    module Base58_check = Base58_check.Make (T)
 
-    let version_byte = Base58_check.Version_bytes.proof
-
-    let to_yojson s =
-      `String (Base58_check.encode ~version_byte ~payload:(to_string s))
+    let to_yojson s = `String (Base58_check.encode (to_string s))
 
     let of_yojson = function
       | `String s -> (
         try
-          let vb, decoded = Base58_check.decode_exn s in
-          if Char.equal vb version_byte then Ok (of_string decoded)
-          else Error "of_yojson: unexpected version byte"
+          let decoded = Base58_check.decode_exn s in
+          Ok (of_string decoded)
         with exn ->
           Error (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn))
         )

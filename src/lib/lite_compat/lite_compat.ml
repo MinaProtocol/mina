@@ -1,22 +1,16 @@
 open Core
 include Lite_compat_algebra
 
-let verification_key vk =
-  let open Crypto_params.Tock_backend.Full.GM_verification_key_accessors in
-  let g_alpha = g_alpha vk |> g1 in
-  let h_beta = h_beta vk |> g2 in
-  let g_alpha_h_beta = LTock.Pairing.reduced_pairing g_alpha h_beta in
-  { LTock.Groth_maller.Verification_key.h= h vk |> g2
-  ; g_alpha
-  ; h_beta
-  ; g_alpha_h_beta
-  ; g_gamma= g_gamma vk |> g1
-  ; h_gamma= h_gamma vk |> g2
+let verification_key (vk : Crypto_params.Tock_backend.Verification_key.t) =
+  let open Crypto_params.Tock_backend.Verification_key in
+  { Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key.alpha_beta=
+      alpha_beta vk |> target_field
+  ; delta= delta vk |> g2
   ; query= query vk |> g1_vector }
 
-let proof proof : LTock.Groth_maller.Proof.t =
-  let module P = Crypto_params.Tock_backend.Full.GM_proof_accessors in
-  {a= P.a proof |> g1; b= P.b proof |> g2; c= P.c proof |> g1}
+let proof {Crypto_params.Tock_backend.Proof.a; b; c; delta_prime; z} :
+    Lite_base.Crypto_params.Tock.Bowe_gabizon.Proof.t =
+  {a= g1 a; b= g2 b; c= g1 c; delta_prime= g2 delta_prime; z= g1 z}
 
 let merkle_path :
        Coda_base.Ledger.Path.t

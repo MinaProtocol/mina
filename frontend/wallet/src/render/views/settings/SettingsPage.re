@@ -22,6 +22,7 @@ module Styles = {
       padding(`rem(2.)),
       borderTop(`px(1), `solid, white),
       borderLeft(`px(1), `solid, white),
+      overflow(`scroll),
     ]);
 
   let label =
@@ -30,7 +31,6 @@ module Styles = {
       style([
         margin2(~v=`rem(0.5), ~h=`zero),
         color(Theme.Colors.midnight),
-        userSelect(`none),
       ]),
     ]);
 
@@ -48,7 +48,6 @@ module Styles = {
     merge([
       Theme.Text.Body.regular,
       style([
-        userSelect(`none),
         padding(`rem(1.)),
         color(Theme.Colors.midnight),
         display(`flex),
@@ -62,7 +61,10 @@ module Styles = {
       ]),
     ]);
 
-  let walletName = style([width(`rem(12.5))]);
+  let walletName = style([width(`rem(12.5)), color(Theme.Colors.marine)]);
+
+  let walletKey =
+    merge([Theme.Text.Body.mono, style([color(Theme.Colors.midnightAlpha(0.7))])]);
 
   let walletChevron =
     style([display(`inlineFlex), color(Theme.Colors.tealAlpha(0.5))]);
@@ -118,7 +120,7 @@ module WalletSettingsItem = {
       className=Styles.walletItem
       onClick={_ => ReasonReact.Router.push(route)}>
       <div className=Styles.walletName> <WalletName pubkey=publicKey /> </div>
-      <span className=Theme.Text.Body.mono>
+      <span className=Styles.walletKey>
         <Pill> {React.string(PublicKey.prettyPrint(publicKey))} </Pill>
       </span>
       <Spacer width=5.0 />

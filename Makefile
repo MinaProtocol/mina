@@ -167,6 +167,9 @@ containerstart: git_hooks
 ########################################
 ## Artifacts
 
+publish-macos:
+	@./scripts/publish-macos.sh
+
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
@@ -204,6 +207,14 @@ test-ppx:
 
 web:
 	./scripts/web.sh
+
+
+########################################
+## Benchmarks
+
+benchmarks:
+	cd src && dune build app/benchmarks/main.exe
+
 
 ########################################
 # Coverage testing and output

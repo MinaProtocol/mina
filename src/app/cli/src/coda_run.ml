@@ -60,10 +60,9 @@ let get_lite_chain :
       let proof = Lite_compat.proof proof in
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-let log_shutdown ~conf_dir t =
+let log_shutdown ~conf_dir ~top_logger coda_ref =
   let logger =
-    Logger.extend
-      (Coda_lib.top_level_logger t)
+    Logger.extend top_logger
       [("coda_run", `String "Logging state before program ends")]
   in
   let frontier_file = conf_dir ^/ "frontier.dot" in
@@ -71,13 +70,18 @@ let log_shutdown ~conf_dir t =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
     (Visualization_message.success "registered masks" mask_file) ;
   Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
-  match Coda_lib.visualize_frontier ~filename:frontier_file t with
-  | `Active () ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-        (Visualization_message.success "transition frontier" frontier_file)
-  | `Bootstrapping ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-        (Visualization_message.bootstrap "transition frontier")
+  match !coda_ref with
+  | None ->
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Shutdown before Coda instance was created, not saving a visualization"
+  | Some t -> (
+    match Coda_lib.visualize_frontier ~filename:frontier_file t with
+    | `Active () ->
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+          (Visualization_message.success "transition frontier" frontier_file)
+    | `Bootstrapping ->
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+          (Visualization_message.bootstrap "transition frontier") )
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
@@ -167,7 +171,16 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
           return (Coda_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
         (fun () filename -> return (Coda_base.Ledger.Debug.visualize ~filename)
-      ) ]
+      )
+    ; implement Daemon_rpcs.Set_staking.rpc (fun () keypairs ->
+          let keypair_and_compressed_key =
+            List.map keypairs
+              ~f:(fun ({Keypair.Stable.Latest.public_key; _} as keypair) ->
+                (keypair, Public_key.compress public_key) )
+          in
+          Coda_lib.replace_propose_keypairs coda
+            (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
+          Deferred.unit ) ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
@@ -293,17 +306,35 @@ let run_snark_worker ?shutdown_on_disconnect:(s = true) ~client_port
       create_snark_worker ~shutdown_on_disconnect:s ~public_key ~client_port
       |> ignore
 
-let handle_shutdown ~monitor ~conf_dir t =
+let handle_crash e =
+  Core.eprintf
+    !{err|
+
+  💀 Coda's Daemon Crashed. The Coda Protocol developers would like to know why!
+
+  Please:
+    Open an issue:
+      https://github.com/CodaProtocol/coda/issues/new
+
+    Tell us what you were doing, and paste the last 20 lines of log messages.
+    And then paste the following:
+
+    %s%!|err}
+    (Exn.to_string e)
+
+let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-      log_shutdown ~conf_dir t ; raise exn ) ;
+      log_shutdown ~conf_dir ~top_logger coda_ref ;
+      handle_crash exn ;
+      Stdlib.exit 1 ) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->
-        log_shutdown ~conf_dir t ;
+        log_shutdown ~conf_dir ~top_logger coda_ref ;
         let logger =
-          Logger.extend
-            (Coda_lib.top_level_logger t)
+          Logger.extend top_logger
             [("coda_run", `String "Program got killed by signal")]
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           !"Coda process got interrupted by signal %{sexp:t}"
-          signal ))
+          signal ;
+        Stdlib.exit 130 ))
