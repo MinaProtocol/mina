@@ -134,7 +134,7 @@ describe("Bindings", () =>
           ChildProcess.spawn(
             "echo",
             [|"hello"|],
-            {"stdio": ChildProcess.pipe, "env": ChildProcess.Process.env},
+            ChildProcess.spawnOptions(~stdio=ChildProcess.pipe, ()),
           );
         let stdout = ChildProcess.Process.stdoutGet(echoProcess);
         Stream.Readable.on(stdout, "data", data =>
@@ -150,7 +150,7 @@ describe("Bindings", () =>
           ChildProcess.spawn(
             "sleep",
             [|"10"|],
-            {"stdio": ChildProcess.ignore, "env": ChildProcess.Process.env},
+            ChildProcess.spawnOptions(~stdio=ChildProcess.ignore, ()),
           );
         ChildProcess.Process.onExit(
           pauseProcess,
@@ -170,7 +170,7 @@ describe("Bindings", () =>
           ChildProcess.spawn(
             "this-program-doesn't-exist",
             [||],
-            {"stdio": ChildProcess.ignore, "env": ChildProcess.Process.env},
+            ChildProcess.spawnOptions(~stdio=ChildProcess.ignore, ()),
           );
         ChildProcess.Process.onError(pauseProcess, _ => cb(pass));
       },
