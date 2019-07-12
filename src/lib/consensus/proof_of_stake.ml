@@ -2224,10 +2224,10 @@ module Hooks = struct
           type query = Coda_base.Ledger_hash.Stable.V1.t [@@deriving bin_io]
 
           type response =
-            (Coda_base.Sparse_ledger.Stable.V1.t, string) Result.t
-          [@@deriving bin_io]
-
-          let version = 1
+            ( Coda_base.Sparse_ledger.Stable.V1.t
+            , string )
+            Core_kernel.Result.Stable.V1.t
+          [@@deriving bin_io, version {rpc}]
 
           let query_of_caller_model = Fn.id
 
