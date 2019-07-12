@@ -284,4 +284,5 @@ include Make (struct
   module Transition_handler_validator = Transition_handler.Validator
   module Breadcrumb_builder = Transition_handler.Breadcrumb_builder
   module Network = Coda_networking
+  module Transition_chain_witness = Transition_chain_witness
 end)

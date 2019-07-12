@@ -466,6 +466,11 @@ struct
     module Transition_frontier = Transition_frontier
   end)
 
+  module Transition_chain_witness = Transition_chain_witness.Make (struct
+    include Transition_frontier_inputs
+    module Transition_frontier = Transition_frontier
+  end)
+
   module Breadcrumb_visualizations = struct
     module Graph =
       Visualization.Make_ocamlgraph (Transition_frontier.Breadcrumb)

@@ -96,3 +96,8 @@ module Make (Inputs : Inputs_intf) :
       ~transition_chain_witness:(oldest_state_hash, merkle_list) =
     Merkle_list.verify ~init:oldest_state_hash merkle_list state_hash
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+end)
