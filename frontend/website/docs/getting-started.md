@@ -73,4 +73,4 @@ If these commands succeed, you will have successfully forwarded ports `8301-8304
 
 If so, [find your router model](https://portforward.com/router.htm) and follow the instructions to forward TCP ports `8301-8304` from your router to your device running the Coda node.
 
-Now that you've installed the Coda binary and configured settings, let's move on to the fun part - [sending a transaction](/my-first-transaction)!
+Now that you've installed the Coda binary and configured settings, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!

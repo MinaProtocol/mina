@@ -12,6 +12,7 @@ module Styles = {
           display(`flex),
           marginTop(rem(2.)),
           marginBottom(`rem(0.5)),
+          color(Style.Colors.marine),
           hover([selector(".headerlink", [display(`inlineBlock)])]),
         ],
       ),
@@ -30,7 +31,12 @@ module Styles = {
       ),
       selector(
         "h1",
-        Style.H1.heroStyles @ [alignItems(`baseline), fontWeight(`normal)],
+        Style.H1.heroStyles
+        @ [
+          color(Style.Colors.teal),
+          alignItems(`baseline),
+          fontWeight(`normal),
+        ],
       ),
       selector("h2", Style.H2.basicStyles @ [alignItems(`baseline)]),
       selector(
@@ -131,17 +137,46 @@ module Styles = {
     style([
       minWidth(rem(15.)),
       selector("ul", [listStyleType(`none)]),
+      selector("ul:first-child", [marginLeft(`zero)]),
       selector("li > ul", [marginLeft(rem(1.))]),
       selector("li", [marginBottom(rem(0.5))]),
+      selector(
+        ".current > a",
+        [
+          position(`relative),
+          fontWeight(`bold),
+          before([
+            position(`absolute),
+            left(rem(-0.75)),
+            contentRule("\\2022 "),
+          ]),
+        ],
+      ),
       selector("ul > li > ul", [marginTop(rem(0.5))]),
-      selector("input + ul", [display(`none)]),
-      selector("input:checked + ul", [display(`block)]),
+      selector("input ~ ul", [display(`none)]),
+      selector("input:checked ~ ul", [display(`block)]),
+      selector(
+        "li > label",
+        [
+          display(`flex),
+          alignItems(`center),
+          justifyContent(`spaceBetween),
+        ],
+      ),
+      selector("label > img", [opacity(0.7), transform(rotate(`deg(0)))]),
+      selector(
+        "input:checked ~ label > img",
+        [transform(rotate(`deg(-180)))],
+      ),
       media(
         Style.MediaQuery.somewhatLarge,
         [marginRight(rem(2.)), marginTop(rem(3.))],
       ),
     ]);
 };
+
+// We need to calculate the CDN url and inject it into the template
+let chevronUrl = Links.Cdn.url("/static/img/chevron-down.svg")
 
 let component = ReasonReact.statelessComponent("Blog");
 
@@ -167,20 +202,24 @@ let make = _children => {
       <aside
         className=Styles.sideNav
         dangerouslySetInnerHTML={
-          "__html": {|
+          "__html": {j|
             {% if nav|length>1 %}
               <ul>
               {% for nav_item in nav %}
                 {% if nav_item.children %}
                   <li>
-                    <label for="{{ nav_item.title }}-toggle">
-                      {{ nav_item.title }}
-                    </label>
                     <input
                       type="checkbox"
+                      {% if nav_item.children|map(attribute='active')|sort|last %}
+                        checked
+                      {% endif %}
                       style="display:none"
-                      id="{{ nav_item.title }}-toggle"
+                      id="{{nav_item.title|replace(" ", "_") }}-toggle"
                     />
+                    <label for="{{nav_item.title|replace(" ", "_") }}-toggle">
+                      {{ nav_item.title }}
+                      <img src="$chevronUrl" width="16" height="16" />
+                    </label>
                     <ul>
                     {% for nav_item in nav_item.children %}
                       <li class="{% if nav_item.active%}current{% endif %}">
@@ -197,7 +236,7 @@ let make = _children => {
               {% endfor %}
               </ul>
             {% endif %}
-          |},
+          |j},
         }
       />
       <article
