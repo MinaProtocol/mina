@@ -8,7 +8,7 @@ open Fold_lib
 open Signature_lib
 open Module_version
 module Time = Coda_base.Block_time
-module Run = Snarky.Snark.Run.Make (Snark_params.Tick_backend) (Unit)
+module Run = Snark_params.Tick.Run
 
 let m : Run.field Snarky.Snark.m = (module Run)
 
