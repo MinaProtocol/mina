@@ -38,7 +38,7 @@ The newest binary releases can be found [here](). With the exception of the .exe
 
 Windows is not yet supported - there is [grant funding available]() for adding Windows support.
 
-To build from source code, please follow [the instructions in the Coda protocol repo](https://github.com/CodaProtocol/coda/blob/master/README-dev.md#building-coda)
+To build from source code, please follow [the instructions in the Coda protocol repo](https://github.com/CodaProtocol/coda/blob/master/README-dev.md#building-coda).
 
 ## Port forwarding
 

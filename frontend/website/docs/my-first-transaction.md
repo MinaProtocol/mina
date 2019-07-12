@@ -1,6 +1,6 @@
 # My First Transaction
 
-In this section, we'll make our first transaction on the Coda network. After setting up `coda.exe`, we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
+In this section, we'll make our first transaction on the Coda network. After [setting up `coda.exe`](../getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
 
 ## Start up a node
 
@@ -102,4 +102,4 @@ We'll get a response that looks like this:
     balance is ___
     ...
 
-Once you feel comfortable with the basics of creating an address, and sending & receiving coda, we can move on to the truly unique parts of the Coda network - [participating in consensus and helping compress the blockchain](/docs/node-operator/).
+Once you feel comfortable with the basics of creating an address, and sending & receiving coda, we can move on to the truly unique parts of the Coda network - [participating in consensus and helping compress the blockchain](/node-operator).

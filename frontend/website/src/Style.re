@@ -32,7 +32,6 @@ module Colors = {
   let slate = `hsl((209, 20, 40));
   let slateAlpha = a => `hsla((209, 20, 40, a));
 
-  let marine = `hex("336897");
   let navy = `rgb((0, 49, 90));
   let navyBlue = `rgb((0, 23, 74));
   let navyBlueAlpha = a => `rgba((0, 23, 74, a));
