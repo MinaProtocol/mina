@@ -34,7 +34,7 @@ struct
     >>| Field.Var.project
 
   let make_checked f =
-    M.make_checked f |> Checked.with_state (Impl.As_prover.return ())
+    M.make_checked f |> M.Internal_Basic.with_state (Impl.As_prover.return ())
 
   let group_map x =
     make_checked (fun () ->
@@ -225,7 +225,7 @@ let%test_module "test" =
       in
       Quickcheck.test ~trials:3 input ~f:(fun (message_length, inp) ->
           let typ =
-            let open Typ in
+            let open Impl.Typ in
             of_hlistable
               [ array ~length:message_length Impl.Boolean.typ
               ; Curve.Checked.typ

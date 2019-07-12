@@ -171,7 +171,16 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
           return (Coda_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
         (fun () filename -> return (Coda_base.Ledger.Debug.visualize ~filename)
-      ) ]
+      )
+    ; implement Daemon_rpcs.Set_staking.rpc (fun () keypairs ->
+          let keypair_and_compressed_key =
+            List.map keypairs
+              ~f:(fun ({Keypair.Stable.Latest.public_key; _} as keypair) ->
+                (keypair, Public_key.compress public_key) )
+          in
+          Coda_lib.replace_propose_keypairs coda
+            (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
+          Deferred.unit ) ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
