@@ -160,7 +160,7 @@ module Transport = struct
 
       let create ~directory ~max_size =
         if not (Result.is_ok (access directory [`Exists])) then
-          mkdir_p ~perm:log_perm directory ;
+          mkdir_p ~perm:0o755 directory ;
         if not (Result.is_ok (access directory [`Exists; `Read; `Write])) then
           failwithf
             "cannot create log files: read/write permissions required on %s"
