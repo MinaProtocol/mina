@@ -154,13 +154,22 @@ let daemon logger =
              let fullname = Filename.concat dirname basename in
              match Core.Sys.is_directory fullname with
              | `Yes ->
-                 Core.Sys.ls_dir fullname
-                 |> List.map ~f:(all_files fullname)
-                 |> List.concat
+                 let dirs, files =
+                   Core.Sys.ls_dir fullname
+                   |> List.map ~f:(all_files fullname)
+                   |> List.unzip
+                 in
+                 let dirs =
+                   if String.equal dirname conf_dir then List.concat dirs
+                   else List.append (List.concat dirs) [fullname]
+                 in
+                 (dirs, List.concat files)
              | _ ->
-                 [fullname]
+                 ([], [fullname])
            in
-           List.iter (all_files dir "") ~f:(fun file -> Core.Sys.remove file)
+           let dirs, files = all_files dir "" in
+           List.iter files ~f:(fun file -> Core.Sys.remove file) ;
+           List.iter dirs ~f:(fun file -> Core.Unix.rmdir file)
          in
          let clean_up () =
            let () = del_files conf_dir in
