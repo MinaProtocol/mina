@@ -88,7 +88,7 @@ val create_value :
   -> unit
   -> Value.t
 
-val genesis : Value.t
+val genesis : Value.t Lazy.t
 
 val blockchain_state : ('a, _, _, _, _) Poly.t -> 'a
 

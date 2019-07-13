@@ -81,7 +81,7 @@ jobs:
 
     build-macos:
        macos:
-           xcode: "10.1.0"
+           xcode: "10.2.1"
        working_directory: /Users/distiller/coda
        environment:
            HOMEBREW_LOGS: /Users/distiller/homebrew.log
@@ -120,6 +120,9 @@ jobs:
            - run:
                  name: Build OCaml
                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                 no_output_timeout: 1h
+                 environment: 
+                  DUNE_PROFILE: testnet_postake_medium_curves
            - run:
                  name: Record Constraint System Digests
                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
@@ -127,17 +130,8 @@ jobs:
                  name: Run all tests (on master)
                  command: echo "FIXME Tests not yet working on mac"
            - run: 
-                 name: Create Portable Binary
-                 command: ./scripts/skip_if_only_frontend.sh make macos-portable
-           - run: 
-                 name: Install JFrog CLI
-                 command: ./scripts/skip_if_only_frontend.sh bash -c 'curl -fL https://getcli.jfrog.io | sh'
-           - run: 
-                 name: Configure JFrog CLI
-                 command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt config --url $ARTIFACTORY_URL --user $ARTIFACTORY_USER --apikey $ARTIFACTORY_API_KEY --interactive=false'
-           - run: 
-                 name: Release Build to Artifactory
-                 command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt u _build/coda-daemon-macos.zip macos-coda/coda-daemon-$CIRCLE_BUILD_NUM.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM'
+                 name: Publish to Artifactory
+                 command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
@@ -160,9 +154,15 @@ jobs:
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
             - run:
                   name: Build deb Package with keys
                   command: ./scripts/skip_if_only_frontend.sh make deb
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
             - run:
                   name: Store Generated Proving and Verifying Keys
                   command: ./scripts/skip_if_only_frontend.sh make provingkeys
@@ -198,7 +198,24 @@ jobs:
                 path: core_dumps
     {%- endfor %}
 
-    {%- for profile in test_permutations.keys() | sort %}
+    {%- for profile in unit_test_profiles_medium_curves %}
+    test-unit--{{profile}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: ulimit -c unlimited
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 1h
+            - store_artifacts:
+                path: core_dumps
+    {%- endfor %}
+
+    {%- for profile in small_curves_tests.keys() | sort %}
     test--{{profile}}:
         resource_class: large
         docker:
@@ -206,10 +223,30 @@ jobs:
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
-            {%- for test in test_permutations[profile] %}
+            {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+            {%- endfor %}
+            - store_artifacts:
+                  path: test_logs
+    {%- endfor %}
+
+    {%- for profile in medium_curves_tests.keys() | sort %}
+    test--{{profile}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            {%- for test in medium_curves_tests[profile] %}
+            - run:
+                  name: Running test -- {{profile}}:{{test}}
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
             {%- endfor %}
             - store_artifacts:
                   path: test_logs
@@ -233,6 +270,22 @@ workflows:
             {%- for profile in unit_test_profiles %}
             - test-unit--{{profile}}
             {%- endfor %}
-            {%- for profile in test_permutations.keys() | sort %}
+            {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
+    daily:
+        triggers:
+          - schedule:
+              cron: "0 12 * * *"
+              filters:
+                branches:
+                  only:
+                    - master
+                    - release/beta
+        jobs:
+          {%- for profile in unit_test_profiles_medium_curves %}
+          - test-unit--{{profile}}
+          {%- endfor %}
+          {%- for profile in medium_curves_tests.keys() | sort %}
+          - test--{{profile}}
+          {%- endfor %}
