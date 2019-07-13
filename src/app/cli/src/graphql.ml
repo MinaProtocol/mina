@@ -26,8 +26,6 @@ let result_field_no_inputs ~resolve =
       Deferred.return @@ resolve resolve_info src )
 
 module Doc = struct
-  let uint64 = sprintf !"%s (stringified uint64)"
-
   let date =
     sprintf
       !"%s (stringified Unix time - number of milliseconds since January 1, \
@@ -87,9 +85,6 @@ module Types = struct
   open Schema
 
   module Stringable = struct
-    (** base58 representation of public key that is compressed to make snark computation efficent *)
-    let public_key = Public_key.Compressed.to_base58_check
-
     (** string representation of IPv4 or IPv6 address *)
     let ip_address = Unix.Inet_addr.to_string
 
@@ -102,16 +97,6 @@ module Types = struct
           None
       | Banned_until tm ->
           Some (date tm)
-
-    (** Javascript only has 53-bit integers so we need to make them into strings  *)
-    let uint64 uint64 = Unsigned.UInt64.to_string uint64
-
-    (** Balance of Coda (a uint64 under the hood) *)
-    let balance b = Balance.to_uint64 b |> uint64
-
-    let fee fee = uint64 @@ Currency.Fee.to_uint64 fee
-
-    let amount amount = uint64 @@ Currency.Amount.to_uint64 amount
 
     module State_hash = Codable.Make_base58_check (State_hash.Stable.V1)
     module Ledger_hash = Codable.Make_base58_check (Ledger_hash.Stable.V1)
@@ -133,15 +118,13 @@ module Types = struct
       Base58_check.encode (Bigstring.to_string bigstring)
   end
 
-  let uint64_arg name ~doc ~typ =
-    let open Schema.Arg in
-    arg name ~typ ~doc:(Doc.uint64 doc)
+  let public_key =
+    scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
+      ~coerce:(fun key -> `String (Public_key.Compressed.to_base58_check key))
 
-  let uint64_field name ~doc =
-    field name ~typ:(non_null string) ~doc:(Doc.uint64 doc)
-
-  let uint64_result_field name ~doc =
-    result_field_no_inputs name ~typ:(non_null string) ~doc:(Doc.uint64 doc)
+  let uint64 =
+    scalar "UInt64" ~doc:"String representing a uint64 number in base 10"
+      ~coerce:(fun num -> `String (Unsigned.UInt64.to_string num))
 
   let sync_status : ('context, [`Offline | `Synced | `Bootstrap] option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
@@ -226,8 +209,8 @@ module Types = struct
                ~sync_status:(id ~typ:(non_null sync_status))
                ~propose_pubkeys:
                  (Reflection.reflect
-                    ~typ:Schema.(non_null @@ list (non_null string))
-                    (List.map ~f:Stringable.public_key))
+                    ~typ:Schema.(non_null @@ list (non_null public_key))
+                    Fn.id)
                ~histograms:(id ~typ:histograms) ~consensus_time_best_tip:string
                ~consensus_time_now:nn_string ~consensus_mechanism:nn_string
                ~consensus_configuration:
@@ -236,7 +219,7 @@ module Types = struct
 
   let user_command : (Coda_lib.t, User_command.t option) typ =
     obj "UserCommand" ~fields:(fun _ ->
-        [ field "id" ~typ:(non_null string)
+        [ field "id" ~typ:(non_null guid)
             ~args:Arg.[]
             ~resolve:(fun _ user_command -> Id.user_command user_command)
         ; field "isDelegation" ~typ:(non_null bool)
@@ -257,21 +240,22 @@ module Types = struct
             ~resolve:(fun _ payment ->
               User_command_payload.nonce @@ User_command.payload payment
               |> Account.Nonce.to_int )
-        ; field "from" ~typ:(non_null string) ~doc:"Public key of the sender"
+        ; field "from" ~typ:(non_null public_key)
+            ~doc:"Public key of the sender"
             ~args:Arg.[]
-            ~resolve:(fun _ payment ->
-              User_command.sender payment |> Stringable.public_key )
-        ; field "to" ~typ:(non_null string) ~doc:"Public key of the receiver"
+            ~resolve:(fun _ payment -> User_command.sender payment)
+        ; field "to" ~typ:(non_null public_key)
+            ~doc:"Public key of the receiver"
             ~args:Arg.[]
             ~resolve:(fun _ payment ->
               match
                 User_command_payload.body (User_command.payload payment)
               with
               | Payment {Payment_payload.Poly.receiver; _} ->
-                  Stringable.public_key receiver
+                  receiver
               | Stake_delegation (Set_delegate {new_delegate}) ->
-                  Stringable.public_key new_delegate )
-        ; uint64_result_field "amount"
+                  new_delegate )
+        ; result_field_no_inputs "amount" ~typ:(non_null uint64)
             ~doc:
               "Amount that sender is sending to receiver - this is 0 for \
                delegations"
@@ -281,16 +265,15 @@ module Types = struct
                 User_command_payload.body (User_command.payload payment)
               with
               | Payment {Payment_payload.Poly.amount; _} ->
-                  Ok (amount |> Currency.Amount.to_uint64 |> Stringable.uint64)
+                  Ok (amount |> Currency.Amount.to_uint64)
               | Stake_delegation _ ->
                   (* Stake delegation does not have an amount, so we set it to 0 *)
-                  Ok "0" )
-        ; uint64_field "fee"
+                  Ok Unsigned.UInt64.zero )
+        ; field "fee" ~typ:(non_null uint64)
             ~doc:"Fee that sender is willing to pay for making the transaction"
             ~args:Arg.[]
             ~resolve:(fun _ payment ->
-              User_command.fee payment |> Currency.Fee.to_uint64
-              |> Stringable.uint64 )
+              User_command.fee payment |> Currency.Fee.to_uint64 )
         ; field "memo" ~typ:(non_null string)
             ~doc:"Short arbitrary message provided by the sender"
             ~args:Arg.[]
@@ -302,12 +285,13 @@ module Types = struct
     obj "FeeTransfer" ~fields:(fun _ ->
         [ field "recipient"
             ~args:Arg.[]
-            ~doc:"Public key of fee transfer recipient" ~typ:(non_null string)
-            ~resolve:(fun _ (pk, _) -> Stringable.public_key pk)
-        ; uint64_field "fee"
-            ~doc:"Amount that the recipient is paid in this fee transfer"
+            ~doc:"Public key of fee transfer recipient"
+            ~typ:(non_null public_key)
+            ~resolve:(fun _ (pk, _) -> pk)
+        ; field "fee" ~typ:(non_null uint64)
             ~args:Arg.[]
-            ~resolve:(fun _ (_, fee) -> Stringable.fee fee) ] )
+            ~doc:"Amount that the recipient is paid in this fee transfer"
+            ~resolve:(fun _ (_, fee) -> Currency.Fee.to_uint64 fee) ] )
 
   let transactions =
     let open Filtered_external_transition.Transactions in
@@ -325,10 +309,11 @@ module Types = struct
             ~typ:(non_null @@ list @@ non_null fee_transfer)
             ~args:Arg.[]
             ~resolve:(fun _ {fee_transfers; _} -> fee_transfers)
-        ; uint64_field "coinbase"
+        ; field "coinbase" ~typ:(non_null uint64)
             ~doc:"Amount of coda granted to the producer of this block"
             ~args:Arg.[]
-            ~resolve:(fun _ {coinbase; _} -> Stringable.amount coinbase) ] )
+            ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
+        ] )
 
   let blockchain_state =
     obj "BlockchainState" ~fields:(fun _ ->
@@ -371,11 +356,10 @@ module Types = struct
       typ =
     let open Filtered_external_transition in
     obj "Block" ~fields:(fun _ ->
-        [ field "creator" ~typ:(non_null string)
+        [ field "creator" ~typ:(non_null public_key)
             ~doc:"Public key of account that produced this block"
             ~args:Arg.[]
-            ~resolve:(fun _ {With_hash.data; _} ->
-              Stringable.public_key data.creator )
+            ~resolve:(fun _ {With_hash.data; _} -> data.creator)
         ; field "stateHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the state after this block"
             ~args:Arg.[]
@@ -393,12 +377,6 @@ module Types = struct
       ~doc:"Status for whenever the blockchain is reorganized"
       ~values:[enum_value "CHANGED" ~value:`Changed]
 
-  let pubkey_field ~resolve =
-    field "publicKey" ~typ:(non_null string)
-      ~doc:"The public identity of a wallet"
-      ~args:Arg.[]
-      ~resolve
-
   module Wallet = struct
     module AnnotatedBalance = struct
       type t = {total: Balance.t; unknown: Balance.t}
@@ -408,17 +386,16 @@ module Types = struct
           ~doc:
             "A total balance annotated with the amount that is currently \
              unknown with the invariant: unknown <= total" ~fields:(fun _ ->
-            [ field "total" ~typ:(non_null string)
-                ~doc:
-                  "The amount of coda owned by the account (stringified uint64)"
+            [ field "total" ~typ:(non_null uint64)
+                ~doc:"The amount of coda owned by the account"
                 ~args:Arg.[]
-                ~resolve:(fun _ (b : t) -> Stringable.balance b.total)
-            ; field "unknown" ~typ:(non_null string)
+                ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.total)
+            ; field "unknown" ~typ:(non_null uint64)
                 ~doc:
                   "The amount of coda owned by the account whose origin is \
-                   currently unknown (stringified uint64)"
+                   currently unknown"
                 ~args:Arg.[]
-                ~resolve:(fun _ (b : t) -> Stringable.balance b.unknown) ] )
+                ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.unknown) ] )
     end
 
     (** Hack: Account.Poly.t is only parameterized over 'pk once and so, in
@@ -440,9 +417,11 @@ module Types = struct
     let wallet =
       obj "Wallet" ~doc:"An account record according to the daemon"
         ~fields:(fun _ ->
-          [ pubkey_field ~resolve:(fun _ {account; _} ->
-                Stringable.public_key
-                @@ Option.value_exn account.Account.Poly.public_key )
+          [ field "publicKey" ~typ:(non_null public_key)
+              ~doc:"The public identity of a wallet"
+              ~args:Arg.[]
+              ~resolve:(fun _ {account; _} ->
+                Option.value_exn account.Account.Poly.public_key )
           ; field "balance"
               ~typ:(non_null AnnotatedBalance.obj)
               ~doc:"The amount of coda owned by the account"
@@ -462,14 +441,12 @@ module Types = struct
               ~resolve:(fun _ {account; _} ->
                 Option.map ~f:Receipt.Chain_hash.to_string
                   account.Account.Poly.receipt_chain_hash )
-          ; field "delegate" ~typ:string
+          ; field "delegate" ~typ:public_key
               ~doc:
                 "The public key to which you are delegating - if you are not \
                  delegating to anybody, this would return your public key"
               ~args:Arg.[]
-              ~resolve:(fun _ {account; _} ->
-                Option.map ~f:Stringable.public_key
-                  account.Account.Poly.delegate )
+              ~resolve:(fun _ {account; _} -> account.Account.Poly.delegate)
           ; field "votingFor" ~typ:string
               ~doc:
                 "The previous epoch lock hash of the chain which you are \
@@ -493,33 +470,30 @@ module Types = struct
 
   let snark_worker =
     obj "SnarkWorker" ~fields:(fun _ ->
-        [ field "key" ~typ:(non_null string)
+        [ field "key" ~typ:(non_null public_key)
             ~doc:"Public key of current snark worker"
             ~args:Arg.[]
-            ~resolve:(fun (_ : Coda_lib.t resolve_info) (key, _) ->
-              Stringable.public_key key )
-        ; field "fee" ~typ:(non_null string)
-            ~doc:
-              "Fee that snark worker is charging to generate a snark proof \
-               (stringified uint64)"
+            ~resolve:(fun (_ : Coda_lib.t resolve_info) (key, _) -> key)
+        ; field "fee" ~typ:(non_null uint64)
+            ~doc:"Fee that snark worker is charging to generate a snark proof"
             ~args:Arg.[]
             ~resolve:(fun (_ : Coda_lib.t resolve_info) (_, fee) ->
-              Stringable.uint64 (Currency.Fee.to_uint64 fee) ) ] )
+              Currency.Fee.to_uint64 fee ) ] )
 
   module Payload = struct
     let add_wallet : (Coda_lib.t, Account.key sexp_option) typ =
       obj "AddWalletPayload" ~fields:(fun _ ->
-          [ field "publicKey" ~typ:(non_null string)
+          [ field "publicKey" ~typ:(non_null public_key)
               ~doc:"Public key of the newly-created wallet"
               ~args:Arg.[]
-              ~resolve:(fun _ key -> Stringable.public_key key) ] )
+              ~resolve:(fun _ -> Fn.id) ] )
 
     let delete_wallet =
       obj "DeleteWalletPayload" ~fields:(fun _ ->
-          [ field "publicKey" ~typ:(non_null string)
+          [ field "publicKey" ~typ:(non_null public_key)
               ~doc:"Public key of the deleted wallet"
               ~args:Arg.[]
-              ~resolve:(fun _ key -> Stringable.public_key key) ] )
+              ~resolve:(fun _ -> Fn.id) ] )
 
     let trust_status =
       obj "TrustStatusPayload" ~fields:(fun _ ->
@@ -562,18 +536,12 @@ module Types = struct
               ~doc:
                 "Returns the last wallet public keys that were staking before \
                  or empty if there were none"
-              ~typ:(non_null (list (non_null string)))
+              ~typ:(non_null (list (non_null public_key)))
               ~args:Arg.[]
-              ~resolve:(fun _ keys -> List.map ~f:Stringable.public_key keys)
-          ] )
+              ~resolve:(fun _ -> Fn.id) ] )
   end
 
   module Arguments = struct
-    let public_key ~name public_key =
-      result_of_or_error
-        (Public_key.Compressed.of_base58_check public_key)
-        ~error:(sprintf !"%s address is not valid." name)
-
     let ip_address ~name ip_addr =
       result_of_exn Unix.Inet_addr.of_string ip_addr
         ~error:(sprintf !"%s is not valid." name)
@@ -582,14 +550,38 @@ module Types = struct
   module Input = struct
     open Schema.Arg
 
+    let public_key_arg =
+      scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
+        ~coerce:(fun key ->
+          match key with
+          | `String s ->
+              Public_key.Compressed.of_base58_check s
+              |> Result.map_error ~f:(fun _ -> "Could not decode public key.")
+          | _ ->
+              Error "Invalid format for public key." )
+
+    let uint64_arg =
+      scalar "UInt64" ~doc:"String representing a uint64 number in base 10"
+        ~coerce:(fun key ->
+          match key with
+          | `String s ->
+              result_of_exn Unsigned.UInt64.of_string s
+                ~error:"Could not decode uint64."
+          | `Int n ->
+              if n < 0 then
+                Error "Could not convert negative number to uint64."
+              else Ok (Unsigned.UInt64.of_int n)
+          | _ ->
+              Error "Invalid format for public key." )
+
     module Fields = struct
-      let from ~doc = arg "from" ~typ:(non_null string) ~doc
+      let from ~doc = arg "from" ~typ:(non_null public_key_arg) ~doc
 
-      let to_ ~doc = arg "to" ~typ:(non_null string) ~doc
+      let to_ ~doc = arg "to" ~typ:(non_null public_key_arg) ~doc
 
-      let fee ~doc = uint64_arg "fee" ~typ:(non_null string) ~doc
+      let fee ~doc = arg "fee" ~typ:(non_null uint64_arg) ~doc
 
-      let memo ~doc = uint64_arg "memo" ~typ:string ~doc
+      let memo ~doc = arg "memo" ~typ:string ~doc
     end
 
     let send_payment =
@@ -599,8 +591,8 @@ module Types = struct
         ~fields:
           [ from ~doc:"Public key of recipient of payment"
           ; to_ ~doc:"Public key of sender of payment"
-          ; uint64_arg "amount" ~doc:"Amount of coda to send to to receiver"
-              ~typ:(non_null string)
+          ; arg "amount" ~doc:"Amount of coda to send to to receiver"
+              ~typ:(non_null uint64_arg)
           ; fee ~doc:"Fee amount in order to send payment"
           ; memo ~doc:"Short arbitrary message provided by the sender" ]
 
@@ -618,37 +610,37 @@ module Types = struct
       obj "DeleteWalletInput" ~coerce:Fn.id
         ~fields:
           [ arg "publicKey" ~doc:"Public key of account to be deleted"
-              ~typ:(non_null string) ]
+              ~typ:(non_null public_key_arg) ]
 
     let reset_trust_status =
       obj "ResetTrustStatusInput" ~coerce:Fn.id
         ~fields:[arg "ipAddress" ~typ:(non_null string)]
 
     (* TODO: Treat cases where filter_input has a null argument *)
-    let filter_input ~title ~arg_name ~arg_doc =
-      obj title ~coerce:Fn.id
-        ~fields:[arg arg_name ~doc:arg_doc ~typ:(non_null string)]
-
     let block_filter_input =
-      filter_input ~title:"BlockFilterInput" ~arg_name:"relatedTo"
-        ~arg_doc:"A public key of an user who has their transaction in a block"
+      obj "BlockFilterInput" ~coerce:Fn.id
+        ~fields:
+          [ arg "relatedTo"
+              ~doc:
+                "A public key of a user who has their\n\
+                \        transaction in the block, or produced the block"
+              ~typ:(non_null public_key_arg) ]
 
     let user_command_filter_input =
-      obj "UserCommandFilterType"
-        ~coerce:(fun public_key -> public_key)
+      obj "UserCommandFilterType" ~coerce:Fn.id
         ~fields:
           [ arg "toOrFrom"
               ~doc:
                 "Public key of sender or receiver of transactions you are \
                  looking for"
-              ~typ:(non_null string) ]
+              ~typ:(non_null public_key_arg) ]
 
     let set_staking =
       obj "SetStakingInput"
         ~coerce:(fun wallets -> wallets)
         ~fields:
           [ arg "wallets"
-              ~typ:(non_null (list (non_null string)))
+              ~typ:(non_null (list (non_null public_key_arg)))
               ~doc:
                 "Public keys of wallets you wish to stake - these must be \
                  wallets that are in ownedWallets" ]
@@ -734,7 +726,7 @@ module Types = struct
 
       val get_database : Coda_lib.t -> Pagination_database.t
 
-      val filter_argument : string option Schema.Arg.arg_typ
+      val filter_argument : Account.key option Schema.Arg.arg_typ
 
       val query_name : string
 
@@ -818,10 +810,6 @@ module Types = struct
           ~resolve:(fun {ctx= coda; _} () public_key first after last before ->
             let open Deferred.Result.Let_syntax in
             let%map result, total_counts =
-              let%bind public_key =
-                Deferred.return
-                @@ Arguments.public_key ~name:"publicKey" public_key
-              in
               let database = get_database coda in
               let resolve_cursor = function
                 | None ->
@@ -1033,14 +1021,10 @@ module Subscriptions = struct
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key that is included in the block"
-              ~typ:(non_null string) ]
+              ~typ:(non_null Types.Input.public_key_arg) ]
       ~resolve:(fun {ctx= coda; _} public_key ->
-        let open Deferred.Result.Let_syntax in
-        let%map public_key =
-          Deferred.return
-          @@ Types.Arguments.public_key ~name:"publicKey" public_key
-        in
-        Coda_commands.Subscriptions.new_block coda public_key )
+        Deferred.Result.return
+        @@ Coda_commands.Subscriptions.new_block coda public_key )
 
   let chain_reorganization =
     subscription_field "chainReorganization"
@@ -1078,19 +1062,13 @@ module Mutations = struct
       ~doc:"Delete a wallet that you own based on its public key"
       ~typ:(non_null Types.Payload.delete_wallet)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.delete_wallet)]
-      ~resolve:(fun {ctx= coda; _} () public_key_input ->
+      ~resolve:(fun {ctx= coda; _} () public_key ->
         let open Deferred.Result.Let_syntax in
-        let%bind public_key =
-          Deferred.return
-          @@ Types.Arguments.public_key ~name:"public_key" public_key_input
-        in
         let wallets = Coda_lib.wallets coda in
         let%map () =
           Deferred.Result.map_error
             ~f:(fun `Not_found ->
-              sprintf
-                !"Could not find wallet with public key: %s"
-                public_key_input )
+              "Could not find wallet with specified public key" )
             (Secrets.Wallets.delete wallets public_key)
         in
         public_key )
@@ -1125,20 +1103,18 @@ module Mutations = struct
 
   let parse_user_command_input ~kind coda from to_ fee maybe_memo =
     let open Result.Let_syntax in
-    let%bind receiver = Types.Arguments.public_key ~name:"to" to_ in
-    let%bind sender = Types.Arguments.public_key ~name:"from" from in
     let%bind sender_account =
       Result.of_option
-        Partial_account.(of_pk coda sender |> to_full_account)
+        Partial_account.(of_pk coda from |> to_full_account)
         ~error:"Couldn't find the account for specified `sender`."
     in
     let%bind fee =
-      result_of_exn Currency.Fee.of_string fee
+      result_of_exn Currency.Fee.of_uint64 fee
         ~error:(sprintf "Invalid %s `fee` provided." kind)
     in
     let%bind sender_kp =
       Result.of_option
-        (Secrets.Wallets.find (Coda_lib.wallets coda) ~needle:sender)
+        (Secrets.Wallets.find (Coda_lib.wallets coda) ~needle:from)
         ~error:
           (sprintf
              "Couldn't find the private key for specified `sender`. Do you \
@@ -1151,7 +1127,7 @@ module Mutations = struct
           result_of_exn User_command_memo.create_by_digesting_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
-    (sender_account, sender_kp, memo, receiver, fee)
+    (sender_account, sender_kp, memo, to_, fee)
 
   let send_delegation =
     io_field "sendDelegation"
@@ -1177,17 +1153,15 @@ module Mutations = struct
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.send_payment)]
       ~resolve:(fun {ctx= coda; _} () (from, to_, amount, fee, maybe_memo) ->
         let open Deferred.Result.Let_syntax in
-        let%bind amount =
-          Deferred.return
-          @@ result_of_exn Currency.Amount.of_string amount
-               ~error:"Invalid payment `amount` provided."
-        in
         let%bind sender_account, sender_kp, memo, receiver, fee =
           Deferred.return
           @@ parse_user_command_input ~kind:"payment" coda from to_ fee
                maybe_memo
         in
-        let body = User_command_payload.Body.Payment {receiver; amount} in
+        let body =
+          User_command_payload.Body.Payment
+            {receiver; amount= Amount.of_uint64 amount}
+        in
         build_user_command coda sender_account sender_kp memo body fee )
 
   let add_payment_receipt =
@@ -1212,35 +1186,16 @@ module Mutations = struct
         Some payment )
 
   let set_staking =
-    result_field "setStaking"
+    field "setStaking"
       ~doc:
         "Set keys you wish to stake with - silently fails if you pass keys \
          not tracked in ownedWallets"
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_staking)]
       ~typ:(non_null Types.Payload.set_staking)
-      ~resolve:(fun {ctx= coda; _} () pk_strings ->
-        let open Result.Let_syntax in
+      ~resolve:(fun {ctx= coda; _} () pks ->
         (* TODO: Handle errors like: duplicates, etc *)
-        let%map pks =
-          List.fold pk_strings ~init:(Result.return [])
-            ~f:(fun acc pk_string ->
-              let%bind acc = acc in
-              let%map pk =
-                Types.Arguments.public_key ~name:"wallets" pk_string
-              in
-              pk :: acc )
-        in
-        let kps =
-          List.filter_map pks ~f:(fun pk ->
-              let open Option.Let_syntax in
-              let%map kps =
-                Coda_lib.wallets coda |> Secrets.Wallets.find ~needle:pk
-              in
-              (kps, pk) )
-        in
         let old_propose_keys = Coda_lib.propose_public_keys coda in
-        Coda_lib.replace_propose_keypairs coda
-          (Keypair.And_compressed_pk.Set.of_list kps) ;
+        ignore @@ Coda_commands.replace_proposers coda pks ;
         Public_key.Compressed.Set.to_list old_propose_keys )
 
   let commands =
@@ -1256,16 +1211,14 @@ module Queries = struct
   open Schema
 
   let pooled_user_commands =
-    result_field "pooledUserCommands"
+    field "pooledUserCommands"
       ~doc:"Retrieve all the user commands sent by a public key"
       ~typ:(non_null @@ list @@ non_null Types.user_command)
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of sender of pooled user commands"
-              ~typ:(non_null string) ]
-      ~resolve:(fun {ctx= coda; _} () pk_string ->
-        let open Result.Let_syntax in
-        let%map pk = Types.Arguments.public_key ~name:"publicKey" pk_string in
+              ~typ:(non_null Types.Input.public_key_arg) ]
+      ~resolve:(fun {ctx= coda; _} () pk ->
         let transaction_pool = Coda_lib.transaction_pool coda in
         List.map
           (Network_pool.Transaction_pool.Resource_pool.all_from_user
@@ -1326,19 +1279,14 @@ module Queries = struct
                ; path= Secrets.Wallets.get_path wallets pk } ) )
 
   let wallet =
-    result_field "wallet" ~doc:"Find any wallet via a public key"
-      ~typ:
-        Types.Wallet.wallet
-        (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
+    field "wallet" ~doc:"Find any wallet via a public key"
+      ~typ:Types.Wallet.wallet
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of wallet being retrieved"
-              ~typ:(non_null string) ]
-      ~resolve:(fun {ctx= coda; _} () (pk_string : string) ->
-        let open Result.Let_syntax in
+              ~typ:(non_null Types.Input.public_key_arg) ]
+      ~resolve:(fun {ctx= coda; _} () pk ->
         let propose_public_keys = Coda_lib.propose_public_keys coda in
-        let%map pk = Types.Arguments.public_key ~name:"publicKey" pk_string in
-        (* TODO: return null if the pubkey is not a valid base58check key *)
         Some
           { Types.Wallet.account= Partial_account.of_pk coda pk
           ; is_actively_staking=

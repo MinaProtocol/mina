@@ -1,3 +1,6 @@
+scalar UInt64
+scalar PublicKey
+
 type Interval {
   start: String! # timespan
   end: String! # timespan
@@ -51,11 +54,11 @@ type DaemonStatus {
   stateHash: String
   commitId: String! # git sha
   confDir: String!
-  peers: [String!]!
+  peers: [PublicKey!]!
   userCommandsSent: Int!
   runSnarkWorker: Boolean!
   syncStatus: SyncStatus!
-  proposePubkeys: [String!]! @examples(values: [["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]])
+  proposePubkeys: [PublicKey!]! @examples(values: [["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]])
   histograms: Histograms
   consensusTimeBestTip: String
   consensusTimeNow: String!
@@ -74,24 +77,24 @@ enum ChainReorganizationStatus {
 }
 
 type SnarkWorker {
-  key: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: String! @fake(type: number)
+  key: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  fee: UInt64! @fake(type: number)
 }
 
 type UserCommand {
   id: String!
   isDelegation: Boolean!
   nonce: Int!
-  from: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]) 
-  to: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  amount: String! @fake(type: number)
-  fee: String! @fake(type: number)
+  from: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]) 
+  to: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  amount: UInt64! @fake(type: number)
+  fee: UInt64! @fake(type: number)
   memo: String! @fake(type:hackerPhrase)
 }
 
 type FeeTransfer {
-  recipient: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: String! @fake(type: number)
+  recipient: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  fee: UInt64! @fake(type: number)
 }
 
 type BlockchainState {
@@ -108,11 +111,11 @@ type ProtocolState {
 type Transactions {
   userCommands: [UserCommand!]!
   feeTransfer: [FeeTransfer!]!
-  coinbase: String! @fake(type: number)
+  coinbase: UInt64! @fake(type: number)
 }
 
 type Block {
-  creator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  creator: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
   stateHash: String!
   protocolState: ProtocolState!
   transactions: Transactions!
@@ -124,15 +127,15 @@ type BlockConfirmation {
 }
 
 type AnnotatedBalance {
-  total: String! @fake(type: number)
-  unknown: String! @fake(type: number)
+  total: UInt64! @fake(type: number)
+  unknown: UInt64! @fake(type: number)
 }
 
 type Wallet {
-  publicKey: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  publicKey: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
   nonce: String!
   receiptChainHash: String!
-  delegate: String!
+  delegate: PublicKey!
   votingFor: String!
   balance: AnnotatedBalance!
   stakingActive: Boolean! # Actively staking. There is a lag between switching staking keys and them appearing here as you may be in the middle of a staking procedure with other keys.
@@ -146,12 +149,12 @@ type NodeStatus {
 ## Input types
 
 input AddWalletInput {
-  publicKey: String
+  publicKey: PublicKey
   privateKey: String
 }
 
 input DeleteWalletInput {
-  publicKey: String!
+  publicKey: PublicKey!
 }
 
 input AddPaymentReceiptInput {
@@ -163,37 +166,37 @@ input SetNetworkInput {
 }
 
 input SetSnarkWorkerInput {
-  worker: String!
-  fee: String!
+  worker: PublicKey!
+  fee: UInt64!
 }
 
 input CreatePaymentInput {
-  from: String!,
-  to: String!,
-  amount: String!,
-  fee: String!,
+  from: PublicKey!,
+  to: PublicKey!,
+  amount: UInt64!,
+  fee: UInt64!,
   memo: String
 }
 
 input CreateDelegationInput {
-  from: String!,
-  to: String,
-  fee: String!,
+  from: PublicKey!,
+  to: PublicKey,
+  fee: UInt64!,
   memo: String
 }
 
 input UserCommandFilterInput {
-  from: String,
+  from: PublicKey,
 }
 
 input BlockFilterInput {
-  relatedTo: String!,
+  relatedTo: PublicKey!,
 }
 
 input SetStakingInput {
   # Set to empty to stop staking
   # Set to a non-empty list of public keys to start staking on these keys
-  wallets: [String!]!
+  wallets: [PublicKey!]!
 }
 
 ## Payload types
@@ -219,17 +222,17 @@ type AddPaymentReceiptPayload {
 }
 
 type AddWalletPayload {
-  publicKey: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  publicKey: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
 }
 
 type DeleteWalletPayload {
-  publicKey: String @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  publicKey: PublicKey @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
 }
 
 type SetStakingPayload {
   # Returns the last wallet public keys that were staking before
   # or empty if there were none
-  lastStaking: [String!]!
+  lastStaking: [PublicKey!]!
 }
 
 # Pagination types
@@ -269,9 +272,9 @@ type Query {
   # List of wallets currently tracked by the node
   ownedWallets: [Wallet!]!
   
-  wallet(publicKey: String!): Wallet
+  wallet(publicKey: PublicKey!): Wallet
   
-  pooledUserCommands(publicKey: String!): [UserCommand!]!
+  pooledUserCommands(publicKey: PublicKey!): [UserCommand!]!
   
   blocks(
     filter: BlockFilterInput!,
@@ -328,7 +331,7 @@ type Subscription {
   blockConfirmation: BlockConfirmation!
   
   # Subscribe to all blocks related to `key`
-  newBlock(key: String): Block!
+  newBlock(key: PublicKey): Block!
   
   # Triggered whenever the best tip changes
   # to another branch in the transition frontier
