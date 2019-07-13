@@ -33,9 +33,13 @@ let client = {
 };
 
 module Decoders = {
-  let int64 = Int64.of_string;
-  let optInt64 = Option.map(~f=Int64.of_string);
-  let publicKey = PublicKey.ofStringExn;
+  let int64 = pk =>
+    Js.Json.decodeString(pk) |> Option.getExn |> Int64.of_string;
+
+  let optInt64 = Option.map(~f=int64);
+
+  let publicKey = pk =>
+    Js.Json.decodeString(pk) |> Option.getExn |> PublicKey.ofStringExn;
 
   let date = Js.Date.fromString;
   let optDate = Option.map(~f=Js.Date.fromString);
