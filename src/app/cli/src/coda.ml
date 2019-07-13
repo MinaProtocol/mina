@@ -147,6 +147,16 @@ let daemon logger =
            Deferred.return conf_dir
          else Sys.home_directory () >>| compute_conf_dir
        in
+       let () =
+         if is_background then (
+           Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
+             conf_dir ;
+           Daemon.daemonize
+             ~redirect_stdout:(`File_append (conf_dir ^/ "coda.log"))
+             ~redirect_stderr:(`File_append (conf_dir ^/ "coda.log"))
+             () )
+         else ()
+       in
        (*Check if the config files are for the current version*)
        let%bind () =
          let del_files dir =
@@ -201,16 +211,6 @@ let daemon logger =
                 %s"
                conf_dir ;
              clean_up ()
-       in
-       let () =
-         if is_background then (
-           Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
-             conf_dir ;
-           Daemon.daemonize
-             ~redirect_stdout:(`File_append (conf_dir ^/ "coda.log"))
-             ~redirect_stderr:(`File_append (conf_dir ^/ "coda.log"))
-             () )
-         else ()
        in
        (* 512MB logrotate max size = 1GB max filesystem usage *)
        let logrotate_max_size = 1024 * 1024 * 512 in
