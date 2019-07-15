@@ -12,31 +12,36 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
 
     val logger : _ t -> Logger.t
 
-    val remove : 'elt t -> 'elt -> unit
+    val remove : 'elt t -> [`Consumed | `Unconsumed | `Failure] -> 'elt -> unit
   end = struct
     type 'a t =
-      {name: string; set: ('a, 'a Intf.final_state) Hashtbl.t; logger: Logger.t}
+      { name: string
+      ; on_add: 'a -> unit
+      ; on_remove: [`Consumed | `Unconsumed | `Failure] -> 'a -> unit
+      ; set: ('a, 'a Intf.final_state) Hashtbl.t
+      ; logger: Logger.t }
 
     let name {name; _} = name
 
     let logger {logger; _} = logger
 
-    let create (type elt) ~name ~logger
+    let create (type elt) ~name ~logger ~on_add ~on_remove
         (module Elt : Hashtbl.Key_plain with type t = elt) : elt t =
       let set = Hashtbl.create ~growth_allowed:true ?size:None (module Elt) in
       let logger = Logger.extend logger [("cache", `String name)] in
-      {name; set; logger}
+      {name; on_add; on_remove; set; logger}
 
     let final_state t x = Hashtbl.find t.set x
 
     let register_exn t x =
       let final_state = Ivar.create () in
       Hashtbl.add_exn t.set ~key:x ~data:final_state ;
+      t.on_add x ;
       Cached.create t x final_state
 
     let mem t x = Hashtbl.mem t.set x
 
-    let remove t x = Hashtbl.remove t.set x
+    let remove t reason x = Hashtbl.remove t.set x ; t.on_remove reason x
 
     let to_list t = Hashtbl.keys t.set
   end
@@ -140,10 +145,11 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
     let attach_finalizer t =
       Gc.Expert.add_finalizer (Heap_block.create_exn t) (fun block ->
           let t = Heap_block.value block in
-          if not (was_consumed t) then
+          if not (was_consumed t) then (
             let cache = cache t in
+            Cache.remove cache `Unconsumed (original t) ;
             Inputs.handle_unconsumed_cache_item ~logger:(Cache.logger cache)
-              ~cache_name:(Cache.name cache) ) ;
+              ~cache_name:(Cache.name cache) ) ) ;
       t
 
     let create cache data final_state =
@@ -183,13 +189,13 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
     let invalidate_with_failure (type a b) (t : (a, b) t) : a =
       assert_not_finalized t "Cached item has already been finalized" ;
       mark_failed t ;
-      Cache.remove (cache t) (original t) ;
+      Cache.remove (cache t) `Failure (original t) ;
       value t
 
     let invalidate_with_success (type a b) (t : (a, b) t) : a =
       assert_not_finalized t "Cached item has already been finalized" ;
       mark_success t ;
-      Cache.remove (cache t) (original t) ;
+      Cache.remove (cache t) `Consumed (original t) ;
       value t
 
     let sequence_deferred (type a b) (t : (a Deferred.t, b) t) :
@@ -217,6 +223,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
      and module Cache := Cache = struct
     module Make
         (Transmuter : Intf.Transmuter.S)
+        (Registry : Intf.Registry.S with type element := Transmuter.Target.t)
         (Name : Intf.Constant.S with type t := string) :
       Intf.Transmuter_cache.S
       with module Cached := Cached
@@ -230,7 +237,9 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       type t = Transmuter.Target.t Cache.t
 
       let create ~logger =
-        Cache.create ~logger ~name:Name.t (module Transmuter.Target)
+        Cache.create ~logger ~name:Name.t ~on_add:Registry.element_added
+          ~on_remove:Registry.element_removed
+          (module Transmuter.Target)
 
       let register_exn t x =
         let target = Cache.register_exn t (Transmuter.transmute x) in
@@ -260,7 +269,10 @@ let%test_module "cache_lib test instance" =
       |> f
 
     let with_cache ~logger ~f =
-      Cache.create ~name:"test" ~logger (module String) |> f
+      Cache.create ~name:"test" ~logger ~on_add:ignore
+        ~on_remove:(fun _ _ -> ())
+        (module String)
+      |> f
 
     let%test_unit "cached objects do not trigger unconsumption hook when \
                    invalidated" =

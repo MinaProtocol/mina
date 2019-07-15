@@ -311,7 +311,9 @@ let create_genesis_frontier (config : Config.t) ~verifier =
     ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
     }
   in
-  let genesis_protocol_state = With_hash.data Genesis_protocol_state.t in
+  let genesis_protocol_state =
+    With_hash.data (Lazy.force Genesis_protocol_state.t)
+  in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment first_transition) =
     External_transition.Validated.create_unsafe
@@ -319,19 +321,20 @@ let create_genesis_frontier (config : Config.t) ~verifier =
          ~protocol_state_proof:Precomputed_values.base_proof
          ~staged_ledger_diff:empty_diff)
   in
+  let genesis_ledger = Lazy.force Genesis_ledger.t in
   let ledger_db =
     Ledger.Db.create ?directory_name:config.ledger_db_location ()
   in
   let root_snarked_ledger =
-    Ledger_transfer.transfer_accounts ~src:Genesis_ledger.t ~dest:ledger_db
+    Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db
   in
   let snarked_ledger_hash =
-    Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root Genesis_ledger.t
+    Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root genesis_ledger
   in
   let%bind root_staged_ledger =
     match%map
       Staged_ledger.of_scan_state_and_ledger ~logger:config.logger ~verifier
-        ~snarked_ledger_hash ~ledger:Genesis_ledger.t
+        ~snarked_ledger_hash ~ledger:genesis_ledger
         ~scan_state:(Staged_ledger.Scan_state.empty ())
         ~pending_coinbase_collection:pending_coinbases
     with
@@ -368,7 +371,8 @@ let create (config : Config.t) =
             create_genesis_frontier config ~verifier
           in
           let ledger_db =
-            Ledger_transfer.transfer_accounts ~src:Genesis_ledger.t
+            Ledger_transfer.transfer_accounts
+              ~src:(Lazy.force Genesis_ledger.t)
               ~dest:ledger_db
           in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =

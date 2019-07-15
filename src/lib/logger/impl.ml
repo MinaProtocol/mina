@@ -159,6 +159,12 @@ module Transport = struct
         ; mutable primary_log_size: int }
 
       let create ~directory ~max_size =
+        if not (Result.is_ok (access directory [`Exists])) then
+          mkdir_p ~perm:0o755 directory ;
+        if not (Result.is_ok (access directory [`Exists; `Read; `Write])) then
+          failwithf
+            "cannot create log files: read/write permissions required on %s"
+            directory () ;
         let primary_log_loc = Filename.concat directory primary_log_name in
         let primary_log_size, mode =
           if Result.is_ok (access primary_log_loc [`Exists; `Read; `Write])
@@ -183,6 +189,7 @@ module Transport = struct
 
       let transport t str =
         if t.primary_log_size > t.max_size then rotate t ;
+        let str = str ^ "\n" in
         let len = String.length str in
         if write t.primary_log ~buf:(Bytes.of_string str) ~len <> len then
           printf "unexpected error writing to persistent log" ;
