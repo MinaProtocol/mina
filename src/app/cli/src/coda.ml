@@ -162,12 +162,12 @@ let daemon logger =
          let del_files dir =
            let rec all_files dirname basename =
              let fullname = Filename.concat dirname basename in
-             match Core.Sys.is_directory fullname with
+             match%bind Sys.is_directory fullname with
              | `Yes ->
-                 let dirs, files =
-                   Core.Sys.ls_dir fullname
-                   |> List.map ~f:(all_files fullname)
-                   |> List.unzip
+                 let%map dirs, files =
+                   Sys.ls_dir fullname
+                   >>= Deferred.List.map ~f:(all_files fullname)
+                   >>| List.unzip
                  in
                  let dirs =
                    if String.equal dirname conf_dir then List.concat dirs
@@ -175,14 +175,16 @@ let daemon logger =
                  in
                  (dirs, List.concat files)
              | _ ->
-                 ([], [fullname])
+                 Deferred.return ([], [fullname])
            in
-           let dirs, files = all_files dir "" in
-           List.iter files ~f:(fun file -> Core.Sys.remove file) ;
-           List.iter dirs ~f:(fun file -> Core.Unix.rmdir file)
+           let%bind dirs, files = all_files dir "" in
+           let%bind () =
+             Deferred.List.iter files ~f:(fun file -> Sys.remove file)
+           in
+           Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
          in
          let clean_up () =
-           let () = del_files conf_dir in
+           let%bind () = del_files conf_dir in
            let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
            Writer.write_line wr Coda_version.commit_id ;
            Writer.close wr
