@@ -8,6 +8,13 @@ open Fold_lib
 open Signature_lib
 open Module_version
 module Time = Coda_base.Block_time
+module Run = Snark_params.Tick.Run
+
+let m : Run.field Snarky.Snark.m = (module Run)
+
+let make_checked t =
+  let open Snark_params.Tick in
+  with_state (As_prover.return ()) (Run.make_checked t)
 
 let name = "proof_of_stake"
 
@@ -765,12 +772,20 @@ module Data = struct
     module Threshold = struct
       open Bignum_bigint
 
-      let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
+      (* TEMPORARY HACK FOR TESTNETS: c should be 1 (or possibly 2) otherwise *)
+      let c = `Two_to_the 2
 
-      (* TEMPORARY HACK FOR TESTNETS: c should be 1 otherwise *)
-      let c_int = 2
+      let base = Bignum.(one / of_int 2)
 
-      let c = of_int c_int
+      let c_bias =
+        let (`Two_to_the i) = c in
+        fun xs -> List.drop xs i
+
+      let params =
+        Snarky_taylor.Exp.params ~base
+          ~field_size_in_bits:Snark_params.Tick.Field.size_in_bits
+
+      let bigint_of_uint64 = Fn.compose Bigint.of_string UInt64.to_string
 
       (*  Check if
           vrf_output / 2^256 <= c * my_stake / total_currency
@@ -780,34 +795,58 @@ module Data = struct
           vrf_output * total_currency <= c * my_stake * 2^256
       *)
       let is_satisfied ~my_stake ~total_stake vrf_output =
-        of_bit_fold_lsb (Random_oracle.Digest.fold_bits vrf_output)
-        * of_uint64_exn (Amount.to_uint64 total_stake)
-        <= shift_left
-             (c * of_uint64_exn (Balance.to_uint64 my_stake))
-             Random_oracle.Digest.length_in_bits
+        let input =
+          (* get first params.per_term_precision bits of top / bottom.
+
+            This is equal to
+
+            floor(2^params.per_term_precision * top / bottom) / 2^params.per_term_precision
+          *)
+          let k = params.per_term_precision in
+          let top = bigint_of_uint64 (Balance.to_uint64 my_stake) in
+          let bottom = bigint_of_uint64 (Amount.to_uint64 total_stake) in
+          Bignum.(
+            of_bigint Bignum_bigint.(shift_left top k / bottom)
+            / of_bigint Bignum_bigint.(shift_left one k))
+        in
+        let rhs = Snarky_taylor.Exp.Unchecked.one_minus_exp params input in
+        let lhs =
+          let bs = Random_oracle.Digest.to_bits vrf_output in
+          let n = of_bits_lsb (c_bias (Array.to_list bs)) in
+          Bignum.(
+            of_bigint n
+            / of_bigint
+                Bignum_bigint.(
+                  shift_left one Random_oracle.Digest.length_in_bits))
+        in
+        Bignum.(lhs <= rhs)
 
       module Checked = struct
-        (* This version can't be used right now because the field is too small. *)
-        let _is_satisfied ~my_stake ~total_stake vrf_output =
-          let open Snark_params.Tick in
-          let open Number in
-          let%bind lhs =
-            of_bits vrf_output * Amount.var_to_number total_stake
-          in
-          let%bind rhs =
-            let%bind x =
-              (* someday: This should really just be a scalar multiply... *)
-              constant (Field.of_int c_int) * Amount.var_to_number my_stake
-            in
-            mul_pow_2 x (`Two_to_the Random_oracle.Digest.length_in_bits)
-          in
-          lhs <= rhs
-
-        (* It was somewhat involved to implement that check with the small field, so
-           we've stubbed it out for now. *)
-        let is_satisfied ~my_stake:_ ~total_stake:_ _vrf_output =
-          let () = assert Coda_base.Insecure.vrf_threshold_check in
-          Snark_params.Tick.(Checked.return Boolean.true_)
+        let is_satisfied ~my_stake ~total_stake (vrf_output : Output.var) =
+          let open Snarky_taylor in
+          make_checked (fun () ->
+              let open Run in
+              let rhs =
+                Exp.one_minus_exp ~m params
+                  (Floating_point.of_quotient ~m
+                     ~precision:params.per_term_precision
+                     ~top:
+                       (Integer.of_bits ~m
+                          (Balance.var_to_bits my_stake :> Boolean.var list))
+                     ~bottom:
+                       (Integer.of_bits ~m
+                          (Amount.var_to_bits total_stake :> Boolean.var list))
+                     ~top_is_less_than_bottom:())
+              in
+              let vrf_output =
+                Array.to_list (vrf_output :> Boolean.var array)
+              in
+              let lhs = c_bias vrf_output in
+              Floating_point.(
+                le ~m
+                  (of_bits ~m lhs
+                     ~precision:Random_oracle.Digest.length_in_bits)
+                  rhs) )
       end
     end
 
@@ -1878,14 +1917,10 @@ module Data = struct
             (Global_slot.create ~epoch:next_epoch ~slot:next_slot)
       ; checkpoints }
 
-    module M = Snarky.Snark.Run.Make (Curve_choice.Tick_backend) (Unit)
-
-    let m : M.field Snarky.Snark.m = (module M)
-
     let same_checkpoint_window ~prev:(slot1 : Global_slot.Packed.var)
         ~next:(slot2 : Global_slot.Packed.var) =
       let open Snarky_taylor in
-      let open M in
+      let open Run in
       let _q1, r1 =
         Integer.div_mod ~m
           (Global_slot.Checked.to_integer slot1)
@@ -1904,8 +1939,7 @@ module Data = struct
         .less
 
     let same_checkpoint_window ~prev ~next =
-      with_state (As_prover.return ())
-        (M.make_checked (fun () -> same_checkpoint_window ~prev ~next))
+      make_checked (fun () -> same_checkpoint_window ~prev ~next)
 
     let negative_one : Value.t =
       { Poly.blockchain_length= Length.zero
@@ -2186,10 +2220,10 @@ module Hooks = struct
           type query = Coda_base.Ledger_hash.Stable.V1.t [@@deriving bin_io]
 
           type response =
-            (Coda_base.Sparse_ledger.Stable.V1.t, string) Result.t
-          [@@deriving bin_io]
-
-          let version = 1
+            ( Coda_base.Sparse_ledger.Stable.V1.t
+            , string )
+            Core_kernel.Result.Stable.V1.t
+          [@@deriving bin_io, version {rpc}]
 
           let query_of_caller_model = Fn.id
 
