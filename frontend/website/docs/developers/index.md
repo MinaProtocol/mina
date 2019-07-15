@@ -6,8 +6,8 @@ See the [Contributing Guide](https://github.com/CodaProtocol/coda/blob/master/CO
 
 Other documents relevant to contributing code include:
 
-- [Style Guide](style-guide)
-- [Code Review Guidelines](code-reviews)
-- [Repository Structure](directory-structure)
+- [Style Guide](/docs/developers/style-guide)
+- [Code Review Guidelines](/docs/developers/code-reviews)
+- [Repository Structure](/docs/developers/directory-structure)
 
 Coda is entirely open source, and the code is distributed under the terms of the [Apache License 2.0](https://github.com/CodaProtocol/coda/blob/master/LICENSE).

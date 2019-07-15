@@ -52,13 +52,12 @@ module Styles = {
       selector(
         "ul, ol",
         [
-          margin(`zero),
+          margin2(~v=`rem(1.), ~h=`zero),
           marginLeft(rem(1.5)),
           padding(`zero),
           ...Style.Body.basicStyles,
         ],
       ),
-      selector("ul", [margin2(~v=`rem(1.), ~h=`zero)]),
       selector(
         "code",
         [Style.Typeface.pragmataPro, color(Style.Colors.midnight)],
@@ -85,6 +84,7 @@ module Styles = {
         "a",
         [
           hover([color(Style.Colors.hyperlinkHover)]),
+          cursor(`pointer),
           ...Style.Link.basicStyles,
         ],
       ),

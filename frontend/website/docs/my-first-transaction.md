@@ -31,7 +31,7 @@ This step requires waiting for approximately ~5 minutes to sync with the network
 ### Troubleshooting hints:
 
 - If the number of peers is 1 or fewer, there may be an issue with the IP address - make sure you typed in the IP address and port exactly as specified in [Start a Coda node](#start-a-coda-node).
-- If sync status is `Offline`, you may need to [configure port forwarding for your router ](/getting-started/#port-forwarding). Otherwise you may need to resolve connectivity issues with your home network.
+- If sync status is `Offline`, you may need to [configure port forwarding for your router ](/docs/getting-started/#port-forwarding). Otherwise you may need to resolve connectivity issues with your home network.
 - If sync status is `Bootstrap`, you'll need to wait for a bit for your node to catch up to the rest of the network. In the Coda network, we do not have to download full transaction history from the genesis block, but nodes participating in block production and compression need to download recent history and the current account data in the network.
 
 ## Create a new account
@@ -85,7 +85,7 @@ Great! we have successfully sent our first transaction. Let's go ahead and check
 
     $ coda.exe client get-txn-status <txn-hash>
 
-Hmmm - why does our transaction say `Pending`? Remember that Coda is a peer-to-peer network and we'll need to wait until a [block producer](../glossary/#block-producer) adds our transaction to a block. In the Coda network, this should take no more than 10 seconds, after which we'll need to wait for 30 [block confirmations](../glossary/#block-confirmation) for our transaction to become `Confirmed`.
+Hmmm - why does our transaction say `Pending`? Remember that Coda is a peer-to-peer network and we'll need to wait until a [block producer](../glossary/#block-producer) adds our transaction to a block. In the Coda network, this should take no more than 10 seconds, after which we'll need to wait for 30 [block confirmations](../glossary/#block-confirmations) for our transaction to become `Confirmed`.
 
 Why 30 blocks? This gives us the probabilistic security that our transaction will not be affected by a [reorganization](../glossary/#reorganization), and we can rest assured that the intended recipient has received the tokens we sent over.
 
@@ -102,4 +102,4 @@ We'll get a response that looks like this:
     balance is ___
     ...
 
-Once you feel comfortable with the basics of creating an address, and sending & receiving coda, we can move on to the truly unique parts of the Coda network - [participating in consensus and helping compress the blockchain](/node-operator).
+Once you feel comfortable with the basics of creating an address, and sending & receiving coda, we can move on to the truly unique parts of the Coda network - [participating in consensus and helping compress the blockchain](/docs/node-operator).
