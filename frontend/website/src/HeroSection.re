@@ -66,7 +66,7 @@ module Copy = {
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
-                    [marginTop(`rem(1.75)), marginBottom(`rem(4.0))],
+                    [marginTop(`rem(1.75)), marginBottom(`rem(2.0))],
                   ),
                 ]),
               ])

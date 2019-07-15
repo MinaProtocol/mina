@@ -100,6 +100,6 @@ module.exports.confirmEmail = async event => {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Credentials": "true"
     },
-    body: "<html><body>nice</body></html>"
+    body: "<html><head><meta http-equiv=\"Refresh\" content=\"3; url=https://codaprotocol.com\"></head><body><p>Thanks for subscribing!</p><p>You will be redirected shortly. If you are not redirected click <a href=\"https://codaprotocol.com\">here</a>.</p></body></html>"
   };
 };

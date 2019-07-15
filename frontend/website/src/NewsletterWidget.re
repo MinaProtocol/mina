@@ -65,16 +65,23 @@ module Styles = {
     ]);
 };
 
+let widgetCounter = ref(0);
+let uniqueId = () => {
+  widgetCounter := widgetCounter^ + 1;
+  string_of_int(widgetCounter^);
+};
+
 let component =
   ReasonReact.statelessComponent("HeroSection.NewsletterWidget");
 let make = _ => {
   ...component,
-  render: _self =>
-    <form id="newsletter-subscribe" className=Styles.container>
+  render: _self => {
+    let formId = uniqueId();
+    <form id={"subscribe-form-" ++ formId} className=Styles.container>
       <div className=Css.(style([marginBottom(px(8))]))>
         {ReasonReact.string("Subscribe to our newsletter for updates")}
       </div>
-      <div id="success-message" className=Styles.successMessage>
+      <div id={"success-message-" ++ formId} className=Styles.successMessage>
         {ReasonReact.string({js|✓ Check your email|js})}
       </div>
       <input
@@ -86,19 +93,19 @@ let make = _ => {
       <input
         type_="submit"
         value="Subscribe"
-        id="subscribe-button"
+        id={"subscribe-button-" ++ formId}
         className=Styles.submit
       />
       <RunScript>
-        {js|
-            function newsletterSubmit(e) {
+      {j|
+            document.getElementById('subscribe-form-$formId '.trim()).onsubmit = function (e) {
               e.preventDefault();
-              const formElement = document.getElementById('newsletter-subscribe');
+              const formElement = document.getElementById('subscribe-form-$formId '.trim());
               const request = new XMLHttpRequest();
-              const submitButton = document.getElementById('subscribe-button');
+              const submitButton = document.getElementById('subscribe-button-$formId '.trim());
               submitButton.setAttribute('disabled', 'disabled');
               request.onload = function () {
-                const successMessage = document.getElementById('success-message');
+                const successMessage = document.getElementById('success-message-$formId '.trim());
                 successMessage.style.visibility = "visible";
                 successMessage.style.opacity = 1;
                 setTimeout(function () {
@@ -111,10 +118,8 @@ let make = _ => {
               request.send(new URLSearchParams(new FormData(formElement)));
               return false;
             }
-
-            const formElement = document.getElementById('newsletter-subscribe');
-            formElement.onsubmit = newsletterSubmit;
-          |js}
+          |j}
       </RunScript>
-    </form>,
+    </form>;
+  },
 };
