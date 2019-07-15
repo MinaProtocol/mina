@@ -38,7 +38,7 @@ module Styles = {
 
 module TransactionsQueryString = [%graphql
   {|
-    query transactions($after: String, $publicKey: String!) {
+    query transactions($after: String, $publicKey: PublicKey!) {
       blocks(first: 5, after: $after, filter: { relatedTo: $publicKey }) {
         nodes {
           creator @bsDecoder(fn: "Apollo.Decoders.publicKey")
@@ -180,7 +180,7 @@ let make = () => {
      | Some(pubkey) =>
        let transactionQuery =
          TransactionsQueryString.make(
-           ~publicKey=PublicKey.toString(pubkey),
+           ~publicKey=Apollo.Encoders.publicKey(pubkey),
            (),
          );
        <TransactionsQuery variables=transactionQuery##variables>
@@ -207,7 +207,7 @@ let make = () => {
                    onLoadMore={() => {
                      let moreTransactions =
                        TransactionsQueryString.make(
-                         ~publicKey=PublicKey.toString(pubkey),
+                         ~publicKey=Apollo.Encoders.publicKey(pubkey),
                          (),
                        );
 
