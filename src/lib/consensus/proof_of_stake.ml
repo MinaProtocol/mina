@@ -43,6 +43,19 @@ let compute_delegatee_table keys ~iter_accounts =
             in
             Account.Index.Table.add_exn table ~key:i ~data:acct.balance ;
             Some table ) ) ;
+  (* TODO: this metric tracking currently assumes that the
+   * result of compute_delegatee_table is called with the
+   * full set of proposer keypairs every time the set
+   * changes, which is true right now, but this should be
+   * control flow should be refactored to make this clearer *)
+  let num_delegators =
+    Public_key.Compressed.Table.fold outer_table ~init:0
+      ~f:(fun ~key:_ ~data sum -> sum + Account.Index.Table.length data)
+  in
+  Coda_metrics.Gauge.set Coda_metrics.Consensus.staking_keypairs
+    (Float.of_int @@ Public_key.Compressed.Set.length keys) ;
+  Coda_metrics.Gauge.set Coda_metrics.Consensus.stake_delegators
+    (Float.of_int num_delegators) ;
   outer_table
 
 let compute_delegatee_table_sparse_ledger keys ledger =
@@ -934,6 +947,8 @@ module Data = struct
                 (Amount.to_int total_stake)
                 (Bignum_bigint.of_bit_fold_lsb
                    (Random_oracle.Digest.fold_bits vrf_result)) ;
+              Coda_metrics.Counter.inc_one
+                Coda_metrics.Consensus.vrf_evaluations ;
               if
                 Threshold.is_satisfied ~my_stake:balance ~total_stake
                   vrf_result

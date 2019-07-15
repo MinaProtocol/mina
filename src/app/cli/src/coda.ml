@@ -83,6 +83,12 @@ let daemon logger =
            "PORT local REST-server for daemon interaction (default no \
             rest-server)"
          (optional int16)
+     and metrics_server_port =
+       flag "metrics-port"
+         ~doc:
+           "PORT metrics server for scraping via Prometheus (default no \
+            metrics-server)"
+         (optional int16)
      and external_ip_opt =
        flag "external-ip"
          ~doc:
@@ -487,6 +493,11 @@ let daemon logger =
        Coda_run.setup_local_server ?client_whitelist ?rest_server_port ~coda
          ~client_port () ;
        Coda_run.run_snark_worker ~client_port run_snark_worker_action ;
+       let%bind () =
+         Option.map metrics_server_port ~f:(fun port ->
+             Coda_metrics.server ~port ~logger >>| ignore )
+         |> Option.value ~default:Deferred.unit
+       in
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Running coda services" ;
        Async.never ())
