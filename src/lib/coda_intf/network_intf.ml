@@ -26,7 +26,7 @@ module type Network_intf = sig
 
   val random_peers : t -> int -> Network_peer.Peer.t list
 
-  val catchup_transition :
+  val transition_catchup :
        t
     -> Network_peer.Peer.t
     -> State_hash.t
@@ -40,6 +40,12 @@ module type Network_intf = sig
        , State_body_hash.t list * external_transition )
        Proof_carrying_data.t
        Deferred.Or_error.t
+
+  val get_transition_chain_witness :
+       t
+    -> Network_peer.Peer.t
+    -> State_hash.t
+    -> (State_hash.t * State_body_hash.t List.t) Deferred.Option.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t
@@ -117,5 +123,8 @@ module type Network_intf = sig
                         , State_body_hash.t list * external_transition )
                         Proof_carrying_data.t
                         Deferred.Option.t)
+    -> get_transition_chain_witness:(   State_hash.t Envelope.Incoming.t
+                                     -> (State_hash.t * State_body_hash.t list)
+                                        Deferred.Option.t)
     -> t Deferred.t
 end

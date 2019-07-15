@@ -84,14 +84,6 @@ module Make (Inputs : Inputs_intf) :
     in
     (oldest_state_hash, merkle_list)
 
-  let expand (oldest_state_hash, merkle_list) =
-    List.fold ~init:[oldest_state_hash]
-      ~f:(fun acc state_body_hash ->
-        Protocol_state.hash_abstract ~hash_body:Fn.id
-          {previous_state_hash= List.hd_exn acc; body= state_body_hash}
-        :: acc )
-      merkle_list
-
   let verify ~state_hash
       ~transition_chain_witness:(oldest_state_hash, merkle_list) =
     Merkle_list.verify ~init:oldest_state_hash merkle_list state_hash

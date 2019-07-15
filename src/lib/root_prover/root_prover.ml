@@ -157,7 +157,8 @@ module Make (Inputs : Inputs_intf) :
     in
     let%bind () =
       check_error ~message:"Peer gave an invalid proof of it's root"
-        (Merkle_list.verify ~init:root_hash merkle_list best_tip_hash)
+        ( Merkle_list.verify ~init:root_hash merkle_list best_tip_hash
+        |> Option.is_some )
     in
     let root_with_validation =
       External_transition.skip_time_received_validation

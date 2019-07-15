@@ -425,6 +425,15 @@ let create (config : Config.t) =
                 in
                 Root_prover.prove ~logger:config.logger ~frontier
                   consensus_state )
+              ~get_transition_chain_witness:(fun query ->
+                let state_hash = Envelope.Incoming.data query in
+                Deferred.return
+                @@
+                let open Option.Let_syntax in
+                let%bind frontier =
+                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                in
+                Transition_chain_witness.prove ~frontier state_hash )
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~logger:config.logger

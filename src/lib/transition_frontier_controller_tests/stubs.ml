@@ -558,7 +558,7 @@ struct
       let peer_list = Hash_set.to_list peers in
       List.take (List.permute peer_list) num_peers
 
-    let catchup_transition {ip_table; _} peer state_hash =
+    let transition_catchup {ip_table; _} peer state_hash =
       Deferred.Result.return
       @@
       let open Option.Let_syntax in
@@ -589,6 +589,13 @@ struct
            (let open Option.Let_syntax in
            let%bind frontier = Hashtbl.find ip_table inet_addr in
            Root_prover.prove ~logger ~frontier consensus_state)
+
+    let get_transition_chain_witness {ip_table; _} peer requested_state_hash =
+      Deferred.return
+      @@
+      let open Option.Let_syntax in
+      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
+      Transition_chain_witness.prove ~frontier requested_state_hash
 
     let glue_sync_ledger {ip_table; logger; _} query_reader response_writer :
         unit =

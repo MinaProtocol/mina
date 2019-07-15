@@ -147,6 +147,54 @@ module Make (Inputs : Inputs.S) :
     in
     (result, Option.value_exn initial_state_hash)
 
+  (*
+  let get_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
+      ~unprocessed_transition_cache ~state_hash =
+    let peers = Network.random_peers network num_peers in
+    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:[("target_hash", State_hash.to_yojson state_hash)]
+      "doing a catchup job with target $target_hash" ;
+    Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
+        match%map
+          Network.get_transition_chain_witness network peer state_hash
+        with
+        | None ->
+            Or_error.errorf
+              !"Peer %{sexp:Network_peer.Peer.t} did not have the transition"
+              peer
+        | Some transition_chain_witness
+          ->
+            let open Or_error.Let_syntax in
+            let%bind state_hashes =
+              match Transition_chain_witness.verify ~state_hash ~transition_chain_witness with
+              | Some state_hashes -> return state_hashes
+              | None ->
+                let error_msg =
+                  sprintf
+                    !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof"
+                    peer
+                in
+                ignore
+                  Trust_system.(
+                    record trust_system logger peer.host
+                      Actions.(Violated_protocol, Some (error_msg, []))) ;
+                Or_error.error_string error_msg
+            in
+            List.fold_until state_hashes ~init:[]
+              ~f:(fun acc state_hash ->
+                if
+                  Unprocessed_transition_cache.mem_target
+                    unprocessed_transition_cache state_hash
+                  || Transition_frontier.find frontier state_hash
+                     |> Option.is_some
+                then Continue_or_stop.Stop (Ok (peer, acc))
+                else Continue_or_stop.Continue (state_hash :: acc) )
+              ~finish:(fun _ ->
+                Or_error.errorf
+                  !"Peer %{sexp:Network_peer.Peer.t} moves too fast"
+                  peer ) )
+*)
+
   let get_transitions_and_compute_breadcrumbs ~logger ~trust_system ~verifier
       ~network ~frontier ~num_peers ~unprocessed_transition_cache
       ~target_forest =
@@ -158,7 +206,7 @@ module Make (Inputs : Inputs.S) :
       ~metadata:[("target_hash", State_hash.to_yojson target_hash)] ;
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
         O1trace.trace_recurring_task "ledger catchup" (fun () ->
-            match%bind Network.catchup_transition network peer target_hash with
+            match%bind Network.transition_catchup network peer target_hash with
             | None ->
                 Deferred.return
                 @@ Or_error.errorf

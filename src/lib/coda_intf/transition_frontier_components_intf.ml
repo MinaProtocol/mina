@@ -181,6 +181,8 @@ module type Unprocessed_transition_cache_intf = sig
     -> ( external_transition_with_initial_validation Envelope.Incoming.t
        , State_hash.t )
        Cached.t
+
+  val mem_target : t -> State_hash.t -> bool
 end
 
 module type Transition_handler_intf = sig
@@ -265,14 +267,10 @@ module type Transition_chain_witness_intf = sig
     -> State_hash.t
     -> (State_hash.t * State_body_hash.t List.t) Option.t
 
-  (* Expanding the list of state_body_hash to the corresponding list of
-     state hash in reverse order, state_hash of new transitions comes first *)
-  val expand : State_hash.t * State_body_hash.t List.t -> State_hash.t List.t
-
   val verify :
        state_hash:State_hash.t
     -> transition_chain_witness:State_hash.t * State_body_hash.t List.t
-    -> Bool.t
+    -> State_hash.t list option
 end
 
 module type Root_prover_intf = sig
