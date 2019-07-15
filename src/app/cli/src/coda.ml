@@ -157,7 +157,11 @@ let daemon logger =
              () )
          else ()
        in
-       (*Check if the config files are for the current version*)
+       (* Check if the config files are for the current version. 
+        * WARNING: Deleting ALL the files in the config directory if there is
+        * a version mismatch *)
+       (* When persistence is added back, this needs to be revisited
+        * to handle persistence related files properly *)
        let%bind () =
          let del_files dir =
            let rec all_files dirname basename =
