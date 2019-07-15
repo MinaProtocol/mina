@@ -1,7 +1,42 @@
 module Cdn = {
+  module Crypto = {
+    type t;
+    [@bs.val] [@bs.module "crypto"] external createHash: string => t = "";
+    [@bs.send] external update: (t, string) => unit = "";
+    [@bs.send] external digest: (t, string) => string = "";
+  };
+
   let prefix = ref("");
 
-  let url = s => prefix^ ++ s;
+  let cache = Hashtbl.create(20);
+
+  let getHashedPath = path => {
+    if (!Hashtbl.mem(cache, path)) {
+      let localPath =
+        if (path.[0] == '/') {
+          "." ++ path;
+        } else {
+          prerr_endline("Expected cdn url to begin with /");
+          exit(1);
+        };
+      // Get file contents
+      let content = Node.Fs.readFileAsUtf8Sync(localPath);
+      // Generate hash of file
+      let hashGen = Crypto.createHash("sha256");
+      Crypto.update(hashGen, content);
+      let hash = Crypto.digest(hashGen, "hex");
+      let index = Js.String.lastIndexOf(".", path);
+      let newPath =
+        String.sub(path, 0, index)
+        ++ "-"
+        ++ hash
+        ++ String.sub(path, index, String.length(path) - index);
+      Hashtbl.add(cache, path, newPath);
+    };
+    Hashtbl.find(cache, path);
+  };
+
+  let url = path => prefix^ ++ getHashedPath(path);
 };
 
 module Named = {
@@ -45,6 +80,14 @@ module Static = {
     name: ("Read the Coda Whitepaper", "coda-whitepaper"),
     // Hardcoding to v2 as the pdf is no longer tracked in git
     link: "https://cdn.codaprotocol.com/v2/static/coda-whitepaper-05-10-2018-0.pdf",
+  };
+
+  let modifiedsnark = () => {
+    name: (
+      "Read about the zkSNARK construction we're using",
+      "modified-BG-snark",
+    ),
+    link: Cdn.url("/static/modified-BG-snark-05-03-2019-0.pdf"),
   };
 
   let snarkette = {
@@ -208,6 +251,7 @@ module Lists = {
       ThirdParty.coindeskStartupBlockchain,
       ThirdParty.codaMediumPost,
       ThirdParty.tokenDailyQA,
+      Static.modifiedsnark(),
     ]
     // top 5 above, rest below the fold
     @ List.map(
