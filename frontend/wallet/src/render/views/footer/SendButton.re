@@ -142,16 +142,16 @@ let make = (~wallets, ~onSubmit) => {
                    Option.map(~f=s => {...s, fromStr: Some(value)}),
                  )
                }
-                options={
-                  wallets
-                  |> Array.map(~f=wallet =>
-                        (
-                          PublicKey.toString(wallet.Wallet.key),
-                          <WalletDropdownItem wallet />,
-                        )
+               options={
+                 wallets
+                 |> Array.map(~f=wallet =>
+                      (
+                        PublicKey.toString(wallet.Wallet.publicKey),
+                        <WalletDropdownItem wallet />,
                       )
-                  |> Array.toList
-                }
+                    )
+                 |> Array.toList
+               }
              />
              spacer
              <TextField

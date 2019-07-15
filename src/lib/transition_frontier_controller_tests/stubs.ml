@@ -368,7 +368,8 @@ struct
           Coda_base.Ledger.Db.create ~directory_name:ledger_dir ()
         in
         let root_snarked_ledger =
-          Ledger_transfer.transfer_accounts ~src:Genesis_ledger.t
+          Ledger_transfer.transfer_accounts
+            ~src:(Lazy.force Genesis_ledger.t)
             ~dest:ledger_db
         in
         let consensus_local_state =
@@ -377,7 +378,8 @@ struct
         let%bind frontier =
           create_frontier_from_genesis_protocol_state ~logger
             ~consensus_local_state
-            ~genesis_protocol_state_with_hash:Genesis_protocol_state.t
+            ~genesis_protocol_state_with_hash:
+              (Lazy.force Genesis_protocol_state.t)
             root_snarked_ledger
         in
         f frontier )
@@ -397,7 +399,7 @@ struct
         ~genesis_consensus_state:
           (Consensus.Data.Consensus_state.create_genesis
              ~negative_one_protocol_state_hash:
-               Protocol_state.(hash negative_one))
+               Protocol_state.(hash (Lazy.force negative_one)))
         ~genesis_ledger:(Ledger.of_database root_snarked_ledger)
     in
     create_frontier_from_genesis_protocol_state ~logger ~consensus_local_state
