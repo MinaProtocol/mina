@@ -14,4 +14,3 @@ test_logs
 .firebase/
 node_modules/
 .DS_Store
-/docs/site

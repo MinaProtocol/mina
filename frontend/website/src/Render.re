@@ -277,3 +277,5 @@ Markdown.Child_process.execSync(
   "mkdocs build -d site/docs",
   Markdown.Child_process.option(),
 );
+
+Fs.symlinkSync(Node.Process.cwd() ++ "/graphql-docs", "./site/graphql");
