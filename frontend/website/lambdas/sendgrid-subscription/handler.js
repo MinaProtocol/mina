@@ -57,7 +57,7 @@ module.exports.sendConfirmation = async event => {
       "Access-Control-Allow-Headers":
         "Origin, X-Requested-With, Content-Type, Accept",
       "Content-Type": "application/json",
-      "Access-Control-Allow-Methods": "POST, PUT, GET, OPTIONS",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Max-Age": "2592000",
       "Access-Control-Allow-Credentials": "true"
     },
