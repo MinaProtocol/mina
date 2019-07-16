@@ -386,6 +386,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         !"Submitting transition $state_hash to the transition \
                           frontier controller"
                         ~metadata ;
+                      Coda_metrics.(Counter.inc_one Proposer.blocks_proposed) ;
                       let%bind () =
                         Strict_pipe.Writer.write transition_writer breadcrumb
                       in
@@ -478,12 +479,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_for_proposal
                 | `Propose_now (keypair, data) ->
+                    Coda_metrics.(Counter.inc_one Proposer.slots_won) ;
                     Interruptible.finally
                       (Singleton_supervisor.dispatch proposal_supervisor
                          (keypair, now, data))
                       ~f:check_for_proposal
                     |> ignore
                 | `Propose (time, keypair, data) ->
+                    Coda_metrics.(Counter.inc_one Proposer.slots_won) ;
                     let scheduled_time = time_of_ms time in
                     Singleton_scheduler.schedule scheduler scheduled_time
                       ~f:(fun () ->

@@ -342,9 +342,12 @@ module Make (Inputs : Inputs_intf) :
       Extensions.handle_diff t.extensions t.extension_writers
         (Diff.New_frontier root_breadcrumb)
     in
+    Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
     t
 
-  let close {extension_writers; _} = Extensions.close_pipes extension_writers
+  let close {extension_writers; _} =
+    Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
+    Extensions.close_pipes extension_writers
 
   let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -512,6 +515,8 @@ module Make (Inputs : Inputs_intf) :
     let node =
       {Node.breadcrumb; successor_hashes= []; length= parent_node.length + 1}
     in
+    Coda_metrics.(Gauge.inc_one Transition_frontier.active_breadcrumbs) ;
+    Coda_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs) ;
     attach_node_to t ~parent_node ~node
 
   (** Given:
@@ -566,6 +571,31 @@ module Make (Inputs : Inputs_intf) :
     Hashtbl.remove t.table t.root ;
     Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
     t.root <- new_root_hash ;
+    let num_finalized_staged_txns =
+      Breadcrumb.external_transition new_root
+      |> External_transition.Validated.staged_ledger_diff
+      |> Staged_ledger_diff.user_commands |> List.length |> Float.of_int
+    in
+    (* TODO: these metrics are too expensive to compute in this way, but it should be ok for beta *)
+    let root_snarked_ledger_accounts =
+      Ledger.Db.to_list t.root_snarked_ledger
+    in
+    Coda_metrics.(
+      Gauge.set Transition_frontier.recently_finalized_staged_txns
+        num_finalized_staged_txns) ;
+    Coda_metrics.(
+      Counter.inc Transition_frontier.finalized_staged_txns
+        num_finalized_staged_txns) ;
+    Coda_metrics.(
+      Gauge.set Transition_frontier.root_snarked_ledger_accounts
+        (Float.of_int @@ List.length root_snarked_ledger_accounts)) ;
+    Coda_metrics.(
+      Gauge.set Transition_frontier.root_snarked_ledger_total_currency
+        ( Float.of_int
+        @@ List.fold_left root_snarked_ledger_accounts ~init:0
+             ~f:(fun sum account ->
+               sum + Currency.Balance.to_int account.balance ) )) ;
+    Coda_metrics.(Counter.inc_one Transition_frontier.root_transitions) ;
     new_root_node
 
   let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
@@ -757,6 +787,10 @@ module Make (Inputs : Inputs_intf) :
                   (Hashtbl.find_exn t.table g).breadcrumb )
             in
             List.iter garbage ~f:(Hashtbl.remove t.table) ;
+            (* removed root + garbage, so total removed == 1 + #garbage *)
+            Coda_metrics.(
+              Gauge.dec Transition_frontier.active_breadcrumbs
+                (Float.of_int @@ (1 + List.length garbage))) ;
             (* 4.VI *)
             let new_root_staged_ledger =
               Breadcrumb.staged_ledger new_root_node.breadcrumb
