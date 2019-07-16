@@ -141,6 +141,9 @@ module Make (Inputs : Inputs.S) :
             | Ok breadcrumb ->
                 Deferred.return (Ok breadcrumb) )
       in
+      Coda_metrics.(
+        Counter.inc_one
+          Transition_frontier_controller.breadcrumbs_built_by_processor) ;
       Deferred.map ~f:Result.return
         (add_and_finalize ~frontier ~catchup_scheduler
            ~processed_transition_writer ~only_if_present:false breadcrumb))
@@ -194,6 +197,9 @@ module Make (Inputs : Inputs.S) :
             * transition from the network) can happen iff there is another node
             * with the exact same private key and view of the transaction pool. *)
          [ Reader.map proposer_transition_reader ~f:(fun breadcrumb ->
+               Coda_metrics.(
+                 Gauge.inc_one
+                   Transition_frontier_controller.transitions_being_processed) ;
                `Proposed_breadcrumb (Cached.pure breadcrumb) )
          ; Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
                `Catchup_breadcrumbs cb )
@@ -222,19 +228,25 @@ module Make (Inputs : Inputs.S) :
                          "failed to attach all catchup breadcrumbs to \
                           transition frontier: %s"
                          (Error.to_string_hum err) )
-               | `Proposed_breadcrumb breadcrumb -> (
-                   match%map
-                     add_and_finalize ~only_if_present:false breadcrumb
-                   with
-                   | Ok () ->
-                       ()
-                   | Error err ->
-                       Logger.error logger ~module_:__MODULE__
-                         ~location:__LOC__
-                         ~metadata:
-                           [("error", `String (Error.to_string_hum err))]
-                         "failed to attach breadcrumb proposed internally to \
-                          transition frontier: $error" )
+               | `Proposed_breadcrumb breadcrumb ->
+                   let%map () =
+                     match%map
+                       add_and_finalize ~only_if_present:false breadcrumb
+                     with
+                     | Ok () ->
+                         ()
+                     | Error err ->
+                         Logger.error logger ~module_:__MODULE__
+                           ~location:__LOC__
+                           ~metadata:
+                             [("error", `String (Error.to_string_hum err))]
+                           "failed to attach breadcrumb proposed internally \
+                            to transition frontier: $error"
+                   in
+                   Coda_metrics.(
+                     Gauge.dec_one
+                       Transition_frontier_controller
+                       .transitions_being_processed)
                | `Partially_valid_transition transition ->
                    process_transition ~transition ) ))
 end

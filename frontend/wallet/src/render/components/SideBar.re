@@ -37,7 +37,7 @@ module AddWallet = [%graphql
   {|
     mutation addWallet {
         addWallet {
-            publicKey
+          publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
         }
     }
   |}
@@ -80,8 +80,7 @@ let make = () => {
                    | EmptyResponse => ()
                    | Errors(_) => print_endline("Error adding wallet")
                    | Data(data) => {
-                       let pk = data##addWallet##publicKey;
-                       let key = PublicKey.ofStringExn(pk);
+                       let key = data##addWallet##publicKey;
                        updateAddressBook(AddressBook.set(~key, ~name));
                      },
                );
