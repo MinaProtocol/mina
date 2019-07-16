@@ -7,6 +7,8 @@ module Stable = struct
     module T = struct
       type t = Tick.Inner_curve.Scalar.t
       [@@deriving bin_io, sexp, version {asserted}]
+
+      let to_yojson t = `String (Tick.Inner_curve.Scalar.to_string t)
     end
 
     include T
@@ -15,7 +17,7 @@ module Stable = struct
   module Latest = V1
 end
 
-type t = Stable.Latest.t [@@deriving sexp]
+type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
 let create () =
   (* This calls into libsnark which uses /dev/urandom *)
