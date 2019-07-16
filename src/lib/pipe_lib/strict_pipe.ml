@@ -214,7 +214,7 @@ module Writer = struct
         let my_name = Option.value writer.name ~default:"<unnamed>" in
         Logger.warn logger
           ~metadata:[("pipe_name", `String my_name)]
-          ~location:__LOC__ ~module_:__MODULE__ "dropping message on pipe %s"
+          ~location:__LOC__ ~module_:__MODULE__ "Dropping message on pipe %s"
           my_name ;
         ignore (Pipe.read_now writer.strict_reader.reader) ;
         Pipe.write_without_pushback writer.writer data
