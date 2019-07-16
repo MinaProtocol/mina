@@ -123,12 +123,6 @@ type FeeTransfer {
   fee: UInt64!
 }
 
-enum TransactionStatus {
-  PENDING
-  INCLUDED
-  UNKNOWN
-}
-
 type Histogram {
   values: [Int!]!
   intervals: [Interval!]!
@@ -234,8 +228,11 @@ type query {
     publicKey: PublicKey!
   ): [UserCommand!]!
 
-  # Retrieve status of a transaction
-  transactionStatus(payment: string): TransactionStatus
+  # Get the status of a transaction
+  transactionStatus(
+    # Serialized payment (base58-encoded janestreet/bin_prot serialization)
+    payment: String!
+  ): TransactionStatus!
 }
 
 type RpcPair {
@@ -338,6 +335,18 @@ type Transactions {
 
   # Amount of coda granted to the producer of this block
   coinbase: UInt64!
+}
+
+# Status of a transaction
+enum TransactionStatus {
+  # A transaction that is on the longest chain
+  INCLUDED
+
+  # A transaction either in the transition frontier or in transaction pool but is not on the longest chain
+  PENDING
+
+  # The transaction has either been snarked, reached finality through consensus or has been dropped
+  UNKNOWN
 }
 
 # String representing a uint64 number in base 10

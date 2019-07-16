@@ -143,11 +143,10 @@ module Types = struct
               ~doc:
                 "A transaction either in the transition frontier or in \
                  transaction pool but is not on the longest chain"
-          ; enum_value "UNKOWN" ~value:Unknown
+          ; enum_value "UNKNOWN" ~value:Unknown
               ~doc:
-                "The status includes either been snarked, reached finality \
-                 through consensus or has been dropped. Computing these type \
-                 of statuses still need to be implemented" ]
+                "The transaction has either been snarked, reached finality \
+                 through consensus or has been dropped" ]
 
   module DaemonStatus = struct
     type t = Daemon_rpcs.Types.Status.t
