@@ -318,7 +318,7 @@ module type S = sig
         end
         with type V1.t = t
 
-      val precomputed_handler : Snark_params.Tick.Handler.t
+      val precomputed_handler : Snark_params.Tick.Handler.t Lazy.t
 
       val handler :
            t
@@ -361,7 +361,7 @@ module type S = sig
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
 
-      val negative_one : Value.t
+      val negative_one : Value.t Lazy.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t

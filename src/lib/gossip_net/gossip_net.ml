@@ -153,6 +153,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Removing peer from peer set: %{sexp: Peer.t}"
       peer ;
+    Coda_metrics.(Gauge.dec_one Network.peers) ;
     Hash_set.remove t.peers peer ;
     Hashtbl.update t.peers_by_ip peer.host ~f:(function
       | None ->
@@ -398,6 +399,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               ( Message.implement_multi
                   (fun client_host_and_port ~version:_ msg ->
                     (* wrap received message in envelope *)
+                    Coda_metrics.(
+                      Counter.inc_one Network.gossip_messages_received) ;
                     let sender =
                       Envelope.Sender.Remote
                         (Unix.Inet_addr.of_string
@@ -432,6 +435,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                     "Some peers connected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
                   List.iter peers ~f:(fun peer ->
+                      Coda_metrics.(Gauge.inc_one Network.peers) ;
                       Hash_set.add t.peers peer ;
                       Hashtbl.add_multi t.peers_by_ip ~key:peer.host ~data:peer
                   ) ;
