@@ -66,7 +66,7 @@ module Copy = {
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
-                    [marginTop(`rem(1.75)), marginBottom(`rem(4.0))],
+                    [marginTop(`rem(1.75)), marginBottom(`rem(2.0))],
                   ),
                 ]),
               ])
@@ -87,45 +87,7 @@ module Copy = {
                )}
             </span>
             <br />
-            <br />
-            <A
-              name={"hero-" ++ Links.Forms.mailingList.name}
-              target="_blank"
-              href={Links.Forms.mailingList.link}
-              className=largeLinkStyle>
-              {ReasonReact.string({j|Join our mailing list\u00A0→|j})}
-            </A>
-            <br />
-            <A
-              name="hero-twitter"
-              target="_blank"
-              href="https://twitter.com/codaprotocol"
-              className=Css.(
-                merge([
-                  largeLinkStyle,
-                  style([
-                    marginTop(`rem(0.5)),
-                    display(`flex),
-                    alignItems(`center),
-                    // Original color of svg
-                    unsafe(heroSvgVar, Style.Colors.(string(hyperlink))),
-                    hover([
-                      unsafe(
-                        heroSvgVar,
-                        Style.Colors.(string(hyperlinkHover)),
-                      ),
-                    ]),
-                  ]),
-                ])
-              )>
-              <span className=Css.(style([marginRight(`rem(0.375))]))>
-                {ReasonReact.string({j|Follow us on Twitter|j})}
-              </span>
-              {GetInvolvedSection.SocialLink.Svg.twitter(
-                 ~dims=(16, 16),
-                 heroSvgVar,
-               )}
-            </A>
+            <NewsletterWidget />
           </p>
         </div>
       </div>;
