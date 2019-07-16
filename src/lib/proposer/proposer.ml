@@ -293,8 +293,23 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   with
                   | Error err ->
                       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                        "failed to prove generated protocol state: %s"
-                        (Error.to_string_hum err) ;
+                        "Prover failed to prove freshly generated transition: \
+                         $error"
+                        ~metadata:
+                          [ ("error", `String (Error.to_string_hum err))
+                          ; ( "prev_state"
+                            , Protocol_state.value_to_yojson
+                                previous_protocol_state )
+                          ; ( "prev_state_proof"
+                            , Proof.to_yojson previous_protocol_state_proof )
+                          ; ( "next_state"
+                            , Protocol_state.value_to_yojson protocol_state )
+                          ; ( "internal_transition"
+                            , Internal_transition.to_yojson internal_transition
+                            )
+                          ; ( "pending_coinbase_witness"
+                            , Pending_coinbase_witness.to_yojson
+                                pending_coinbase_witness ) ] ;
                       return ()
                   | Ok protocol_state_proof -> (
                       let span = Time.diff (Time.now time_controller) t0 in
