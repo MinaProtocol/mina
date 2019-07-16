@@ -79,10 +79,10 @@ module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 module SendPayment = [%graphql
   {|
     mutation (
-      $from: String!,
-      $to_: String!,
-      $amount: String!,
-      $fee: String!,
+      $from: PublicKey!,
+      $to_: PublicKey!,
+      $amount: UInt64!,
+      $fee: UInt64!,
       $memo: String) {
       sendPayment(input:
                     {from: $from, to: $to_, amount: $amount, fee: $fee, memo: $memo}) {
@@ -131,10 +131,10 @@ let make = () => {
                        ) => {
                          let variables =
                            SendPayment.make(
-                             ~from=PublicKey.toString(from),
-                             ~to_=PublicKey.toString(to_),
-                             ~amount,
-                             ~fee,
+                             ~from=Apollo.Encoders.publicKey(from),
+                             ~to_=Apollo.Encoders.publicKey(to_),
+                             ~amount=Js.Json.string(amount),
+                             ~fee=Js.Json.string(fee),
                              ~memo=?memoOpt,
                              (),
                            )##variables;
