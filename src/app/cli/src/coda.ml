@@ -218,7 +218,7 @@ let daemon logger =
          | Error e ->
              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                "Error reading coda.version: %s" (Error.to_string_mach e) ;
-             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                "Failed to read coda.version, cleaning up the config directory \
                 %s"
                conf_dir ;
