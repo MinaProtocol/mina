@@ -1311,10 +1311,7 @@ module Queries = struct
   let transaction_status =
     result_field "transactionStatus" ~doc:"Get the status of a transaction"
       ~typ:(non_null Types.transaction_status)
-      ~args:
-        Arg.
-          [ arg "payment" ~typ:(non_null string)
-              ~doc:(Doc.bin_prot "Serialized payment") ]
+      ~args:Arg.[arg "payment" ~typ:(non_null guid) ~doc:"Id of a UserCommand"]
       ~resolve:(fun {ctx= coda; _} () serialized_payment ->
         let open Result.Let_syntax in
         let%bind payment =
