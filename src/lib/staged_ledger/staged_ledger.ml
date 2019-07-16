@@ -1454,7 +1454,7 @@ let%test_module "test" =
       (* mirrors module structure of Public_key.Compressed *)
       module Compressed_public_key = struct
         module T = struct
-          type t = string [@@deriving sexp, to_yojson, compare, yojson, hash]
+          type t = string [@@deriving sexp, compare, yojson, hash]
         end
 
         include T
@@ -1489,8 +1489,7 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = unit
-              [@@deriving
-                bin_io, sexp, to_yojson, yojson, version {unnumbered}]
+              [@@deriving bin_io, sexp, yojson, version {unnumbered}]
             end
 
             include T
@@ -1504,27 +1503,25 @@ let%test_module "test" =
           module Checked = Unit
         end
 
-        type t = Stable.Latest.t [@@deriving sexp, to_yojson, yojson]
+        type t = Stable.Latest.t [@@deriving sexp, yojson]
 
         let create ~fee:_ ~prover:_ = ()
       end
 
       module User_command = struct
         type fee = Currency.Fee.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, yojson]
+        [@@deriving sexp, bin_io, compare, yojson]
 
-        type txn_amt = int
-        [@@deriving sexp, to_yojson, bin_io, compare, eq, yojson]
+        type txn_amt = int [@@deriving sexp, bin_io, compare, eq, yojson]
 
-        type txn_fee = int
-        [@@deriving sexp, to_yojson, bin_io, compare, eq, yojson]
+        type txn_fee = int [@@deriving sexp, bin_io, compare, eq, yojson]
 
         module Stable = struct
           module V1 = struct
             module T = struct
               type t = txn_amt * txn_fee
               [@@deriving
-                sexp, to_yojson, bin_io, compare, eq, yojson, version {for_test}]
+                sexp, bin_io, compare, eq, yojson, version {for_test}]
             end
 
             include T
@@ -1533,11 +1530,11 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = Stable.Latest.t [@@deriving sexp, to_yojson, compare, yojson]
+        type t = Stable.Latest.t [@@deriving sexp, compare, yojson]
 
         module With_valid_signature = struct
           type t = Stable.Latest.t
-          [@@deriving sexp, to_yojson, bin_io, compare, eq, yojson]
+          [@@deriving sexp, bin_io, compare, eq, yojson]
         end
 
         let check : t -> With_valid_signature.t option = fun i -> Some i
@@ -1549,10 +1546,10 @@ let%test_module "test" =
 
       module Fee_transfer = struct
         type public_key = Compressed_public_key.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, eq, yojson, hash]
+        [@@deriving sexp, bin_io, compare, eq, yojson, hash]
 
         type fee = Currency.Fee.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, eq, hash, yojson, hash]
+        [@@deriving sexp, bin_io, compare, eq, hash, yojson, hash]
 
         module Single = struct
           module Stable = struct
@@ -1560,13 +1557,7 @@ let%test_module "test" =
               module T = struct
                 type t = public_key * fee
                 [@@deriving
-                  bin_io
-                  , sexp
-                  , compare
-                  , eq
-                  , yojson
-                  , hash
-                  , version {for_test}]
+                  bin_io, sexp, compare, eq, yojson, hash, version {for_test}]
               end
 
               include T
@@ -1575,8 +1566,7 @@ let%test_module "test" =
             module Latest = V1
           end
 
-          type t = Stable.Latest.t
-          [@@deriving sexp, to_yojson, compare, yojson, hash]
+          type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
         end
 
         module Stable = struct
@@ -1586,7 +1576,7 @@ let%test_module "test" =
                 | One of Single.Stable.V1.t
                 | Two of Single.Stable.V1.t * Single.Stable.V1.t
               [@@deriving
-                bin_io, sexp, to_yojson, compare, eq, yojson, version {for_test}]
+                bin_io, sexp, compare, eq, yojson, version {for_test}]
             end
 
             include T
@@ -1598,7 +1588,7 @@ let%test_module "test" =
         type t = Stable.Latest.t =
           | One of Single.Stable.V1.t
           | Two of Single.Stable.V1.t * Single.Stable.V1.t
-        [@@deriving sexp, to_yojson, compare, yojson]
+        [@@deriving sexp, compare, yojson]
 
         let to_list = function One x -> [x] | Two (x, y) -> [x; y]
 
@@ -1731,7 +1721,7 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = int [@@deriving sexp, to_yojson, compare, hash, eq, yojson]
+        type t = int [@@deriving sexp, compare, hash, eq, yojson]
 
         include Hashable.Make_binable (Stable.Latest)
 
@@ -1757,7 +1747,7 @@ let%test_module "test" =
         module Coinbase_data = struct
           type t =
             Compressed_public_key.Stable.V1.t * Currency.Amount.Stable.V1.t
-          [@@deriving bin_io, sexp, to_yojson, compare, hash, eq, yojson]
+          [@@deriving bin_io, sexp, compare, hash, eq, yojson]
 
           let to_string (pk, amt) = pk ^ Currency.Amount.to_string amt
 
@@ -1770,7 +1760,7 @@ let%test_module "test" =
 
         module Stack = struct
           type t = Coinbase_data.t list
-          [@@deriving sexp, to_yojson, bin_io, compare, hash, eq, yojson]
+          [@@deriving sexp, bin_io, compare, hash, eq, yojson]
 
           let push (t : t) c =
             let cb = Coinbase_data.of_coinbase c in
@@ -1825,7 +1815,7 @@ let%test_module "test" =
       module Pending_coinbase_stack_state = struct
         type t =
           {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
-        [@@deriving sexp, to_yojson, bin_io, compare, hash, yojson, eq]
+        [@@deriving sexp, bin_io, compare, hash, yojson, eq]
       end
 
       module Transaction_snark_statement = struct
@@ -1916,7 +1906,7 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = Stable.Latest.t [@@deriving sexp, to_yojson, yojson]
+        type t = Stable.Latest.t [@@deriving sexp, yojson]
 
         type ledger_hash = Ledger_hash.t
 
@@ -2092,16 +2082,16 @@ let%test_module "test" =
         let proofs_length = 2
 
         type proof = Ledger_proof.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, yojson]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type statement = Transaction_snark_statement.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, eq, hash, yojson]
+        [@@deriving sexp, bin_io, compare, eq, hash, yojson]
 
         type fee = Fee.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, hash, yojson]
+        [@@deriving sexp, bin_io, compare, hash, yojson]
 
         type public_key = Compressed_public_key.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, yojson]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         let ledger_proof_to_yojson = proof_to_yojson
 
@@ -2111,8 +2101,7 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = {fee: fee; proofs: proof list; prover: public_key}
-              [@@deriving
-                sexp, to_yojson, bin_io, compare, yojson, version {for_test}]
+              [@@deriving sexp, bin_io, compare, yojson, version {for_test}]
             end
 
             include T
@@ -2150,8 +2139,7 @@ let%test_module "test" =
             module Latest = V1
           end
 
-          type t = Stable.Latest.t
-          [@@deriving sexp, to_yojson, compare, hash, eq, yojson]
+          type t = Stable.Latest.t [@@deriving sexp, compare, hash, eq, yojson]
 
           include Hashable.Make (Stable.Latest)
 
@@ -2179,27 +2167,27 @@ let%test_module "test" =
 
       module Staged_ledger_diff = struct
         type completed_work = Transaction_snark_work.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, yojson]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type completed_work_checked =
           Transaction_snark_work.Checked.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, yojson]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type user_command = User_command.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, yojson]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type fee_transfer_single = Fee_transfer.Single.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, yojson]
+        [@@deriving sexp, bin_io, yojson]
 
         type user_command_with_valid_signature =
           User_command.With_valid_signature.t
-        [@@deriving sexp, to_yojson, bin_io, compare, yojson]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type public_key = Compressed_public_key.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, yojson]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type staged_ledger_hash = Staged_ledger_hash.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, compare, yojson]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         module At_most_two = struct
           module Stable = struct
@@ -2209,7 +2197,7 @@ let%test_module "test" =
                   | Zero
                   | One of 'a option
                   | Two of ('a * 'a option) option
-                [@@deriving sexp, to_yojson, bin_io, yojson, version]
+                [@@deriving sexp, bin_io, yojson, version]
               end
 
               include T
@@ -2222,7 +2210,7 @@ let%test_module "test" =
             | Zero
             | One of 'a option
             | Two of ('a * 'a option) option
-          [@@deriving sexp, to_yojson, yojson]
+          [@@deriving sexp, yojson]
 
           let increase t ws =
             match (t, ws) with
@@ -2245,7 +2233,7 @@ let%test_module "test" =
             module V1 = struct
               module T = struct
                 type 'a t = Zero | One of 'a option
-                [@@deriving sexp, to_yojson, bin_io, yojson, version]
+                [@@deriving sexp, bin_io, yojson, version]
               end
 
               include T
@@ -2255,7 +2243,7 @@ let%test_module "test" =
           end
 
           type 'a t = 'a Stable.Latest.t = Zero | One of 'a option
-          [@@deriving sexp, to_yojson, yojson]
+          [@@deriving sexp, yojson]
 
           let increase t ws =
             match (t, ws) with
@@ -2276,8 +2264,7 @@ let%test_module "test" =
                   ; user_commands: user_command list
                   ; coinbase: fee_transfer_single At_most_two.Stable.Latest.t
                   }
-                [@@deriving
-                  sexp, bin_io, yojson, version {for_test}]
+                [@@deriving sexp, bin_io, yojson, version {for_test}]
               end
 
               include T
@@ -2290,7 +2277,7 @@ let%test_module "test" =
             { completed_works: completed_work list
             ; user_commands: user_command list
             ; coinbase: fee_transfer_single At_most_two.t }
-          [@@deriving sexp, to_yojson, yojson]
+          [@@deriving sexp, yojson]
         end
 
         module Pre_diff_with_at_most_one_coinbase = struct
@@ -2302,8 +2289,7 @@ let%test_module "test" =
                   ; user_commands: user_command list
                   ; coinbase: fee_transfer_single At_most_one.Stable.Latest.t
                   }
-                [@@deriving
-                  sexp, bin_io, yojson, version {for_test}]
+                [@@deriving sexp, bin_io, yojson, version {for_test}]
               end
 
               include T
@@ -2326,8 +2312,7 @@ let%test_module "test" =
                 type t =
                   Pre_diff_with_at_most_two_coinbase.Stable.V1.t
                   * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
-                [@@deriving
-                  sexp, bin_io, yojson, version {unnumbered}]
+                [@@deriving sexp, bin_io, yojson, version {unnumbered}]
               end
 
               include T
@@ -2336,7 +2321,7 @@ let%test_module "test" =
             module Latest = V1
           end
 
-          type t = Stable.Latest.t [@@deriving sexp, to_yojson, yojson]
+          type t = Stable.Latest.t [@@deriving sexp, yojson]
         end
 
         module Stable = struct
@@ -2360,21 +2345,20 @@ let%test_module "test" =
             { completed_works: completed_work_checked list
             ; user_commands: user_command_with_valid_signature list
             ; coinbase: fee_transfer_single At_most_two.t }
-          [@@deriving sexp, to_yojson, yojson]
+          [@@deriving sexp, yojson]
 
           type pre_diff_with_at_most_one_coinbase =
             { completed_works: completed_work_checked list
             ; user_commands: user_command_with_valid_signature list
             ; coinbase: fee_transfer_single At_most_one.t }
-          [@@deriving sexp, to_yojson, yojson]
+          [@@deriving sexp, yojson]
 
           type diff =
             pre_diff_with_at_most_two_coinbase
             * pre_diff_with_at_most_one_coinbase option
-          [@@deriving sexp, to_yojson, yojson]
+          [@@deriving sexp, yojson]
 
-          type t = {diff: diff; creator: public_key}
-          [@@deriving sexp, to_yojson, yojson]
+          type t = {diff: diff; creator: public_key} [@@deriving sexp, yojson]
 
           let user_commands t =
             (fst t.diff).user_commands

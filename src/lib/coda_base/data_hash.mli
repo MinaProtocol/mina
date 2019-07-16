@@ -6,7 +6,7 @@ open Fold_lib
 
 module type Basic = sig
   type t = private Pedersen.Digest.t
-  [@@deriving sexp, to_yojson, eq, compare, hash, yojson]
+  [@@deriving sexp, eq, compare, hash, yojson]
 
   val gen : t Quickcheck.Generator.t
 
