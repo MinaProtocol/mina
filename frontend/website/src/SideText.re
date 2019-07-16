@@ -50,7 +50,7 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
           ]),
         ])
       )>
-      ...ps
+       ...ps </div>;
       //...{Array.append(
       //  ps,
       //  [|
@@ -65,6 +65,5 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
       //    </A>,
       //  |],
       //)}
-    </div>;
   },
 };

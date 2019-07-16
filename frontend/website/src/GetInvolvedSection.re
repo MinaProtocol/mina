@@ -400,7 +400,10 @@ let make = (~posts, _children) => {
             maxWidth(`rem(46.0)),
             media(
               Style.MediaQuery.notMobile,
-              [justifyContent(`center), margin3(~top=`zero, ~h=`auto, ~bottom=`rem(2.))],
+              [
+                justifyContent(`center),
+                margin3(~top=`zero, ~h=`auto, ~bottom=`rem(2.)),
+              ],
             ),
           ])
         )>
@@ -409,10 +412,7 @@ let make = (~posts, _children) => {
       <div
         className=Css.(
           style([
-            media(
-              Style.MediaQuery.notMobile,
-              [marginBottom(`rem(2.4))],
-            ),
+            media(Style.MediaQuery.notMobile, [marginBottom(`rem(2.4))]),
             display(`flex),
             flexWrap(`wrap),
             justifyContent(`spaceAround),
