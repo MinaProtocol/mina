@@ -156,6 +156,7 @@ module Make (Inputs : Inputs.S) :
               peer
         | Some transition_chain_witness ->
             let open Or_error.Let_syntax in
+            (* a list of state_hashes from new to old *)
             let%bind state_hashes =
               match
                 Transition_chain_witness.verify ~state_hash
@@ -264,9 +265,10 @@ module Make (Inputs : Inputs.S) :
                       @@ Continue_or_stop.Continue (verified_transition :: acc)
                   )
                 ~finish:(fun acc ->
-                  let last_transition = List.last_exn transitions in
+                  let oldest_missing_transition = List.hd_exn transitions in
                   let initial_state_hash =
-                    External_transition.protocol_state last_transition
+                    External_transition.protocol_state
+                      oldest_missing_transition
                     |> Protocol_state.previous_state_hash
                   in
                   Deferred.Or_error.return (acc, initial_state_hash) )
@@ -295,6 +297,12 @@ module Make (Inputs : Inputs.S) :
                 |> ignore ;
                 Deferred.Or_error.fail e ) )
 
+  let garbage_collect_disconnected_subtrees ~logger ~disconnected_subtrees =
+    List.iter disconnected_subtrees ~f:(fun subtree ->
+        Rose_tree.map subtree ~f:Cached.invalidate_with_failure |> ignore ) ;
+    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+      "garbage collected failed cached transitions"
+
   let run ~logger ~trust_system ~verifier ~network ~frontier
       ~catchup_job_reader
       ~(catchup_breadcrumbs_writer :
@@ -306,7 +314,7 @@ module Make (Inputs : Inputs.S) :
          Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
     let num_peers = 8 in
     Strict_pipe.Reader.iter_without_pushback catchup_job_reader
-      ~f:(fun (hash, subtrees) ->
+      ~f:(fun (hash, received_subtrees) ->
         ( match%bind
             get_state_hashes ~logger ~trust_system ~network ~frontier
               ~num_peers ~unprocessed_transition_cache ~state_hash:hash
@@ -316,18 +324,15 @@ module Make (Inputs : Inputs.S) :
               !"All peers either sent us bad transition_chain_witness, didn't \
                 have the info, or our transition frontier moved too fast: %s"
               (Error.to_string_hum e) ;
-            List.iter subtrees ~f:(fun subtree ->
-                Rose_tree.iter subtree ~f:(fun cached_transition ->
-                    Cached.invalidate_with_failure cached_transition |> ignore
-                ) ) ;
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              "garbage collected failed cached transitions" ;
+            garbage_collect_disconnected_subtrees ~logger
+              ~disconnected_subtrees:received_subtrees ;
             Deferred.unit
         | Ok (preferred_peer, hashes) -> (
             match%bind
               get_transitions_and_compute_breadcrumbs ~logger ~trust_system
                 ~verifier ~network ~frontier ~num_peers
-                ~unprocessed_transition_cache ~preferred_peer ~hashes ~subtrees
+                ~unprocessed_transition_cache ~preferred_peer ~hashes
+                ~subtrees:received_subtrees
             with
             | Ok trees ->
                 Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -345,12 +350,8 @@ module Make (Inputs : Inputs.S) :
                   !"All peers either sent us bad transitions, didn't have the \
                     info, or our transition frontier moved too fast: %s"
                   (Error.to_string_hum e) ;
-                List.iter subtrees ~f:(fun subtree ->
-                    Rose_tree.iter subtree ~f:(fun cached_transition ->
-                        Cached.invalidate_with_failure cached_transition
-                        |> ignore ) ) ;
-                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                  "garbage collected failed cached transitions" ;
+                garbage_collect_disconnected_subtrees ~logger
+                  ~disconnected_subtrees:received_subtrees ;
                 Deferred.unit ) )
         |> don't_wait_for )
     |> don't_wait_for

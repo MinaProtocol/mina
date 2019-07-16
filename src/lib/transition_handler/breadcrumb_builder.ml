@@ -25,7 +25,7 @@ module Make (Inputs : Inputs.S) :
       | None ->
           let msg =
             Printf.sprintf
-              !"Transition frontier garbage already collected the parent on \
+              !"Transition frontier already garbage collected the parent on \
                 %{sexp: Coda_base.State_hash.t}"
               initial_hash
           in
