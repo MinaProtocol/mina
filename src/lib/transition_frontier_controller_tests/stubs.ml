@@ -597,6 +597,23 @@ struct
       let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
       Transition_chain_witness.prove ~frontier requested_state_hash
 
+    let get_transition_chain {ip_table; _} peer hashes =
+      Deferred.return
+      @@
+      let open Option.Let_syntax in
+      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
+      Option.all
+      @@ List.map hashes ~f:(fun hash ->
+             Option.merge
+               (Transition_frontier.find frontier hash)
+               (Transition_frontier.find_in_root_history frontier hash)
+               ~f:(failwith "impossible")
+             |> Option.map ~f:(fun breadcrumb ->
+                    Transition_frontier.Breadcrumb.transition_with_hash
+                      breadcrumb
+                    |> With_hash.data
+                    |> External_transition.Validated.forget_validation ) )
+
     let glue_sync_ledger {ip_table; logger; _} query_reader response_writer :
         unit =
       Pipe_lib.Linear_pipe.iter_unordered ~max_concurrency:8 query_reader

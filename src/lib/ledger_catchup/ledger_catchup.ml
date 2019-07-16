@@ -120,40 +120,32 @@ module Make (Inputs : Inputs.S) :
         in
         Error (Error.of_string "invalid proof")
     | Error `Disconnected ->
-        let%map () =
-          Trust_system.record_envelope_sender trust_system logger sender
-            (Trust_system.Actions.Disconnected_chain, None)
-        in
-        Error (Error.of_string "disconnected chain")
+        Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
 
-  let take_while_map_result_rev ~f list =
-    let open Deferred.Or_error.Let_syntax in
-    let%map result, initial_state_hash =
-      Deferred.Or_error.List.fold list ~init:([], None)
-        ~f:(fun (acc, initial_state_hash) elem ->
-          let open Deferred.Let_syntax in
-          if Option.is_some initial_state_hash then
-            Deferred.Or_error.return (acc, initial_state_hash)
-          else
-            match%bind f elem with
-            | Error e ->
-                List.iter acc
-                  ~f:(Fn.compose ignore Cached.invalidate_with_failure) ;
-                Deferred.return (Error e)
-            | Ok (Either.First hash) ->
-                Deferred.Or_error.return (acc, Some hash)
-            | Ok (Either.Second transition) ->
-                Deferred.Or_error.return (transition :: acc, None) )
-    in
-    (result, Option.value_exn initial_state_hash)
+  let rec fold_until ~(init : 'accum)
+      ~(f :
+            'accum
+         -> 'a
+         -> ('accum, 'final) Continue_or_stop.t Deferred.Or_error.t)
+      ~(finish : 'accum -> 'final Deferred.Or_error.t) :
+      'a list -> 'final Deferred.Or_error.t = function
+    | [] ->
+        finish init
+    | x :: xs -> (
+        let open Deferred.Or_error.Let_syntax in
+        match%bind f init x with
+        | Continue_or_stop.Stop res ->
+            Deferred.Or_error.return res
+        | Continue_or_stop.Continue init ->
+            fold_until ~init ~f ~finish xs )
 
-  (*
+  (* returns a list of state-hashes with the older ones at the front *)
   let get_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
       ~unprocessed_transition_cache ~state_hash =
     let peers = Network.random_peers network num_peers in
-    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("target_hash", State_hash.to_yojson state_hash)]
-      "doing a catchup job with target $target_hash" ;
+      "Doing a catchup job with target $target_hash" ;
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
         match%map
           Network.get_transition_chain_witness network peer state_hash
@@ -162,23 +154,26 @@ module Make (Inputs : Inputs.S) :
             Or_error.errorf
               !"Peer %{sexp:Network_peer.Peer.t} did not have the transition"
               peer
-        | Some transition_chain_witness
-          ->
+        | Some transition_chain_witness ->
             let open Or_error.Let_syntax in
             let%bind state_hashes =
-              match Transition_chain_witness.verify ~state_hash ~transition_chain_witness with
-              | Some state_hashes -> return state_hashes
+              match
+                Transition_chain_witness.verify ~state_hash
+                  ~transition_chain_witness
+              with
+              | Some state_hashes ->
+                  return state_hashes
               | None ->
-                let error_msg =
-                  sprintf
-                    !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof"
-                    peer
-                in
-                ignore
-                  Trust_system.(
-                    record trust_system logger peer.host
-                      Actions.(Violated_protocol, Some (error_msg, []))) ;
-                Or_error.error_string error_msg
+                  let error_msg =
+                    sprintf
+                      !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof"
+                      peer
+                  in
+                  ignore
+                    Trust_system.(
+                      record trust_system logger peer.host
+                        Actions.(Violated_protocol, Some (error_msg, []))) ;
+                  Or_error.error_string error_msg
             in
             List.fold_until state_hashes ~init:[]
               ~f:(fun acc state_hash ->
@@ -187,99 +182,118 @@ module Make (Inputs : Inputs.S) :
                     unprocessed_transition_cache state_hash
                   || Transition_frontier.find frontier state_hash
                      |> Option.is_some
-                then Continue_or_stop.Stop (Ok (peer, acc))
+                then (
+                  let num_of_missing_transitions = List.length acc in
+                  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:
+                      [ ( "states_hashes"
+                        , `List (List.map acc ~f:State_hash.to_yojson) ) ]
+                    !"The total number of missing transitions are %d"
+                    num_of_missing_transitions ;
+                  Continue_or_stop.Stop (Ok (peer, acc)) )
                 else Continue_or_stop.Continue (state_hash :: acc) )
               ~finish:(fun _ ->
                 Or_error.errorf
                   !"Peer %{sexp:Network_peer.Peer.t} moves too fast"
                   peer ) )
-*)
+
+  let verify_against_hashes transitions hashes =
+    List.length transitions = List.length hashes
+    && List.for_all2_exn transitions hashes ~f:(fun transition hash ->
+           State_hash.equal
+             ( External_transition.protocol_state transition
+             |> Protocol_state.hash )
+             hash )
 
   let get_transitions_and_compute_breadcrumbs ~logger ~trust_system ~verifier
       ~network ~frontier ~num_peers ~unprocessed_transition_cache
-      ~target_forest =
-    let peers = Network.random_peers network num_peers in
-    let target_hash, subtrees = target_forest in
-    let open Deferred.Or_error.Let_syntax in
-    Logger.trace logger "doing a catchup job with target $target_hash"
-      ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("target_hash", State_hash.to_yojson target_hash)] ;
-    Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
-        O1trace.trace_recurring_task "ledger catchup" (fun () ->
-            match%bind Network.transition_catchup network peer target_hash with
-            | None ->
-                Deferred.return
-                @@ Or_error.errorf
-                     !"Peer %{sexp:Network_peer.Peer.t} did not have transition"
-                     peer
-            | Some queried_transitions -> (
-                let rev_queried_transitions =
-                  Non_empty_list.rev queried_transitions
+      ~preferred_peer ~hashes ~subtrees =
+    let random_peers = Network.random_peers network num_peers in
+    Deferred.Or_error.find_map_ok (preferred_peer :: random_peers)
+      ~f:(fun peer ->
+        match%bind Network.get_transition_chain network peer hashes with
+        | None ->
+            Deferred.Or_error.errorf
+              !"Peer %{sexp:Network_peer.Peer.t} did not have the transitions \
+                we requested"
+              peer
+        | Some transitions -> (
+            let open Deferred.Or_error.Let_syntax in
+            let%bind () =
+              if not @@ verify_against_hashes transitions hashes then (
+                let error_msg =
+                  sprintf
+                    !"Peer %{sexp:Network_peer.Peer.t} returned a list that \
+                      is different from the one that is requested."
+                    peer
                 in
-                let last = Non_empty_list.head rev_queried_transitions in
-                let%bind () =
-                  if
-                    State_hash.equal
-                      (Protocol_state.hash
-                         (External_transition.protocol_state last))
-                      target_hash
-                  then return ()
-                  else (
-                    ignore
-                      Trust_system.(
-                        record trust_system logger peer.host
-                          Actions.
-                            ( Violated_protocol
-                            , Some
-                                ( "Peer returned a different target \
-                                   transition than requested"
-                                , [] ) )) ;
-                    Deferred.return (Error (Error.of_string "")) )
-                in
-                let%bind verified_transitions, initial_state_hash =
-                  take_while_map_result_rev
-                    Non_empty_list.(to_list rev_queried_transitions)
-                    ~f:(fun transition ->
-                      let transition_with_hash =
-                        With_hash.of_data
-                          ~hash_data:
-                            (Fn.compose Protocol_state.hash
-                               External_transition.protocol_state)
-                          transition
-                      in
-                      verify_transition ~logger ~trust_system ~verifier
-                        ~frontier ~unprocessed_transition_cache
-                        (Envelope.Incoming.wrap ~data:transition_with_hash
-                           ~sender:(Envelope.Sender.Remote peer.host)) )
-                in
-                let split_last xs =
-                  let init = List.take xs (List.length xs - 1) in
-                  let last = List.last_exn xs in
-                  (init, last)
-                in
-                let subtrees_of_transitions =
-                  if List.length verified_transitions > 0 then
-                    let rest, target_transition =
-                      split_last verified_transitions
-                    in
-                    [ List.fold_right rest
-                        ~init:(Rose_tree.T (target_transition, subtrees))
-                        ~f:(fun transition acc ->
-                          Rose_tree.T (transition, [acc]) ) ]
-                  else subtrees
-                in
-                let open Deferred.Let_syntax in
-                match%bind
-                  Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
-                    ~verifier ~trust_system ~frontier
-                    ~initial_hash:initial_state_hash subtrees_of_transitions
-                with
-                | Ok result ->
-                    Deferred.Or_error.return result
-                | error ->
-                    List.iter verified_transitions
-                      ~f:(Fn.compose ignore Cached.invalidate_with_failure) ;
-                    Deferred.return error ) ) )
+                Trust_system.(
+                  record trust_system logger peer.host
+                    Actions.(Violated_protocol, Some (error_msg, [])))
+                |> don't_wait_for ;
+                Deferred.Or_error.error_string error_msg )
+              else Deferred.Or_error.return ()
+            in
+            (* a list of verified_transitions with new-er one at the front *)
+            let%bind verified_transitions, initial_state_hash =
+              fold_until transitions ~init:[]
+                ~f:(fun acc transition ->
+                  let hashed_transition =
+                    With_hash.of_data transition
+                      ~hash_data:
+                        (Fn.compose Protocol_state.hash
+                           External_transition.protocol_state)
+                  in
+                  let enveloped_transition =
+                    Envelope.Incoming.wrap ~data:hashed_transition
+                      ~sender:(Envelope.Sender.Remote peer.host)
+                  in
+                  let open Deferred.Let_syntax in
+                  match%bind
+                    verify_transition ~logger ~trust_system ~verifier ~frontier
+                      ~unprocessed_transition_cache enveloped_transition
+                  with
+                  | Error e ->
+                      List.map acc ~f:Cached.invalidate_with_failure |> ignore ;
+                      Deferred.Or_error.fail e
+                  | Ok (Either.First initial_state_hash) ->
+                      Deferred.Or_error.return
+                      @@ Continue_or_stop.Stop (acc, initial_state_hash)
+                  | Ok (Either.Second verified_transition) ->
+                      Deferred.Or_error.return
+                      @@ Continue_or_stop.Continue (verified_transition :: acc)
+                  )
+                ~finish:(fun acc ->
+                  let last_transition = List.last_exn transitions in
+                  let initial_state_hash =
+                    External_transition.protocol_state last_transition
+                    |> Protocol_state.previous_state_hash
+                  in
+                  Deferred.Or_error.return (acc, initial_state_hash) )
+            in
+            let subtrees_of_transitions =
+              if List.length verified_transitions <= 0 then subtrees
+              else
+                [ List.(
+                    fold
+                      (tl_exn verified_transitions)
+                      ~init:
+                        (Rose_tree.T (hd_exn verified_transitions, subtrees))
+                      ~f:(fun acc verified_transition ->
+                        Rose_tree.T (verified_transition, [acc]) )) ]
+            in
+            let open Deferred.Let_syntax in
+            match%bind
+              Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
+                ~verifier ~trust_system ~frontier
+                ~initial_hash:initial_state_hash subtrees_of_transitions
+            with
+            | Ok result ->
+                Deferred.Or_error.return result
+            | Error e ->
+                List.map verified_transitions ~f:Cached.invalidate_with_failure
+                |> ignore ;
+                Deferred.Or_error.fail e ) )
 
   let run ~logger ~trust_system ~verifier ~network ~frontier
       ~catchup_job_reader
@@ -290,28 +304,17 @@ module Make (Inputs : Inputs.S) :
          , Strict_pipe.crash Strict_pipe.buffered
          , unit )
          Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
+    let num_peers = 8 in
     Strict_pipe.Reader.iter_without_pushback catchup_job_reader
       ~f:(fun (hash, subtrees) ->
         ( match%bind
-            get_transitions_and_compute_breadcrumbs ~logger ~trust_system
-              ~verifier ~network ~frontier ~num_peers:8
-              ~unprocessed_transition_cache ~target_forest:(hash, subtrees)
+            get_state_hashes ~logger ~trust_system ~network ~frontier
+              ~num_peers ~unprocessed_transition_cache ~state_hash:hash
           with
-        | Ok trees ->
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              "about to write to the catchup breadcrumbs pipe" ;
-            if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
-              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                "catchup breadcrumbs pipe was closed; attempt to write to \
-                 closed pipe" ;
-              Deferred.unit )
-            else
-              Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
-              |> Deferred.return
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"All peers either sent us bad data, didn't have the info, or \
-                our transition frontier moved too fast: %s"
+              !"All peers either sent us bad transition_chain_witness, didn't \
+                have the info, or our transition frontier moved too fast: %s"
               (Error.to_string_hum e) ;
             List.iter subtrees ~f:(fun subtree ->
                 Rose_tree.iter subtree ~f:(fun cached_transition ->
@@ -319,7 +322,36 @@ module Make (Inputs : Inputs.S) :
                 ) ) ;
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               "garbage collected failed cached transitions" ;
-            Deferred.unit )
+            Deferred.unit
+        | Ok (preferred_peer, hashes) -> (
+            match%bind
+              get_transitions_and_compute_breadcrumbs ~logger ~trust_system
+                ~verifier ~network ~frontier ~num_peers
+                ~unprocessed_transition_cache ~preferred_peer ~hashes ~subtrees
+            with
+            | Ok trees ->
+                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                  "about to write to the catchup breadcrumbs pipe" ;
+                if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+                  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                    "catchup breadcrumbs pipe was closed; attempt to write to \
+                     closed pipe" ;
+                  Deferred.unit )
+                else
+                  Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
+                  |> Deferred.return
+            | Error e ->
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  !"All peers either sent us bad transitions, didn't have the \
+                    info, or our transition frontier moved too fast: %s"
+                  (Error.to_string_hum e) ;
+                List.iter subtrees ~f:(fun subtree ->
+                    Rose_tree.iter subtree ~f:(fun cached_transition ->
+                        Cached.invalidate_with_failure cached_transition
+                        |> ignore ) ) ;
+                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                  "garbage collected failed cached transitions" ;
+                Deferred.unit ) )
         |> don't_wait_for )
     |> don't_wait_for
 end

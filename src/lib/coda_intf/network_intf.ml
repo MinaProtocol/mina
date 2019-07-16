@@ -32,6 +32,12 @@ module type Network_intf = sig
     -> State_hash.t
     -> external_transition Non_empty_list.t option Deferred.Or_error.t
 
+  val get_transition_chain :
+       t
+    -> Network_peer.Peer.t
+    -> State_hash.t list
+    -> external_transition list Deferred.Option.t
+
   val get_ancestry :
        t
     -> Unix.Inet_addr.t
@@ -126,5 +132,7 @@ module type Network_intf = sig
     -> get_transition_chain_witness:(   State_hash.t Envelope.Incoming.t
                                      -> (State_hash.t * State_body_hash.t list)
                                         Deferred.Option.t)
+    -> get_transition_chain:(   State_hash.t list Envelope.Incoming.t
+                             -> external_transition list Deferred.Option.t)
     -> t Deferred.t
 end
