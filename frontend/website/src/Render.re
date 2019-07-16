@@ -278,4 +278,4 @@ Markdown.Child_process.execSync(
   Markdown.Child_process.option(),
 );
 
-Fs.symlinkSync(Node.Process.cwd() ++ "/graphql-docs", "./site/graphql");
+Fs.symlinkSync(Node.Process.cwd() ++ "/graphql-docs", "./site/docs/graphql");
