@@ -24,6 +24,20 @@ let reverse = List.fold_left ~init:[] ~f:(fun lst x -> x :: lst)
 let rec replicate num fn =
   if num = 0 then [] else fn () :: replicate (num - 1) fn
 
+let shift poly diff =
+  let deg = Fr_laurent.deg poly in
+  let coeffs = Fr_laurent.coeffs poly in
+  Fr_laurent.create (deg + diff) coeffs
+
+let shift_y poly diff =
+  let deg = Bivariate_fr_laurent.deg poly in
+  let coeffs = Bivariate_fr_laurent.coeffs poly in
+  let rec helper lst =
+    match lst with
+    | [] -> []
+    | hd::tl -> (shift hd diff) :: (helper tl) in
+  Bivariate_fr_laurent.create deg (helper coeffs)
+
 let eval_on_y y l =
   let deg = Bivariate_fr_laurent.deg l in
   let coeffs = Bivariate_fr_laurent.coeffs l in
@@ -47,6 +61,9 @@ let eval_on_x x l =
         Fr_laurent.( + ) (f d hd) (ff (d + 1) tl)
   in
   ff deg coeffs
+
+let eval_on_x_y x y l =
+  Fr_laurent.eval (eval_on_y y l) x
 
 (* each constant coefficient in the univariate poly L becomes an equivalent
    constant poly in Y (as the coefficient of the same X term) *)

@@ -9,15 +9,16 @@ let shuffle lst =
 
 let%test_unit "permutation" =
   let n = 20 in
-  let sigmas = shuffle (List.range 1 (n + 1)) in
-  let psis = List.map (List.range 1 (n + 1)) ~f:(fun _ -> Fr.random ()) in
+  let sigma = shuffle (List.range 1 (n + 1)) in
+  let psi = List.map (List.range 1 (n + 1)) ~f:(fun _ -> Fr.random ()) in
+  let psi_poly = psi_poly_from_sigma_psi sigma psi in
   let x = Fr.random () in
   let alpha = Fr.random () in
   let d = 45 in
   let srs = Srs.create d x alpha in
   let y = Fr.random () in
   let z = Fr.random () in
-  let proof = perm_p srs y z psis sigmas in
+  let proof = perm_p srs y z psi_poly in
   let bad_proof = {proof with perm_psi_eval= Fr.random ()} in
-  assert (perm_v srs y z psis sigmas proof) ;
-  assert (not (perm_v srs y z psis sigmas bad_proof))
+  assert (perm_v srs y z psi_poly proof) ;
+  assert (not (perm_v srs y z psi_poly bad_proof))

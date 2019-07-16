@@ -1,8 +1,9 @@
 (library
   (name sonic_prototype)
   (modules backend default_backend laurent srs arithmetic_circuit constraints commitment_scheme
-           grand_product permutation signature protocol utils test_laurent test_constraints
-           test_commitment_scheme test_grand_product test_permutation test_signature test_protocol)
+           grand_product permutation_utils permutation helped_signature unhelped_signature protocol
+           utils test_laurent test_constraints test_commitment_scheme test_grand_product 
+           test_permutation test_signatures test_protocol)
   (inline_tests)
   (preprocess (pps ppx_inline_test ppx_jane ppx_deriving.eq))
   (libraries core snarkette snarky snarky_taylor qcheck)

@@ -1,6 +1,6 @@
 open Core
 open Srs
-open Signature
+open Helped_signature
 open Utils
 open Commitment_scheme
 open Constraints
@@ -49,9 +49,9 @@ let prover (srs : Srs.t) (assignment : Assignment.t)
     open_poly srs commit_r (Fr.( * ) y z) (eval_on_y Fr.one poly_r')
   in
   let _t', wt = open_poly srs commit_t z (eval_on_y y t_p) in
-  let s = Fr_laurent.eval (eval_on_y y s_p) z in
+  let s = eval_on_x_y z y s_p in
   let ys = replicate m Fr.random in
-  let hsc_proof = hsc_p srs arith_circuit.weights ys in
+  let hsc_proof = hsc_p srs (s_poly arith_circuit.weights) ys in
   ( { pr_r= commit_r
     ; pr_t= commit_t
     ; pr_a= a
@@ -74,7 +74,7 @@ let verifier (srs : Srs.t) (arith_circuit : Arith_circuit.t) (proof : Proof.t)
       (proof.pr_a * (proof.pr_b + proof.pr_s)) + negate (Fr_laurent.eval ky y))
   in
   let checks =
-    [ hsc_v srs ys arith_circuit.weights proof.pr_hsc_proof
+    [ hsc_v srs ys (s_poly arith_circuit.weights) proof.pr_hsc_proof
     ; pc_v srs proof.pr_r z (proof.pr_a, proof.pr_wa)
     ; pc_v srs proof.pr_r (Fr.( * ) y z) (proof.pr_b, proof.pr_wb)
     ; pc_v srs proof.pr_t z (t, proof.pr_wt) ]
