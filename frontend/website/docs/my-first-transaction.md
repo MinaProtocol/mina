@@ -85,10 +85,6 @@ Great! we have successfully sent our first transaction. Let's go ahead and check
 
     $ coda.exe client get-txn-status <txn-hash>
 
-Hmmm - why does our transaction say `Pending`? Remember that Coda is a peer-to-peer network and we'll need to wait until a [block producer](../glossary/#block-producer) adds our transaction to a block. In the Coda network, this should take no more than 10 seconds, after which we'll need to wait for 30 [block confirmations](../glossary/#block-confirmations) for our transaction to become `Confirmed`.
-
-Why 30 blocks? This gives us the probabilistic security that our transaction will not be affected by a [reorganization](../glossary/#reorganization), and we can rest assured that the intended recipient has received the tokens we sent over.
-
 ## Check account balance
 
 Now that we can send transactions, it might be helpful to know our balance, so that we don't spend our testnet tokens too carelessly! Let's check our current balance by running the following command, passing in the public key of the account we generated:
