@@ -44,7 +44,7 @@
 /src/lib/codable/ @johnwu93 @bkase
 /src/lib/consensus/ @nholland94
 /src/lib/crs/ @rbkhmrcr @vanishreerao
-/src/lib/crypto_params/ @rbkhmrcr @vanishreerao
+/src/lib/crypto_params/ @rbkhmrcr @vanishreerao @mrmr1993
 /src/lib/currency/ @bkase @nholland94
 /src/lib/daemon_rpcs/ @johnwu93 @bkase
 /src/lib/debug_assert/ @nholland94 @bkase @cmr

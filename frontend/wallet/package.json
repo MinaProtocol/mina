@@ -41,7 +41,8 @@
     "test": "yarn run build && jest lib/js/",
     "dist": "yarn run build && yarn run pack && build",
     "dev-real": "concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'",
-    "dev": "GRAPHQL_BACKEND=faker yarn dev-real"
+    "dev": "GRAPHQL_BACKEND=faker yarn dev-real",
+    "regen-sdl": "node generate-schema.js http://localhost:8080/graphql > schema.graphql"
   },
   "build": {
     "appId": "FOO.org.codaprotocol.prowallet",

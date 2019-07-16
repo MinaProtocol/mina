@@ -4,7 +4,7 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-8959b8dfda29263d2f88f13a284ef34c9da0a081
+            - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -50,7 +50,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -141,7 +141,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -154,9 +154,15 @@ jobs:
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
             - run:
                   name: Build deb Package with keys
                   command: ./scripts/skip_if_only_frontend.sh make deb
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
             - run:
                   name: Store Generated Proving and Verifying Keys
                   command: ./scripts/skip_if_only_frontend.sh make provingkeys
@@ -180,7 +186,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -192,18 +198,55 @@ jobs:
                 path: core_dumps
     {%- endfor %}
 
-    {%- for profile in test_permutations.keys() | sort %}
+    {%- for profile in unit_test_profiles_medium_curves %}
+    test-unit--{{profile}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
+        steps:
+            - checkout
+            - run: ulimit -c unlimited
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 1h
+            - store_artifacts:
+                path: core_dumps
+    {%- endfor %}
+
+    {%- for profile in small_curves_tests.keys() | sort %}
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
-            {%- for test in test_permutations[profile] %}
+            {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+            {%- endfor %}
+            - store_artifacts:
+                  path: test_logs
+    {%- endfor %}
+
+    {%- for profile in medium_curves_tests.keys() | sort %}
+    test--{{profile}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            {%- for test in medium_curves_tests[profile] %}
+            - run:
+                  name: Running test -- {{profile}}:{{test}}
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
             {%- endfor %}
             - store_artifacts:
                   path: test_logs
@@ -227,6 +270,22 @@ workflows:
             {%- for profile in unit_test_profiles %}
             - test-unit--{{profile}}
             {%- endfor %}
-            {%- for profile in test_permutations.keys() | sort %}
+            {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
+    daily:
+        triggers:
+          - schedule:
+              cron: "0 12 * * *"
+              filters:
+                branches:
+                  only:
+                    - master
+                    - release/beta
+        jobs:
+          {%- for profile in unit_test_profiles_medium_curves %}
+          - test-unit--{{profile}}
+          {%- endfor %}
+          {%- for profile in medium_curves_tests.keys() | sort %}
+          - test--{{profile}}
+          {%- endfor %}

@@ -1,8 +1,8 @@
-[%%define ledger_depth 11]
+[%%import "config/ledger_depth/full.mlh"]
 [%%import "config/curve_size/medium.mlh"]
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/postake_medium_curve.mlh"]
-[%%import "config/scan_state/point1tps.mlh"]
+[%%import "config/scan_state/small.mlh"]
 [%%import "config/debug_level/some.mlh"]
 [%%import "config/proof_level/full.mlh"]
 [%%import "config/txpool_size.mlh"]
@@ -11,7 +11,7 @@
 [%%define cache_exceptions false]
 [%%define fake_hash false]
 
-[%%define genesis_ledger "testnet_postake"]
+[%%define genesis_ledger "testnet_postake_many_proposers"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
 [%%define block_window_duration 300000]
 
