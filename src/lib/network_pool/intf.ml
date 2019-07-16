@@ -160,13 +160,10 @@ module type Transaction_resource_pool_intf = sig
     with type transition_frontier := transition_frontier
      and type t := t
 
-  val pool : t -> Indexed_pool.t
+  val member : t -> User_command.With_valid_signature.t -> bool
 
   val transactions : t -> User_command.With_valid_signature.t Sequence.t
 
   val all_from_user :
     t -> Public_key.Compressed.t -> User_command.With_valid_signature.t list
-
-  val handle_diff :
-    t -> transition_frontier -> best_tip_diff -> unit Deferred.t
 end

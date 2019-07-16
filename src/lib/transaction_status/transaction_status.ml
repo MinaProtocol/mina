@@ -16,7 +16,7 @@ module type S = sig
                                Broadcast_pipe.Reader.t
     -> transaction_pool:transaction_pool
     -> User_command.t
-    -> State.t
+    -> State.t Or_error.t
 end
 
 module type Inputs_intf = sig
@@ -48,58 +48,43 @@ module Make (Inputs : Inputs_intf) :
    and type transaction_pool := Inputs.Transaction_pool.t = struct
   open Inputs
 
-  let error_if_true bool ~error = if bool then Error error else Ok ()
-
   let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
-    let check_cmd = User_command.check cmd |> Option.value_exn in
+    let open Or_error.Let_syntax in
+    let%map check_cmd =
+      Result.of_option (User_command.check cmd)
+        ~error:(Error.of_string "Invalid signature")
+    in
     let resource_pool = Transaction_pool.resource_pool transaction_pool in
-    let indexed_pool = Transaction_pool.Resource_pool.pool resource_pool in
     match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
     | None ->
-        if Network_pool.Indexed_pool.member indexed_pool check_cmd then
-          State.Unknown
-        else State.Pending
-    | Some transition_frontier -> (
-        let resulting_status =
-          (* HACK: Leveraging the result monad to expressively compute the
-             status of a transaction. If a condition is true, we would like to
-             abort the computation early and return the status reprenting the
-             condition *)
-          let open Result.Let_syntax in
-          let best_tip_path =
-            Transition_frontier.best_tip_path transition_frontier
-          in
-          let best_tip_user_commands =
-            Sequence.fold (Sequence.of_list best_tip_path)
-              ~init:User_command.Set.empty ~f:(fun acc_set breadcrumb ->
-                let external_transition =
-                  Transition_frontier.Breadcrumb.external_transition breadcrumb
-                in
-                let user_commands =
-                  External_transition.Validated.user_commands
-                    external_transition
-                in
-                List.fold user_commands ~init:acc_set ~f:Set.add )
-          in
-          let%bind () =
-            error_if_true
-              (Set.mem best_tip_user_commands cmd)
-              ~error:State.Included
-          in
-          let all_transactions =
-            Transition_frontier.all_user_commands transition_frontier
-          in
-          let%bind () =
-            error_if_true (Set.mem all_transactions cmd) ~error:State.Pending
-          in
-          error_if_true
-            (Network_pool.Indexed_pool.member indexed_pool check_cmd)
-            ~error:State.Pending
-        in
-        match resulting_status with
-        | Error result ->
-            result
-        | Ok () ->
+        if Transaction_pool.Resource_pool.member resource_pool check_cmd then
+          State.Pending
+        else State.Unknown
+    | Some transition_frontier ->
+        with_return (fun {return} ->
+            let best_tip_path =
+              Transition_frontier.best_tip_path transition_frontier
+            in
+            let best_tip_user_commands =
+              Sequence.fold (Sequence.of_list best_tip_path)
+                ~init:User_command.Set.empty ~f:(fun acc_set breadcrumb ->
+                  let external_transition =
+                    Transition_frontier.Breadcrumb.external_transition
+                      breadcrumb
+                  in
+                  let user_commands =
+                    External_transition.Validated.user_commands
+                      external_transition
+                  in
+                  List.fold user_commands ~init:acc_set ~f:Set.add )
+            in
+            if Set.mem best_tip_user_commands cmd then return State.Included ;
+            let all_transactions =
+              Transition_frontier.all_user_commands transition_frontier
+            in
+            if Set.mem all_transactions cmd then return State.Pending ;
+            if Transaction_pool.Resource_pool.member resource_pool check_cmd
+            then return State.Pending ;
             State.Unknown )
 end
 

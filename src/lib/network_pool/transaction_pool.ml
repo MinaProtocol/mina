@@ -89,7 +89,7 @@ struct
       ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
     [@@deriving sexp_of]
 
-    let pool t = t.pool
+    let member t = Indexed_pool.member t.pool
 
     let transactions' p =
       Sequence.unfold ~init:p ~f:(fun pool ->

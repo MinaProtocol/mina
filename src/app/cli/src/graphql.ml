@@ -1318,14 +1318,16 @@ module Queries = struct
               ~doc:(Doc.bin_prot "Serialized payment") ]
       ~resolve:(fun {ctx= coda; _} () serialized_payment ->
         let open Result.Let_syntax in
-        let%map payment =
+        let%bind payment =
           Types.Pagination.User_command.Inputs.Cursor.deserialize
             ~error:"Invalid payment provided" serialized_payment
         in
         let frontier_broadcast_pipe = Coda_lib.transition_frontier coda in
         let transaction_pool = Coda_lib.transaction_pool coda in
-        Transaction_status.get_status ~frontier_broadcast_pipe
-          ~transaction_pool payment )
+        Result.map_error
+          (Transaction_status.get_status ~frontier_broadcast_pipe
+             ~transaction_pool payment)
+          ~f:Error.to_string_hum )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
