@@ -188,11 +188,11 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port coda =
             let%bind snark_worker_key = Coda_lib.snark_worker_key coda in
             let%map r = Coda_lib.request_work coda in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:
-                  [ ( "work_spec"
-                    , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r)
-                    ) ]
-                "responding to a Get_work request with some new work";
+              ~metadata:
+                [ ( "work_spec"
+                  , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r) )
+                ]
+              "responding to a Get_work request with some new work" ;
             (r, snark_worker_key)) )
     ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
