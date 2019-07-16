@@ -411,12 +411,13 @@ let make = (~posts, _children) => {
           style([
             media(
               Style.MediaQuery.notMobile,
-              [marginTop(`rem(1.0)), marginBottom(`rem(2.4))],
+              [marginBottom(`rem(2.4))],
             ),
             display(`flex),
             flexWrap(`wrap),
             justifyContent(`spaceAround),
             alignItems(`center),
+            marginTop(`rem(1.0)),
             marginBottom(`rem(1.25)),
             maxWidth(`rem(63.)),
             marginLeft(`auto),

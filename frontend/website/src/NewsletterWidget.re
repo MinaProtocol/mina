@@ -4,7 +4,12 @@ module Styles = {
   let container =
     merge([
       Style.Body.basic_semibold,
-      style([position(`relative), fontWeight(`normal)]),
+      style([
+        position(`relative),
+        width(`percent(100.)),
+        fontWeight(`normal),
+        media(Style.MediaQuery.notMobile, [width(`auto)]),
+      ]),
     ]);
 
   let successMessage =
@@ -32,7 +37,7 @@ module Styles = {
       alignItems(`center),
       height(px(40)),
       borderRadius(px(4)),
-      width(px(272)),
+      width(`percent(100.)),
       color(Style.Colors.teal),
       padding(px(12)),
       border(px(1), `solid, Style.Colors.hyperlinkAlpha(0.3)),
@@ -44,6 +49,7 @@ module Styles = {
         outline(px(0), `solid, `transparent),
         borderColor(Style.Colors.hyperlinkAlpha(0.7)),
       ]),
+      media(Style.MediaQuery.notMobile, [width(px(272))]),
     ]);
 
   let submit =
@@ -54,7 +60,8 @@ module Styles = {
       color(white),
       backgroundColor(Style.Colors.jungle),
       border(px(0), `solid, `transparent),
-      marginLeft(px(8)),
+      marginTop(`rem(0.5)),
+      marginLeft(`zero),
       height(px(40)),
       width(px(120)),
       borderRadius(px(4)),
@@ -62,6 +69,10 @@ module Styles = {
       active([outline(px(0), `solid, `transparent)]),
       focus([outline(px(0), `solid, `transparent)]),
       disabled([backgroundColor(Style.Colors.slateAlpha(0.3))]),
+      media(
+        Style.MediaQuery.notMobile,
+        [marginLeft(`rem(0.5)), marginTop(`zero)],
+      ),
     ]);
 };
 
@@ -97,7 +108,7 @@ let make = _ => {
         className=Styles.submit
       />
       <RunScript>
-      {j|
+        {j|
             document.getElementById('subscribe-form-$formId '.trim()).onsubmit = function (e) {
               e.preventDefault();
               const formElement = document.getElementById('subscribe-form-$formId '.trim());
