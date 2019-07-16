@@ -372,27 +372,22 @@ let make = (~page, _children) => {
   ...component,
   render: _self => {
     <NavWrapper keepAnnouncementBar={page == `Home || page == `Blog}>
-
-        <SimpleButton
-          name="Blog"
-          link="/blog.html"
-          activePage={page == `Blog}
-        />
-        <SimpleButton
-          name="Testnet"
-          link="/testnet.html"
-          activePage={page == `Testnet}
-        />
-        <SimpleButton
-          name="GitHub"
-          link="/code.html"
-          activePage={page == `Code}
-        />
-        <SimpleButton
-          name="Careers"
-          link="/jobs.html"
-          activePage={page == `Jobs}
-        />
-      </NavWrapper>;
+      <SimpleButton name="Blog" link="/blog.html" activePage={page == `Blog} />
+      <SimpleButton
+        name="Testnet"
+        link="/testnet.html"
+        activePage={page == `Testnet}
+      />
+      <SimpleButton
+        name="GitHub"
+        link="/code.html"
+        activePage={page == `Code}
+      />
+      <SimpleButton
+        name="Careers"
+        link="/jobs.html"
+        activePage={page == `Jobs}
+      />
+    </NavWrapper>;
   },
 };
