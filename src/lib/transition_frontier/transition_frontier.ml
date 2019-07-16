@@ -635,7 +635,7 @@ module Make (Inputs : Inputs_intf) :
       go bc2 []
     in
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      "common ancestor: $state_hash"
+      "Common ancestor: $state_hash"
       ~metadata:[("state_hash", State_hash.to_yojson ancestor)] ;
     ( path_from_to (find_exn t ancestor) bc1
     , path_from_to (find_exn t ancestor) bc2 )

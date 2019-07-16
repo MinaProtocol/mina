@@ -1562,7 +1562,6 @@ let%test_module "test" =
                 [@@deriving
                   bin_io
                   , sexp
-                  , to_yojson
                   , compare
                   , eq
                   , yojson
@@ -2278,7 +2277,7 @@ let%test_module "test" =
                   ; coinbase: fee_transfer_single At_most_two.Stable.Latest.t
                   }
                 [@@deriving
-                  sexp, to_yojson, bin_io, yojson, version {for_test}]
+                  sexp, bin_io, yojson, version {for_test}]
               end
 
               include T
@@ -2304,7 +2303,7 @@ let%test_module "test" =
                   ; coinbase: fee_transfer_single At_most_one.Stable.Latest.t
                   }
                 [@@deriving
-                  sexp, to_yojson, bin_io, yojson, version {for_test}]
+                  sexp, bin_io, yojson, version {for_test}]
               end
 
               include T
@@ -2317,7 +2316,7 @@ let%test_module "test" =
             { completed_works: completed_work list
             ; user_commands: user_command list
             ; coinbase: fee_transfer_single At_most_one.t }
-          [@@deriving sexp, to_yojson, yojson]
+          [@@deriving sexp, yojson]
         end
 
         module Diff = struct
@@ -2328,7 +2327,7 @@ let%test_module "test" =
                   Pre_diff_with_at_most_two_coinbase.Stable.V1.t
                   * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
                 [@@deriving
-                  sexp, to_yojson, bin_io, yojson, version {unnumbered}]
+                  sexp, bin_io, yojson, version {unnumbered}]
               end
 
               include T
@@ -2354,7 +2353,7 @@ let%test_module "test" =
         end
 
         type t = Stable.Latest.t = {diff: Diff.Stable.V1.t; creator: public_key}
-        [@@deriving sexp, to_yojson, yojson, fields]
+        [@@deriving sexp, yojson, fields]
 
         module With_valid_signatures_and_proofs = struct
           type pre_diff_with_at_most_two_coinbase =
