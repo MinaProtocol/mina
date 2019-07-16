@@ -609,7 +609,7 @@ struct
              Option.merge
                (Transition_frontier.find frontier hash)
                (Transition_frontier.find_in_root_history frontier hash)
-               ~f:(failwith "impossible")
+               ~f:Fn.const
              |> Option.map ~f:(fun breadcrumb ->
                     Transition_frontier.Breadcrumb.transition_with_hash
                       breadcrumb
