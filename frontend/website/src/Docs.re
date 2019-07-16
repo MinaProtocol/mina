@@ -243,6 +243,28 @@ let make = _children => {
         className=Css.(
           style([maxWidth(`rem(43.)), width(`percent(100.))])
         )>
+        <A
+          name="Edit Link"
+          target="_blank"
+          href="{{ page.edit_url }}"
+          className=Css.(style([
+            position(`relative),
+            float(`right),
+            marginTop(`rem(3.25)),
+            marginBottom(`rem(0.5)),
+            hover([color(Style.Colors.hyperlinkHover)]),
+            ...Style.Link.basicStyles,
+          ]))>
+          <svg
+            fill=Style.Colors.(string(greyBlue))
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24">
+            <path
+              d="M7.127 22.562l-7.127 1.438 1.438-7.128 5.689 5.69zm1.414-1.414l11.228-11.225-5.69-5.692-11.227 11.227 5.689 5.69zm9.768-21.148l-2.816 2.817 5.691 5.691 2.816-2.819-5.691-5.689z"/>
+          </svg>
+        </A>
         {ReasonReact.string("{{ page.content }}")}
       </article>
     </div>,

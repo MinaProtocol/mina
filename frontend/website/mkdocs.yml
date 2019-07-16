@@ -2,6 +2,8 @@ site_name: Coda Documentation
 theme:
   name: null
   custom_dir: 'docs-theme/'
+repo_url: https://github.com/codaprotocol/coda/
+edit_uri: edit/mk-docs/frontend/website/docs/
 nav:
   - Overview: index.md
   - Getting Started: getting-started.md

@@ -6,7 +6,7 @@ In this section, we'll make our first transaction on the Coda network. After [se
 
 Run the following command to start up a Coda node instance and connect to the network:
 
-    $ coda.exe daemon -peer <seed-host>:<seed-port> 
+    $ coda.exe daemon -peer mighty-wombat.o1test.net:8302
 
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. 
 
