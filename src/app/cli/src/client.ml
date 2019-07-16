@@ -16,9 +16,9 @@ let dispatch rpc query port =
           Rpc.Rpc.dispatch rpc conn query )
 
 (** Call an RPC, passing handlers for a successful call and a failing one. Note
-   that a successful *call* may have failed on the server side and returned a
-   failing result. To deal with that, the success handler returns an
-   Or_error. *)
+    that a successful *call* may have failed on the server side and returned a
+    failing result. To deal with that, the success handler returns an
+    Or_error. *)
 let dispatch_with_message rpc query port ~success ~error =
   let fail err = eprintf "%s\n%!" err ; exit 14 in
   match%bind dispatch rpc query port with
@@ -599,6 +599,22 @@ let stop_tracing =
          | Error e ->
              eprintf !"Error: %{sexp:Error.t}\n" e ))
 
+let set_staking =
+  let privkey_path = Cli_lib.Flag.privkey_write_path in
+  Command.async ~summary:"Set keypair to stake and propose a new block"
+    (Cli_lib.Background_daemon.init privkey_path ~f:(fun port privkey_path ->
+         let%bind ({Keypair.public_key; _} as keypair) =
+           Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+         in
+         match%map dispatch Daemon_rpcs.Set_staking.rpc [keypair] port with
+         | Error e ->
+             eprintf !"Error: %{sexp:Error.t}\n" e
+         | Ok () ->
+             printf
+               !"New staking public key : %s\n"
+               (Public_key.Compressed.to_base58_check
+                  (Public_key.compress public_key)) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -650,6 +666,7 @@ let command =
     ; ("send-payment", send_payment)
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
+    ; ("set-staking", set_staking)
     ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
     ; ("stop-daemon", stop_daemon)

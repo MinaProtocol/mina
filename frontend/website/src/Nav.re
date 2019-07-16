@@ -426,18 +426,9 @@ let component = ReasonReact.statelessComponent("CodaNav");
 let make = (~page, _children) => {
   ...component,
   render: _self => {
-    <NavWrapper keepAnnouncementBar={true}>
+    <NavWrapper keepAnnouncementBar=true>
       <SimpleButton name="Blog" link="/blog.html" activePage={page == `Blog} />
-      <SimpleButton
-        name="Docs"
-        link="/docs/"
-        activePage={page == `Docs}
-      />
-      <SimpleButton
-        name="Testnet"
-        link="/testnet.html"
-        activePage={page == `Testnet}
-      />
+      <SimpleButton name="Docs" link="/docs/" activePage={page == `Docs} />
       <SimpleButton
         name="Careers"
         link="/jobs.html"
@@ -445,8 +436,8 @@ let make = (~page, _children) => {
       />
       <SimpleButton
         name="GitHub"
-        link="/code.html"
-        activePage={page == `Code}
+        link="https://github.com/CodaProtocol/coda"
+        activePage=false
       />
     </NavWrapper>;
   },

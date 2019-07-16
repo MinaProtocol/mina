@@ -85,11 +85,12 @@ module Process = {
       ChildProcess.spawn(
         command.executable,
         command.args,
-        {
-          "env": command.env,
-          "stdio":
+        ChildProcess.spawnOptions(
+          ~env=command.env,
+          ~stdio=
             ChildProcess.makeIOTriple(`Ignore, `Stream(log), `Stream(log)),
-        },
+          (),
+        ),
       );
 
     ChildProcess.Process.onError(process, e =>
