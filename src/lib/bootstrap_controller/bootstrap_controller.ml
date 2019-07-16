@@ -159,9 +159,10 @@ end = struct
       | Error e ->
           Deferred.return
           @@ Fn.const `Ignored
-          @@ Logger.error t.logger
-               !"Could not get the proof of root from the network: %s"
-               (Error.to_string_hum e)
+          @@ Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:[("error", `String (Error.to_string_hum e))]
+               !"Could not get the proof of the root transition from the \
+                 network: $error"
       | Ok peer_root_with_proof -> (
           match%bind
             Root_prover.verify ~logger:t.logger ~verifier:t.verifier
@@ -311,10 +312,13 @@ end = struct
                        scan state from the peer."
                     , [] ) ))
         in
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("error", `String (Error.to_string_hum e))]
-          "Failed to find scan state from the peer or received faulty scan \
-           state. Retry bootstrap!" ;
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ("error", `String (Error.to_string_hum e))
+            ; ("state_hash", State_hash.to_yojson hash) ]
+          "Failed to find scan state for the transition with hash $state_hash \
+           from the peer or received faulty scan state: $error. Retry \
+           bootstrap" ;
         run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
           ~transition_reader
     | Ok root_staged_ledger -> (
@@ -345,7 +349,7 @@ end = struct
               ~local_state
           with
           | None ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "local_state"
                     , Consensus.Data.Local_state.to_yojson local_state )
@@ -370,9 +374,9 @@ end = struct
                 sync_jobs
         with
         | Error e ->
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("error", `String (Error.to_string_hum e))]
-              "Local state sync failed. Retry bootstrap" ;
+              "Local state sync failed: $error. Retry bootstrap" ;
             run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
               ~transition_reader
         | Ok () ->
