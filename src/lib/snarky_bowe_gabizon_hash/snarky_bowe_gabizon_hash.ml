@@ -34,7 +34,7 @@ struct
     >>| Field.Var.project
 
   let make_checked f =
-    M.make_checked f |> Checked.with_state (Impl.As_prover.return ())
+    M.make_checked f |> M.Internal_Basic.with_state (Impl.As_prover.return ())
 
   let group_map x =
     make_checked (fun () ->
@@ -169,12 +169,12 @@ let%test_module "test" =
       module G2 = struct
         include D.G2
 
-        let to_affine_coordinates t =
+        let to_affine_exn t =
           let f v = C.Field.Vector.(get v 0, get v 1, get v 2) in
           let x, y = D.G2.to_affine_exn t in
           (f x, f y)
 
-        let of_affine_coordinates (x, y) =
+        let of_affine (x, y) =
           let f a =
             let open C.Field.Vector in
             let t = C.Field.Vector.create () in
@@ -186,8 +186,7 @@ let%test_module "test" =
         let typ =
           let fqe = Typ.tuple3 Field.typ Field.typ Field.typ in
           Typ.tuple2 fqe fqe
-          |> Typ.transport ~there:to_affine_coordinates
-               ~back:of_affine_coordinates
+          |> Typ.transport ~there:to_affine_exn ~back:of_affine
 
         let gen = curve_gen (scale_field one)
       end
@@ -226,7 +225,7 @@ let%test_module "test" =
       in
       Quickcheck.test ~trials:3 input ~f:(fun (message_length, inp) ->
           let typ =
-            let open Typ in
+            let open Impl.Typ in
             of_hlistable
               [ array ~length:message_length Impl.Boolean.typ
               ; Curve.Checked.typ

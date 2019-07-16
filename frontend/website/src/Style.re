@@ -49,6 +49,9 @@ module Colors = {
 
   let blueBlue = `rgb((42, 81, 224));
   let midnight = `rgb((31, 45, 61));
+
+  let jungleAlpha = a => `rgba((47, 172, 70, a));
+  let jungle = jungleAlpha(1.);
 };
 
 module Typeface = {

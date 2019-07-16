@@ -171,21 +171,37 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
           return (Coda_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
         (fun () filename -> return (Coda_base.Ledger.Debug.visualize ~filename)
-      ) ]
+      )
+    ; implement Daemon_rpcs.Set_staking.rpc (fun () keypairs ->
+          let keypair_and_compressed_key =
+            List.map keypairs
+              ~f:(fun ({Keypair.Stable.Latest.public_key; _} as keypair) ->
+                (keypair, Public_key.compress public_key) )
+          in
+          Coda_lib.replace_propose_keypairs coda
+            (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
+          Deferred.unit ) ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
           let r = Coda_lib.request_work coda in
           Option.iter r ~f:(fun r ->
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
-                r ) ;
+                ~metadata:
+                  [ ( "work_spec"
+                    , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r)
+                    ) ]
+                "responding to a Get_work request with some new work" ) ;
           return r )
     ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-            !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
-            work.spec ;
+            "received completed work from a snark worker"
+            ~metadata:
+              [ ( "work_spec"
+                , `String
+                    (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" work.spec) )
+              ] ;
           List.iter work.metrics ~f:(fun (total, tag) ->
               match tag with
               | `Merge ->

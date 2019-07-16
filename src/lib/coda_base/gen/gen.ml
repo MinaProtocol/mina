@@ -41,13 +41,21 @@ let expr ~loc =
       (List.map keypairs ~f:(fun {public_key; private_key} ->
            E.pexp_tuple
              [ estring
-                 (Public_key.Compressed.to_base58_check
+                 (Binable.to_string
+                    (module Public_key.Compressed.Stable.Latest)
                     (Public_key.compress public_key))
-             ; estring (Private_key.to_base58_check private_key) ] ))
+             ; estring
+                 (Binable.to_string
+                    (module Private_key.Stable.Latest)
+                    private_key) ] ))
   in
   let%expr conv (pk, sk) =
-    ( Signature_lib.Public_key.Compressed.of_base58_check_exn pk
-    , Signature_lib.Private_key.of_base58_check_exn sk )
+    ( Core_kernel.Binable.of_string
+        (module Signature_lib.Public_key.Compressed.Stable.Latest)
+        pk
+    , Core_kernel.Binable.of_string
+        (module Signature_lib.Private_key.Stable.Latest)
+        sk )
   in
   Array.map conv [%e earray]
 
@@ -56,7 +64,7 @@ let structure ~loc =
     let loc = loc
   end) in
   let open E in
-  [%str let keypairs = [%e expr ~loc]]
+  [%str let keypairs = lazy [%e expr ~loc]]
 
 let json =
   `List

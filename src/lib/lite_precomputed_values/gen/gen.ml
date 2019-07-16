@@ -30,7 +30,7 @@ let wrap_vk ~loc =
   let vk_base58 =
     Base58_check.encode
       (Binable.to_string
-         (module Lite_params.Tock.Groth_maller.Verification_key)
+         (module Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key)
          vk)
   in
   let%map () =
@@ -47,7 +47,7 @@ let wrap_vk ~loc =
   let open E in
   [%expr
     Core_kernel.Binable.of_string
-      (module Lite_params.Tock.Groth_maller.Verification_key)
+      (module Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key)
       (Base58_check.decode_exn [%e estring vk_base58])]
 
 let protocol_state (s : Protocol_state.Value.t) : Lite_base.Protocol_state.t =
@@ -77,7 +77,9 @@ let genesis ~loc =
     let loc = loc
   end) in
   let open E in
-  let protocol_state = protocol_state Genesis_protocol_state.t.data in
+  let protocol_state =
+    protocol_state (Lazy.force Genesis_protocol_state.t).data
+  in
   let ledger =
     Sparse_ledger_lib.Sparse_ledger.of_hash ~depth:0
       protocol_state.body.blockchain_state.staged_ledger_hash.ledger_hash

@@ -59,8 +59,19 @@ module StakingSwitch = {
   };
 };
 
+type ownedWallets =
+  Wallet.t = {
+    publicKey: PublicKey.t,
+    balance: {. "total": int64},
+  };
+
 module Wallets = [%graphql
-  {| query getWallets { ownedWallets {publicKey, balance {total}} } |}
+  {| query getWallets { ownedWallets @bsRecord {
+      publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+      balance {
+          total @bsDecoder(fn: "Apollo.Decoders.int64")
+      }
+    }} |}
 ];
 
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
@@ -68,10 +79,10 @@ module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 module SendPayment = [%graphql
   {|
     mutation (
-      $from: String!,
-      $to_: String!,
-      $amount: String!,
-      $fee: String!,
+      $from: PublicKey!,
+      $to_: PublicKey!,
+      $amount: UInt64!,
+      $fee: UInt64!,
       $memo: String) {
       sendPayment(input:
                     {from: $from, to: $to_, amount: $amount, fee: $fee, memo: $memo}) {
@@ -106,33 +117,24 @@ let make = () => {
                {switch (modalState) {
                 | false => React.null
                 | true =>
-                  <RequestCodaModal
-                    wallets={Array.map(
-                      ~f=Wallet.ofGraphqlExn,
-                      data##ownedWallets,
-                    )}
-                    setModalState
-                  />
+                  <RequestCodaModal wallets=data##ownedWallets setModalState />
                 }}
                <Spacer width=1. />
                <SendPaymentMutation>
                  (
                    (mutation, _) =>
                      <SendButton
-                       wallets={Array.map(
-                         ~f=Wallet.ofGraphqlExn,
-                         data##ownedWallets,
-                       )}
+                       wallets=data##ownedWallets
                        onSubmit={(
                          {from, to_, amount, fee, memoOpt}: SendButton.ModalState.Validated.t,
                          afterSubmit,
                        ) => {
                          let variables =
                            SendPayment.make(
-                             ~from=PublicKey.toString(from),
-                             ~to_=PublicKey.toString(to_),
-                             ~amount,
-                             ~fee,
+                             ~from=Apollo.Encoders.publicKey(from),
+                             ~to_=Apollo.Encoders.publicKey(to_),
+                             ~amount=Js.Json.string(amount),
+                             ~fee=Js.Json.string(fee),
                              ~memo=?memoOpt,
                              (),
                            )##variables;

@@ -95,6 +95,10 @@ module Make (Inputs : Inputs.S) :
                   with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in
+                      Coda_metrics.(
+                        Counter.inc_one
+                          Transition_frontier_controller
+                          .breadcrumbs_built_by_builder) ;
                       Deferred.return
                         (let%map (_ : Transition_frontier.Breadcrumb.t) =
                            breadcrumb_if_present ()
