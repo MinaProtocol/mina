@@ -107,7 +107,7 @@ module Make (Inputs : Inputs_intf) :
       ~metadata:
         [ ( "merkle_list"
           , `List (List.map ~f:State_body_hash.to_yojson merkle_list) ) ]
-      "Produced a merkle list of $merkle_list" ;
+      "Root prover produced a merkle list of $merkle_list" ;
     Some
       Proof_carrying_data.
         { data= root |> External_transition.Validated.forget_validation

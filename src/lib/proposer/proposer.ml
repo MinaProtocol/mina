@@ -63,8 +63,8 @@ module Singleton_scheduler : sig
 
   val create : Time.Controller.t -> t
 
-  (** If you reschedule when already scheduled, take the min of the two schedulings *)
   val schedule : t -> Time.t -> f:(unit -> unit) -> unit
+  (** If you reschedule when already scheduled, take the min of the two schedulings *)
 end = struct
   type t =
     { mutable timeout: unit Time.Timeout.t option
@@ -211,7 +211,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Bootstrapping right now. Cannot generate new blockchains or \
-           schedule event"
+           schedule event until it has finished"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let propose ivar (keypair, proposal_data) =
@@ -375,14 +375,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         [("state_hash", State_hash.to_yojson transition_hash)]
                       in
                       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                        !"Submitting transition $state_hash to the transition \
-                          frontier controller"
+                        !"Submitting newly produced block $state_hash to the \
+                          transition frontier controller"
                         ~metadata ;
                       Coda_metrics.(Counter.inc_one Proposer.blocks_proposed) ;
                       let%bind () =
                         Strict_pipe.Writer.write transition_writer breadcrumb
                       in
-                      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                         ~metadata
                         "Waiting for transition $state_hash to be inserted \
                          into frontier" ;

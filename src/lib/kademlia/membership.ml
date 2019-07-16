@@ -258,7 +258,8 @@ module Haskell_process = struct
                 line_no_prefix ;
               None
           | "DATA" ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+              (* Too noisy to put in info logs *)
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
                 line_no_prefix ;
               Some [line_no_prefix]
           | _ ->

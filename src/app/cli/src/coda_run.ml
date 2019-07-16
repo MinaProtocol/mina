@@ -67,20 +67,20 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   in
   let frontier_file = conf_dir ^/ "frontier.dot" in
   let mask_file = conf_dir ^/ "registered_masks.dot" in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
     (Visualization_message.success "registered masks" mask_file) ;
   Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
   match !coda_ref with
   | None ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
         "Shutdown before Coda instance was created, not saving a visualization"
   | Some t -> (
     match Coda_lib.visualize_frontier ~filename:frontier_file t with
     | `Active () ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
           (Visualization_message.success "transition frontier" frontier_file)
     | `Bootstrapping ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
           (Visualization_message.bootstrap "transition frontier") )
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
@@ -334,7 +334,7 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
           Logger.extend top_logger
             [("coda_run", `String "Program got killed by signal")]
         in
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
           !"Coda process got interrupted by signal %{sexp:t}"
           signal ;
         Stdlib.exit 130 ))
