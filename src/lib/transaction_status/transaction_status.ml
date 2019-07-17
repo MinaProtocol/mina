@@ -57,9 +57,7 @@ module Make (Inputs : Inputs_intf) :
     let resource_pool = Transaction_pool.resource_pool transaction_pool in
     match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
     | None ->
-        if Transaction_pool.Resource_pool.member resource_pool check_cmd then
-          State.Pending
-        else State.Unknown
+        State.Unknown
     | Some transition_frontier ->
         with_return (fun {return} ->
             let best_tip_path =

@@ -57,7 +57,8 @@ let%test_module "transaction_status" =
       transaction_pool
 
     let single_async_test ~f gen =
-      don't_wait_for (Quickcheck.async_test ~trials:1 gen ~f)
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Quickcheck.async_test ~trials:1 gen ~f )
 
     let get_status_exn ~frontier_broadcast_pipe ~transaction_pool user_command
         =
@@ -65,15 +66,16 @@ let%test_module "transaction_status" =
       @@ Test.get_status ~frontier_broadcast_pipe ~transaction_pool
            user_command
 
-    let%test_unit "If the transition frontier currently doesn't exist but is \
-                   in the transaction pool, then the transaction is pending" =
+    let%test_unit "If the transition frontier currently doesn't exist, the \
+                   status of a sent transaction will be unknown" =
       single_async_test user_command_gen ~f:(fun user_command ->
           let frontier_broadcast_pipe, _ = Broadcast_pipe.create None in
           let%bind transaction_pool = create_pool ~frontier_broadcast_pipe in
           let%map () = Transaction_pool.add transaction_pool user_command in
+          Logger.info logger "Hello" ~module_:__MODULE__ ~location:__LOC__ ;
           [%test_eq: Transaction_status.State.t]
             ~equal:Transaction_status.State.equal
-            Transaction_status.State.Pending
+            Transaction_status.State.Unknown
             (get_status_exn ~frontier_broadcast_pipe ~transaction_pool
                user_command) )
 
