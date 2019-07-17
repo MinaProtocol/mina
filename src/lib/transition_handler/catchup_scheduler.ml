@@ -173,7 +173,7 @@ module Make (Inputs : Inputs.S) = struct
           let forest = extract_forest t parent_hash in
           Hashtbl.remove t.parent_root_timeouts parent_hash ;
           remove_tree t parent_hash ;
-          Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+          Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ("parent_hash", Coda_base.State_hash.to_yojson parent_hash)
               ; ( "duration"

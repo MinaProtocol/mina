@@ -674,8 +674,8 @@ end = struct
             ~metadata:
               [ ("old_root_hash", Root_hash.to_yojson root_hash)
               ; ("new_root_hash", Root_hash.to_yojson h) ]
-            "New_goal in sync ledger changing target from $old_root_hash to \
-             $new_root_hash" ) ;
+            "New_goal: changing target from $old_root_hash to $new_root_hash"
+      ) ;
       Ivar.fill_if_empty t.validity_listener
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
