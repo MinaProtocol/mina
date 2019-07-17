@@ -539,7 +539,7 @@ module Base = struct
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(tick_input ()) main))
-      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
+      ~create_env:(fun x -> Coda_base.Ci_die.skip_key_generation () ; Keypair.generate (Lazy.force x))
 end
 
 module Transition_data = struct
@@ -824,7 +824,7 @@ module Merge = struct
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(input ()) main))
-      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
+      ~create_env:(fun x -> Coda_base.Ci_die.skip_key_generation () ; Keypair.generate (Lazy.force x))
 end
 
 module Verification = struct
@@ -1071,7 +1071,7 @@ struct
       ~brew_install_path:Cache_dir.brew_install_path
       ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
       ~input:(constraint_system ~exposing:wrap_input main)
-      ~create_env:Keypair.generate
+      ~create_env:(fun x -> Coda_base.Ci_die.skip_key_generation () ; Keypair.generate x)
 end
 
 module type S = sig

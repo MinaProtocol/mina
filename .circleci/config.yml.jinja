@@ -125,6 +125,7 @@ jobs:
                  no_output_timeout: 1h
                  environment:
                   DUNE_PROFILE: testnet_postake_medium_curves
+                  CODA_CI_DIE_IF_KEYS_OUTDATED: true
            - run:
                  name: Run all tests (on master)
                  command: echo "FIXME Tests not yet working on mac"
