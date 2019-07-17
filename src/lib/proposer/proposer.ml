@@ -529,8 +529,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             [ ( "time_till_genesis"
               , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )
             ]
-          "node started before genesis: waiting $time_till_genesis ms before \
-           proposing any blocks" ;
+          "Node started before genesis: waiting $time_till_genesis \
+           milliseconds before proposing any blocks" ;
         ignore
           (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
                start () )) )
