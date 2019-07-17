@@ -208,8 +208,7 @@ Router.(
       [|
         File(
           "main",
-          <Page
-            page=`Docs name="/docs/main" extraHeaders={Docs.extraHeaders()}>
+          <Page page=`Docs name="/docs/main">
             <Wrapped> <Docs /> </Wrapped>
           </Page>,
         ),
