@@ -8,6 +8,9 @@ Run the following command to start up a Coda node instance and connect to the ne
 
     $ coda daemon -peer genesis-test.o1test.net:8303
 
+!!!note
+    On macOS, you'll need to also run `export CODA_KADEMLIA_PATH=./kademlia`
+
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. 
 
 !!!note
