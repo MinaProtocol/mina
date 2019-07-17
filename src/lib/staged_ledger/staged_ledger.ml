@@ -155,7 +155,7 @@ struct
       (Statement_scanner_proof_verifier)
 
   type pending_coinbase_collection = Pending_coinbase.t
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp, to_yojson, bin_io]
 
   type t =
     { scan_state: Scan_state.t
@@ -1415,7 +1415,11 @@ include Make (struct
 
     [%%define_locally
     Pending_coinbase.
-      (latest_stack, create, remove_coinbase_stack, update_coinbase_stack)]
+      ( latest_stack
+      , create
+      , remove_coinbase_stack
+      , update_coinbase_stack
+      , to_yojson )]
   end
 
   module Proof_type = Transaction_snark.Proof_type
@@ -1460,7 +1464,14 @@ let%test_module "test" =
             module T = struct
               type t = string
               [@@deriving
-                sexp, bin_io, compare, eq, yojson, hash, version {unnumbered}]
+                sexp
+                , to_yojson
+                , bin_io
+                , compare
+                , eq
+                , yojson
+                , hash
+                , version {unnumbered}]
             end
 
             include T
@@ -1611,17 +1622,18 @@ let%test_module "test" =
       end
 
       module Coinbase = struct
-        type public_key = string [@@deriving sexp, bin_io, compare, eq, hash]
+        type public_key = string
+        [@@deriving sexp, to_yojson, bin_io, compare, eq, hash]
 
         type fee_transfer = Fee_transfer.Single.Stable.V1.t
-        [@@deriving sexp, bin_io, compare, eq, hash]
+        [@@deriving sexp, to_yojson, bin_io, compare, eq, hash]
 
         (* TODO : version *)
         type t =
           { proposer: public_key
           ; amount: Currency.Amount.Stable.V1.t
           ; fee_transfer: fee_transfer option }
-        [@@deriving sexp, bin_io, compare, eq, hash]
+        [@@deriving sexp, to_yojson, bin_io, compare, eq, hash]
 
         let supply_increase {proposer= _; amount; fee_transfer} =
           match fee_transfer with
@@ -1651,20 +1663,22 @@ let%test_module "test" =
 
       module Transaction = struct
         type valid_user_command = User_command.With_valid_signature.t
-        [@@deriving sexp, bin_io, compare, eq]
+        [@@deriving sexp, to_yojson, bin_io, compare, eq]
 
         type fee_transfer = Fee_transfer.Stable.V1.t
-        [@@deriving sexp, bin_io, compare, eq]
+        [@@deriving sexp, to_yojson, bin_io, compare, eq]
 
-        type coinbase = Coinbase.t [@@deriving sexp, bin_io, compare, eq]
+        type coinbase = Coinbase.t
+        [@@deriving sexp, to_yojson, bin_io, compare, eq]
 
-        type unsigned_fee = Fee.Stable.V1.t [@@deriving sexp, bin_io, compare]
+        type unsigned_fee = Fee.Stable.V1.t
+        [@@deriving sexp, to_yojson, bin_io, compare]
 
         type t =
           | User_command of valid_user_command
           | Fee_transfer of fee_transfer
           | Coinbase of coinbase
-        [@@deriving sexp, bin_io, compare, eq]
+        [@@deriving sexp, to_yojson, bin_io, compare, eq]
 
         let fee_excess : t -> Fee.Signed.t Or_error.t =
          fun t ->
@@ -1691,7 +1705,14 @@ let%test_module "test" =
             module T = struct
               type t = int
               [@@deriving
-                sexp, bin_io, compare, hash, eq, yojson, version {unnumbered}]
+                sexp
+                , to_yojson
+                , bin_io
+                , compare
+                , hash
+                , eq
+                , yojson
+                , version {unnumbered}]
             end
 
             include T
@@ -1715,7 +1736,7 @@ let%test_module "test" =
 
       module Pending_coinbase_hash = struct
         module T = struct
-          type t = string [@@deriving sexp, bin_io, compare, hash]
+          type t = string [@@deriving sexp, to_yojson, bin_io, compare, hash]
         end
 
         include T
@@ -1748,7 +1769,7 @@ let%test_module "test" =
           let gen = Quickcheck.Generator.list_non_empty Coinbase_data.gen
         end
 
-        type t = Stack.t list [@@deriving sexp, bin_io]
+        type t = Stack.t list [@@deriving sexp, to_yojson, bin_io]
 
         let merkle_root : t -> Pending_coinbase_hash.t =
          fun t ->
@@ -1809,7 +1830,14 @@ let%test_module "test" =
                 ; fee_excess: Fee.Signed.Stable.V1.t
                 ; proof_type: [`Base | `Merge] }
               [@@deriving
-                sexp, bin_io, compare, hash, yojson, eq, version {for_test}]
+                sexp
+                , to_yojson
+                , bin_io
+                , compare
+                , hash
+                , yojson
+                , eq
+                , version {for_test}]
             end
 
             include T
@@ -1903,11 +1931,11 @@ let%test_module "test" =
 
       module Ledger = struct
         (*TODO: Test with a ledger that's more comprehensive*)
-        type t = int ref [@@deriving sexp, bin_io, compare]
+        type t = int ref [@@deriving sexp, to_yojson, bin_io, compare]
 
         type ledger_hash = Ledger_hash.t
 
-        type transaction = Transaction.t [@@deriving sexp, bin_io]
+        type transaction = Transaction.t [@@deriving sexp, to_yojson, bin_io]
 
         module Undo = struct
           type t = transaction [@@deriving sexp]
@@ -1916,7 +1944,7 @@ let%test_module "test" =
             module V1 = struct
               module T = struct
                 type t = transaction
-                [@@deriving sexp, bin_io, version {for_test}]
+                [@@deriving sexp, to_yojson, bin_io, version {for_test}]
               end
 
               include T
@@ -1997,7 +2025,7 @@ let%test_module "test" =
       end
 
       module Sparse_ledger = struct
-        type t = int [@@deriving sexp, bin_io]
+        type t = int [@@deriving sexp, to_yojson, bin_io]
 
         let of_ledger_subset_exn :
             Ledger.t -> Compressed_public_key.t list -> t =
@@ -2023,7 +2051,13 @@ let%test_module "test" =
             module T = struct
               type t = string
               [@@deriving
-                bin_io, sexp, hash, compare, yojson, version {unnumbered}]
+                bin_io
+                , sexp
+                , to_yojson
+                , hash
+                , compare
+                , yojson
+                , version {unnumbered}]
             end
 
             include T
@@ -2033,7 +2067,7 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = string [@@deriving sexp, eq, compare]
+        type t = string [@@deriving sexp, to_yojson, eq, compare]
 
         type ledger_hash = Ledger_hash.t
 
@@ -2059,6 +2093,10 @@ let%test_module "test" =
         type public_key = Compressed_public_key.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
+        let ledger_proof_to_yojson = proof_to_yojson
+
+        let compressed_public_key_to_yojson = public_key_to_yojson
+
         module Stable = struct
           module V1 = struct
             module T = struct
@@ -2074,7 +2112,7 @@ let%test_module "test" =
 
         type t = Stable.Latest.t =
           {fee: fee; proofs: proof list; prover: public_key}
-        [@@deriving sexp, compare]
+        [@@deriving sexp, to_yojson, compare]
 
         let fee {fee; _} = fee
 
@@ -2084,7 +2122,14 @@ let%test_module "test" =
               module T = struct
                 type t = statement list
                 [@@deriving
-                  sexp, bin_io, compare, hash, eq, yojson, version {for_test}]
+                  sexp
+                  , to_yojson
+                  , bin_io
+                  , compare
+                  , hash
+                  , eq
+                  , yojson
+                  , version {for_test}]
               end
 
               include T
@@ -2110,7 +2155,7 @@ let%test_module "test" =
 
           type t = Stable.Latest.t =
             {fee: fee; proofs: proof list; prover: public_key}
-          [@@deriving sexp, compare]
+          [@@deriving sexp, to_yojson, compare]
 
           let create_unsafe = Fn.id
         end
@@ -2283,7 +2328,7 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = {diff: Diff.Stable.V1.t; creator: public_key}
-              [@@deriving sexp, bin_io, version {for_test}]
+              [@@deriving sexp, to_yojson, bin_io, version {for_test}]
             end
 
             include T
@@ -2363,7 +2408,7 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = {ledger: Sparse_ledger.t}
-              [@@deriving bin_io, sexp, version {for_test}]
+              [@@deriving bin_io, sexp, to_yojson, version {for_test}]
             end
 
             include T

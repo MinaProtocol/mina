@@ -3,7 +3,7 @@ module Hash = struct
     module V1 = struct
       module T = struct
         type t = Lite_base.Pedersen.Digest.t
-        [@@deriving sexp, bin_io, eq, compare, version {asserted}]
+        [@@deriving sexp, to_yojson, bin_io, eq, compare, version {asserted}]
       end
 
       include T
@@ -14,7 +14,7 @@ module Hash = struct
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson, eq, compare]
 
   let merge = Stable.Latest.merge
 end

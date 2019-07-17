@@ -11,6 +11,13 @@ module Compressed = struct
       module T = struct
         type t = {x: Field.t; is_odd: bool}
         [@@deriving bin_io, eq, sexp, version {asserted}]
+
+        module Display = struct
+          type t = {x: string; is_odd: bool} [@@deriving to_yojson]
+        end
+
+        let to_yojson {x; is_odd} =
+          Display.to_yojson {Display.x= Field.to_string x; is_odd}
       end
 
       include T
@@ -20,6 +27,13 @@ module Compressed = struct
   end
 
   type t = Stable.Latest.t = {x: Field.t; is_odd: bool} [@@deriving eq, sexp]
+
+  module Display = struct
+    type t = {x: string; is_odd: bool} [@@deriving to_yojson]
+  end
+
+  let to_yojson {x; is_odd} =
+    Display.to_yojson {Display.x= Field.to_string x; is_odd}
 
   let fold_bits {is_odd; x} =
     {Fold.fold= (fun ~init ~f -> f ((Field.fold_bits x).fold ~init ~f) is_odd)}

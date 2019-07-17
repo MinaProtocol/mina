@@ -19,7 +19,7 @@ module Stable = struct
   module V1 = struct
     module T = struct
       type t = V1_make.Stable.V1.t
-      [@@deriving bin_io, sexp, version {unnumbered}]
+      [@@deriving bin_io, to_yojson, sexp, version {unnumbered}]
     end
 
     include T
@@ -35,6 +35,7 @@ module Latest_make = V1_make
 [%%define_locally
 Latest_make.
   ( of_hash
+  , to_yojson
   , get_exn
   , path_exn
   , set_exn

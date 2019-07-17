@@ -219,7 +219,10 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                 (`Call
                   (fun _net exn ->
                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                      "%s" (Exn.to_string_mach exn) ))
+                      "Exception while handling REST server request: $error"
+                      ~metadata:
+                        [ ("error", `String (Exn.to_string_mach exn))
+                        ; ("context", `String "rest_server") ] ))
               (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
@@ -249,16 +252,20 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
         ~on_handler_error:
           (`Call
             (fun _net exn ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-                (Exn.to_string_mach exn) ))
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                "Exception while handling TCP server request: $error"
+                ~metadata:
+                  [ ("error", `String (Exn.to_string_mach exn))
+                  ; ("context", `String "rpc_tcp_server") ] ))
         where_to_listen
         (fun address reader writer ->
           let address = Socket.Address.Inet.addr address in
           if not (Set.mem client_whitelist address) then (
             Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              !"Rejecting client connection from \
-                %{sexp:Unix.Inet_addr.Blocking_sexp.t}"
-              address ;
+              !"Rejecting client connection from $address, it is not present \
+                in the whitelist."
+              ~metadata:
+                [("$address", `String (Unix.Inet_addr.to_string address))] ;
             Deferred.unit )
           else
             Rpc.Connection.server_with_close reader writer
@@ -271,7 +278,13 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                 (`Call
                   (fun exn ->
                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                      "%s" (Exn.to_string_mach exn) ;
+                      "Exception while handling RPC server request from \
+                       $address: $error"
+                      ~metadata:
+                        [ ("error", `String (Exn.to_string_mach exn))
+                        ; ("context", `String "rpc_server")
+                        ; ( "address"
+                          , `String (Unix.Inet_addr.to_string address) ) ] ;
                     Deferred.unit )) ) )
   |> ignore
 
@@ -334,7 +347,7 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
           Logger.extend top_logger
             [("coda_run", `String "Program was killed by signal")]
         in
-        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-          !"Coda process was interrupted by signal %{sexp:t}"
-          signal ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          !"Coda process was interrupted by $signal"
+          ~metadata:[("signal", `String (to_string signal))] ;
         Stdlib.exit 130 ))
