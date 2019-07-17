@@ -7,13 +7,13 @@ This section will walk you through the requirements needed to run a Coda protoco
 
 ## Requirements
 
-**Software**: macOS (10.x.x and above) or Linux (currently supports Debian 9 and Ubuntu)
+**Software**: macOS (10.x.x and above) or Linux (currently supports Debian 9 and Ubuntu 18.04 LTS)
 
 **Hardware**: Sending and receiving coda does not require any special hardware, but participating as a node operator currently requires:
 - at least a 4-core processor
 - at least 8 GB of RAM
 
-GPU's aren't currently necessary, but may be required for node operators when the protoctol is upgraded.
+GPU's aren't currently required, but may be required for node operators when the protoctol is upgraded.
 
 **Network**: At least 1 Mbps connection
 
@@ -26,27 +26,29 @@ The newest binary releases can be found [here](). With the exception of the .exe
 1. Download [coda.zip](https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip) - NOTE: This is a large file (~2.2 GB), so this step might take some time
 2. Unzip anywhere, `cd` to navigate to the Coda directory
 3. Run `brew install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp)
-4. Set up port forwarding (see below)
+4. Set up port forwarding ([see below](/docs/getting-started/#port-forwarding))
 5. `./coda -help` to see if it works
 
 ### Linux (Ubuntu / Debian)
 
 1. Download [coda.deb](https://s3-us-west-2.amazonaws.com/packages.o1test.net/pool/unstable/c/co/coda-testnet-postake-medium-curves_0.0.1-release-beta-0d13213e.deb) - NOTE: This is a large file (~2.2 GB), so this step might take some time
-2. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp)
-3. Set up port forwarding (see below)
-4. Double click
+2. Double click
+3. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp)
+4. Set up port forwarding ([see below](/docs/getting-started/#port-forwarding))
 5. `coda -help` to see if it works
 
 
 ### Windows
 
-Windows is not yet supported - there is [grant funding available]() for adding Windows support.
+Windows is not yet supported. If you have any interest in developing Coda for Windows, please reach out to contact@codaprotocol.org or reach out in the [Discord server](https://discord.gg/ShKhA7J).
+
+### Build from source
 
 To build from source code, please follow [the instructions in the Coda protocol repo](https://github.com/CodaProtocol/coda/blob/master/README-dev.md#building-coda).
 
 ## Port forwarding
 
-If you're running a Coda node on a home or office machine, you'll have to manually set up [port forwarding](https://en.wikipedia.org/wiki/Port_forwarding) to make your node visible on the internet to other Coda nodes.
+If you're running a Coda node on a home or office machine, you'll have to set up [port forwarding](https://en.wikipedia.org/wiki/Port_forwarding) to make your node visible on the internet to other Coda nodes.
 
 Run the following commands to use MiniUPnP to reconfigure ports on your IP address:
 

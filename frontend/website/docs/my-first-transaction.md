@@ -85,6 +85,8 @@ Great! we have successfully sent our first transaction. Let's go ahead and check
 
     $ coda.exe client get-txn-status <txn-hash>
 
+If our transaction is not yet finalized, we will see a response that indicates that the status is `PENDING`.
+
 ## Check account balance
 
 Now that we can send transactions, it might be helpful to know our balance, so that we don't spend our testnet tokens too carelessly! Let's check our current balance by running the following command, passing in the public key of the account we generated:

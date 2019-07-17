@@ -45,9 +45,6 @@ files play:
         library in `lib`. When you create a library `lib/foo_lib` with a `dune` file giving
         the library's name as `foo_lib`, you must create a `foo_lib.opam` file.
     
-    - `config.mlh`    
-        This file defines some constants for the `ocaml` preprocessor we use.
-    
     - `app/`    
         Applications live here.
         
@@ -65,6 +62,9 @@ files play:
         
         - `kademlia-haskell/`   
             This is a simple wrapper around a Haskell implementation of the kademlia DHT.
+    
+    - `config/`    
+        Build time config - these .mlh files define compile time constants and their values.
 
     - `external/`   
         Local copies of external libraries which we've had to make some tweaks to.
