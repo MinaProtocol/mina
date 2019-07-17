@@ -268,7 +268,7 @@ let daemon logger =
                Some c
            | Error e ->
                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "ferror reading daemon.json, not using it: %s"
+                 "error reading daemon.json, not using it: %s"
                  (Error.to_string_mach e) ;
                None
          in
