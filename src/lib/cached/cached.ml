@@ -8,7 +8,7 @@ let try_load bin path =
   let controller = Storage.Disk.Controller.create ~logger bin in
   match%map Storage.Disk.load_with_checksum controller path with
   | Ok {Storage.Checked_data.data; checksum} ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
         "Loaded value successfully from %s" path ;
       Ok {path; value= data; checksum}
   | Error `Checksum_no_match ->

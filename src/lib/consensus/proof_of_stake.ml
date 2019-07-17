@@ -940,8 +940,8 @@ module Data = struct
               let vrf_result =
                 T.eval ~private_key {epoch; slot; seed; delegator}
               in
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                !"vrf result for %d: %d/%d -> %{sexp: Bignum_bigint.t}"
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                !"VRF result for %d: %d/%d -> %{sexp: Bignum_bigint.t}"
                 (Coda_base.Account.Index.to_int delegator)
                 (Balance.to_int balance)
                 (Amount.to_int total_stake)
@@ -2226,7 +2226,7 @@ module Hooks = struct
                 [ ("peer", `String (sprintf "%s:%d" conn.host conn.port))
                 ; ("ledger_hash", Coda_base.Ledger_hash.to_yojson ledger_hash)
                 ]
-              "serving epoch ledger query with hash $ledger_hash from $peer" ;
+              "Serving epoch ledger query with hash $ledger_hash from $peer" ;
             let response =
               if
                 Ledger_hash.equal ledger_hash
@@ -2253,8 +2253,8 @@ module Hooks = struct
                     ; ("error", `String err)
                     ; ( "ledger_hash"
                       , Coda_base.Ledger_hash.to_yojson ledger_hash ) ]
-                  "failed to serve epoch ledger query with hash $ledger_hash \
-                   from $peer: $error" ) ;
+                  "Failed to serve epoch ledger query with hash $ledger_hash \
+                   from $peer. See error for details: $error" ) ;
             Ivar.fill ivar response )
     end
 
@@ -2367,7 +2367,8 @@ module Hooks = struct
     let open Snapshot in
     let open Deferred.Let_syntax in
     let requested_syncs = Non_empty_list.to_list requested_syncs in
-    Logger.info logger "syncing local state, %d jobs"
+    Logger.info logger
+      "Syncing local state -- requesting %d snaphots from peers"
       (List.length requested_syncs)
       ~location:__LOC__ ~module_:__MODULE__
       ~metadata:
@@ -2471,8 +2472,8 @@ module Hooks = struct
       let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
       log_result choice msg
     in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "selecting best consensus state"
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      "Selecting best consensus state"
       ~metadata:
         [ ("existing", Consensus_state.Value.to_yojson existing)
         ; ("candidate", Consensus_state.Value.to_yojson candidate) ] ;
@@ -2591,13 +2592,13 @@ module Hooks = struct
       then Epoch.incr (curr_epoch, curr_slot)
       else (curr_epoch, curr_slot)
     in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      "Systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
       (Int64.to_int now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
       ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
       @@ Epoch.start_time epoch ) ;
     let next_slot =
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
         !"Selecting correct epoch data from state -- epoch by time: %d, state \
           epoch: %d, state epoch count: %d"
         (Epoch.to_int epoch)
@@ -2618,8 +2619,8 @@ module Hooks = struct
         let source, snapshot =
           select_epoch_snapshot ~consensus_state:state ~local_state ~epoch
         in
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          !"using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+          !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
           (epoch_snapshot_name source)
           (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ;
         snapshot

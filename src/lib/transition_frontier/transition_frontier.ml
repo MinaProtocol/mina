@@ -457,7 +457,7 @@ module Make (Inputs : Inputs_intf) :
               | Some child_node ->
                   add_edge acc_graph node child_node
               | None ->
-                  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                     ~metadata:
                       [ ( "state_hash"
                         , State_hash.to_yojson successor_state_hash )
