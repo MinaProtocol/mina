@@ -268,7 +268,8 @@ let daemon logger =
                Some c
            | Error e ->
                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "error reading daemon.json: %s" (Error.to_string_mach e) ;
+                 "ferror reading daemon.json, not using it: %s"
+                 (Error.to_string_mach e) ;
                None
          in
          let maybe_from_config (type a) (f : YJ.json -> a option)
@@ -289,7 +290,7 @@ let daemon logger =
                x
            | None ->
                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "didn't find %s in the config file, using default" keyname ;
+                 "%s not found in the config file, using default" keyname ;
                default
          in
          let external_port : int =

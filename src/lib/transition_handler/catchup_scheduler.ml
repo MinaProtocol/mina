@@ -173,7 +173,7 @@ module Make (Inputs : Inputs.S) = struct
           let forest = extract_forest t parent_hash in
           Hashtbl.remove t.parent_root_timeouts parent_hash ;
           remove_tree t parent_hash ;
-          Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+          Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ("parent_hash", Coda_base.State_hash.to_yojson parent_hash)
               ; ( "duration"
@@ -213,8 +213,8 @@ module Make (Inputs : Inputs.S) = struct
         then
           Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("state_hash", State_hash.to_yojson hash)]
-            "Received request to watch transition for catchup that already \
-             was being watched: $state_hash"
+            "Received request to watch transition for catchup that already is \
+             being watched: $state_hash"
         else
           let (_ : Block_time.Span.t option) = cancel_timeout t hash in
           Hashtbl.set t.collected_transitions ~key:parent_hash

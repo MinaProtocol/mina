@@ -767,7 +767,8 @@ module Make (Inputs : Inputs_intf) = struct
                      ~sender:(Envelope.Sender.Remote inet_addr))
             | Ok (Error e) ->
                 Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                  "Answering sync ledger query rpc error: $error"
+                  "Peer $peer didn't have enough information to answer \
+                   ledger_hash query. See error for more details: $error"
                   ~metadata:[("error", `String (Error.to_string_hum e))] ;
                 Hash_set.add peers_tried peer ;
                 None
@@ -785,7 +786,8 @@ module Make (Inputs : Inputs_intf) = struct
             (fst query, snd query, answer)
       | None ->
           Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-            !"None of the peers I asked knew my sync ledger query; trying more" ;
+            !"None of the peers contacted were able to answer ledger_hash \
+              query -- trying more" ;
           if ctr > retry_max then Deferred.unit
           else
             let%bind () = Clock.after retry_interval in

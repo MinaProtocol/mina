@@ -941,7 +941,7 @@ module Data = struct
                 T.eval ~private_key {epoch; slot; seed; delegator}
               in
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                !"Vrf result for %d: %d/%d -> %{sexp: Bignum_bigint.t}"
+                !"VRF result for %d: %d/%d -> %{sexp: Bignum_bigint.t}"
                 (Coda_base.Account.Index.to_int delegator)
                 (Balance.to_int balance)
                 (Amount.to_int total_stake)
@@ -2254,7 +2254,7 @@ module Hooks = struct
                     ; ( "ledger_hash"
                       , Coda_base.Ledger_hash.to_yojson ledger_hash ) ]
                   "Failed to serve epoch ledger query with hash $ledger_hash \
-                   from $peer: $error" ) ;
+                   from $peer. See error for details: $error" ) ;
             Ivar.fill ivar response )
     end
 
@@ -2367,7 +2367,8 @@ module Hooks = struct
     let open Snapshot in
     let open Deferred.Let_syntax in
     let requested_syncs = Non_empty_list.to_list requested_syncs in
-    Logger.info logger "Syncing local state, %d jobs"
+    Logger.info logger
+      "Syncing local state -- requesting %d snaphots from peers"
       (List.length requested_syncs)
       ~location:__LOC__ ~module_:__MODULE__
       ~metadata:

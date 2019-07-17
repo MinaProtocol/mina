@@ -262,9 +262,9 @@ module Make (Inputs : Inputs.S) :
               |> Deferred.return
         | Error e ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-              !"Catchup failed: All peers either sent us bad data, didn't \
-                have the info, or our transition frontier moved too fast: \
-                $error"
+              !"Catchup process failed -- unable to receive valid data from \
+                peers or transition frontier progressed faster than catchup \
+                data received. See error for details: $error"
               ~metadata:[("error", `String (Error.to_string_hum e))] ;
             List.iter subtrees ~f:(fun subtree ->
                 Rose_tree.iter subtree ~f:(fun cached_transition ->

@@ -332,9 +332,9 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
         log_shutdown ~conf_dir ~top_logger coda_ref ;
         let logger =
           Logger.extend top_logger
-            [("coda_run", `String "Program got killed by signal")]
+            [("coda_run", `String "Program was killed by signal")]
         in
         Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-          !"Coda process got interrupted by signal %{sexp:t}"
+          !"Coda process was interrupted by signal %{sexp:t}"
           signal ;
         Stdlib.exit 130 ))
