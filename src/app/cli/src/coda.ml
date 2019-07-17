@@ -153,7 +153,6 @@ let daemon logger =
            Deferred.return conf_dir
          else Sys.home_directory () >>| compute_conf_dir
        in
-       let%bind () = Unix.mkdir ~p:() conf_dir in
        let () =
          if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
@@ -164,6 +163,7 @@ let daemon logger =
              () )
          else ()
        in
+       let%bind () = Unix.mkdir ~p:() conf_dir in
        (* Check if the config files are for the current version. 
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
