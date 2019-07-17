@@ -134,12 +134,14 @@ module Make (Inputs : Inputs_intf) = struct
        it didn't receive any transition from network for a while.
        Then it went to the second epoch and it could propose at
        the second epoch. *)
+    let now = Coda_base.Block_time.now time_controller in
     if
-      try
-        Consensus.Hooks.is_genesis @@ Coda_base.Block_time.now time_controller
+      try Consensus.Hooks.is_genesis now
       with Invalid_argument _ ->
+        (* if "now" is before the genesis timestamp, the calculation
+           of the proof-of-stake epoch results in an exception
+        *)
         let module Time = Coda_base.Block_time in
-        let now = Time.now time_controller in
         let time_till_genesis =
           Time.diff Consensus.Constants.genesis_state_timestamp now
         in
