@@ -1,23 +1,23 @@
 # My First Transaction
 
-In this section, we'll make our first transaction on the Coda network. After [setting up `coda.exe`](../getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
+In this section, we'll make our first transaction on the Coda network. After [setting up `coda`](../getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
 
 ## Start up a node
 
 Run the following command to start up a Coda node instance and connect to the network:
 
-    $ coda.exe daemon -peer mighty-wombat.o1test.net:8303
+    $ coda daemon -peer mighty-wombat.o1test.net:8303
 
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. 
 
 !!!note
-    The daemon process needs to be running whenever you issue commands from `coda.exe client`, so make sure you don't kill it by accident.
+    The daemon process needs to be running whenever you issue commands from `coda client`, so make sure you don't kill it by accident.
 
 ## Checking connectivity
 
 Now that we've started up a node and are running the Coda daemon, open up another shell and run the following command:
 
-    $ coda.exe client status
+    $ coda client status
 
 Most likely we will see a response that include the fields below:
 
@@ -38,7 +38,7 @@ This step requires waiting for approximately ~5 minutes to sync with the network
 
 Once our node is synced, we'll create a public/private key-pair so that we can sign transactions and generate an address to receive payments. Run the following command and use `my-wallet` as the path:
 
-    $ coda.exe client generate-keypair -privkey-path my-wallet
+    $ coda client generate-keypair -privkey-path my-wallet
 
 This creates a private key at `my-wallet` with a public key at `my-wallet.pub`.
 
@@ -53,7 +53,7 @@ In order to send our first transaction, we'll first need to get some Coda to pla
 
 Once someone responds affirmatively, we can check our balance to make sure that we received the funds by running the following command, passing in our public key:
 
-    $ coda.exe client get-balance -address <public_key>
+    $ coda client get-balance -address <public_key>
 
 ## Make a payment
 
@@ -61,7 +61,7 @@ Finally we get to the good stuff, sending our first transaction! For testing pur
 
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
-    $ coda.exe client send-payment \
+    $ coda client send-payment \
         -amount <amount> \
         -receiver <public-key> \
         -fee <fee>
@@ -83,7 +83,7 @@ If this command is formatted properly, we should get a response with a hash of t
 
 Great! we have successfully sent our first transaction. Let's go ahead and check the status of our transaction:
 
-    $ coda.exe client get-txn-status <txn-hash>
+    $ coda client get-txn-status <txn-hash>
 
 If our transaction is not yet finalized, we will see a response that indicates that the status is `PENDING`.
 
@@ -91,7 +91,7 @@ If our transaction is not yet finalized, we will see a response that indicates t
 
 Now that we can send transactions, it might be helpful to know our balance, so that we don't spend our testnet tokens too carelessly! Let's check our current balance by running the following command, passing in the public key of the account we generated:
 
-    $ coda.exe client get-balance -address <public-key>
+    $ coda client get-balance -address <public-key>
 
 We'll get a response that looks like this:
 

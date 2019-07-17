@@ -2,7 +2,7 @@
 
 The Coda CLI (command-line interface) is the primary way for users to interact with the Coda network. It provides standard client functionality to create accounts, send transactions, and participate in consensus. There are also advanced client and daemon commands for power users.
 
-The CLI is installed as part of the Coda bundle, and can be accessed from a shell by beginning a statement with `coda.exe`. 
+The CLI is installed as part of the Coda bundle, and can be accessed from a shell by beginning a statement with `coda`. 
 
 !!! warning
     Coda APIs are still under construction, so these commands may change
@@ -11,7 +11,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `client` - Lightweight client commands - eg. creating an account or sending a transaction
 
-    $ coda.exe client SUBCOMMAND
+    $ coda client SUBCOMMAND
 
     === subcommands ===
 
@@ -27,7 +27,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `advanced` - Advanced client commands (intended for Coda power users)
 
-    $ coda.exe advanced SUBCOMMAND
+    $ coda advanced SUBCOMMAND
 
     === subcommands ===
 
@@ -50,7 +50,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `daemon` - Daemon commands to configure settings related to how node interacts with network
 
-    $ coda.exe daemon 
+    $ coda daemon 
 
     === flags ===
 
@@ -110,15 +110,15 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `-version` - Print out client version information
 
-    $ coda.exe -version
+    $ coda -version
     NO_VERSION_UTIL
 
 `help` - Print out subcommands and explanations
 
-    $ coda.exe -help
+    $ coda -help
     Coda
     
-      coda.exe SUBCOMMAND
+      coda SUBCOMMAND
     
     === subcommands ===
     
@@ -134,7 +134,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `get-balance` - Get balance associated with a public key
 
-    $ coda.exe client get-balance 
+    $ coda client get-balance 
 
     === flags ===
 
@@ -145,7 +145,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `send-payment` - Send payment to a public key
 
-    $ coda.exe client send-payment 
+    $ coda client send-payment 
 
     === flags ===
 
@@ -160,7 +160,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `generate-keypair` - Generate a new public / private key pair
 
-    $ coda.exe client generate-keypair 
+    $ coda client generate-keypair 
 
     === flags ===
 
@@ -171,7 +171,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `delegate-stake` - Change the address to which you're delegating your coda
 
-    $ coda.exe client delegate-stake 
+    $ coda client delegate-stake 
 
     === flags ===
 
@@ -186,7 +186,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `generate-receipt` - Generate a receipt for a sent payment
 
-    $ coda.exe client generate-receipt 
+    $ coda client generate-receipt 
 
     === flags ===
 
@@ -201,7 +201,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `verify-receipt` - Verify a receipt of a sent payment
 
-    $ coda.exe client verify-receipt 
+    $ coda client verify-receipt 
 
     === flags ===
 
@@ -215,7 +215,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `stop-daemon` - Stop the daemon
 
-    $ coda.exe client stop-daemon 
+    $ coda client stop-daemon 
 
     === flags ===
 
@@ -225,7 +225,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `status` - Get running daemon status
 
-    $ coda.exe client status 
+    $ coda client status 
 
     === flags ===
 
@@ -242,7 +242,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `batch-send-payments` - Send multiple payments from a file
 
-    $ coda.exe advanced batch-send-payments PAYMENTS-FILE
+    $ coda advanced batch-send-payments PAYMENTS-FILE
 
     === flags ===
 
@@ -253,7 +253,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `constraint-system-digests` - Print MD5 digest of each SNARK constraint
 
-    $ coda.exe advanced constraint-system-digests 
+    $ coda advanced constraint-system-digests 
 
     === flags ===
 
@@ -262,7 +262,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
               
 `dump-keypair` - Print out a keypair from a private key file
 
-    $ coda.exe advanced dump-keypair 
+    $ coda advanced dump-keypair 
 
     === flags ===
 
@@ -272,7 +272,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `dump-ledger` - Print the ledger with given merkle root as a sexp
 
-    $ coda.exe advanced dump-ledger STAGED-LEDGER-HASH
+    $ coda advanced dump-ledger STAGED-LEDGER-HASH
 
     === flags ===
 
@@ -282,7 +282,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `get-nonce` - Get the current nonce for an account
 
-    $ coda.exe advanced get-nonce 
+    $ coda advanced get-nonce 
 
     === flags ===
 
@@ -293,7 +293,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `get-public-keys` - Get public keys
 
-    $ coda.exe advanced get-public-keys 
+    $ coda advanced get-public-keys 
 
     === flags ===
 
@@ -305,7 +305,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `get-trust-status` - Get the trust status associated with an IP address
 
-    $ coda.exe advanced get-trust-status 
+    $ coda advanced get-trust-status 
 
     === flags ===
 
@@ -318,7 +318,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `get-trust-status-all` - Get trust statuses for all peers known to the trust system
 
-    $ coda.exe advanced get-trust-status-all 
+    $ coda advanced get-trust-status-all 
 
     === flags ===
 
@@ -330,7 +330,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `reset-trust-status`- Reset the trust status associated with an IP address
 
-    $ coda.exe advanced reset-trust-status 
+    $ coda advanced reset-trust-status 
 
     === flags ===
 
@@ -343,7 +343,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `snark-job-list`- List of snark jobs in JSON format
 
-    $ coda.exe advanced snark-job-list 
+    $ coda advanced snark-job-list 
 
     === flags ===
 
@@ -353,7 +353,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `start-tracing` - Start async tracing to $config-directory/$pid.trace
 
-    $ coda.exe advanced start-tracing 
+    $ coda advanced start-tracing 
 
     === flags ===
 
@@ -364,7 +364,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 `status-clear-hist` - Clear histograms reported in status
 
 
-    $ coda.exe advanced status-clear-hist 
+    $ coda advanced status-clear-hist 
 
     === flags ===
 
@@ -377,7 +377,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `stop-tracing` - Stop async tracing
 
-    $ coda.exe advanced stop-tracing 
+    $ coda advanced stop-tracing 
 
     === flags ===
 
@@ -387,7 +387,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `visualization` - Visualize data structures special to Coda
 
-    $ coda.exe advanced visualization SUBCOMMAND
+    $ coda advanced visualization SUBCOMMAND
 
     === subcommands ===
 
@@ -397,7 +397,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `wrap-key` - Wrap a private key into a private key file
 
-    $ coda.exe advanced wrap-key 
+    $ coda advanced wrap-key 
 
     === flags ===
 
@@ -408,7 +408,7 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
 
 `help` - explain a given subcommand (perhaps recursively)
 
-    $ coda.exe advanced SUBCOMMAND
+    $ coda advanced SUBCOMMAND
 
     === subcommands ===
 

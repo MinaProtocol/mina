@@ -10,14 +10,14 @@ The Coda network is secured by [Proof-of-Stake consensus](/glossary/#proof-of-st
 
 Since we have some funds in our wallet from [the previous step](/my-first-transaction), we can configure that wallet to stake its coda by issuing the following command, passing in the file path for the associated private key:
 
-    $ coda.exe client set-staking -- <private-key-path>
+    $ coda client set-staking -- <private-key-path>
 
 !!! note
     You can provide a list of key files to turn on staking for multiple wallets at the same time
 
-We can always check which wallets we're currently staking with, by using the `coda.exe client status` command:
+We can always check which wallets we're currently staking with, by using the `coda client status` command:
 
-    $ coda.exe client status
+    $ coda client status
     
     Coda Daemon Status 
     -----------------------------------
@@ -54,7 +54,7 @@ Delegating coda is an alternative option to staking it directly, with the benefi
 
 To delegate your stake, instead of running your own staking node, run this command:
 
-    $ coda.exe client delegate-stake \
+    $ coda client delegate-stake \
         -delegate <public-key> \
         -privkey-path <file> \
         -fee <fee>
@@ -84,7 +84,7 @@ However, this isn't data encoding or compression in the traditional sense - rath
 
 Run the following command to set your node as a snark-worker:
 
-    $ coda.exe client set-snark-worker -pubkey <public-key> -snark-worker-fee <fee>
+    $ coda client set-snark-worker -pubkey <public-key> -snark-worker-fee <fee>
 
 As a snark-worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.
 
