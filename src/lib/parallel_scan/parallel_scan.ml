@@ -1390,6 +1390,60 @@ let view_jobs_with_position (state : ('merge, 'base) State.t) fa fd =
   Non_empty_list.fold ~init:[] state.trees ~f:(fun acc tree ->
       Tree.view_jobs_with_position tree fa fd :: acc )
 
+let job_count t =
+  State.fold_chronological t ~init:(0., 0.)
+    ~f_merge:(fun (c, c') merge_node ->
+      let count_todo, count_done =
+        match snd merge_node with
+        | Merge.Job.Part _ ->
+            (0.5, 0.)
+        | Full {status= Job_status.Todo; _} ->
+            (1., 0.)
+        | Full {status= Job_status.Done; _} ->
+            (0., 1.)
+        | Empty ->
+            (0., 0.)
+      in
+      (c +. count_todo, c' +. count_done) )
+    ~f_base:(fun (c, c') base_node ->
+      let count_todo, count_done =
+        match snd base_node with
+        | Base.Job.Empty ->
+            (0., 0.)
+        | Full {status= Job_status.Todo; _} ->
+            (1., 0.)
+        | Full {status= Job_status.Done; _} ->
+            (0., 1.)
+      in
+      (c +. count_todo, c' +. count_done) )
+
+let assert_job_count t t' ~completed_job_count ~base_job_count ~value_emitted =
+  let todo_before, done_before = job_count t in
+  let todo_after, done_after = job_count t' in
+  let expected_todo_after =
+    let new_jobs =
+      if value_emitted then (completed_job_count -. 1.) /. 2.
+      else completed_job_count /. 2.
+    in
+    todo_before +. base_job_count -. completed_job_count +. new_jobs
+  in
+  let expected_done_after =
+    let jobs_from_delete_tree =
+      if value_emitted then Float.of_int @@ ((2 * t.max_base_jobs) - 1) else 0.
+    in
+    done_before +. completed_job_count -. jobs_from_delete_tree
+  in
+  assert (
+    todo_after =. expected_todo_after && done_after =. expected_done_after )
+
+let test_update t ~data ~completed_jobs =
+  let result_opt, t' = update ~data ~completed_jobs t |> Or_error.ok_exn in
+  assert_job_count t t'
+    ~base_job_count:(Float.of_int @@ List.length data)
+    ~completed_job_count:(Float.of_int @@ List.length completed_jobs)
+    ~value_emitted:(Option.is_some result_opt) ;
+  (result_opt, t')
+
 let%test_module "test" =
   ( module struct
     let%test_unit "always max base jobs" =
@@ -1397,11 +1451,11 @@ let%test_module "test" =
       let state = empty ~max_base_jobs ~delay:3 in
       let _t' =
         List.foldi ~init:([], state) (List.init 100 ~f:Fn.id)
-          ~f:(fun i (expected_results, t') _ ->
+          ~f:(fun i (expected_results, t) _ ->
             let data = List.init max_base_jobs ~f:(fun j -> i + j) in
             let expected_results = data :: expected_results in
             let work =
-              work_for_next_update t' ~data_count:(List.length data)
+              work_for_next_update t ~data_count:(List.length data)
               |> List.concat
             in
             let new_merges =
@@ -1409,7 +1463,7 @@ let%test_module "test" =
                   match job with Base i -> i | Merge (i, j) -> i + j )
             in
             let result_opt, t' =
-              update ~data ~completed_jobs:new_merges t' |> Or_error.ok_exn
+              test_update ~data ~completed_jobs:new_merges t
             in
             let expected_result, remaining_expected_results =
               Option.value_map result_opt
@@ -1435,11 +1489,11 @@ let%test_module "test" =
       Quickcheck.test
         (Quickcheck.Generator.list (Int.gen_incl 1 1))
         ~f:(fun list ->
-          let t' = !state in
+          let t = !state in
           let data = List.take list max_base_jobs in
           let work =
             List.take
-              ( work_for_next_update t' ~data_count:(List.length data)
+              ( work_for_next_update t ~data_count:(List.length data)
               |> List.concat )
               (List.length data * 2)
           in
@@ -1448,7 +1502,7 @@ let%test_module "test" =
                 match job with Base i -> i | Merge (i, j) -> i + j )
           in
           let result_opt, t' =
-            update ~data ~completed_jobs:new_merges t' |> Or_error.ok_exn
+            test_update ~data ~completed_jobs:new_merges t
           in
           let expected_result =
             (max_base_jobs, List.init max_base_jobs ~f:(fun _ -> 1))
@@ -1499,9 +1553,7 @@ let%test_module "scans" =
       in
       let jobs_done = List.map jobs ~f in
       let old_tuple = state.acc in
-      let res_opt, state =
-        Or_error.ok_exn @@ update ~data state ~completed_jobs:jobs_done
-      in
+      let res_opt, state = test_update ~data state ~completed_jobs:jobs_done in
       let state =
         Option.value_map ~default:state res_opt ~f:(fun x ->
             let tuple =
@@ -1561,7 +1613,7 @@ let%test_module "scans" =
               let jobs_done = List.map jobs ~f:job_done in
               let tree_count_before = Non_empty_list.length state.trees in
               let _, state =
-                Or_error.ok_exn @@ update ~data state ~completed_jobs:jobs_done
+                test_update ~data state ~completed_jobs:jobs_done
               in
               match partition.second with
               | None ->
@@ -1635,8 +1687,7 @@ let%test_module "scans" =
               let jobs_done = List.map jobs ~f:job_done in
               let data = List.init max_base_jobs ~f:Int64.of_int in
               let res_opt, s =
-                Or_error.ok_exn
-                @@ update ~data !state ~completed_jobs:jobs_done
+                test_update ~data !state ~completed_jobs:jobs_done
               in
               state := s ;
               if Option.is_some res_opt then
