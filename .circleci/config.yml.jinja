@@ -149,8 +149,8 @@ jobs:
             - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Download Stable Proving Keys
-                  command: ./scripts/skip_if_only_frontend.sh scripts/getkeys.sh
+                  name: Proving and Verifying Keys - Download Candidate Stable Set
+                  command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
@@ -163,9 +163,6 @@ jobs:
                   {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
-            - run:
-                  name: Store Generated Proving and Verifying Keys
-                  command: ./scripts/skip_if_only_frontend.sh make provingkeys
             - run:
                   name: Store Genesis Public/Private Keypairs
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys

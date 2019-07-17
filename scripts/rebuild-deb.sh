@@ -23,7 +23,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1, coda-kademlia
+Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1, miniupnpc, coda-kademlia
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
@@ -41,22 +41,22 @@ mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
 cp ./default/app/logproc/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 
-# Look for static and generated proving/verifying keys
-var_keys=$(shopt -s nullglob dotglob; echo /var/lib/coda/*)
-if (( ${#var_keys} )) ; then
-    echo "Found PV keys in /var/lib/coda - stock keys"
-    ls /var/lib/coda/*
-	mkdir -p ${BUILDDIR}/var/lib/coda
-	cp /var/lib/coda/* ${BUILDDIR}/var/lib/coda
-fi
-
-tmp_keys=$(shopt -s nullglob dotglob; echo /tmp/coda_cache_dir/*)
-if (( ${#tmp_keys} )) ; then
-    echo "Found PV keys in /tmp/coda_cache_dir - snark may have changed"
-    ls /tmp/coda_cache_dir/*
-    mkdir -p ${BUILDDIR}/var/lib/coda
-    cp /tmp/coda_cache_dir/* ${BUILDDIR}/var/lib/coda
-fi
+# Better approach for packaging keys
+# Identify actual keys used in build
+compile_keys=$(./default/app/cli/src/coda.exe internal snark-hashes)
+for key in compile_keys
+do
+    echo "Looking for key: ${key}"
+    if [ -f "/var/lib/coda/${key}_proving" ]; then
+        echo "Found from stable key set"
+        cp /var/lib/coda/${key}* ${BUILDDIR}/var/lib/coda
+    elif [ -f "/tmp/coda_cache_dir/${key}_proving" ]; then
+        echo "Found from compile-time set"
+        cp /tmp/coda_cache_dir/${key}* ${BUILDDIR}/var/lib/coda
+    else
+        echo "Key not found!"
+    fi
+done
 
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
@@ -75,3 +75,7 @@ find ${BUILDDIR}
 echo "------------------------------------------------------------"
 dpkg-deb --build ${BUILDDIR}
 ln -s -f ${BUILDDIR}.deb coda.deb
+
+# Tar up keys for an artifact
+echo "------------------------------------------------------------"
+tar -cvjf coda_pvkeys_$(GITHASH)_${DUNE_PROFILE}.tar.bz2 ${BUILDDIR}/var/lib/coda/* ; \

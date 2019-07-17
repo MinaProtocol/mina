@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# Downloads a stable set of PV keys.
+
 set -eo pipefail
 
 # Get fixed set of PV keys (which needs to be updated when snark changes)
