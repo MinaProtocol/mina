@@ -1,7 +1,5 @@
-let extraHeaders = () => <> {Head.legacyStylesheets()} </>;
-
 module Styles = {
-  open Css;
+  open! Css;
 
   let markdownStyles =
     style([
@@ -12,7 +10,7 @@ module Styles = {
           display(`flex),
           marginTop(rem(2.)),
           marginBottom(`rem(0.5)),
-          color(Style.Colors.marine),
+          color(Style.Colors.denimTwo),
           hover([selector(".headerlink", [display(`inlineBlock)])]),
         ],
       ),
@@ -26,17 +24,12 @@ module Styles = {
           color(`transparent),
           hover([color(`transparent)]),
           backgroundSize(`cover),
-          backgroundImage(url("/static/img/link.svg")),
+          backgroundImage(url(Links.Cdn.url("/static/img/link.svg"))),
         ],
       ),
       selector(
         "h1",
-        Style.H1.heroStyles
-        @ [
-          color(Style.Colors.teal),
-          alignItems(`baseline),
-          fontWeight(`normal),
-        ],
+        Style.H1.heroStyles @ [alignItems(`baseline), fontWeight(`normal)],
       ),
       selector("h2", Style.H2.basicStyles @ [alignItems(`baseline)]),
       selector(
@@ -111,10 +104,7 @@ module Styles = {
           color(Style.Colors.marineAlpha(0.8)),
           selector(
             ".admonition-title",
-            [
-              color(white),
-              backgroundColor(Style.Colors.marineAlpha(0.8)),
-            ],
+            [color(white), backgroundColor(Style.Colors.marineAlpha(0.8))],
           ),
         ],
       ),
@@ -163,7 +153,10 @@ module Styles = {
           justifyContent(`spaceBetween),
         ],
       ),
-      selector("label > img", [opacity(0.7), transform(rotate(`deg(0)))]),
+      selector(
+        "label > img",
+        [opacity(0.7), transform(rotate(`deg(0)))],
+      ),
       selector(
         "input:checked ~ label > img",
         [transform(rotate(`deg(-180)))],
@@ -176,7 +169,7 @@ module Styles = {
 };
 
 // We need to calculate the CDN url and inject it into the template
-let chevronUrl = Links.Cdn.url("/static/img/chevron-down.svg")
+let chevronUrl = Links.Cdn.url("/static/img/chevron-down.svg");
 
 let component = ReasonReact.statelessComponent("Blog");
 
@@ -216,7 +209,7 @@ let make = _children => {
                       style="display:none"
                       id="{{nav_item.title|replace(" ", "_") }}-toggle"
                     />
-                    <label for="{{nav_item.title|replace(" ", "_") }}-toggle">
+                    <label for="{{nav_item.title|replace(" ", "_") }}-toggle" style="cursor:pointer">
                       {{ nav_item.title }}
                       <img src="$chevronUrl" width="16" height="16" />
                     </label>
@@ -247,23 +240,31 @@ let make = _children => {
           name="Edit Link"
           target="_blank"
           href="{{ page.edit_url }}"
-          className=Css.(style([
-            position(`relative),
-            float(`right),
-            marginTop(`rem(3.25)),
-            marginBottom(`rem(0.5)),
-            hover([color(Style.Colors.hyperlinkHover)]),
-            ...Style.Link.basicStyles,
-          ]))>
+          className=Css.(
+            style([
+              position(`relative),
+              float(`right),
+              display(`flex),
+              alignItems(`center),
+              marginTop(`rem(3.25)),
+              marginBottom(`rem(0.5)),
+              hover([color(Style.Colors.hyperlinkHover)]),
+              ...Style.Link.basicStyles,
+            ])
+          )>
           <svg
-            fill=Style.Colors.(string(greyBlue))
+            fill="currentColor"
             xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
+            width="16"
+            height="16"
             viewBox="0 0 24 24">
             <path
-              d="M7.127 22.562l-7.127 1.438 1.438-7.128 5.689 5.69zm1.414-1.414l11.228-11.225-5.69-5.692-11.227 11.227 5.689 5.69zm9.768-21.148l-2.816 2.817 5.691 5.691 2.816-2.819-5.691-5.689z"/>
+              d="M7.127 22.562l-7.127 1.438 1.438-7.128 5.689 5.69zm1.414-1.414l11.228-11.225-5.69-5.692-11.227 11.227 5.689 5.69zm9.768-21.148l-2.816 2.817 5.691 5.691 2.816-2.819-5.691-5.689z"
+            />
           </svg>
+          <span className=Css.(style([marginLeft(`rem(0.25))]))>
+            {ReasonReact.string("Edit")}
+          </span>
         </A>
         {ReasonReact.string("{{ page.content }}")}
       </article>
