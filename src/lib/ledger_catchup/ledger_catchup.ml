@@ -183,15 +183,7 @@ module Make (Inputs : Inputs.S) :
                     unprocessed_transition_cache state_hash
                   || Transition_frontier.find frontier state_hash
                      |> Option.is_some
-                then (
-                  let num_of_missing_transitions = List.length acc in
-                  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                    ~metadata:
-                      [ ( "states_hashes"
-                        , `List (List.map acc ~f:State_hash.to_yojson) ) ]
-                    !"The total number of missing transitions are %d"
-                    num_of_missing_transitions ;
-                  Continue_or_stop.Stop (Ok (peer, acc)) )
+                then Continue_or_stop.Stop (Ok (peer, acc))
                 else Continue_or_stop.Continue (state_hash :: acc) )
               ~finish:(fun _ ->
                 Or_error.errorf
@@ -328,31 +320,41 @@ module Make (Inputs : Inputs.S) :
               ~disconnected_subtrees:received_subtrees ;
             Deferred.unit
         | Ok (preferred_peer, hashes) -> (
-            match%bind
-              get_transitions_and_compute_breadcrumbs ~logger ~trust_system
-                ~verifier ~network ~frontier ~num_peers
-                ~unprocessed_transition_cache ~preferred_peer ~hashes
-                ~subtrees:received_subtrees
-            with
-            | Ok trees ->
-                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                  "about to write to the catchup breadcrumbs pipe" ;
-                if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+            let num_of_missing_transitions = List.length hashes in
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ( "states_hashes"
+                  , `List (List.map hashes ~f:State_hash.to_yojson) ) ]
+              !"The total number of missing transitions are %d"
+              num_of_missing_transitions ;
+            if num_of_missing_transitions <= 0 then Deferred.unit
+            else
+              match%bind
+                get_transitions_and_compute_breadcrumbs ~logger ~trust_system
+                  ~verifier ~network ~frontier ~num_peers
+                  ~unprocessed_transition_cache ~preferred_peer ~hashes
+                  ~subtrees:received_subtrees
+              with
+              | Ok trees ->
                   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                    "catchup breadcrumbs pipe was closed; attempt to write to \
-                     closed pipe" ;
-                  Deferred.unit )
-                else
-                  Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
-                  |> Deferred.return
-            | Error e ->
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  !"All peers either sent us bad transitions, didn't have the \
-                    info, or our transition frontier moved too fast: %s"
-                  (Error.to_string_hum e) ;
-                garbage_collect_disconnected_subtrees ~logger
-                  ~disconnected_subtrees:received_subtrees ;
-                Deferred.unit ) )
+                    "about to write to the catchup breadcrumbs pipe" ;
+                  if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer
+                  then (
+                    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                      "catchup breadcrumbs pipe was closed; attempt to write \
+                       to closed pipe" ;
+                    Deferred.unit )
+                  else
+                    Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
+                    |> Deferred.return
+              | Error e ->
+                  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                    !"All peers either sent us bad transitions, didn't have \
+                      the info, or our transition frontier moved too fast: %s"
+                    (Error.to_string_hum e) ;
+                  garbage_collect_disconnected_subtrees ~logger
+                    ~disconnected_subtrees:received_subtrees ;
+                  Deferred.unit ) )
         |> don't_wait_for )
     |> don't_wait_for
 end
