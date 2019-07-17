@@ -200,7 +200,7 @@ module Make (Inputs : Inputs.S) :
 
   let get_transitions_and_compute_breadcrumbs ~logger ~trust_system ~verifier
       ~network ~frontier ~num_peers ~unprocessed_transition_cache
-      ~preferred_peer ~hashes ~subtrees =
+      ~preferred_peer ~hashes =
     let random_peers = Network.random_peers network num_peers in
     Deferred.Or_error.find_map_ok (preferred_peer :: random_peers)
       ~f:(fun peer ->
@@ -266,13 +266,12 @@ module Make (Inputs : Inputs.S) :
                   Deferred.Or_error.return (acc, initial_state_hash) )
             in
             let subtrees_of_transitions =
-              if List.length verified_transitions <= 0 then subtrees
+              if List.length verified_transitions <= 0 then []
               else
                 [ List.(
                     fold
                       (tl_exn verified_transitions)
-                      ~init:
-                        (Rose_tree.T (hd_exn verified_transitions, subtrees))
+                      ~init:(Rose_tree.T (hd_exn verified_transitions, []))
                       ~f:(fun acc verified_transition ->
                         Rose_tree.T (verified_transition, [acc]) )) ]
             in
@@ -295,6 +294,54 @@ module Make (Inputs : Inputs.S) :
     Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
       "garbage collected failed cached transitions"
 
+  let rec partition size = function
+    | [] ->
+        []
+    | ls ->
+        let sub, rest = List.split_n ls size in
+        sub :: partition size rest
+
+  let download_transitions_and_adding_to_frontier ~logger ~trust_system
+      ~verifier ~network ~frontier ~num_peers ~unprocessed_transition_cache
+      ~catchup_breadcrumbs_writer ~preferred_peer ~received_subtrees
+      ~target_hash ~hashes ~maximum_size =
+    let list_of_hashes = partition maximum_size hashes in
+    match%bind
+      Deferred.Or_error.List.iter list_of_hashes ~how:`Sequential
+        ~f:(fun hashes ->
+          match%bind
+            get_transitions_and_compute_breadcrumbs ~logger ~trust_system
+              ~verifier ~network ~frontier ~num_peers
+              ~unprocessed_transition_cache ~preferred_peer ~hashes
+          with
+          | Ok trees ->
+              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                "about to write to the catchup breadcrumbs pipe" ;
+              if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                  "catchup breadcrumbs pipe was closed; attempt to write to \
+                   closed pipe" ;
+                garbage_collect_disconnected_subtrees ~logger
+                  ~disconnected_subtrees:received_subtrees ;
+                Deferred.Or_error.error_string "" )
+              else
+                Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
+                |> Deferred.Or_error.return
+          | Error e ->
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                !"All peers either sent us bad transitions, didn't have the \
+                  info, or our transition frontier moved too fast: %s"
+                (Error.to_string_hum e) ;
+              Deferred.Or_error.fail e )
+    with
+    | Error e ->
+        garbage_collect_disconnected_subtrees ~logger
+          ~disconnected_subtrees:received_subtrees ;
+        Deferred.Or_error.fail e
+    | Ok e ->
+        Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~verifier
+          ~trust_system ~frontier ~initial_hash:target_hash received_subtrees
+
   let run ~logger ~trust_system ~verifier ~network ~frontier
       ~catchup_job_reader
       ~(catchup_breadcrumbs_writer :
@@ -306,10 +353,10 @@ module Make (Inputs : Inputs.S) :
          Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
     let num_peers = 8 in
     Strict_pipe.Reader.iter_without_pushback catchup_job_reader
-      ~f:(fun (hash, received_subtrees) ->
+      ~f:(fun (target_hash, received_subtrees) ->
         ( match%bind
             get_state_hashes ~logger ~trust_system ~network ~frontier
-              ~num_peers ~unprocessed_transition_cache ~state_hash:hash
+              ~num_peers ~unprocessed_transition_cache ~state_hash:target_hash
           with
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -319,7 +366,7 @@ module Make (Inputs : Inputs.S) :
             garbage_collect_disconnected_subtrees ~logger
               ~disconnected_subtrees:received_subtrees ;
             Deferred.unit
-        | Ok (preferred_peer, hashes) -> (
+        | Ok (preferred_peer, hashes) ->
             let num_of_missing_transitions = List.length hashes in
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
@@ -329,32 +376,12 @@ module Make (Inputs : Inputs.S) :
               num_of_missing_transitions ;
             if num_of_missing_transitions <= 0 then Deferred.unit
             else
-              match%bind
-                get_transitions_and_compute_breadcrumbs ~logger ~trust_system
-                  ~verifier ~network ~frontier ~num_peers
-                  ~unprocessed_transition_cache ~preferred_peer ~hashes
-                  ~subtrees:received_subtrees
-              with
-              | Ok trees ->
-                  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                    "about to write to the catchup breadcrumbs pipe" ;
-                  if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer
-                  then (
-                    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                      "catchup breadcrumbs pipe was closed; attempt to write \
-                       to closed pipe" ;
-                    Deferred.unit )
-                  else
-                    Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
-                    |> Deferred.return
-              | Error e ->
-                  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                    !"All peers either sent us bad transitions, didn't have \
-                      the info, or our transition frontier moved too fast: %s"
-                    (Error.to_string_hum e) ;
-                  garbage_collect_disconnected_subtrees ~logger
-                    ~disconnected_subtrees:received_subtrees ;
-                  Deferred.unit ) )
+              download_transitions_and_adding_to_frontier ~logger ~trust_system
+                ~verifier ~network ~frontier ~num_peers
+                ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
+                ~preferred_peer ~received_subtrees ~target_hash ~hashes
+                ~maximum_size:50
+              |> Deferred.ignore )
         |> don't_wait_for )
     |> don't_wait_for
 end
