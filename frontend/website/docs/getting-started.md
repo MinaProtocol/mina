@@ -31,7 +31,7 @@ The newest binary releases can be found [here](). With the exception of the .exe
 
 ### Linux (Ubuntu / Debian)
 
-1. Download [coda.deb](https://s3-us-west-2.amazonaws.com/packages.o1test.net/pool/unstable/c/co/coda-testnet-postake-medium-curves_0.0.1-release-beta-0d13213e.deb) - NOTE: This is a large file (~2.2 GB), so this step might take some time
+1. Download [coda.deb](https://s3-us-west-2.amazonaws.com/packages.o1test.net/pool/unstable/c/co/coda-testnet-postake-medium-curves_0.0.1-release-beta-307bdc71.deb) - NOTE: This is a large file (~2.2 GB), so this step might take some time
 2. Double click
 3. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp)
 4. Set up port forwarding ([see below](/docs/getting-started/#port-forwarding))
