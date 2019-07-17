@@ -60,12 +60,12 @@ module type Staged_ledger_diff_generalized_intf = sig
 
   module At_most_two : sig
     type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type 'a t [@@deriving sexp, bin_io, version]
+          type 'a t [@@deriving sexp, to_yojson, bin_io, version]
         end
       end
       with type 'a V1.t = 'a t
@@ -74,12 +74,12 @@ module type Staged_ledger_diff_generalized_intf = sig
   end
 
   module At_most_one : sig
-    type 'a t = Zero | One of 'a option [@@deriving sexp]
+    type 'a t = Zero | One of 'a option [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type 'a t [@@deriving sexp, bin_io, version]
+          type 'a t [@@deriving sexp, to_yojson, bin_io, version]
         end
       end
       with type 'a V1.t = 'a t
@@ -92,12 +92,12 @@ module type Staged_ledger_diff_generalized_intf = sig
       { completed_works: transaction_snark_work list
       ; user_commands: user_command list
       ; coinbase: fee_transfer_single At_most_two.Stable.V1.t }
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, version]
+          type t [@@deriving sexp, to_yojson, bin_io, version]
         end
       end
       with type V1.t = t
@@ -108,12 +108,12 @@ module type Staged_ledger_diff_generalized_intf = sig
       { completed_works: transaction_snark_work list
       ; user_commands: user_command list
       ; coinbase: fee_transfer_single At_most_one.t }
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, version]
+          type t [@@deriving sexp, to_yojson, bin_io, version]
         end
       end
       with type V1.t = t
@@ -123,25 +123,25 @@ module type Staged_ledger_diff_generalized_intf = sig
     type t =
       Pre_diff_with_at_most_two_coinbase.Stable.V1.t
       * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, version]
+          type t [@@deriving sexp, bin_io, to_yojson, version]
         end
       end
       with type V1.t = t
   end
 
   type t = {diff: Diff.t; creator: compressed_public_key}
-  [@@deriving sexp, fields]
+  [@@deriving sexp, to_yojson, fields]
 
   module Stable :
     sig
       module V1 : sig
         type t = {diff: Diff.t; creator: compressed_public_key}
-        [@@deriving sexp, bin_io, version]
+        [@@deriving sexp, to_yojson, bin_io, version]
       end
 
       module Latest = V1

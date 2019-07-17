@@ -1,7 +1,7 @@
 open Core_kernel
 
 module type S = sig
-  type t [@@deriving eq, bin_io, sexp, compare]
+  type t [@@deriving eq, bin_io, sexp, to_yojson, compare]
 
   include Stringable.S with type t := t
 

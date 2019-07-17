@@ -1461,7 +1461,13 @@ let%test_module "test" =
             module T = struct
               type t = string
               [@@deriving
-                bin_io, sexp, hash, compare, yojson, version {unnumbered}]
+                bin_io
+                , sexp
+                , to_yojson
+                , hash
+                , compare
+                , yojson
+                , version {unnumbered}]
             end
 
             include T
@@ -1471,7 +1477,7 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = string [@@deriving sexp, eq, compare]
+        type t = string [@@deriving sexp, to_yojson, eq, compare]
 
         type ledger_hash = Ledger_hash.t
 
@@ -1499,6 +1505,10 @@ let%test_module "test" =
         type public_key = Public_key.Compressed.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
+        let ledger_proof_to_yojson = proof_to_yojson
+
+        let compressed_public_key_to_yojson = public_key_to_yojson
+
         module Stable = struct
           module V1 = struct
             module T = struct
@@ -1514,7 +1524,7 @@ let%test_module "test" =
 
         type t = Stable.Latest.t =
           {fee: fee; proofs: proof list; prover: public_key}
-        [@@deriving sexp, compare]
+        [@@deriving sexp, to_yojson, compare]
 
         let fee {fee; _} = fee
 
@@ -1524,7 +1534,7 @@ let%test_module "test" =
               module T = struct
                 type t = statement list
                 [@@deriving
-                  sexp, bin_io, compare, hash, yojson, version {for_test}]
+                  bin_io, compare, hash, sexp, version {for_test}, yojson]
               end
 
               include T
@@ -1550,7 +1560,7 @@ let%test_module "test" =
 
           type t = Stable.Latest.t =
             {fee: fee; proofs: proof list; prover: public_key}
-          [@@deriving sexp, compare]
+          [@@deriving sexp, to_yojson, compare]
 
           let create_unsafe = Fn.id
         end
@@ -1723,7 +1733,7 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = {diff: Diff.Stable.V1.t; creator: public_key}
-              [@@deriving sexp, bin_io, version {for_test}]
+              [@@deriving sexp, to_yojson, bin_io, version {for_test}]
             end
 
             include T

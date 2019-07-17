@@ -218,8 +218,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
   trace_task "proposer" (fun () ->
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Bootstrapping right now. Cannot generate new blockchains or \
-           schedule event"
+          "No frontier available; pausing proposer."
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let propose ivar (keypair, scheduled_time, proposal_data) =
@@ -231,7 +230,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             let crumb = Transition_frontier.best_tip frontier in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
-              !"Begining to propose off of crumb $breadcrumb%!" ;
+              !"Generating new block on top of $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
               let transition : External_transition.Validated.t =
                 (Breadcrumb.transition_with_hash crumb).data
@@ -301,8 +300,23 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   with
                   | Error err ->
                       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                        "failed to prove generated protocol state: %s"
-                        (Error.to_string_hum err) ;
+                        "Prover failed to prove freshly generated transition: \
+                         $error"
+                        ~metadata:
+                          [ ("error", `String (Error.to_string_hum err))
+                          ; ( "prev_state"
+                            , Protocol_state.value_to_yojson
+                                previous_protocol_state )
+                          ; ( "prev_state_proof"
+                            , Proof.to_yojson previous_protocol_state_proof )
+                          ; ( "next_state"
+                            , Protocol_state.value_to_yojson protocol_state )
+                          ; ( "internal_transition"
+                            , Internal_transition.to_yojson internal_transition
+                            )
+                          ; ( "pending_coinbase_witness"
+                            , Pending_coinbase_witness.to_yojson
+                                pending_coinbase_witness ) ] ;
                       return ()
                   | Ok protocol_state_proof -> (
                       let span = Time.diff (Time.now time_controller) t0 in

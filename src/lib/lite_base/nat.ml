@@ -1,5 +1,5 @@
 module Make (Type : sig
-  type t [@@deriving bin_io, eq, sexp, compare, version]
+  type t [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
 end)
 (Impl : sig
           type t
@@ -19,7 +19,8 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Type.t [@@deriving bin_io, eq, sexp, compare, version]
+        type t = Type.t
+        [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
       end
 
       include T
@@ -28,7 +29,7 @@ struct
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving eq, sexp, compare]
+  type t = Stable.Latest.t [@@deriving eq, sexp, to_yojson, compare]
 
   let length_in_triples = (Impl.length_in_bits + 2) / 3
 
@@ -58,7 +59,8 @@ module Input_32 = struct
       module T = struct
         open Core_kernel
 
-        type t = int32 [@@deriving bin_io, eq, sexp, compare, version]
+        type t = int32
+        [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
       end
 
       include T
@@ -94,7 +96,8 @@ module Inputs_64 = struct
       module T = struct
         open Core_kernel
 
-        type t = int64 [@@deriving bin_io, eq, sexp, compare, version]
+        type t = int64
+        [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
       end
 
       include T
