@@ -338,7 +338,7 @@ module Make (Inputs : Inputs.S) :
         garbage_collect_disconnected_subtrees ~logger
           ~disconnected_subtrees:received_subtrees ;
         Deferred.Or_error.fail e
-    | Ok e ->
+    | Ok () ->
         Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~verifier
           ~trust_system ~frontier ~initial_hash:target_hash received_subtrees
 
