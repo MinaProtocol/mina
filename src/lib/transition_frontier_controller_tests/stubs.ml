@@ -468,6 +468,9 @@ struct
     module Transition_frontier = Transition_frontier
   end)
 
+  module Transaction_pool =
+    Network_pool.Transaction_pool.Make (Staged_ledger) (Transition_frontier)
+
   module Breadcrumb_visualizations = struct
     module Graph =
       Visualization.Make_ocamlgraph (Transition_frontier.Breadcrumb)
