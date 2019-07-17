@@ -210,7 +210,7 @@ module type For_staged_ledger_intf = sig
   include For_transaction_snark_scan_state_intf
 
   module Pending_coinbase : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving bin_io, sexp, to_yojson]
 
     val create : unit -> t Or_error.t
 

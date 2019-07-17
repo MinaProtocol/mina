@@ -1344,7 +1344,7 @@ module Data = struct
         module V1 = struct
           module T = struct
             type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
-            [@@deriving sexp, bin_io, compare, version]
+            [@@deriving sexp, bin_io, to_yojson, compare, version]
           end
 
           include T
@@ -1355,7 +1355,7 @@ module Data = struct
 
       type ('epoch, 'slot) t = ('epoch, 'slot) Stable.Latest.t =
         {epoch: 'epoch; slot: 'slot}
-      [@@deriving sexp, compare]
+      [@@deriving sexp, to_yojson, compare]
     end
 
     module Value = struct
@@ -1364,7 +1364,7 @@ module Data = struct
           module T = struct
             type t =
               (Epoch.Stable.V1.t, Epoch.Slot.Stable.V1.t) Poly.Stable.V1.t
-            [@@deriving sexp, bin_io, compare, version]
+            [@@deriving sexp, bin_io, to_yojson, compare, version]
           end
 
           include T
@@ -1383,7 +1383,7 @@ module Data = struct
         module Registered_V1 = Registrar.Register (V1)
       end
 
-      type t = Stable.Latest.t [@@deriving sexp, compare]
+      type t = Stable.Latest.t [@@deriving sexp, to_yojson, compare]
     end
 
     type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) Poly.t
