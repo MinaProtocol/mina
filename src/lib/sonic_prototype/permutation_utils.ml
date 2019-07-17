@@ -1,6 +1,10 @@
 open Core
 open Default_backend.Backend
 
+(* helper function turn a univariate Y polynomial a_1 Y^j_1 + a_2 Y^j_2 + a_3 Y^j_3
+   (the coefficient of some X^i term) into the triple
+   ((j_1, a_1), (j_2, a_2), (j_3, a_3))
+*)
 let coeffs_list_to_triple deg coeffs =
   let rec helper deg lst =
     match lst with
@@ -13,8 +17,24 @@ let coeffs_list_to_triple deg coeffs =
   let third_deg, third_val, _ = helper second_rest_deg second_rest_coeffs in
   ((first_deg, first_val), (second_deg, second_val), (third_deg, third_val))
 
+(* input:   a bivariate polynomial poly(X, Y), which we assume has no more than three Y^j terms
+            multiplying any particular X^i term
+   output:  three permutations sigma_1, sigma_2, and sigma_3 of {1, ..., n} and and three vectors
+            psi_1, psi_2, and psi_3 such that poly(X, Y) = sum_i=1^n phi_{sigma_{1,i}} X^i Y^sigma_{1,i}
+                                                                   + phi_{sigma_{2,i}} X^i Y^sigma_{2,i}
+                                                                   + phi_{sigma_{3,i}} X^i Y^sigma_{3,i}
+*)
 let convert_to_sigmas_psis poly n =
   let poly_coeffs = Bivariate_fr_laurent.coeffs poly in
+
+  (* helper function to turn polynomial into list of tuples:
+       (a_1 Y^j_1 + a_2 Y^j_2 + a_3 Y^j_3) X^1
+     + (b_1 Y^k_1 + b_2 Y^k_2 + b_3 Y^k_3) X^2
+     + (c_1 Y^l_1 + c_2 Y^l_2 + c_3 Y^l_3) X^3
+      --> [ ((j_1, a_1), (j_2, a_2), (j_3, a_3))
+          ; ((k_1, b_1), (k_2, b_2), (k_3, b_3))
+          ; ((l_1, c_1), (l_2, c_2), (l_3, c_3)) ]
+   *)
   let rec parse_coeffs remaining_coeffs =
     match remaining_coeffs with
     | [] -> []
@@ -23,26 +43,37 @@ let convert_to_sigmas_psis poly n =
         let coeffs = Fr_laurent.coeffs hd in
         (coeffs_list_to_triple deg coeffs) :: parse_coeffs tl in
   let input = parse_coeffs poly_coeffs in
+
   let as_lists = List.concat (List.map input ~f:(fun (a, b, c) -> [a; b; c])) in
+  
+  (* remove all the "filler" terms with zero coefficients (added in ) *)
   let nonzero = List.filter as_lists ~f:(fun (_, b) -> (not Fr.(equal b zero))) in
-  let all_firsts = List.sort (List.map nonzero ~f:(fun (a, _) -> a)) ~compare:( - ) in
+  
+  (* list of all the powers j s.t. Y^j has non-zero coefficient (so we can count them) *)
+  let all_powers = List.sort (List.map nonzero ~f:(fun (a, _) -> a)) ~compare:( - ) in
+
+  (* helper function to count occurrences of first item in a list *)
   let rec count_remove item lst =
     match lst with
     | [] -> 0, []
     | hd::tl ->
       let count_in_remaining, new_lst = count_remove item tl in
-      if item = hd then 1 + count_in_remaining, new_lst else count_in_remaining, hd::new_lst in
+      if item = hd then 1 + count_in_remaining, new_lst else count_in_remaining, hd::new_lst in\
+  
+  (* turn list of powers Y^j into counts of how many there *)
   let rec count_all lst =
     match lst with
     | [] -> []
     | hd::_ ->
       let count_of_hd, new_lst = count_remove hd lst in
       (hd, count_of_hd) :: (count_all new_lst) in
-  let counts = count_all all_firsts in
+  let counts = count_all all_powers in
   let rec get_count x counts = 
     match counts with
     | [] -> 0
     | (a, b)::tl -> if a = x then b else get_count x tl in
+
+  (* for each power Y^j, we need to "fill in" terms with coefficient 0, for *any* X^i so there's 3 occurrences *)
   let to_fill_in = List.map ~f:(fun x -> (x, 3 - (get_count x counts))) (List.range 1 (n + 1)) in
   let rec repeat x n =
     if n = 0 then [] else x :: (repeat x (n - 1)) in
@@ -56,8 +87,9 @@ let convert_to_sigmas_psis poly n =
     let new_second, remaining2 = if Fr.(equal b2 zero) then ((List.hd_exn remaining1), Fr.zero), (List.tl_exn remaining1) else (b1, b2), remaining1 in
     let new_third, remaining3 = if Fr.(equal c2 zero) then ((List.hd_exn remaining2), Fr.zero), (List.tl_exn remaining2) else (c1, c2), remaining2 in
     (new_first, new_second, new_third) :: (fill_in tl remaining3) in
-  (* Printf.printf "input: "; List.iter ~f:(fun ((a1, a2), (b1, b2), (c1, c2)) -> Printf.printf "((%d, %s), (%d, %s), (%d, %s))\n" a1 (Fr.to_string a2) b1 (Fr.to_string b2) c1 (Fr.to_string c2)) input; Printf.printf "\n"; *)
   let filled_in = fill_in input all_to_fill_in in
+
+  (* all the possible ways to arrange the 3 Y^j powers for a given X^i *)
   let get_options first second third =
     [(first, second, third);
      (first, third, second);
@@ -65,6 +97,8 @@ let convert_to_sigmas_psis poly n =
      (second, third, first);
      (third, second, first);
      (third, first, second)] in
+  (* check if this arrangement "conflicts" with what we've chosen so far: that is, puts a Y^j power in the
+     same permutation (sigma_1, sigma_2, or sigma_2) as that same Y^j for some other X^i *)
   let is_good first second third first_so_far second_so_far third_so_far =
     (not (List.exists ~f:(fun x -> fst x = fst first) first_so_far))
     && (not (List.exists ~f:(fun x -> fst x = fst second) second_so_far))
@@ -81,6 +115,7 @@ let convert_to_sigmas_psis poly n =
     let new_second_so_far = second_so_far @ [new_second] in
     let new_third_so_far = third_so_far @ [new_third] in
     rearrange new_first_so_far new_second_so_far new_third_so_far tl in
+  
   let f, s, t = rearrange [] [] [] filled_in in
   let sigma_1 = List.map f ~f:fst in
   let sigma_2 = List.map s ~f:fst in
