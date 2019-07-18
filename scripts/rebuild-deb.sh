@@ -76,7 +76,6 @@ find ${BUILDDIR}
 # Build the package
 echo "------------------------------------------------------------"
 dpkg-deb --build ${BUILDDIR}
-cp ${BUILDDIR}.deb coda.deb
 ls -lh coda*.deb
 
 # Tar up keys for an artifact
@@ -95,9 +94,11 @@ ls -lh coda_pvkeys_*
 
 # second deb without the proving keys
 echo "------------------------------------------------------------"
+echo "Building deb without keys:"
+BUILDDIR-NOKEYS="${PROJECT}-noprovingkeys_${VERSION}"
 
 cat << EOF > ${BUILDDIR}/DEBIAN/control
-Package: ${PROJECT}-noproving
+Package: ${PROJECT}-noprovingkeys
 Version: ${VERSION}
 Section: base
 Priority: optional
@@ -113,7 +114,8 @@ EOF
 
 # remove proving keys
 rm -f ${BUILDDIR}/var/lib/coda/*_proving
+mv ${BUILDDIR} ${BUILDDIR-NOKEYS}
 
 # build another deb
-dpkg-deb --build ${BUILDDIR}
-cp ${BUILDDIR}.deb coda-nokeys.deb
+dpkg-deb --build ${BUILDDIR-NOKEYS}
+ls -lh coda*.deb
