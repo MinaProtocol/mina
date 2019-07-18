@@ -321,8 +321,6 @@ module Make (Inputs : Inputs.S) :
                 Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                   "catchup breadcrumbs pipe was closed; attempt to write to \
                    closed pipe" ;
-                garbage_collect_disconnected_subtrees ~logger
-                  ~disconnected_subtrees:received_subtrees ;
                 Deferred.Or_error.error_string "" )
               else
                 Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
