@@ -167,6 +167,8 @@ module Transmuter_cache = struct
 
     val final_state : t -> source -> target final_state Option.t
 
+    val final_state_target : t -> target -> target final_state Option.t
+
     val mem : t -> source -> bool
 
     val mem_target : t -> target -> bool

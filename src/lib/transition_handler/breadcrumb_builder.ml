@@ -29,7 +29,19 @@ module Make (Inputs : Inputs.S) :
                 %{sexp: Coda_base.State_hash.t}"
               initial_hash
           in
-          Logger.error logger ~module_:__MODULE__ ~location:__LOC__ !"%s" msg ;
+          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "hashes of transitions"
+                , `List
+                    (List.map subtrees_of_enveloped_transitions
+                       ~f:(fun subtree ->
+                         Rose_tree.to_yojson
+                           (fun enveloped_transitions ->
+                             Cached.peek enveloped_transitions
+                             |> Envelope.Incoming.data |> fst |> With_hash.hash
+                             |> State_hash.to_yojson )
+                           subtree )) ) ]
+            !"%s" msg ;
           Or_error.error_string msg
       | Some breadcrumb ->
           Or_error.return breadcrumb

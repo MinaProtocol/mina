@@ -183,6 +183,9 @@ module type Unprocessed_transition_cache_intf = sig
        Cached.t
 
   val mem_target : t -> State_hash.t -> bool
+
+  val final_state_target :
+    t -> State_hash.t -> State_hash.t Cache_lib.Intf.final_state option
 end
 
 module type Transition_handler_intf = sig

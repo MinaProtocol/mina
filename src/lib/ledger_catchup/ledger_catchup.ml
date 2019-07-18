@@ -263,6 +263,18 @@ module Make (Inputs : Inputs.S) :
                       oldest_missing_transition
                     |> Protocol_state.previous_state_hash
                   in
+                  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:
+                      [ ( "curr_state_hash"
+                        , External_transition.protocol_state
+                            oldest_missing_transition
+                          |> Protocol_state.hash |> State_hash.to_yojson )
+                      ; ( "prev_state_hash"
+                        , External_transition.protocol_state
+                            oldest_missing_transition
+                          |> Protocol_state.previous_state_hash
+                          |> State_hash.to_yojson ) ]
+                    "compute initial state hash" ;
                   Deferred.Or_error.return (acc, initial_state_hash) )
             in
             let subtrees_of_transitions =
@@ -295,6 +307,30 @@ module Make (Inputs : Inputs.S) :
         let sub, rest = List.split_n ls size in
         sub :: partition size rest
 
+  let check_target_final_state ~logger ~frontier ~unprocessed_transition_cache
+      ~target_hash =
+    match Transition_frontier.find frontier target_hash with
+    | Some _ ->
+        Deferred.Or_error.return ()
+    | None -> (
+        let open Unprocessed_transition_cache in
+        match final_state_target unprocessed_transition_cache target_hash with
+        | None ->
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              "Target transition didn't get into the frontier" ;
+            Deferred.Or_error.error_string ""
+        | Some final_state -> (
+            match%bind Ivar.read final_state with
+            | `Success _ ->
+                Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+                  "Target transition went into the frontier successfully" ;
+                Deferred.Or_error.return ()
+            | `Failed ->
+                Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                  "Target transition didn't get into the frontier" ;
+                Deferred.Or_error.error_string "" ) )
+
   let download_transitions_and_adding_to_frontier ~logger ~trust_system
       ~verifier ~network ~frontier ~num_peers ~unprocessed_transition_cache
       ~catchup_breadcrumbs_writer ~preferred_peer ~received_subtrees
@@ -310,6 +346,9 @@ module Make (Inputs : Inputs.S) :
           with
           | Ok trees ->
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "hashes of transitions"
+                    , `List (List.map hashes ~f:State_hash.to_yojson) ) ]
                 "about to write to the catchup breadcrumbs pipe" ;
               if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
                 Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -320,7 +359,7 @@ module Make (Inputs : Inputs.S) :
                 Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
                 |> Deferred.Or_error.return
           | Error e ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                 !"All peers either sent us bad transitions, didn't have the \
                   info, or our transition frontier moved too fast: %s"
                 (Error.to_string_hum e) ;
@@ -331,9 +370,15 @@ module Make (Inputs : Inputs.S) :
           ~disconnected_subtrees:received_subtrees ;
         Deferred.Or_error.fail e
     | Ok () -> (
+        Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+          !"Finished downloading missing transitions" ;
         match%bind
-          Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~verifier
-            ~trust_system ~frontier ~initial_hash:target_hash received_subtrees
+          let open Deferred.Or_error in
+          check_target_final_state ~logger ~frontier
+            ~unprocessed_transition_cache ~target_hash
+          *> Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~verifier
+               ~trust_system ~frontier ~initial_hash:target_hash
+               received_subtrees
         with
         | Ok trees_of_breadcrumbs ->
             if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
@@ -366,7 +411,7 @@ module Make (Inputs : Inputs.S) :
               ~num_peers ~unprocessed_transition_cache ~state_hash:target_hash
           with
         | Error e ->
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
               !"All peers either sent us bad transition_chain_witness, didn't \
                 have the info, or our transition frontier moved too fast: %s"
               (Error.to_string_hum e) ;
