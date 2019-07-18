@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"codanet"
 	"context"
-	"crypto/rand"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -344,7 +344,7 @@ type generatedKeypair struct {
 }
 
 func (*generateKeypairMsg) run(app *app) (interface{}, error) {
-	privk, pubk, err := crypto.GenerateEd25519Key(rand.Reader)
+	privk, pubk, err := crypto.GenerateEd25519Key(cryptorand.Reader)
 	if err != nil {
 		return nil, badp2p(err)
 	}

@@ -48,7 +48,7 @@ module Helper = struct
     ; lock_path: string
     ; conf_dir: string
     ; outstanding_requests: (int, Yojson.Safe.json Or_error.t Ivar.t) Hashtbl.t
-    ; seqno: int ref
+    ; mutable seqno: int
     ; logger: Logger.t
     ; mutable me_keypair: keypair option
     ; subscriptions:
@@ -93,8 +93,9 @@ module Helper = struct
     ; f: stream -> unit Deferred.t }
 
   let genseq t =
-    let v = !(t.seqno) in
-    incr t.seqno ; v
+    let v = t.seqno in
+    t.seqno <- t.seqno + 1 ;
+    v
 
   let do_rpc t name body =
     if not t.finished then (
@@ -339,7 +340,6 @@ type net = Helper.t
 
 type peer_id = string
 
-(* We hardcode support for only Ed25519 keys so we can keygen without calling go *)
 module Keypair = struct
   type t = keypair
 

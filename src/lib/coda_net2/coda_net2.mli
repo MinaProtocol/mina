@@ -29,10 +29,8 @@ type peer_id
 module Keypair : sig
   type t
 
-  (** Securely generate a new keypair.
-
-  [random net] can fail if generating secure random bytes fails. *)
-  val random : net -> t Deferred.Or_error.t
+  (** Securely generate a new keypair. *)
+  val random : net -> t Deferred.t
 
   val to_string : t -> string
 
@@ -85,6 +83,9 @@ module Pubsub : sig
     * Returned deferred is resolved once the unsubscription is complete.
     * This can fail if already unsubscribed. *)
     val unsubscribe : t -> unit Deferred.Or_error.t
+
+    (** The pipe of messages received about this topic. *)
+    val message_pipe : t -> string Envelope.Incoming.t Strict_pipe.Reader.t
   end
 
   (** Publish a message to a topic.
@@ -103,10 +104,6 @@ module Pubsub : sig
   val subscribe :
        net
     -> string
-    -> ( string Envelope.Incoming.t
-       , _ Strict_pipe.buffered
-       , unit )
-       Strict_pipe.Writer.t
     -> Subscription.t Deferred.Or_error.t
 
   (** [register_validator net topic f] validates messages on [topic] with [f] before forwarding them.
@@ -166,6 +163,10 @@ val peers : net -> PeerID.t list Deferred.t
   The reading end will be closed when the remote peer closes their writing
   end. Once both write ends are closed, the stream ends.
 
+  Long-lived connections are likely to get closed by the remote peer if
+  they reach their connection limit. See the module-level notes about
+  connection limiting.
+
   IMPORTANT NOTE: A single write to the stream will not necessarily result
   in a single read on the other side. libp2p may fragment messages arbitrarily.
  *)
@@ -183,7 +184,9 @@ module Stream : sig
     *)
   val reset : t -> unit Deferred.Or_error.t
 
-  (** TODO: remote addr + peerid *)
+  val remote_addr : t -> Multiaddr.t
+
+  val remote_peerid : t -> PeerID.t
 end
 
 (** [Protocol_handler.t] is the rough equivalent to [Tcp.Server.t].
@@ -213,7 +216,7 @@ end
   The reading end will be closed when the remote peer closes their writing
   end. Once both write ends are closed, the connection terminates.
 
-  This can fail if the peer isn't reachable, doesn't implement the requrested
+  This can fail if the peer isn't reachable, doesn't implement the requested
   protocol, and probably for other reasons.
  *)
 val open_stream :
@@ -237,10 +240,12 @@ val handle_protocol :
 
 (** Try listening on a multiaddr.
 *
-* If successful, returns the list of all addresses this net is listening on.
+* If successful, returns the list of all addresses this net is listening on
 * For example, if listening on ["/ip4/127.0.0.1/tcp/0"], it might return
 * ["/ip4/127.0.0.1/tcp/35647"] after the OS selects an available listening
 * port.
+*
+* This can be called many times.
 *)
 val listen_on : net -> Multiaddr.t -> Multiaddr.t list Deferred.Or_error.t
 

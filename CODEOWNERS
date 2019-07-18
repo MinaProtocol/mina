@@ -20,6 +20,7 @@
 
 /src/app/cli/ @cmr @nholland94 @bkase @wu-s-john
 /src/app/kademlia-haskell/ @bkase @enolan
+/src/app/libp2p_helper @cmr @enolan
 /src/app/logproc/ @nholland94
 /src/app/reformat/ @bkase
 /src/app/testone/ @wu-s-john
