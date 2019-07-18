@@ -77,7 +77,7 @@ find ${BUILDDIR}
 echo "------------------------------------------------------------"
 dpkg-deb --build ${BUILDDIR}
 ln -s -f ${BUILDDIR}.deb coda.deb
-ls -lh coda.deb
+ls -lh coda*.deb
 
 # Tar up keys for an artifact
 echo "------------------------------------------------------------"
