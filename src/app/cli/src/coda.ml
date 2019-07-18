@@ -105,7 +105,7 @@ let daemon logger =
          ~doc:"Print daemon log output as JSON (default: plain text)"
      and log_level =
        flag "log-level" (optional string)
-         ~doc:"Set daemon log level (default: Warn)"
+         ~doc:"Set daemon log level (default: Info)"
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
@@ -131,7 +131,7 @@ let daemon logger =
        let%bind log_level =
          match log_level with
          | None ->
-             Deferred.return Logger.Level.Warn
+             Deferred.return Logger.Level.Info
          | Some log_level_str_with_case -> (
              let open Logger in
              let log_level_str = String.lowercase log_level_str_with_case in
@@ -152,6 +152,13 @@ let daemon logger =
            let conf_dir = compute_conf_dir home in
            Deferred.return conf_dir
          else Sys.home_directory () >>| compute_conf_dir
+       in
+       let () =
+         match Core.Sys.file_exists conf_dir with
+         | `Yes ->
+             ()
+         | _ ->
+             Core.Unix.mkdir conf_dir
        in
        let () =
          if is_background then (
@@ -332,7 +339,6 @@ let daemon logger =
                     "peers" None ~default:[] ]
          in
          let discovery_port = external_port + 1 in
-         let%bind () = Unix.mkdir ~p:() conf_dir in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
          let%bind initial_peers_cleaned =
            Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)

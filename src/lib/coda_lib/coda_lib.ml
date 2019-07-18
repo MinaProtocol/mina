@@ -474,33 +474,41 @@ let create (config : Config.t) =
                    now config.time_controller |> to_span_since_epoch
                    |> Span.to_ms
                  in
-                 if
-                   Ok ()
-                   = Consensus.Hooks.received_at_valid_time ~time_received:now
-                       consensus_state
-                 then (
-                   Logger.trace config.logger ~module_:__MODULE__
-                     ~location:__LOC__
-                     ~metadata:
-                       [ ("state_hash", State_hash.to_yojson hash)
-                       ; ( "external_transition"
-                         , External_transition.Validated.to_yojson
-                             (With_hash.data transition_with_hash) ) ]
-                     "broadcasting $state_hash" ;
-                   (* remove verified status for network broadcast *)
-                   Coda_networking.broadcast_state net
-                     (External_transition.Validated.forget_validation
-                        (With_hash.data transition_with_hash)) )
-                 else
-                   Logger.warn config.logger ~module_:__MODULE__
-                     ~location:__LOC__
-                     ~metadata:
-                       [ ("state_hash", State_hash.to_yojson hash)
-                       ; ( "external_transition"
-                         , External_transition.Validated.to_yojson
-                             (With_hash.data transition_with_hash) ) ]
-                     "refusing to broadcast $state_hash because it is too late"
-             )) ;
+                 match
+                   Consensus.Hooks.received_at_valid_time ~time_received:now
+                     consensus_state
+                 with
+                 | Ok () ->
+                     Logger.trace config.logger ~module_:__MODULE__
+                       ~location:__LOC__
+                       ~metadata:
+                         [ ("state_hash", State_hash.to_yojson hash)
+                         ; ( "external_transition"
+                           , External_transition.Validated.to_yojson
+                               (With_hash.data transition_with_hash) ) ]
+                       "Rebroadcasting $state_hash" ;
+                     (* remove verified status for network broadcast *)
+                     Coda_networking.broadcast_state net
+                       (External_transition.Validated.forget_validation
+                          (With_hash.data transition_with_hash))
+                 | Error reason ->
+                     let timing_error_json =
+                       match reason with
+                       | `Too_early ->
+                           `String "too early"
+                       | `Too_late slots ->
+                           `String (sprintf "%Lu slots too late" slots)
+                     in
+                     Logger.warn config.logger ~module_:__MODULE__
+                       ~location:__LOC__
+                       ~metadata:
+                         [ ("state_hash", State_hash.to_yojson hash)
+                         ; ( "external_transition"
+                           , External_transition.Validated.to_yojson
+                               (With_hash.data transition_with_hash) )
+                         ; ("timing", timing_error_json) ]
+                       "Not rebroadcasting block $state_hash because it was \
+                        received $timing" )) ;
           don't_wait_for
             (Strict_pipe.transfer
                (Coda_networking.states net)
