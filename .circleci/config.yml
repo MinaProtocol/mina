@@ -144,7 +144,7 @@ jobs:
                   name: Create Artifact Dir
                   command: mkdir -p /tmp/artifacts
             - run:
-                  name: Esnure Supmodules Are Updated
+                  name: Ensure Submodules Are Updated
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Proving and Verifying Keys - Download Candidate Stable Set
@@ -181,7 +181,7 @@ jobs:
                   name: Create Artifact Dir
                   command: mkdir -p /tmp/artifacts
             - run:
-                  name: Esnure Supmodules Are Updated
+                  name: Ensure Submodules Are Updated
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Proving and Verifying Keys - Download Candidate Stable Set
@@ -220,7 +220,7 @@ jobs:
                   name: Create Artifact Dir
                   command: mkdir -p /tmp/artifacts
             - run:
-                  name: Esnure Supmodules Are Updated
+                  name: Ensure Submodules Are Updated
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Proving and Verifying Keys - Download Candidate Stable Set
