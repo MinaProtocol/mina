@@ -146,8 +146,12 @@ jobs:
             DUNE_PROFILE: {{profile}}
         steps:
             - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Create Artifact Dir
+                  command: mkdir -p /tmp/artifacts
+            - run:
+                  name: Esnure Supmodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Proving and Verifying Keys - Download Candidate Stable Set
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
@@ -158,7 +162,7 @@ jobs:
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
-                  name: Build deb Package with keys
+                  name: Build deb Package with PV Keys And PV Key TAR
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
@@ -175,7 +179,7 @@ jobs:
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
-                  name: Copy artifacts to Google Cloud
+                  name: Copy Artifacts to Google Cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     {%- endfor %}
 

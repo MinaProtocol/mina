@@ -140,8 +140,12 @@ jobs:
             DUNE_PROFILE: testnet_postake_snarkless_fake_hash
         steps:
             - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Create Artifact Dir
+                  command: mkdir -p /tmp/artifacts
+            - run:
+                  name: Esnure Supmodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Proving and Verifying Keys - Download Candidate Stable Set
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
@@ -149,7 +153,7 @@ jobs:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
             - run:
-                  name: Build deb Package with keys
+                  name: Build deb Package with PV Keys And PV Key TAR
                   command: ./scripts/skip_if_only_frontend.sh make deb
             - run:
                   name: Store Genesis Public/Private Keypairs
@@ -163,7 +167,7 @@ jobs:
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
-                  name: Copy artifacts to Google Cloud
+                  name: Copy Artifacts to Google Cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
@@ -173,8 +177,12 @@ jobs:
             DUNE_PROFILE: testnet_postake_medium_curves
         steps:
             - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Create Artifact Dir
+                  command: mkdir -p /tmp/artifacts
+            - run:
+                  name: Esnure Supmodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Proving and Verifying Keys - Download Candidate Stable Set
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
@@ -183,7 +191,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   no_output_timeout: 20m
             - run:
-                  name: Build deb Package with keys
+                  name: Build deb Package with PV Keys And PV Key TAR
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   no_output_timeout: 20m
             - run:
@@ -198,7 +206,7 @@ jobs:
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
-                  name: Copy artifacts to Google Cloud
+                  name: Copy Artifacts to Google Cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     build-artifacts--testnet_postake_many_proposers_medium_curves:
         resource_class: large
@@ -208,8 +216,12 @@ jobs:
             DUNE_PROFILE: testnet_postake_many_proposers_medium_curves
         steps:
             - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Create Artifact Dir
+                  command: mkdir -p /tmp/artifacts
+            - run:
+                  name: Esnure Supmodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Proving and Verifying Keys - Download Candidate Stable Set
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
@@ -218,7 +230,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   no_output_timeout: 20m
             - run:
-                  name: Build deb Package with keys
+                  name: Build deb Package with PV Keys And PV Key TAR
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   no_output_timeout: 20m
             - run:
@@ -233,7 +245,7 @@ jobs:
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
-                  name: Copy artifacts to Google Cloud
+                  name: Copy Artifacts to Google Cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     test-unit--test_postake_snarkless_unittest:
         resource_class: large

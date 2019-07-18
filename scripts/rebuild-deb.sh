@@ -49,10 +49,12 @@ do
     echo "Looking for key: ${key}"
     if [ -f "/var/lib/coda/${key}_proving" ]; then
         echo "Found from stable key set"
-        cp /var/lib/coda/${key}* ${BUILDDIR}/var/lib/coda
+        ls /var/lib/coda/${key}* 
+        cp /var/lib/coda/${key}* ${BUILDDIR}/var/lib/coda/.
     elif [ -f "/tmp/coda_cache_dir/${key}_proving" ]; then
         echo "Found from compile-time set"
-        cp /tmp/coda_cache_dir/${key}* ${BUILDDIR}/var/lib/coda
+        ls /tmp/coda_cache_dir/${key}*
+        cp /tmp/coda_cache_dir/${key}* ${BUILDDIR}/var/lib/coda/.
     else
         echo "Key not found!"
     fi
