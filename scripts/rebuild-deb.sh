@@ -111,6 +111,9 @@ Description: Coda Client and Daemon
  Built from ${GITHASH}
 EOF
 
-rm ${BUILDDIR}/var/lib/coda/*_proving
+# remove proving keys
+rm -f ${BUILDDIR}/var/lib/coda/*_proving
+
+# build another deb
 dpkg-deb --build ${BUILDDIR}
 cp ${BUILDDIR}.deb coda-nokeys.deb
