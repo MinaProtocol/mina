@@ -6,10 +6,7 @@ In this section, we'll make our first transaction on the Coda network. After [se
 
 Run the following command to start up a Coda node instance and connect to the network:
 
-    $ coda daemon -peer <NETWORK-IS-DOWN>.o1test.net:8303
-
-!!!note
-    On macOS, you'll need to run `export CODA_KADEMLIA_PATH=./kademlia` BEFORE the `coda daemon` command above
+    $ coda daemon -peer genesis-test.o1test.net:8303
 
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. 
 
@@ -39,15 +36,11 @@ This step requires waiting for approximately ~5 minutes to sync with the network
 
 ## Create a new account
 
-Once our node is synced, we'll create a public/private key-pair so that we can sign transactions and generate an address to receive payments. For security reasons, we'll want to make a directory that is harder for attackers to access:
+Once our node is synced, we'll create a public/private key-pair so that we can sign transactions and generate an address to receive payments. For security reasons, we'll want to put the keys under a directory that is harder for attackers to access.
 
-    $ mkdir keys && chmod 700 keys
-
-Now run the following command and use `my-wallet` as the path:
+Run the following command which creates a public and private key `my-wallet` and `my-wallet.pub` under the `keys` directory:
 
     $ coda client generate-keypair -privkey-path keys/my-wallet
-
-This creates a private key at `my-wallet` with a public key at `my-wallet.pub`.
 
 !!! warning
     The public key can be shared freely with anyone, but be very careful with your private key file. Never share this private key with anyone, as it is the equivalent of a password for your funds.
