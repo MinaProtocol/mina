@@ -267,13 +267,7 @@ module Make (Inputs : Inputs.S) :
             in
             let subtrees_of_transitions =
               if List.length verified_transitions <= 0 then []
-              else
-                [ List.(
-                    fold
-                      (tl_exn verified_transitions)
-                      ~init:(Rose_tree.T (hd_exn verified_transitions, []))
-                      ~f:(fun acc verified_transition ->
-                        Rose_tree.T (verified_transition, [acc]) )) ]
+              else [Rose_tree.of_list_exn verified_transitions]
             in
             let open Deferred.Let_syntax in
             match%bind
