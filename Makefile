@@ -173,7 +173,7 @@ publish-macos:
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
-	@cp src/_build/coda.deb /tmp/artifacts/.
+	@cp src/_build/coda*.deb /tmp/artifacts/.
 	@cp src/_build/coda_pvkeys_* /tmp/artifacts/.
 
 publish_deb:

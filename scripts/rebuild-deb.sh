@@ -76,7 +76,7 @@ find ${BUILDDIR}
 # Build the package
 echo "------------------------------------------------------------"
 dpkg-deb --build ${BUILDDIR}
-ln -s -f ${BUILDDIR}.deb coda.deb
+cp ${BUILDDIR}.deb coda.deb
 ls -lh coda*.deb
 
 # Tar up keys for an artifact
@@ -91,3 +91,26 @@ else
     popd
 fi
 ls -lh coda_pvkeys_*
+
+
+# second deb without the proving keys
+echo "------------------------------------------------------------"
+
+cat << EOF > ${BUILDDIR}/DEBIAN/control
+Package: ${PROJECT}-noproving
+Version: ${VERSION}
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1, miniupnpc, coda-kademlia
+License: Apache-2.0
+Homepage: https://codaprotocol.com/
+Maintainer: o(1)Labs <build@o1labs.org>
+Description: Coda Client and Daemon
+ Coda Protocol Client and Daemon
+ Built from ${GITHASH}
+EOF
+
+rm ${BUILDDIR}/var/lib/coda/*_proving
+dpkg-deb --build ${BUILDDIR}
+cp ${BUILDDIR}.deb coda-nokeys.deb
