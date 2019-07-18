@@ -12,7 +12,7 @@ fi
 
 # GC credentials
 echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
-/usr/bin/gcloud auth activate-service-account --key-file=google_creds.json
+gcloud auth activate-service-account --key-file=google_creds.json
 
 # Debug output
 #set -x
@@ -22,7 +22,7 @@ echo "------------------------------------------------------------"
 echo "Downloading keys"
 PINNED_KEY_COMMIT=temporary_hack
 TARBALL="keys-${PINNED_KEY_COMMIT}-${DUNE_PROFILE}.tar.bz2"
-/usr/bin/gsutil cp gs://proving-keys-stable/$TARBALL /tmp/.
+gsutil cp gs://proving-keys-stable/$TARBALL /tmp/.
 
 # Unpack keys
 echo "------------------------------------------------------------"
