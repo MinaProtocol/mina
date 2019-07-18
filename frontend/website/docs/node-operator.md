@@ -1,5 +1,9 @@
 # Become a Node Operator
 
+!!! warning
+    Node operator commands are still being stabilized, so these commands may change. Feel free to try them out and open a pull request to fix anything!
+
+
 Now that we've set up our Coda node and sent our first transaction, let's turn our attention to the other ways we can interact with the Coda network - namely, participating in consensus, and helping compress data by generating zk-SNARKs. By operating a node that helps secure the network, you can receive coda for your efforts.
 
 ## Participating in Consensus

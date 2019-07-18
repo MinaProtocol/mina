@@ -24,7 +24,7 @@ The newest binary releases can be found [here](). With the exception of the .exe
 ### macOS
 
 1. Download [coda.zip](https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip) -- NOTE: This is a large file (~2.2 GB), so this step might take some time
-2. Unzip anywhere, `cd` to navigate to the Coda directory
+2. Unzip anywhere, `cd` to navigate to the Coda directory. This directory will contain a coda binary, a kademlia binary, related libraries, and the proving and verification keys.
 3. Run
 
 ```
@@ -33,7 +33,7 @@ sudo cp var/lib/coda/* /var/lib/coda
 ```
 
 These commands make sure the proving and verification keys for SNARK checking are in the right place.
-4. Run `brew install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp)
+4. Run `brew install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp). You'll need Homebrew installed on your system.
 5. Set up port forwarding ([see below](/docs/getting-started/#port-forwarding))
 6. Run `export PATH=$PWD:$PATH` so we can access `coda` instead of `./coda`
 7. `coda -help` to see if it works
@@ -67,7 +67,7 @@ If you're running a Coda node on a home or office machine, you'll have to set up
 
 Run the following commands to use MiniUPnP to reconfigure ports on your IP address:
 
-1. First run `ifconfig` to get your external IP address - you can find this in the output corresponding to the field `en0`:
+1. First run `ifconfig` to get your external IP address - you can find this in the output corresponding to the field `en0` on macOS and `wlan0` on a linux system:
 
 
         $ ifconfig
@@ -81,15 +81,19 @@ Run the following commands to use MiniUPnP to reconfigure ports on your IP addre
                 status: active
         ...
 
-2. Then run the following commands, with the IP address from from the previous step. Note that you'll have to run it twice for the two ports below:
+2. Then run the following commands, with the IP address next to the `inet` field in the previous step. Note that you'll have to run it twice for the two ports below:
 
         $ sudo upnpc -a 192.168.101.7 8302 8302 TCP
         $ sudo upnpc -a 192.168.101.7 8303 8303 UDP
 
-If these commands succeed, you will have successfully forwarded ports `8302` & `8303`. Otherwise, you may see the following error message:
+If these commands succeed, you will have successfully forwarded ports `8302` & `8303`. Otherwise, you may see the following error messages:
 
     No IGD UPnP Device found on the network !
 
-If so, [find your router model](https://portforward.com/router.htm) and follow the instructions to forward the ports from your router to your device running the Coda node.
+Or
+
+    connect: Connection refused
+
+If so, find your router model and Google `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Coda node. You'll need to open the TCP port 8302, and the UDP port 8303 by default.
 
 Now that you've installed the Coda binary and configured settings, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!

@@ -5,7 +5,7 @@ The Coda CLI (command-line interface) is the primary way for users to interact w
 The CLI is installed as part of the Coda bundle, and can be accessed from a shell by beginning a statement with `coda`. 
 
 !!! warning
-    Coda APIs are still under construction, so these commands may change
+    Coda APIs are still under construction, so these commands will likely change
 
 ### Commands
 
