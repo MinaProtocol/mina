@@ -15,7 +15,7 @@ The host and port specified above refer to the seed peer address - this is the i
 
 ## Checking connectivity
 
-Now that we've started up a node and are running the Coda daemon, open up another shell and run the following command:
+Now that we've started up a node and are running the Coda daemon, open up another shell (if you're on macOS, cd to the place where you've extracted the zip and `export PATH=$PWD:$PATH`), and run the following command:
 
     $ coda client status
 

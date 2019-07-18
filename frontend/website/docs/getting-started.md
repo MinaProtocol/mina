@@ -25,14 +25,11 @@ The newest binary releases can be found below. Instructions are provided for mac
 
 1. Download [coda.zip](https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip) -- NOTE: This is a large file (~2.2 GB), so this step might take some time
 2. Unzip anywhere, `cd` to navigate to the Coda directory. This directory will contain a coda binary, a kademlia binary, related libraries, and the proving and verification keys.
-3. Run
-
+3. These next commands make sure the proving and verification keys for SNARK checking are in the right place. Run
 ```
 sudo mkdir /var/lib/coda
 sudo cp var/lib/coda/* /var/lib/coda
 ```
-
-These commands make sure the proving and verification keys for SNARK checking are in the right place.
 4. Run `brew install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp). You'll need Homebrew installed on your system.
 5. Set up port forwarding ([see below](/docs/getting-started/#port-forwarding))
 6. Run `export PATH=$PWD:$PATH` so we can access `coda` instead of `./coda`
