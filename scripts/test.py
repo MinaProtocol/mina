@@ -10,9 +10,6 @@ import time
 from itertools import chain
 
 build_artifact_profiles = [
-    'testnet_postake',
-    'testnet_postake_many_proposers',
-    'testnet_postake_snarkless_fake_hash',
     'testnet_postake_medium_curves',
     'testnet_postake_many_proposers_medium_curves'
 ]
