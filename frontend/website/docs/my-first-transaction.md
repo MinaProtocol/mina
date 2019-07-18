@@ -6,7 +6,7 @@ In this section, we'll make our first transaction on the Coda network. After [se
 
 Run the following command to start up a Coda node instance and connect to the network:
 
-    $ coda daemon -peer genesis-test.o1test.net:8303
+    $ coda daemon -peer <NETWORK-IS-DOWN>.o1test.net:8303
 
 !!!note
     On macOS, you'll need to run `export CODA_KADEMLIA_PATH=./kademlia` BEFORE the `coda daemon` command above
@@ -54,13 +54,21 @@ This creates a private key at `my-wallet` with a public key at `my-wallet.pub`.
 
 ## Request coda
 
-In order to send our first transaction, we'll first need to get some Coda to play with. Head over to the [Coda Discord server](https://discord.gg/ShKhA7J) and join the `testnet` channel. Once there, simply post a message asking for some test coda and provide your public key. Here's an example:
+In order to send our first transaction, we'll first need to get some Coda to play with. Head over to the [Coda Discord server](https://discord.gg/ShKhA7J) and join the `faucet` channel. Once there, ask our faucet bot for some tokens (you'll receive 100). Here's an example:
 
-    Hi, may I have some testnet coda tokens? My public key is: <public_key>
+    $request tNciWRVyhakSXV1gzHg8KdvWccJ4HXorwUPTUS2SgHVi3gKk4WUbcPqSvRBGSHSUVjZGhJooyLvSkQaxf8eFnAW5sQsAiDF1zRj1hDnnRVFRQsck3kQYna1ELv4UxBt6VP232wpCcrwh8g
 
-Once someone responds affirmatively, we can check our balance to make sure that we received the funds by running the following command, passing in our public key:
+Once a faucet-mod thumbs up your request, keep an eye on the discord channel to see when the transaction goes through on that side. 
+
+We can check our balance to make sure that we received the funds by running the following command, passing in our public key:
 
     $ coda client get-balance -address <public_key>
+
+You might see `No account found at that public\_key (zero balance)`. Be patient! Depending on the traffic in the network, it may take a few blocks before your transaction goes through.
+
+While you're waiting take a look at your daemon logs for new blocks being generated. Run the following command to see the current block height:
+
+    $ coda client status
 
 ## Make a payment
 
@@ -68,31 +76,19 @@ Finally we get to the good stuff, sending our first transaction! For testing pur
 
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
-    $ coda client send-payment \
-        -amount <amount> \
-        -receiver <public-key> \
-        -fee <fee>
-        -privkey-path <path>
+    $ coda client send-payment -amount 10 -receiver <public-key> -fee 2 -privkey-path keys/my-wallet
 
-If you're wondering what to pass in to the commands above:
+If you're wondering what we passed in to the commands above:
 
-- For `amount`, let's send a test value of `300` coda
-- The `receiver` (public key) of the echo service is `codaBRrKLuuNMz8Hh6jmzobBWhV7uQ3dS`
-- For `fee`, let's use the current market rate of `5` coda
+- For `amount`, we're sending a test value of `10` coda
+- The `receiver` (public key) of the echo service is `TODO`
+- For `fee`, let's use the current market rate of `2` coda
 - The `privkey-path` is the private key file path of the private key we generated the `keys` folder
 
-If this command is formatted properly, we should get a response with a hash of the transaction we just made:
+If this command is formatted properly, we should get a response that looks like the following:
 
-    TODO
-    ...
-    <hash of txn>
-    ...
-
-Great! we have successfully sent our first transaction. Let's go ahead and check the status of our transaction:
-
-    $ coda client get-txn-status <txn-hash>
-
-If our transaction is not yet finalized, we will see a response that indicates that the status is `PENDING`.
+Initiated payment
+Receipt chain hash: A3gpN9j4j3UoJMoug6PVEwDvRKskfZtoSDCzwxS5ez7JbMjTJx9ZQHjWCPLsddp6u6pL1YsVfpWDLV3oWRRzpijo6LYApoEemeQirkQ1BFUmbkjWEi1ZCQhcFraNMS7Akyv2wA7gptqVt
 
 ## Check account balance
 
@@ -102,9 +98,6 @@ Now that we can send transactions, it might be helpful to know our balance, so t
 
 We'll get a response that looks like this:
 
-    TODO
-    ...
-    balance is ___
-    ...
+    50
 
 Once you feel comfortable with the basics of creating an address, and sending & receiving coda, we can move on to the truly unique parts of the Coda network - [participating in consensus and helping compress the blockchain](/docs/node-operator).
