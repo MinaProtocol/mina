@@ -35,6 +35,8 @@ let of_private_key_exn private_key =
 
 let create () = of_private_key_exn (Private_key.create ())
 
+let gen = Quickcheck.Generator.(map ~f:of_private_key_exn Private_key.gen)
+
 module And_compressed_pk = struct
   module T = struct
     type t = T.t * Public_key.Compressed.t [@@deriving sexp]

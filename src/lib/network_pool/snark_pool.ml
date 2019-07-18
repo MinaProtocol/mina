@@ -53,11 +53,7 @@ module type S = sig
 
   val add_completed_work :
        t
-    -> ( ( transaction_snark_statement
-         , 'b
-         , 'c
-         , 'd )
-         Snark_work_lib.Work.Single.Spec.t
+    -> ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
          Snark_work_lib.Work.Spec.t
        , ledger_proof )
        Snark_work_lib.Work.Result.t
@@ -91,10 +87,6 @@ end
 
 module Make (Ledger_proof : sig
   type t [@@deriving bin_io, sexp, yojson, version]
-end) (Transaction_snark : sig
-  module Statement : sig
-    type t
-  end
 end) (Transaction_snark_work : sig
   type t =
     { fee: Currency.Fee.t
@@ -262,8 +254,7 @@ end)
   open Snark_work_lib.Work
 
   let add_completed_work t
-      (res : (('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t)
-      =
+      (res : (('a, 'b, 'c) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
     apply_and_broadcast t
       (Envelope.Incoming.wrap
          ~data:
@@ -274,8 +265,7 @@ end)
          ~sender:Envelope.Sender.Local)
 end
 
-include Make (Ledger_proof.Stable.V1) (Transaction_snark)
-          (Transaction_snark_work)
+include Make (Ledger_proof.Stable.V1) (Transaction_snark_work)
           (Transition_frontier)
 
 let%test_module "random set test" =
@@ -285,8 +275,7 @@ let%test_module "random set test" =
     let trust_system = Mocks.trust_system
 
     module Mock_snark_pool =
-      Make (Mocks.Ledger_proof) (Mocks.Transaction_snark)
-        (Mocks.Transaction_snark_work)
+      Make (Mocks.Ledger_proof) (Mocks.Transaction_snark_work)
         (Mocks.Transition_frontier)
 
     let gen =
@@ -366,6 +355,10 @@ let%test_module "random set test" =
                 .fee
                 .fee ) )
 
+    let fake_work =
+      [ Quickcheck.random_value ~seed:(`Deterministic "worktest")
+          Transaction_snark.Statement.gen ]
+
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
       let pool_reader, _pool_writer = Linear_pipe.create () in
@@ -377,7 +370,6 @@ let%test_module "random set test" =
           ~incoming_diffs:pool_reader
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
-      let work = [1] in
       let priced_proof =
         { Priced_proof.proof= []
         ; fee=
@@ -386,14 +378,16 @@ let%test_module "random set test" =
       in
       let command =
         Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
-          (work, priced_proof)
+          (fake_work, priced_proof)
       in
       (fun () ->
         don't_wait_for
         @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
              ~f:(fun _ ->
                let pool = Mock_snark_pool.resource_pool network_pool in
-               ( match Mock_snark_pool.Resource_pool.request_proof pool [1] with
+               ( match
+                   Mock_snark_pool.Resource_pool.request_proof pool fake_work
+                 with
                | Some {proof; fee= _} ->
                    assert (proof = priced_proof.proof)
                | None ->
@@ -405,7 +399,13 @@ let%test_module "random set test" =
 
     let%test_unit "when creating a network, the incoming diffs in reader pipe \
                    will automatically get process" =
-      let works = List.range 0 10 |> List.map ~f:(fun x -> [x]) in
+      let works =
+        Quickcheck.random_sequence ~seed:(`Deterministic "works")
+          Transaction_snark.Statement.gen
+        |> Fn.flip Sequence.take 10
+        |> Sequence.map ~f:List.return
+        |> Sequence.to_list
+      in
       let verify_unsolved_work () =
         let work_diffs =
           List.map works ~f:(fun work ->
