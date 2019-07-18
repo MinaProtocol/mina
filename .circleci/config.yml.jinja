@@ -53,7 +53,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
@@ -121,15 +123,12 @@ jobs:
                  name: Build OCaml
                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                  no_output_timeout: 1h
-                 environment: 
+                 environment:
                   DUNE_PROFILE: testnet_postake_medium_curves
-           - run:
-                 name: Record Constraint System Digests
-                 command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
            - run:
                  name: Run all tests (on master)
                  command: echo "FIXME Tests not yet working on mac"
-           - run: 
+           - run:
                  name: Publish to Artifactory
                  command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
 
@@ -146,11 +145,15 @@ jobs:
             DUNE_PROFILE: {{profile}}
         steps:
             - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Download Stable Proving Keys
-                  command: ./scripts/skip_if_only_frontend.sh scripts/getkeys.sh
+                  name: Create artifact directory
+                  command: mkdir -p /tmp/artifacts
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Download candidate stable PV keys
+                  command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
@@ -158,27 +161,21 @@ jobs:
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
-                  name: Build deb Package with keys
+                  name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
-                  name: Store Generated Proving and Verifying Keys
-                  command: ./scripts/skip_if_only_frontend.sh make provingkeys
-            - run:
-                  name: Store Genesis Public/Private Keypairs
+                  name: Store genesis public/private keypairs
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - run:
-                  name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
-                  name: Copy artifacts to Google Cloud
+                  name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     {%- endfor %}
 
@@ -190,7 +187,9 @@ jobs:
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
@@ -206,7 +205,9 @@ jobs:
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
@@ -222,7 +223,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
@@ -239,7 +242,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             {%- for test in medium_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
