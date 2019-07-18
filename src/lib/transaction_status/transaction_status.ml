@@ -3,7 +3,29 @@ open Coda_base
 open Pipe_lib
 
 module State = struct
-  type t = Pending | Included | Unknown [@@deriving equal, sexp, compare]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Pending | Included | Unknown
+        [@@deriving equal, sexp, compare, bin_io, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t = Pending | Included | Unknown
+  [@@deriving equal, sexp, compare]
+
+  let to_string = function
+    | Pending ->
+        "PENDING"
+    | Included ->
+        "INCLUDED"
+    | Unknown ->
+        "UNKOWN"
 end
 
 module type S = sig

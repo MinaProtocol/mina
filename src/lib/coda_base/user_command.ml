@@ -40,6 +40,8 @@ module Stable = struct
       [@@deriving bin_io, compare, sexp, hash, yojson, version]
     end
 
+    let version_byte = Base58_check.Version_bytes.user_command
+
     include T
     include Registration.Make_latest_version (T)
     include Comparable.Make (T)
@@ -184,6 +186,14 @@ module With_valid_signature = struct
   include Stable.Latest
   include Comparable.Make (Stable.Latest)
 end
+
+module Base58_check = Codable.Make_base58_check (Stable.Latest)
+
+[%%define_locally
+Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
+
+[%%define_locally
+Base58_check.String_ops.(to_string, of_string)]
 
 [%%if
 fake_hash]
