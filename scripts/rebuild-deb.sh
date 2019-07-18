@@ -43,6 +43,7 @@ cp ./default/app/logproc/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 
 # Better approach for packaging keys
 # Identify actual keys used in build
+mkdir -p ${BUILDDIR}/var/lib/coda
 compile_keys=$(./default/app/cli/src/coda.exe internal snark-hashes)
 for key in $compile_keys
 do
@@ -50,7 +51,7 @@ do
     if [ -f "/var/lib/coda/${key}_proving" ]; then
         echo "Found from stable key set"
         ls /var/lib/coda/${key}* 
-        cp /var/lib/coda/${key}* ${BUILDDIR}/var/lib/coda/.
+        cp /var/lib/coda/${key}* v.
     elif [ -f "/tmp/coda_cache_dir/${key}_proving" ]; then
         echo "Found from compile-time set"
         ls /tmp/coda_cache_dir/${key}*
