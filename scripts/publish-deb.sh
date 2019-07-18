@@ -23,6 +23,7 @@ else
 
     # only publish some jobs
     if [[ "$CIRCLE_JOB" == "build-artifacts--testnet_postake" || \
+          "$CIRCLE_JOB" == "build-artifacts--testnet_postake_many_proposers_medium_curves" || \
           "$CIRCLE_JOB" == "build-artifacts--testnet_postake_medium_curves" || \
           "$CIRCLE_JOB" == "build-artifacts--testnet_postake_many_proposers" ]]; then
           cd src/_build
