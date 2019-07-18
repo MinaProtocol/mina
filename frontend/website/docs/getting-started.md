@@ -23,7 +23,7 @@ The newest binary releases can be found [here](). With the exception of the .exe
 
 ### macOS
 
-1. Download [coda.zip](https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip) - NOTE: This is a large file (~2.2 GB), so this step might take some time
+1. Download [coda.zip](https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip) -- NOTE: This is a large file (~2.2 GB), so this step might take some time
 2. Unzip anywhere, `cd` to navigate to the Coda directory
 3. Run `sudo mkdir /var/lib/coda` and `sudo cp var/lib/coda/* /var/lib/coda` . These commands make sure the proving and verification keys for SNARK checking are in the right place.
 3. Run `brew install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp)
@@ -32,7 +32,7 @@ The newest binary releases can be found [here](). With the exception of the .exe
 
 ### Linux (Ubuntu 18.04 / Debian 9)
 
-1. Add the Coda debian repo and install
+1. Add the Coda debian repo and install -- NOTE: This is a large file (~2.2 GB), so this step might take some time
 
 ```
 sudo echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/coda.list
