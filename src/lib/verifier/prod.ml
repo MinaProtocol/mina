@@ -31,37 +31,12 @@ module Worker_state = struct
        let module B = Blockchain_transition.Make (T) in
        let module M = struct
          let verify_wrap state proof =
-           let fold =
-             Fold.(
-               group3 ~default:false (of_list self_wrap)
-               +> State_hash.fold (Protocol_state.hash state))
-           in
-           (* state, fold, hashes, *)
            let instance_hash =
-             Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark fold
+             Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
+               Fold.(
+                 group3 ~default:false (of_list self_wrap)
+                 +> State_hash.fold (Protocol_state.hash state))
            in
-           Logger.error (Logger.create ()) ~module_:__MODULE__
-             ~location:__LOC__
-             ~metadata:
-               [ ("proof", `String (Proof.sexp_of_t proof |> Sexp.to_string))
-               ; ("state", Protocol_state.Value.to_yojson state)
-               ; ( "fold"
-                 , `List
-                     ( Fold.to_list fold
-                     |> List.map ~f:(fun t3 ->
-                            `String
-                              ( [%sexp_of: bool Tuple_lib.Triple.t] t3
-                              |> Sexp.to_string ) ) ) )
-               ; ("instance_hash", `String (Tick.Field.to_string instance_hash))
-               ; ( "bc_vk_wrap"
-                 , `String (Tock_backend.Verification_key.to_string bc_vk.wrap)
-                 ) ]
-             {raw|Validating the wrap verification data:
-               [ $proof
-               , $state
-               , $fold
-               , $instance_hash
-               , $bc_vk_wrap ] |raw} ;
            Tock.verify proof bc_vk.wrap
              Tock.Data_spec.[Wrap_input.typ]
              (Wrap_input.of_tick_field instance_hash)

@@ -194,6 +194,7 @@ jobs:
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
     {%- endfor %}
