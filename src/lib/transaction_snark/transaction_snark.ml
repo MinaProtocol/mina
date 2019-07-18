@@ -1458,9 +1458,13 @@ module Keys = struct
     let%bind merge_vk, merge_pk = Cached.run Merge.cached in
     let%map wrap_vk, wrap_pk =
       let module Wrap = Wrap (struct
-        let base = base_vk.value
+        let dummy =
+          Tick_backend.Verification_key.dummy
+            ~input_size:(Tick.Data_spec.size (tick_input ()))
 
-        let merge = merge_vk.value
+        let base = dummy
+
+        let merge = dummy
       end) in
       Cached.run Wrap.cached
     in

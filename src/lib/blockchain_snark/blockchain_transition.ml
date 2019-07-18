@@ -224,7 +224,8 @@ module Make (T : Transaction_snark.Verification.S) = struct
       let paths = Fn.compose Cache_dir.possible_paths Filename.basename in
       let%bind step_vk, step_pk = Cached.run step_cached in
       let module Wrap = Wrap_base (struct
-        let verification_key = step_vk.value
+        let verification_key =
+          Tick_backend.Verification_key.dummy ~input_size:step_input_size
       end) in
       let wrap_cached =
         let load =
