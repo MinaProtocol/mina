@@ -35,9 +35,9 @@ The newest binary releases can be found [here](). With the exception of the .exe
 1. Add the Coda debian repo and install
 
 ```
-echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/coda.list
-apt-get update
-apt-get install --force-yes -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-0d13213e -y
+sudo echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/coda.list
+sudo apt-get update
+sudo apt-get install --force-yes -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-0d13213e -y
 ```
 
 3. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp)
