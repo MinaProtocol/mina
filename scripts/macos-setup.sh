@@ -39,6 +39,8 @@ if [[ $DOWNLOAD_THINGS == "YES" ]]; then
     echo 'All brew packages have already been installed.'
   fi
 
+  pip install gcloud
+
   # ocaml downloading
   OPAMYES=1 opam init
   eval $(opam config env)
