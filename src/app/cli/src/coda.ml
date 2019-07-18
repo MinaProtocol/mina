@@ -154,6 +154,13 @@ let daemon logger =
          else Sys.home_directory () >>| compute_conf_dir
        in
        let () =
+         match Core.Sys.file_exists conf_dir with
+         | `Yes ->
+             ()
+         | _ ->
+             Core.Unix.mkdir conf_dir
+       in
+       let () =
          if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
              conf_dir ;
@@ -332,7 +339,6 @@ let daemon logger =
                     "peers" None ~default:[] ]
          in
          let discovery_port = external_port + 1 in
-         let%bind () = Unix.mkdir ~p:() conf_dir in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
          let%bind initial_peers_cleaned =
            Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
