@@ -23,21 +23,21 @@ The newest binary releases can be found below. Instructions are provided for mac
 
 ### macOS
 
-1. Download [coda.zip](https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip) -- NOTE: This is a large file (~2.2 GB), so this step might take some time
-2. Unzip anywhere, `cd` to navigate to the Coda directory. This directory will contain a coda binary, a kademlia binary, related libraries, and the proving and verification keys.
-3. These next commands make sure the proving and verification keys for SNARK checking are in the right place. Run
+- Download [coda.zip](https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip) -- NOTE: This is a large file (~2.2 GB), so this step might take some time
+- Unzip anywhere, `cd` to navigate to the Coda directory. This directory will contain a coda binary, a kademlia binary, related libraries, and the proving and verification keys.
+- These next commands make sure the proving and verification keys for SNARK checking are in the right place. Run
 ```
 sudo mkdir /var/lib/coda
 sudo cp var/lib/coda/* /var/lib/coda
 ```
-4. Run `brew install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp). You'll need Homebrew installed on your system.
-5. Set up port forwarding ([see below](/docs/getting-started/#port-forwarding))
-6. Run `export PATH=$PWD:$PATH` so we can access `coda` instead of `./coda`
-7. `coda -help` to see if it works
+- Run `brew install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp). You'll need Homebrew installed on your system.
+- Set up port forwarding ([see below](/docs/getting-started/#port-forwarding))
+- Run `export PATH=$PWD:$PATH` so we can access `coda` instead of `./coda`
+- `coda -help` to see if it works
 
 ### Linux (Ubuntu 18.04 / Debian 9)
 
-1. Add the Coda debian repo and install -- NOTE: This is a large file (~2.2 GB), so this step might take some time
+- Add the Coda debian repo and install -- NOTE: This is a large file (~2.2 GB), so this step might take some time
 
 ```
 sudo echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/coda.list
@@ -45,8 +45,8 @@ sudo apt-get update
 sudo apt-get install --force-yes -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-8afe7755 -y
 ```
 
-3. You'll need forward some ports. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp). When running in the cloud this is unnecessary, instead you should configure security groups for your cloud provider. See below for more info on this.
-4. `coda -help` to see if it works
+- You'll need forward some ports. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp). When running in the cloud this is unnecessary, instead you should configure security groups for your cloud provider. See below for more info on this.
+- `coda -help` to see if it works
 
 
 ### Windows
