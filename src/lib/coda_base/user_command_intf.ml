@@ -102,4 +102,6 @@ module type S = sig
   val accounts_accessed : t -> Public_key.Compressed.t list
 
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
+
+  include Codable.Base58_check_intf with type t := t
 end
