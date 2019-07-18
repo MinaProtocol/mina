@@ -78,4 +78,4 @@ ln -s -f ${BUILDDIR}.deb coda.deb
 
 # Tar up keys for an artifact
 echo "------------------------------------------------------------"
-tar -cvjf coda_pvkeys_$(GITHASH)_${DUNE_PROFILE}.tar.bz2 ${BUILDDIR}/var/lib/coda/* ; \
+tar -cvjf coda_pvkeys_${GITHASH}_${DUNE_PROFILE}.tar.bz2 ${BUILDDIR}/var/lib/coda/* ; \
