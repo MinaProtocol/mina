@@ -171,7 +171,10 @@ let%test_module "test" =
         include D.G2
 
         let to_affine_exn t =
-          let f v = C.Field.Vector.(get v 0, get v 1, get v 2) in
+          let f v =
+            let v = D.Fqe.to_vector v in
+            C.Field.Vector.(get v 0, get v 1, get v 2)
+          in
           let x, y = D.G2.to_affine_exn t in
           (f x, f y)
 
@@ -180,7 +183,7 @@ let%test_module "test" =
             let open C.Field.Vector in
             let t = C.Field.Vector.create () in
             List.iter (Fqe.to_list a) ~f:(emplace_back t) ;
-            t
+            D.Fqe.of_vector t
           in
           of_affine (f x, f y)
 
