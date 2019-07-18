@@ -338,9 +338,24 @@ module Make (Inputs : Inputs.S) :
         garbage_collect_disconnected_subtrees ~logger
           ~disconnected_subtrees:received_subtrees ;
         Deferred.Or_error.fail e
-    | Ok () ->
-        Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~verifier
-          ~trust_system ~frontier ~initial_hash:target_hash received_subtrees
+    | Ok () -> (
+        match%bind
+          Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~verifier
+            ~trust_system ~frontier ~initial_hash:target_hash received_subtrees
+        with
+        | Ok trees_of_breadcrumbs ->
+            if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+              garbage_collect_disconnected_subtrees ~logger
+                ~disconnected_subtrees:received_subtrees ;
+              Deferred.Or_error.error_string "pipe closed" )
+            else
+              Strict_pipe.Writer.write catchup_breadcrumbs_writer
+                trees_of_breadcrumbs
+              |> Deferred.Or_error.return
+        | Error e ->
+            garbage_collect_disconnected_subtrees ~logger
+              ~disconnected_subtrees:received_subtrees ;
+            Deferred.Or_error.fail e )
 
   let run ~logger ~trust_system ~verifier ~network ~frontier
       ~catchup_job_reader
