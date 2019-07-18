@@ -19,7 +19,7 @@ GPU's aren't currently required, but may be required for node operators when the
 
 ## Installation
 
-The newest binary releases can be found [here](). With the exception of the .exe and .dmg files, they are archives of the latest executable binaries for each release. Instructions are provided for macOS and Linux below:
+The newest binary releases can be found below. Instructions are provided for macOS and Linux below:
 
 ### macOS
 
@@ -48,9 +48,8 @@ sudo apt-get update
 sudo apt-get install --force-yes -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-307bdc71 -y
 ```
 
-3. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp). When running in the cloud this is unnecessary, instead you should configure security groups for your cloud provider.
-4. Set up port forwarding ([see below](/docs/getting-started/#port-forwarding))
-5. `coda -help` to see if it works
+3. You'll need forward some ports. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp). When running in the cloud this is unnecessary, instead you should configure security groups for your cloud provider. See below for more info on this.
+4. `coda -help` to see if it works
 
 
 ### Windows
@@ -67,7 +66,7 @@ If you're running a Coda node on a home or office machine, you'll have to set up
 
 Run the following commands to use MiniUPnP to reconfigure ports on your IP address:
 
-1. First run `ifconfig` to get your external IP address - you can find this in the output corresponding to the field `en0` on macOS and `wlan0` on a linux system:
+1. First run `ifconfig` to get your internal IP address - you can find this in the output corresponding to the field `en0` on macOS and `wlan0` on a linux system:
 
 
         $ ifconfig
@@ -95,5 +94,7 @@ Or
     connect: Connection refused
 
 If so, find your router model and Google `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Coda node. You'll need to open the TCP port 8302, and the UDP port 8303 by default.
+
+## Next
 
 Now that you've installed the Coda binary and configured settings, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!
