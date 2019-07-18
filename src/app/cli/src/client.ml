@@ -447,7 +447,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            ~success:
              (Or_error.map ~f:(fun receipt_chain_hash ->
                   sprintf
-                    "Initiated %s\nReceipt chain hash: %s\nTransaction ID:%s\n"
+                    "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
                     label
                     (Receipt.Chain_hash.to_string receipt_chain_hash)
                     (User_command.to_base58_check payment) ))
@@ -481,14 +481,14 @@ let get_transaction_status =
                user_command port
                ~success:
                  (Or_error.map ~f:(fun status ->
-                      sprintf !"Transaction status:%s\n"
+                      sprintf !"Transaction status : %s\n"
                       @@ Transaction_status.State.to_string status ))
                ~error:(fun e ->
-                 sprintf "Failed to get transaction status: %s"
+                 sprintf "Failed to get transaction status : %s"
                    (Error.to_string_hum e) )
          | Error _e ->
              eprintf "Could not deserialize user command" ;
-             exit 1 ))
+             exit 16 ))
 
 let delegate_stake =
   let body =
