@@ -44,7 +44,7 @@ cp ./default/app/logproc/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 # Better approach for packaging keys
 # Identify actual keys used in build
 compile_keys=$(./default/app/cli/src/coda.exe internal snark-hashes)
-for key in compile_keys
+for key in $compile_keys
 do
     echo "Looking for key: ${key}"
     if [ -f "/var/lib/coda/${key}_proving" ]; then
