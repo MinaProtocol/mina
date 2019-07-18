@@ -47,14 +47,12 @@ mkdir -p ${BUILDDIR}/var/lib/coda
 compile_keys=$(./default/app/cli/src/coda.exe internal snark-hashes)
 for key in $compile_keys
 do
-    echo "Looking for key: ${key}"
+    echo "Looking for keys matching: ${key}"
     if [ -f "/var/lib/coda/${key}_proving" ]; then
-        echo "Found from stable key set"
-        ls /var/lib/coda/${key}* 
-        cp /var/lib/coda/${key}* v.
+        echo "\tfound in stable key set"
+        cp /var/lib/coda/${key}* ${BUILDDIR}/var/lib/coda/.
     elif [ -f "/tmp/coda_cache_dir/${key}_proving" ]; then
-        echo "Found from compile-time set"
-        ls /tmp/coda_cache_dir/${key}*
+        echo "\tfound in compile-time set"
         cp /tmp/coda_cache_dir/${key}* ${BUILDDIR}/var/lib/coda/.
     else
         echo "Key not found!"
@@ -83,7 +81,10 @@ ln -s -f ${BUILDDIR}.deb coda.deb
 echo "------------------------------------------------------------"
 if [ -z "$(ls -A ${BUILDDIR}/var/lib/coda)" ]; then
     echo "PV Key Dir Empty"
+    touch ${cwd}/coda_pvkeys_EMPTY
 else
     echo "Creating PV Key Tar"
-    tar -cvjf coda_pvkeys_${GITHASH}_${DUNE_PROFILE}.tar.bz2 ${BUILDDIR}/var/lib/coda/* ; \
+    pushd ${BUILDDIR}/var/lib/coda
+    tar -cvjf ${cwd}/coda_pvkeys_${GITHASH}_${DUNE_PROFILE}.tar.bz2 * ; \
+    popd
 fi

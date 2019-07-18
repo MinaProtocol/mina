@@ -53,7 +53,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
@@ -121,7 +123,7 @@ jobs:
                  name: Build OCaml
                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                  no_output_timeout: 1h
-                 environment: 
+                 environment:
                   DUNE_PROFILE: testnet_postake_medium_curves
            - run:
                  name: Record Constraint System Digests
@@ -129,7 +131,7 @@ jobs:
            - run:
                  name: Run all tests (on master)
                  command: echo "FIXME Tests not yet working on mac"
-           - run: 
+           - run:
                  name: Publish to Artifactory
                  command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
     build-artifacts--testnet_postake_snarkless_fake_hash:
@@ -254,7 +256,9 @@ jobs:
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
@@ -267,7 +271,9 @@ jobs:
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
@@ -280,7 +286,9 @@ jobs:
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_medium_curves_unit_test -j8 && (dune runtest --profile=test_postake_snarkless_medium_curves_unit_test -j8 || (./scripts/link-coredumps.sh && false))'
@@ -294,7 +302,9 @@ jobs:
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev_medium_curves -j8 && (dune runtest --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
@@ -307,7 +317,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- fake_hash:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test"'
@@ -319,7 +331,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:full-test"'
@@ -334,7 +348,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-bootstrap-test"'
@@ -349,7 +365,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
@@ -361,7 +379,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_delegation:coda-delegation-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation:coda-delegation-test"'
@@ -373,7 +393,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5"'
@@ -385,7 +407,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments"'
@@ -397,7 +421,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5"'
@@ -412,7 +438,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_snarkless:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:full-test"'
@@ -427,7 +455,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2"'
@@ -439,7 +469,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-peers-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-peers-test"'
@@ -466,7 +498,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_txns:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-shared-state-test"'
@@ -481,7 +515,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_delegation_medium_curves:coda-delegation-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation_medium_curves:coda-delegation-test"'
@@ -493,7 +529,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_medium_curves:full-test"'
@@ -510,7 +548,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:full-test"'
@@ -525,7 +565,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2"'
@@ -537,7 +579,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_split_snarkless_medium_curves:coda-peers-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-peers-test"'
@@ -564,7 +608,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_txns_medium_curves:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns_medium_curves:coda-shared-state-test"'

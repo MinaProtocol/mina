@@ -53,7 +53,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
@@ -121,7 +123,7 @@ jobs:
                  name: Build OCaml
                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                  no_output_timeout: 1h
-                 environment: 
+                 environment:
                   DUNE_PROFILE: testnet_postake_medium_curves
            - run:
                  name: Record Constraint System Digests
@@ -129,7 +131,7 @@ jobs:
            - run:
                  name: Run all tests (on master)
                  command: echo "FIXME Tests not yet working on mac"
-           - run: 
+           - run:
                  name: Publish to Artifactory
                  command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
 
@@ -191,7 +193,9 @@ jobs:
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
@@ -207,7 +211,9 @@ jobs:
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
@@ -223,7 +229,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
@@ -240,7 +248,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Ensure Submodules Are Updated
+                  command: git submodule sync && git submodule update --init --recursive
             {%- for test in medium_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
