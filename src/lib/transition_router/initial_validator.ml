@@ -199,6 +199,6 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
                 ; ( "transition"
                   , External_transition.to_yojson
                       (With_hash.data transition_with_hash) ) ]
-              !"Failed to validate transition from $peer" )
+              "Failed to validate transition from peer $peer" )
     |> don't_wait_for
 end

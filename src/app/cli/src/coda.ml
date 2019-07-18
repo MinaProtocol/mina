@@ -219,16 +219,18 @@ let daemon logger =
              if String.equal c Coda_version.commit_id then return ()
              else (
                Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-                 "Older version in Coda config directory. Cleaning up %s"
-                 conf_dir ;
+                 "Different version of Coda detected in config directory \
+                  $config_directory, removing existing configuration"
+                 ~metadata:[("config_directory", `String conf_dir)] ;
                clean_up () )
          | Error e ->
              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-               "Error reading coda.version: %s" (Error.to_string_mach e) ;
+               ~metadata:[("error", `String (Error.to_string_mach e))]
+               "Error reading coda.version: $error" ;
              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                "Failed to read coda.version, cleaning up the config directory \
-                %s"
-               conf_dir ;
+                $config_directory"
+               ~metadata:[("config_directory", `String conf_dir)] ;
              clean_up ()
        in
        (* 512MB logrotate max size = 1GB max filesystem usage *)
@@ -275,8 +277,8 @@ let daemon logger =
                Some c
            | Error e ->
                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "error reading daemon.json, not using it: %s"
-                 (Error.to_string_mach e) ;
+                 "Error reading daemon.json: $error"
+                 ~metadata:[("error", `String (Error.to_string_mach e))] ;
                None
          in
          let maybe_from_config (type a) (f : YJ.json -> a option)
@@ -297,7 +299,8 @@ let daemon logger =
                x
            | None ->
                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "%s not found in the config file, using default" keyname ;
+                 "Key '$key' not found in the config file, using default"
+                 ~metadata:[("key", `String keyname)] ;
                default
          in
          let external_port : int =
@@ -356,9 +359,11 @@ let daemon logger =
                            ~port:(Host_and_port.port addr))
                | Error e ->
                    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                     "getaddr exception: %s" (Error.to_string_mach e) ;
+                     "Error on getaddr: $error"
+                     ~metadata:[("error", `String (Error.to_string_mach e))] ;
                    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                     "failed to look up address for %s, skipping" host ;
+                     "Failed to get address for host $host, skipping"
+                     ~metadata:[("host", `String host)] ;
                    return None )
          in
          let%bind () =
@@ -448,15 +453,16 @@ let daemon logger =
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-               "long async cycle %s"
-               (Time_ns.Span.to_string span) ) ;
+               "Long async cycle: $span milliseconds"
+               ~metadata:[("span", `String (Time_ns.Span.to_string span))] ) ;
          let run_snark_worker_action =
            Option.value_map run_snark_worker_flag ~default:`Don't_run
              ~f:(fun k -> `With_public_key k)
          in
-         let trace_database_initialization typ location =
-           Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
-             ~location typ
+         let trace_database_initialization typ location directory =
+           Logger.trace logger ~module_:__MODULE__ ~location
+             "Creating database of type $typ in directory $directory"
+             ~metadata:[("typ", `String typ); ("directory", `String directory)]
          in
          let trust_dir = conf_dir ^/ "trust" in
          let () = Snark_params.set_chunked_hashing true in
@@ -584,22 +590,30 @@ let rec ensure_testnet_id_still_good logger =
       (fun () -> don't_wait_for @@ ensure_testnet_id_still_good logger)
       ()
   in
+  let soon_minutes = Int.of_float (60.0 *. recheck_soon) in
   match%bind
     Monitor.try_with_or_error (fun () ->
         Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
   with
   | Error e ->
       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        "exception while trying to fetch testnet_id, trying again in 6 minutes" ;
+        "Exception while trying to fetch testnet_id: $error. Trying again in \
+         $retry_minutes minutes"
+        ~metadata:
+          [ ("error", `String (Error.to_string_hum e))
+          ; ("retry_minutes", `Int soon_minutes) ] ;
       try_later recheck_soon ;
       Deferred.unit
   | Ok (resp, body) -> (
       if resp.status <> `OK then (
-        try_later recheck_soon ;
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          "HTTP response status %s while getting testnet id, checking again \
-           in 6 minutes."
-          (Cohttp.Code.string_of_status resp.status) ;
+          "HTTP response status $HTTP_status while getting testnet id, \
+           checking again in $retry_minutes minutes."
+          ~metadata:
+            [ ( "HTTP_status"
+              , `String (Cohttp.Code.string_of_status resp.status) )
+            ; ("retry_minutes", `Int soon_minutes) ] ;
+        try_later recheck_soon ;
         Deferred.unit )
       else
         let%bind body_string = Body.to_string body in
