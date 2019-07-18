@@ -39,9 +39,13 @@ This step requires waiting for approximately ~5 minutes to sync with the network
 
 ## Create a new account
 
-Once our node is synced, we'll create a public/private key-pair so that we can sign transactions and generate an address to receive payments. Run the following command and use `my-wallet` as the path:
+Once our node is synced, we'll create a public/private key-pair so that we can sign transactions and generate an address to receive payments. For security reasons, we'll want to make a directory that is harder for attackers to access:
 
-    $ coda client generate-keypair -privkey-path my-wallet
+    $ mkdir keys && chmod 700 keys
+
+Now run the following command and use `my-wallet` as the path:
+
+    $ coda client generate-keypair -privkey-path keys/my-wallet
 
 This creates a private key at `my-wallet` with a public key at `my-wallet.pub`.
 
@@ -75,7 +79,7 @@ If you're wondering what to pass in to the commands above:
 - For `amount`, let's send a test value of `300` coda
 - The `receiver` (public key) of the echo service is `codaBRrKLuuNMz8Hh6jmzobBWhV7uQ3dS`
 - For `fee`, let's use the current market rate of `5` coda
-- The `privkey-path` is the private key file path of the private key we generated the `my-wallet` folder
+- The `privkey-path` is the private key file path of the private key we generated the `keys` folder
 
 If this command is formatted properly, we should get a response with a hash of the transaction we just made:
 

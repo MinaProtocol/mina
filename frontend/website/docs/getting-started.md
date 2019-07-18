@@ -30,10 +30,16 @@ The newest binary releases can be found [here](). With the exception of the .exe
 4. Set up port forwarding ([see below](/docs/getting-started/#port-forwarding))
 5. `./coda -help` to see if it works
 
-### Linux (Ubuntu / Debian)
+### Linux (Ubuntu 18.04 / Debian 9)
 
-1. Download [coda.deb](https://s3-us-west-2.amazonaws.com/packages.o1test.net/pool/unstable/c/co/coda-testnet-postake-medium-curves_0.0.1-release-beta-307bdc71.deb) - NOTE: This is a large file (~2.2 GB), so this step might take some time
-2. Double click
+1. Add the Coda debian repo and install
+
+```
+echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/coda.list
+apt-get update
+apt-get install --force-yes -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-0d13213e -y
+```
+
 3. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp)
 4. Set up port forwarding ([see below](/docs/getting-started/#port-forwarding))
 5. `coda -help` to see if it works
@@ -43,7 +49,7 @@ The newest binary releases can be found [here](). With the exception of the .exe
 
 Windows is not yet supported. If you have any interest in developing Coda for Windows, please reach out to contact@codaprotocol.org or reach out in the [Discord server](https://discord.gg/ShKhA7J).
 
-### Build from source
+### Build from source (other Linux distros; macOS)
 
 To build from source code, please follow [the instructions in the Coda protocol repo](https://github.com/CodaProtocol/coda/blob/master/README-dev.md#building-coda).
 
