@@ -105,7 +105,7 @@ let daemon logger =
          ~doc:"Print daemon log output as JSON (default: plain text)"
      and log_level =
        flag "log-level" (optional string)
-         ~doc:"Set daemon log level (default: Warn)"
+         ~doc:"Set daemon log level (default: Info)"
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
@@ -131,7 +131,7 @@ let daemon logger =
        let%bind log_level =
          match log_level with
          | None ->
-             Deferred.return Logger.Level.Warn
+             Deferred.return Logger.Level.Info
          | Some log_level_str_with_case -> (
              let open Logger in
              let log_level_str = String.lowercase log_level_str_with_case in
