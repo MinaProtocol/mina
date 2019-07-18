@@ -283,6 +283,19 @@ module Send_user_command = struct
       ~bin_response
 end
 
+module Get_transaction_status = struct
+  type query = User_command.Stable.Latest.t [@@deriving bin_io]
+
+  type response = Transaction_status.State.Stable.Latest.t Or_error.t
+  [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_transaction_status" ~version:0 ~bin_query
+      ~bin_response
+end
+
 module Send_user_commands = struct
   type query = User_command.Stable.Latest.t list [@@deriving bin_io]
 
