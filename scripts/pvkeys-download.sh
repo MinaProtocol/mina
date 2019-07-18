@@ -15,7 +15,7 @@ echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
 /usr/bin/gcloud auth activate-service-account --key-file=google_creds.json
 
 # Debug output
-set -x
+#set -x
 
 # Get cached keys
 echo "------------------------------------------------------------"
@@ -29,5 +29,6 @@ echo "------------------------------------------------------------"
 echo "Unapacking keys"
 sudo mkdir -p /var/lib/coda
 cd /var/lib/coda
-sudo tar --strip-components=2 -xvf /tmp/$TARBALL
+#sudo tar --strip-components=2 -xvf /tmp/$TARBALL
+sudo tar -xvf /tmp/$TARBALL
 rm /tmp/$TARBALL

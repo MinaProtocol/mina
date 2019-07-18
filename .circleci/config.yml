@@ -146,7 +146,7 @@ jobs:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Download candidate stable proving and verifying keys
+                  name: Download candidate stable PV keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
@@ -180,7 +180,7 @@ jobs:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Download candidate stable proving and verifying keys
+                  name: Download candidate stable PV keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
@@ -216,7 +216,7 @@ jobs:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Download candidate stable proving and verifying keys
+                  name: Download candidate stable PV keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml

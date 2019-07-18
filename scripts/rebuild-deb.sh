@@ -43,16 +43,17 @@ cp ./default/app/logproc/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 
 # Better approach for packaging keys
 # Identify actual keys used in build
+echo "Checking PV keys"
 mkdir -p ${BUILDDIR}/var/lib/coda
 compile_keys=$(./default/app/cli/src/coda.exe internal snark-hashes)
 for key in $compile_keys
 do
-    echo "Looking for keys matching: ${key}"
+    echo -n "Looking for keys matching: ${key} -- "
     if [ -f "/var/lib/coda/${key}_proving" ]; then
-        echo "\tfound in stable key set"
+        echo " [OK] found in stable key set"
         cp /var/lib/coda/${key}* ${BUILDDIR}/var/lib/coda/.
     elif [ -f "/tmp/coda_cache_dir/${key}_proving" ]; then
-        echo "\tfound in compile-time set"
+        echo " [WARN] found in compile-time set"
         cp /tmp/coda_cache_dir/${key}* ${BUILDDIR}/var/lib/coda/.
     else
         echo "Key not found!"
@@ -76,6 +77,7 @@ find ${BUILDDIR}
 echo "------------------------------------------------------------"
 dpkg-deb --build ${BUILDDIR}
 ln -s -f ${BUILDDIR}.deb coda.deb
+ls -lh coda.deb
 
 # Tar up keys for an artifact
 echo "------------------------------------------------------------"
@@ -88,3 +90,4 @@ else
     tar -cvjf ${cwd}/coda_pvkeys_${GITHASH}_${DUNE_PROFILE}.tar.bz2 * ; \
     popd
 fi
+ls -lh coda_pvkeys_*
