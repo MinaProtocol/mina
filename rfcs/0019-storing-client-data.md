@@ -4,7 +4,7 @@ The Coda protocol contains many different types of objects (external_transitions
 
 # Motivation
 
-The primary database that we store transactions and external_transitions is Rocksdb. When we load the databases, we read all of the key-value pairs and load them into an in-memory cache that is designed for making fast in-memory reads and pagination queries. The downside of this is that this design limits us from making complex queries. Namely, we make a pagination query that is sent from or received by a public key, but not strictly one or the other. Additionally, the indexes for the current design is limited to the keys of the database. This enables to answer queries about which transactions are in an external_transition but not the other way around (i.e. for a given transaction, which external_transitions have the transition). We can put this auxilary information that tells us which external_transitions contain a certain transaction in the value of the transaction database. However, this results in verbose code and extra invariants to take care, leading to potential bugs. Relational/graph databases are good at taking care of these type of details. Relational/graph databases can give us more indexes and they can grant us more flexible and fast queries with less code. 
+The primary database that we store transactions and external_transitions is Rocksdb. When we load the databases, we read all of the key-value pairs and load them into an in-memory cache that is designed for making fast in-memory reads and pagination queries. The downside of this is that this design limits us from making complex queries. Namely, we make a pagination query that is sent from or received by a public key, but not strictly one or the other. Additionally, the indexes for the current design is limited to the keys of the database. This enables to answer queries about which transactions are in an external_transition but not the other way around (i.e. for a given transaction, which external_transitions have the transition). We can put this auxilary information that tells us which external_transitions contain a certain transaction in the value of the transaction database. However, this results in verbose code and extra invariants to take care, leading to potential bugs. Relational/graph databases are good at taking care of these type of details. Relational/graph databases can give us more indexes and they can grant us more flexible and fast queries with less code.
 
 This RFC will also formally define some GraphQL APIs as some of them were losely defined in the past. This would give us more robustness for this RFC's design and less reason to refactor the architecture in the long run.
 
@@ -41,10 +41,10 @@ module Fee_transfer {
 }
 ```
 
-
-You may notice that the user_commands type has the field receipt_chain_hash. This is a reference to a `receipt_chain_hash` which is used to prove the payment of a transaction. The API for proving the existence of a payment, `prove_payment`, would now require `payment_id` as an argument (See Appendix for the API of `prove_payment`). There is also an `addPaymentReceipt` API that allows a client to add an arbitrary transaction along with the date that the client saw the transaction. However, the transaction input itself cannot just be used to prove that a transaction has been sent. To prove a transaction, we need use current receipt_chain_hash of a transaction and its previous receipt_chain_hash. Therefore, inputs for the `addPaymentReceipt` API should be a receipt_chain and its parent. 
+You may notice that the user_commands type has the field receipt_chain_hash. This is a reference to a `receipt_chain_hash` which is used to prove the payment of a transaction. The API for proving the existence of a payment, `prove_payment`, would now require `payment_id` as an argument (See Appendix for the API of `prove_payment`). There is also an `addPaymentReceipt` API that allows a client to add an arbitrary transaction along with the date that the client saw the transaction. However, the transaction input itself cannot just be used to prove that a transaction has been sent. To prove a transaction, we need use current receipt_chain_hash of a transaction and its previous receipt_chain_hash. Therefore, inputs for the `addPaymentReceipt` API should be a receipt_chain and its parent.
 
 Below is the type of a `receipt_chain_hash`:
+
 ```ocaml
 module Receipt_chain_hash = struct
   type t = {
@@ -88,7 +88,6 @@ type consensus_status =
 
 Notice that `consensus_status` is a block's position in Nakamoto consensus. This position has nothing to do with a block being snarked or not, so `Snarked` is not a constructor of this variant. 
 
-
 With the `external_transitions` and `conseus_status`, we can compute the status of a transaction. We will denote the status of transaction as the type `transaction_status` and below is the type:
 
 ```ocaml
@@ -114,7 +113,7 @@ Enum consensus_status {
   pending [note: "Still in the transition frontier. There is no annotation "]
   failure [note: "Got removed from the transition frontier"]
 }
- 
+
 Table external_transition {
   state_hash string [pk]
   creator string [not null]
@@ -229,12 +228,12 @@ For this design, we are assuming that objects will never get deleted because the
 
 We can create another Transition_frontier extension to make these database updates. They will essentially listen to diffs that add external_transitions and remove external_transitions and we will make the database updates accordingly. 
 
-
 Below are SQL queries that will assist us in implementing several GraphQL services:
 
 ### Queries
 
 #### Transaction_status
+
 This service can tell us the consensus status of transaction as well as if it is snarked or not. These values is based on which external_transitions that they are in. Below is the SQL query that can help us compute the status of a transaction. 
 
 ```SQL
@@ -276,7 +275,9 @@ let get_transaction_status ~frontier ~sql ~txn_pool txn : (bool * transaction_st
 ```
 
 ### Pagination Queries
+
 We make the pagination `blocks` query using the following SQL query
+
 ```SQL
 -- blocks
 
@@ -298,7 +299,7 @@ LIMIT 10
 
 From this command, we can further query the actual transactions in a block using the following lookup:
 
-```
+```SQL
 SELECT id, nonce, amount, ... FROM
 user_commands
 WHERE id IN $TRANSACTION_IDS
@@ -329,7 +330,6 @@ Dgraph seems to work nicely with graphql. It doesn't require serializing and des
 
 JanusGraph is another graph database to consider. We can explicitly mention the relationship of each type of vertex (i.e. 1-to-1, Many-to-many). We can also indicate how each vertex can index their edges, which is useful for optimizing different relationship queries. JanusGraph has its own "functional" graph query language called Gremlin and it has good interoperability with common languages, such as Java, Python and Javascript. However, there are no bindings with OCaml, but we can lauch a Gremlin server and we can communicate with the server using HTTP requests, Graphson, or use it's own untyped DSL written in Groovy.
 
-
 # Rationale and Alternatives
 
 - Makes it easy to perform difficult queries for our protocol
@@ -350,15 +350,14 @@ We can have a third-party archived node tell a client the consensus_state of the
 
 We can also have a third-part achrived node tell a client the snarked status of an external_transition. We can also create a heuristic that gives us a probability that an `external_transition` has been snarked. We can introduce a new nonce that indicates how many ledger proofs have been emitted from genesis to a certain external_transition. If the root external_transition emitted `N` ledger proofs, then all the external_transitions that have emitted less than `N` ledgers should have been snarked.
 
-
 # Prior Art
 
 Ethereum is representing their data as patricia tries and are storing them in LevelDB. 
 
 Coinbase also uses MongoDB to store all of the data in a blockchain.
 
-
 # Unresolved questions
+
 - Can we use the transition frontier and transaction pool as a cache layer to reduce the number of queries that hit the database? (I've thought about this deeply and have made a design solution extending the solution discussed in this RFC. I have not written out the full details of this solution.)
 - How can we extend this design so that a client has multiple devices (i.e. Desktop application, mobile, etc...).
 - There is a possibility for inconsistent queries for `snarked` and reach root. 
@@ -367,16 +366,22 @@ Coinbase also uses MongoDB to store all of the data in a blockchain.
 # Appendix
 
 The flexibility of this new design changed some parts of the schema of the GraphqQL database. Here is the schema:
-```
 
+```graphql
 enum ConsensusStatus {
-  SUBMITTED
-  INCLUDED # Included in any block
-  FINALIZED
-  SNARKED
   FAILED
+  CONFIRMED
+  PENDING of int
+  UNKNOWN
 }
 
+enum TransactionConsensusStatus {
+  SCHEDULED
+  FAILED
+  CONFIRMED
+  PENDING of int
+  UNKNOWN
+}
 
 type UserCommand {
   id: ID!
@@ -423,7 +428,6 @@ type Transactions {
   coinbase: UInt64!
 }
 
-
 type Block {
   # Public key of account that produced this block
   creator: PublicKey!
@@ -432,6 +436,18 @@ type Block {
   stateHash: String!
   protocolState: ProtocolState!
   transactions: Transactions!
+}
+
+type BlockUpdate {
+  block: Block!
+  consensusStatus: ConsensusStatus!
+  isSnarked: Bool!
+}
+
+type TransactionUpdate {
+  block: Transaction!
+  consensusStatus: TransactionConsensusStatus!
+  isSnarked: Bool!
 }
 
 
@@ -456,20 +472,26 @@ type BlockConfirmation {
 }
 
 type PaymentUpdate {
-  payment: Payment
+  payment: Payment!
   consensus: ConsensusState!
 }
 
-  input AddPaymentReceiptInput {
-    hash: [String!]!
+input AddPaymentReceiptInput {
+  hash: [String!]!
 
-    ancestor_hash: String!
-  }
+  ancestor_hash: String!
+}
   
-  type PaymentProof {
-    proof: [String!]!  
-  }
+type PaymentProof {
+  proof: [String!]!  
+}
+
+type TransactionStatus {
+  isSnarked: bool!
+  transactionConsensusStatus: TransactionConsensusStatus!
+}
   
+type query {
   # Construct a proof of a payment based on the account on the best tip of the transition_frontier
   provePayment (paymentId: Id!) : PaymentProof
   
@@ -502,22 +524,18 @@ type PaymentUpdate {
   transactionStatus(
     paymentId: ID!
   ): TransactionStatus!
+}
   
   
+type mutation {
   # Add receipts of payments that a client has missed. Return true if the receipts connect to a payment
   addPaymentReceipt(input: AddPaymentReceiptInput!): Bool!
+}
+
+union FollowUpdate = BlockUpdate | TransactionUpdate
   
-  
-  type subscription {
-  
-    # get block confirmation updates for a certain public key 
-    blockConfirmation(publicKey: PublicKey!): BlockConfirmation!
-    
-    # Subscribe to payments for which this key is the sender or receiver
-    newPaymentUpdate(filterBySenderOrReceiver: PublicKey!): PaymentUpdate!
-    
-  }
+type subscription {
+  # Subscribe to the blocks that a user was involved and the transactions they sent
+  followUser(publicKey :PublicKey!): [FollowUpdate!]!
+}
 ```
-
-
-
