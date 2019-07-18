@@ -7,7 +7,7 @@ cd $SCRIPTPATH/../src/_build
 PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 DATE=$(date +%Y-%m-%d)
 GITHASH=$(git rev-parse --short=8 HEAD)
-GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!' )
+GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
 
 set +u
 # Identify All Artifacts by Branch and Git Hash
