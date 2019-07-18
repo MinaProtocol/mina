@@ -494,8 +494,10 @@ module T = struct
             with
             | Ok proof ->
                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  !"Constructed proof for receipt: %{sexp:Receipt.Chain_hash.t}"
-                  proving_receipt ;
+                  !"Constructed proof for receipt: $receipt_chain_hash"
+                  ~metadata:
+                    [ ( "receipt_chain_hash"
+                      , Receipt.Chain_hash.to_yojson proving_receipt ) ] ;
                 proof
             | Error e ->
                 failwithf

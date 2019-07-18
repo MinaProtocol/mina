@@ -196,6 +196,12 @@ module Make (Inputs : Inputs_intf) :
       let open External_transition.Validated in
       let open Staged_ledger_diff in
       user_commands @@ staged_ledger_diff external_transition
+
+    let all_user_commands breadcrumbs =
+      Sequence.fold (Sequence.of_list breadcrumbs) ~init:User_command.Set.empty
+        ~f:(fun acc_set breadcrumb ->
+          let user_commands = to_user_commands breadcrumb in
+          Set.union acc_set (User_command.Set.of_list user_commands) )
   end
 
   module Fake_db = struct
@@ -424,6 +430,8 @@ module Make (Inputs : Inputs_intf) :
 
   let best_tip t = find_exn t t.best_tip
 
+  let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
+
   let successor_hashes t hash =
     let node = Hashtbl.find_exn t.table hash in
     node.successor_hashes
@@ -457,7 +465,7 @@ module Make (Inputs : Inputs_intf) :
               | Some child_node ->
                   add_edge acc_graph node child_node
               | None ->
-                  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                     ~metadata:
                       [ ( "state_hash"
                         , State_hash.to_yojson successor_state_hash )
@@ -960,6 +968,8 @@ module Make (Inputs : Inputs_intf) :
     List.equal equal_breadcrumb
       (all_breadcrumbs t1 |> sort_breadcrumbs)
       (all_breadcrumbs t2 |> sort_breadcrumbs)
+
+  let all_user_commands t = Breadcrumb.all_user_commands (all_breadcrumbs t)
 
   module For_tests = struct
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger

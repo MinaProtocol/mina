@@ -779,7 +779,7 @@ struct
             scan_state'
         |> to_staged_ledger_or_error )
     in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
         [ ("user_command_count", `Int user_commands_count)
         ; ("coinbase_count", `Int (List.length coinbases))

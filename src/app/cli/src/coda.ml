@@ -154,6 +154,13 @@ let daemon logger =
          else Sys.home_directory () >>| compute_conf_dir
        in
        let () =
+         match Core.Sys.file_exists conf_dir with
+         | `Yes ->
+             ()
+         | _ ->
+             Core.Unix.mkdir conf_dir
+       in
+       let () =
          if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
              conf_dir ;
@@ -268,9 +275,8 @@ let daemon logger =
                Some c
            | Error e ->
                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "error reading daemon.json: %s" (Error.to_string_mach e) ;
-               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-                 "failed to read daemon.json, not using it" ;
+                 "error reading daemon.json, not using it: %s"
+                 (Error.to_string_mach e) ;
                None
          in
          let maybe_from_config (type a) (f : YJ.json -> a option)
@@ -290,8 +296,8 @@ let daemon logger =
            | Some x ->
                x
            | None ->
-               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                 "didn't find %s in the config file, using default" keyname ;
+               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                 "%s not found in the config file, using default" keyname ;
                default
          in
          let external_port : int =
@@ -333,7 +339,6 @@ let daemon logger =
                     "peers" None ~default:[] ]
          in
          let discovery_port = external_port + 1 in
-         let%bind () = Unix.mkdir ~p:() conf_dir in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
          let%bind initial_peers_cleaned =
            Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)

@@ -73,7 +73,7 @@ let schedule_user_command t (txn : User_command.t) account_opt =
     in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("user_command", User_command.to_yojson txn)]
-      "Added command $user_command to pool successfully" ;
+      "Added transaction $user_command to transaction pool successfully" ;
     txn_count := !txn_count + 1 ;
     Or_error.return ()
 

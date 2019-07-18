@@ -296,6 +296,7 @@ module Haskell_process = struct
           match prefix with
           | "DBUG" ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+                ~metadata:[("kademlia_level", `String "DBUG")]
                 line_no_prefix ;
               None
           | "TRAC" ->
@@ -303,10 +304,13 @@ module Haskell_process = struct
               None
           | "EROR" ->
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+                ~metadata:[("kademlia_level", `String "EROR")]
                 line_no_prefix ;
               None
           | "DATA" ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+              (* Too noisy to put in info logs *)
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+                ~metadata:[("kademlia_level", `String "DATA")]
                 line_no_prefix ;
               Some [line_no_prefix]
           | _ ->

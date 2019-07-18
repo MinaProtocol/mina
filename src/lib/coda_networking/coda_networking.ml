@@ -499,7 +499,7 @@ module Make (Inputs : Inputs_intf) = struct
       return result
     in
     let transition_catchup_rpc conn ~version:_ hash =
-      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
         "Peer with IP %s sent transition_catchup" conn.Host_and_port.host ;
       let action_msg = "Transition catchup with hash $hash" in
       let msg_args = [("hash", State_hash.to_yojson hash)] in
@@ -509,7 +509,7 @@ module Make (Inputs : Inputs_intf) = struct
       record_unknown_item result sender action_msg msg_args
     in
     let get_ancestry_rpc conn ~version:_ query =
-      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
         "Sending root proof to peer with IP %s" conn.Host_and_port.host ;
       let action_msg = "Get_ancestry query: $query" in
       let msg_args = [("query", Rpcs.Get_ancestry.query_to_yojson query)] in
@@ -767,7 +767,9 @@ module Make (Inputs : Inputs_intf) = struct
                      ~sender:(Envelope.Sender.Remote inet_addr))
             | Ok (Error e) ->
                 Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                  "Rpc error: %s" (Error.to_string_mach e) ;
+                  "Peer $peer didn't have enough information to answer \
+                   ledger_hash query. See error for more details: $error"
+                  ~metadata:[("error", `String (Error.to_string_hum e))] ;
                 Hash_set.add peers_tried peer ;
                 None
             | Error err ->
@@ -784,7 +786,8 @@ module Make (Inputs : Inputs_intf) = struct
             (fst query, snd query, answer)
       | None ->
           Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-            !"None of the peers I asked knew; trying more" ;
+            !"None of the peers contacted were able to answer ledger_hash \
+              query -- trying more" ;
           if ctr > retry_max then Deferred.unit
           else
             let%bind () = Clock.after retry_interval in
