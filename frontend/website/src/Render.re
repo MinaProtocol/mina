@@ -201,6 +201,7 @@ Router.(
   )
 );
 
+Rimraf.sync("docs-theme");
 Router.(
   generateStatic(
     Dir(
