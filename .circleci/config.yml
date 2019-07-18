@@ -54,7 +54,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Check circle CI configuration rendering
@@ -126,9 +126,6 @@ jobs:
                  environment:
                   DUNE_PROFILE: testnet_postake_medium_curves
            - run:
-                 name: Record Constraint System Digests
-                 command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
-           - run:
                  name: Run all tests (on master)
                  command: echo "FIXME Tests not yet working on mac"
            - run:
@@ -143,33 +140,30 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Create Artifact Dir
+                  name: Create artifact directory
                   command: mkdir -p /tmp/artifacts
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Proving and Verifying Keys - Download Candidate Stable Set
+                  name: Download candidate stable proving and verifying keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
             - run:
-                  name: Build deb Package with PV Keys And PV Key TAR
+                  name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
             - run:
-                  name: Store Genesis Public/Private Keypairs
+                  name: Store genesis public/private keypairs
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - run:
-                  name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
-                  name: Copy Artifacts to Google Cloud
+                  name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
@@ -180,35 +174,32 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Create Artifact Dir
+                  name: Create artifact directory
                   command: mkdir -p /tmp/artifacts
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Proving and Verifying Keys - Download Candidate Stable Set
+                  name: Download candidate stable proving and verifying keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   no_output_timeout: 20m
             - run:
-                  name: Build deb Package with PV Keys And PV Key TAR
+                  name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   no_output_timeout: 20m
             - run:
-                  name: Store Genesis Public/Private Keypairs
+                  name: Store genesis public/private keypairs
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - run:
-                  name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
-                  name: Copy Artifacts to Google Cloud
+                  name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     build-artifacts--testnet_postake_many_proposers_medium_curves:
         resource_class: large
@@ -219,35 +210,32 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Create Artifact Dir
+                  name: Create artifact directory
                   command: mkdir -p /tmp/artifacts
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Proving and Verifying Keys - Download Candidate Stable Set
+                  name: Download candidate stable proving and verifying keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   no_output_timeout: 20m
             - run:
-                  name: Build deb Package with PV Keys And PV Key TAR
+                  name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   no_output_timeout: 20m
             - run:
-                  name: Store Genesis Public/Private Keypairs
+                  name: Store genesis public/private keypairs
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - run:
-                  name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
-                  name: Copy Artifacts to Google Cloud
+                  name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     test-unit--test_postake_snarkless_unittest:
         resource_class: large
@@ -257,7 +245,7 @@ jobs:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
@@ -272,7 +260,7 @@ jobs:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
@@ -287,7 +275,7 @@ jobs:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
@@ -303,7 +291,7 @@ jobs:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
@@ -318,7 +306,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- fake_hash:full-test
@@ -332,7 +320,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake:full-test
@@ -349,7 +337,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
@@ -366,7 +354,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
@@ -380,7 +368,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_delegation:coda-delegation-test
@@ -394,7 +382,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5
@@ -408,7 +396,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments
@@ -422,7 +410,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5
@@ -439,7 +427,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_snarkless:full-test
@@ -456,7 +444,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2
@@ -470,7 +458,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-peers-test
@@ -499,7 +487,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_txns:coda-shared-state-test
@@ -516,7 +504,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_delegation_medium_curves:coda-delegation-test
@@ -530,7 +518,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
@@ -549,7 +537,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
@@ -566,7 +554,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2
@@ -580,7 +568,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_split_snarkless_medium_curves:coda-peers-test
@@ -609,7 +597,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_txns_medium_curves:coda-shared-state-test

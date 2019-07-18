@@ -54,7 +54,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Check circle CI configuration rendering
@@ -126,9 +126,6 @@ jobs:
                  environment:
                   DUNE_PROFILE: testnet_postake_medium_curves
            - run:
-                 name: Record Constraint System Digests
-                 command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
-           - run:
                  name: Run all tests (on master)
                  command: echo "FIXME Tests not yet working on mac"
            - run:
@@ -149,13 +146,13 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Create Artifact Dir
+                  name: Create artifact directory
                   command: mkdir -p /tmp/artifacts
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Proving and Verifying Keys - Download Candidate Stable Set
+                  name: Download candidate stable proving and verifying keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
@@ -164,24 +161,21 @@ jobs:
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
-                  name: Build deb Package with PV Keys And PV Key TAR
+                  name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
-                  name: Store Genesis Public/Private Keypairs
+                  name: Store genesis public/private keypairs
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - run:
-                  name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
-                  name: Copy Artifacts to Google Cloud
+                  name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     {%- endfor %}
 
@@ -194,7 +188,7 @@ jobs:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
@@ -212,7 +206,7 @@ jobs:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
@@ -230,7 +224,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             {%- for test in small_curves_tests[profile] %}
             - run:
@@ -249,7 +243,7 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Ensure Submodules Are Updated
+                  name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             {%- for test in medium_curves_tests[profile] %}
             - run:
