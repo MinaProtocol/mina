@@ -100,6 +100,8 @@ let daemon logger =
          (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
+     and is_archive_node =
+       flag "archive" no_arg ~doc:"Running the daemon will also"
      and log_json =
        flag "log-json" no_arg
          ~doc:"Print daemon log output as JSON (default: plain text)"
@@ -535,7 +537,8 @@ let daemon logger =
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
                 ~transition_frontier_location ~time_controller
                 ~initial_propose_keypairs ~monitor ~consensus_local_state
-                ~transaction_database ~external_transition_database ())
+                ~transaction_database ~external_transition_database
+                ~is_archive_node ())
          in
          { Coda_initialization.coda
          ; client_whitelist
@@ -690,7 +693,8 @@ let coda_commands logger =
         ; (module Coda_long_fork)
         ; (module Coda_delegation_test)
         ; (module Full_test)
-        ; (module Transaction_snark_profiler) ]
+        ; (module Transaction_snark_profiler)
+        ; (module Coda_archive_node_test) ]
         : (module Integration_test) list )
   in
   coda_commands logger

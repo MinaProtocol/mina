@@ -543,6 +543,7 @@ let create (config : Config.t) =
               ~time_controller:config.time_controller ~new_blocks ~wallets
               ~external_transition_database:config.external_transition_database
               ~transition_frontier:frontier_broadcast_pipe_r
+              ~is_storing_all:config.is_archive_node
           in
           return
             { config

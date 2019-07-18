@@ -101,6 +101,11 @@ module Api = struct
         Coda_process.get_all_user_commands_exn worker public_key )
       t i
 
+  let get_all_transitions t i public_key =
+    run_online_worker
+      ~f:(fun worker -> Coda_process.get_all_transitions worker public_key)
+      t i
+
   let start t i =
     Linear_pipe.write t.start_writer
       ( i
@@ -406,8 +411,8 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test logger n proposers snark_work_public_keys work_selection_method
-    ~max_concurrent_connections =
+let test ?is_archive_node logger n proposers snark_work_public_keys
+    work_selection_method ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
   let acceptable_delay =
@@ -422,7 +427,7 @@ let test logger n proposers snark_work_public_keys work_selection_method
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
       ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections
+      ~max_concurrent_connections ?is_archive_node
   in
   let%map workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in
