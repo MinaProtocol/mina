@@ -449,8 +449,8 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
                   sprintf
                     "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
                     label
-                    (Receipt.Chain_hash.to_string receipt_chain_hash)
-                    (User_command.to_base58_check payment) ))
+                    (User_command.to_base58_check payment)
+                    (Receipt.Chain_hash.to_string receipt_chain_hash) ))
            ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
 
 let send_payment =
