@@ -81,4 +81,9 @@ ln -s -f ${BUILDDIR}.deb coda.deb
 
 # Tar up keys for an artifact
 echo "------------------------------------------------------------"
-tar -cvjf coda_pvkeys_${GITHASH}_${DUNE_PROFILE}.tar.bz2 ${BUILDDIR}/var/lib/coda/* ; \
+if [ -z "$(ls -A ${BUILDDIR}/var/lib/coda)" ]; then
+    echo "PV Key Dir Empty"
+else
+    echo "Creating PV Key Tar"
+    tar -cvjf coda_pvkeys_${GITHASH}_${DUNE_PROFILE}.tar.bz2 ${BUILDDIR}/var/lib/coda/* ; \
+fi
