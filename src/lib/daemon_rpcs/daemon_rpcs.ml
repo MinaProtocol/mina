@@ -233,7 +233,6 @@ module Types = struct
       ; blockchain_length: int option
       ; uptime_secs: int
       ; ledger_merkle_root: string option
-      ; staged_ledger_hash: string option
       ; state_hash: string option
       ; commit_id: Git_sha.t
       ; conf_dir: string
@@ -257,10 +256,10 @@ module Types = struct
       end) in
       let open M in
       Fields.to_list ~sync_status ~num_accounts ~blockchain_length ~uptime_secs
-        ~ledger_merkle_root ~staged_ledger_hash ~state_hash ~commit_id
-        ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkeys
-        ~histograms ~consensus_time_best_tip ~consensus_time_now
-        ~consensus_mechanism ~consensus_configuration
+        ~ledger_merkle_root ~state_hash ~commit_id ~conf_dir ~peers
+        ~user_commands_sent ~run_snark_worker ~propose_pubkeys ~histograms
+        ~consensus_time_best_tip ~consensus_time_now ~consensus_mechanism
+        ~consensus_configuration
       |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =

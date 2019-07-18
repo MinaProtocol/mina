@@ -203,8 +203,8 @@ module Types = struct
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
                ~blockchain_length:int ~uptime_secs:nn_int
-               ~ledger_merkle_root:string ~staged_ledger_hash:string
-               ~state_hash:string ~commit_id:nn_string ~conf_dir:nn_string
+               ~ledger_merkle_root:string ~state_hash:string
+               ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
                ~user_commands_sent:nn_int ~run_snark_worker:nn_bool
                ~sync_status:(id ~typ:(non_null sync_status))
