@@ -37,7 +37,7 @@ The newest binary releases can be found [here](). With the exception of the .exe
 ```
 sudo echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/coda.list
 sudo apt-get update
-sudo apt-get install --force-yes -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-0d13213e -y
+sudo apt-get install --force-yes -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-307bdc71 -y
 ```
 
 3. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp). When running in the cloud this is unnecessary, instead you should configure security groups for your cloud provider.
