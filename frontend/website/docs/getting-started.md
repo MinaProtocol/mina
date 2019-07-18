@@ -40,7 +40,7 @@ sudo apt-get update
 sudo apt-get install --force-yes -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-0d13213e -y
 ```
 
-3. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp)
+3. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp). When running in the cloud this is unnecessary, instead you should configure security groups for your cloud provider.
 4. Set up port forwarding ([see below](/docs/getting-started/#port-forwarding))
 5. `coda -help` to see if it works
 
