@@ -398,7 +398,9 @@ module Tick = struct
 
     module Checked = struct
       include Snarky.Pedersen.Make (Tick0) (Inner_curve)
-                (Crypto_params.Pedersen_params)
+                (struct
+                  let params = Crypto_params.Pedersen_params.affine
+                end)
 
       let hash_prefix (p : State.t) =
         Section.create ~acc:(`Value p.acc)

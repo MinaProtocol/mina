@@ -121,7 +121,8 @@ let%test_module "test" =
     module Pedersen =
       Snarky.Pedersen.Make (Impl) (Curve)
         (struct
-          let params = pedersen_params
+          let params =
+            Array.map ~f:(Quadruple.map ~f:Curve.to_affine_exn) pedersen_params
         end)
 
     module Inputs_checked = struct
