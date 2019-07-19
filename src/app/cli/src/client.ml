@@ -687,6 +687,7 @@ let command =
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
+    ; ("get-txn-status", get_transaction_status)
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("set-staking", set_staking)
