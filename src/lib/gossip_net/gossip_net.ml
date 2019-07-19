@@ -58,6 +58,7 @@ module type S = sig
         ( Unix.Inet_addr.t
         , (Uuid.t, Connection_with_state.t) Hashtbl.t )
         Hashtbl.t
+    ; first_connect: unit Ivar.t
     ; max_concurrent_connections: int option }
 
   module Config : Config_intf
@@ -112,6 +113,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         Hashtbl.t
           (**mapping a Uuid to a connection to be able to remove it from the hash
          *table since Rpc.Connection.t doesn't have the socket information*)
+    ; first_connect: unit Ivar.t
     ; max_concurrent_connections: int option
           (* maximum number of concurrent connections from an ip (infinite if None)*)
     }
@@ -344,6 +346,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                    (Error.to_string_hum e))
         in
         let peer_events = Membership.changes membership in
+        let first_connect = Ivar.create () in
         let broadcast_reader, broadcast_writer = Linear_pipe.create () in
         let received_reader, received_writer =
           Strict_pipe.create ~name:"received gossip messages"
@@ -361,7 +364,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; initial_peers= config.initial_peers
           ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
           ; connections= Hashtbl.create (module Unix.Inet_addr)
-          ; max_concurrent_connections= config.max_concurrent_connections }
+          ; max_concurrent_connections= config.max_concurrent_connections
+          ; first_connect }
         in
         don't_wait_for
           (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
@@ -431,6 +435,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             Linear_pipe.iter_unordered ~max_concurrency:64 peer_events
               ~f:(function
               | Connect peers ->
+                  Ivar.fill_if_empty first_connect () ;
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                     "Some peers connected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;

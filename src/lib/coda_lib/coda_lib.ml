@@ -155,7 +155,11 @@ let sync_status t =
       ~f:(fun online_status active_status ->
         match online_status with
         | `Offline ->
-            `Offline
+            let (network : Coda_networking.t) = t.components.net in
+            if Coda_networking.has_made_a_connection network then `Connecting
+            else if Coda_networking.has_received_first_message network then
+              `Listening
+            else `Offline
         | `Online ->
             Option.value_map active_status ~default:`Bootstrap
               ~f:(Fn.const `Synced) )
