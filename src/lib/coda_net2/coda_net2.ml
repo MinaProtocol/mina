@@ -74,13 +74,15 @@ module Helper = struct
         ( string Envelope.Incoming.t
         , Strict_pipe.crash Strict_pipe.buffered
         , unit )
-        Strict_pipe.Writer.t 
-      ; read_pipe: string Envelope.Incoming.t Strict_pipe.Reader.t }
+        Strict_pipe.Writer.t
+    ; read_pipe: string Envelope.Incoming.t Strict_pipe.Reader.t }
 
   and stream =
     { net: t
     ; idx: int
     ; protocol: string
+    ; remote_peerid: string
+    ; remote_addr: string
     ; incoming_r: string Pipe.Reader.t
     ; incoming_w: string Pipe.Writer.t
     ; outgoing_r: string Pipe.Reader.t
@@ -449,7 +451,7 @@ module Helper = struct
       ; validators= Hashtbl.create (module String)
       ; streams= Hashtbl.create (module Int)
       ; protocol_handlers= Hashtbl.create (module String)
-      ; seqno= ref 1
+      ; seqno= 1
       ; finished= false }
     in
     let err = Process.stderr subprocess in
