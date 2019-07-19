@@ -153,8 +153,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   *)
   let remove_peer t peer =
     Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Removing peer from peer set: %{sexp: Peer.t}"
-      peer ;
+      !"Removing peer from peer set: %s"
+      (Peer.to_string peer) ;
     Coda_metrics.(Gauge.dec_one Network.peers) ;
     Hash_set.remove t.peers peer ;
     Hashtbl.update t.peers_by_ip peer.host ~f:(function
@@ -223,10 +223,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       | Ok (Error err) -> (
           (* call succeeded, result is an error *)
           Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-            !"RPC call error: %s {{{%s}}} [[[%{sexp: Error.t}]]]"
-            (Exn.to_string (Error.to_exn err))
-            (Exn.to_string_mach (Error.to_exn err))
-            err ;
+            !"RPC call error: %s" (Error.to_string_hum err)
+            ~metadata:
+              [ ("error_string", `String (Exn.to_string (Error.to_exn err)))
+              ; ( "error_string_machine"
+                , `String (Exn.to_string_mach (Error.to_exn err)) ) ] ;
           match (Error.to_exn err, Error.sexp_of_t err) with
           | ( _
             , Sexp.List
@@ -297,9 +298,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         then
           Deferred.return
             (Or_error.errorf
-               !"Not connecting to peer %{sexp:Peer.t}. Number of open \
-                 connections to the peer equals the limit %d.\n"
-               peer
+               !"Not connecting to peer %s. Number of open connections to the \
+                 peer equals the limit %d.\n"
+               (Peer.to_string peer)
                (Option.value_exn t.max_concurrent_connections))
         else call ()
 
@@ -316,11 +317,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             ()
         | Error e ->
             Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-              "broadcasting $short_msg to $peer failed: %s"
-              ~metadata:
-                [ ("short_msg", `String (Message.summary msg))
-                ; ("msg", Message.msg_to_yojson msg)
-                ; ("peer", Peer.to_yojson peer) ]
+              !"broadcasting %s to %s failed: %s"
+              ~metadata:[("msg", Message.msg_to_yojson msg)]
+              (Message.summary msg) (Peer.to_string peer)
               (Error.to_string_hum e) )
 
   let broadcast_random t n msg =
@@ -375,8 +374,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                    Deferred.unit
                | Some conn_tbl ->
                    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-                     !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
-                     addr ;
+                     !"Peer %s banned, disconnecting."
+                     (Unix.Inet_addr.to_string addr) ;
                    let%map () =
                      Deferred.List.iter (Hashtbl.to_alist conn_tbl)
                        ~f:(fun (_, conn_state) ->
@@ -437,8 +436,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               | Connect peers ->
                   Ivar.fill_if_empty first_connect () ;
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                    "Some peers connected %s"
-                    (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
+                    !"Connected to some peers [%s]"
+                    (Peer.pretty_list peers) ;
                   List.iter peers ~f:(fun peer ->
                       Coda_metrics.(Gauge.inc_one Network.peers) ;
                       Hash_set.add t.peers peer ;
@@ -447,8 +446,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   Deferred.unit
               | Disconnect peers ->
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                    "Some peers disconnected %s"
-                    (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
+                    "Some peers disconnected %s" (Peer.pretty_list peers) ;
                   List.iter peers ~f:(remove_peer t) ;
                   Deferred.unit )
             |> ignore ) ;
@@ -573,14 +571,13 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let query_peer t (peer : Peer.t) rpc query =
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Querying peer %{sexp: Peer.t}"
-      peer ;
+      !"Querying peer %s" (Peer.to_string peer) ;
     try_call_rpc t peer rpc query
 
   let query_random_peers t n rpc query =
     let peers = random_peers t n in
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Querying random peers: %{sexp: Peer.t list}"
-      peers ;
+      !"Querying random peers: %s"
+      (Peer.pretty_list peers) ;
     List.map peers ~f:(fun peer -> query_peer t peer rpc query)
 end
