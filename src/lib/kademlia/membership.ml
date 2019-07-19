@@ -252,7 +252,7 @@ module Haskell_process = struct
               Ok ()
           | Error _ ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                "Process $process does not exist, cannot be killed"
+                "Process $process does not exist, won't kill"
                 ~metadata:[("process", `String p)] ;
               return @@ Ok () )
       | _ ->

@@ -107,8 +107,10 @@ struct
           b
       | Error e ->
           Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:[("error", `String (Error.to_string_hum e))]
-            "Unable to verify proof with transaction snark: $error" ;
+            ~metadata:
+              [ ("statement", Transaction_snark_statement.to_yojson statement)
+              ; ("error", `String (Error.to_string_hum e)) ]
+            "Invalid transaction snark for statement $statement: $error" ;
           false
 
   let verify ~logger ~verifier ~message job proof prover =
@@ -1377,7 +1379,7 @@ struct
           generate logger completed_works_seq valid_on_this_ledger self
             partitions max_jobs_count unbundled_job_count )
     in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       "Number of proofs ready for purchase: $proof_count"
       ~metadata:[("proof_count", `Int proof_count)] ;
     trace_event "prediffs done" ;
