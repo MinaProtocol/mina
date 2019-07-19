@@ -188,17 +188,8 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
             |> Writer.write valid_transition_writer ;
             return ()
         | Error error ->
-            let%map () =
-              handle_validation_error ~logger ~trust_system ~sender
-                ~state_hash:(With_hash.hash transition_with_hash)
-                error
-            in
-            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ("peer", Envelope.Sender.to_yojson sender)
-                ; ( "transition"
-                  , External_transition.to_yojson
-                      (With_hash.data transition_with_hash) ) ]
-              !"Failed to validate transition from $peer" )
+            handle_validation_error ~logger ~trust_system ~sender
+              ~state_hash:(With_hash.hash transition_with_hash)
+              error )
     |> don't_wait_for
 end
