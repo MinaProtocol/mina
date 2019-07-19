@@ -182,8 +182,8 @@ struct
                       Sexp_diff_kernel.Algo.diff ~original ~updated ()
                     in
                     Logger.fatal logger
-                      "Out-of-snark (left) and in-snark (right) disagree on \
-                       what the next top_hash should be."
+                      "Out-of-SNARK and in-SNARK calculations of the next top \
+                       hash differ"
                       ~metadata:
                         [ ( "state_sexp_diff"
                           , `String
@@ -193,8 +193,9 @@ struct
                   return ()
               | None ->
                   Logger.error logger
-                    "expected_next_state is empty; this should only be true \
-                     during precomputed_values"
+                    "From the current prover state, got None for the expected \
+                     next state, which should be true only when calculating \
+                     precomputed values"
                     ~location:__LOC__ ~module_:__MODULE__ ;
                   return ()))
       in
