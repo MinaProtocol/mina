@@ -74,7 +74,8 @@ module Helper = struct
         ( string Envelope.Incoming.t
         , Strict_pipe.crash Strict_pipe.buffered
         , unit )
-        Strict_pipe.Writer.t }
+        Strict_pipe.Writer.t 
+      ; read_pipe: string Envelope.Incoming.t Strict_pipe.Reader.t }
 
   and stream =
     { net: t
@@ -407,12 +408,13 @@ module Pubsub = struct
           ( string Envelope.Incoming.t
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
-          Strict_pipe.Writer.t }
+          Strict_pipe.Writer.t 
+      ; read_pipe: string Envelope.Incoming.t Strict_pipe.Reader.t }
 
-    let publish {net; topic; idx= _; closed= _; write_pipe= _} message =
+    let publish {net; topic; _} message =
       publish net ~topic ~data:message
 
-    let unsubscribe ({net; idx; write_pipe; closed= _; topic= _} as t) =
+    let unsubscribe ({net; idx; write_pipe; _} as t) =
       if not t.closed then (
         t.closed <- true ;
         Strict_pipe.Writer.close write_pipe ;
@@ -426,31 +428,23 @@ module Pubsub = struct
             failwithf "helper broke RPC protocol: unsubscribe got %s"
               (Yojson.Safe.to_string v) () )
       else Deferred.Or_error.error_string "already unsubscribed"
+
+    let message_pipe ({read_pipe; _}) = read_pipe
   end
 
-  let subscribe (type a) (net : net) (topic : string)
-      (out_pipe :
-        ( string Envelope.Incoming.t
-        , a Strict_pipe.buffered
-        , unit )
-        Strict_pipe.Writer.t) =
+  let subscribe (net : net) (topic : string) =
     let sub_num = Helper.genseq net in
-    let cast_pipe :
-        ( string Envelope.Incoming.t
-        , Strict_pipe.crash Strict_pipe.buffered
-        , unit )
-        Strict_pipe.Writer.t =
-      Obj.magic out_pipe
-    in
+    let read_pipe, write_pipe = Strict_pipe.create ~name:(sprintf "subscription to topic «%s»" topic) Strict_pipe.(Buffered (`Capacity 64, `Overflow Crash)) in
     let sub =
       { Subscription.net
       ; closed= false
       ; topic
       ; idx= sub_num
-      ; write_pipe= cast_pipe }
+      ; write_pipe
+      ; read_pipe }
     in
     (* TODO: check if already subscribed to topic, fail. *)
-    Hashtbl.add_exn net.subscriptions ~key:sub_num ~data:(cast_pipe, sub) ;
+    Hashtbl.add_exn net.subscriptions ~key:sub_num ~data:(write_pipe, sub) ;
     match%map
       Helper.do_rpc net "subscribe"
         [("topic", `String topic); ("subscription_idx", `Int sub_num)]
@@ -770,8 +764,8 @@ let%test_module "coda network tests" =
           ~conf_dir:"/tmp/b"
         >>| Or_error.ok_exn
       in
-      let%bind kp_a = Keypair.random a >>| Or_error.ok_exn in
-      let%bind kp_b = Keypair.random a >>| Or_error.ok_exn in
+      let%bind kp_a = Keypair.random a in
+      let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let network_id = "test_stream" in
       let%bind () =
@@ -828,18 +822,14 @@ let%test_module "coda network tests" =
         let%bind a, b = setup_two_nodes "test_pubsub" in
         (* Give the libp2p helpers time to see each other. *)
         let%bind () = after (sec 0.5) in
-        let a_r, a_w =
-          Strict_pipe.(create (Buffered (`Capacity 10, `Overflow Crash)))
-        in
-        let b_r, b_w =
-          Strict_pipe.(create (Buffered (`Capacity 10, `Overflow Crash)))
-        in
         let%bind a_sub =
-          Pubsub.subscribe a "test" a_w |> Deferred.Or_error.ok_exn
+          Pubsub.subscribe a "test" |> Deferred.Or_error.ok_exn
         in
         let%bind b_sub =
-          Pubsub.subscribe b "test" b_w |> Deferred.Or_error.ok_exn
+          Pubsub.subscribe b "test" |> Deferred.Or_error.ok_exn
         in
+        let a_r = Pubsub.Subscription.message_pipe a_sub in 
+        let b_r = Pubsub.Subscription.message_pipe b_sub in 
         (* Give the subscriptions time to propagate *)
         let%bind () = after (sec 0.5) in
         let%bind () = Pubsub.Subscription.publish a_sub "msg from a" in
