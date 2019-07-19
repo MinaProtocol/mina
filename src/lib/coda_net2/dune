@@ -2,4 +2,4 @@
  (name coda_net2)
  (libraries core async yojson callipyge digestif.ocaml pipe_lib envelope logger base58)
  (inline_tests)
- (preprocess (pps ppx_jane ppx_let)))
+ (preprocess (pps ppx_jane ppx_let ppx_deriving_yojson)))
