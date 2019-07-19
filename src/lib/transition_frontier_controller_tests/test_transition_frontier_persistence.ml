@@ -59,13 +59,13 @@ let%test_module "Transition Frontier Persistence" =
       |> Deferred.map ~f:(function
            | Ok value ->
                value
-           | Error e ->
+           | Error exn ->
                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-                 "Error when persisting transition frontier: $error. Creating \
-                  frontier visualization"
-                 ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                 "Exception when persisting transition frontier: $exn. \
+                  Creating frontier visualization"
+                 ~metadata:[("exn", `String (Exn.to_string_hum exn))] ;
                Transition_frontier.visualize ~filename:"frontier.dot" frontier ;
-               raise e )
+               raise exn )
 
     let generate_breadcrumbs ~gen_root_breadcrumb_builder frontier size =
       gen_root_breadcrumb_builder ~logger ~trust_system ~size
