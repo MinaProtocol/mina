@@ -878,11 +878,10 @@ module Data = struct
       let handler : Snark_params.Tick.Handler.t Lazy.t =
         lazy
           (let pk, sk = keypairs.(0) in
-           (* NOTE: this ephemeral ledger is leaked. It needs to be tied to the lifetime of the returned handler. *)
-           let ephemeral = Coda_base.Ledger.create_ephemeral () in
-           Coda_base.Ledger.create_empty ephemeral pk |> ignore ;
            let dummy_sparse_ledger =
-             Coda_base.Sparse_ledger.of_ledger_subset_exn ephemeral [pk]
+             Coda_base.Sparse_ledger.of_ledger_subset_exn
+               (Lazy.force Genesis_ledger.t)
+               [pk]
            in
            let empty_pending_coinbase =
              Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
@@ -901,7 +900,7 @@ module Data = struct
                  (push fail (create_single pending_coinbase_handler))
                  (create_single ledger_handler))
            in
-           fun (Snarky.Request.With {request; respond}) ->
+           fun (With {request; respond}) ->
              match request with
              | Winner_address ->
                  respond (Provide 0)

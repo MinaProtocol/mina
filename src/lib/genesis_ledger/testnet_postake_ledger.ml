@@ -3,7 +3,10 @@ module Public_key = Signature_lib.Public_key
 
 include Make (struct
   let accounts =
-    [ { pk=
+    [ { pk= fst Coda_base.Sample_keypairs.keypairs.(0)
+      ; balance= 0
+      ; delegate= None }
+    ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "tNciTDiJziUovrKA4KKs7wN1XNhV8BW1YUvcyoo33RdrtPa5fKSKJSqFTgo13aNscVYTBa2kRmPnNGCdsuAqsSw6YJSn1GKVuqfpTDxXkifm6PJoVmVN3Gd1vBPKzdpeyuTBULfwsjmFxB"
       ; balance= 1600000
