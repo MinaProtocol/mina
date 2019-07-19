@@ -148,9 +148,9 @@ module Transport = struct
 
       let log_perm = 0o644
 
-      let primary_log_name = "coda.log.0"
+      let primary_log_name = "coda.log"
 
-      let secondary_log_name = "coda.log.1"
+      let secondary_log_name = "coda.log.0"
 
       type t =
         { directory: string
