@@ -22,12 +22,14 @@ else
     fi
 
     # only publish some jobs
-    if [[ "$CIRCLE_JOB" == "build-artifacts--testnet_postake" || \
-          "$CIRCLE_JOB" == "build-artifacts--testnet_postake_many_proposers_medium_curves" || \
-          "$CIRCLE_JOB" == "build-artifacts--testnet_postake_medium_curves" || \
-          "$CIRCLE_JOB" == "build-artifacts--testnet_postake_many_proposers" ]]; then
+    if [[ "$CIRCLE_JOB" == "build-artifacts--testnet_postake_many_proposers_medium_curves" || \
+          "$CIRCLE_JOB" == "build-artifacts--testnet_postake_medium_curves"  ]]; then
           cd src/_build
+          echo "Publishing debs:"
+          ls coda-*.deb
+          set -x
           ${DEBS3} --codename ${CODENAME} --component main coda-*.deb
+          set +x
     else
         echo "WARNING: Circle job: ${CIRCLE_JOB} not in publish list"
     fi
