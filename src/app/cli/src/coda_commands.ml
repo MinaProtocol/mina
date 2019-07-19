@@ -282,7 +282,7 @@ let get_status ~flag t =
     in
     let num_accounts = Ledger.num_accounts ledger in
     let%bind state = Coda_lib.best_protocol_state t in
-    let state_hash = Protocol_state.hash state |> State_hash.to_string in
+    let state_hash = Protocol_state.hash state |> State_hash.to_base58_check in
     let consensus_state = state |> Protocol_state.consensus_state in
     let blockchain_length =
       Length.to_int
