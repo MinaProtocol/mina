@@ -95,7 +95,7 @@ ls -lh coda_pvkeys_*
 # second deb without the proving keys
 echo "------------------------------------------------------------"
 echo "Building deb without keys:"
-BUILDDIR-NOKEYS="${PROJECT}-noprovingkeys_${VERSION}"
+BUILDDIRNOKEYS="${PROJECT}-noprovingkeys_${VERSION}"
 
 cat << EOF > ${BUILDDIR}/DEBIAN/control
 Package: ${PROJECT}-noprovingkeys
@@ -114,8 +114,8 @@ EOF
 
 # remove proving keys
 rm -f ${BUILDDIR}/var/lib/coda/*_proving
-mv ${BUILDDIR} ${BUILDDIR-NOKEYS}
+mv ${BUILDDIR} ${BUILDDIRNOKEYS}
 
 # build another deb
-dpkg-deb --build ${BUILDDIR-NOKEYS}
+dpkg-deb --build ${BUILDDIRNOKEYS}
 ls -lh coda*.deb
