@@ -19,6 +19,9 @@ Now that we've started up a node and are running the Coda daemon, open up anothe
 
     $ coda client status
 
+!!!note
+   For now, it will take up to a minute before `coda client status` will even successfully connect to the daemon when you are first starting it up. So if you see `Error: daemon not running. See coda daemon`, just a wait a bit and try again.
+
 Most likely we will see a response that include the fields below:
 
     ...
@@ -57,7 +60,7 @@ We can check our balance to make sure that we received the funds by running the 
 
     $ coda client get-balance -address <public_key>
 
-You might see `No account found at that public\_key (zero balance)`. Be patient! Depending on the traffic in the network, it may take a few blocks before your transaction goes through.
+You might see `No account found at that public_key (zero balance)`. Be patient! Depending on the traffic in the network, it may take a few blocks before your transaction goes through.
 
 While you're waiting take a look at your daemon logs for new blocks being generated. Run the following command to see the current block height:
 
@@ -80,8 +83,8 @@ If you're wondering what we passed in to the commands above:
 
 If this command is formatted properly, we should get a response that looks like the following:
 
-Initiated payment
-Receipt chain hash: A3gpN9j4j3UoJMoug6PVEwDvRKskfZtoSDCzwxS5ez7JbMjTJx9ZQHjWCPLsddp6u6pL1YsVfpWDLV3oWRRzpijo6LYApoEemeQirkQ1BFUmbkjWEi1ZCQhcFraNMS7Akyv2wA7gptqVt
+    Dispatched payment with ID 3XCgvAHLAqz9VVbU7an7f2L5ffJtZoFega7jZpVJrPCYA4j5HEmUAx51BCeMc232eBWVz6q9t62Kp2cNvQZoNCSGqJ1rrJpXFqMN6NQe7x987sAC2Sd6wu9Vbs9xSr8g1AkjJoB65v3suPsaCcvvCjyUvUs8c3eVRucH4doa2onGj41pjxT53y5ZkmGaPmPnpWzdJt4YJBnDRW1GcJeyqj61GKWcvvrV6KcGD25VEeHQBfhGppZc7ewVwi3vcUQR7QFFs15bMwA4oZDEfzSbnr1ECoiZGy61m5LX7afwFaviyUwjphtrzoPbQ2QAZ2w2ypnVUrcJ9oUT4y4dvDJ5vkUDazRdGxjAA6Cz86bJqqgfMHdMFqpkmLxCdLbj2Nq3Ar2VpPVvfn2kdKoxwmAGqWCiVhqYbTvHkyZSc4n3siGTEpTGAK9usPnBnqLi53Z2bPPaJ3PuZTMgmdZYrRv4UPxztRtmyBz2HdQSnH8vbxurLkyxK6yEwS23JSZWToccM83sx2hAAABNynBVuxagL8aNZF99k3LKX6E581uSVSw5DAJ2S198DvZHXD53QvjcDGpvB9jYUpofkk1aPvtW7QZkcofBYruePM7kCHjKvbDXSw2CV5brHVv5ZBV9DuUcuFHfcYAA2TVuDtFeNLBjxDumiBASgaLvcdzGiFvSqqnzmS9MBXxYybQcmmz1WuKZHjgqph99XVEapwTsYfZGi1T8ApahcWc5EX9
+    Receipt chain hash is now A3gpLyBJGvcpMXny2DsHjvE5GaNFn2bbpLLQqTCHuY3Nd7sqy8vDbM6qHTwHt8tcfqqBkd36LuV4CC6hVH6YsmRqRp4Lzx77WnN9gnRX7ceeXdCQUVB7B2uMo3oCYxfdpU5Q2f2KzJQ46
 
 ## Check account balance
 
