@@ -24,9 +24,42 @@ let with_snark = false
 
 [%%endif]
 
+[%%if
+time_offsets = true]
+
+let setup_time_offsets () =
+  Unix.putenv ~key:"CODA_TIME_OFFSET"
+    ~data:
+      ( Time.Span.to_int63_seconds_round_down_exn (force Coda_processes.offset)
+      |> Int63.to_int
+      |> Option.value_exn ?here:None ?message:None ?error:None
+      |> Int.to_string )
+
+[%%else]
+
+let setup_time_offsets () = ()
+
+[%%endif]
+
+let logger = Logger.create ()
+
+let heartbeat_flag = ref true
+
+let print_heartbeat () =
+  let rec loop () =
+    if !heartbeat_flag then (
+      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+        "Heartbeat for CI" ;
+      let%bind () = after (Time.Span.of_min 1.) in
+      loop () )
+    else return ()
+  in
+  loop ()
+
 let run_test () : unit Deferred.t =
+  setup_time_offsets () ;
+  print_heartbeat () |> don't_wait_for ;
   Parallel.init_master () ;
-  let logger = Logger.create () in
   File_system.with_temp_dir "full_test_config" ~f:(fun temp_conf_dir ->
       let keypair = Genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
@@ -339,25 +372,32 @@ let run_test () : unit Deferred.t =
                ( Genesis_ledger.keypair_of_account_record_exn (sk, account)
                , account ) )
       in
-      if with_snark then
-        let accounts = List.take other_accounts 2 in
-        let%bind blockchain_length' =
-          test_multiple_payments accounts ~txn_count:1 15.
-        in
-        (*wait for a block after the ledger_proof is emitted*)
-        let%map () =
-          wait_until_cond
-            ~f:(fun t -> blockchain_length t > blockchain_length')
-            ~timeout:5.
-        in
-        assert (blockchain_length coda > blockchain_length')
-      else
-        let%bind _ =
-          test_multiple_payments other_accounts
-            ~txn_count:(List.length other_accounts)
-            7.
-        in
-        test_duplicate_payments sender_keypair receiver_keypair )
+      let%map () =
+        if with_snark then
+          let accounts = List.take other_accounts 2 in
+          let%bind blockchain_length' =
+            test_multiple_payments accounts ~txn_count:1 120.
+          in
+          (*wait for a block after the ledger_proof is emitted*)
+          let%map () =
+            wait_until_cond
+              ~f:(fun t -> blockchain_length t > blockchain_length')
+              ~timeout:
+                ( Consensus.Constants.(
+                    (delta + c) * Consensus.Constants.block_window_duration_ms)
+                  / 1000 / 60
+                |> Float.of_int )
+          in
+          assert (blockchain_length coda > blockchain_length')
+        else
+          let%bind _ =
+            test_multiple_payments other_accounts
+              ~txn_count:(List.length other_accounts)
+              7.
+          in
+          test_duplicate_payments sender_keypair receiver_keypair
+      in
+      heartbeat_flag := false )
 
 let command =
   let open Async in

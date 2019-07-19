@@ -19,7 +19,7 @@ module Stable = struct
   module V1 = struct
     module T = struct
       type t = V1_make.Stable.V1.t
-      [@@deriving bin_io, sexp, version {unnumbered}]
+      [@@deriving bin_io, to_yojson, sexp, version {unnumbered}]
     end
 
     include T
@@ -35,6 +35,7 @@ module Latest_make = V1_make
 [%%define_locally
 Latest_make.
   ( of_hash
+  , to_yojson
   , get_exn
   , path_exn
   , set_exn
@@ -120,8 +121,6 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
   let nonce = User_command.Payload.nonce payload in
   let fee = User_command.Payload.fee payload in
   assert (Account.Nonce.equal sender_account.nonce nonce) ;
-  if not Insecure.fee_collection then
-    failwith "Bundle.Sparse_ledger: Insecure.fee_collection" ;
   let open Currency in
   let sender_account =
     { sender_account with

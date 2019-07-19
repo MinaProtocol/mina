@@ -26,9 +26,6 @@ let daemon logger =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional string)
-     and from_genesis =
-       flag "from-genesis"
-         ~doc:"Indicating that we are starting from genesis or not" no_arg
      and unsafe_track_propose_key =
        flag "unsafe-track-propose-key"
          ~doc:
@@ -85,6 +82,12 @@ let daemon logger =
          ~doc:
            "PORT local REST-server for daemon interaction (default no \
             rest-server)"
+         (optional int16)
+     and metrics_server_port =
+       flag "metrics-port"
+         ~doc:
+           "PORT metrics server for scraping via Prometheus (default no \
+            metrics-server)"
          (optional int16)
      and external_ip_opt =
        flag "external-ip"
@@ -143,28 +146,103 @@ let daemon logger =
              | Ok ll ->
                  Deferred.return ll )
        in
-       let logger_config =
-         if log_json then None
-         else
-           Some
-             { Logproc_lib.Interpolator.mode= Inline
-             ; max_interpolation_length= 30
-             ; pretty_print= true }
-       in
-       Logger.settings := (log_level, logger_config) ;
        let%bind conf_dir =
-         if is_background then (
+         if is_background then
            let home = Core.Sys.home_directory () in
            let conf_dir = compute_conf_dir home in
+           Deferred.return conf_dir
+         else Sys.home_directory () >>| compute_conf_dir
+       in
+       let () =
+         if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
              conf_dir ;
            Daemon.daemonize
              ~redirect_stdout:(`File_append (conf_dir ^/ "coda.log"))
              ~redirect_stderr:(`File_append (conf_dir ^/ "coda.log"))
-             () ;
-           Deferred.return conf_dir )
-         else Sys.home_directory () >>| compute_conf_dir
+             () )
+         else ()
        in
+       (* Check if the config files are for the current version. 
+        * WARNING: Deleting ALL the files in the config directory if there is
+        * a version mismatch *)
+       (* When persistence is added back, this needs to be revisited
+        * to handle persistence related files properly *)
+       let%bind () =
+         let del_files dir =
+           let rec all_files dirname basename =
+             let fullname = Filename.concat dirname basename in
+             match%bind Sys.is_directory fullname with
+             | `Yes ->
+                 let%map dirs, files =
+                   Sys.ls_dir fullname
+                   >>= Deferred.List.map ~f:(all_files fullname)
+                   >>| List.unzip
+                 in
+                 let dirs =
+                   if String.equal dirname conf_dir then List.concat dirs
+                   else List.append (List.concat dirs) [fullname]
+                 in
+                 (dirs, List.concat files)
+             | _ ->
+                 Deferred.return ([], [fullname])
+           in
+           let%bind dirs, files = all_files dir "" in
+           let%bind () =
+             Deferred.List.iter files ~f:(fun file -> Sys.remove file)
+           in
+           Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
+         in
+         let clean_up () =
+           let%bind () = del_files conf_dir in
+           let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
+           Writer.write_line wr Coda_version.commit_id ;
+           Writer.close wr
+         in
+         match%bind
+           Monitor.try_with_or_error (fun () ->
+               let%bind r = Reader.open_file (conf_dir ^/ "coda.version") in
+               match%map Pipe.to_list (Reader.lines r) with
+               | [] ->
+                   ""
+               | s ->
+                   List.hd_exn s )
+         with
+         | Ok c ->
+             if String.equal c Coda_version.commit_id then return ()
+             else (
+               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                 "Older version in Coda config directory. Cleaning up %s"
+                 conf_dir ;
+               clean_up () )
+         | Error e ->
+             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+               "Error reading coda.version: %s" (Error.to_string_mach e) ;
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               "Failed to read coda.version, cleaning up the config directory \
+                %s"
+               conf_dir ;
+             clean_up ()
+       in
+       (* 512MB logrotate max size = 1GB max filesystem usage *)
+       let logrotate_max_size = 1024 * 1024 * 512 in
+       Logger.Consumer_registry.register ~id:"raw_persistent"
+         ~processor:(Logger.Processor.raw ())
+         ~transport:
+           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+              ~max_size:logrotate_max_size) ;
+       let stdout_log_processor =
+         if log_json then Logger.Processor.raw ()
+         else
+           Logger.Processor.pretty ~log_level
+             ~config:
+               { Logproc_lib.Interpolator.mode= Inline
+               ; max_interpolation_length= 30
+               ; pretty_print= true }
+       in
+       Logger.Consumer_registry.register ~id:"primary_output"
+         ~processor:stdout_log_processor
+         ~transport:(Logger.Transport.stdout ()) ;
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
@@ -474,19 +552,17 @@ let daemon logger =
        in
        coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
-       let%bind () =
-         if from_genesis then Deferred.unit
-         else
-           after
-             ( Consensus.Constants.block_window_duration_ms * 2
-             |> Float.of_int |> Time.Span.of_ms )
-       in
        Coda_lib.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_whitelist ?rest_server_port ~coda
          ~client_port () ;
        Coda_run.run_snark_worker ~client_port run_snark_worker_action ;
+       let%bind () =
+         Option.map metrics_server_port ~f:(fun port ->
+             Coda_metrics.server ~port ~logger >>| ignore )
+         |> Option.value ~default:Deferred.unit
+       in
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Running coda services" ;
        Async.never ())
@@ -574,8 +650,8 @@ let internal_commands =
   ; ("snark-hashes", snark_hashes) ]
 
 let coda_commands logger =
-  [ ("client", Client.command)
-  ; ("daemon", daemon logger)
+  [ ("daemon", daemon logger)
+  ; ("client", Client.command)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
@@ -619,7 +695,7 @@ let coda_commands logger =
 
 let () =
   Random.self_init () ;
-  let logger = Logger.create () in
+  let logger = Logger.create ~initialize_default_consumer:false () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;

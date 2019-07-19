@@ -225,7 +225,7 @@ module type State_hooks_intf = sig
   val generate_transition :
        previous_protocol_state:protocol_state
     -> blockchain_state:blockchain_state
-    -> time:Unix_timestamp.t
+    -> current_time:Unix_timestamp.t
     -> proposal_data:proposal_data
     -> transactions:Coda_base.User_command.t list
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
@@ -266,7 +266,7 @@ module type S = sig
     * This is mostly useful for PoStake and other consensus mechanisms that have their own
     * notions of time.
   *)
-  val time_hum : Time.t -> string
+  val time_hum : Coda_base.Block_time.t -> string
 
   module Constants : Constants_intf
 
@@ -306,19 +306,19 @@ module type S = sig
     end
 
     module Prover_state : sig
-      type t [@@deriving sexp]
+      type t [@@deriving to_yojson, sexp]
 
       module Stable :
         sig
           module V1 : sig
-            type t [@@deriving bin_io, sexp, version]
+            type t [@@deriving bin_io, sexp, to_yojson, version]
           end
 
           module Latest = V1
         end
         with type V1.t = t
 
-      val precomputed_handler : Snark_params.Tick.Handler.t
+      val precomputed_handler : Snark_params.Tick.Handler.t Lazy.t
 
       val handler :
            t
@@ -330,11 +330,11 @@ module type S = sig
       module Value : sig
         module Stable : sig
           module V1 : sig
-            type t [@@deriving sexp, bin_io, version]
+            type t [@@deriving sexp, bin_io, to_yojson, version]
           end
         end
 
-        type t = Stable.V1.t [@@deriving sexp]
+        type t = Stable.V1.t [@@deriving to_yojson, sexp]
       end
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
@@ -361,7 +361,7 @@ module type S = sig
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
 
-      val negative_one : Value.t
+      val negative_one : Value.t Lazy.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
@@ -412,6 +412,9 @@ module type S = sig
         -> local_state:Local_state.t
         -> Host_and_port.t Rpc.Implementation.t list
     end
+
+    (* Check whether we are in the genesis epoch *)
+    val is_genesis : Coda_base.Block_time.t -> bool
 
     (**
      * Check that a consensus state was received at a valid time.

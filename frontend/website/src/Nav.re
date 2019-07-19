@@ -294,6 +294,7 @@ module NavWrapper = {
             style([
               position(`relative),
               width(`auto),
+              maxWidth(px(500)),
               order(2),
               NavStyle.bottomNudgeOffset(0.5),
               media(
@@ -366,62 +367,6 @@ module SimpleButton = {
   };
 };
 
-module SignupButton = {
-  open Style;
-
-  let component = ReasonReact.statelessComponent("Nav.SignupButton");
-  let make = (~name, ~link, _children) => {
-    ...component,
-    render: _self => {
-      <A
-        name={"nav-" ++ link.Links.Named.name}
-        href={link.Links.Named.link}
-        className=Css.(
-          merge([
-            H4.wide,
-            style(
-              paddingX(`rem(0.75))
-              @ paddingY(`rem(0.75))
-              @ [
-                display(`flex),
-                width(`rem(6.25)),
-                height(`rem(2.5)),
-                borderRadius(`px(5)),
-                color(Style.Colors.hyperlink),
-                border(`px(1), `solid, Style.Colors.hyperlink),
-                textDecoration(`none),
-                whiteSpace(`nowrap),
-                hover([
-                  backgroundColor(Style.Colors.hyperlink),
-                  color(Style.Colors.whiteAlpha(0.95)),
-                ]),
-                // Make this display the same as a SimpleButton
-                // when the screen is small enough to show a menu
-                media(NavStyle.MediaQuery.menuMax, menuStyle),
-              ],
-            ),
-          ])
-        )>
-        <span
-          className=Css.(
-            style([
-              marginLeft(`rem(0.1875)),
-              marginRight(`rem(0.0625)),
-              // HACK: vertically centering leaves it 1px too high
-              paddingTop(`rem(0.0625)),
-              media(
-                NavStyle.MediaQuery.menuMax,
-                [margin(`zero), ...Style.paddingY(`zero)],
-              ),
-            ])
-          )>
-          {ReasonReact.string(name)}
-        </span>
-      </A>;
-    },
-  };
-};
-
 let component = ReasonReact.statelessComponent("CodaNav");
 let make = (~page, _children) => {
   ...component,
@@ -443,7 +388,6 @@ let make = (~page, _children) => {
         link="/jobs.html"
         activePage={page == `Jobs}
       />
-      <SignupButton name="Sign up" link=Links.Forms.mailingList />
     </NavWrapper>;
   },
 };

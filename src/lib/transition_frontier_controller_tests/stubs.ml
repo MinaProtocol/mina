@@ -70,13 +70,7 @@ struct
   end
 
   module Staged_ledger = Staged_ledger.Make (struct
-    module Compressed_public_key = Signature_lib.Public_key.Compressed
     module User_command = User_command
-    module Fee_transfer = Coda_base.Fee_transfer
-    module Coinbase = Coda_base.Coinbase
-    module Transaction = Transaction
-    module Ledger_hash = Coda_base.Ledger_hash
-    module Frozen_ledger_hash = Coda_base.Frozen_ledger_hash
     module Ledger_proof_statement = Transaction_snark.Statement
     module Proof = Proof
     module Sok_message = Coda_base.Sok_message
@@ -84,25 +78,13 @@ struct
     module Ledger_proof_verifier = Verifier
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Staged_ledger_hash = Staged_ledger_hash_binable
-    module Transaction_snark_statement = Transaction_snark.Statement
     module Transaction_snark_work = Transaction_snark_work
     module Transaction_validator = Transaction_validator
     module Staged_ledger_diff = Staged_ledger_diff
     module Account = Coda_base.Account
-    module Ledger = Coda_base.Ledger
-    module Sparse_ledger = Coda_base.Sparse_ledger
     module Verifier = Verifier
     module Proof_type = Transaction_snark.Proof_type
-
-    module Pending_coinbase = struct
-      include Pending_coinbase.Stable.V1
-
-      include (
-        Pending_coinbase : module type of Pending_coinbase with type t := t )
-    end
-
     module Pending_coinbase_hash = Pending_coinbase.Hash
-    module Pending_coinbase_stack = Pending_coinbase.Stack
     module Pending_coinbase_stack_state =
       Transaction_snark.Pending_coinbase_stack_state
     module Transaction_witness = Transaction_witness
@@ -368,7 +350,8 @@ struct
           Coda_base.Ledger.Db.create ~directory_name:ledger_dir ()
         in
         let root_snarked_ledger =
-          Ledger_transfer.transfer_accounts ~src:Genesis_ledger.t
+          Ledger_transfer.transfer_accounts
+            ~src:(Lazy.force Genesis_ledger.t)
             ~dest:ledger_db
         in
         let consensus_local_state =
@@ -377,7 +360,8 @@ struct
         let%bind frontier =
           create_frontier_from_genesis_protocol_state ~logger
             ~consensus_local_state
-            ~genesis_protocol_state_with_hash:Genesis_protocol_state.t
+            ~genesis_protocol_state_with_hash:
+              (Lazy.force Genesis_protocol_state.t)
             root_snarked_ledger
         in
         f frontier )
@@ -397,7 +381,7 @@ struct
         ~genesis_consensus_state:
           (Consensus.Data.Consensus_state.create_genesis
              ~negative_one_protocol_state_hash:
-               Protocol_state.(hash negative_one))
+               Protocol_state.(hash (Lazy.force negative_one)))
         ~genesis_ledger:(Ledger.of_database root_snarked_ledger)
     in
     create_frontier_from_genesis_protocol_state ~logger ~consensus_local_state
@@ -545,6 +529,9 @@ struct
     let create _ = failwith "stub"
 
     let create_stub ~logger ~ip_table ~peers = {logger; ip_table; peers}
+
+    let peers_by_ip _ ip =
+      [Network_peer.Peer.{host= ip; discovery_port= 0; communication_port= 0}]
 
     let random_peers {peers; _} num_peers =
       let peer_list = Hash_set.to_list peers in

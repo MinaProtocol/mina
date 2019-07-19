@@ -23,9 +23,9 @@
     "rimraf": "^2.6.3"
   },
   "devDependencies": {
+    "@2fd/graphdoc": "^2.4.0",
     "bs-platform": "^5.0.0-dev.5",
     "concurrently": "^4.1.0",
-    "firebase-tools": "^6.5.0",
     "reload": "^3.0.1"
   },
   "nodemonConfig": {

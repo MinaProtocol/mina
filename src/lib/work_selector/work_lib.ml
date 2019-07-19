@@ -26,8 +26,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     module Seen_key = struct
       module T = struct
         type t =
-          Inputs.Ledger_proof_statement.t
-          * Inputs.Ledger_proof_statement.t option
+          Transaction_snark.Statement.t * Transaction_snark.Statement.t option
         [@@deriving compare, sexp]
       end
 
@@ -68,7 +67,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       | _ ->
           failwith "Should contain one or two elements"
 
-    type statement = Inputs.Ledger_proof_statement.t
+    type statement = Transaction_snark.Statement.t
 
     let does_not_have_better_fee ~snark_pool ~fee works =
       does_not_have_better_fee ~snark_pool ~fee

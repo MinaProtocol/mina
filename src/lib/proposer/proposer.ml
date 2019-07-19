@@ -103,7 +103,7 @@ end
 
 let generate_next_state ~previous_protocol_state ~time_controller
     ~staged_ledger ~transactions ~get_completed_work ~logger
-    ~(keypair : Keypair.t) ~proposal_data =
+    ~(keypair : Keypair.t) ~proposal_data ~scheduled_time =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let%bind ( diff
@@ -153,17 +153,25 @@ let generate_next_state ~previous_protocol_state ~time_controller
             ~default:Currency.Amount.zero
         in
         let blockchain_state =
-          Blockchain_state.create_value ~timestamp:(Time.now time_controller)
+          (* We use the time this proposal was supposed to happen at because
+             if things are slower than expected, we may have entered the next
+             slot and putting the **current** timestamp rather than the expected
+             one will screw things up.
+
+             [generate_transition] will log an error if the [current_time] has a
+             different slot from the [scheduled_time]
+          *)
+          Blockchain_state.create_value ~timestamp:scheduled_time
             ~snarked_ledger_hash:next_ledger_hash
             ~staged_ledger_hash:next_staged_ledger_hash
         in
-        let time =
+        let current_time =
           Time.now time_controller |> Time.to_span_since_epoch
           |> Time.Span.to_ms
         in
         measure "consensus generate_transition" (fun () ->
             Consensus_state_hooks.generate_transition ~previous_protocol_state
-              ~blockchain_state ~time ~proposal_data
+              ~blockchain_state ~current_time ~proposal_data
               ~transactions:
                 ( Staged_ledger_diff.With_valid_signatures_and_proofs
                   .user_commands diff
@@ -210,11 +218,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
   trace_task "proposer" (fun () ->
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Bootstrapping right now. Cannot generate new blockchains or \
-           schedule event"
+          "No frontier available; pausing proposer."
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let propose ivar (keypair, proposal_data) =
+      let propose ivar (keypair, scheduled_time, proposal_data) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -223,7 +230,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             let crumb = Transition_frontier.best_tip frontier in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
-              !"Begining to propose off of crumb $breadcrumb%!" ;
+              !"Generating new block on top of $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
               let transition : External_transition.Validated.t =
                 (Breadcrumb.transition_with_hash crumb).data
@@ -241,8 +248,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
             in
             let%bind next_state_opt =
-              generate_next_state ~proposal_data ~previous_protocol_state
-                ~time_controller
+              generate_next_state ~scheduled_time ~proposal_data
+                ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
             in
@@ -293,8 +300,23 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   with
                   | Error err ->
                       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                        "failed to prove generated protocol state: %s"
-                        (Error.to_string_hum err) ;
+                        "Prover failed to prove freshly generated transition: \
+                         $error"
+                        ~metadata:
+                          [ ("error", `String (Error.to_string_hum err))
+                          ; ( "prev_state"
+                            , Protocol_state.value_to_yojson
+                                previous_protocol_state )
+                          ; ( "prev_state_proof"
+                            , Proof.to_yojson previous_protocol_state_proof )
+                          ; ( "next_state"
+                            , Protocol_state.value_to_yojson protocol_state )
+                          ; ( "internal_transition"
+                            , Internal_transition.to_yojson internal_transition
+                            )
+                          ; ( "pending_coinbase_witness"
+                            , Pending_coinbase_witness.to_yojson
+                                pending_coinbase_witness ) ] ;
                       return ()
                   | Ok protocol_state_proof -> (
                       let span = Time.diff (Time.now time_controller) t0 in
@@ -378,6 +400,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         !"Submitting transition $state_hash to the transition \
                           frontier controller"
                         ~metadata ;
+                      Coda_metrics.(Counter.inc_one Proposer.blocks_proposed) ;
                       let%bind () =
                         Strict_pipe.Writer.write transition_writer breadcrumb
                       in
@@ -459,10 +482,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   Consensus.Hooks.required_local_state_sync ~consensus_state
                     ~local_state:consensus_local_state
                   = None ) ;
+                let now = Time.now time_controller in
                 match
                   measure "asking conensus what to do" (fun () ->
-                      Consensus.Hooks.next_proposal
-                        (time_to_ms (Time.now time_controller))
+                      Consensus.Hooks.next_proposal (time_to_ms now)
                         consensus_state ~local_state:consensus_local_state
                         ~keypairs ~logger )
                 with
@@ -470,29 +493,52 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_for_proposal
                 | `Propose_now (keypair, data) ->
+                    Coda_metrics.(Counter.inc_one Proposer.slots_won) ;
                     Interruptible.finally
                       (Singleton_supervisor.dispatch proposal_supervisor
-                         (keypair, data))
+                         (keypair, now, data))
                       ~f:check_for_proposal
                     |> ignore
                 | `Propose (time, keypair, data) ->
-                    Singleton_scheduler.schedule scheduler (time_of_ms time)
+                    Coda_metrics.(Counter.inc_one Proposer.slots_won) ;
+                    let scheduled_time = time_of_ms time in
+                    Singleton_scheduler.schedule scheduler scheduled_time
                       ~f:(fun () ->
                         ignore
                           (Interruptible.finally
                              (Singleton_supervisor.dispatch proposal_supervisor
-                                (keypair, data))
+                                (keypair, scheduled_time, data))
                              ~f:check_for_proposal) ) ) )
       in
-      (* Schedule to wake up immediately on the next tick of the proposer
-       * instead of immediately mutating local_state here as there could be a
-       * race.
-       *
-       * Given that rescheduling takes the min of the two timeouts, we won't
-       * erase this timeout even if the last run of the proposer wants to wait
-       * for a long while.
-       * *)
-      Agent.on_update keypairs ~f:(fun _new_keypairs ->
-          Singleton_scheduler.schedule scheduler (Time.now time_controller)
-            ~f:check_for_proposal ) ;
-      check_for_proposal () )
+      let start () =
+        (* Schedule to wake up immediately on the next tick of the proposer
+         * instead of immediately mutating local_state here as there could be a
+         * race.
+         *
+         * Given that rescheduling takes the min of the two timeouts, we won't
+         * erase this timeout even if the last run of the proposer wants to wait
+         * for a long while.
+         * *)
+        Agent.on_update keypairs ~f:(fun _new_keypairs ->
+            Singleton_scheduler.schedule scheduler (Time.now time_controller)
+              ~f:check_for_proposal ) ;
+        check_for_proposal ()
+      in
+      (* if the proposer starts before genesis, sleep until genesis *)
+      let now = Time.now time_controller in
+      if Time.( >= ) now Consensus.Constants.genesis_state_timestamp then
+        start ()
+      else
+        let time_till_genesis =
+          Time.diff Consensus.Constants.genesis_state_timestamp now
+        in
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "time_till_genesis"
+              , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )
+            ]
+          "node started before genesis: waiting $time_till_genesis ms before \
+           proposing any blocks" ;
+        ignore
+          (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
+               start () )) )

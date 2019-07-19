@@ -16,23 +16,12 @@ let wrap_input = Tock.Data_spec.[Wrap_input.typ]
 
 let exists' typ ~f = Tick.(exists typ ~compute:As_prover.(map get_state ~f))
 
-module Input = struct
-  (* TODO : version *)
-  type t =
-    { source: Frozen_ledger_hash.Stable.V1.t
-    ; target: Frozen_ledger_hash.Stable.V1.t
-    ; fee_excess: Currency.Amount.Signed.Stable.V1.t
-    ; pending_coinbase_before: Pending_coinbase.Stack.Stable.V1.t
-    ; pending_coinbase_after: Pending_coinbase.Stack.Stable.V1.t }
-  [@@deriving bin_io, sexp, compare]
-end
-
 module Proof_type = struct
   module Stable = struct
     module V1 = struct
       module T = struct
         type t = [`Base | `Merge]
-        [@@deriving bin_io, sexp, hash, compare, yojson, version]
+        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end
 
       include T
@@ -105,7 +94,7 @@ module Statement = struct
               Pending_coinbase_stack_state.Stable.V1.t
           ; fee_excess: Currency.Fee.Signed.Stable.V1.t
           ; proof_type: Proof_type.Stable.V1.t }
-        [@@deriving sexp, bin_io, hash, compare, yojson, version]
+        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end
 
       include T
@@ -278,7 +267,7 @@ module Verification_keys = struct
   let dummy : t =
     { merge= Dummy_values.Tick.Groth16.verification_key
     ; base= Dummy_values.Tick.Groth16.verification_key
-    ; wrap= Dummy_values.Tock.GrothMaller17.verification_key }
+    ; wrap= Dummy_values.Tock.Bowe_gabizon18.verification_key }
 end
 
 module Keys0 = struct
@@ -293,7 +282,7 @@ module Keys0 = struct
     let dummy =
       { merge= Dummy_values.Tick.Groth16.proving_key
       ; base= Dummy_values.Tick.Groth16.proving_key
-      ; wrap= Dummy_values.Tock.GrothMaller17.proving_key }
+      ; wrap= Dummy_values.Tock.Bowe_gabizon18.proving_key }
   end
 
   module T = struct
@@ -597,7 +586,7 @@ module Merge = struct
           ~f:(fun acc x -> Pedersen.Checked.Section.disjoint_union_exn acc x)
           ~init:s ss
 
-  module Verifier = Tick.Groth_maller_verifier
+  module Verifier = Tick.Verifier
 
   let vk_input_offset =
     Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
