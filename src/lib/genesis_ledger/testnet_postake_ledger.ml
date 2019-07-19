@@ -3,7 +3,7 @@ module Public_key = Signature_lib.Public_key
 
 include Make (struct
   let accounts =
-    [ { pk= fst Coda_base.Sample_keypairs.keypairs.(0)
+    [ { pk= fst (Lazy.force Coda_base.Sample_keypairs.keypairs).(0)
       ; balance= 0
       ; delegate= None }
     ; { pk=
