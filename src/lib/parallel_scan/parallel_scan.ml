@@ -228,12 +228,12 @@ module Available_job = struct
 end
 
 (**New jobs to be added (including new transactions or new merge jobs)*)
-module New_job = struct
+module Job = struct
   module Stable = struct
     module V1 = struct
       module T = struct
         type ('merge, 'base) t = Base of 'base | Merge of 'merge
-        [@@deriving sexp]
+        [@@deriving sexp, bin_io]
       end
 
       include T
@@ -341,7 +341,7 @@ module Job_view = struct
 end
 
 module Hash = struct
-  type t = Digestif.SHA256.t
+  type t = Digestif.SHA256.t [@@deriving eq]
 end
 
 (**A single tree with number of leaves = max_base_jobs = 2**transaction_capacity_log_2 *)
@@ -573,7 +573,7 @@ module Tree = struct
         (Node {depth; value= value'; sub_tree= sub}, count_list)
 
   let update :
-         ('merge_job, 'base_job) New_job.t list
+         ('merge_job, 'base_job) Job.t list
       -> update_level:int
       -> sequence_no:int
       -> depth:int
@@ -581,7 +581,7 @@ module Tree = struct
       -> (('merge_t, 'base_t) t * 'b option) Or_error.t =
    fun completed_jobs ~update_level ~sequence_no:seq_no ~depth:_ tree ->
     let open Or_error.Let_syntax in
-    let add_merges (jobs : ('b, 'c) New_job.t list) cur_level (weight, m) =
+    let add_merges (jobs : ('b, 'c) Job.t list) cur_level (weight, m) =
       let left, right = weight in
       if cur_level = update_level - 1 then
         (*Create new jobs from the completed ones*)
@@ -589,7 +589,7 @@ module Tree = struct
           match (jobs, m) with
           | [], _ ->
               Ok (weight, m)
-          | [New_job.Merge a; Merge b], Merge.Job.Empty ->
+          | [Job.Merge a; Merge b], Merge.Job.Empty ->
               Ok
                 ( (left - 1, right - 1)
                 , Full {left= a; right= b; seq_no; status= Job_status.Todo} )
@@ -650,11 +650,11 @@ module Tree = struct
       match (jobs, d) with
       | [], _ ->
           Ok (weight, d)
-      | [New_job.Base d], Base.Job.Empty ->
+      | [Job.Base d], Base.Job.Empty ->
           Ok
             ( weight - 1
             , Base.Job.Full {job= d; seq_no; status= Job_status.Todo} )
-      | [New_job.Merge _], Full b ->
+      | [Job.Merge _], Full b ->
           Ok (weight, Full {b with status= Job_status.Done})
       | xs, _ ->
           Or_error.errorf
@@ -709,7 +709,7 @@ module Tree = struct
     |> List.rev
 
   let to_hashable_jobs :
-      ('merge_t, 'base_t) t -> ('merge_job, 'base_job) New_job.t list =
+      ('merge_t, 'base_t) t -> ('merge_job, 'base_job) Job.t list =
    fun tree ->
     fold ~init:[]
       ~f_merge:(fun acc a ->
@@ -717,32 +717,29 @@ module Tree = struct
         | _, Merge.Job.Full {status= Job_status.Done; _} ->
             acc
         | _ ->
-            New_job.Merge a :: acc )
+            Job.Merge a :: acc )
       ~f_base:(fun acc d ->
         match d with
         | _, Base.Job.Full {status= Job_status.Done; _} ->
             acc
         | _ ->
-            New_job.Base d :: acc )
+            Job.Base d :: acc )
       tree
     |> List.rev
 
   let jobs_records :
-      ('merge_t, 'base_t) t -> ('merge_job, 'base_job) New_job.t list =
+      ('merge_t, 'base_t) t -> ('merge_job, 'base_job) Job.t list =
    fun tree ->
     fold ~init:[]
       ~f_merge:(fun acc a ->
         match a with
         | _weight, Merge.Job.Full x ->
-            New_job.Merge x :: acc
+            Job.Merge x :: acc
         | _ ->
             acc )
       ~f_base:(fun acc d ->
-        match d with
-        | _weight, Base.Job.Full j ->
-            New_job.Base j :: acc
-        | _ ->
-            acc )
+        match d with _weight, Base.Job.Full j -> Job.Base j :: acc | _ -> acc
+        )
       tree
     |> List.rev
 
@@ -837,9 +834,47 @@ module T = struct
           ; max_base_jobs: int (*transaction_capacity_log_2*)
           ; delay: int }
         [@@deriving sexp, bin_io, version]
+
+        (*module Binable_T = struct
+          (*type level = int [@@deriving sexp, bin_io]*)
+          type ('merge, 'base) t =
+          { trees:
+              (*List of jobs on each level of a tree alon with the weight information *)
+              (int * (( 'merge Merge.Stable.V1.t
+              , 'base Base.Stable.V1.t )
+              Job.Stable.V1.t) list) list
+          ; acc: ('merge * 'base list) option
+          ; curr_job_seq_no: int
+          ; max_base_jobs: int
+          ; delay: int } [@@deriving sexp, bin_io]
+        end*)
       end
 
       include T
+
+      let with_leaner_trees ({trees; _} as t) =
+        let trees =
+          Non_empty_list.map trees ~f:(fun tree ->
+              Tree.map tree
+                ~f_merge:(fun merge_node ->
+                  match snd merge_node with
+                  | Merge.Job.Full {status= Job_status.Done; _} ->
+                      (fst merge_node, Merge.Job.Empty)
+                  | _ ->
+                      merge_node )
+                ~f_base:Fn.id )
+        in
+        {t with trees}
+
+      include Binable.Of_binable2
+                (T)
+                (struct
+                  type nonrec ('merge, 'base) t = ('merge, 'base) t
+
+                  let to_binable = with_leaner_trees
+
+                  let of_binable = Fn.id
+                end)
     end
 
     module Latest = V1
@@ -855,6 +890,8 @@ module T = struct
     ; max_base_jobs: int
     ; delay: int }
   [@@deriving sexp]
+
+  let with_leaner_trees = Stable.V1.with_leaner_trees
 
   let create_tree_for_level ~level ~depth ~merge_job ~base_job =
     let rec go : type merge_t base_t.
@@ -902,14 +939,16 @@ module State = struct
   include T
   module Hash = Hash
 
-  let hash {trees; acc; max_base_jobs; curr_job_seq_no; delay; _} f_merge
-      f_base =
+  let hash t f_merge f_base =
+    let {trees; acc; max_base_jobs; curr_job_seq_no; delay; _} =
+      with_leaner_trees t
+    in
     let h = ref (Digestif.SHA256.init ()) in
     let add_string s = h := Digestif.SHA256.feed_string !h s in
     let () =
       let tree_hash tree f_merge f_base =
         List.iter (Tree.to_hashable_jobs tree) ~f:(fun job ->
-            match job with New_job.Merge a -> f_merge a | Base d -> f_base d )
+            match job with Job.Merge a -> f_merge a | Base d -> f_base d )
       in
       Non_empty_list.iter trees ~f:(fun tree ->
           let w_to_string (l, r) = Int.to_string l ^ Int.to_string r in
@@ -1110,7 +1149,7 @@ let add_merge_jobs :
     let%bind state = State_or_error.get in
     let delay = state.delay + 1 in
     let depth = Int.ceil_log2 state.max_base_jobs in
-    let merge_jobs = List.map completed_jobs ~f:(fun j -> New_job.Merge j) in
+    let merge_jobs = List.map completed_jobs ~f:(fun j -> Job.Merge j) in
     let jobs_required = work_for_tree state ~data_tree:`Current in
     let%bind () =
       check
@@ -1188,7 +1227,7 @@ let add_data : data:'base list -> (_, _, 'base) State_or_error.t =
     let%bind state = State_or_error.get in
     let depth = Int.ceil_log2 state.max_base_jobs in
     let tree = Non_empty_list.head state.trees in
-    let base_jobs = List.map data ~f:(fun j -> New_job.Base j) in
+    let base_jobs = List.map data ~f:(fun j -> Job.Base j) in
     let available_space = Tree.required_job_count tree in
     let%bind () =
       check
@@ -1668,11 +1707,9 @@ let%test_module "scans" =
                     (module Int)
                     ~f:
                       (fun (job :
-                             ( int64 Merge.Record.t
-                             , int64 Base.Record.t )
-                             New_job.t) ->
+                             (int64 Merge.Record.t, int64 Base.Record.t) Job.t) ->
                       match job with
-                      | New_job.Merge {seq_no; _} ->
+                      | Job.Merge {seq_no; _} ->
                           seq_no - offset
                       | Base {seq_no; _} ->
                           seq_no - offset )
@@ -1695,6 +1732,35 @@ let%test_module "scans" =
                 if !counter >= p + 1 then verify_sequence_number !state
                 else counter := !counter + 1
               else () )
+
+        let%test_unit "serialize, deserialize scan state" =
+          Backtrace.elide := false ;
+          let g =
+            gen
+              ~gen_data:
+                Quickcheck.Generator.Let_syntax.(
+                  Int.quickcheck_generator >>| Int64.of_int)
+              ~f_job_done:job_done ~f_acc:f_merge_up
+          in
+          Quickcheck.test g ~sexp_of:[%sexp_of: (int64, int64) State.t]
+            ~trials:50 ~f:(fun s ->
+              let hash_s = State.hash s Int64.to_string Int64.to_string in
+              let sz =
+                State.Stable.Latest.bin_size_t Int64.bin_size_t
+                  Int64.bin_size_t s
+              in
+              let buf = Bin_prot.Common.create_buf sz in
+              ignore
+                (State.Stable.V1.bin_write_t Int64.bin_write_t
+                   Int64.bin_write_t buf ~pos:0 s) ;
+              let deserialized =
+                State.Stable.V1.bin_read_t Int64.bin_read_t Int64.bin_read_t
+                  ~pos_ref:(ref 0) buf
+              in
+              let new_hash =
+                State.hash deserialized Int64.to_string Int64.to_string
+              in
+              assert (Hash.equal hash_s new_hash) )
 
         let%test_unit "scan can be initialized from intermediate state" =
           Backtrace.elide := false ;
