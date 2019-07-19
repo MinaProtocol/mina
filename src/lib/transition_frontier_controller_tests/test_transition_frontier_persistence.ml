@@ -61,7 +61,9 @@ let%test_module "Transition Frontier Persistence" =
                value
            | Error e ->
                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-                 "Encountered an error: Visualizing transition frontier" ;
+                 "Error when persisting transition frontier: $error. Creating \
+                  frontier visualization"
+                 ~metadata:[("error", `String (Error.to_string_hum e))] ;
                Transition_frontier.visualize ~filename:"frontier.dot" frontier ;
                raise e )
 
