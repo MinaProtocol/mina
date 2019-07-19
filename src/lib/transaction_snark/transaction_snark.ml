@@ -1017,7 +1017,7 @@ struct
    constraints pass iff
    (b1, b2, .., bn) = unpack input,
    there is a proof making one of [ base_vk; merge_vk ] accept (b1, b2, .., bn) *)
-  let%snarkydef main (input : Wrap_input.var) =
+  let%snarkydef main ?(use_dummy_keys = false) (input : Wrap_input.var) =
     let%bind input = with_label __LOC__ (Wrap_input.Checked.to_scalar input) in
     let%bind is_base =
       exists' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
@@ -1029,6 +1029,14 @@ struct
            ~then_:base_vk_precomp ~else_:merge_vk_precomp)
     in
     let%bind verification_key =
+      let base_vk, merge_vk =
+        let dummy =
+          Tick_backend.Verification_key.dummy
+            ~input_size:(Tick.Data_spec.size (tick_input ()))
+          |> Verifier.vk_of_backend_vk
+        in
+        if use_dummy_keys then (base_vk, merge_vk) else (dummy, dummy)
+      in
       with_label __LOC__
         (Verifier.Verification_key.if_ is_base
            ~then_:(Verifier.constant_vk base_vk)
@@ -1063,12 +1071,23 @@ struct
       in
       (verification, {proving with value= ()})
     in
+    (* TODO: This constructs essentially the constraint system two times:
+
+       1. For the digest, with the verification keys stubbed out as dummys.
+       1. For the actual keypair, with the verification keys getting the actual values.
+    *)
+    let r1cs use_dummy_keys =
+      constraint_system ~exposing:wrap_input (main ~use_dummy_keys)
+    in
     Cached.Spec.create ~load ~name:"transaction-snark wrap keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
-      ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
-      ~input:(constraint_system ~exposing:wrap_input main)
-      ~create_env:Keypair.generate
+      ~digest_input:(fun () ->
+        R1CS_constraint_system.digest (r1cs true) |> Md5.to_hex )
+      ~input:()
+      ~create_env:(fun () -> Keypair.generate (r1cs false))
+
+  let main x = main ~use_dummy_keys:false x
 end
 
 module type S = sig
@@ -1458,13 +1477,9 @@ module Keys = struct
     let%bind merge_vk, merge_pk = Cached.run Merge.cached in
     let%map wrap_vk, wrap_pk =
       let module Wrap = Wrap (struct
-        let dummy =
-          Tick_backend.Verification_key.dummy
-            ~input_size:(Tick.Data_spec.size (tick_input ()))
+        let base = base_vk.value
 
-        let base = dummy
-
-        let merge = dummy
+        let merge = merge_vk.value
       end) in
       Cached.run Wrap.cached
     in

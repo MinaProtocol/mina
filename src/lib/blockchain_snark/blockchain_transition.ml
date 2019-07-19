@@ -224,8 +224,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
       let paths = Fn.compose Cache_dir.possible_paths Filename.basename in
       let%bind step_vk, step_pk = Cached.run step_cached in
       let module Wrap = Wrap_base (struct
-        let verification_key =
-          Tick_backend.Verification_key.dummy ~input_size:step_input_size
+        let verification_key = step_vk.value
       end) in
       let wrap_cached =
         let load =
@@ -239,13 +238,17 @@ module Make (T : Transaction_snark.Verification.S) = struct
           in
           (verification, {proving with value= ()})
         in
+        let r1cs use_dummy_key =
+          Tock.constraint_system ~exposing:Wrap.input
+            (Wrap.main ~use_dummy_key)
+        in
         Cached.Spec.create ~load ~name:"blockchain-snark wrap keys"
           ~autogen_path:Cache_dir.autogen_path
           ~manual_install_path:Cache_dir.manual_install_path
-          ~digest_input:
-            (Fn.compose Md5.to_hex Tock.R1CS_constraint_system.digest)
-          ~create_env:Tock.Keypair.generate
-          ~input:(Tock.constraint_system ~exposing:Wrap.input Wrap.main)
+          ~digest_input:(fun () ->
+            Tock.R1CS_constraint_system.digest (r1cs true) |> Md5.to_hex )
+          ~create_env:(fun () -> Tock.Keypair.generate (r1cs false))
+          ~input:()
       in
       let%map wrap_vk, wrap_pk = Cached.run wrap_cached in
       let location : Location.t =
