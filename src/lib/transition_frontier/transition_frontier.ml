@@ -198,26 +198,6 @@ module Make (Inputs : Inputs_intf) :
       user_commands @@ staged_ledger_diff external_transition
   end
 
-  module Fake_db = struct
-    include Coda_base.Ledger.Db
-
-    type location = Location.t
-
-    let get_or_create ledger key =
-      let key, loc =
-        match
-          get_or_create_account_exn ledger key (Account.initialize key)
-        with
-        | `Existed, loc ->
-            ([], loc)
-        | `Added, loc ->
-            ([key], loc)
-      in
-      (key, get ledger loc |> Option.value_exn, loc)
-  end
-
-  module TL = Coda_base.Transaction_logic.Make (Fake_db)
-
   let max_length = max_length
 
   module Diff = Diff.Make (struct
@@ -854,20 +834,25 @@ module Make (Inputs : Inputs_intf) :
                   ~expect:(Ledger_proof.statement proof_data).source
                   ( Ledger.Db.merkle_root t.root_snarked_ledger
                   |> Frozen_ledger_hash.of_ledger_hash ) ;
-                let db_mask = Ledger.of_database t.root_snarked_ledger in
+                (* Apply all the transactions associated with the new ledger
+                   proof to the database-backed SNARKed ledger. We create a
+                   mask and apply them to that, then commit it to the DB. This
+                   saves a lot of IO since committing is batched. Would be even
+                   faster if we implemented #2760. *)
+                let db_casted =
+                  Ledger.Any_ledger.cast
+                    (module Ledger.Db)
+                    t.root_snarked_ledger
+                in
+                let db_mask =
+                  Ledger.Maskable.register_mask db_casted
+                    (Ledger.Mask.create ())
+                in
                 Non_empty_list.iter txns ~f:(fun txn ->
-                    (* TODO: @cmr use the ignore-hash ledger here as well *)
-                    TL.apply_transaction t.root_snarked_ledger txn
+                    Ledger.apply_transaction db_mask txn
                     |> Or_error.ok_exn |> ignore ) ;
-                (* TODO: See issue #1606 to make this faster *)
-
-                (*Ledger.commit db_mask ;*)
-                ignore
-                  (Ledger.Maskable.unregister_mask_exn
-                     (Ledger.Any_ledger.cast
-                        (module Ledger.Db)
-                        t.root_snarked_ledger)
-                     db_mask)
+                Ledger.commit db_mask ;
+                ignore @@ Ledger.Maskable.unregister_mask_exn db_casted db_mask
             | _, false | None, _ ->
                 () ) ;
             [%test_result: Frozen_ledger_hash.t]
