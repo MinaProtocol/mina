@@ -89,12 +89,12 @@ include Make (struct
       }
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNci4GbJQMkTxsoZyVtn86HtLYA6KKxcR1ujoy9da7QWzw7QZgiL7MTxXbb3cxDx7nRpeFBBJ7m8SSVRR3Ua3tbiDAiARBYW6x7DFf56jTNjAypFbq69FvJsKBubKb5GhnH27qR6FjJeEA"
+            "tNciUTDQupJTEjEgFefiGBYuXNF8asTBSEimH2uBjkmq1vMEDMnzQyaVF9MgRmecViUUzZwPMQCDVoKLFmPeWG9dPY7o7erkLDFRWnoGpNGUk3H5r3rHtyfrG17Di6tx9VqQMq6rehPmAu"
       ; balance= 10000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
-               "tNcihXwbnb6Sv3MwW2rbhXDS4TNSn75tnDZjzUKsjgFSmVJUycLFftqnSZmikKBKEo7KHeLviRpsZw3XUh6zDZwtdH8zk9mhNG6ydL8pqrFM5FdkeV9fYdtvysVC29PSKyb97vK7jkJB5d")
+               "tNci4GbJQMkTxsoZyVtn86HtLYA6KKxcR1ujoy9da7QWzw7QZgiL7MTxXbb3cxDx7nRpeFBBJ7m8SSVRR3Ua3tbiDAiARBYW6x7DFf56jTNjAypFbq69FvJsKBubKb5GhnH27qR6FjJeEA")
       }
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
