@@ -63,7 +63,7 @@ let%test_module "Transition Frontier Persistence" =
                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
                  "Exception when persisting transition frontier: $exn. \
                   Creating frontier visualization"
-                 ~metadata:[("exn", `String (Exn.to_string_hum exn))] ;
+                 ~metadata:[("exn", `String (Exn.to_string exn))] ;
                Transition_frontier.visualize ~filename:"frontier.dot" frontier ;
                raise exn )
 
