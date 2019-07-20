@@ -80,6 +80,24 @@ include Make (struct
       ; delegate= None }
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
+            "tNciczxpMfZ4eW1ZPP9NVK2vxcm9cCHvTBWMe8Nskn2A25P1YqcdvFCD5LvgngraiCmAsnC8zWAiv5pwMYjrUwpMNYDePMQYiXX7HVMjrnB1JkEckyayvsAm2Bo4EQBWbHXD5Cxp65PZy5"
+      ; balance= 100000
+      ; delegate=
+          Some
+            (Public_key.Compressed.of_base58_check_exn
+               "tNcihXwbnb6Sv3MwW2rbhXDS4TNSn75tnDZjzUKsjgFSmVJUycLFftqnSZmikKBKEo7KHeLviRpsZw3XUh6zDZwtdH8zk9mhNG6ydL8pqrFM5FdkeV9fYdtvysVC29PSKyb97vK7jkJB5d")
+      }
+    ; { pk=
+          Public_key.Compressed.of_base58_check_exn
+            "tNci4GbJQMkTxsoZyVtn86HtLYA6KKxcR1ujoy9da7QWzw7QZgiL7MTxXbb3cxDx7nRpeFBBJ7m8SSVRR3Ua3tbiDAiARBYW6x7DFf56jTNjAypFbq69FvJsKBubKb5GhnH27qR6FjJeEA"
+      ; balance= 10000
+      ; delegate=
+          Some
+            (Public_key.Compressed.of_base58_check_exn
+               "tNcihXwbnb6Sv3MwW2rbhXDS4TNSn75tnDZjzUKsjgFSmVJUycLFftqnSZmikKBKEo7KHeLviRpsZw3XUh6zDZwtdH8zk9mhNG6ydL8pqrFM5FdkeV9fYdtvysVC29PSKyb97vK7jkJB5d")
+      }
+    ; { pk=
+          Public_key.Compressed.of_base58_check_exn
             "tNciaMga2fcyoTSo4Jd1UfexzTgt2v7dcCw9RQgMTPyS1JVj7YaVbL5NkhoEN3BobJAo8nkuD7FFW6GyJBYbbKTyTDadY51GbEnijZbHG4a5sxvRj2vGPyrgTvZBdTjeBGW8Ug5KYw4h87"
       ; balance= 66666
       ; delegate=
