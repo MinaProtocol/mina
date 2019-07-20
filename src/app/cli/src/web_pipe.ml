@@ -107,8 +107,8 @@ let store_verification_keys ~send ~logger =
       store_file ~send ~logger verification_key_location "verification keys"
   | Error e ->
       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        !"Verification key Lookup Error: %s"
-        (Error.to_string_hum e) ;
+        "Error getting verification key location: $error"
+        ~metadata:[("error", `String (Error.to_string_hum e))] ;
       Deferred.unit
 
 let copy ~src ~dst =
@@ -169,8 +169,9 @@ let run_service coda ~conf_dir ~logger =
                            ~send:send_file_to_s3 ]
                  | `No | `Unknown ->
                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                       !"Js file directory %s does not exists"
-                       file_dir ;
+                       "Javascript directory $file_dir does not exist, or is \
+                        a file other than a directory"
+                       ~metadata:[("file_dir", `String file_dir)] ;
                      Deferred.unit )
         in
         let work =
