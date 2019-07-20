@@ -58,6 +58,7 @@ module type S = sig
         ( Unix.Inet_addr.t
         , (Uuid.t, Connection_with_state.t) Hashtbl.t )
         Hashtbl.t
+    ; first_connect: unit Ivar.t
     ; max_concurrent_connections: int option }
 
   module Config : Config_intf
@@ -112,6 +113,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         Hashtbl.t
           (**mapping a Uuid to a connection to be able to remove it from the hash
          *table since Rpc.Connection.t doesn't have the socket information*)
+    ; first_connect: unit Ivar.t
     ; max_concurrent_connections: int option
           (* maximum number of concurrent connections from an ip (infinite if None)*)
     }
@@ -151,8 +153,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   *)
   let remove_peer t peer =
     Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Removing peer from peer set: %{sexp: Peer.t}"
-      peer ;
+      "Removing peer $peer from peer set"
+      ~metadata:[("peer", Peer.to_yojson peer)] ;
     Coda_metrics.(Gauge.dec_one Network.peers) ;
     Hash_set.remove t.peers peer ;
     Hashtbl.update t.peers_by_ip peer.host ~f:(function
@@ -221,10 +223,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       | Ok (Error err) -> (
           (* call succeeded, result is an error *)
           Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-            !"RPC call error: %s {{{%s}}} [[[%{sexp: Error.t}]]]"
-            (Exn.to_string (Error.to_exn err))
-            (Exn.to_string_mach (Error.to_exn err))
-            err ;
+            "RPC call error: $error, same error in machine format: \
+             $machine_error"
+            ~metadata:
+              [ ("error", `String (Error.to_string_hum err))
+              ; ("machine_error", `String (Error.to_string_mach err)) ] ;
           match (Error.to_exn err, Error.sexp_of_t err) with
           | ( _
             , Sexp.List
@@ -281,7 +284,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               remove_peer t peer ; Or_error.of_exn exn
           | _ ->
               Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-                "RPC call raised an exception: %s" (Exn.to_string exn) ;
+                "RPC call raised an exception: $exn"
+                ~metadata:[("exn", `String (Exn.to_string exn))] ;
               return (Or_error.of_exn exn) )
     in
     match Hashtbl.find t.connections peer.host with
@@ -314,12 +318,12 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             ()
         | Error e ->
             Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-              "broadcasting $short_msg to $peer failed: %s"
+              "Broadcasting message $message_summary to $peer failed: $error"
               ~metadata:
-                [ ("short_msg", `String (Message.summary msg))
-                ; ("msg", Message.msg_to_yojson msg)
-                ; ("peer", Peer.to_yojson peer) ]
-              (Error.to_string_hum e) )
+                [ ("error", `String (Error.to_string_hum e))
+                ; ("message_summary", `String (Message.summary msg))
+                ; ("message", Message.msg_to_yojson msg)
+                ; ("peer", Peer.to_yojson peer) ] )
 
   let broadcast_random t n msg =
     let selected_peers = random_sublist (Hash_set.to_list t.peers) n in
@@ -344,6 +348,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                    (Error.to_string_hum e))
         in
         let peer_events = Membership.changes membership in
+        let first_connect = Ivar.create () in
         let broadcast_reader, broadcast_writer = Linear_pipe.create () in
         let received_reader, received_writer =
           Strict_pipe.create ~name:"received gossip messages"
@@ -361,7 +366,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; initial_peers= config.initial_peers
           ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
           ; connections= Hashtbl.create (module Unix.Inet_addr)
-          ; max_concurrent_connections= config.max_concurrent_connections }
+          ; max_concurrent_connections= config.max_concurrent_connections
+          ; first_connect }
         in
         don't_wait_for
           (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
@@ -431,6 +437,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             Linear_pipe.iter_unordered ~max_concurrency:64 peer_events
               ~f:(function
               | Connect peers ->
+                  Ivar.fill_if_empty first_connect () ;
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                     "Some peers connected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
@@ -451,9 +458,13 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           Tcp.Server.create
             ~on_handler_error:
               (`Call
-                (fun _ exn ->
+                (fun addr exn ->
                   Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-                    "%s" (Exn.to_string_mach exn) ;
+                    "Exception raised in gossip net TCP server handler when \
+                     connected to address $address: $exn"
+                    ~metadata:
+                      [ ("exn", `String (Exn.to_string_mach exn))
+                      ; ("address", `String (Socket.Address.to_string addr)) ] ;
                   raise exn ))
             Tcp.(
               Where_to_listen.bind_to
@@ -494,10 +505,14 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                    >= Option.value_exn t.max_concurrent_connections
               then (
                 Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-                  "Cannot open another connection. Number of open connections \
-                   from %s equals the limit %d."
-                  (Socket.Address.Inet.to_string client)
-                  (Option.value_exn t.max_concurrent_connections) ;
+                  "Gossip net TCP server cannot open another connection. \
+                   Number of open connections from client $client equals the \
+                   limit $max_connections"
+                  ~metadata:
+                    [ ("client", `String (Socket.Address.Inet.to_string client))
+                    ; ( "max_connections"
+                      , `Int (Option.value_exn t.max_concurrent_connections) )
+                    ] ;
                 Reader.close reader >>= fun _ -> Writer.close writer )
               else
                 let conn_id = Uuid_unix.create () in

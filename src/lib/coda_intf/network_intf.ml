@@ -22,6 +22,10 @@ module type Network_intf = sig
 
   val peers : t -> Network_peer.Peer.t list
 
+  val has_made_a_connection : t -> bool
+
+  val has_received_first_message : t -> bool
+
   val online_status : t -> [`Online | `Offline] Broadcast_pipe.Reader.t
 
   val random_peers : t -> int -> Network_peer.Peer.t list

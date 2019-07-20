@@ -44,7 +44,9 @@ val best_protocol_state : t -> Protocol_state.Value.t Participating_state.t
 val best_tip : t -> Transition_frontier.Breadcrumb.t Participating_state.t
 
 val sync_status :
-  t -> [`Offline | `Synced | `Bootstrap] Coda_incremental.Status.Observer.t
+     t
+  -> [`Offline | `Synced | `Bootstrap | `Connecting | `Listening]
+     Coda_incremental.Status.Observer.t
 
 val visualize_frontier : filename:string -> t -> unit Participating_state.t
 

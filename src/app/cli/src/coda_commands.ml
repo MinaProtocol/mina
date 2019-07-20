@@ -295,6 +295,10 @@ let get_status ~flag t =
       with
       | `Bootstrap ->
           `Bootstrapping
+      | `Connecting ->
+          `Active `Connecting
+      | `Listening ->
+          `Active `Listening
       | `Offline ->
           `Active `Offline
       | `Synced ->
