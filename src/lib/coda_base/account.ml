@@ -13,7 +13,7 @@ module Index = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = int [@@deriving bin_io, sexp, version]
+        type t = int [@@deriving bin_io, to_yojson, sexp, version]
       end
 
       include T
@@ -22,7 +22,7 @@ module Index = struct
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
   let to_int = Int.to_int
 

@@ -45,7 +45,7 @@ cp -r site deploy/website
 
 CI=no
 if [[ "$1" == "staging" ]]; then
-  TARGET=coda-staging-84430
+  TARGET=proof-of-steak-7ab54
 elif [[ "$1" == "ci" ]]; then
   TARGET=coda-staging-84430
   CI=yes

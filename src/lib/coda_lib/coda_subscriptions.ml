@@ -72,11 +72,13 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
           Deferred.unit
       | Error e ->
           Logger.error logger
-            "Could not process transactions in valid external_transition "
+            "Staged ledger had error with transactions in block for state \
+             $state_hash: $error"
             ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ( "error"
-                , `String (Staged_ledger.Pre_diff_info.Error.to_string e) ) ] ;
+                , `String (Staged_ledger.Pre_diff_info.Error.to_string e) )
+              ; ("state_hash", State_hash.to_yojson hash) ] ;
           Deferred.unit )
   |> don't_wait_for ;
   let reorganization_subscription = [] in

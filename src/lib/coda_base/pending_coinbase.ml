@@ -55,7 +55,7 @@ end
 module Stack_id : sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, compare, eq, version]
+      type t [@@deriving bin_io, sexp, to_yojson, compare, eq, version]
     end
 
     module Latest = V1
@@ -79,7 +79,7 @@ end = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = int [@@deriving sexp, compare, eq, bin_io, version]
+        type t = int [@@deriving sexp, to_yojson, compare, eq, bin_io, version]
       end
 
       include T
@@ -351,7 +351,7 @@ struct
       module V1 = struct
         module T = struct
           type t = V1_make.Stable.V1.t
-          [@@deriving bin_io, sexp, version {unnumbered}]
+          [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
         end
 
         include T
@@ -388,7 +388,7 @@ struct
 
           let typ = Pedersen.Checked.Digest.typ
 
-          let hash ~height h1 h2 =
+          let merge ~height h1 h2 =
             let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =
               Bitstring_lib.Bitstring.pad_to_triple_list
                 ~default:Boolean.false_
@@ -522,7 +522,7 @@ struct
         module T = struct
           type ('tree, 'stack_id) t =
             {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
-          [@@deriving bin_io, sexp, version]
+          [@@deriving bin_io, sexp, to_yojson, version]
         end
 
         include T
@@ -540,7 +540,7 @@ struct
       module T = struct
         type t =
           (Merkle_tree.Stable.V1.t, Stack_id.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, version {unnumbered}]
+        [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
       end
 
       include T
@@ -549,7 +549,7 @@ struct
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   let create_exn' () =
     let init_hash = Stack.data_hash Stack.empty in

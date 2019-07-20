@@ -49,6 +49,18 @@ module type Gen_intf = sig
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
+
+    (** Generate a valid sequence of payments based on the initial state of a
+        ledger. Use this together with Ledger.gen_initial_ledger_state.
+    *)
+    val sequence :
+         ?length:int
+      -> ?sign_type:[`Fake | `Real]
+      -> ( Signature_lib.Keypair.t
+         * Currency.Amount.t
+         * Coda_numbers.Account_nonce.t )
+         array
+      -> t list Quickcheck.Generator.t
   end
 end
 

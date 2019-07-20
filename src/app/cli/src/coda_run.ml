@@ -171,21 +171,37 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
           return (Coda_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
         (fun () filename -> return (Coda_base.Ledger.Debug.visualize ~filename)
-      ) ]
+      )
+    ; implement Daemon_rpcs.Set_staking.rpc (fun () keypairs ->
+          let keypair_and_compressed_key =
+            List.map keypairs
+              ~f:(fun ({Keypair.Stable.Latest.public_key; _} as keypair) ->
+                (keypair, Public_key.compress public_key) )
+          in
+          Coda_lib.replace_propose_keypairs coda
+            (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
+          Deferred.unit ) ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
           let r = Coda_lib.request_work coda in
           Option.iter r ~f:(fun r ->
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
-                r ) ;
+                ~metadata:
+                  [ ( "work_spec"
+                    , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r)
+                    ) ]
+                "responding to a Get_work request with some new work" ) ;
           return r )
     ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-            !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
-            work.spec ;
+            "received completed work from a snark worker"
+            ~metadata:
+              [ ( "work_spec"
+                , `String
+                    (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" work.spec) )
+              ] ;
           List.iter work.metrics ~f:(fun (total, tag) ->
               match tag with
               | `Merge ->
@@ -210,7 +226,10 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                 (`Call
                   (fun _net exn ->
                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                      "%s" (Exn.to_string_mach exn) ))
+                      "Exception while handling REST server request: $error"
+                      ~metadata:
+                        [ ("error", `String (Exn.to_string_mach exn))
+                        ; ("context", `String "rest_server") ] ))
               (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
@@ -240,16 +259,20 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
         ~on_handler_error:
           (`Call
             (fun _net exn ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-                (Exn.to_string_mach exn) ))
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                "Exception while handling TCP server request: $error"
+                ~metadata:
+                  [ ("error", `String (Exn.to_string_mach exn))
+                  ; ("context", `String "rpc_tcp_server") ] ))
         where_to_listen
         (fun address reader writer ->
           let address = Socket.Address.Inet.addr address in
           if not (Set.mem client_whitelist address) then (
             Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              !"Rejecting client connection from \
-                %{sexp:Unix.Inet_addr.Blocking_sexp.t}"
-              address ;
+              !"Rejecting client connection from $address, it is not present \
+                in the whitelist."
+              ~metadata:
+                [("$address", `String (Unix.Inet_addr.to_string address))] ;
             Deferred.unit )
           else
             Rpc.Connection.server_with_close reader writer
@@ -262,7 +285,13 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                 (`Call
                   (fun exn ->
                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                      "%s" (Exn.to_string_mach exn) ;
+                      "Exception while handling RPC server request from \
+                       $address: $error"
+                      ~metadata:
+                        [ ("error", `String (Exn.to_string_mach exn))
+                        ; ("context", `String "rpc_server")
+                        ; ( "address"
+                          , `String (Unix.Inet_addr.to_string address) ) ] ;
                     Deferred.unit )) ) )
   |> ignore
 
@@ -326,6 +355,6 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
             [("coda_run", `String "Program got killed by signal")]
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          !"Coda process got interrupted by signal %{sexp:t}"
-          signal ;
+          !"Coda process got interrupted by $signal"
+          ~metadata:[("signal", `String (to_string signal))] ;
         Stdlib.exit 130 ))

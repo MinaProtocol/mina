@@ -218,8 +218,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
   trace_task "proposer" (fun () ->
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Bootstrapping right now. Cannot generate new blockchains or \
-           schedule event"
+          "No frontier available; pausing proposer."
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let propose ivar (keypair, scheduled_time, proposal_data) =
@@ -231,7 +230,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             let crumb = Transition_frontier.best_tip frontier in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
-              !"Begining to propose off of crumb $breadcrumb%!" ;
+              !"Generating new block on top of $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
               let transition : External_transition.Validated.t =
                 (Breadcrumb.transition_with_hash crumb).data
@@ -301,8 +300,23 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   with
                   | Error err ->
                       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                        "failed to prove generated protocol state: %s"
-                        (Error.to_string_hum err) ;
+                        "Prover failed to prove freshly generated transition: \
+                         $error"
+                        ~metadata:
+                          [ ("error", `String (Error.to_string_hum err))
+                          ; ( "prev_state"
+                            , Protocol_state.value_to_yojson
+                                previous_protocol_state )
+                          ; ( "prev_state_proof"
+                            , Proof.to_yojson previous_protocol_state_proof )
+                          ; ( "next_state"
+                            , Protocol_state.value_to_yojson protocol_state )
+                          ; ( "internal_transition"
+                            , Internal_transition.to_yojson internal_transition
+                            )
+                          ; ( "pending_coinbase_witness"
+                            , Pending_coinbase_witness.to_yojson
+                                pending_coinbase_witness ) ] ;
                       return ()
                   | Ok protocol_state_proof -> (
                       let span = Time.diff (Time.now time_controller) t0 in
@@ -386,6 +400,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         !"Submitting transition $state_hash to the transition \
                           frontier controller"
                         ~metadata ;
+                      Coda_metrics.(Counter.inc_one Proposer.blocks_proposed) ;
                       let%bind () =
                         Strict_pipe.Writer.write transition_writer breadcrumb
                       in
@@ -478,12 +493,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_for_proposal
                 | `Propose_now (keypair, data) ->
+                    Coda_metrics.(Counter.inc_one Proposer.slots_won) ;
                     Interruptible.finally
                       (Singleton_supervisor.dispatch proposal_supervisor
                          (keypair, now, data))
                       ~f:check_for_proposal
                     |> ignore
                 | `Propose (time, keypair, data) ->
+                    Coda_metrics.(Counter.inc_one Proposer.slots_won) ;
                     let scheduled_time = time_of_ms time in
                     Singleton_scheduler.schedule scheduler scheduled_time
                       ~f:(fun () ->
@@ -493,15 +510,35 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 (keypair, scheduled_time, data))
                              ~f:check_for_proposal) ) ) )
       in
-      (* Schedule to wake up immediately on the next tick of the proposer
-       * instead of immediately mutating local_state here as there could be a
-       * race.
-       *
-       * Given that rescheduling takes the min of the two timeouts, we won't
-       * erase this timeout even if the last run of the proposer wants to wait
-       * for a long while.
-       * *)
-      Agent.on_update keypairs ~f:(fun _new_keypairs ->
-          Singleton_scheduler.schedule scheduler (Time.now time_controller)
-            ~f:check_for_proposal ) ;
-      check_for_proposal () )
+      let start () =
+        (* Schedule to wake up immediately on the next tick of the proposer
+         * instead of immediately mutating local_state here as there could be a
+         * race.
+         *
+         * Given that rescheduling takes the min of the two timeouts, we won't
+         * erase this timeout even if the last run of the proposer wants to wait
+         * for a long while.
+         * *)
+        Agent.on_update keypairs ~f:(fun _new_keypairs ->
+            Singleton_scheduler.schedule scheduler (Time.now time_controller)
+              ~f:check_for_proposal ) ;
+        check_for_proposal ()
+      in
+      (* if the proposer starts before genesis, sleep until genesis *)
+      let now = Time.now time_controller in
+      if Time.( >= ) now Consensus.Constants.genesis_state_timestamp then
+        start ()
+      else
+        let time_till_genesis =
+          Time.diff Consensus.Constants.genesis_state_timestamp now
+        in
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "time_till_genesis"
+              , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )
+            ]
+          "node started before genesis: waiting $time_till_genesis ms before \
+           proposing any blocks" ;
+        ignore
+          (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
+               start () )) )
