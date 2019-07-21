@@ -158,25 +158,25 @@ let sync_status t =
             let (network : Coda_networking.t) = t.components.net in
             if Coda_networking.has_made_a_connection network then (
               Logger.info (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__ "Coda daemon is now connecting..." ;
+                ~location:__LOC__ "Coda daemon is now connecting" ;
               `Connecting )
             else if Coda_networking.has_received_first_message network then (
               Logger.info (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__ "Coda daemon is now listening..." ;
+                ~location:__LOC__ "Coda daemon is now listening" ;
               `Listening )
             else (
               Logger.info (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__ "Coda daemon is now offline..." ;
+                ~location:__LOC__ "Coda daemon is now offline" ;
               `Offline )
         | `Online ->
             Option.value_map active_status
               ~default:
                 ( Logger.info (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ "Coda daemon is now bootstrapping..." ;
+                    ~location:__LOC__ "Coda daemon is now bootstrapping" ;
                   `Bootstrap )
               ~f:(fun _ ->
                 Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now synced..." ;
+                  ~location:__LOC__ "Coda daemon is now synced" ;
                 `Synced ) )
   in
   let observer = observe incremental_status in
