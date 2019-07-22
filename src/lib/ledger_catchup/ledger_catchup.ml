@@ -343,17 +343,17 @@ module Make (Inputs : Inputs.S) :
               ~target_hash ~subtrees
           with
         | Ok trees_of_breadcrumbs ->
-            let hashes =
-              List.concat_map trees_of_breadcrumbs ~f:Rose_tree.flatten
-              |> List.map
-                   ~f:
-                     (Fn.compose Transition_frontier.Breadcrumb.state_hash
-                        Cached.peek)
-            in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
                 [ ( "hashes of transitions"
-                  , `List (List.map hashes ~f:State_hash.to_yojson) ) ]
+                  , `List
+                      (List.map trees_of_breadcrumbs ~f:(fun tree ->
+                           Rose_tree.to_yojson
+                             (fun breadcrumb ->
+                               Cached.peek breadcrumb
+                               |> Transition_frontier.Breadcrumb.state_hash
+                               |> State_hash.to_yojson )
+                             tree )) ) ]
               "about to write to the catchup breadcrumbs pipe" ;
             if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
