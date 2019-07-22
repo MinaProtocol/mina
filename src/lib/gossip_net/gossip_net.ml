@@ -154,7 +154,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let remove_peer t peer =
     Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Removing peer from peer set: %s"
-      (Peer.to_string peer) ;
+      (Peer.to_string peer)
+      ~metadata:[("peer", Peer.to_yojson peer)] ;
     Coda_metrics.(Gauge.dec_one Network.peers) ;
     Hash_set.remove t.peers peer ;
     Hashtbl.update t.peers_by_ip peer.host ~f:(function
