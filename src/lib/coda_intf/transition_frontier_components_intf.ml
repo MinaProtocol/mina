@@ -181,8 +181,6 @@ module type Unprocessed_transition_cache_intf = sig
     -> ( external_transition_with_initial_validation Envelope.Incoming.t
        , State_hash.t )
        Cached.t
-
-  val mem_target : t -> State_hash.t -> bool
 end
 
 module type Transition_handler_intf = sig

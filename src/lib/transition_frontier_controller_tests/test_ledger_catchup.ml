@@ -113,7 +113,7 @@ let%test_module "Ledger catchup" =
 
     let%test "peers can provide transitions with length between max_length to \
               2 * max_length" =
-      let logger = Logger.null () in
+      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       Thread_safe.block_on_async_exn (fun () ->
           let num_breadcrumbs =

@@ -141,7 +141,7 @@ module Make (Inputs : Inputs.S) :
 
   (* returns a list of state-hashes with the older ones at the front *)
   let download_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
-      ~unprocessed_transition_cache ~target_hash =
+      ~target_hash =
     let peers = Network.random_peers network num_peers in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
@@ -178,10 +178,7 @@ module Make (Inputs : Inputs.S) :
             in
             List.fold_until hashes ~init:[]
               ~f:(fun acc hash ->
-                if
-                  Unprocessed_transition_cache.mem_target
-                    unprocessed_transition_cache hash
-                  || Transition_frontier.find frontier hash |> Option.is_some
+                if Transition_frontier.find frontier hash |> Option.is_some
                 then Continue_or_stop.Stop (Ok (peer, acc))
                 else Continue_or_stop.Continue (hash :: acc) )
               ~finish:(fun _ ->
@@ -244,18 +241,12 @@ module Make (Inputs : Inputs.S) :
                          Envelope.Incoming.wrap ~data:transition_with_hash
                            ~sender:(Envelope.Sender.Remote peer.host) ) ) )
 
-  let garbage_collect_subtrees ~logger ~subtrees =
-    List.iter subtrees ~f:(fun subtree ->
-        Rose_tree.map subtree ~f:Cached.invalidate_with_failure |> ignore ) ;
-    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-      "garbage collected failed cached transitions"
-
   let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
       ~frontier ~unprocessed_transition_cache ~transitions ~target_hash
       ~subtrees =
     let open Deferred.Or_error.Let_syntax in
     let%bind transitions_with_initial_validation, initial_hash =
-      fold_until transitions ~init:[]
+      fold_until (List.rev transitions) ~init:[]
         ~f:(fun acc transition ->
           let open Deferred.Let_syntax in
           match%bind
@@ -288,9 +279,7 @@ module Make (Inputs : Inputs.S) :
     in
     let trees_of_transitions =
       if List.length transitions_with_initial_validation <= 0 then subtrees
-      else
-        [ Rose_tree.of_list_exn ~subtrees
-            (List.rev transitions_with_initial_validation) ]
+      else [Rose_tree.of_list_exn ~subtrees transitions_with_initial_validation]
     in
     let open Deferred.Let_syntax in
     match%bind
@@ -304,6 +293,12 @@ module Make (Inputs : Inputs.S) :
           ~f:Cached.invalidate_with_failure
         |> ignore ;
         Deferred.Or_error.fail e
+
+  let garbage_collect_subtrees ~logger ~subtrees =
+    List.iter subtrees ~f:(fun subtree ->
+        Rose_tree.map subtree ~f:Cached.invalidate_with_failure |> ignore ) ;
+    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+      "garbage collected failed cached transitions"
 
   let run ~logger ~trust_system ~verifier ~network ~frontier
       ~catchup_job_reader
@@ -322,10 +317,21 @@ module Make (Inputs : Inputs.S) :
             let open Deferred.Or_error.Let_syntax in
             let%bind preferred_peer, hashes_of_missing_transitions =
               download_state_hashes ~logger ~trust_system ~network ~frontier
-                ~num_peers ~unprocessed_transition_cache ~target_hash
+                ~num_peers ~target_hash
             in
+            let num_of_missing_transitions =
+              List.length hashes_of_missing_transitions
+            in
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ( "hashes_of_missing_transitions"
+                  , `List
+                      (List.map hashes_of_missing_transitions
+                         ~f:State_hash.to_yojson) ) ]
+              !"Number of missing transitions is %d"
+              num_of_missing_transitions ;
             let%bind transitions =
-              if List.length hashes_of_missing_transitions <= 0 then
+              if num_of_missing_transitions <= 0 then
                 Deferred.Or_error.return []
               else
                 download_transitions ~logger ~trust_system ~network ~num_peers
@@ -337,11 +343,23 @@ module Make (Inputs : Inputs.S) :
               ~target_hash ~subtrees
           with
         | Ok trees_of_breadcrumbs ->
+            let hashes =
+              List.concat_map trees_of_breadcrumbs ~f:Rose_tree.flatten
+              |> List.map
+                   ~f:
+                     (Fn.compose Transition_frontier.Breadcrumb.state_hash
+                        Cached.peek)
+            in
+            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ( "hashes of transitions"
+                  , `List (List.map hashes ~f:State_hash.to_yojson) ) ]
+              "about to write to the catchup breadcrumbs pipe" ;
             if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                 "catchup breadcrumbs pipe was closed; attempt to write to \
                  closed pipe" ;
-              garbage_collect_subtrees ~logger ~subtrees )
+              garbage_collect_subtrees ~logger ~subtrees:trees_of_breadcrumbs )
             else
               Strict_pipe.Writer.write catchup_breadcrumbs_writer
                 trees_of_breadcrumbs
