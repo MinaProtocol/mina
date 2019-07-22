@@ -271,8 +271,9 @@ let extend_blockchain {connection; _} chain next_state block prover_state
                 (Sexp.to_string (Extend_blockchain_input.sexp_of_t input)) )
           ; ( "input-bin-io"
             , `String
-                (Binable.to_string (module Extend_blockchain_input) input) ) ]
-        "Prover failed: %s" (Error.to_string_hum e) ;
+                (Binable.to_string (module Extend_blockchain_input) input) )
+          ; ("error", `String (Error.to_string_hum e)) ]
+        "Prover failed: $error" ;
       Error.raise e
 
 let prove t ~prev_state ~prev_state_proof ~next_state

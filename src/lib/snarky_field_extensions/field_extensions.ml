@@ -233,7 +233,11 @@ struct
 
     let to_list x = [x]
 
-    module Unchecked = Field
+    module Unchecked = struct
+      include Field
+
+      let to_yojson t = `String (to_string t)
+    end
 
     type t = Field.Var.t
 

@@ -7,6 +7,8 @@ module Stable = struct
     module T = struct
       type t = Tick.Inner_curve.Scalar.t
       [@@deriving bin_io, sexp, version {asserted}]
+
+      let to_yojson t = `String (Tick.Inner_curve.Scalar.to_string t)
     end
 
     include T
@@ -15,7 +17,7 @@ module Stable = struct
   module Latest = V1
 end
 
-type t = Stable.Latest.t [@@deriving sexp]
+type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
 let create () =
   (* This calls into libsnark which uses /dev/urandom *)
@@ -24,7 +26,7 @@ let create () =
 let gen =
   let open Bignum_bigint in
   Quickcheck.Generator.map
-    (gen_incl one (Snark_params.Tick.Inner_curve.Scalar.size - one))
+    (gen_uniform_incl one (Snark_params.Tick.Inner_curve.Scalar.size - one))
     ~f:Snark_params.Tock.Bigint.(Fn.compose to_field of_bignum_bigint)
 
 let of_bigstring_exn = Binable.of_bigstring (module Stable.Latest)
