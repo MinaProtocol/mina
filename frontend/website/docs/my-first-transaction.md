@@ -93,7 +93,7 @@ Finally we get to the good stuff, sending our first transaction! For testing pur
 
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
-    $ coda client send-payment -amount 10 -receiver <public-key> -fee 2 -privkey-path keys/my-wallet
+    $ coda client send-payment -amount 10 -receiver tNciF85uM2yA1QHWc24vdQCGUe7EykM4cqaJma8FXqp64JDssnv5ywPsWNv3417akmKRwBmVaMwrSkXjZrBpJaCtfcAbNupLwSx1PEd9135kEZek7muGySzq1bQZ6nGR4oNVoy3qygX1ph -fee 2 -privkey-path keys/my-wallet
 
 If you're wondering what we passed in to the commands above:
 
