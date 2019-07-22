@@ -6,12 +6,33 @@ In this section, we'll make our first transaction on the Coda network. After [se
 
 Run the following command to start up a Coda node instance and connect to the network:
 
-    $ coda daemon -peer silly-grumpus.o1test.net:8303
+    $ coda daemon -peer strawberry-milkshake.o1test.net:8303
 
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. 
 
 !!!note
     The daemon process needs to be running whenever you issue commands from `coda client`, so make sure you don't kill it by accident.
+
+### Troubleshooting
+
+If you're running Coda on macOS and see the following time out error `monitor.ml.Error "Timed out getting connection from process"`, you'll need to add your hostname to `/etc/hosts` by running the following:
+
+- `$ hostname` to get your hostname
+- `$ vim /etc/hosts` to open your hostfile and add the mapping:
+
+```    
+##
+# Host Database
+#
+# localhost is used to configure the loopback interface
+# when the system is booting.  Do not change this entry.
+##
+127.0.0.1       localhost
+127.0.0.1       <ADD YOUR HOSTNAME HERE>
+```
+
+This is necessary because sometimes macOS doesn't resolve your hostname to your local IP address.
+
 
 ## Checking connectivity
 
@@ -72,7 +93,7 @@ Finally we get to the good stuff, sending our first transaction! For testing pur
 
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
-    $ coda client send-payment -amount 10 -receiver <public-key> -fee 2 -privkey-path keys/my-wallet
+    $ coda client send-payment -amount 10 -receiver tNciF85uM2yA1QHWc24vdQCGUe7EykM4cqaJma8FXqp64JDssnv5ywPsWNv3417akmKRwBmVaMwrSkXjZrBpJaCtfcAbNupLwSx1PEd9135kEZek7muGySzq1bQZ6nGR4oNVoy3qygX1ph -fee 2 -privkey-path keys/my-wallet
 
 If you're wondering what we passed in to the commands above:
 
