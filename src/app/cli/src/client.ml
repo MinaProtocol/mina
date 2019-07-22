@@ -4,7 +4,7 @@ open Signature_lib
 open Coda_base
 
 let print_rpc_error error =
-  eprintf !"Encountered RPC connection error: %s\n" (Error.to_string_hum error)
+  eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
 
 let dispatch rpc query port =
   Tcp.with_connection
