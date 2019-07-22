@@ -176,6 +176,8 @@ let daemon logger =
              () )
          else ()
        in
+       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+         "Coda daemon is booting up" ;
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
@@ -581,7 +583,7 @@ let daemon logger =
          |> Option.value ~default:Deferred.unit
        in
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-         "Running coda services" ;
+         "Daemon ready. Clients can now connect" ;
        Async.never ())
 
 [%%if
