@@ -329,7 +329,7 @@ let handle_crash e =
   Core.eprintf
     !{err|
 
-  💀 Coda Daemon crashed. The Coda Protocol developers would like to know why!
+  ☠  Coda Daemon crashed. The Coda Protocol developers would like to know why!
 
   Please:
     Open an issue:

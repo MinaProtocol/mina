@@ -175,8 +175,7 @@ module Types = struct
 
       let num_accounts = int_option_entry "Global Number of Accounts"
 
-      let blockchain_length =
-        int_option_entry "Block Height"
+      let blockchain_length = int_option_entry "Block Height"
 
       let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
 
