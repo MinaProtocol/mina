@@ -143,20 +143,20 @@ module Make (Inputs : Inputs_intf) = struct
     attached_mask
 
   let unregister_mask_exn (t : t) (mask : Mask.Attached.t) =
-    let error_msg_prefix =
-      sprintf "Couldn't unregister mask with UUID %s from parent %s"
+    let t_uuid = get_uuid t in
+    let error_msg suffix =
+      sprintf "Couldn't unregister mask with UUID %s from parent %s, %s"
         (Mask.Attached.get_uuid mask |> Uuid.to_string_hum)
         (get_uuid t |> Uuid.to_string_hum)
+        suffix
     in
-    let t_uuid = get_uuid t in
     match Uuid.Table.find registered_masks t_uuid with
     | None ->
-        failwith @@ error_msg_prefix ^ ", parent not in registered_masks"
+        failwith @@ error_msg "parent not in registered_masks"
     | Some masks ->
         ( match List.find masks ~f:(fun m -> phys_equal m mask) with
         | None ->
-            failwith @@ error_msg_prefix
-            ^ ", mask not registered with that parent"
+            failwith @@ error_msg "mask not registered with that parent"
         | Some _ -> (
             let bad, good =
               List.partition_tf masks ~f:(fun m -> phys_equal m mask)
