@@ -13,6 +13,27 @@ The host and port specified above refer to the seed peer address - this is the i
 !!!note
     The daemon process needs to be running whenever you issue commands from `coda client`, so make sure you don't kill it by accident.
 
+### Troubleshooting
+
+If you're running Coda on macOS and see the following time out error `monitor.ml.Error "Timed out getting connection from process"`, you'll need to add your hostname to `/etc/hosts` by running the following:
+
+- `$ hostname` to get your hostname
+- `$ vim /etc/hosts` to open your hostfile and add the mapping:
+
+```    
+##
+# Host Database
+#
+# localhost is used to configure the loopback interface
+# when the system is booting.  Do not change this entry.
+##
+127.0.0.1       localhost
+127.0.0.1       <ADD YOUR HOSTNAME HERE>
+```
+
+This is necessary because sometimes macOS doesn't resolve your hostname to your local IP address.
+
+
 ## Checking connectivity
 
 Now that we've started up a node and are running the Coda daemon, open up another shell (if you're on macOS, cd to the place where you've extracted the zip and `export PATH=$PWD:$PATH`), and run the following command:
