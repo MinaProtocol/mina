@@ -83,8 +83,8 @@ let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
 let user_commands {transactions= {Transactions.user_commands; _}; _} =
   user_commands
 
-let of_transition tracked_participants_opt
-    {With_hash.data= external_transition; _} =
+let of_transition tracked_participants {With_hash.data= external_transition; _}
+    =
   let open External_transition.Validated in
   let creator = proposer external_transition in
   let protocol_state =
@@ -111,11 +111,11 @@ let of_transition tracked_participants_opt
               (User_command.accounts_accessed user_command)
               ~f:(Public_key.Compressed.Set.mem participants)
           in
-          match tracked_participants_opt with
-          | Some tracked_participants
+          match tracked_participants with
+          | `Some interested_participants
             when not
                    (should_include_transaction user_command
-                      tracked_participants) ->
+                      interested_participants) ->
               acc_transactions
           | _ ->
               { acc_transactions with
@@ -130,12 +130,14 @@ let of_transition tracked_participants_opt
                 [fee_transfer1; fee_transfer2]
           in
           let fee_transfers =
-            Option.value_map tracked_participants_opt
-              ~default:fee_transfer_list ~f:(fun tracked_participants ->
+            match tracked_participants with
+            | `All ->
+                fee_transfer_list
+            | `Some interested_participants ->
                 List.filter
                   ~f:(fun (pk, _) ->
-                    Public_key.Compressed.Set.mem tracked_participants pk )
-                  fee_transfer_list )
+                    Public_key.Compressed.Set.mem interested_participants pk )
+                  fee_transfer_list
           in
           { acc_transactions with
             fee_transfers= fee_transfers @ acc_transactions.fee_transfers }

@@ -101,7 +101,7 @@ let daemon logger =
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
      and is_archive_node =
-       flag "archive" no_arg ~doc:"Running the daemon will also"
+       flag "archive" no_arg ~doc:"Archive all blocks heard"
      and log_json =
        flag "log-json" no_arg
          ~doc:"Print daemon log output as JSON (default: plain text)"

@@ -34,12 +34,12 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
     ~f:(fun ({With_hash.data= _; hash} as new_block_with_hash) ->
       let filtered_external_transition_result =
         if is_storing_all then
-          Filtered_external_transition.of_transition None new_block_with_hash
+          Filtered_external_transition.of_transition `All new_block_with_hash
         else
           Filtered_external_transition.of_transition
-            (Some
-               ( Public_key.Compressed.Set.of_list
-               @@ Hashtbl.keys subscribed_block_users ))
+            (`Some
+              ( Public_key.Compressed.Set.of_list
+              @@ Hashtbl.keys subscribed_block_users ))
             new_block_with_hash
       in
       match filtered_external_transition_result with
