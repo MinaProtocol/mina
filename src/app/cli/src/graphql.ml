@@ -112,12 +112,14 @@ module Types = struct
     scalar "UInt64" ~doc:"String representing a uint64 number in base 10"
       ~coerce:(fun num -> `String (Unsigned.UInt64.to_string num))
 
-  let sync_status : ('context, [`Offline | `Synced | `Bootstrap] option) typ =
+  let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
         [ enum_value "BOOTSTRAP" ~value:`Bootstrap
         ; enum_value "SYNCED" ~value:`Synced
-        ; enum_value "OFFLINE" ~value:`Offline ]
+        ; enum_value "OFFLINE" ~value:`Offline
+        ; enum_value "CONNECTING" ~value:`Connecting
+        ; enum_value "LISTENING" ~value:`Listening ]
 
   let transaction_status : ('context, Transaction_status.State.t option) typ =
     enum "TransactionStatus" ~doc:"Status of a transaction"

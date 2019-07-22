@@ -118,6 +118,12 @@ let daemon logger =
          (optional txn_fee)
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
+     and insecure_rest_server =
+       flag "insecure-rest-server" no_arg
+         ~doc:
+           "Have REST server listen on all addresses, not just localhost \
+            (this is INSECURE, make sure your firewall is configured \
+            correctly!)"
      and limit_connections =
        flag "limit-concurrent-connections"
          ~doc:
@@ -172,6 +178,8 @@ let daemon logger =
              () )
          else ()
        in
+       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+         "Coda daemon is booting up" ;
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
@@ -221,16 +229,18 @@ let daemon logger =
              if String.equal c Coda_version.commit_id then return ()
              else (
                Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-                 "Older version in Coda config directory. Cleaning up %s"
-                 conf_dir ;
+                 "Different version of Coda detected in config directory \
+                  $config_directory, removing existing configuration"
+                 ~metadata:[("config_directory", `String conf_dir)] ;
                clean_up () )
          | Error e ->
              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-               "Error reading coda.version: %s" (Error.to_string_mach e) ;
+               ~metadata:[("error", `String (Error.to_string_mach e))]
+               "Error reading coda.version: $error" ;
              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                "Failed to read coda.version, cleaning up the config directory \
-                %s"
-               conf_dir ;
+                $config_directory"
+               ~metadata:[("config_directory", `String conf_dir)] ;
              clean_up ()
        in
        (* 512MB logrotate max size = 1GB max filesystem usage *)
@@ -277,8 +287,8 @@ let daemon logger =
                Some c
            | Error e ->
                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "error reading daemon.json, not using it: %s"
-                 (Error.to_string_mach e) ;
+                 "Error reading daemon.json: $error"
+                 ~metadata:[("error", `String (Error.to_string_mach e))] ;
                None
          in
          let maybe_from_config (type a) (f : YJ.json -> a option)
@@ -299,7 +309,8 @@ let daemon logger =
                x
            | None ->
                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "%s not found in the config file, using default" keyname ;
+                 "Key '$key' not found in the config file, using default"
+                 ~metadata:[("key", `String keyname)] ;
                default
          in
          let external_port : int =
@@ -358,9 +369,11 @@ let daemon logger =
                            ~port:(Host_and_port.port addr))
                | Error e ->
                    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                     "getaddr exception: %s" (Error.to_string_mach e) ;
+                     "Error on getaddr: $error"
+                     ~metadata:[("error", `String (Error.to_string_mach e))] ;
                    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                     "failed to look up address for %s, skipping" host ;
+                     "Failed to get address for host $host, skipping"
+                     ~metadata:[("host", `String host)] ;
                    return None )
          in
          let%bind () =
@@ -450,15 +463,16 @@ let daemon logger =
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-               "long async cycle %s"
-               (Time_ns.Span.to_string span) ) ;
+               "Long async cycle: $span milliseconds"
+               ~metadata:[("span", `String (Time_ns.Span.to_string span))] ) ;
          let run_snark_worker_action =
            Option.value_map run_snark_worker_flag ~default:`Don't_run
              ~f:(fun k -> `With_public_key k)
          in
-         let trace_database_initialization typ location =
-           Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
-             ~location typ
+         let trace_database_initialization typ location directory =
+           Logger.trace logger ~module_:__MODULE__ ~location
+             "Creating database of type $typ in directory $directory"
+             ~metadata:[("typ", `String typ); ("directory", `String directory)]
          in
          let trust_dir = conf_dir ^/ "trust" in
          let () = Snark_params.set_chunked_hashing true in
@@ -564,7 +578,7 @@ let daemon logger =
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-         ~client_port () ;
+         ~insecure_rest_server ~client_port () ;
        Coda_run.run_snark_worker ~client_port run_snark_worker_action ;
        let%bind () =
          Option.map metrics_server_port ~f:(fun port ->
@@ -572,7 +586,7 @@ let daemon logger =
          |> Option.value ~default:Deferred.unit
        in
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-         "Running coda services" ;
+         "Daemon ready. Clients can now connect" ;
        Async.never ())
 
 [%%if
@@ -587,22 +601,30 @@ let rec ensure_testnet_id_still_good logger =
       (fun () -> don't_wait_for @@ ensure_testnet_id_still_good logger)
       ()
   in
+  let soon_minutes = Int.of_float (60.0 *. recheck_soon) in
   match%bind
     Monitor.try_with_or_error (fun () ->
         Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
   with
   | Error e ->
       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        "exception while trying to fetch testnet_id, trying again in 6 minutes" ;
+        "Exception while trying to fetch testnet_id: $error. Trying again in \
+         $retry_minutes minutes"
+        ~metadata:
+          [ ("error", `String (Error.to_string_hum e))
+          ; ("retry_minutes", `Int soon_minutes) ] ;
       try_later recheck_soon ;
       Deferred.unit
   | Ok (resp, body) -> (
       if resp.status <> `OK then (
-        try_later recheck_soon ;
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          "HTTP response status %s while getting testnet id, checking again \
-           in 6 minutes."
-          (Cohttp.Code.string_of_status resp.status) ;
+          "HTTP response status $HTTP_status while getting testnet id, \
+           checking again in $retry_minutes minutes."
+          ~metadata:
+            [ ( "HTTP_status"
+              , `String (Cohttp.Code.string_of_status resp.status) )
+            ; ("retry_minutes", `Int soon_minutes) ] ;
+        try_later recheck_soon ;
         Deferred.unit )
       else
         let%bind body_string = Body.to_string body in
@@ -702,13 +724,42 @@ let coda_commands logger =
 
 [%%endif]
 
+let print_version_help coda_exe =
+  (* mimic Jane Street command help *)
+  let lines =
+    [ "print version information"
+    ; ""
+    ; sprintf "  %s version" (Filename.basename coda_exe)
+    ; ""
+    ; "=== flags ==="
+    ; ""
+    ; "  [-help]  print this help text and exit"
+    ; "           (alias: -?)" ]
+  in
+  List.iter lines ~f:(Core.printf "%s\n%!")
+
+let print_version_info () =
+  Core.printf "Commit %s on branch %s\n"
+    (String.sub Coda_version.commit_id ~pos:0 ~len:7)
+    Coda_version.branch
+
 let () =
   Random.self_init () ;
   let logger = Logger.create ~initialize_default_consumer:false () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
-  Command.run
-    (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
-       (coda_commands logger)) ;
+  (* intercept command-line processing for "version", because we don't
+     use the Jane Street scripts that generate their version information
+   *)
+  ( match Sys.argv with
+  | [|_coda_exe; "version"|] ->
+      print_version_info ()
+  | [|coda_exe; "version"; s|]
+    when List.mem ["-help"; "-?"] s ~equal:String.equal ->
+      print_version_help coda_exe
+  | _ ->
+      Command.run
+        (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
+           (coda_commands logger)) ) ;
   Core.exit 0

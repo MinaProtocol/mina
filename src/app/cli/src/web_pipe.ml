@@ -67,17 +67,22 @@ let verification_key_basename = "client_verification_key"
 let verification_key_location () =
   let autogen = Cache_dir.autogen_path ^/ verification_key_basename in
   let manual = Cache_dir.manual_install_path ^/ verification_key_basename in
+  let brew = Cache_dir.brew_install_path ^/ verification_key_basename in
   match%bind Sys.file_exists manual with
   | `Yes ->
       return (Ok manual)
   | `No | `Unknown -> (
-      match%map Sys.file_exists autogen with
+      match%bind Sys.file_exists brew with
       | `Yes ->
-          Ok autogen
-      | `No | `Unknown ->
-          Or_error.errorf
-            !"IO ERROR: Verification key does not exist\n\
-             \        You should probably turn off snarks" )
+          return (Ok brew)
+      | `No | `Unknown -> (
+          match%map Sys.file_exists autogen with
+          | `Yes ->
+              Ok autogen
+          | `No | `Unknown ->
+              Or_error.errorf
+                !"IO ERROR: Verification key does not exist\n\
+                 \        You should probably turn off snarks" ) )
 
 let send_file_to_s3 logger filename =
   let open Deferred.Or_error.Let_syntax in
@@ -102,8 +107,8 @@ let store_verification_keys ~send ~logger =
       store_file ~send ~logger verification_key_location "verification keys"
   | Error e ->
       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        !"Verification key Lookup Error: %s"
-        (Error.to_string_hum e) ;
+        "Error getting verification key location: $error"
+        ~metadata:[("error", `String (Error.to_string_hum e))] ;
       Deferred.unit
 
 let copy ~src ~dst =
@@ -164,8 +169,9 @@ let run_service coda ~conf_dir ~logger =
                            ~send:send_file_to_s3 ]
                  | `No | `Unknown ->
                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                       !"Js file directory %s does not exists"
-                       file_dir ;
+                       "Javascript directory $file_dir does not exist, or is \
+                        a file other than a directory"
+                       ~metadata:[("file_dir", `String file_dir)] ;
                      Deferred.unit )
         in
         let work =

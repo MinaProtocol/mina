@@ -75,9 +75,9 @@ let get_balance =
              port
          with
          | Ok (Some b) ->
-             printf "%s\n" (Currency.Balance.to_string b)
+             printf "Balance: %s CODA\n" (Currency.Balance.to_string b)
          | Ok None ->
-             printf "No account found at that public_key (zero balance)\n"
+             printf "There are no funds in this account\n"
          | Error e ->
              printf "Failed to get balance %s\n" (Error.to_string_hum e) ))
 
@@ -687,6 +687,7 @@ let command =
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
+    ; ("get-txn-status", get_transaction_status)
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("set-staking", set_staking)
