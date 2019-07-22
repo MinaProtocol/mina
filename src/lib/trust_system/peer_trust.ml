@@ -110,6 +110,16 @@ struct
     let simple_old = Record_inst.to_peer_status old_record in
     let simple_new = Record_inst.to_peer_status new_record in
     let action_fmt, action_metadata = Action.to_log action in
+    let log_trust_change () =
+      let verb =
+        if simple_new.trust >. simple_old.trust then "Increasing"
+        else "Decreasing"
+      in
+      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:([("peer", Peer_id.to_yojson peer)] @ action_metadata)
+        "%s trust for peer $peer due to action %s. New trust is %f." verb
+        action_fmt simple_new.trust
+    in
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
@@ -122,18 +132,16 @@ struct
                   ) ]
               @ action_metadata )
             "Banning peer $peer until $expiration because it %s" action_fmt ;
-          if Option.is_some db then Strict_pipe.Writer.write bans_writer peer
+          if Option.is_some db then (
+            Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
+            Strict_pipe.Writer.write bans_writer peer )
           else Deferred.unit
-      | _, _ ->
-          let verb =
-            if simple_new.trust >. simple_old.trust then "Increasing"
-            else "Decreasing"
-          in
-          Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:([("peer", Peer_id.to_yojson peer)] @ action_metadata)
-            "%s trust for peer $peer due to action %s. New trust is %f." verb
-            action_fmt simple_new.trust ;
+      | Banned_until _, Unbanned ->
+          Coda_metrics.Gauge.dec_one Coda_metrics.Trust_system.banned_peers ;
+          log_trust_change () ;
           Deferred.unit
+      | _, _ ->
+          log_trust_change () ; Deferred.unit
     in
     Option.iter db ~f:(fun db' -> Db.set db' ~key:peer ~data:new_record)
 

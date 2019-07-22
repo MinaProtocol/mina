@@ -2,7 +2,7 @@ open Coda_base
 open Signature_lib
 
 module type S = sig
-  val t : Ledger.t
+  val t : Ledger.t Lazy.t
 
   val accounts : (Private_key.t option * Account.t) list
 

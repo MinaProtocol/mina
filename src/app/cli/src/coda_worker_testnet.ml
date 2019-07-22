@@ -235,7 +235,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
              >>| Array.to_list
            in
            Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-             "best paths diverged completely, network is forked"
+             "Best paths have diverged completely, network is forked"
              ~metadata:
                [ ("chains", chains_json ())
                ; ("tf_vizs", `List (List.map ~f:(fun s -> `String s) tfs)) ] ;
@@ -243,7 +243,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
           |> don't_wait_for
         else
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            "chains are ok, they have $hashes in common"
+            "Chains are OK, they have hashes $hashes in common"
             ~metadata:
               [ ( "hashes"
                 , `List
@@ -252,8 +252,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               ; ("chains", chains_json ()) ]
     | None ->
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-          "empty list of online chains, this is OK if we're still starting \
-           the network"
+          "Empty list of online chains, OK if we're still starting the network"
           ~metadata:[("chains", chains_json ())]
   in
   let last_time = ref (Time.now ()) in
@@ -273,7 +272,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
                 /. 1000. )
        then (
          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-           "no recent blocks" ;
+           "No recent blocks" ;
          ignore (exit 8) ) ;
        let%bind () = after (Time.Span.of_sec 1.0) in
        go ()
@@ -340,7 +339,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                       ~metadata:
                         [ ("worker_id", `Int worker_id)
                         ; ("user_cmd", User_command.to_yojson user_cmd) ]
-                      "transaction $user_cmd took too long to get into the \
+                      "Transaction $user_cmd took too long to get into the \
                        root of node $worker_id" ;
                     exit 9 |> ignore ) ) ;
               List.iter user_commands ~f:(fun user_cmd ->
@@ -354,7 +353,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                             [ ("user_cmd", User_command.to_yojson user_cmd)
                             ; ("worker_id", `Int worker_id)
                             ; ("length", `Int length) ]
-                          "transaction $user_cmd finally gets into the root \
+                          "Transaction $user_cmd finally gets into the root \
                            of node $worker_id, when root length is $length" ;
                         None
                     | None ->
@@ -635,7 +634,8 @@ module Restarts : sig
 end = struct
   let restart_node testnet ~logger ~node ~duration =
     let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
+      node ;
     (* Send one payment *)
     let%bind () = Api.stop testnet node in
     let%bind () = after duration in
@@ -643,7 +643,8 @@ end = struct
 
   let trigger_catchup testnet ~logger ~node =
     let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
+      node ;
     let%bind () = Api.stop testnet node in
     let signal = Api.setup_catchup_signal testnet node in
     let%bind () = Ivar.read signal in
@@ -653,11 +654,12 @@ end = struct
 
   let trigger_bootstrap testnet ~logger ~node =
     let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
+      node ;
     let%bind () = Api.stop testnet node in
     let signal = Api.setup_bootstrap_signal testnet node in
     let%bind () = Ivar.read signal in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Triggering bootstrap on %d" node ;
+      "Triggering bootstrap on node %d" node ;
     Api.start testnet node
 end

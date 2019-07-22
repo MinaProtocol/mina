@@ -21,7 +21,7 @@ module Proof_type = struct
     module V1 = struct
       module T = struct
         type t = [`Base | `Merge]
-        [@@deriving bin_io, sexp, hash, compare, yojson, version]
+        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end
 
       include T
@@ -94,7 +94,7 @@ module Statement = struct
               Pending_coinbase_stack_state.Stable.V1.t
           ; fee_excess: Currency.Fee.Signed.Stable.V1.t
           ; proof_type: Proof_type.Stable.V1.t }
-        [@@deriving sexp, bin_io, hash, compare, yojson, version]
+        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end
 
       include T
