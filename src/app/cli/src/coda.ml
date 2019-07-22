@@ -116,6 +116,12 @@ let daemon logger =
          (optional txn_fee)
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
+     and insecure_rest_server =
+       flag "insecure-rest-server" no_arg
+         ~doc:
+           "Have REST server listen on all addresses, not just localhost \
+            (this is INSECURE, make sure your firewall is configured \
+            correctly!)"
      and limit_connections =
        flag "limit-concurrent-connections"
          ~doc:
@@ -170,6 +176,8 @@ let daemon logger =
              () )
          else ()
        in
+       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+         "Coda daemon is booting up" ;
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
@@ -567,7 +575,7 @@ let daemon logger =
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-         ~client_port () ;
+         ~insecure_rest_server ~client_port () ;
        Coda_run.run_snark_worker ~client_port run_snark_worker_action ;
        let%bind () =
          Option.map metrics_server_port ~f:(fun port ->
@@ -575,7 +583,7 @@ let daemon logger =
          |> Option.value ~default:Deferred.unit
        in
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-         "Running coda services" ;
+         "Daemon ready. Clients can now connect" ;
        Async.never ())
 
 [%%if
