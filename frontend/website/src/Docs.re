@@ -267,6 +267,33 @@ let make = _children => {
           </span>
         </A>
         {ReasonReact.string("{{ page.content }}")}
+        <hr
+          className=Css.(
+            style([
+              borderColor(Style.Colors.slateAlpha(0.1)),
+              margin2(~v=`rem(2.), ~h=`zero),
+            ])
+          )
+        />
+        <div
+          className=Css.(
+            style([display(`flex), justifyContent(`spaceBetween)])
+          )>
+          {ReasonReact.string("{% if page.previous_page %}")}
+          <A name="next_page" href="{{ page.previous_page.url|url }}">
+            {ReasonReact.string({js|⟵ {{ page.previous_page.title }}|js})}
+          </A>
+          {ReasonReact.string("{% else %}")}
+          <span />
+          {ReasonReact.string("{% endif %}")}
+          {ReasonReact.string("{% if page.next_page %}")}
+          <A name="next_page" href="{{ page.next_page.url|url }}">
+            {ReasonReact.string({js|{{ page.next_page.title }} ⟶|js})}
+          </A>
+          {ReasonReact.string("{% else %}")}
+          <span />
+          {ReasonReact.string("{% endif %}")}
+        </div>
       </article>
     </div>,
 };
