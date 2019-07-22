@@ -93,7 +93,7 @@ struct
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
      user if they at least one coin*)
-  let gen_payments accounts_with_secret_keys :
+  let gen_payments staged_ledger accounts_with_secret_keys :
       User_command.With_valid_signature.t Sequence.t =
     let public_keys =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
@@ -105,14 +105,22 @@ struct
         let%bind sender_sk = sender_sk in
         let sender_keypair = Keypair.of_private_key_exn sender_sk in
         let%bind receiver_pk = List.random_element public_keys in
+        let nonce =
+          let ledger = Staged_ledger.ledger staged_ledger in
+          let status, account_location =
+            Ledger.get_or_create_account_exn ledger sender_account.public_key
+              sender_account
+          in
+          assert (status = `Existed) ;
+          (Option.value_exn (Ledger.get ledger account_location)).nonce
+        in
         let send_amount = Currency.Amount.of_int 1 in
         let sender_account_amount =
           sender_account.Account.Poly.balance |> Currency.Balance.to_amount
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let payload : User_command.Payload.t =
-          User_command.Payload.create ~fee:Fee.zero
-            ~nonce:sender_account.Account.Poly.nonce
+          User_command.Payload.create ~fee:Fee.zero ~nonce
             ~memo:User_command_memo.dummy
             ~body:(Payment {receiver= receiver_pk; amount= send_amount})
         in
@@ -156,7 +164,9 @@ struct
       let parent_staged_ledger =
         Transition_frontier.Breadcrumb.staged_ledger parent_breadcrumb
       in
-      let transactions = gen_payments accounts_with_secret_keys in
+      let transactions =
+        gen_payments parent_staged_ledger accounts_with_secret_keys
+      in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
           ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2)

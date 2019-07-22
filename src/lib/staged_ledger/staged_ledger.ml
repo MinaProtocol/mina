@@ -1325,17 +1325,18 @@ struct
                   (User_command t) )
           with
           | Error e ->
-              (* FIXME This should be fatal and crash the daemon but can't be
-               because of a buggy test. See #2346.
-            *)
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              let error_message =
+                sprintf
+                  !"Invalid user command! Error was: %s, command was: \
+                    $user_command"
+                  (Error.to_string_hum e)
+              in
+              Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "user_command"
                     , User_command.With_valid_signature.to_yojson t ) ]
-                !"Invalid user command! Error was: %s, command was: \
-                  $user_command"
-                (Error.to_string_hum e) ;
-              seq
+                !"%s" error_message ;
+              failwith error_message
           | Ok _ ->
               Sequence.append (Sequence.singleton t) seq )
     in
