@@ -77,7 +77,7 @@ therefore avoiding downloading unnecessary things.
 
 The proposed design would do much better than the current in average case. Let's see some examples first:
 
-In all of the following examples, let's assume **k** = 3000, **size of transition** = 1 kB, **size of state_body_hash** = 5 bytes, 
+In all of the following examples, let's assume **k** = 3000, **size of transition** = 1 kB, **size of state_body_hash** = 100 bytes, 
 
 ### Example 1
 
@@ -91,7 +91,7 @@ request to some random peers.
 * In proposed design, the peer would respond with 2k state_body_hash. By
 looking at the hashes, we would realize that we only need 40 transitions, so
 we send another request to download those 40 transitions. In this scenario we
-would download 2k * **size of state_body_hash** + 40 * **size of transition** = 70kB
+would download 2k * **size of state_body_hash** + 40 * **size of transition** = 640kB
 data in total.
 
 ### Example 2
@@ -99,7 +99,7 @@ data in total.
 let's assume this time the node is missing k transitions.
 
 * In current implementation, we would download 6MB of data.
-* In proposed design, we would download 3.04MB of data
+* In proposed design, we would download 3.6MB of data
 
 ### Example 3
 
@@ -107,7 +107,7 @@ let's assume a node is offline for a long time, and it's missing 2k-1 transition
 is the edger case between ledger-catchup and bootstrap).
 
 * In current implementation, we would download 6MB of data.
-* In proposed design, we would download 6.04 MB of data.
+* In proposed design, we would download 6.6 MB of data.
 
 We can see that in this case, the proposed design would behave slightly worse than the current implementation.
 
