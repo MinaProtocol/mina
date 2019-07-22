@@ -35,7 +35,7 @@ The newest binary releases can be found below. Instructions are provided for mac
 ```
 sudo echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/coda.list
 sudo apt-get update
-sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-8afe7755
+sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-9fa6e5ec
 ```
 
 - `coda -help` to see if it works
