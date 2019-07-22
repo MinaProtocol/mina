@@ -65,24 +65,6 @@ module Make (Inputs : Inputs_intf) :
         in
         Sync_ledger.Mask.Responder.answer_query responder query
 
-  let transition_catchup ~frontier state_hash =
-    let open Option.Let_syntax in
-    let%bind transitions =
-      Transition_frontier.root_history_path_map frontier
-        ~f:(fun b ->
-          Transition_frontier.Breadcrumb.transition_with_hash b
-          |> With_hash.data |> External_transition.Validated.forget_validation
-          )
-        state_hash
-    in
-    let length =
-      Int.min
-        (Non_empty_list.length transitions)
-        (2 * Transition_frontier.max_length)
-    in
-    Non_empty_list.take (Non_empty_list.rev transitions) length
-    >>| Non_empty_list.rev
-
   let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier state_hash
       =
     let open Option.Let_syntax in

@@ -258,9 +258,13 @@ let get_status ~flag t =
           ; get_ancestry=
               { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_ancestry"
               ; impl= r ~name:"rpc_impl_get_ancestry" }
-          ; transition_catchup=
-              { Rpc_pair.dispatch= r ~name:"rpc_dispatch_transition_catchup"
-              ; impl= r ~name:"rpc_impl_transition_catchup" } }
+          ; get_transition_chain_witness=
+              { Rpc_pair.dispatch=
+                  r ~name:"rpc_dispatch_get_transition_chain_witness"
+              ; impl= r ~name:"rpc_impl_get_transition_chain_witness" }
+          ; get_transition_chain=
+              { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_transition_chain"
+              ; impl= r ~name:"rpc_impl_get_transition_chain" } }
         in
         Some
           { Daemon_rpcs.Types.Status.Histograms.rpc_timings

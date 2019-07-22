@@ -247,8 +247,6 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
 
       let final_state t x = Cache.final_state t (Transmuter.transmute x)
 
-      let final_state_target t x = Cache.final_state t x
-
       let mem t x = Cache.mem t (Transmuter.transmute x)
 
       let mem_target t x = Cache.mem t x

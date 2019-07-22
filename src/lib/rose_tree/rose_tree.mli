@@ -10,7 +10,7 @@ open Async_kernel
 
 type 'a t = T of 'a * 'a t list [@@deriving yojson]
 
-val of_list_exn : 'a list -> 'a t
+val of_list_exn : ?subtrees:'a t list -> 'a list -> 'a t
 
 val equal : f:('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 

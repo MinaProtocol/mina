@@ -542,15 +542,6 @@ struct
       let peer_list = Hash_set.to_list peers in
       List.take (List.permute peer_list) num_peers
 
-    let transition_catchup {ip_table; _} peer state_hash =
-      Deferred.Result.return
-      @@
-      let open Option.Let_syntax in
-      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
-      Sync_handler.transition_catchup ~frontier state_hash
-
-    let mplus ma mb = if Option.is_some ma then ma else mb
-
     let query_peer {ip_table= _; _} _peer _f _r = failwith "..."
 
     let get_staged_ledger_aux_and_pending_coinbases_at_hash {ip_table; _}

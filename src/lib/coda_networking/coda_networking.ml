@@ -129,54 +129,6 @@ module Make_rpcs (Inputs : Base_inputs_intf) = struct
     end
   end
 
-  module Transition_catchup = struct
-    module Master = struct
-      let name = "transition_catchup"
-
-      module T = struct
-        (* "master" types, do not change *)
-        type query = State_hash.Stable.V1.t
-
-        type response =
-          External_transition.Stable.V1.t Non_empty_list.Stable.V1.t option
-      end
-
-      module Caller = T
-      module Callee = T
-    end
-
-    include Master.T
-    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
-    include M
-
-    include Perf_histograms.Rpc.Plain.Extend (struct
-      include M
-      include Master
-    end)
-
-    module V1 = struct
-      module T = struct
-        type query = State_hash.Stable.V1.t
-        [@@deriving bin_io, sexp, version {rpc}]
-
-        type response =
-          External_transition.Stable.V1.t Non_empty_list.Stable.V1.t option
-        [@@deriving bin_io, sexp, version {rpc}]
-
-        let query_of_caller_model = Fn.id
-
-        let callee_model_of_query = Fn.id
-
-        let response_of_callee_model = Fn.id
-
-        let caller_model_of_response = Fn.id
-      end
-
-      include T
-      include Register (T)
-    end
-  end
-
   module Get_transition_chain = struct
     module Master = struct
       let name = "get_transition_chain"
@@ -515,9 +467,6 @@ module Make (Inputs : Inputs_intf) = struct
             (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.Query.t)
             Envelope.Incoming.t
          -> Sync_ledger.Answer.t Deferred.Or_error.t)
-      ~(transition_catchup :
-            State_hash.t Envelope.Incoming.t
-         -> External_transition.t Non_empty_list.t Deferred.Option.t)
       ~(get_ancestry :
             Consensus.Data.Consensus_state.Value.t Envelope.Incoming.t
          -> ( External_transition.t
@@ -596,16 +545,6 @@ module Make (Inputs : Inputs_intf) = struct
       in
       return result
     in
-    let transition_catchup_rpc conn ~version:_ hash =
-      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
-        "Peer with IP %s sent transition_catchup" conn.Host_and_port.host ;
-      let action_msg = "Transition catchup with hash $hash" in
-      let msg_args = [("hash", State_hash.to_yojson hash)] in
-      let%bind result, sender =
-        run_for_rpc_result conn hash ~f:transition_catchup action_msg msg_args
-      in
-      record_unknown_item result sender action_msg msg_args
-    in
     let get_ancestry_rpc conn ~version:_ query =
       Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
         "Sending root proof to peer with IP %s" conn.Host_and_port.host ;
@@ -650,7 +589,6 @@ module Make (Inputs : Inputs_intf) = struct
             get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc
         ; Rpcs.Answer_sync_ledger_query.implement_multi
             answer_sync_ledger_query_rpc
-        ; Rpcs.Transition_catchup.implement_multi transition_catchup_rpc
         ; Rpcs.Get_ancestry.implement_multi get_ancestry_rpc
         ; Rpcs.Get_transition_chain_witness.implement_multi
             get_transition_chain_witness_rpc
@@ -754,10 +692,6 @@ module Make (Inputs : Inputs_intf) = struct
 
   let random_peers_except {gossip_net; _} n ~(except : Peer.Hash_set.t) =
     Gossip_net.random_peers_except gossip_net n ~except
-
-  let transition_catchup t peer state_hash =
-    Gossip_net.query_peer t.gossip_net peer
-      Rpcs.Transition_catchup.dispatch_multi state_hash
 
   let get_transition_chain_witness t peer state_hash =
     let open Deferred.Let_syntax in

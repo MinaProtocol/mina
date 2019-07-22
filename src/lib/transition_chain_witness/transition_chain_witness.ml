@@ -84,9 +84,9 @@ module Make (Inputs : Inputs_intf) :
     in
     (oldest_state_hash, merkle_list)
 
-  let verify ~state_hash
+  let verify ~target_hash
       ~transition_chain_witness:(oldest_state_hash, merkle_list) =
-    Merkle_list.verify ~init:oldest_state_hash merkle_list state_hash
+    Merkle_list.verify ~init:oldest_state_hash merkle_list target_hash
 end
 
 include Make (struct

@@ -410,15 +410,6 @@ let create (config : Config.t) =
                                !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
                                Coda_networking.refused_answer_query_string
                                ledger_hash)) )
-              ~transition_catchup:(fun enveloped_hash ->
-                let open Deferred.Option.Let_syntax in
-                let hash = Envelope.Incoming.data enveloped_hash in
-                let%bind frontier =
-                  Deferred.return
-                  @@ Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Deferred.return
-                @@ Sync_handler.transition_catchup ~frontier hash )
               ~get_ancestry:(fun query_env ->
                 let consensus_state = Envelope.Incoming.data query_env in
                 Deferred.return

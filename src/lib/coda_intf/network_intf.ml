@@ -26,18 +26,6 @@ module type Network_intf = sig
 
   val random_peers : t -> int -> Network_peer.Peer.t list
 
-  val transition_catchup :
-       t
-    -> Network_peer.Peer.t
-    -> State_hash.t
-    -> external_transition Non_empty_list.t option Deferred.Or_error.t
-
-  val get_transition_chain :
-       t
-    -> Network_peer.Peer.t
-    -> State_hash.t list
-    -> external_transition list Deferred.Option.t
-
   val get_ancestry :
        t
     -> Unix.Inet_addr.t
@@ -52,6 +40,12 @@ module type Network_intf = sig
     -> Network_peer.Peer.t
     -> State_hash.t
     -> (State_hash.t * State_body_hash.t List.t) Deferred.Option.t
+
+  val get_transition_chain :
+       t
+    -> Network_peer.Peer.t
+    -> State_hash.t list
+    -> external_transition list Deferred.Option.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t
@@ -120,9 +114,6 @@ module type Network_intf = sig
     -> answer_sync_ledger_query:(   (Ledger_hash.t * Sync_ledger.Query.t)
                                     Envelope.Incoming.t
                                  -> Sync_ledger.Answer.t Deferred.Or_error.t)
-    -> transition_catchup:(   State_hash.t Envelope.Incoming.t
-                           -> external_transition Non_empty_list.t
-                              Deferred.Option.t)
     -> get_ancestry:(   Consensus.Data.Consensus_state.Value.t
                         Envelope.Incoming.t
                      -> ( external_transition
