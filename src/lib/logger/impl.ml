@@ -113,8 +113,19 @@ module Processor = struct
         | Error err ->
             Core.printf "logproc interpolation error: %s\n" err ;
             None
-        | Ok (str, _) ->
-            Some (Level.show msg.level ^ ": " ^ str)
+        | Ok (str, extra) ->
+            let formatted_extra =
+              extra
+              |> List.map ~f:(fun (k, v) -> "\n\t" ^ k ^ ": " ^ v)
+              |> String.concat ~sep:""
+            in
+            let time =
+              Core.Time.format msg.timestamp "%Y-%m-%d %H:%M:%S"
+                ~zone:(Lazy.force Time.Zone.local)
+            in
+            Some
+              ( time ^ " [" ^ Level.show msg.level ^ "] " ^ str
+              ^ formatted_extra )
   end
 
   let raw () = T ((module Raw), Raw.create ())
@@ -218,7 +229,7 @@ module Consumer_registry = struct
     else t := List.Assoc.add !t id {processor; transport} ~equal:( = )
 
   let broadcast_log_message msg =
-    List.iter !t ~f:(fun (_, consumer) ->
+    List.iter !t ~f:(fun (_id, consumer) ->
         let (Processor.T ((module Processor_mod), processor)) =
           consumer.processor
         in
