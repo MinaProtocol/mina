@@ -25,5 +25,6 @@ type t =
   ; transaction_database: Transaction_database.t
   ; external_transition_database: External_transition_database.t
   ; snark_work_fee: Currency.Fee.t
-  ; consensus_local_state: Consensus.Data.Local_state.t }
+  ; consensus_local_state: Consensus.Data.Local_state.t
+  ; is_archive_node: bool [@default false] }
 [@@deriving make]
