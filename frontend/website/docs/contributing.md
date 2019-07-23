@@ -18,10 +18,6 @@ See the [Developers](../developers/) section for details on how to contribute co
 
 Coda is entirely open source, and the code is distributed under the terms of the [Apache License 2.0](https://github.com/CodaProtocol/coda/blob/master/LICENSE).
 
-## Coda Grants
-
-There are also a [limited set of grants]() for projects related to Coda's development. Many of these focus on development, but more will be added in the areas of design and community development. Stay tuned for more info on the grant program.
-
 ## Reporting Issues
 
 If you notice any [Code of Conduct](../code-of-conduct) violations, please follow the [Reporting Guidelines](../reporting-guidelines) to file a report and alert the community to any bad behavior.
