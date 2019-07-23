@@ -9,13 +9,23 @@ open Coda_state
     into a transition frontier by requesting a path of external_transitions
     from its peer. It receives the state_hash to catchup from
     [Catchup_scheduler]. With that state_hash, it will ask its peers for
-    a path of external_transitions from their root to the state_hash it is
-    asking for. It will then perform the following validations on each
-    external_transition:
+    a merkle path/list from their oldest transition to the state_hash it is
+    asking for. Upon receiving the merkle path/list, it will do the following:
+    
+    1. verify the merkle path/list is correct by calling
+    [Transition_chain_witness.verify]. This function would returns a list
+    of state hashes if the verification is successful.
+    
+    2. using the list of state hashes to poke at current transition frontier
+    in order to find the hashes of missing transitions. If none of the hashes
+    are found, then it means some more transitions are missing.
 
-    1. The root should exist in the frontier. The frontier should not be
-    missing too many external_transitions, so the querying node should have the
-    root in its transition_frontier.
+    Once the list of missing hashes are computed, it would do another request to
+    download the corresponding transitions in batches. It will then perform the
+    following validations on each external_transition:
+
+``` 1. Check the list of transitions corresponds the list of hashes that we
+    requested;
 
     2. Each transition is checked through [Transition_processor.Validator] and
     [Protocol_state_validator]
@@ -29,8 +39,7 @@ open Coda_state
     its corresponding external_transition staged_ledger_diff and applying it to
     its preceding breadcrumb staged_ledger to obtain its corresponding
     staged_ledger. If there was an error in building the breadcrumbs, then
-    1) catchup will punish the sender for sending a faulty staged_ledger_diff;
-    2) catchup would invalidate the cached transitions.
+    catchup would invalidate the cached transitions.
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
