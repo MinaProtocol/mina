@@ -247,18 +247,18 @@ module Consensus = struct
 end
 
 module Proposer = struct
-  let subsystem = "Proposer"
+  let subsystem = "Block_producer"
 
   let slots_won : Counter.t =
     let help =
-      "slots which the proposer has won (does not represent that a proposer \
-       actually proposed)"
+      "slots which the block producer has won (does not represent that a \
+       block has been produced)"
     in
     Counter.v "slots_won" ~help ~namespace ~subsystem
 
   let blocks_proposed : Counter.t =
     let help = "blocks produced and submitted by the proposer" in
-    Counter.v "blocks_proposed" ~help ~namespace ~subsystem
+    Counter.v "blocks_produced" ~help ~namespace ~subsystem
 end
 
 module Transition_frontier = struct

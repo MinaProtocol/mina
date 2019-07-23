@@ -36,16 +36,16 @@ let daemon logger =
      and propose_key =
        flag "propose-key"
          ~doc:
-           "KEYFILE Private key file for the proposing transitions. You \
+           "KEYFILE Private key file for the block producer. You \
             cannot provide both `propose-key` and `propose-public-key`. \
-            (default:don't propose)"
+            (default:don't produce blocks)"
          (optional string)
      and propose_public_key =
        flag "propose-public-key"
          ~doc:
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both `propose-key` and \
-            `propose-public-key`. (default: don't propose)"
+            `propose-public-key`. (default: don't produce blocks)"
          (optional public_key_compressed)
      and initial_peers_raw =
        flag "peer"

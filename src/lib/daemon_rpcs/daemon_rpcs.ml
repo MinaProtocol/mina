@@ -202,7 +202,7 @@ module Types = struct
       let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
-        map_entry "Proposers Running" ~f:(fun keys ->
+        map_entry "Block Producers Running" ~f:(fun keys ->
             Printf.sprintf "Total: %d " (List.length keys)
             ^ List.to_string ~f:Public_key.Compressed.to_string keys )
 
