@@ -120,8 +120,8 @@ module Processor = struct
               |> String.concat ~sep:""
             in
             let time =
-              Core.Time.format msg.timestamp "%Y-%m-%d %H:%M:%S"
-                ~zone:(Lazy.force Time.Zone.local)
+              Core.Time.format msg.timestamp "%Y-%m-%d %H:%M:%S UTC"
+                ~zone:Time.Zone.utc
             in
             Some
               ( time ^ " [" ^ Level.show msg.level ^ "] " ^ str
