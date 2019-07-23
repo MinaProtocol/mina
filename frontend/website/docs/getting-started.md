@@ -44,7 +44,7 @@ sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-releas
 
 ### Windows
 
-Windows is not yet supported. If you have any interest in developing Coda for Windows, please reach out to contact@codaprotocol.org or reach out in the [Discord server](https://discord.gg/ShKhA7J).
+Windows is not yet supported. If you have any interest in developing Coda for Windows, please reach out to contact@codaprotocol.org or reach out in the [Discord server](https://bit.ly/CodaDiscord).
 
 ### Build from source
 
@@ -54,12 +54,9 @@ If you're running another Linux distro or a different version of macOS, you can 
 
 If you're running a Coda node on a home or office machine, you'll have to set up [port forwarding](https://en.wikipedia.org/wiki/Port_forwarding) to make your node visible on the internet to other Coda nodes. Note that when running Coda in the cloud, this is unnecessary -- instead you should configure security groups for your cloud provider.
 
-Follow the steps below to use MiniUPnP to forward ports on your router:
+Follow the steps below to use [MiniUPnP](https://github.com/miniupnp/miniupnp) to forward ports on your router:
 
-1. Install [MiniUPnP](https://github.com/miniupnp/miniupnp) -- `brew install miniupnpc` on macOS or `apt-get install miniupnpc` on Linux
-
-2. Run `ifconfig` to get your internal IP address -- you can find this in the output corresponding to the field `en0` on macOS and `wlan0` on a linux system:
-
+1. Run `ifconfig` to get your internal IP address -- you can find this in the output corresponding to the field `en0` on macOS and `wlan0` on a linux system:
 
         $ ifconfig
         ...
@@ -72,7 +69,7 @@ Follow the steps below to use MiniUPnP to forward ports on your router:
                 status: active
         ...
 
-3. Run the following commands, with the IP address next to the `inet` field in the previous step. Note that you'll have to run it twice for the two ports below:
+2. Run the following commands, with the IP address next to the `inet` field in the previous step. Note that you'll have to run it twice for the two ports below:
 
         $ sudo upnpc -a 192.168.101.7 8302 8302 TCP
         $ sudo upnpc -a 192.168.101.7 8303 8303 UDP

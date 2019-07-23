@@ -425,7 +425,7 @@ let make = (~posts, _children) => {
           <A
             name="copy-discord"
             className=Style.Link.basic
-            href="https://discord.gg/wz7zQyc">
+            href="https://bit.ly/CodaDiscord">
             {ReasonReact.string("Discord")}
           </A>
           <span> {ReasonReact.string(", and follow our progress on ")} </span>
@@ -498,7 +498,7 @@ let make = (~posts, _children) => {
           svg={SocialLink.Svg.twitter("--svg-color-social")}
         />
         <SocialLink
-          link="https://discord.gg/wz7zQyc"
+          link="https://bit.ly/CodaDiscord"
           name="Discord"
           svg=SocialLink.Svg.discord
         />

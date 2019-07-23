@@ -42,7 +42,7 @@ The [Developer docs](https://codaprotocol.com/docs/developers/) contain all the 
 
 ## Community
 
-- Join the public [Discord server](https://discord.gg/ShKhA7J)! Please come by if you need help or have any questions.
+- Join the public [Discord server](https://bit.ly/CodaDiscord)! Please come by if you need help or have any questions.
 - Get the latest updates by [signing up for the Coda newsletter](https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+just+want+to+learn+more!).
 
 ## License

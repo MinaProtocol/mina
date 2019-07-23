@@ -71,7 +71,7 @@ Run the following command which creates a public and private key `my-wallet` and
 
 ## Request coda
 
-In order to send our first transaction, we'll first need to get some Coda to play with. Head over to the [Coda Discord server](https://discord.gg/ShKhA7J) and join the `faucet` channel. Once there, ask our faucet bot for some tokens (you'll receive 100). Here's an example:
+In order to send our first transaction, we'll first need to get some Coda to play with. Head over to the [Coda Discord server](https://bit.ly/CodaDiscord) and join the `faucet` channel. Once there, ask our faucet bot for some tokens (you'll receive 100). Here's an example:
 
     $request tNciWRVyhakSXV1gzHg8KdvWccJ4HXorwUPTUS2SgHVi3gKk4WUbcPqSvRBGSHSUVjZGhJooyLvSkQaxf8eFnAW5sQsAiDF1zRj1hDnnRVFRQsck3kQYna1ELv4UxBt6VP232wpCcrwh8g
 
