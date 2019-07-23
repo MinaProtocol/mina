@@ -163,12 +163,25 @@ let sync_status t =
       ~f:(fun online_status active_status first_connection first_message ->
         match online_status with
         | `Offline ->
-            if `Empty = first_connection then `Connecting
-            else if `Empty = first_message then `Listening
+            if `Empty = first_connection then (
+              Logger.info (Logger.create ()) ~module_:__MODULE__
+                ~location:__LOC__ "Coda daemon is now connecting" ;
+              `Connecting )
+            else if `Empty = first_message then (
+              Logger.info (Logger.create ()) ~module_:__MODULE__
+                ~location:__LOC__ "Coda daemon is now listening" ;
+              `Listening )
             else `Offline
         | `Online ->
-            Option.value_map active_status ~default:`Bootstrap
-              ~f:(Fn.const `Synced) )
+            Option.value_map active_status
+              ~default:
+                ( Logger.info (Logger.create ()) ~module_:__MODULE__
+                    ~location:__LOC__ "Coda daemon is now bootstrapping" ;
+                  `Bootstrap )
+              ~f:(fun _ ->
+                Logger.info (Logger.create ()) ~module_:__MODULE__
+                  ~location:__LOC__ "Coda daemon is now synced" ;
+                `Synced ) )
   in
   let observer = observe incremental_status in
   stabilize () ; observer

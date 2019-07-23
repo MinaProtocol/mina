@@ -116,6 +116,12 @@ let daemon logger =
          (optional txn_fee)
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
+     and insecure_rest_server =
+       flag "insecure-rest-server" no_arg
+         ~doc:
+           "Have REST server listen on all addresses, not just localhost \
+            (this is INSECURE, make sure your firewall is configured \
+            correctly!)"
      and limit_connections =
        flag "limit-concurrent-connections"
          ~doc:
@@ -170,6 +176,8 @@ let daemon logger =
              () )
          else ()
        in
+       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+         "Coda daemon is booting up" ;
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
@@ -567,7 +575,7 @@ let daemon logger =
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-         ~client_port () ;
+         ~insecure_rest_server ~client_port () ;
        Coda_run.run_snark_worker ~client_port run_snark_worker_action ;
        let%bind () =
          Option.map metrics_server_port ~f:(fun port ->
@@ -575,7 +583,7 @@ let daemon logger =
          |> Option.value ~default:Deferred.unit
        in
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-         "Running coda services" ;
+         "Daemon ready. Clients can now connect" ;
        Async.never ())
 
 [%%if
@@ -712,13 +720,42 @@ let coda_commands logger =
 
 [%%endif]
 
+let print_version_help coda_exe =
+  (* mimic Jane Street command help *)
+  let lines =
+    [ "print version information"
+    ; ""
+    ; sprintf "  %s version" (Filename.basename coda_exe)
+    ; ""
+    ; "=== flags ==="
+    ; ""
+    ; "  [-help]  print this help text and exit"
+    ; "           (alias: -?)" ]
+  in
+  List.iter lines ~f:(Core.printf "%s\n%!")
+
+let print_version_info () =
+  Core.printf "Commit %s on branch %s\n"
+    (String.sub Coda_version.commit_id ~pos:0 ~len:7)
+    Coda_version.branch
+
 let () =
   Random.self_init () ;
   let logger = Logger.create ~initialize_default_consumer:false () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
-  Command.run
-    (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
-       (coda_commands logger)) ;
+  (* intercept command-line processing for "version", because we don't
+     use the Jane Street scripts that generate their version information
+   *)
+  ( match Sys.argv with
+  | [|_coda_exe; "version"|] ->
+      print_version_info ()
+  | [|coda_exe; "version"; s|]
+    when List.mem ["-help"; "-?"] s ~equal:String.equal ->
+      print_version_help coda_exe
+  | _ ->
+      Command.run
+        (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
+           (coda_commands logger)) ) ;
   Core.exit 0

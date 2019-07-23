@@ -84,8 +84,8 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
           (Visualization_message.bootstrap "transition frontier") )
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
-let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
-    ~client_port () =
+let setup_local_server ?(client_whitelist = []) ?rest_server_port
+    ?(insecure_rest_server = false) ~coda ~client_port () =
   let client_whitelist =
     Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
   in
@@ -223,7 +223,9 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                       ~metadata:
                         [ ("error", `String (Exn.to_string_mach exn))
                         ; ("context", `String "rest_server") ] ))
-              (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
+              (Tcp.Where_to_listen.bind_to
+                 (if insecure_rest_server then All_addresses else Localhost)
+                 (On_port rest_server_port))
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
                 let status flag =
@@ -242,7 +244,11 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                     status `Performance >>| lift
                 | _ ->
                     Server.respond_string ~status:`Not_found "Route not found"
-                    >>| lift )) )
+                    >>| lift ))
+          |> Deferred.map ~f:(fun _ ->
+                 Logger.info logger
+                   !"Created GraphQL server and status endpoints at port : %i"
+                   rest_server_port ~module_:__MODULE__ ~location:__LOC__ ) )
       |> ignore ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
