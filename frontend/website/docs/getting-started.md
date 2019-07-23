@@ -16,7 +16,7 @@ Join the Coda server on [Discord](http://bit.ly/CodaDiscord) to connect with the
 - at least a 4-core processor
 - at least 8 GB of RAM
 
-GPU's aren't currently required, but may be required for node operators when the protoctol is upgraded.
+GPUs aren't currently required, but may be required for node operators when the protoctol is upgraded.
 
 **Network**: At least 1 Mbps connection
 
@@ -24,15 +24,18 @@ GPU's aren't currently required, but may be required for node operators when the
 
 The newest binary releases can be found below. Instructions are provided for macOS and Linux below:
 
+!!! note
+    This is a large download, around 1GB, so the install might take some time.
+
 ### macOS
 
-- Run `brew install codaprotocol/coda/coda` -- NOTE: This is a large file (~1 GB), so this step might take some time
+- Run `brew install codaprotocol/coda/coda`
 - `coda -help` to see if it works
 - Set up port forwarding ([see here](/docs/troubleshooting/#port-forwarding))
 
 ### Ubuntu 18.04 / Debian 9
 
-- Add the Coda Debian repo and install -- NOTE: This is a large file (~1 GB), so this step might take some time
+- Add the Coda Debian repo and install
 
 ```
 sudo echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/coda.list
@@ -46,7 +49,7 @@ sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-releas
 
 ### Windows
 
-Windows is not yet supported. If you have any interest in developing Coda for Windows, please reach out to contact@codaprotocol.org or reach out in the [Discord server](https://discord.gg/ShKhA7J).
+Windows is not yet supported. If you have any interest in developing Coda for Windows, please reach out to contact@codaprotocol.org or join us in the [Discord server](https://discord.gg/ShKhA7J).
 
 ### Build from source
 

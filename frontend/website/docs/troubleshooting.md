@@ -58,7 +58,7 @@ Depending on your router, you may see one of the following errors:
 - `No IGD UPnP Device found on the network!`
 - `connect: Connection refused`
 
-If so, find your router model and Google `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Coda node. You'll need to open the TCP port 8302, and the UDP port 8303 by default.
+If so, find your router model and search for `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Coda node. You'll need to open the TCP port 8302, and the UDP port 8303 by default.
 
 ## macOS Hostname
 
@@ -87,3 +87,13 @@ This is necessary because sometimes macOS doesn't resolve your hostname to your 
 - If sync status is `Offline` for more than 10 minutes, you may need to [configure port forwarding for your router ](/docs/getting-started/#port-forwarding). Otherwise you may need to resolve connectivity issues with your home network.
 - If sync status is `Bootstrap`, you'll need to wait for a bit for your node to catch up to the rest of the network. In the Coda network, we do not have to download full transaction history from the genesis block, but nodes participating in block production and compression need to download recent history and the current account data in the network.
 
+## Other issues
+
+### Accepting incoming connections
+If you see one or more warnings like the below, then choose "Allow":
+```
+Do you want the application "coda" to accept incoming network connections?
+```
+
+### Failure on daemon restart
+If you restart your daemon and it fails, then try deleting your `~/.coda-config` directory and starting it again.

@@ -51,7 +51,7 @@ In order to send our first transaction, we'll first need to get some Coda to pla
 
     $request <public_key>
 
-Once a faucet-mod thumbs up your request, keep an eye on the discord channel to see when the transaction goes through on that side. 
+Once a faucet-mod thumbs up your request, keep an eye on the Discord channel to see when the transaction goes through on that side.
 
 We can check our balance to make sure that we received the funds by running the following command, passing in our public key:
 
@@ -70,16 +70,16 @@ Finally we get to the good stuff, sending our first transaction! For testing pur
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
     $ coda client send-payment \
-      -amount 50 \
+      -amount 20 \
       -receiver tNciF85uM2yA1QHWc24vdQCGUe7EykM4cqaJma8FXqp64JDssnv5ywPsWNv3417akmKRwBmVaMwrSkXjZrBpJaCtfcAbNupLwSx1PEd9135kEZek7muGySzq1bQZ6nGR4oNVoy3qygX1ph \
-      -fee 2 \
+      -fee 5 \
       -privkey-path keys/my-wallet
 
 If you're wondering what we passed in to the commands above:
 
-- For `amount`, we're sending a test value of `10` coda
-- The `receiver` (public key) of the echo service is `TODO`
-- For `fee`, let's use the current market rate of `2` coda
+- For `amount`, we're sending a test value of `20` coda
+- The `receiver` (public key) of the echo service is the above address
+- For `fee`, let's use the current market rate of `5` coda
 - The `privkey-path` is the private key file path of the private key we generated the `keys` folder
 
 If this command is formatted properly, we should get a response that looks like the following:
@@ -95,6 +95,6 @@ Now that we can send transactions, it might be helpful to know our balance, so t
 
 We'll get a response that looks like this:
 
-    50
+    Balance: 50 coda
 
 Once you feel comfortable with the basics of creating an address, and sending & receiving coda, we can move on to the truly unique parts of the Coda network - [participating in consensus and helping compress the blockchain](/docs/node-operator).

@@ -10,4 +10,4 @@ This breakthrough is made possible due to zk-SNARKs - a type of succinct cryptog
 
 Trying out Coda is simple - head over to the [Getting Started page](/docs/getting-started/) to install the Coda client and join the network.
 
-You can also sign up for the public testnet [here](https://bit.ly/TestnetForm).
+You can also sign up for the public testnet updates [here](https://bit.ly/TestnetForm).
