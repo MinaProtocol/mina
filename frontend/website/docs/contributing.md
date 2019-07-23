@@ -4,7 +4,7 @@ Coda is an open-source project with a mission to build an inclusive and sustaina
 
 Currently, the protocol is in development and would benefit from contributions in the form of writing code, user testing, documentation, and community support. Below, you will find specific instructions for contributing in each of these domains.
 
-For any general questions on how to get involved, feel free to reach out to the Coda community on the [Discord server](https://discord.gg/ShKhA7J).
+For any general questions on how to get involved, feel free to reach out to the Coda community on the [Discord server](http://bit.ly/CodaDiscord).
 
 ## Join the Public Testnet
 
