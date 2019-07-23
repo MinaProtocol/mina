@@ -1,6 +1,6 @@
 # My First Transaction
 
-In this section, we'll make our first transaction on the Coda network. After [setting up `coda`](../getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
+In this section, we'll make our first transaction on the Coda network. After [installing the software](../getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
 
 ## Start up a node
 
@@ -8,7 +8,7 @@ Run the following command to start up a Coda node instance and connect to the ne
 
     $ coda daemon -peer strawberry-milkshake.o1test.net:8303
 
-The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. 
+The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8302 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
 
 !!!note
     The daemon process needs to be running whenever you issue commands from `coda client`, so make sure you don't kill it by accident.
@@ -22,16 +22,16 @@ Now that we've started up a node and are running the Coda daemon, open up anothe
     $ coda client status
 
 !!!note
-    For now, it will take up to a minute before `coda client status` will even successfully connect to the daemon when you are first starting it up. So if you see `Error: daemon not running. See coda daemon`, just a wait a bit and try again.
+    For now, it may take up to a minute before `coda client status` connects to the daemon when first starting up. So if you see `Error: daemon not running. See coda daemon`, just a wait a bit and try again.
 
 Most likely we will see a response that include the fields below:
 
     ...
     Peers:                                         Total: 4 (...)
     ...
-    Sync Status:                                   Synced
+    Sync Status:                                   Bootstrap
 
-This step requires waiting for approximately ~5 minutes to sync with the network. When sync status reaches `Synced` and the node is connected to 2 or more peers, we will have successfully connected to the network.
+If you see `Sync Status: Bootstrap`, this means that the Coda node is bootstrapping and needs to sync with the rest of the network. You may need to be patient here as this step might take some time for the node to get all the data it needs. When sync status reaches `Synced` and the node is connected to 1 or more peers, we will have successfully connected to the network.
 
 
 ## Create a new account
@@ -47,15 +47,15 @@ Run the following command which creates a public and private key `my-wallet` and
 
 ## Request coda
 
-In order to send our first transaction, we'll first need to get some Coda to play with. Head over to the [Coda Discord server](https://discord.gg/ShKhA7J) and join the `faucet` channel. Once there, ask our faucet bot for some tokens (you'll receive 100). Here's an example:
+In order to send our first transaction, we'll first need to get some coda to play with. Head over to the [Coda Discord server](https://bit.ly/CodaDiscord) and join the `#faucet` channel. Once there, ask Tiny the dog for some coda (you'll receive 100). Here's an example:
 
-    $request <public_key>
+    $request <public-key>
 
-Once a faucet-mod thumbs up your request, keep an eye on the discord channel to see when the transaction goes through on that side. 
+Once a faucet-mod thumbs up your request, keep an eye on the Discord channel to see when the transaction goes through on that side.
 
 We can check our balance to make sure that we received the funds by running the following command, passing in our public key:
 
-    $ coda client get-balance -address <public_key>
+    $ coda client get-balance -address <public-key>
 
 You might see `No account found at that public_key (zero balance)`. Be patient! Depending on the traffic in the network, it may take a few blocks before your transaction goes through.
 
@@ -70,16 +70,16 @@ Finally we get to the good stuff, sending our first transaction! For testing pur
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
     $ coda client send-payment \
-      -amount 50 \
+      -amount 20 \
       -receiver tNciF85uM2yA1QHWc24vdQCGUe7EykM4cqaJma8FXqp64JDssnv5ywPsWNv3417akmKRwBmVaMwrSkXjZrBpJaCtfcAbNupLwSx1PEd9135kEZek7muGySzq1bQZ6nGR4oNVoy3qygX1ph \
-      -fee 2 \
+      -fee 5 \
       -privkey-path keys/my-wallet
 
 If you're wondering what we passed in to the commands above:
 
-- For `amount`, we're sending a test value of `10` coda
-- The `receiver` (public key) of the echo service is `TODO`
-- For `fee`, let's use the current market rate of `2` coda
+- For `amount`, we're sending a test value of `20` coda
+- The `receiver` is the public key of the echo service
+- For `fee`, let's use the current market rate of `5` coda
 - The `privkey-path` is the private key file path of the private key we generated the `keys` folder
 
 If this command is formatted properly, we should get a response that looks like the following:
@@ -95,6 +95,6 @@ Now that we can send transactions, it might be helpful to know our balance, so t
 
 We'll get a response that looks like this:
 
-    50
+    Balance: 50 coda
 
 Once you feel comfortable with the basics of creating an address, and sending & receiving coda, we can move on to the truly unique parts of the Coda network - [participating in consensus and helping compress the blockchain](/docs/node-operator).

@@ -24,7 +24,6 @@ The node selected to add the next block to the Coda blockchain. The block produc
 
 - "Coda" with a capital C references the underlying cryptocurrency protocol and the network infrastructure that the system depends upon
 - "coda" is the unit of the cryptocurrency that is exchanged by participating nodes on the network
-- "CODA" is the acronym for the coda cryptocurrency that is referenced in financial contexts (eg. an exchange rate)
 
 ####Compressing
 
@@ -40,7 +39,7 @@ A digital asset or currency that uses cryptographic primitives to secure financi
 
 ####Daemon
 
-The Coda daemon is a background process that implements the Coda protocol and runs on a node<link to node> locally. This allows a local client or wallet to talk to the Coda network. For example, when a CLI is used to issue a command to send a transaction, this request is made to the Coda daemon, which then broadcasts it to the peer-to-peer network. It also listens for events like new blocks and relays this to the client via a pub-sub<link to pub-sub> model.
+The Coda daemon is a background process that implements the Coda protocol and runs on a node locally. This allows a local client or wallet to talk to the Coda network. For example, when a CLI is used to issue a command to send a transaction, this request is made to the Coda daemon, which then broadcasts it to the peer-to-peer network. It also listens for events like new blocks and relays this to the client via a [pub-sub](#pub-sub) model.
 
 ####Delegating
 
@@ -52,7 +51,7 @@ A distributed hash table (DHT) for decentralized peer-to-peer networks. Coda use
 
 ####Node
 
-A node is the context of distributed systems, and specifically cryptocurrency networks, is any   
+A node is a machine running the coda daemon.
 
 ####Peer-to-peer
 
@@ -64,7 +63,7 @@ The other component in public-key cryptography - private keys are held private w
 
 ####Proof-of-Stake
 
-The type of consensus algorithm Coda implements to allow nodes to agree upon the state of the network. Proof-of-Stake (PoS) allows nodes to stake<link to staking> coda on the network to increase their chance of being selected as the next block producer.
+The type of consensus algorithm Coda implements to allow nodes to agree upon the state of the network. Proof-of-Stake (PoS) allows nodes to [stake](#staking) coda on the network to increase their chance of being selected as the next block producer.
 
 ####Public key
 
@@ -88,7 +87,7 @@ A node on the network that is participating in SNARK generation.  The SNARK work
 
 ####Staking
 
-Staking coda allows nodes on the network to increase their chances of being selected as a block producer in accordance with the consensus mechanism. The chance of winning the block scales in proportion to the amount of coda staked. For example, if one node stakes 50% of the available coda in the network, they theoretically have a 50% chance of being selected to produce future blocks. Coda uses Ouroboros<link> Proof-of-Stake to implement the details of staking. If a node chooses to stake its coda, it is required to be online and connected to the Coda network.
+Staking coda allows nodes on the network to increase their chances of being selected as a block producer in accordance with the consensus mechanism. The chance of winning the block scales in proportion to the amount of coda staked. For example, if one node stakes 50% of the available coda in the network, they theoretically have a 50% chance of being selected to produce future blocks. Coda uses Ouroboros Proof-of-Stake to implement the details of staking. If a node chooses to stake its coda, it is required to be online and connected to the Coda network.
 
 ####Staking Pool
 

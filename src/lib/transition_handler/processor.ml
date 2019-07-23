@@ -97,15 +97,15 @@ module Make (Inputs : Inputs.S) :
               Trust_system.record_envelope_sender trust_system logger sender
                 ( Trust_system.Actions.Gossiped_invalid_transition
                 , Some
-                    ( "$state_hash was not selected over transition frontier \
-                       root"
+                    ( "The transition with hash $state_hash was not selected \
+                       over the transition frontier root"
                     , metadata ) )
             in
             Error ()
         | Error `Already_in_frontier ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
-              "refusing to process $state_hash because is is already in the \
-               transition frontier" ;
+              "Refusing to process the transition with hash $state_hash \
+               because is is already in the transition frontier" ;
             return (Error ())
         | Error `Parent_missing_from_frontier ->
             Catchup_scheduler.watch catchup_scheduler
@@ -134,7 +134,8 @@ module Make (Inputs : Inputs.S) :
                   ~metadata:
                     ( metadata
                     @ [("error", `String (Error.to_string_hum error))] )
-                  "error while building breadcrumb in processor: $error" ;
+                  "Error while building breadcrumb in the transition handler \
+                   processor: $error" ;
                 Deferred.return (Error ())
             | Error (`Fatal_error exn) ->
                 raise exn
@@ -225,7 +226,7 @@ module Make (Inputs : Inputs.S) :
                    | Error err ->
                        Logger.error logger ~module_:__MODULE__
                          ~location:__LOC__
-                         "failed to attach all catchup breadcrumbs to \
+                         "Error, failed to attach all catchup breadcrumbs to \
                           transition frontier: %s"
                          (Error.to_string_hum err) )
                | `Proposed_breadcrumb breadcrumb ->
@@ -240,8 +241,8 @@ module Make (Inputs : Inputs.S) :
                            ~location:__LOC__
                            ~metadata:
                              [("error", `String (Error.to_string_hum err))]
-                           "failed to attach breadcrumb proposed internally \
-                            to transition frontier: $error"
+                           "Error, failed to attach proposed breadcrumb to \
+                            transition frontier: $error"
                    in
                    Coda_metrics.(
                      Gauge.dec_one

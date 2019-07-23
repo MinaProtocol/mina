@@ -44,7 +44,7 @@
 /src/lib/codable/ @johnwu93 @bkase
 /src/lib/consensus/ @nholland94
 /src/lib/crs/ @rbkhmrcr @vanishreerao
-/src/lib/crypto_params/ @rbkhmrcr @vanishreerao
+/src/lib/crypto_params/ @rbkhmrcr @vanishreerao @mrmr1993
 /src/lib/currency/ @bkase @nholland94
 /src/lib/daemon_rpcs/ @johnwu93 @bkase
 /src/lib/debug_assert/ @nholland94 @bkase @cmr
@@ -148,7 +148,7 @@
 /src/lib/unix_timestamp/ @nholland94
 /src/lib/unsigned_extended/ @bkase
 /src/lib/visualization/ @johnwu93
-/src/lib/vrf_lib/ @nholland94
+/src/lib/vrf_lib/ @nholland94 @mrmr1993 @bkase
 /src/lib/web_client_pipe/ @johnwu93 @bkase
 /src/lib/web_request/ @johnwu93 @bkase
 /src/lib/webkit_trace_event/ @mrmr1993 @cmr

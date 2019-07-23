@@ -8,12 +8,9 @@ If you're running a Coda node on a home or office machine, you'll have to set up
 
 ### Using UPnP
 
-Follow the steps below to use MiniUPnP to forward ports on your router:
+Follow the steps below to use [MiniUPnP](https://github.com/miniupnp/miniupnp) to forward ports on your router:
 
-1. Install [MiniUPnP](https://github.com/miniupnp/miniupnp) -- `brew install miniupnpc` on macOS or `apt-get install miniupnpc` on Linux
-
-2. Run `ifconfig` to get your internal IP address -- you can find this in the output corresponding to the field `en0` on macOS and `wlan0` on a linux system:
-
+1. Run `ifconfig` to get your internal IP address -- you can find this in the output corresponding to the field `en0` on macOS and `wlan0` on a linux system:
 
         $ ifconfig
         ...
@@ -26,10 +23,10 @@ Follow the steps below to use MiniUPnP to forward ports on your router:
                 status: active
         ...
 
-3. Run the following commands, with the IP address next to the `inet` field in the previous step. Note that you'll have to run it twice for the two ports below:
+2. Run the following commands, with the IP address next to the `inet` field in the previous step. Note that you'll have to run it twice for the two ports below:
 
-        $ sudo upnpc -a 192.168.101.7 8302 8302 TCP
-        $ sudo upnpc -a 192.168.101.7 8303 8303 UDP
+        $ sudo upnpc -a <your-ip-address> 8302 8302 TCP
+        $ sudo upnpc -a <your-ip-address> 8303 8303 UDP
 
 If these commands succeed, you'll see responses indicating that the ports have been successfully redirected:
 
@@ -51,7 +48,7 @@ AddPortMapping(8302, 8302, 192.168.101.7) failed with code 718 (ConflictInMappin
 If this happens, you can forward different ports, as long as they are unused by another application. Two things the keep in mind if you forward custom ports:
 
 - The UDP port forwarded has to be the next consecutive port from the TCP mapping.
-- When running Coda daemon commands in the next step, you'll need to add the flag `-external-port <TCP PORT>` passing in the TCP port forwarded.
+- When running Coda daemon commands in the next step, you'll need to add the flag `-external-port <custom-TCP-port>` passing in the TCP port forwarded.
 
 ### Manual port forwarding
 
@@ -60,7 +57,7 @@ Depending on your router, you may see one of the following errors:
 - `No IGD UPnP Device found on the network!`
 - `connect: Connection refused`
 
-If so, find your router model and Google `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Coda node. You'll need to open the TCP port 8302, and the UDP port 8303 by default.
+If so, find your router model and search for `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Coda node. You'll need to open the TCP port 8302, and the UDP port 8303 by default.
 
 ## macOS Hostname
 
@@ -82,10 +79,22 @@ If you're running Coda on macOS and see the following time out error `monitor.ml
 
 This is necessary because sometimes macOS doesn't resolve your hostname to your local IP address.
 
-
 ## Connectivity Issues
 
-- If the number of peers is 1 or fewer, there may be an issue with the IP address - make sure you typed in the IP address and port exactly as specified in [Start a Coda node](#start-a-coda-node).
-- If sync status is `Offline` for more than 10 minutes, you may need to [configure port forwarding for your router ](/docs/getting-started/#port-forwarding). Otherwise you may need to resolve connectivity issues with your home network.
-- If sync status is `Bootstrap`, you'll need to wait for a bit for your node to catch up to the rest of the network. In the Coda network, we do not have to download full transaction history from the genesis block, but nodes participating in block production and compression need to download recent history and the current account data in the network.
+- If the number of peers is 0, there may be an issue with the IP address - make sure you typed in the IP address and port exactly as specified in [Start a Coda node](#start-a-coda-node).
+- If sync status is `Bootstrap`, you'll need to wait for a bit for your node to catch up to the rest of the network. In the Coda network, we do not have to download full transaction history from the genesis block, but nodes participating in block production and compression need to download recent history and the current account data in the network. Future versions of the client will allow non-operating nodes to avoid having to download this data.
+- If sync status is `Offline` or `Bootstrap` for more than 15 minutes, you may need to [configure port forwarding for your router](/docs/getting-started/#port-forwarding). Otherwise you may need to resolve connectivity issues with your home network.
 
+## Other issues
+
+### Accepting incoming connections
+If you see one or more warnings like the below, then choose "Allow":
+```
+Do you want the application "coda" to accept incoming network connections?
+```
+
+### Failure on daemon restart
+If you restart the Coda daemon and it fails, then try deleting your `~/.coda-config` directory and starting it again.
+
+### Daemon restart on computer sleep
+If the machine running your Coda node enters sleep mode or hibernates, you will need to restart the Coda daemon once the machine becomes active.

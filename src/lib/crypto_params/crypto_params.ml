@@ -43,10 +43,11 @@ module Tock_backend = struct
                 end
 
                 module Fqe = struct
-                  type t = Field.Vector.t
+                  type t = Full.Fqe.t
 
                   let to_list x =
-                    List.init (Field.Vector.length x) ~f:(Field.Vector.get x)
+                    let v = Full.Fqe.to_vector x in
+                    List.init (Field.Vector.length v) ~f:(Field.Vector.get v)
                 end
 
                 module G1 = Full.G1

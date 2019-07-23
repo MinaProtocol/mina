@@ -1,13 +1,13 @@
 open Core
+open Coda_base
+open Signature_lib
 
 module Make (Inputs : Coda_intf.Tmp_test_stub_hack.For_staged_ledger_intf) : sig
   open Inputs
 
   include
     Coda_intf.Staged_ledger_pre_diff_info_generalized_intf
-    with type user_command := User_command.t
-     and type transaction := Transaction.t
-     and type transaction_snark_work := Transaction_snark_work.t
+    with type transaction_snark_work := Transaction_snark_work.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type valid_staged_ledger_diff :=
                 Staged_ledger_diff.With_valid_signatures_and_proofs.t
@@ -65,7 +65,7 @@ end = struct
     maximum number of provers), in which case, we simply add one coinbase as part
     of the second prediff.
   *)
-  let create_coinbase coinbase_parts (proposer : Compressed_public_key.t) =
+  let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t) =
     let open Result.Let_syntax in
     let coinbase = Coda_compile_config.coinbase in
     let coinbase_or_error = function
@@ -163,14 +163,14 @@ end = struct
     in
     let%bind singles_map =
       Or_error.try_with (fun () ->
-          Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
+          Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
               Option.value_exn (Currency.Fee.add f1 f2) ) )
       |> to_staged_ledger_or_error
     in
     (* deduct the coinbase work fee from the singles_map. It is already part of the coinbase *)
     Or_error.try_with (fun () ->
         List.fold coinbase_fts ~init:singles_map ~f:(fun accum single ->
-            match Compressed_public_key.Map.find accum (fst single) with
+            match Public_key.Compressed.Map.find accum (fst single) with
             | None ->
                 accum
             | Some fee ->
@@ -178,15 +178,15 @@ end = struct
                   Option.value_exn (Currency.Fee.sub fee (snd single))
                 in
                 if new_fee > Currency.Fee.zero then
-                  Compressed_public_key.Map.update accum (fst single)
+                  Public_key.Compressed.Map.update accum (fst single)
                     ~f:(fun _ -> new_fee)
-                else Compressed_public_key.Map.remove accum (fst single) )
+                else Public_key.Compressed.Map.remove accum (fst single) )
         (* TODO: This creates a weird incentive to have a small public_key *)
         |> Map.to_alist ~key_order:`Increasing
         |> Fee_transfer.of_single_list )
     |> to_staged_ledger_or_error
 
-  let get_individual_info coinbase_parts (proposer : Compressed_public_key.t)
+  let get_individual_info coinbase_parts (proposer : Public_key.Compressed.t)
       user_commands completed_works =
     let open Result.Let_syntax in
     let%map user_commands, coinbase, transactions =
@@ -289,7 +289,7 @@ end = struct
     let txn_works =
       List.map ~f:Transaction_snark_work.forget completed_works
     in
-    let coinbase_fts : (Compressed_public_key.t * Currency.Fee.t) sexp_list =
+    let coinbase_fts : (Public_key.Compressed.t * Currency.Fee.t) sexp_list =
       match coinbase_parts with
       | `One (Some ft) ->
           [ft]
