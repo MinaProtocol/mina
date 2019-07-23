@@ -208,9 +208,9 @@ module Types = struct
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
       let consensus_time_best_tip =
-        string_option_entry "Best Tip Consensus Time"
+        string_option_entry "Best Tip Consensus Time (epoch:slot)"
 
-      let consensus_time_now = string_entry "Consensus Time Now"
+      let consensus_time_now = string_entry "Consensus Time Now (epoch:slot)"
 
       let consensus_mechanism = string_entry "Consensus Mechanism"
 

@@ -75,7 +75,7 @@ let get_balance =
              port
          with
          | Ok (Some b) ->
-             printf "Balance: %s CODA\n" (Currency.Balance.to_string b)
+             printf "Balance: %s coda\n" (Currency.Balance.to_string b)
          | Ok None ->
              printf "There are no funds in this account\n"
          | Error e ->
