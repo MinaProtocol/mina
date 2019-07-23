@@ -51,7 +51,7 @@ In order to send our first transaction, we'll first need to get some coda to pla
 
     $request <public-key>
 
-Once a faucet-mod thumbs up your request, keep an eye on the Discord channel to see when the transaction goes through on that side.
+Once a faucet-mod thumbs up your request, keep an eye on the Discord channel to see when the transaction goes through on that side. It may take a few minutes for your funds to appear.
 
 We can check our balance to make sure that we received the funds by running the following command, passing in our public key:
 
@@ -65,7 +65,7 @@ While you're waiting take a look at your daemon logs for new blocks being genera
 
 ## Make a payment
 
-Finally we get to the good stuff, sending our first transaction! For testing purposes, there's already an echo service set up that will immediately refund your payment minus the transaction fees.
+Finally we get to the good stuff, sending our first transaction! For testing purposes, there's already an [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service) set up that will immediately refund your payment minus the transaction fees.
 
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
@@ -78,7 +78,7 @@ Let's send some of our newly received coda to this service to see what a payment
 If you're wondering what we passed in to the commands above:
 
 - For `amount`, we're sending a test value of `20` coda
-- The `receiver` is the public key of the echo service
+- The `receiver` is the public key of the [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service)
 - For `fee`, let's use the current market rate of `5` coda
 - The `privkey-path` is the private key file path of the private key we generated the `keys` folder
 

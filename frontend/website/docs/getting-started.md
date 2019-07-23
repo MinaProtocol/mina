@@ -5,7 +5,7 @@ This section will walk you through the requirements needed to run a Coda protoco
 Join the Coda server on [Discord](http://bit.ly/CodaDiscord) to connect with the community, get support, and learn about how you can participate in weekly challenges for Testnet Points.[\*](#disclaimer)
 
 !!! note
-    Last updated for release v0.0.1
+    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for `v0.0.1-beta.1`.
 
 ## Requirements
 
@@ -29,16 +29,15 @@ The newest binary releases can be found below. Instructions are provided for mac
 
 ### macOS
 
-- Install using [brew](https://brew.sh)
+Install using [brew](https://brew.sh).
 ```
 brew install codaprotocol/coda/coda
 ``` 
-- `coda -help` to see if it works
-- Set up port forwarding ([see here](/docs/troubleshooting/#port-forwarding))
+You can run `coda -version` to see if the works
 
 ### Ubuntu 18.04 / Debian 9
 
-- Add the Coda Debian repo and install
+Add the Coda Debian repo and install.
 
 ```
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | sudo tee /etc/apt/sources.list.d/coda.list
@@ -46,8 +45,7 @@ sudo apt-get update
 sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-9fa6e5ec
 ```
 
-- `coda -help` to see if it works
-- Set up port forwarding ([see here](/docs/troubleshooting/#port-forwarding))
+You can `coda -version` to see if it works.
 
 
 ### Windows
@@ -58,9 +56,18 @@ Windows is not yet supported. If you have any interest in developing Coda for Wi
 
 If you're running another Linux distro or a different version of macOS, you can [try building Coda from source code](https://github.com/CodaProtocol/coda/blob/master/README-dev.md#building-coda). Please note that other operating systems haven't been tested thoroughly, and may have issues. Feel free to share any logs and get troubleshooting help in the Discord channel.
 
+## Set up port forwarding
+
+You must allow inbound traffic to the following ports through your **external** IP address.
+
+- `TCP` port `8302`
+- `UDP` port `8303`
+- (Optionally) `TCP` port `49370` for the GraphQL API
+
+For walk-through instructions see [this guide](/docs/troubleshooting/#port-forwarding).
 ## Next
 
-Now that you've installed the Coda binary and configured settings, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!
+Now that you've installed Coda and configured your network, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!
 
 <span id="disclaimer">
 \*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
