@@ -210,7 +210,7 @@ let daemon logger =
            in
            Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
          in
-         let make_version ~wipe_dir:bool =
+         let make_version ~wipe_dir =
            let%bind () =
              if wipe_dir then del_files conf_dir else Deferred.unit
            in
