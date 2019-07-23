@@ -144,9 +144,9 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
                 ; ("hash", State_hash.to_yojson hash)
                 ; ( "current_protocol_state_hash"
                   , State_hash.to_yojson protocol_state_hash ) ]
-              "Duplicate producer and slot: producer = $block_producer, slot = \
-               $slot, previous protocol state hash = $hash, current protocol \
-               state hash = $current_protocol_state_hash"
+              "Duplicate producer and slot: producer = $block_producer, slot \
+               = $slot, previous protocol state hash = $hash, current \
+               protocol state hash = $current_protocol_state_hash"
   end
 
   let run ~logger ~trust_system ~verifier ~transition_reader

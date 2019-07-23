@@ -36,8 +36,8 @@ let daemon logger =
      and propose_key =
        flag "propose-key"
          ~doc:
-           "KEYFILE Private key file for the block producer. You \
-            cannot provide both `propose-key` and `propose-public-key`. \
+           "KEYFILE Private key file for the block producer. You cannot \
+            provide both `propose-key` and `propose-public-key`. \
             (default:don't produce blocks)"
          (optional string)
      and propose_public_key =
