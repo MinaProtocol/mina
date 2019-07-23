@@ -574,11 +574,9 @@ module Make (Inputs : Inputs_intf) = struct
     ; online_status
     ; first_received_message }
 
-  let has_received_first_message {first_received_message; _} =
-    Ivar.is_full first_received_message
+  let first_message {first_received_message; _} = first_received_message
 
-  let has_made_a_connection {gossip_net; _} =
-    Ivar.is_full gossip_net.first_connect
+  let first_connection {gossip_net; _} = gossip_net.first_connect
 
   (* TODO: Have better pushback behavior *)
   let broadcast t msg =
