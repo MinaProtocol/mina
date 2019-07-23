@@ -85,7 +85,11 @@ let shareItems =
       {ReasonReact.string("Twitter")}
     </A>
     dot
+<<<<<<< HEAD
     <A name="share-blog-discord" href="https://bit.ly/CodaDiscord">
+=======
+    <A name="share-blog-discord" href="http://bit.ly/CodaDiscord">
+>>>>>>> 3079e36c08cb10ef1186881274d0b6f3fb6ed3e4
       {ReasonReact.string("Discord")}
     </A>
     dot

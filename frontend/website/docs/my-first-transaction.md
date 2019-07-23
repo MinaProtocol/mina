@@ -1,6 +1,6 @@
 # My First Transaction
 
-In this section, we'll make our first transaction on the Coda network. After [setting up `coda`](../getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
+In this section, we'll make our first transaction on the Coda network. After [installing the software](../getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
 
 ## Start up a node
 
@@ -13,35 +13,16 @@ The host and port specified above refer to the seed peer address - this is the i
 !!!note
     The daemon process needs to be running whenever you issue commands from `coda client`, so make sure you don't kill it by accident.
 
-### Troubleshooting
-
-If you're running Coda on macOS and see the following time out error `monitor.ml.Error "Timed out getting connection from process"`, you'll need to add your hostname to `/etc/hosts` by running the following:
-
-- `$ hostname` to get your hostname
-- `$ vim /etc/hosts` to open your hostfile and add the mapping:
-
-```    
-##
-# Host Database
-#
-# localhost is used to configure the loopback interface
-# when the system is booting.  Do not change this entry.
-##
-127.0.0.1       localhost
-127.0.0.1       <ADD YOUR HOSTNAME HERE>
-```
-
-This is necessary because sometimes macOS doesn't resolve your hostname to your local IP address.
-
+See [here](/docs/troubleshooting/) for common issues when first running a node.
 
 ## Checking connectivity
 
-Now that we've started up a node and are running the Coda daemon, open up another shell (if you're on macOS, cd to the place where you've extracted the zip and `export PATH=$PWD:$PATH`), and run the following command:
+Now that we've started up a node and are running the Coda daemon, open up another shell and run the following command:
 
     $ coda client status
 
 !!!note
-   For now, it will take up to a minute before `coda client status` will even successfully connect to the daemon when you are first starting it up. So if you see `Error: daemon not running. See coda daemon`, just a wait a bit and try again.
+    For now, it will take up to a minute before `coda client status` will even successfully connect to the daemon when you are first starting it up. So if you see `Error: daemon not running. See coda daemon`, just a wait a bit and try again.
 
 Most likely we will see a response that include the fields below:
 
@@ -52,11 +33,6 @@ Most likely we will see a response that include the fields below:
 
 This step requires waiting for approximately ~5 minutes to sync with the network. When sync status reaches `Synced` and the node is connected to 2 or more peers, we will have successfully connected to the network.
 
-### Troubleshooting hints:
-
-- If the number of peers is 1 or fewer, there may be an issue with the IP address - make sure you typed in the IP address and port exactly as specified in [Start a Coda node](#start-a-coda-node).
-- If sync status is `Offline` for more than 10 minutes, you may need to [configure port forwarding for your router ](/docs/getting-started/#port-forwarding). Otherwise you may need to resolve connectivity issues with your home network.
-- If sync status is `Bootstrap`, you'll need to wait for a bit for your node to catch up to the rest of the network. In the Coda network, we do not have to download full transaction history from the genesis block, but nodes participating in block production and compression need to download recent history and the current account data in the network.
 
 ## Create a new account
 
@@ -73,9 +49,9 @@ Run the following command which creates a public and private key `my-wallet` and
 
 In order to send our first transaction, we'll first need to get some Coda to play with. Head over to the [Coda Discord server](https://bit.ly/CodaDiscord) and join the `faucet` channel. Once there, ask our faucet bot for some tokens (you'll receive 100). Here's an example:
 
-    $request tNciWRVyhakSXV1gzHg8KdvWccJ4HXorwUPTUS2SgHVi3gKk4WUbcPqSvRBGSHSUVjZGhJooyLvSkQaxf8eFnAW5sQsAiDF1zRj1hDnnRVFRQsck3kQYna1ELv4UxBt6VP232wpCcrwh8g
+    $request <public_key>
 
-Once a faucet-mod thumbs up your request, keep an eye on the discord channel to see when the transaction goes through on that side. 
+Once a faucet-mod thumbs up your request, keep an eye on the Discord channel to see when the transaction goes through on that side.
 
 We can check our balance to make sure that we received the funds by running the following command, passing in our public key:
 
@@ -93,13 +69,17 @@ Finally we get to the good stuff, sending our first transaction! For testing pur
 
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
-    $ coda client send-payment -amount 10 -receiver tNciF85uM2yA1QHWc24vdQCGUe7EykM4cqaJma8FXqp64JDssnv5ywPsWNv3417akmKRwBmVaMwrSkXjZrBpJaCtfcAbNupLwSx1PEd9135kEZek7muGySzq1bQZ6nGR4oNVoy3qygX1ph -fee 2 -privkey-path keys/my-wallet
+    $ coda client send-payment \
+      -amount 20 \
+      -receiver tNciF85uM2yA1QHWc24vdQCGUe7EykM4cqaJma8FXqp64JDssnv5ywPsWNv3417akmKRwBmVaMwrSkXjZrBpJaCtfcAbNupLwSx1PEd9135kEZek7muGySzq1bQZ6nGR4oNVoy3qygX1ph \
+      -fee 5 \
+      -privkey-path keys/my-wallet
 
 If you're wondering what we passed in to the commands above:
 
-- For `amount`, we're sending a test value of `10` coda
-- The `receiver` (public key) of the echo service is `TODO`
-- For `fee`, let's use the current market rate of `2` coda
+- For `amount`, we're sending a test value of `20` coda
+- The `receiver` is the public key of the echo service
+- For `fee`, let's use the current market rate of `5` coda
 - The `privkey-path` is the private key file path of the private key we generated the `keys` folder
 
 If this command is formatted properly, we should get a response that looks like the following:
@@ -115,6 +95,6 @@ Now that we can send transactions, it might be helpful to know our balance, so t
 
 We'll get a response that looks like this:
 
-    50
+    Balance: 50 coda
 
 Once you feel comfortable with the basics of creating an address, and sending & receiving coda, we can move on to the truly unique parts of the Coda network - [participating in consensus and helping compress the blockchain](/docs/node-operator).

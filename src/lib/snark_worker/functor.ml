@@ -14,8 +14,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     module Single = struct
       module Spec = struct
         type t =
-          ( Transaction_snark.Statement.t
-          , Transaction.t
+          ( Transaction.t
           , Transaction_witness.t
           , Ledger_proof.t )
           Work.Single.Spec.t
