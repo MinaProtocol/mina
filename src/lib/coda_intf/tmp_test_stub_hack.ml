@@ -161,7 +161,7 @@ module type For_transaction_snark_scan_state_intf = sig
       ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
-    [@@deriving compare, eq, sexp]
+    [@@deriving compare, eq, sexp, to_yojson]
 
     module Stable : sig
       module V1 : sig

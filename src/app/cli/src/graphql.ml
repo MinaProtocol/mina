@@ -104,20 +104,6 @@ module Types = struct
       Codable.Make_base58_check (Frozen_ledger_hash.Stable.V1)
   end
 
-  module Base58_check = Base58_check.Make (struct
-    let version_byte = Base58_check.Version_bytes.graphql
-  end)
-
-  module Id = struct
-    (* The id of a user_command is the Base58Check encoding of the serialized version of the user_command *)
-    let user_command user_command =
-      let bigstring =
-        Bin_prot.Utils.bin_dump Coda_base.User_command.Stable.V1.bin_t.writer
-          user_command
-      in
-      Base58_check.encode (Bigstring.to_string bigstring)
-  end
-
   let public_key =
     scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
       ~coerce:(fun key -> `String (Public_key.Compressed.to_base58_check key))
@@ -126,12 +112,14 @@ module Types = struct
     scalar "UInt64" ~doc:"String representing a uint64 number in base 10"
       ~coerce:(fun num -> `String (Unsigned.UInt64.to_string num))
 
-  let sync_status : ('context, [`Offline | `Synced | `Bootstrap] option) typ =
+  let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
         [ enum_value "BOOTSTRAP" ~value:`Bootstrap
         ; enum_value "SYNCED" ~value:`Synced
-        ; enum_value "OFFLINE" ~value:`Offline ]
+        ; enum_value "OFFLINE" ~value:`Offline
+        ; enum_value "CONNECTING" ~value:`Connecting
+        ; enum_value "LISTENING" ~value:`Listening ]
 
   let transaction_status : ('context, Transaction_status.State.t option) typ =
     enum "TransactionStatus" ~doc:"Status of a transaction"
@@ -236,7 +224,8 @@ module Types = struct
     obj "UserCommand" ~fields:(fun _ ->
         [ field "id" ~typ:(non_null guid)
             ~args:Arg.[]
-            ~resolve:(fun _ user_command -> Id.user_command user_command)
+            ~resolve:(fun _ user_command ->
+              User_command.to_base58_check user_command )
         ; field "isDelegation" ~typ:(non_null bool)
             ~doc:
               "If true, this represents a delegation of stake, otherwise it \
@@ -876,19 +865,12 @@ module Types = struct
         module Cursor = struct
           type t = User_command.t
 
-          let serialize = Id.user_command
+          let serialize = User_command.to_base58_check
 
           let deserialize ?error serialized_payment =
-            let open Result.Let_syntax in
-            let%bind serialized_transaction =
-              result_of_or_error
-                (Base58_check.decode serialized_payment)
-                ~error:(Option.value error ~default:"Invalid cursor")
-            in
-            Ok
-              (Coda_base.User_command.Stable.V1.bin_t.reader.read
-                 (Bigstring.of_string serialized_transaction)
-                 ~pos_ref:(ref 0))
+            result_of_or_error
+              (User_command.of_base58_check serialized_payment)
+              ~error:(Option.value error ~default:"Invalid cursor")
 
           let doc = Doc.bin_prot "Opaque pagination cursor for a user command"
         end

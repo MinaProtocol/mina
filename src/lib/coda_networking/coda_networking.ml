@@ -383,7 +383,8 @@ module Make (Inputs : Inputs_intf) = struct
         Transaction_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
     ; snark_pool_diffs:
         Snark_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
-    ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t }
+    ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
+    ; first_received_message: unit Ivar.t }
   [@@deriving fields]
 
   let offline_time =
@@ -544,8 +545,10 @@ module Make (Inputs : Inputs_intf) = struct
     let online_status =
       online_broadcaster config.time_controller online_notifier
     in
+    let first_received_message = Ivar.create () in
     let states, snark_pool_diffs, transaction_pool_diffs =
       Strict_pipe.Reader.partition_map3 received_gossips ~f:(fun envelope ->
+          Ivar.fill_if_empty first_received_message () ;
           match Envelope.Incoming.data envelope with
           | New_state state ->
               Perf_histograms.add_span ~name:"external_transition_latency"
@@ -568,7 +571,12 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_pool_diffs= Strict_pipe.Reader.to_linear_pipe snark_pool_diffs
     ; transaction_pool_diffs=
         Strict_pipe.Reader.to_linear_pipe transaction_pool_diffs
-    ; online_status }
+    ; online_status
+    ; first_received_message }
+
+  let first_message {first_received_message; _} = first_received_message
+
+  let first_connection {gossip_net; _} = gossip_net.first_connect
 
   (* TODO: Have better pushback behavior *)
   let broadcast t msg =

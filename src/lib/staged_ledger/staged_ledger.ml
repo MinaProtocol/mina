@@ -107,8 +107,10 @@ struct
           b
       | Error e ->
           Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:[("error", `String (Error.to_string_hum e))]
-            "Bad transaction snark: $error" ;
+            ~metadata:
+              [ ("statement", Transaction_snark_statement.to_yojson statement)
+              ; ("error", `String (Error.to_string_hum e)) ]
+            "Invalid transaction snark for statement $statement: $error" ;
           false
 
   let verify ~logger ~verifier ~message job proof prover =
@@ -1048,8 +1050,9 @@ struct
         | Ok res'' ->
             if within_capacity res'' then res'' else res
         | Error e ->
-            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-              (Error.to_string_hum e) ;
+            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+              "Error when increasing coinbase: $error"
+              ~metadata:[("error", `String (Error.to_string_hum e))] ;
             res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
@@ -1221,8 +1224,8 @@ struct
                 One x
             | _ ->
                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                  "Error creating diff: Should have at most one coinbase in \
-                   the second pre_diff" ;
+                  "Error creating staged ledger diff: Should have at most one \
+                   coinbase in the second pre_diff" ;
                 Zero
           in
           (* We have to reverse here because we only know they work in THIS order *)
@@ -1362,12 +1365,11 @@ struct
                because of a buggy test. See #2346.
             *)
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                "Invalid user command $user_command: $error"
                 ~metadata:
                   [ ( "user_command"
-                    , User_command.With_valid_signature.to_yojson t ) ]
-                !"Invalid user command! Error was: %s, command was: \
-                  $user_command"
-                (Error.to_string_hum e) ;
+                    , User_command.With_valid_signature.to_yojson t )
+                  ; ("error", `String (Error.to_string_hum e)) ] ;
               seq
           | Ok _ ->
               Sequence.append (Sequence.singleton t) seq )
@@ -1377,8 +1379,9 @@ struct
           generate logger completed_works_seq valid_on_this_ledger self
             partitions max_jobs_count unbundled_job_count )
     in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Block stats: Proofs ready for purchase: %d" proof_count ;
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      "Number of proofs ready for purchase: $proof_count"
+      ~metadata:[("proof_count", `Int proof_count)] ;
     trace_event "prediffs done" ;
     {Staged_ledger_diff.With_valid_signatures_and_proofs.diff; creator= self}
 

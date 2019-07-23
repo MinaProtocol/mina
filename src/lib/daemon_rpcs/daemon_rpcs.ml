@@ -175,8 +175,7 @@ module Types = struct
 
       let num_accounts = int_option_entry "Global Number of Accounts"
 
-      let blockchain_length =
-        int_option_entry "The Total Number of Blocks in the Blockchain"
+      let blockchain_length = int_option_entry "Block Height"
 
       let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
 
@@ -202,16 +201,16 @@ module Types = struct
       let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
-        map_entry "Proposers Running" ~f:(fun keys ->
+        map_entry "Block Producers Running" ~f:(fun keys ->
             Printf.sprintf "Total: %d " (List.length keys)
             ^ List.to_string ~f:Public_key.Compressed.to_string keys )
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
       let consensus_time_best_tip =
-        string_option_entry "Best Tip Consensus Time"
+        string_option_entry "Best Tip Consensus Time (epoch:slot)"
 
-      let consensus_time_now = string_entry "Consensus Time Now"
+      let consensus_time_now = string_entry "Consensus Time Now (epoch:slot)"
 
       let consensus_mechanism = string_entry "Consensus Mechanism"
 
@@ -280,6 +279,19 @@ module Send_user_command = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Send_user_command" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Get_transaction_status = struct
+  type query = User_command.Stable.Latest.t [@@deriving bin_io]
+
+  type response = Transaction_status.State.Stable.Latest.t Or_error.t
+  [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_transaction_status" ~version:0 ~bin_query
       ~bin_response
 end
 

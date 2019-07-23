@@ -75,11 +75,11 @@ let get_balance =
              port
          with
          | Ok (Some b) ->
-             printf "%s\n" (Currency.Balance.to_string b)
+             printf "Balance: %s coda\n" (Currency.Balance.to_string b)
          | Ok None ->
-             printf "No account found at that public_key (zero balance)\n"
+             printf "There are no funds in this account\n"
          | Error e ->
-             printf "Failed to get balance %s\n" (Error.to_string_hum e) ))
+             printf "Failed to get balance\n%s\n" (Error.to_string_hum e) ))
 
 let print_trust_status status json =
   if json then
@@ -440,13 +440,16 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            User_command.Payload.create ~fee ~nonce
              ~memo:User_command_memo.dummy ~body
          in
-         let payment = User_command.sign sender_kp payload in
-         dispatch_with_message Daemon_rpcs.Send_user_command.rpc
-           (payment :> User_command.t)
-           port
+         let payment =
+           (User_command.sign sender_kp payload :> User_command.t)
+         in
+         dispatch_with_message Daemon_rpcs.Send_user_command.rpc payment port
            ~success:
              (Or_error.map ~f:(fun receipt_chain_hash ->
-                  sprintf "Initiated %s\nReceipt chain hash: %s" label
+                  sprintf
+                    "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
+                    label
+                    (User_command.to_base58_check payment)
                     (Receipt.Chain_hash.to_string receipt_chain_hash) ))
            ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
 
@@ -466,6 +469,26 @@ let send_payment =
   in
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
+
+let get_transaction_status =
+  Command.async ~summary:"Get the status of a transaction"
+    (Cli_lib.Background_daemon.init
+       Command.Param.(anon @@ ("txn" %: string))
+       ~f:(fun port serialized_transaction ->
+         match User_command.of_base58_check serialized_transaction with
+         | Ok user_command ->
+             dispatch_with_message Daemon_rpcs.Get_transaction_status.rpc
+               user_command port
+               ~success:
+                 (Or_error.map ~f:(fun status ->
+                      sprintf !"Transaction status : %s\n"
+                      @@ Transaction_status.State.to_string status ))
+               ~error:(fun e ->
+                 sprintf "Failed to get transaction status : %s"
+                   (Error.to_string_hum e) )
+         | Error _e ->
+             eprintf "Could not deserialize user command" ;
+             exit 16 ))
 
 let delegate_stake =
   let body =
@@ -527,7 +550,7 @@ let generate_keypair =
     let open Deferred.Let_syntax in
     let kp = Keypair.create () in
     let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
-    printf "Public key: %s\n"
+    printf "Keypair generated\nPublic key: %s\n"
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check ) ;
     exit 0)
@@ -664,6 +687,7 @@ let command =
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
+    ; ("get-txn-status", get_transaction_status)
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("set-staking", set_staking)

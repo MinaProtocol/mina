@@ -188,8 +188,9 @@ module Haskell_process = struct
         ; cli_format external_ip discovery_port ]
         @ List.map filtered_initial_peers ~f:cli_format_initial_peer
       in
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "Args: %s\n"
-        (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
+      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+        "Kademlia command-line arguments: $argv"
+        ~metadata:[("argv", `List (List.map args ~f:(fun arg -> `String arg)))] ;
       (* This is where nix dumps the haskell artifact *)
       let kademlia_binary = "src/app/kademlia-haskell/result/bin/kademlia" in
       (* This is where you'd manually install kademlia *)
@@ -225,8 +226,10 @@ module Haskell_process = struct
                   ()
               | `Die, (Error _ as e) ->
                   Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                    !"Kademlia process died: %s%!"
-                    (Unix.Exit_or_signal.to_string_hum e) ;
+                    "Kademlia process died: $exit_or_signal"
+                    ~metadata:
+                      [ ( "exit_or_signal"
+                        , `String (Unix.Exit_or_signal.to_string_hum e) ) ] ;
                   raise Child_died ) ;
           Ok p
       | Error e ->
@@ -243,12 +246,14 @@ module Haskell_process = struct
           match%bind Process.run ~prog:"kill" ~args:[p] () with
           | Ok _ ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                "Killing Dead Kademlia Process %s" p ;
+                "Killing Kademlia process: $process"
+                ~metadata:[("process", `String p)] ;
               let%map () = Sys.remove lock_path in
               Ok ()
           | Error _ ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                "Process %s does not exists and will not be killed" p ;
+                "Process $process does not exist, won't kill"
+                ~metadata:[("process", `String p)] ;
               return @@ Ok () )
       | _ ->
           return @@ Ok ()
@@ -269,8 +274,8 @@ module Haskell_process = struct
           (Pipe.iter_without_pushback
              (Reader.pipe (Process.stderr process))
              ~f:(fun str ->
-               Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-                 str )) ;
+               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                 "Kademlia stderr output: %s" str )) ;
         t
     | _ ->
         Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
@@ -285,7 +290,7 @@ module Haskell_process = struct
         let prefix = String.prefix line prefix_name_size in
         let pass_through () =
           Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-            "Unexpected output from Kademlia Haskell: %s" line ;
+            "Unexpected Kademlia output: %s" line ;
           None
         in
         if String.length line < prefix_size then pass_through ()
@@ -294,18 +299,13 @@ module Haskell_process = struct
             String.slice line prefix_size (String.length line)
           in
           match prefix with
-          | "DBUG" ->
+          | "DBUG" | "EROR" ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-                ~metadata:[("kademlia_level", `String "DBUG")]
+                ~metadata:[("kademlia_level", `String prefix)]
                 line_no_prefix ;
               None
           | "TRAC" ->
               (* trace is 99% ping/pong checks, omit *)
-              None
-          | "EROR" ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-                ~metadata:[("kademlia_level", `String "EROR")]
-                line_no_prefix ;
               None
           | "DATA" ->
               (* Too noisy to put in info logs *)

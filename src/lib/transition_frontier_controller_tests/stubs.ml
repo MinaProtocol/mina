@@ -554,6 +554,10 @@ struct
     let peers_by_ip _ ip =
       [Network_peer.Peer.{host= ip; discovery_port= 0; communication_port= 0}]
 
+    let first_message _ = Ivar.create ()
+
+    let first_connection _ = Ivar.create ()
+
     let random_peers {peers; _} num_peers =
       let peer_list = Hash_set.to_list peers in
       List.take (List.permute peer_list) num_peers
