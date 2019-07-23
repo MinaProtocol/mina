@@ -113,6 +113,12 @@ module Incr = struct
 
   let transition_frontier t =
     of_broadcast_pipe @@ t.components.transition_frontier
+
+  let first_connection t =
+    of_ivar @@ Coda_networking.first_connection t.components.net
+
+  let first_message t =
+    of_ivar @@ Coda_networking.first_message t.components.net
 end
 
 [%%if
@@ -149,25 +155,23 @@ let sync_status t =
   let open Coda_incremental.Status in
   let transition_frontier_incr = Var.watch @@ Incr.transition_frontier t in
   let incremental_status =
-    map2
+    map4
       (Var.watch @@ Incr.online_status t)
       transition_frontier_incr
-      ~f:(fun online_status active_status ->
+      (Var.watch @@ Incr.first_connection t)
+      (Var.watch @@ Incr.first_message t)
+      ~f:(fun online_status active_status first_connection first_message ->
         match online_status with
         | `Offline ->
-            let (network : Coda_networking.t) = t.components.net in
-            if Coda_networking.has_made_a_connection network then (
+            if `Empty = first_connection then (
               Logger.info (Logger.create ()) ~module_:__MODULE__
                 ~location:__LOC__ "Coda daemon is now connecting" ;
               `Connecting )
-            else if Coda_networking.has_received_first_message network then (
+            else if `Empty = first_message then (
               Logger.info (Logger.create ()) ~module_:__MODULE__
                 ~location:__LOC__ "Coda daemon is now listening" ;
               `Listening )
-            else (
-              Logger.info (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__ "Coda daemon is now offline" ;
-              `Offline )
+            else `Offline
         | `Online ->
             Option.value_map active_status
               ~default:
@@ -562,6 +566,7 @@ let create (config : Config.t) =
               ~time_controller:config.time_controller ~new_blocks ~wallets
               ~external_transition_database:config.external_transition_database
               ~transition_frontier:frontier_broadcast_pipe_r
+              ~is_storing_all:config.is_archive_node
           in
           return
             { config
