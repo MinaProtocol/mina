@@ -16,15 +16,15 @@ open Coda_state
     [Transition_chain_witness.verify]. This function would returns a list
     of state hashes if the verification is successful.
     
-    2. using the list of state hashes to poke at current transition frontier
+    2. using the list of state hashes to poke a transition frontier
     in order to find the hashes of missing transitions. If none of the hashes
     are found, then it means some more transitions are missing.
 
     Once the list of missing hashes are computed, it would do another request to
-    download the corresponding transitions in batches. It will then perform the
+    download the corresponding transitions in a batch fashion. Next it will perform the
     following validations on each external_transition:
 
-``` 1. Check the list of transitions corresponds the list of hashes that we
+``` 1. Check the list of transitions corresponds to the list of hashes that we
     requested;
 
     2. Each transition is checked through [Transition_processor.Validator] and
