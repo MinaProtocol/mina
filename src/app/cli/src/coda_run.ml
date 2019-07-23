@@ -338,7 +338,8 @@ let handle_crash e =
     Briefly describe what you were doing, and include the last 20 lines from .coda-config/coda.log.
     And then paste the following:
 
-    %s%!|err}
+    %s
+%!|err}
     (Exn.to_string e)
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
