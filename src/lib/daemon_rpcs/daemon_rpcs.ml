@@ -175,8 +175,7 @@ module Types = struct
 
       let num_accounts = int_option_entry "Global Number of Accounts"
 
-      let blockchain_length =
-        int_option_entry "The Total Number of Blocks in the Blockchain"
+      let blockchain_length = int_option_entry "Block Height"
 
       let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
 
@@ -202,16 +201,16 @@ module Types = struct
       let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
-        map_entry "Proposers Running" ~f:(fun keys ->
+        map_entry "Block Producers Running" ~f:(fun keys ->
             Printf.sprintf "Total: %d " (List.length keys)
             ^ List.to_string ~f:Public_key.Compressed.to_string keys )
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
       let consensus_time_best_tip =
-        string_option_entry "Best Tip Consensus Time"
+        string_option_entry "Best Tip Consensus Time (epoch:slot)"
 
-      let consensus_time_now = string_entry "Consensus Time Now"
+      let consensus_time_now = string_entry "Consensus Time Now (epoch:slot)"
 
       let consensus_mechanism = string_entry "Consensus Mechanism"
 

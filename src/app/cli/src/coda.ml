@@ -36,16 +36,16 @@ let daemon logger =
      and propose_key =
        flag "propose-key"
          ~doc:
-           "KEYFILE Private key file for the proposing transitions. You \
-            cannot provide both `propose-key` and `propose-public-key`. \
-            (default:don't propose)"
+           "KEYFILE Private key file for the block producer. You cannot \
+            provide both `propose-key` and `propose-public-key`. \
+            (default:don't produce blocks)"
          (optional string)
      and propose_public_key =
        flag "propose-public-key"
          ~doc:
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both `propose-key` and \
-            `propose-public-key`. (default: don't propose)"
+            `propose-public-key`. (default: don't produce blocks)"
          (optional public_key_compressed)
      and initial_peers_raw =
        flag "peer"
@@ -256,10 +256,10 @@ let daemon logger =
            Logger.Processor.pretty ~log_level
              ~config:
                { Logproc_lib.Interpolator.mode= Inline
-               ; max_interpolation_length= 30
+               ; max_interpolation_length= 50
                ; pretty_print= true }
        in
-       Logger.Consumer_registry.register ~id:"primary_output"
+       Logger.Consumer_registry.register ~id:"default"
          ~processor:stdout_log_processor
          ~transport:(Logger.Transport.stdout ()) ;
        Parallel.init_master () ;
@@ -462,7 +462,7 @@ let daemon logger =
            (Async.Scheduler.long_cycles
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
-             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                "Long async cycle: $span milliseconds"
                ~metadata:[("span", `String (Time_ns.Span.to_string span))] ) ;
          let run_snark_worker_action =
