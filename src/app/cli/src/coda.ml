@@ -205,8 +205,13 @@ let daemon logger =
                  Deferred.return ([], [fullname])
            in
            let%bind dirs, files = all_files dir "" in
+           (* HACK to whitelist client_whitelist *)
+           let filtered_files =
+             List.filter files ~f:(fun file ->
+                 not (String.is_suffix file ~suffix:"client_whitelist") )
+           in
            let%bind () =
-             Deferred.List.iter files ~f:(fun file -> Sys.remove file)
+             Deferred.List.iter filtered_files ~f:(fun file -> Sys.remove file)
            in
            Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
          in
