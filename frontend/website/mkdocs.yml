@@ -28,4 +28,3 @@ markdown_extensions:
   - toc:
       permalink: a
   - admonition
-  # - codehilite

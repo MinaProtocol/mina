@@ -1,12 +1,12 @@
-/* Clipboard integration */
+/* adds copy button all code blocks */
+
 const blocks = document.querySelectorAll("pre > code");
 
 Array.prototype.forEach.call(blocks, (block, index) => {
-//   /* Create button with message container */
   const parent = block.parentNode;
   parent.style.position = "relative";
 
-  const button = document.createElement("div");
+  const button = document.createElement("button");
   button.style.position = "absolute";
   button.style.top = "6px";
   button.style.right = "6px";
