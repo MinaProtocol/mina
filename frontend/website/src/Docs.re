@@ -295,5 +295,7 @@ let make = _children => {
           {ReasonReact.string("{% endif %}")}
         </div>
       </article>
+      <script src={Links.Cdn.url("/static/js/clipboard.js")}>
+      </script>
     </div>,
 };
