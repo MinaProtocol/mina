@@ -720,13 +720,42 @@ let coda_commands logger =
 
 [%%endif]
 
+let print_version_help coda_exe =
+  (* mimic Jane Street command help *)
+  let lines =
+    [ "print version information"
+    ; ""
+    ; sprintf "  %s version" (Filename.basename coda_exe)
+    ; ""
+    ; "=== flags ==="
+    ; ""
+    ; "  [-help]  print this help text and exit"
+    ; "           (alias: -?)" ]
+  in
+  List.iter lines ~f:(Core.printf "%s\n%!")
+
+let print_version_info () =
+  Core.printf "Commit %s on branch %s\n"
+    (String.sub Coda_version.commit_id ~pos:0 ~len:7)
+    Coda_version.branch
+
 let () =
   Random.self_init () ;
   let logger = Logger.create ~initialize_default_consumer:false () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
-  Command.run
-    (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
-       (coda_commands logger)) ;
+  (* intercept command-line processing for "version", because we don't
+     use the Jane Street scripts that generate their version information
+   *)
+  ( match Sys.argv with
+  | [|_coda_exe; "version"|] ->
+      print_version_info ()
+  | [|coda_exe; "version"; s|]
+    when List.mem ["-help"; "-?"] s ~equal:String.equal ->
+      print_version_help coda_exe
+  | _ ->
+      Command.run
+        (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
+           (coda_commands logger)) ) ;
   Core.exit 0
