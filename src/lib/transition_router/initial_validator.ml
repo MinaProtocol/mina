@@ -139,14 +139,14 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
           if not (State_hash.equal hash protocol_state_hash) then
             Logger.error logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
-                [ ("proposer", Public_key.Compressed.to_yojson proposer)
+                [ ("block_producer", Public_key.Compressed.to_yojson proposer)
                 ; ("slot", `Int slot)
                 ; ("hash", State_hash.to_yojson hash)
                 ; ( "current_protocol_state_hash"
                   , State_hash.to_yojson protocol_state_hash ) ]
-              "Duplicate proposer and slot: proposer = $proposer, slot = \
-               $slot, previous protocol state hash = $hash, current protocol \
-               state hash = $current_protocol_state_hash"
+              "Duplicate producer and slot: producer = $block_producer, slot \
+               = $slot, previous protocol state hash = $hash, current \
+               protocol state hash = $current_protocol_state_hash"
   end
 
   let run ~logger ~trust_system ~verifier ~transition_reader

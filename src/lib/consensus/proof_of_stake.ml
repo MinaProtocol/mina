@@ -2589,8 +2589,12 @@ module Hooks = struct
 
   let next_proposal now (state : Consensus_state.Value.t) ~local_state
       ~keypairs ~logger =
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Checking for next proposal" ;
+    let info_if_proposing =
+      if Keypair.And_compressed_pk.Set.is_empty keypairs then Logger.debug
+      else Logger.info
+    in
+    info_if_proposing logger ~module_:__MODULE__ ~location:__LOC__
+      "Determining next slot to produce block" ;
     let curr_epoch, curr_slot =
       Epoch.epoch_and_slot_of_time_exn
         (Coda_base.Block_time.of_span_since_epoch
@@ -2679,8 +2683,8 @@ module Hooks = struct
     let ms_since_epoch = Fn.compose Time.Span.to_ms Time.to_span_since_epoch in
     match next_slot with
     | Some (next_slot, keypair, data) ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Proposing in %d slots"
+        info_if_proposing logger ~module_:__MODULE__ ~location:__LOC__
+          "Producing block in %d slots"
           (Epoch.Slot.to_int next_slot - Epoch.Slot.to_int slot) ;
         if Epoch.Slot.equal curr_slot next_slot then
           `Propose_now (keypair, data)
@@ -2692,8 +2696,9 @@ module Hooks = struct
             , data )
     | None ->
         let epoch_end_time = Epoch.end_time epoch |> ms_since_epoch in
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "No slots won in this epoch. Waiting for next epoch, @%d"
+        info_if_proposing logger ~module_:__MODULE__ ~location:__LOC__
+          "No slots won in this epoch. Waiting for next epoch to check again, \
+           @%d"
           (Int64.to_int epoch_end_time) ;
         `Check_again epoch_end_time
 
