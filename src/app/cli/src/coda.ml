@@ -210,8 +210,10 @@ let daemon logger =
            in
            Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
          in
-         let clean_up () =
-           let%bind () = del_files conf_dir in
+         let make_version ~wipe_dir:bool =
+           let%bind () =
+             if wipe_dir then del_files conf_dir else Deferred.unit
+           in
            let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
            Writer.write_line wr Coda_version.commit_id ;
            Writer.close wr
@@ -232,7 +234,7 @@ let daemon logger =
                  "Different version of Coda detected in config directory \
                   $config_directory, removing existing configuration"
                  ~metadata:[("config_directory", `String conf_dir)] ;
-               clean_up () )
+               make_version ~wipe_dir:true )
          | Error e ->
              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                ~metadata:[("error", `String (Error.to_string_mach e))]
@@ -241,7 +243,7 @@ let daemon logger =
                "Failed to read coda.version, cleaning up the config directory \
                 $config_directory"
                ~metadata:[("config_directory", `String conf_dir)] ;
-             clean_up ()
+             make_version ~wipe_dir:false
        in
        (* 512MB logrotate max size = 1GB max filesystem usage *)
        let logrotate_max_size = 1024 * 1024 * 512 in
