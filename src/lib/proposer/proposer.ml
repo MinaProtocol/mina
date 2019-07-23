@@ -475,7 +475,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     ~local_state:consensus_local_state
                   = None ) ;
                 match
-                  measure "asking conensus what to do" (fun () ->
+                  measure "asking consensus what to do" (fun () ->
                       Consensus.Hooks.next_proposal
                         (time_to_ms (Time.now time_controller))
                         consensus_state ~local_state:consensus_local_state
