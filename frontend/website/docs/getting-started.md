@@ -2,14 +2,14 @@
 
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
-Join the Coda server on [Discord](http://bit.ly/CodaDiscord) to connect with the community, get support, and learn about how you can participate in weekly challenges for Testnet Points.\*
+Join the Coda server on [Discord](http://bit.ly/CodaDiscord) to connect with the community, get support, and learn about how you can participate in weekly challenges for Testnet Points.[\*](#disclaimer)
 
 !!! note
     Last updated for release v0.0.1
 
 ## Requirements
 
-**Software**: macOS (10.x+) or Linux (currently supports Debian 9 and Ubuntu 18.04 LTS)
+**Software**: macOS or Linux (currently supports Debian 9 and Ubuntu 18.04 LTS)
 
 **Hardware**: Sending and receiving coda does not require any special hardware, but participating as a node operator currently requires:
 
@@ -29,7 +29,10 @@ The newest binary releases can be found below. Instructions are provided for mac
 
 ### macOS
 
-- Run `brew install codaprotocol/coda/coda`
+- Install using [brew](https://brew.sh)
+```
+brew install codaprotocol/coda/coda
+``` 
 - `coda -help` to see if it works
 - Set up port forwarding ([see here](/docs/troubleshooting/#port-forwarding))
 
@@ -38,7 +41,7 @@ The newest binary releases can be found below. Instructions are provided for mac
 - Add the Coda Debian repo and install
 
 ```
-sudo echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/coda.list
+echo "deb [trusted=yes] http://packages.o1test.net unstable main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
 sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-9fa6e5ec
 ```
@@ -59,5 +62,7 @@ If you're running another Linux distro or a different version of macOS, you can 
 
 Now that you've installed the Coda binary and configured settings, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!
 
+<span id="disclaimer">
 \*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
+</span>
 

@@ -6,6 +6,8 @@ Here are some common problems you might encounter while trying to set up the Cod
 
 If you're running a Coda node on a home or office machine, you'll have to set up [port forwarding](https://en.wikipedia.org/wiki/Port_forwarding) to make your node visible on the internet to other Coda nodes. Note that when running Coda in the cloud, this is unnecessary -- instead you should configure security groups for your cloud provider.
 
+### Using UPnP
+
 Follow the steps below to use [MiniUPnP](https://github.com/miniupnp/miniupnp) to forward ports on your router:
 
 1. Run `ifconfig` to get your internal IP address -- you can find this in the output corresponding to the field `en0` on macOS and `wlan0` on a linux system:
