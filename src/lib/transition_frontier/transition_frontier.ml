@@ -460,9 +460,9 @@ module Make (Inputs : Inputs_intf) :
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                     ~metadata:
                       [ ( "state_hash"
-                        , State_hash.to_yojson successor_state_hash ) ]
-                    "Could not visualize node $state_hash. Looks like the \
-                     node did not get garbage collected properly" ;
+                        , State_hash.to_yojson successor_state_hash )
+                      ; ("error", `String "missing from frontier") ]
+                    "Could not visualize state $state_hash: $error" ;
                   acc_graph ) )
   end
 
@@ -493,8 +493,8 @@ module Make (Inputs : Inputs_intf) :
       | Some x ->
           Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("state_hash", State_hash.to_yojson hash)]
-            "attach_node_to with breadcrumb for state $state_hash already \
-             present; catchup scheduler bug?" ;
+            "attach_node_to called with breadcrumb for state $state_hash \
+             which is already present; catchup scheduler bug?" ;
           Some x
       | None ->
           Hashtbl.set t.table ~key:parent_hash
@@ -634,9 +634,9 @@ module Make (Inputs : Inputs_intf) :
       in
       go bc2 []
     in
-    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Common ancestor: %{sexp: State_hash.t}"
-      ancestor ;
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      "Common ancestor: $state_hash"
+      ~metadata:[("state_hash", State_hash.to_yojson ancestor)] ;
     ( path_from_to (find_exn t ancestor) bc1
     , path_from_to (find_exn t ancestor) bc2 )
 
@@ -913,9 +913,12 @@ module Make (Inputs : Inputs_intf) :
         add_breadcrumb_exn t breadcrumb
     | None ->
         Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
-          !"When trying to add breadcrumb, its parent had been removed from \
-            transition frontier: %{sexp: State_hash.t}"
-          parent_hash ;
+          "Failed to add breadcrumb for state $state_hash: $error"
+          ~metadata:
+            [ ("error", `String "parent missing")
+            ; ("parent_state_hash", State_hash.to_yojson parent_hash)
+            ; ( "state_hash"
+              , State_hash.to_yojson breadcrumb.transition_with_hash.hash ) ] ;
         Deferred.unit
 
   let best_tip_path_length_exn {table; root; best_tip; _} =

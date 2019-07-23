@@ -147,17 +147,82 @@ let daemon logger =
                  Deferred.return ll )
        in
        let%bind conf_dir =
-         if is_background then (
+         if is_background then
            let home = Core.Sys.home_directory () in
            let conf_dir = compute_conf_dir home in
+           Deferred.return conf_dir
+         else Sys.home_directory () >>| compute_conf_dir
+       in
+       let () =
+         if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
              conf_dir ;
            Daemon.daemonize
              ~redirect_stdout:(`File_append (conf_dir ^/ "coda.log"))
              ~redirect_stderr:(`File_append (conf_dir ^/ "coda.log"))
-             () ;
-           Deferred.return conf_dir )
-         else Sys.home_directory () >>| compute_conf_dir
+             () )
+         else ()
+       in
+       (* Check if the config files are for the current version. 
+        * WARNING: Deleting ALL the files in the config directory if there is
+        * a version mismatch *)
+       (* When persistence is added back, this needs to be revisited
+        * to handle persistence related files properly *)
+       let%bind () =
+         let del_files dir =
+           let rec all_files dirname basename =
+             let fullname = Filename.concat dirname basename in
+             match%bind Sys.is_directory fullname with
+             | `Yes ->
+                 let%map dirs, files =
+                   Sys.ls_dir fullname
+                   >>= Deferred.List.map ~f:(all_files fullname)
+                   >>| List.unzip
+                 in
+                 let dirs =
+                   if String.equal dirname conf_dir then List.concat dirs
+                   else List.append (List.concat dirs) [fullname]
+                 in
+                 (dirs, List.concat files)
+             | _ ->
+                 Deferred.return ([], [fullname])
+           in
+           let%bind dirs, files = all_files dir "" in
+           let%bind () =
+             Deferred.List.iter files ~f:(fun file -> Sys.remove file)
+           in
+           Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
+         in
+         let clean_up () =
+           let%bind () = del_files conf_dir in
+           let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
+           Writer.write_line wr Coda_version.commit_id ;
+           Writer.close wr
+         in
+         match%bind
+           Monitor.try_with_or_error (fun () ->
+               let%bind r = Reader.open_file (conf_dir ^/ "coda.version") in
+               match%map Pipe.to_list (Reader.lines r) with
+               | [] ->
+                   ""
+               | s ->
+                   List.hd_exn s )
+         with
+         | Ok c ->
+             if String.equal c Coda_version.commit_id then return ()
+             else (
+               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                 "Older version in Coda config directory. Cleaning up %s"
+                 conf_dir ;
+               clean_up () )
+         | Error e ->
+             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+               "Error reading coda.version: %s" (Error.to_string_mach e) ;
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               "Failed to read coda.version, cleaning up the config directory \
+                %s"
+               conf_dir ;
+             clean_up ()
        in
        (* 512MB logrotate max size = 1GB max filesystem usage *)
        let logrotate_max_size = 1024 * 1024 * 512 in

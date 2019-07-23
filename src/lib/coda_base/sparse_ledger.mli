@@ -7,11 +7,11 @@ type t =
   , Account.key
   , Account.t )
   Sparse_ledger_lib.Sparse_ledger.Poly.Stable.V1.t
-[@@deriving sexp]
+[@@deriving to_yojson, sexp]
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, sexp, version]
+    type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
   end
 
   module Latest = V1

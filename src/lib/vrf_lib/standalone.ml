@@ -481,7 +481,10 @@ let%test_module "vrf-test" =
     module Pedersen =
       Snarky.Pedersen.Make (Impl) (Curve)
         (struct
-          let params = params
+          let params =
+            Array.map
+              ~f:(Tuple_lib.Quadruple.map ~f:Curve.to_affine_exn)
+              params
         end)
 
     module Message = struct

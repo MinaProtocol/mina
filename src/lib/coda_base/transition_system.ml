@@ -258,13 +258,6 @@ struct
                     (Fn.compose Verifier.proof_of_backend_proof
                        Prover_state.proof))
         in
-        Logger.error ~module_:__MODULE__ ~location:__LOC__ (Logger.create ())
-          !"When wrap executes: Step_vk key is $step_vk"
-          ~metadata:
-            [ ( "step_vk"
-              , `String
-                  (Tick0.Verification_key.to_string Step_vk.verification_key)
-              ) ] ;
         Verifier.verify step_vk_constant step_vk_precomp [input] proof
       in
       with_label __LOC__ (Boolean.Assert.is_true result)

@@ -47,7 +47,7 @@ module Colors = {
 
   let rosebud = `rgb((163, 83, 111));
   let rosebudAlpha = a => `rgba((163, 83, 111, a));
-  
+
   let blueBlue = `rgb((42, 81, 224));
   let midnight = `rgb((31, 45, 61));
 
@@ -59,6 +59,9 @@ module Colors = {
 
   let marine = `rgb((51, 104, 151));
   let marineAlpha = a => `rgba((51, 104, 151, a));
+
+  let jungleAlpha = a => `rgba((47, 172, 70, a));
+  let jungle = jungleAlpha(1.);
 };
 
 module Typeface = {
@@ -198,21 +201,22 @@ module Link = {
 module H1 = {
   open Css;
 
-  let (hero, heroStyles) = generateStyles([
-    Typeface.ibmplexsans,
-    fontWeight(`light),
-    fontSize(`rem(2.25)),
-    letterSpacing(`rem(-0.02375)),
-    lineHeight(`rem(3.0)),
-    media(
-      MediaQuery.full,
-      [
-        fontSize(`rem(3.0)),
-        letterSpacing(`rem(-0.03125)),
-        lineHeight(`rem(4.0)),
-      ],
-    ),
-  ]);
+  let (hero, heroStyles) =
+    generateStyles([
+      Typeface.ibmplexsans,
+      fontWeight(`light),
+      fontSize(`rem(2.25)),
+      letterSpacing(`rem(-0.02375)),
+      lineHeight(`rem(3.0)),
+      media(
+        MediaQuery.full,
+        [
+          fontSize(`rem(3.0)),
+          letterSpacing(`rem(-0.03125)),
+          lineHeight(`rem(4.0)),
+        ],
+      ),
+    ]);
 };
 
 module H2 = {

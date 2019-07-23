@@ -62,6 +62,8 @@ include Sexpable.Of_stringable (String_hum)
 
 include (String_hum : Stringable.S with type t := t)
 
+let to_yojson t = `String (to_string t)
+
 include Binable.Of_stringable (struct
   type nonrec t = t
 
