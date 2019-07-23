@@ -11,13 +11,13 @@ nav:
   - Become a Node Operator: node-operator.md
   - Contributing to Coda: contributing.md
   - Developers:
-    - Overview: developers/index.md
+    - Developers Overview: developers/index.md
     - Repository Structure: developers/directory-structure.md
     - Style Guide: developers/style-guide.md
     - Code Reviews: developers/code-reviews.md
     - GraphQL API: developers/graphql-api.md
   - Coda Protocol Architecture:
-    - Overview: architecture/index.md
+    - Coda Overview: architecture/index.md
     - Lifecycle of a Payment: architecture/lifecycle-payment.md
     - Consensus: architecture/consensus.md
     - Proof of Stake: architecture/proof-of-stake.md
