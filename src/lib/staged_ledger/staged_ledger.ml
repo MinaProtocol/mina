@@ -100,7 +100,7 @@ struct
       | Error e ->
           Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
-              [ ("statement", Transaction_snark_statement.to_yojson statement)
+              [ ("statement", Transaction_snark.Statement.to_yojson statement)
               ; ("error", `String (Error.to_string_hum e)) ]
             "Invalid transaction snark for statement $statement: $error" ;
           false
