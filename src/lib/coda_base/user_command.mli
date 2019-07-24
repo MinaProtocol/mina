@@ -23,6 +23,8 @@ module Stable : sig
       Poly.Stable.V1.t
     [@@deriving bin_io, sexp, hash, yojson, version]
 
+    val version_byte : char (* for base58_check *)
+
     include Comparable.S with type t := t
 
     include Hashable.S with type t := t
