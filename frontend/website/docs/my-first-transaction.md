@@ -71,7 +71,7 @@ Let's send some of our newly received coda to this service to see what a payment
 
     coda client send-payment \
       -amount 20 \
-      -receiver tNciF85uM2yA1QHWc24vdQCGUe7EykM4cqaJma8FXqp64JDssnv5ywPsWNv3417akmKRwBmVaMwrSkXjZrBpJaCtfcAbNupLwSx1PEd9135kEZek7muGySzq1bQZ6nGR4oNVoy3qygX1ph \
+      -receiver tNciB5atiEC8k4poyYQX64WPZzSTt1pLYwujjiQeQtw9xaTPY5ZqVdcc6aP3MUVUVm8QTP7vcGPtGqZmDmozkjpZZKiMppMc4D6Dq8JScuPw5D9oCjAoYq431Ka8Ch2povNMJE7TYusPM3 \
       -fee 5 \
       -privkey-path keys/my-wallet
 
