@@ -215,10 +215,10 @@ let generate_next_state ~previous_protocol_state ~time_controller
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs
     ~consensus_local_state ~frontier_reader ~transition_writer =
-  trace_task "proposer" (fun () ->
+  trace_task "block_producer" (fun () ->
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "No frontier available; pausing proposer."
+          "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let propose ivar (keypair, scheduled_time, proposal_data) =
@@ -230,7 +230,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             let crumb = Transition_frontier.best_tip frontier in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
-              !"Generating new block on top of $breadcrumb%!" ;
+              !"Producing new block with parent $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
               let transition : External_transition.Validated.t =
                 (Breadcrumb.transition_with_hash crumb).data
@@ -397,14 +397,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         [("state_hash", State_hash.to_yojson transition_hash)]
                       in
                       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                        !"Submitting transition $state_hash to the transition \
-                          frontier controller"
+                        !"Submitting newly produced block $state_hash to the \
+                          transition frontier controller"
                         ~metadata ;
                       Coda_metrics.(Counter.inc_one Proposer.blocks_proposed) ;
                       let%bind () =
                         Strict_pipe.Writer.write transition_writer breadcrumb
                       in
-                      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                         ~metadata
                         "Waiting for transition $state_hash to be inserted \
                          into frontier" ;
@@ -537,8 +537,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             [ ( "time_till_genesis"
               , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )
             ]
-          "node started before genesis: waiting $time_till_genesis ms before \
-           proposing any blocks" ;
+          "Node started before genesis: waiting $time_till_genesis \
+           milliseconds before starting block producer" ;
         ignore
           (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
                start () )) )

@@ -35,7 +35,11 @@ let load ~logger ~disk_location : t Deferred.t =
               Some (keypair.public_key |> Public_key.compress, keypair)
           | Error e ->
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                "Failed to read %s: %s" path (Error.to_string_hum e) ;
+                "Error reading key pair at $path/$file: $error"
+                ~metadata:
+                  [ ("file", `String file)
+                  ; ("path", `String path)
+                  ; ("error", `String (Error.to_string_hum e)) ] ;
               None )
   in
   let%map () = Unix.chmod path ~perm:0o700 in

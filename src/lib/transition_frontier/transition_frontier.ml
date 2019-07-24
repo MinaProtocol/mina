@@ -196,27 +196,13 @@ module Make (Inputs : Inputs_intf) :
       let open External_transition.Validated in
       let open Staged_ledger_diff in
       user_commands @@ staged_ledger_diff external_transition
+
+    let all_user_commands breadcrumbs =
+      Sequence.fold (Sequence.of_list breadcrumbs) ~init:User_command.Set.empty
+        ~f:(fun acc_set breadcrumb ->
+          let user_commands = to_user_commands breadcrumb in
+          Set.union acc_set (User_command.Set.of_list user_commands) )
   end
-
-  module Fake_db = struct
-    include Coda_base.Ledger.Db
-
-    type location = Location.t
-
-    let get_or_create ledger key =
-      let key, loc =
-        match
-          get_or_create_account_exn ledger key (Account.initialize key)
-        with
-        | `Existed, loc ->
-            ([], loc)
-        | `Added, loc ->
-            ([key], loc)
-      in
-      (key, get ledger loc |> Option.value_exn, loc)
-  end
-
-  module TL = Coda_base.Transaction_logic.Make (Fake_db)
 
   let max_length = max_length
 
@@ -424,6 +410,8 @@ module Make (Inputs : Inputs_intf) :
 
   let best_tip t = find_exn t t.best_tip
 
+  let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
+
   let successor_hashes t hash =
     let node = Hashtbl.find_exn t.table hash in
     node.successor_hashes
@@ -457,7 +445,7 @@ module Make (Inputs : Inputs_intf) :
               | Some child_node ->
                   add_edge acc_graph node child_node
               | None ->
-                  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                     ~metadata:
                       [ ( "state_hash"
                         , State_hash.to_yojson successor_state_hash )
@@ -854,20 +842,25 @@ module Make (Inputs : Inputs_intf) :
                   ~expect:(Ledger_proof.statement proof_data).source
                   ( Ledger.Db.merkle_root t.root_snarked_ledger
                   |> Frozen_ledger_hash.of_ledger_hash ) ;
-                let db_mask = Ledger.of_database t.root_snarked_ledger in
+                (* Apply all the transactions associated with the new ledger
+                   proof to the database-backed SNARKed ledger. We create a
+                   mask and apply them to that, then commit it to the DB. This
+                   saves a lot of IO since committing is batched. Would be even
+                   faster if we implemented #2760. *)
+                let db_casted =
+                  Ledger.Any_ledger.cast
+                    (module Ledger.Db)
+                    t.root_snarked_ledger
+                in
+                let db_mask =
+                  Ledger.Maskable.register_mask db_casted
+                    (Ledger.Mask.create ())
+                in
                 Non_empty_list.iter txns ~f:(fun txn ->
-                    (* TODO: @cmr use the ignore-hash ledger here as well *)
-                    TL.apply_transaction t.root_snarked_ledger txn
+                    Ledger.apply_transaction db_mask txn
                     |> Or_error.ok_exn |> ignore ) ;
-                (* TODO: See issue #1606 to make this faster *)
-
-                (*Ledger.commit db_mask ;*)
-                ignore
-                  (Ledger.Maskable.unregister_mask_exn
-                     (Ledger.Any_ledger.cast
-                        (module Ledger.Db)
-                        t.root_snarked_ledger)
-                     db_mask)
+                Ledger.commit db_mask ;
+                ignore @@ Ledger.Maskable.unregister_mask_exn db_casted db_mask
             | _, false | None, _ ->
                 () ) ;
             [%test_result: Frozen_ledger_hash.t]
@@ -960,6 +953,8 @@ module Make (Inputs : Inputs_intf) :
     List.equal equal_breadcrumb
       (all_breadcrumbs t1 |> sort_breadcrumbs)
       (all_breadcrumbs t2 |> sort_breadcrumbs)
+
+  let all_user_commands t = Breadcrumb.all_user_commands (all_breadcrumbs t)
 
   module For_tests = struct
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger
