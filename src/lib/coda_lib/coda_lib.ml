@@ -22,7 +22,7 @@ type components =
   ; transaction_pool: Network_pool.Transaction_pool.t
   ; snark_pool: Network_pool.Snark_pool.t
   ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
-  }
+  ; most_recent_valid_block: External_transition.t Broadcast_pipe.Reader.t }
 
 type pipes =
   { validated_transitions_reader:
@@ -252,6 +252,8 @@ let receipt_chain_database t = t.config.receipt_chain_database
 
 let top_level_logger t = t.config.logger
 
+let most_recent_valid_transition t = t.components.most_recent_valid_block
+
 let staged_ledger_ledger_proof t =
   let open Option.Let_syntax in
   let%bind sl = best_staged_ledger_opt t in
@@ -393,6 +395,11 @@ let create (config : Config.t) =
           let%bind ledger_db, transition_frontier =
             create_genesis_frontier config ~verifier
           in
+          let genesis_transition =
+            Transition_frontier.(
+              root transition_frontier |> Breadcrumb.external_transition
+              |> External_transition.Validated.forget_validation)
+          in
           let ledger_db =
             Ledger_transfer.transfer_accounts
               ~src:(Lazy.force Genesis_ledger.t)
@@ -459,6 +466,10 @@ let create (config : Config.t) =
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
+          let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
+              =
+            Broadcast_pipe.create genesis_transition
+          in
           let valid_transitions =
             Transition_router.run ~logger:config.logger
               ~trust_system:config.trust_system ~verifier ~network:net
@@ -470,6 +481,7 @@ let create (config : Config.t) =
                 (Strict_pipe.Reader.map external_transitions_reader
                    ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
               ~proposer_transition_reader transition_frontier
+              ~most_recent_valid_block
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -575,7 +587,8 @@ let create (config : Config.t) =
                 { net
                 ; transaction_pool
                 ; snark_pool
-                ; transition_frontier= frontier_broadcast_pipe_r }
+                ; transition_frontier= frontier_broadcast_pipe_r
+                ; most_recent_valid_block= most_recent_valid_block_reader }
             ; pipes=
                 { validated_transitions_reader= valid_transitions_for_api
                 ; proposer_transition_writer
