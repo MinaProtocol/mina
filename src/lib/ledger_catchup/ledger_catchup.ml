@@ -198,10 +198,7 @@ module Make (Inputs : Inputs.S) :
   let verify_against_hashes transitions hashes =
     List.length transitions = List.length hashes
     && List.for_all2_exn transitions hashes ~f:(fun transition hash ->
-           State_hash.equal
-             ( External_transition.protocol_state transition
-             |> Protocol_state.hash )
-             hash )
+           State_hash.equal (External_transition.state_hash transition) hash )
 
   let rec partition size = function
     | [] ->
@@ -216,7 +213,7 @@ module Make (Inputs : Inputs.S) :
     let random_peers = Network.random_peers network num_peers in
     Deferred.Or_error.List.concat_map
       (partition maximum_download_size hashes_of_missing_transitions)
-      ~how:`Sequential ~f:(fun hashes ->
+      ~how:`Parallel ~f:(fun hashes ->
         Deferred.Or_error.find_map_ok (preferred_peer :: random_peers)
           ~f:(fun peer ->
             match%bind Network.get_transition_chain network peer hashes with
@@ -243,9 +240,7 @@ module Make (Inputs : Inputs.S) :
                   @@ List.map transitions ~f:(fun transition ->
                          let transition_with_hash =
                            With_hash.of_data transition
-                             ~hash_data:
-                               (Fn.compose Protocol_state.hash
-                                  External_transition.protocol_state)
+                             ~hash_data:External_transition.state_hash
                          in
                          Envelope.Incoming.wrap ~data:transition_with_hash
                            ~sender:(Envelope.Sender.Remote peer.host) ) ) )
@@ -281,8 +276,7 @@ module Make (Inputs : Inputs.S) :
               |> With_hash.data
             in
             let initial_state_hash =
-              External_transition.protocol_state oldest_missing_transition
-              |> Protocol_state.previous_state_hash
+              External_transition.parent_hash oldest_missing_transition
             in
             Deferred.Or_error.return (acc, initial_state_hash) )
     in
