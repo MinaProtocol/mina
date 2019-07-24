@@ -119,7 +119,7 @@ let project_directory = "CODA_PROJECT_DIR"
 let run_service coda ~conf_dir ~logger =
   O1trace.trace_task "web pipe" (fun () -> function
     | `None ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "Not running a web client pipe" ;
         don't_wait_for
           (Strict_pipe.Reader.iter_without_pushback

@@ -5,11 +5,9 @@ open Signature_lib
 
 let name = "coda-delegation-test"
 
-let logger = Logger.create ()
-
 let heartbeat_flag = ref true
 
-let print_heartbeat () =
+let print_heartbeat logger =
   let rec loop () =
     if !heartbeat_flag then (
       Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
@@ -21,6 +19,7 @@ let print_heartbeat () =
   loop ()
 
 let main () =
+  let logger = Logger.create () in
   let num_proposers = 3 in
   let snark_work_public_keys ndx =
     List.nth_exn Genesis_ledger.accounts ndx
@@ -33,7 +32,7 @@ let main () =
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Started test net" ;
   (* keep CI alive *)
-  Deferred.don't_wait_for (print_heartbeat ()) ;
+  Deferred.don't_wait_for (print_heartbeat logger) ;
   (* dump account info to log *)
   List.iteri Genesis_ledger.accounts ~f:(fun ndx ((_, acct) as record) ->
       let keypair = Genesis_ledger.keypair_of_account_record_exn record in

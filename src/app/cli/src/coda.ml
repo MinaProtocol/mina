@@ -36,16 +36,16 @@ let daemon logger =
      and propose_key =
        flag "propose-key"
          ~doc:
-           "KEYFILE Private key file for the proposing transitions. You \
-            cannot provide both `propose-key` and `propose-public-key`. \
-            (default:don't propose)"
+           "KEYFILE Private key file for the block producer. You cannot \
+            provide both `propose-key` and `propose-public-key`. \
+            (default:don't produce blocks)"
          (optional string)
      and propose_public_key =
        flag "propose-public-key"
          ~doc:
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both `propose-key` and \
-            `propose-public-key`. (default: don't propose)"
+            `propose-public-key`. (default: don't produce blocks)"
          (optional public_key_compressed)
      and initial_peers_raw =
        flag "peer"
@@ -210,8 +210,10 @@ let daemon logger =
            in
            Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
          in
-         let clean_up () =
-           let%bind () = del_files conf_dir in
+         let make_version ~wipe_dir =
+           let%bind () =
+             if wipe_dir then del_files conf_dir else Deferred.unit
+           in
            let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
            Writer.write_line wr Coda_version.commit_id ;
            Writer.close wr
@@ -232,7 +234,7 @@ let daemon logger =
                  "Different version of Coda detected in config directory \
                   $config_directory, removing existing configuration"
                  ~metadata:[("config_directory", `String conf_dir)] ;
-               clean_up () )
+               make_version ~wipe_dir:true )
          | Error e ->
              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                ~metadata:[("error", `String (Error.to_string_mach e))]
@@ -241,7 +243,7 @@ let daemon logger =
                "Failed to read coda.version, cleaning up the config directory \
                 $config_directory"
                ~metadata:[("config_directory", `String conf_dir)] ;
-             clean_up ()
+             make_version ~wipe_dir:false
        in
        (* 512MB logrotate max size = 1GB max filesystem usage *)
        let logrotate_max_size = 1024 * 1024 * 512 in
@@ -256,10 +258,10 @@ let daemon logger =
            Logger.Processor.pretty ~log_level
              ~config:
                { Logproc_lib.Interpolator.mode= Inline
-               ; max_interpolation_length= 30
+               ; max_interpolation_length= 50
                ; pretty_print= true }
        in
-       Logger.Consumer_registry.register ~id:"primary_output"
+       Logger.Consumer_registry.register ~id:"default"
          ~processor:stdout_log_processor
          ~transport:(Logger.Transport.stdout ()) ;
        Parallel.init_master () ;
@@ -462,7 +464,7 @@ let daemon logger =
            (Async.Scheduler.long_cycles
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
-             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                "Long async cycle: $span milliseconds"
                ~metadata:[("span", `String (Time_ns.Span.to_string span))] ) ;
          let run_snark_worker_action =
