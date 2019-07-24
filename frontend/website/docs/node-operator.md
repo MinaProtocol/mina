@@ -86,7 +86,7 @@ However, this isn't data encoding or compression in the traditional sense - rath
 When you [start the daemon](/docs/my-first-transaction/#start-up-a-node), set these extra arguments to also start a snark-worker:
 
     coda daemon \
-        -peer dry-plants.o1test.net:8303 \
+        -peer hello-coda.o1test.net:8303 \
         -run-snark-worker <public-key> \
         -snark-worker-fee <fee>
 
