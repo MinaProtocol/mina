@@ -26,5 +26,5 @@ Array.prototype.forEach.call(blocks, (block, index) => {
     });
   };
 
-  parent.insertBefore(button, block);
+  // parent.insertBefore(button, block);
 });
