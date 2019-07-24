@@ -73,7 +73,7 @@ let schedule_user_command t (txn : User_command.t) account_opt =
     in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("user_command", User_command.to_yojson txn)]
-      "Added command $user_command to pool successfully" ;
+      "Added transaction $user_command to transaction pool successfully" ;
     txn_count := !txn_count + 1 ;
     Or_error.return ()
 
@@ -217,7 +217,6 @@ type active_state_fields =
   { num_accounts: int option
   ; blockchain_length: int option
   ; ledger_merkle_root: string option
-  ; staged_ledger_hash: string option
   ; state_hash: string option
   ; consensus_time_best_tip: string option }
 
@@ -289,22 +288,21 @@ let get_status ~flag t =
       Length.to_int
       @@ Consensus.Data.Consensus_state.blockchain_length consensus_state
     in
-    let%bind sync_status =
+    let%map sync_status =
       Coda_incremental.Status.stabilize () ;
       match
         Coda_incremental.Status.Observer.value_exn @@ Coda_lib.sync_status t
       with
       | `Bootstrap ->
           `Bootstrapping
+      | `Connecting ->
+          `Active `Connecting
+      | `Listening ->
+          `Active `Listening
       | `Offline ->
           `Active `Offline
       | `Synced ->
           `Active `Synced
-    in
-    let%map staged_ledger = Coda_lib.best_staged_ledger t in
-    let staged_ledger_hash =
-      staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
-      |> Sexp.to_string
     in
     let consensus_time_best_tip =
       Consensus.Data.Consensus_state.time_hum consensus_state
@@ -313,7 +311,6 @@ let get_status ~flag t =
     , { num_accounts= Some num_accounts
       ; blockchain_length= Some blockchain_length
       ; ledger_merkle_root= Some ledger_merkle_root
-      ; staged_ledger_hash= Some staged_ledger_hash
       ; state_hash= Some state_hash
       ; consensus_time_best_tip= Some consensus_time_best_tip } )
   in
@@ -321,7 +318,6 @@ let get_status ~flag t =
       , { num_accounts
         ; blockchain_length
         ; ledger_merkle_root
-        ; staged_ledger_hash
         ; state_hash
         ; consensus_time_best_tip } ) =
     match active_status () with
@@ -332,7 +328,6 @@ let get_status ~flag t =
         , { num_accounts= None
           ; blockchain_length= None
           ; ledger_merkle_root= None
-          ; staged_ledger_hash= None
           ; state_hash= None
           ; consensus_time_best_tip= None } )
   in
@@ -341,7 +336,6 @@ let get_status ~flag t =
   ; blockchain_length
   ; uptime_secs
   ; ledger_merkle_root
-  ; staged_ledger_hash
   ; state_hash
   ; consensus_time_best_tip
   ; commit_id

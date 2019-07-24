@@ -134,7 +134,40 @@ module Make (Inputs : Inputs_intf) = struct
        it didn't receive any transition from network for a while.
        Then it went to the second epoch and it could propose at
        the second epoch. *)
-    if Consensus.Hooks.is_genesis @@ Coda_base.Block_time.now time_controller
+    let now = Coda_base.Block_time.now time_controller in
+    if
+      try Consensus.Hooks.is_genesis now
+      with Invalid_argument _ ->
+        (* if "now" is before the genesis timestamp, the calculation
+           of the proof-of-stake epoch results in an exception
+        *)
+        let module Time = Coda_base.Block_time in
+        let time_till_genesis =
+          Time.diff Consensus.Constants.genesis_state_timestamp now
+        in
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "time_till_genesis"
+              , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )
+            ]
+          "Node started before genesis: waiting $time_till_genesis \
+           milliseconds before running transition router" ;
+        let seconds_to_wait = 30 in
+        let milliseconds_to_wait = Int64.of_int_exn (seconds_to_wait * 1000) in
+        let rec wait_loop tm =
+          if Int64.(tm <= zero) then ()
+          else (
+            Core.Unix.sleep seconds_to_wait ;
+            let tm_remaining = Int64.(tm - milliseconds_to_wait) in
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              "Still waiting $tm_remaining milliseconds before running \
+               transition router"
+              ~metadata:[("tm_remaining", `Int (Int64.to_int_exn tm_remaining))] ;
+            wait_loop tm_remaining )
+        in
+        wait_loop @@ Time.Span.to_ms time_till_genesis ;
+        (* after waiting, we're at least at the genesis time, maybe a bit past it *)
+        Consensus.Hooks.is_genesis @@ Coda_base.Block_time.now time_controller
     then
       start_transition_frontier_controller ~logger ~trust_system ~verifier
         ~network ~time_controller ~proposer_transition_reader
