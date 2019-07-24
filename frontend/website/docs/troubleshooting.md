@@ -10,7 +10,7 @@ If you're running a Coda node on a home or office machine, you'll have to set up
 
 Follow the steps below to use [MiniUPnP](https://github.com/miniupnp/miniupnp) to forward ports on your router:
 
-1. Run `ifconfig` to get your internal IP address -- you can find this in the output corresponding to the field `en0` on macOS and `wlan0` on a linux system:
+1. Run `ifconfig` to get your internal IP address -- you can find this in the output corresponding to the network interface `en0` on macOS. On Linux, this might be on `wlan0`, but oftentimes it is on another network interface - simply look for the one with `inet <IP-address>`. The response will look like this:
 
         $ ifconfig
         ...
@@ -23,7 +23,7 @@ Follow the steps below to use [MiniUPnP](https://github.com/miniupnp/miniupnp) t
                 status: active
         ...
 
-2. Run the following commands, with the IP address next to the `inet` field in the previous step. Note that you'll have to run it twice for the two ports below:
+2. Run the following commands, with the IP address next to `inet` in the previous step. Note that you'll have to run it twice for the two ports below:
 
         $ sudo upnpc -a <your-ip-address> 8302 8302 TCP
         $ sudo upnpc -a <your-ip-address> 8303 8303 UDP
