@@ -33,7 +33,7 @@ Install using [brew](https://brew.sh).
 ```
 brew install codaprotocol/coda/coda
 ``` 
-You can run `coda -version` to see if the works
+You can run `coda -help` to see if the works
 
 ### Ubuntu 18.04 / Debian 9
 
@@ -45,7 +45,7 @@ sudo apt-get update
 sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-43cb0790
 ```
 
-You can `coda -version` to see if it works.
+You can `coda -help` to see if it works.
 
 
 ### Windows
@@ -62,13 +62,12 @@ You must allow inbound traffic to the following ports through your **external** 
 
 - `TCP` port `8302`
 - `UDP` port `8303`
-- (Optionally) `TCP` port `49370` for the GraphQL API
 
 For walk-through instructions see [this guide](/docs/troubleshooting/#port-forwarding).
 ## Next
 
 Now that you've installed Coda and configured your network, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!
-
+https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service)
 <span id="disclaimer">
 \*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
 </span>
