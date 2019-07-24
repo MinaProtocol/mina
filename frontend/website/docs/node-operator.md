@@ -14,7 +14,7 @@ The Coda network is secured by [Proof-of-Stake consensus](/glossary/#proof-of-st
 
 Since we have some funds in our wallet from [the previous step](/my-first-transaction), we can configure that wallet to stake its coda by issuing the following command, passing in the file path for the associated private key:
 
-    $ coda client set-staking -- <private-key-path>
+    $ coda client set-staking -privkey-path <file-path>
 
 !!! note
     You can provide a list of key files to turn on staking for multiple wallets at the same time
