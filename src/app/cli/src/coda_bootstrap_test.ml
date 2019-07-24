@@ -27,8 +27,8 @@ let main () =
    Pipe_lib.Linear_pipe.iter (Option.value_exn sync_status_pipe_opt)
      ~f:(fun sync_status ->
        Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-         !"Bootstrap node received status: %{sexp:Sync_status.t}"
-         sync_status ;
+         !"Bootstrap node received status: %s"
+         (Sync_status.to_string sync_status) ;
        Hash_set.add previous_status sync_status ;
        Deferred.unit ))
   |> don't_wait_for ;
