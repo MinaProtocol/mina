@@ -6,7 +6,7 @@ In this section, we'll make our first transaction on the Coda network. After [in
 
 Run the following command to start up a Coda node instance and connect to the network:
 
-    $ coda daemon -peer dry-plants.o1test.net:8303
+    coda daemon -peer dry-plants.o1test.net:8303
 
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8302 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
 
@@ -19,7 +19,7 @@ See [here](/docs/troubleshooting/) for common issues when first running a node.
 
 Now that we've started up a node and are running the Coda daemon, open up another shell and run the following command:
 
-    $ coda client status
+    coda client status
 
 !!!note
     For now, it may take up to a minute before `coda client status` connects to the daemon when first starting up. So if you see `Error: daemon not running. See coda daemon`, just a wait a bit and try again.
@@ -40,7 +40,7 @@ Once our node is synced, we'll create a public/private key-pair so that we can s
 
 Run the following command which creates a public and private key `my-wallet` and `my-wallet.pub` under the `keys` directory:
 
-    $ coda client generate-keypair -privkey-path keys/my-wallet
+    coda client generate-keypair -privkey-path keys/my-wallet
 
 !!! warning
     The public key can be shared freely with anyone, but be very careful with your private key file. Never share this private key with anyone, as it is the equivalent of a password for your funds.
@@ -55,13 +55,13 @@ Once a faucet-mod thumbs up your request, keep an eye on the Discord channel to 
 
 We can check our balance to make sure that we received the funds by running the following command, passing in our public key:
 
-    $ coda client get-balance -address <public-key>
+    coda client get-balance -address <public-key>
 
 You might see `No account found at that public_key (zero balance)`. Be patient! Depending on the traffic in the network, it may take a few blocks before your transaction goes through.
 
 While you're waiting take a look at your daemon logs for new blocks being generated. Run the following command to see the current block height:
 
-    $ coda client status
+    coda client status
 
 ## Make a payment
 
@@ -69,7 +69,7 @@ Finally we get to the good stuff, sending our first transaction! For testing pur
 
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
-    $ coda client send-payment \
+    coda client send-payment \
       -amount 20 \
       -receiver tNciF85uM2yA1QHWc24vdQCGUe7EykM4cqaJma8FXqp64JDssnv5ywPsWNv3417akmKRwBmVaMwrSkXjZrBpJaCtfcAbNupLwSx1PEd9135kEZek7muGySzq1bQZ6nGR4oNVoy3qygX1ph \
       -fee 5 \
@@ -91,7 +91,7 @@ If this command is formatted properly, we should get a response that looks like 
 
 Now that we can send transactions, it might be helpful to know our balance, so that we don't spend our testnet tokens too carelessly! Let's check our current balance by running the following command, passing in the public key of the account we generated:
 
-    $ coda client get-balance -address <public-key>
+    coda client get-balance -address <public-key>
 
 We'll get a response that looks like this:
 
