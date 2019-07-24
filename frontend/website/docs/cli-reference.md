@@ -108,10 +108,10 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
     [-help]                                     print this help text and exit
                                                 (alias: -?)
 
-`-version` - Print out client version information
+`version` - Print out client version information
 
-    $ coda -version
-    NO_VERSION_UTIL
+    $ coda version
+    Commit <...> on branch <...>
 
 `help` - Print out subcommands and explanations
 
