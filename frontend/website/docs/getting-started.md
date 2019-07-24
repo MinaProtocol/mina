@@ -67,6 +67,7 @@ For walk-through instructions see [this guide](/docs/troubleshooting/#port-forwa
 ## Next
 
 Now that you've installed Coda and configured your network, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!
+
 <span id="disclaimer">
 \*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
 </span>

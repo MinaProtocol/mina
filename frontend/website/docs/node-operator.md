@@ -83,12 +83,12 @@ The Coda protocol is unique in that it doesn't require nodes to maintain the ful
 
 However, this isn't data encoding or compression in the traditional sense - rather nodes "compress" data in the network by generating cryptographic proofs. Node operators play a crucial role in this process by designating themselves as "snark-workers" that generate zk-SNARKs for transactions that have been added to blocks.
 
-!!! note
-    This requires a GPU as generating SNARK proofs is computationally intensive. For more information on hardware requirements, [see here]().
+When you [start the daemon](/docs/my-first-transaction/#start-up-a-node), set these extra arguments to also start a snark-worker:
 
-Run the following command to set your node as a snark-worker:
-
-    $ coda client set-snark-worker -pubkey <public-key> -snark-worker-fee <fee>
+    $ coda daemon \
+        -peer <...> \
+        -run-snark-worker <public-key> \
+        -snark-worker-fee <fee>
 
 As a snark-worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.
 
