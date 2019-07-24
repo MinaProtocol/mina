@@ -2,9 +2,7 @@
 const blocks = document.querySelectorAll("pre > code");
 
 Array.prototype.forEach.call(blocks, (block, index) => {
-//   /* Create button with message container */
   const parent = block.parentNode;
-  parent.style.position = "relative";
 
   const button = document.createElement("div");
   button.style.position = "absolute";
@@ -26,5 +24,11 @@ Array.prototype.forEach.call(blocks, (block, index) => {
     });
   };
 
-  // parent.insertBefore(button, block);
+  const containerElement = document.createElement("div");
+
+  containerElement.style.position = "relative";
+
+  containerElement.appendChild(button);
+  containerElement.appendChild(parent.cloneNode(true));
+  parent.replaceWith(containerElement);
 });
