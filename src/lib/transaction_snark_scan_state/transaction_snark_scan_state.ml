@@ -78,7 +78,7 @@ module Make
     type t = Stable.Latest.t =
       { transaction_with_info: Ledger.Undo.t
       ; statement: Transaction_snark.Statement.t
-      ; witness: Transaction_witness.t }
+      ; witness: Transaction_witness.t sexp_opaque }
     [@@deriving sexp]
   end
 
