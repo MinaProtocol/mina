@@ -12,16 +12,16 @@ The Coda network is secured by [Proof-of-Stake consensus](/glossary/#proof-of-st
 
 ### Staking coda
 
-Since we have some funds in our wallet from [the previous step](/my-first-transaction), we can configure that wallet to stake its coda by issuing the following command, passing in the file path for the associated private key:
+Since we have some funds in our wallet from [the previous step](/my-first-transaction), we can configure that wallet to stake its coda by issuing the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`):
 
-    $ coda client set-staking -privkey-path <file-path>
+    coda client set-staking -privkey-path keys/my-wallet
 
 !!! note
     You can provide a list of key files to turn on staking for multiple wallets at the same time
 
 We can always check which wallets we're currently staking with, by using the `coda client status` command:
 
-    $ coda client status
+    coda client status
     
     Coda Daemon Status 
     -----------------------------------
@@ -58,7 +58,7 @@ Delegating coda is an alternative option to staking it directly, with the benefi
 
 To delegate your stake, instead of running your own staking node, run this command:
 
-    $ coda client delegate-stake \
+    coda client delegate-stake \
         -delegate <public-key> \
         -privkey-path <file> \
         -fee <fee>
@@ -85,8 +85,8 @@ However, this isn't data encoding or compression in the traditional sense - rath
 
 When you [start the daemon](/docs/my-first-transaction/#start-up-a-node), set these extra arguments to also start a snark-worker:
 
-    $ coda daemon \
-        -peer <...> \
+    coda daemon \
+        -peer dry-plants.o1test.net:8303 \
         -run-snark-worker <public-key> \
         -snark-worker-fee <fee>
 
