@@ -108,6 +108,12 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           Coda_commands.schedule_user_commands coda ts
           |> Participating_state.active_exn ;
           Deferred.unit )
+    ; implement Daemon_rpcs.Get_payment_status.rpc (fun () ts ->
+          Deferred.return
+          @@ Transaction_status.get_status
+               ~frontier_broadcast_pipe:(Coda_lib.transition_frontier coda)
+               ~transaction_pool:(Coda_lib.transaction_pool coda)
+               ts )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
           return
             ( Coda_commands.get_balance coda pk

@@ -473,24 +473,24 @@ let send_payment =
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
 
-let get_transaction_status =
-  Command.async ~summary:"Get the status of a transaction"
+let get_payment_status =
+  Command.async ~summary:"Get the status of a payment"
     (Cli_lib.Background_daemon.init
        Command.Param.(anon @@ ("txn" %: string))
-       ~f:(fun port serialized_transaction ->
-         match User_command.of_base58_check serialized_transaction with
+       ~f:(fun port serialized_payment ->
+         match User_command.of_base58_check serialized_payment with
          | Ok user_command ->
-             dispatch_with_message Daemon_rpcs.Get_transaction_status.rpc
+             dispatch_with_message Daemon_rpcs.Get_payment_status.rpc
                user_command port
                ~success:
                  (Or_error.map ~f:(fun status ->
-                      sprintf !"Transaction status : %s\n"
+                      sprintf !"Payment status : %s\n"
                       @@ Transaction_status.State.to_string status ))
                ~error:(fun e ->
-                 sprintf "Failed to get transaction status : %s"
+                 sprintf "Failed to get payment status : %s"
                    (Error.to_string_hum e) )
          | Error _e ->
-             eprintf "Could not deserialize user command" ;
+             eprintf "Could not deserialize payment" ;
              exit 16 ))
 
 let delegate_stake =
@@ -690,6 +690,7 @@ let command =
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
+    ; ("get-payment-status", get_payment_status)
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("set-staking", set_staking)
