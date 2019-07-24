@@ -20,6 +20,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
   include Base
 
+  (** Maps parent ledger UUIDs to child masks. *)
   let (registered_masks : Mask.Attached.t list Uuid.Table.t) =
     Uuid.Table.create ()
 
@@ -79,6 +80,8 @@ module Make (Inputs : Inputs_intf) = struct
         (List.map masks ~f:(fun mask -> (Mask.Attached.get_uuid mask, mask)))
     in
     let open Graphviz in
+    (* TODO this only visualizes masks. Adding parents would help. But need to
+       display ledger type, so have to modify Base_ledger_intf. *)
     Uuid.Table.fold uuid_to_masks_table ~init:empty
       ~f:(fun ~key:uuid ~data:mask graph ->
         let graph_with_mask = add_vertex graph mask in
@@ -142,6 +145,7 @@ module Make (Inputs : Inputs_intf) = struct
     Uuid.Table.add_multi registered_masks ~key:(get_uuid t) ~data:attached_mask ;
     attached_mask
 
+  (* TODO We have the parent already from mask.parent. remove extra param. *)
   let unregister_mask_exn (t : t) (mask : Mask.Attached.t) =
     let t_uuid = get_uuid t in
     let error_msg suffix =
@@ -150,6 +154,10 @@ module Make (Inputs : Inputs_intf) = struct
         (get_uuid t |> Uuid.to_string_hum)
         suffix
     in
+    [%test_result: Uuid.t]
+      ~message:"parent in param should be parent in data structure"
+      ~expect:t_uuid
+      (Mask.Attached.get_parent mask |> get_uuid) ;
     match Uuid.Table.find registered_masks t_uuid with
     | None ->
         failwith @@ error_msg "parent not in registered_masks"
@@ -181,6 +189,7 @@ module Make (Inputs : Inputs_intf) = struct
         List.iter masks ~f:(fun mask ->
             Mask.Attached.parent_set_notify mask account )
 
+  (* TODO we have the children already, from the registered_masks table. remove children param. *)
   let remove_and_reparent_exn t t_as_mask ~children =
     let parent = Mask.Attached.get_parent t_as_mask in
     let merkle_root = Mask.Attached.merkle_root t_as_mask in
