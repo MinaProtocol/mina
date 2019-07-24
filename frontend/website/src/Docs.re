@@ -168,14 +168,13 @@ module Styles = {
     ]);
 };
 
-// We need to calculate the CDN url and inject it into the template
-let chevronUrl = Links.Cdn.url("/static/img/chevron-down.svg");
-
 let component = ReasonReact.statelessComponent("Blog");
 
 let make = _children => {
   ...component,
-  render: _self =>
+  render: _self => {
+    // We need to calculate the CDN url and inject it into the template
+    let chevronUrl = Links.Cdn.url("/static/img/chevron-down.svg");
     <div
       className=Css.(
         merge([
@@ -296,5 +295,6 @@ let make = _children => {
         </div>
       </article>
       <script src={Links.Cdn.url("/static/js/clipboard.js")} />
-    </div>,
+    </div>;
+  },
 };
