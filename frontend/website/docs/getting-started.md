@@ -2,7 +2,7 @@
 
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
-Join the Coda server on [Discord](http://bit.ly/CodaDiscord) to connect with the community, get support, and learn about how you can participate in weekly challenges for [Testnet Points](/docs#testnet-points)[\*](#disclaimer). Check out the [Testnet Leaderboard](http://bit.ly/TestnetBetaLeaderboard) to see how people are doing on this release's challenges.
+Join the Coda server on [Discord](http://bit.ly/CodaDiscord) to connect with the community, get support, and learn about how you can participate in weekly challenges for [Testnet Points](/docs#testnet-points)[\*](#disclaimer). Check out the [Testnet Leaderboard](http://bit.ly/TestnetBetaLeaderboard) to see who is winning this week's challenges.
 
 !!! note
     This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for `v0.0.1-beta.1`.
