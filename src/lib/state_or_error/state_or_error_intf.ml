@@ -13,42 +13,45 @@ module type State_intf2 = sig
   type ('a, 'b) t
 end
 
-module type S = functor (State : State_intf) -> sig
+module type S = sig
   include Monad.S
 
-  val run_state : 'a t -> state:State.t -> ('a * State.t) Or_error.t
+  type state
 
-  val get : State.t t
+  val run_state : 'a t -> state:state -> ('a * state) Or_error.t
 
-  val put : State.t -> unit t
+  val get : state t
+
+  val put : state -> unit t
 
   val error_if : bool -> message:string -> value:'a -> 'a t
 end
 
-module type S2 = functor (State : State_intf1) -> sig
+module type S2 = sig
+  type 'a state
+
   include Monad.S2
 
-  val run_state :
-    ('b, 'a) t -> state:'a State.t -> ('b * 'a State.t) Or_error.t
+  val run_state : ('b, 'a) t -> state:'a state -> ('b * 'a state) Or_error.t
 
-  val get : ('a State.t, 'a) t
+  val get : ('a state, 'a) t
 
-  val put : 'a State.t -> (unit, 'a) t
+  val put : 'a state -> (unit, 'a) t
 
   val error_if : bool -> message:string -> value:'a -> ('a, _) t
 end
 
-module type S3 = functor (State : State_intf2) -> sig
+module type S3 = sig
   include Monad.S3
 
+  type ('a, 'b) state
+
   val run_state :
-       ('c, 'a, 'b) t
-    -> state:('a, 'b) State.t
-    -> ('c * ('a, 'b) State.t) Or_error.t
+    ('c, 'a, 'b) t -> state:('a, 'b) state -> ('c * ('a, 'b) state) Or_error.t
 
-  val get : (('a, 'b) State.t, 'a, 'b) t
+  val get : (('a, 'b) state, 'a, 'b) t
 
-  val put : ('a, 'b) State.t -> (unit, 'a, 'b) t
+  val put : ('a, 'b) state -> (unit, 'a, 'b) t
 
   val error_if : bool -> message:string -> value:'a -> ('a, _, _) t
 end
