@@ -231,10 +231,9 @@ module Make (Inputs : Inputs.S) :
               Deferred.Or_error.error_string error_msg )
             else
               Deferred.Or_error.return
-              @@ List.map transitions ~f:(fun transition ->
+              @@ List.map2_exn hashes transitions ~f:(fun hash transition ->
                      let transition_with_hash =
-                       With_hash.of_data transition
-                         ~hash_data:External_transition.state_hash
+                       With_hash.of_data transition ~hash_data:(Fn.const hash)
                      in
                      Envelope.Incoming.wrap ~data:transition_with_hash
                        ~sender:(Envelope.Sender.Remote peer.host) ) ) )
