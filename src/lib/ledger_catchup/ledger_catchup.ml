@@ -239,40 +239,45 @@ module Make (Inputs : Inputs.S) :
          ( (Inputs.Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
            Rose_tree.t
            list
+           * (unit -> unit Deferred.t)
          , Strict_pipe.crash Strict_pipe.buffered
          , unit )
          Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
     Strict_pipe.Reader.iter_without_pushback catchup_job_reader
       ~f:(fun (hash, subtrees) ->
-        ( match%bind
-            get_transitions_and_compute_breadcrumbs ~logger ~trust_system
-              ~verifier ~network ~frontier ~num_peers:8
-              ~unprocessed_transition_cache ~target_forest:(hash, subtrees)
-          with
-        | Ok trees ->
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              "about to write to the catchup breadcrumbs pipe" ;
-            if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
-              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                "catchup breadcrumbs pipe was closed; attempt to write to \
-                 closed pipe" ;
-              Deferred.unit )
-            else
-              Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
-              |> Deferred.return
-        | Error e ->
-            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-              !"Catchup process failed -- unable to receive valid data from \
-                peers or transition frontier progressed faster than catchup \
-                data received. See error for details: $error"
-              ~metadata:[("error", `String (Error.to_string_hum e))] ;
-            List.iter subtrees ~f:(fun subtree ->
-                Rose_tree.iter subtree ~f:(fun cached_transition ->
-                    Cached.invalidate_with_failure cached_transition |> ignore
-                ) ) ;
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              "garbage collected failed cached transitions" ;
-            Deferred.unit )
+        (let%bind () = Transition_frontier.incr_num_catchup_jobs frontier in
+         match%bind
+           get_transitions_and_compute_breadcrumbs ~logger ~trust_system
+             ~verifier ~network ~frontier ~num_peers:8
+             ~unprocessed_transition_cache ~target_forest:(hash, subtrees)
+         with
+         | Ok trees ->
+             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+               "about to write to the catchup breadcrumbs pipe" ;
+             if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                 "catchup breadcrumbs pipe was closed; attempt to write to \
+                  closed pipe" ;
+               Transition_frontier.decr_num_catchup_jobs frontier )
+             else
+               Strict_pipe.Writer.write catchup_breadcrumbs_writer
+                 ( trees
+                 , fun () -> Transition_frontier.decr_num_catchup_jobs frontier
+                 )
+               |> Deferred.return
+         | Error e ->
+             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+               !"Catchup process failed -- unable to receive valid data from \
+                 peers or transition frontier progressed faster than catchup \
+                 data received. See error for details: $error"
+               ~metadata:[("error", `String (Error.to_string_hum e))] ;
+             List.iter subtrees ~f:(fun subtree ->
+                 Rose_tree.iter subtree ~f:(fun cached_transition ->
+                     Cached.invalidate_with_failure cached_transition |> ignore
+                 ) ) ;
+             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+               "garbage collected failed cached transitions" ;
+             Transition_frontier.decr_num_catchup_jobs frontier)
         |> don't_wait_for )
     |> don't_wait_for
 end

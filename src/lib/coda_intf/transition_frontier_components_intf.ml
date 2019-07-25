@@ -36,6 +36,7 @@ module type Catchup_intf = sig
                                     Cached.t
                                     Rose_tree.t
                                     list
+                                    * (unit -> unit Deferred.t)
                                   , Strict_pipe.crash Strict_pipe.buffered
                                   , unit )
                                   Strict_pipe.Writer.t
@@ -145,17 +146,19 @@ module type Transition_handler_processor_intf = sig
                           , Strict_pipe.crash Strict_pipe.buffered
                           , unit )
                           Strict_pipe.Writer.t
-    -> catchup_breadcrumbs_reader:( transition_frontier_breadcrumb
-                                  , State_hash.t )
-                                  Cached.t
-                                  Rose_tree.t
-                                  list
+    -> catchup_breadcrumbs_reader:( ( transition_frontier_breadcrumb
+                                    , State_hash.t )
+                                    Cached.t
+                                    Rose_tree.t
+                                    list
+                                  * (unit -> unit Deferred.t) )
                                   Strict_pipe.Reader.t
     -> catchup_breadcrumbs_writer:( ( transition_frontier_breadcrumb
                                     , State_hash.t )
                                     Cached.t
                                     Rose_tree.t
                                     list
+                                    * (unit -> unit Deferred.t)
                                   , Strict_pipe.crash Strict_pipe.buffered
                                   , unit )
                                   Strict_pipe.Writer.t

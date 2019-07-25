@@ -154,10 +154,20 @@ let sync_status _ =
 let sync_status t =
   let open Coda_incremental.Status in
   let transition_frontier_incr = Var.watch @@ Incr.transition_frontier t in
+  let transition_frontier_and_catchup_signal_incr =
+    transition_frontier_incr
+    >>= function
+    | Some transition_frontier ->
+        Transition_frontier.catchup_signal transition_frontier
+        |> of_broadcast_pipe |> Var.watch
+        >>| fun catchup_signal -> Some (transition_frontier, catchup_signal)
+    | None ->
+        return None
+  in
   let incremental_status =
     map4
       (Var.watch @@ Incr.online_status t)
-      transition_frontier_incr
+      transition_frontier_and_catchup_signal_incr
       (Var.watch @@ Incr.first_connection t)
       (Var.watch @@ Incr.first_message t)
       ~f:(fun online_status active_status first_connection first_message ->
@@ -178,10 +188,17 @@ let sync_status t =
                 ( Logger.info (Logger.create ()) ~module_:__MODULE__
                     ~location:__LOC__ "Coda daemon is now bootstrapping" ;
                   `Bootstrap )
-              ~f:(fun _ ->
-                Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now synced" ;
-                `Synced ) )
+              ~f:(fun (_, catchup_signal) ->
+                match catchup_signal with
+                | `Catchup ->
+                    Logger.info (Logger.create ()) ~module_:__MODULE__
+                      ~location:__LOC__
+                      "Coda daemon is now doing ledger catchup" ;
+                    `Catchup
+                | `Normal ->
+                    Logger.info (Logger.create ()) ~module_:__MODULE__
+                      ~location:__LOC__ "Coda daemon is now synced" ;
+                    `Synced ) )
   in
   let observer = observe incremental_status in
   stabilize () ; observer
