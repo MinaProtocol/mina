@@ -1,22 +1,23 @@
-FROM debian:stretch-slim
+FROM debian:stretch
 
 # Dependencies
 RUN apt-get -y update && \
   DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
   DEBIAN_FRONTEND=noninteractive apt-get -y install \
+    strace \
     dumb-init \
     libssl1.1 \
     libprocps6 \
     libgmp10 \
     libgomp1 \
-    libffi6 && \
+    libffi6 \
+    apt-transport-https \
+    ca-certificates && \
   rm -rf /var/lib/apt/lists/*
 
 # coda package
-# FIXME: The copy creates a layer, wasting space.
-COPY coda.deb /tmp/
-RUN dpkg -i /tmp/coda.deb
+RUN echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/coda.list \
+  && apt-get update \
+  && apt-get install --force-yes -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-43cb0790 -y
 
-# FIXME: unpack verification keys
-
-ENTRYPOINT ["/usr/bin/dumb-init", "/usr/local/bin/coda"]
+ENTRYPOINT ["/usr/bin/dumb-init", "coda" ]
