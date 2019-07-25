@@ -227,6 +227,12 @@ type query {
     # Public key of sender of pooled user commands
     publicKey: PublicKey!
   ): [UserCommand!]!
+
+  # Get the status of a transaction
+  transactionStatus(
+    # Serialized payment (base58-encoded janestreet/bin_prot serialization)
+    payment: String!
+  ): TransactionStatus!
 }
 
 type RpcPair {
@@ -331,6 +337,18 @@ type Transactions {
   coinbase: UInt64!
 }
 
+# Status of a transaction
+enum TransactionStatus {
+  # A transaction that is on the longest chain
+  INCLUDED
+
+  # A transaction either in the transition frontier or in transaction pool but is not on the longest chain
+  PENDING
+
+  # The transaction has either been snarked, reached finality through consensus or has been dropped
+  UNKNOWN
+}
+
 # String representing a uint64 number in base 10
 scalar UInt64
 
@@ -386,4 +404,3 @@ type Wallet {
   # Path of the private key file for this account
   privateKeyPath: String!
 }
-

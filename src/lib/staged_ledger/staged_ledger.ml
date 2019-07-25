@@ -100,8 +100,10 @@ struct
           b
       | Error e ->
           Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:[("error", `String (Error.to_string_hum e))]
-            "Bad transaction snark: $error" ;
+            ~metadata:
+              [ ("statement", Transaction_snark.Statement.to_yojson statement)
+              ; ("error", `String (Error.to_string_hum e)) ]
+            "Invalid transaction snark for statement $statement: $error" ;
           false
 
   let verify ~logger ~verifier ~message job proof prover =
@@ -716,7 +718,7 @@ struct
             scan_state'
         |> to_staged_ledger_or_error )
     in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
         [ ("user_command_count", `Int user_commands_count)
         ; ("coinbase_count", `Int (List.length coinbases))
@@ -1015,8 +1017,9 @@ struct
         | Ok res'' ->
             res''
         | Error e ->
-            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-              (Error.to_string_hum e) ;
+            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+              "Error when increasing coinbase: $error"
+              ~metadata:[("error", `String (Error.to_string_hum e))] ;
             res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
@@ -1161,8 +1164,8 @@ struct
                 One x
             | _ ->
                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                  "Error creating diff: Should have at most one coinbase in \
-                   the second pre_diff" ;
+                  "Error creating staged ledger diff: Should have at most one \
+                   coinbase in the second pre_diff" ;
                 Zero
           in
           (* We have to reverse here because we only know they work in THIS order *)
@@ -1293,17 +1296,18 @@ struct
                   (User_command t) )
           with
           | Error e ->
-              (* FIXME This should be fatal and crash the daemon but can't be
-               because of a buggy test. See #2346.
-            *)
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              let error_message =
+                sprintf
+                  !"Invalid user command! Error was: %s, command was: \
+                    $user_command"
+                  (Error.to_string_hum e)
+              in
+              Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "user_command"
                     , User_command.With_valid_signature.to_yojson t ) ]
-                !"Invalid user command! Error was: %s, command was: \
-                  $user_command"
-                (Error.to_string_hum e) ;
-              seq
+                !"%s" error_message ;
+              failwith error_message
           | Ok _ ->
               Sequence.append (Sequence.singleton t) seq )
     in
@@ -1312,8 +1316,9 @@ struct
           generate logger completed_works_seq valid_on_this_ledger self
             partitions )
     in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Block stats: Proofs ready for purchase: %d" proof_count ;
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      "Number of proofs ready for purchase: $proof_count"
+      ~metadata:[("proof_count", `Int proof_count)] ;
     trace_event "prediffs done" ;
     {Staged_ledger_diff.With_valid_signatures_and_proofs.diff; creator= self}
 

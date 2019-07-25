@@ -430,7 +430,7 @@ let make = (~posts, _children) => {
           svg={SocialLink.Svg.twitter("--svg-color-social")}
         />
         <SocialLink
-          link="https://discord.gg/wz7zQyc"
+          link="https://bit.ly/CodaDiscord"
           name="Discord"
           svg=SocialLink.Svg.discord
         />

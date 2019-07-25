@@ -52,11 +52,9 @@ let setup_time_offsets () = ()
 
 [%%endif]
 
-let logger = Logger.create ()
-
 let heartbeat_flag = ref true
 
-let print_heartbeat () =
+let print_heartbeat logger =
   let rec loop () =
     if !heartbeat_flag then (
       Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
@@ -68,8 +66,9 @@ let print_heartbeat () =
   loop ()
 
 let run_test () : unit Deferred.t =
+  let logger = Logger.create () in
   setup_time_offsets () ;
-  print_heartbeat () |> don't_wait_for ;
+  print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
   File_system.with_temp_dir "full_test_config" ~f:(fun temp_conf_dir ->
       let keypair = Genesis_ledger.largest_account_keypair_exn () in

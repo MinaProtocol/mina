@@ -1,0 +1,31 @@
+site_name: Coda Documentation
+theme:
+  name: null
+  custom_dir: 'docs-theme/'
+repo_url: https://github.com/codaprotocol/coda/
+edit_uri: edit/master/frontend/website/docs/
+nav:
+  - Overview: index.md
+  - Getting Started: getting-started.md
+  - My First Transaction: my-first-transaction.md
+  - Become a Node Operator: node-operator.md
+  - Contributing to Coda: contributing.md
+  - Developers:
+    - Developers Overview: developers/index.md
+    - Repository Structure: developers/directory-structure.md
+    - Style Guide: developers/style-guide.md
+    - Code Reviews: developers/code-reviews.md
+    - GraphQL API: developers/graphql-api.md
+  - Coda Protocol Architecture:
+    - Coda Overview: architecture/index.md
+    - Lifecycle of a Payment: architecture/lifecycle-payment.md
+    - Consensus: architecture/consensus.md
+    - Proof of Stake: architecture/proof-of-stake.md
+  - CLI Reference: cli-reference.md
+  - Troubleshooting: troubleshooting.md
+  - Glossary: glossary.md
+markdown_extensions:
+  - toc:
+      permalink: a
+  - admonition
+  # - codehilite
