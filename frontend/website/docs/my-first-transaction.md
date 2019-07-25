@@ -67,6 +67,9 @@ While you're waiting take a look at your daemon logs for new blocks being genera
 
 Finally we get to the good stuff, sending our first transaction! For testing purposes, there's already an [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service) set up that will immediately refund your payment minus the transaction fees.
 
+!!! warning
+    If two requests go to the echo service within the same 5min window, the echo service may eat your funds. You'll still get testnet points even if this happens, but you'll lose the tokens you've sent.
+
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
     coda client send-payment \

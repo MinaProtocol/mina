@@ -11,3 +11,17 @@ This breakthrough is made possible due to zk-SNARKs - a type of succinct cryptog
 Trying out Coda is simple - head over to the [Getting Started page](/docs/getting-started/) to install the Coda client and join the network.
 
 You can also sign up for the public testnet updates [here](https://bit.ly/TestnetForm).
+
+<span id="testnet-points" />
+## Testnet Points[\*](#disclaimer)
+
+We want to recognize those who are actively involved in the network and our community. We’ll be issuing weekly challenges, tied to Testnet Points[\*](#disclaimer) to make it fun, interesting and a little competitive!
+
+You can track the community’s Testnet Points[\*](#disclaimer) in our public, [read-only leaderboard](http://bit.ly/TestnetBetaLeaderboard).
+
+Check out our [Discord](http://bit.ly/CodaDiscord) for specifics and updates on the challenges.
+
+<span id="disclaimer">
+\*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
+</span>
+
