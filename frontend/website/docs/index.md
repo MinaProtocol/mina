@@ -13,7 +13,7 @@ Trying out Coda is simple - head over to the [Getting Started page](/docs/gettin
 You can also sign up for the public testnet updates [here](https://bit.ly/TestnetForm).
 
 <span id="testnet-points" />
-## Testnet Points[\*](#disclaimer)
+## Testnet Points*
 
 We want to recognize those who are actively involved in the network and our community. We’ll be issuing weekly challenges, tied to Testnet Points[\*](#disclaimer) to make it fun, interesting and a little competitive!
 
