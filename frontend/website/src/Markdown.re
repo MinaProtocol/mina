@@ -44,7 +44,7 @@ let load = path => {
       "pandoc " ++ "--filter src/filter.js " ++ path ++ " --mathjax",
       Child_process.option(
         ~env={
-          "CODA_CDN_URL": Links.Cdn.prefix^,
+          "CODA_CDN_URL": Links.Cdn.prefix(),
           "PATH": Js_dict.unsafeGet(Node.Process.process##env, "PATH"),
         },
         (),
