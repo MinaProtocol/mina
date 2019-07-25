@@ -1,4 +1,4 @@
-# Style Guidelines
+# Style Guide
 
 ## Ocaml
 [ocaml]: #ocaml

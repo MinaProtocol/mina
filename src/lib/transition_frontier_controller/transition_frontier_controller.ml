@@ -81,7 +81,7 @@ module Make (Inputs : Inputs_intf) :
         (Buffered (`Capacity 30, `Overflow Crash))
     in
     let proposer_transition_reader_copy, proposer_transition_writer_copy =
-      Strict_pipe.create ~name:"proposer transition copy" Synchronous
+      Strict_pipe.create ~name:"block producer transition copy" Synchronous
     in
     Strict_pipe.transfer_while_writer_alive proposer_transition_reader
       proposer_transition_writer_copy ~f:Fn.id

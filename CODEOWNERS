@@ -1,15 +1,14 @@
 /src/ @imeckler
 /CODEOWNERS @imeckler @bkase
-/frontend/ @schmavery @bkase @figitaki
+/frontend/ @schmavery @bkase @figitaki @o1pranay
 /dockerfiles/ @jkrauska
 /rfcs/ @imeckler @es92 @bkase
-/docs/ @rbkhmrcr @imeckler @bkase @nholland94 @cmr @o1pranay
+/docs/ @rbkhmrcr @imeckler @bkase @nholland94 @cmr @o1pranay @schmavery @figitaki
 /scripts/ @nholland94 @jkrauska @cmr
 /Makefile @jkrauska
 /src/config/ @imeckler @nholland94
 /CODE_OF_CONDUCT.md @imeckler @cmr
 /CONTRIBUTING.md @imeckler @cmr
-/DIRECTORY_STRUCTURE.md @imeckler @jkrauska
 /LICENSE @imeckler
 /README.md @cmr @imeckler @o1pranay
 /README-dev.md @cmr @imeckler @o1pranay
@@ -44,7 +43,7 @@
 /src/lib/codable/ @johnwu93 @bkase
 /src/lib/consensus/ @nholland94
 /src/lib/crs/ @rbkhmrcr @vanishreerao
-/src/lib/crypto_params/ @rbkhmrcr @vanishreerao
+/src/lib/crypto_params/ @rbkhmrcr @vanishreerao @mrmr1993
 /src/lib/currency/ @bkase @nholland94
 /src/lib/daemon_rpcs/ @johnwu93 @bkase
 /src/lib/debug_assert/ @nholland94 @bkase @cmr
@@ -148,7 +147,7 @@
 /src/lib/unix_timestamp/ @nholland94
 /src/lib/unsigned_extended/ @bkase
 /src/lib/visualization/ @johnwu93
-/src/lib/vrf_lib/ @nholland94
+/src/lib/vrf_lib/ @nholland94 @mrmr1993 @bkase
 /src/lib/web_client_pipe/ @johnwu93 @bkase
 /src/lib/web_request/ @johnwu93 @bkase
 /src/lib/webkit_trace_event/ @mrmr1993 @cmr

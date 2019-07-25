@@ -111,7 +111,7 @@ val blockchain_state : (_, ('a, _) Body.t) Poly.t -> 'a
 
 val consensus_state : (_, (_, 'a) Body.t) Poly.t -> 'a
 
-val negative_one : Value.t
+val negative_one : Value.t Lazy.t
 
 val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 

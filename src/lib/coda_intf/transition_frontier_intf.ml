@@ -377,6 +377,8 @@ module type Transition_frontier_intf = sig
 
   val all_breadcrumbs : t -> Breadcrumb.t list
 
+  val all_user_commands : t -> User_command.Set.t
+
   val root : t -> Breadcrumb.t
 
   val previous_root : t -> Breadcrumb.t option
@@ -384,6 +386,8 @@ module type Transition_frontier_intf = sig
   val root_length : t -> int
 
   val best_tip : t -> Breadcrumb.t
+
+  val best_tip_path : t -> Breadcrumb.t list
 
   val path_map : t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
 
