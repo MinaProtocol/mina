@@ -708,9 +708,14 @@ module Make (Inputs : Inputs_intf) = struct
         Rpcs.Get_transition_chain_witness.dispatch_multi state_hash
     with
     | Ok (Some response) ->
-        Some response
-    | Ok None | Error _ ->
-        None
+        Ok response
+    | Ok None ->
+        Or_error.errorf
+          !"Peer %{sexp:Network_peer.Peer.t} doesn't have the requested \
+            transition"
+          peer
+    | Error e ->
+        Error e
 
   let get_transition_chain t peer request =
     let open Deferred.Let_syntax in
@@ -719,9 +724,14 @@ module Make (Inputs : Inputs_intf) = struct
         Rpcs.Get_transition_chain.dispatch_multi request
     with
     | Ok (Some response) ->
-        Some response
-    | Ok None | Error _ ->
-        None
+        Ok response
+    | Ok None ->
+        Or_error.errorf
+          !"Peer %{sexp:Network_peer.Peer.t} doesn't have the requested chain \
+            of transitions"
+          peer
+    | Error e ->
+        Error e
 
   let query_peer :
          t

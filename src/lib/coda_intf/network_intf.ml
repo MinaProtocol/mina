@@ -43,13 +43,13 @@ module type Network_intf = sig
        t
     -> Network_peer.Peer.t
     -> State_hash.t
-    -> (State_hash.t * State_body_hash.t List.t) Deferred.Option.t
+    -> (State_hash.t * State_body_hash.t List.t) Deferred.Or_error.t
 
   val get_transition_chain :
        t
     -> Network_peer.Peer.t
     -> State_hash.t list
-    -> external_transition list Deferred.Option.t
+    -> external_transition list Deferred.Or_error.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t

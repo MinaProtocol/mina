@@ -583,14 +583,21 @@ struct
            Root_prover.prove ~logger ~frontier consensus_state)
 
     let get_transition_chain_witness {ip_table; _} peer requested_state_hash =
-      Deferred.return
+      return
+      @@ Result.of_option
+           ~error:
+             (Error.of_string "Peer doesn't have the requested transition")
       @@
       let open Option.Let_syntax in
       let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
       Transition_chain_witness.prove ~frontier requested_state_hash
 
     let get_transition_chain {ip_table; _} peer hashes =
-      Deferred.return
+      return
+      @@ Result.of_option
+           ~error:
+             (Error.of_string
+                "Peer doesn't have the requested chain of transitions")
       @@
       let open Option.Let_syntax in
       let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in

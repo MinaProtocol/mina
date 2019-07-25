@@ -155,46 +155,42 @@ module Make (Inputs : Inputs.S) :
       ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
       "Doing a catchup job with target $target_hash" ;
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
-        match%map
+        let open Deferred.Or_error.Let_syntax in
+        let%bind transition_chain_witness =
           Network.get_transition_chain_witness network peer target_hash
-        with
-        | None ->
-            Or_error.errorf
-              !"Peer %{sexp:Network_peer.Peer.t} did not have the transition"
-              peer
-        | Some transition_chain_witness ->
-            let open Or_error.Let_syntax in
-            (* a list of state_hashes from new to old *)
-            let%bind hashes =
-              match
-                Transition_chain_witness.verify ~target_hash
-                  ~transition_chain_witness
-              with
-              | Some hashes ->
-                  return hashes
-              | None ->
-                  let error_msg =
-                    sprintf
-                      !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof"
-                      peer
-                  in
-                  ignore
-                    Trust_system.(
-                      record trust_system logger peer.host
-                        Actions.(Violated_protocol, Some (error_msg, []))) ;
-                  Or_error.error_string error_msg
-            in
-            List.fold_until
-              (Non_empty_list.to_list hashes)
-              ~init:[]
-              ~f:(fun acc hash ->
-                if Transition_frontier.find frontier hash |> Option.is_some
-                then Continue_or_stop.Stop (Ok (peer, acc))
-                else Continue_or_stop.Continue (hash :: acc) )
-              ~finish:(fun _ ->
-                Or_error.errorf
-                  !"Peer %{sexp:Network_peer.Peer.t} moves too fast"
-                  peer ) )
+        in
+        (* a list of state_hashes from new to old *)
+        let%bind hashes =
+          match
+            Transition_chain_witness.verify ~target_hash
+              ~transition_chain_witness
+          with
+          | Some hashes ->
+              Deferred.Or_error.return hashes
+          | None ->
+              let error_msg =
+                sprintf
+                  !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof"
+                  peer
+              in
+              ignore
+                Trust_system.(
+                  record trust_system logger peer.host
+                    Actions.(Violated_protocol, Some (error_msg, []))) ;
+              Deferred.Or_error.error_string error_msg
+        in
+        Deferred.return
+        @@ List.fold_until
+             (Non_empty_list.to_list hashes)
+             ~init:[]
+             ~f:(fun acc hash ->
+               if Transition_frontier.find frontier hash |> Option.is_some then
+                 Continue_or_stop.Stop (Ok (peer, acc))
+               else Continue_or_stop.Continue (hash :: acc) )
+             ~finish:(fun _ ->
+               Or_error.errorf
+                 !"Peer %{sexp:Network_peer.Peer.t} moves too fast"
+                 peer ) )
 
   let verify_against_hashes transitions hashes =
     List.length transitions = List.length hashes
@@ -217,34 +213,31 @@ module Make (Inputs : Inputs.S) :
       ~how:`Parallel ~f:(fun hashes ->
         Deferred.Or_error.find_map_ok (preferred_peer :: random_peers)
           ~f:(fun peer ->
-            match%bind Network.get_transition_chain network peer hashes with
-            | None ->
-                Deferred.Or_error.errorf
-                  !"Peer %{sexp:Network_peer.Peer.t} did not have the \
-                    transitions we requested"
+            let open Deferred.Or_error.Let_syntax in
+            let%bind transitions =
+              Network.get_transition_chain network peer hashes
+            in
+            if not @@ verify_against_hashes transitions hashes then (
+              let error_msg =
+                sprintf
+                  !"Peer %{sexp:Network_peer.Peer.t} returned a list that is \
+                    different from the one that is requested."
                   peer
-            | Some transitions ->
-                if not @@ verify_against_hashes transitions hashes then (
-                  let error_msg =
-                    sprintf
-                      !"Peer %{sexp:Network_peer.Peer.t} returned a list that \
-                        is different from the one that is requested."
-                      peer
-                  in
-                  Trust_system.(
-                    record trust_system logger peer.host
-                      Actions.(Violated_protocol, Some (error_msg, [])))
-                  |> don't_wait_for ;
-                  Deferred.Or_error.error_string error_msg )
-                else
-                  Deferred.Or_error.return
-                  @@ List.map transitions ~f:(fun transition ->
-                         let transition_with_hash =
-                           With_hash.of_data transition
-                             ~hash_data:External_transition.state_hash
-                         in
-                         Envelope.Incoming.wrap ~data:transition_with_hash
-                           ~sender:(Envelope.Sender.Remote peer.host) ) ) )
+              in
+              Trust_system.(
+                record trust_system logger peer.host
+                  Actions.(Violated_protocol, Some (error_msg, [])))
+              |> don't_wait_for ;
+              Deferred.Or_error.error_string error_msg )
+            else
+              Deferred.Or_error.return
+              @@ List.map transitions ~f:(fun transition ->
+                     let transition_with_hash =
+                       With_hash.of_data transition
+                         ~hash_data:External_transition.state_hash
+                     in
+                     Envelope.Incoming.wrap ~data:transition_with_hash
+                       ~sender:(Envelope.Sender.Remote peer.host) ) ) )
 
   let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
       ~frontier ~unprocessed_transition_cache ~transitions ~target_hash
