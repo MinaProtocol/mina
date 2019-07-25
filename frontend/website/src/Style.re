@@ -137,6 +137,35 @@ module Typeface = {
         ),
       );
     ();
+
+    let _ =
+      fontFamily(
+        fontFace(
+          ~fontFamily="PragmataPro",
+          ~src=[
+            cdnUrl("/static/font/Essential-PragmataPro-Regular.woff2"),
+            cdnUrl("/static/font/Essential-PragmataPro-Regular.woff"),
+          ],
+          ~fontStyle=`normal,
+          ~fontWeight=`medium,
+          (),
+        ),
+      );
+
+    let _ =
+      fontFamily(
+        fontFace(
+          ~fontFamily="PragmataPro",
+          ~src=[
+            cdnUrl("/static/font/Essential-PragmataPro-Bold.woff2"),
+            cdnUrl("/static/font/Essential-PragmataPro-Bold.woff"),
+          ],
+          ~fontStyle=`normal,
+          ~fontWeight=`bold,
+          (),
+        ),
+      );
+    ();
   };
 
   let ibmplexserif = fontFamily("IBM Plex Serif, serif");
