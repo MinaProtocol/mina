@@ -1,7 +1,7 @@
 module Styles = {
   open! Css;
 
-  let markdownStyles =
+  let markdownStyles = linkSvg =>
     style([
       position(`relative),
       selector(
@@ -24,7 +24,7 @@ module Styles = {
           color(`transparent),
           hover([color(`transparent)]),
           backgroundSize(`cover),
-          backgroundImage(url(Links.Cdn.url("/static/img/link.svg"))),
+          backgroundImage(url(linkSvg)),
         ],
       ),
       selector(
@@ -175,10 +175,11 @@ let make = _children => {
   render: _self => {
     // We need to calculate the CDN url and inject it into the template
     let chevronUrl = Links.Cdn.url("/static/img/chevron-down.svg");
+    let linkUrl = Links.Cdn.url("/static/img/link.svg");
     <div
       className=Css.(
         merge([
-          Styles.markdownStyles,
+          Styles.markdownStyles(linkUrl),
           style([
             display(`flex),
             flexDirection(`column),

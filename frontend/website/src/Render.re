@@ -34,9 +34,7 @@ module Rimraf = {
 
 let isProd = Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod";
 
-if (isProd) {
-  Links.Cdn.prefix := "https://cdn.codaprotocol.com/website";
-};
+Links.Cdn.setPrefix(isProd ? "https://cdn.codaprotocol.com/website" : "");
 
 Style.Typeface.load();
 
