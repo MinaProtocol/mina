@@ -152,7 +152,8 @@ module Make (Inputs : Inputs.S) :
       ~target_hash =
     let peers = Network.random_peers network num_peers in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+      ~metadata:
+        [("target_hash", `String (State_hash.to_base58_check target_hash))]
       "Doing a catchup job with target $target_hash" ;
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
         let open Deferred.Or_error.Let_syntax in
@@ -324,8 +325,8 @@ module Make (Inputs : Inputs.S) :
               ~metadata:
                 [ ( "hashes_of_missing_transitions"
                   , `List
-                      (List.map hashes_of_missing_transitions
-                         ~f:State_hash.to_yojson) ) ]
+                      (List.map hashes_of_missing_transitions ~f:(fun hash ->
+                           `String (State_hash.to_base58_check hash) )) ) ]
               !"Number of missing transitions is %d"
               num_of_missing_transitions ;
             let%bind transitions =
@@ -350,7 +351,8 @@ module Make (Inputs : Inputs.S) :
                              (fun breadcrumb ->
                                Cached.peek breadcrumb
                                |> Transition_frontier.Breadcrumb.state_hash
-                               |> State_hash.to_yojson )
+                               |> State_hash.to_base58_check
+                               |> fun str -> `String str )
                              tree )) ) ]
               "about to write to the catchup breadcrumbs pipe" ;
             if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
