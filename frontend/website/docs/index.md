@@ -15,7 +15,7 @@ You can also sign up for the public testnet updates [here](https://bit.ly/Testne
 <span id="testnet-points" />
 ## Testnet Points*
 
-We want to recognize those who are actively involved in the network and our community. We’ll be issuing weekly challenges, tied to Testnet Points[\*](#disclaimer) to make it fun, interesting and a little competitive!
+The goal of Testnet Points[\*](#disclaimer) is to recognize Coda community members who are actively involved in the network. There will be weekly challenges, tied to Testnet Points[\*](#disclaimer) to make it fun, interesting, and foster some friendly competition!
 
 You can track the community’s Testnet Points[\*](#disclaimer) in our public, [read-only leaderboard](http://bit.ly/TestnetBetaLeaderboard).
 
