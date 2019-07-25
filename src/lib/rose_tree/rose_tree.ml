@@ -15,6 +15,11 @@ let to_yojson conv t = display_to_yojson conv (to_display t)
 let of_yojson conv json =
   Result.map ~f:of_display (display_of_yojson conv json)
 
+let of_non_empty_list ?(subtrees = []) =
+  Non_empty_list.fold
+    ~init:(fun x -> T (x, subtrees))
+    ~f:(fun acc x -> T (x, [acc]))
+
 let rec of_list_exn ?(subtrees = []) = function
   | [] ->
       raise

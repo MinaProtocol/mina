@@ -24,7 +24,7 @@ module Make_intf (Input : Inputs_intf) = struct
          init:Input.hash
       -> Input.proof_elem list
       -> Input.hash
-      -> Input.hash list option
+      -> Input.hash Non_empty_list.t option
   end
 end
 
@@ -40,9 +40,11 @@ module Make (Input : Inputs_intf) : Make_intf(Input).S = struct
 
   let verify ~init (merkle_list : proof_elem list) underlying_hash =
     let hashes =
-      List.fold merkle_list ~init:[init] ~f:(fun acc proof_elem ->
-          hash (List.hd_exn acc) proof_elem :: acc )
+      List.fold merkle_list ~init:(Non_empty_list.singleton init)
+        ~f:(fun acc proof_elem ->
+          Non_empty_list.cons (hash (Non_empty_list.head acc) proof_elem) acc
+      )
     in
-    if equal_hash underlying_hash (List.hd_exn hashes) then Some hashes
+    if equal_hash underlying_hash (Non_empty_list.head hashes) then Some hashes
     else None
 end

@@ -3,7 +3,6 @@ open Async
 open Cache_lib
 open Pipe_lib
 open Coda_base
-open Coda_state
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
@@ -24,7 +23,7 @@ open Coda_state
     download the corresponding transitions in a batch fashion. Next it will perform the
     following validations on each external_transition:
 
-``` 1. Check the list of transitions corresponds to the list of hashes that we
+    1. Check the list of transitions corresponds to the list of hashes that we
     requested;
 
     2. Each transition is checked through [Transition_processor.Validator] and
@@ -95,11 +94,11 @@ module Make (Inputs : Inputs.S) :
     let open Deferred.Let_syntax in
     match%bind cached_initially_validated_transition_result with
     | Ok x ->
-        Deferred.return @@ Ok (Either.Second x)
+        Deferred.return @@ Ok (`Building_path x)
     | Error (`In_frontier hash) ->
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup has already been seen" ;
-        Deferred.return @@ Ok (Either.First hash)
+        Deferred.return @@ Ok (`In_frontier hash)
     | Error (`In_process consumed_state) -> (
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup is still in process in \
@@ -110,7 +109,7 @@ module Make (Inputs : Inputs.S) :
               "transition queried during ledger catchup failed" ;
             Error (Error.of_string "Previous transition failed")
         | `Success hash ->
-            Ok (Either.First hash) )
+            Ok (`In_frontier hash) )
     | Error (`Verifier_error error) ->
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:[("error", `String (Error.to_string_hum error))]
@@ -185,7 +184,9 @@ module Make (Inputs : Inputs.S) :
                         Actions.(Violated_protocol, Some (error_msg, []))) ;
                   Or_error.error_string error_msg
             in
-            List.fold_until hashes ~init:[]
+            List.fold_until
+              (Non_empty_list.to_list hashes)
+              ~init:[]
               ~f:(fun acc hash ->
                 if Transition_frontier.find frontier hash |> Option.is_some
                 then Continue_or_stop.Stop (Ok (peer, acc))
@@ -260,10 +261,10 @@ module Make (Inputs : Inputs.S) :
           | Error e ->
               List.map acc ~f:Cached.invalidate_with_failure |> ignore ;
               Deferred.Or_error.fail e
-          | Ok (Either.First initial_hash) ->
+          | Ok (`In_frontier initial_hash) ->
               Deferred.Or_error.return
               @@ Continue_or_stop.Stop (acc, initial_hash)
-          | Ok (Either.Second transition_with_initial_validation) ->
+          | Ok (`Building_path transition_with_initial_validation) ->
               Deferred.Or_error.return
               @@ Continue_or_stop.Continue
                    (transition_with_initial_validation :: acc) )
@@ -281,8 +282,10 @@ module Make (Inputs : Inputs.S) :
             Deferred.Or_error.return (acc, initial_state_hash) )
     in
     let trees_of_transitions =
-      if List.length transitions_with_initial_validation <= 0 then subtrees
-      else [Rose_tree.of_list_exn ~subtrees transitions_with_initial_validation]
+      Option.fold
+        (Non_empty_list.of_list_opt transitions_with_initial_validation)
+        ~init:subtrees ~f:(fun _ transitions ->
+          [Rose_tree.of_non_empty_list ~subtrees transitions] )
     in
     let open Deferred.Let_syntax in
     match%bind
