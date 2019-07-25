@@ -19,7 +19,7 @@ The goal of Testnet Points[\*](#disclaimer) is to recognize Coda community membe
 
 You can track the Testnet Points[\*](#disclaimer) and current leaders in the public, [read-only leaderboard](http://bit.ly/TestnetBetaLeaderboard).
 
-Check out our [Discord](http://bit.ly/CodaDiscord) for specifics and updates on the challenges.
+Check out the [Discord server](http://bit.ly/CodaDiscord) and head to the #testnet-general channel for specifics and updates on challenges.
 
 <span id="disclaimer">
 \*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
