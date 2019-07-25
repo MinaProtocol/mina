@@ -31,8 +31,8 @@ end = struct
           Format.asprintf !"Coinbase error: %s \n" err
       | Insufficient_fee (f1, f2) ->
           Format.asprintf
-            !"Transaction fee %{sexp: Currency.Fee.t} does not suffice proof \
-              fee %{sexp: Currency.Fee.t} \n"
+            !"Transaction fees %{sexp: Currency.Fee.t} does not suffice proof \
+              fees %{sexp: Currency.Fee.t} \n"
             f1 f2
       | Unexpected e ->
           Error.to_string_hum e
@@ -285,27 +285,25 @@ end = struct
     let txn_works =
       List.map ~f:Transaction_snark_work.forget completed_works
     in
-    let coinbase_fts : (Public_key.Compressed.t * Currency.Fee.t) sexp_list =
-      match coinbase_parts with
-      | `One (Some ft) ->
-          [ft]
-      | `Two (Some (ft, None)) ->
-          [ft]
-      | `Two (Some (ft1, Some ft2)) ->
-          [ft1; ft2]
-      | _ ->
-          []
-    in
-    let coinbase_work_fees = sum_fees coinbase_fts ~f:snd |> Or_error.ok_exn in
     let coinbase_parts =
       O1trace.measure "create_coinbase" (fun () ->
           ok_exn' (create_coinbase coinbase_parts proposer) )
     in
+    let coinbase_fts =
+      List.concat_map coinbase_parts ~f:(fun cb ->
+          Option.value_map cb.fee_transfer ~default:[] ~f:(fun ft -> [ft]) )
+    in
+    let coinbase_work_fees = sum_fees coinbase_fts ~f:snd |> Or_error.ok_exn in
+    let txn_works_others =
+      List.filter txn_works ~f:(fun {Transaction_snark_work.prover; _} ->
+          not (Public_key.Compressed.equal proposer prover) )
+    in
     let delta =
-      ok_exn' (fee_remainder user_commands txn_works coinbase_work_fees)
+      ok_exn' (fee_remainder user_commands txn_works_others coinbase_work_fees)
     in
     let fee_transfers =
-      ok_exn' (create_fee_transfers txn_works delta proposer coinbase_fts)
+      ok_exn'
+        (create_fee_transfers txn_works_others delta proposer coinbase_fts)
     in
     let transactions =
       List.map user_commands ~f:(fun t -> Transaction.User_command t)
