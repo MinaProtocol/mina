@@ -984,8 +984,10 @@ module Data = struct
       let open Local_state in
       let open Snapshot in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Checking vrf evaluations at %d:%d" (Epoch.to_int epoch)
-        (Epoch.Slot.to_int slot) ;
+        "Checking VRF evaluations at epoch: $epoch, slot: $slot"
+        ~metadata:
+          [ ("epoch", `Int (Epoch.to_int epoch))
+          ; ("slot", `Int (Epoch.Slot.to_int slot)) ] ;
       with_return (fun {return} ->
           Hashtbl.iteri
             ( Snapshot.delegators epoch_snapshot public_key_compressed
@@ -994,13 +996,20 @@ module Data = struct
               let vrf_result =
                 T.eval ~private_key {epoch; slot; seed; delegator}
               in
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                !"vrf result for %d: %d/%d -> %{sexp: Bignum_bigint.t}"
-                (Coda_base.Account.Index.to_int delegator)
-                (Balance.to_int balance)
-                (Amount.to_int total_stake)
-                (Bignum_bigint.of_bit_fold_lsb
-                   (Random_oracle.Digest.fold_bits vrf_result)) ;
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                "VRF result for delegator: $delegator, balance: $balance, \
+                 amount: $amount, result: $result"
+                ~metadata:
+                  [ ( "delegator"
+                    , `Int (Coda_base.Account.Index.to_int delegator) )
+                  ; ("balance", `Int (Balance.to_int balance))
+                  ; ("amount", `Int (Amount.to_int total_stake))
+                  ; ( "result"
+                    , `String
+                        (* use sexp representation; int might be too small *)
+                        ( Random_oracle.Digest.fold_bits vrf_result
+                        |> Bignum_bigint.of_bit_fold_lsb
+                        |> Bignum_bigint.sexp_of_t |> Sexp.to_string ) ) ] ;
               Coda_metrics.Counter.inc_one
                 Coda_metrics.Consensus.vrf_evaluations ;
               if
@@ -2267,16 +2276,15 @@ module Hooks = struct
 
       let implementation ~logger ~local_state conn ~version:_ ledger_hash =
         let open Coda_base in
-        let open Host_and_port in
         let open Local_state in
         let open Snapshot in
         Deferred.create (fun ivar ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
-                [ ("peer", `String (sprintf "%s:%d" conn.host conn.port))
+                [ ("peer", `String (Host_and_port.to_string conn))
                 ; ("ledger_hash", Coda_base.Ledger_hash.to_yojson ledger_hash)
                 ]
-              "serving epoch ledger query with hash $ledger_hash from $peer" ;
+              "Serving epoch ledger query with hash $ledger_hash from $peer" ;
             let response =
               if
                 Ledger_hash.equal ledger_hash
@@ -2299,11 +2307,11 @@ module Hooks = struct
             Result.iter_error response ~f:(fun err ->
                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
-                    [ ("peer", `String (sprintf "%s:%d" conn.host conn.port))
+                    [ ("peer", `String (Host_and_port.to_string conn))
                     ; ("error", `String err)
                     ; ( "ledger_hash"
                       , Coda_base.Ledger_hash.to_yojson ledger_hash ) ]
-                  "failed to serve epoch ledger query with hash $ledger_hash \
+                  "Failed to serve epoch ledger query with hash $ledger_hash \
                    from $peer: $error" ) ;
             Ivar.fill ivar response )
     end
@@ -2417,11 +2425,12 @@ module Hooks = struct
     let open Snapshot in
     let open Deferred.Let_syntax in
     let requested_syncs = Non_empty_list.to_list requested_syncs in
-    Logger.info logger "syncing local state, %d jobs"
-      (List.length requested_syncs)
+    Logger.info logger
+      "Syncing local state; requesting $num_requested snapshots from peers"
       ~location:__LOC__ ~module_:__MODULE__
       ~metadata:
-        [ ( "requested_syncs"
+        [ ("num_requested", `Int (List.length requested_syncs))
+        ; ( "requested_syncs"
           , `List (List.map requested_syncs ~f:local_state_sync_to_yojson) )
         ; ("local_state", Local_state.to_yojson local_state) ] ;
     let sync {snapshot_id; expected_root= target_ledger_hash} =
@@ -2466,7 +2475,7 @@ module Hooks = struct
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("error", `String err) ]
-                  "peer $peer failed to serve requested epoch ledger: $error" ;
+                  "Peer $peer failed to serve requested epoch ledger: $error" ;
                 return false
             | Error err ->
                 Logger.faulty_peer_without_punishment logger
@@ -2474,7 +2483,7 @@ module Hooks = struct
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("error", `String (Error.to_string_hum err)) ]
-                  "error querying peer $peer: $error" ;
+                  "Error when querying peer $peer for epoch ledger: $error" ;
                 return false )
     in
     if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
@@ -2508,7 +2517,10 @@ module Hooks = struct
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
     let log_result choice msg =
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        "RESULT: %s -- %s" (string_of_choice choice) msg
+        "Select result: $choice -- $message"
+        ~metadata:
+          [ ("choice", `String (string_of_choice choice))
+          ; ("message", `String msg) ]
     in
     let log_choice ~precondition_msg ~choice_msg choice =
       let choice_msg =
@@ -2521,8 +2533,8 @@ module Hooks = struct
       let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
       log_result choice msg
     in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "selecting best consensus state"
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      "Selecting best consensus state"
       ~metadata:
         [ ("existing", Consensus_state.Value.to_yojson existing)
         ; ("candidate", Consensus_state.Value.to_yojson candidate) ] ;
@@ -2627,8 +2639,12 @@ module Hooks = struct
 
   let next_proposal now (state : Consensus_state.Value.t) ~local_state
       ~keypairs ~logger =
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Checking for next proposal..." ;
+    let info_if_proposing =
+      if Keypair.And_compressed_pk.Set.is_empty keypairs then Logger.debug
+      else Logger.info
+    in
+    info_if_proposing logger ~module_:__MODULE__ ~location:__LOC__
+      "Determining next slot to produce block" ;
     let curr_epoch, curr_slot =
       Epoch.epoch_and_slot_of_time_exn
         (Coda_base.Block_time.of_span_since_epoch
@@ -2641,13 +2657,13 @@ module Hooks = struct
       then Epoch.incr (curr_epoch, curr_slot)
       else (curr_epoch, curr_slot)
     in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      "Systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
       (Int64.to_int now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
       ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
       @@ Epoch.start_time epoch ) ;
     let next_slot =
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
         !"Selecting correct epoch data from state -- epoch by time: %d, state \
           epoch: %d, state epoch count: %d"
         (Epoch.to_int epoch)
@@ -2659,17 +2675,18 @@ module Hooks = struct
             epoch_data
         | Error () ->
             Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              "system time is out of sync with protocol state time" ;
+              "System time is out of sync with protocol state time" ;
             failwith
-              "System time is out of sync. (hint: setup NTP if you haven't)"
+              "System time is out of sync with protocol state time; please \
+               setup NTP if you haven't)"
       in
       let total_stake = epoch_data.ledger.total_currency in
       let epoch_snapshot =
         let source, snapshot =
           select_epoch_snapshot ~consensus_state:state ~local_state ~epoch
         in
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          !"using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+          !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
           (epoch_snapshot_name source)
           (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ;
         snapshot
@@ -2716,8 +2733,8 @@ module Hooks = struct
     let ms_since_epoch = Fn.compose Time.Span.to_ms Time.to_span_since_epoch in
     match next_slot with
     | Some (next_slot, keypair, data) ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Proposing in %d slots"
+        info_if_proposing logger ~module_:__MODULE__ ~location:__LOC__
+          "Producing block in %d slots"
           (Epoch.Slot.to_int next_slot - Epoch.Slot.to_int slot) ;
         if Epoch.Slot.equal curr_slot next_slot then
           `Propose_now (keypair, data)
@@ -2729,8 +2746,9 @@ module Hooks = struct
             , data )
     | None ->
         let epoch_end_time = Epoch.end_time epoch |> ms_since_epoch in
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "No slots won in this epoch. Waiting for next epoch, @%d"
+        info_if_proposing logger ~module_:__MODULE__ ~location:__LOC__
+          "No slots won in this epoch. Waiting for next epoch to check again, \
+           @%d"
           (Int64.to_int epoch_end_time) ;
         `Check_again epoch_end_time
 

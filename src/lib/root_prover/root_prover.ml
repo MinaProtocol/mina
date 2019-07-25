@@ -103,11 +103,11 @@ module Make (Inputs : Inputs_intf) :
       |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
     in
     let merkle_list = Merkle_list.prove ~context:frontier best_verified_tip in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
         [ ( "merkle_list"
           , `List (List.map ~f:State_body_hash.to_yojson merkle_list) ) ]
-      "Produced a merkle list of $merkle_list" ;
+      "Root prover produced a merkle list of $merkle_list" ;
     Some
       Proof_carrying_data.
         { data= root |> External_transition.Validated.forget_validation

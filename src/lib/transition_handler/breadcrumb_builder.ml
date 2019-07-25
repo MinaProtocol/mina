@@ -25,9 +25,8 @@ module Make (Inputs : Inputs.S) :
       | None ->
           let msg =
             Printf.sprintf
-              !"Transition frontier already garbage collected the parent on \
-                %{sexp: Coda_base.State_hash.t}"
-              initial_hash
+              "Transition frontier already garbage-collected the parent of %s"
+              (Coda_base.State_hash.to_base58_check initial_hash)
           in
           Logger.error logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
@@ -39,7 +38,9 @@ module Make (Inputs : Inputs.S) :
                            (fun enveloped_transitions ->
                              Cached.peek enveloped_transitions
                              |> Envelope.Incoming.data |> fst |> With_hash.hash
-                             |> State_hash.to_yojson )
+                             |> fun hash ->
+                             `String
+                               (Coda_base.State_hash.to_base58_check hash) )
                            subtree )) ) ]
             !"%s" msg ;
           Or_error.error_string msg

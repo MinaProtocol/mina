@@ -368,9 +368,10 @@ module Make (Inputs : Inputs.S) :
                 trees_of_breadcrumbs
         | Error e ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-              !"All peers either sent us bad data, didn't have the info, or \
-                our transition frontier moved too fast: %s"
-              (Error.to_string_hum e) ;
+              ~metadata:[("error", `String (Error.to_string_hum e))]
+              "Catchup process failed -- unable to receive valid data from \
+               peers or transition frontier progressed faster than catchup \
+               data received. See error for details: $error" ;
             garbage_collect_subtrees ~logger ~subtrees )
         |> don't_wait_for )
     |> don't_wait_for

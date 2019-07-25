@@ -67,25 +67,25 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   in
   let frontier_file = conf_dir ^/ "frontier.dot" in
   let mask_file = conf_dir ^/ "registered_masks.dot" in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
     (Visualization_message.success "registered masks" mask_file) ;
   Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
   match !coda_ref with
   | None ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
         "Shutdown before Coda instance was created, not saving a visualization"
   | Some t -> (
     match Coda_lib.visualize_frontier ~filename:frontier_file t with
     | `Active () ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
           (Visualization_message.success "transition frontier" frontier_file)
     | `Bootstrapping ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
           (Visualization_message.bootstrap "transition frontier") )
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
-let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
-    ~client_port () =
+let setup_local_server ?(client_whitelist = []) ?rest_server_port
+    ?(insecure_rest_server = false) ~coda ~client_port () =
   let client_whitelist =
     Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
   in
@@ -230,7 +230,9 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                       ~metadata:
                         [ ("error", `String (Exn.to_string_mach exn))
                         ; ("context", `String "rest_server") ] ))
-              (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
+              (Tcp.Where_to_listen.bind_to
+                 (if insecure_rest_server then All_addresses else Localhost)
+                 (On_port rest_server_port))
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
                 let status flag =
@@ -249,7 +251,11 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                     status `Performance >>| lift
                 | _ ->
                     Server.respond_string ~status:`Not_found "Route not found"
-                    >>| lift )) )
+                    >>| lift ))
+          |> Deferred.map ~f:(fun _ ->
+                 Logger.info logger
+                   !"Created GraphQL server and status endpoints at port : %i"
+                   rest_server_port ~module_:__MODULE__ ~location:__LOC__ ) )
       |> ignore ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
@@ -330,16 +336,17 @@ let handle_crash e =
   Core.eprintf
     !{err|
 
-  💀 Coda's Daemon Crashed. The Coda Protocol developers would like to know why!
+  ☠  Coda Daemon crashed. The Coda Protocol developers would like to know why!
 
   Please:
     Open an issue:
       https://github.com/CodaProtocol/coda/issues/new
 
-    Tell us what you were doing, and paste the last 20 lines of log messages.
+    Briefly describe what you were doing, and include the last 20 lines from .coda-config/coda.log.
     And then paste the following:
 
-    %s%!|err}
+    %s
+%!|err}
     (Exn.to_string e)
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
@@ -352,9 +359,9 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
         log_shutdown ~conf_dir ~top_logger coda_ref ;
         let logger =
           Logger.extend top_logger
-            [("coda_run", `String "Program got killed by signal")]
+            [("coda_run", `String "Program was killed by signal")]
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          !"Coda process got interrupted by $signal"
+          !"Coda process was interrupted by $signal"
           ~metadata:[("signal", `String (to_string signal))] ;
         Stdlib.exit 130 ))

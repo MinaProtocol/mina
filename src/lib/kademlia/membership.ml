@@ -54,6 +54,47 @@ let get_project_root () =
   in
   go @@ realpath current_dir_name
 
+(* This snippet was taken from our fork of RPC Parallel.
+ * Would be nice to have a shared utility, but this is
+ * easiest for now. *)
+(* To get the currently running executable:
+  On Darwin:
+  Use _NSGetExecutablePath via Ctypes
+
+  On Linux:
+  Use /proc/PID/exe
+   - argv[0] might have been deleted (this is quite common with jenga)
+   - `cp /proc/PID/exe dst` works as expected while `cp /proc/self/exe dst` does not *)
+let get_coda_binary =
+  lazy
+    (let open Async in
+    let open Deferred.Or_error.Let_syntax in
+    let%bind os = Process.run ~prog:"uname" ~args:["-s"] () in
+    if os = "Darwin\n" then
+      let open Ctypes in
+      let ns_get_executable_path =
+        Foreign.foreign "_NSGetExecutablePath"
+          (ptr char @-> ptr uint32_t @-> returning int)
+      in
+      let path_max = Syslimits.path_max () in
+      let buf = Ctypes.allocate_n char ~count:path_max in
+      let count = Ctypes.allocate uint32_t (Unsigned.UInt32.of_int path_max) in
+      let%map () =
+        Deferred.return
+          (Result.ok_if_true
+             (ns_get_executable_path buf count = 0)
+             ~error:
+               (Error.of_string
+                  "call to _NSGetExecutablePath failed unexpectedly"))
+      in
+      let s =
+        string_from_ptr buf ~length:(!@count |> Unsigned.UInt32.to_int)
+      in
+      List.hd_exn @@ String.split s ~on:(Char.of_int 0 |> Option.value_exn)
+    else
+      Deferred.Or_error.return
+        (Unix.getpid () |> Pid.to_int |> sprintf "/proc/%d/exe"))
+
 let lock_file = "kademlia.lock"
 
 let write_lock_file lock_path pid =
@@ -147,23 +188,31 @@ module Haskell_process = struct
         ; cli_format external_ip discovery_port ]
         @ List.map filtered_initial_peers ~f:cli_format_initial_peer
       in
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "Args: %s\n"
-        (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
+      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+        "Kademlia command-line arguments: $argv"
+        ~metadata:[("argv", `List (List.map args ~f:(fun arg -> `String arg)))] ;
       (* This is where nix dumps the haskell artifact *)
       let kademlia_binary = "src/app/kademlia-haskell/result/bin/kademlia" in
       (* This is where you'd manually install kademlia *)
       let coda_kademlia = "coda-kademlia" in
+      let%bind coda_binary_absolute = Lazy.force get_coda_binary in
       let open Deferred.Let_syntax in
       match%map
         keep_trying
-          ( ( Unix.getenv "CODA_KADEMLIA_PATH"
-            |> Option.value ~default:coda_kademlia )
-          ::
-          ( match get_project_root () with
-          | Some path ->
-              [path ^/ kademlia_binary]
-          | None ->
-              [] ) )
+          (List.filter_map ~f:Fn.id
+             [ Some
+                 ( Unix.getenv "CODA_KADEMLIA_PATH"
+                 |> Option.value ~default:coda_kademlia )
+             ; ( match coda_binary_absolute with
+               | Ok path ->
+                   Some (Filename.dirname path ^/ "kademlia")
+               | Error _ ->
+                   None )
+             ; ( match get_project_root () with
+               | Some path ->
+                   Some (path ^/ kademlia_binary)
+               | None ->
+                   None ) ])
           ~f:(fun prog -> Process.create ~prog ~args ())
         |> Deferred.Or_error.map ~f:(fun process ->
                {failure_response= ref `Die; process; lock_path} )
@@ -177,8 +226,10 @@ module Haskell_process = struct
                   ()
               | `Die, (Error _ as e) ->
                   Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                    !"Kademlia process died: %s%!"
-                    (Unix.Exit_or_signal.to_string_hum e) ;
+                    "Kademlia process died: $exit_or_signal"
+                    ~metadata:
+                      [ ( "exit_or_signal"
+                        , `String (Unix.Exit_or_signal.to_string_hum e) ) ] ;
                   raise Child_died ) ;
           Ok p
       | Error e ->
@@ -195,12 +246,14 @@ module Haskell_process = struct
           match%bind Process.run ~prog:"kill" ~args:[p] () with
           | Ok _ ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                "Killing Dead Kademlia Process %s" p ;
+                "Killing Kademlia process: $process"
+                ~metadata:[("process", `String p)] ;
               let%map () = Sys.remove lock_path in
               Ok ()
           | Error _ ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                "Process %s does not exists and will not be killed" p ;
+                "Process $process does not exist, won't kill"
+                ~metadata:[("process", `String p)] ;
               return @@ Ok () )
       | _ ->
           return @@ Ok ()
@@ -221,8 +274,8 @@ module Haskell_process = struct
           (Pipe.iter_without_pushback
              (Reader.pipe (Process.stderr process))
              ~f:(fun str ->
-               Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-                 str )) ;
+               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                 "Kademlia stderr output: %s" str )) ;
         t
     | _ ->
         Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
@@ -237,7 +290,7 @@ module Haskell_process = struct
         let prefix = String.prefix line prefix_name_size in
         let pass_through () =
           Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-            "Unexpected output from Kademlia Haskell: %s" line ;
+            "Unexpected Kademlia output: %s" line ;
           None
         in
         if String.length line < prefix_size then pass_through ()
@@ -246,19 +299,18 @@ module Haskell_process = struct
             String.slice line prefix_size (String.length line)
           in
           match prefix with
-          | "DBUG" ->
+          | "DBUG" | "EROR" ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+                ~metadata:[("kademlia_level", `String prefix)]
                 line_no_prefix ;
               None
           | "TRAC" ->
               (* trace is 99% ping/pong checks, omit *)
               None
-          | "EROR" ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-                line_no_prefix ;
-              None
           | "DATA" ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+              (* Too noisy to put in info logs *)
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+                ~metadata:[("kademlia_level", `String "DATA")]
                 line_no_prefix ;
               Some [line_no_prefix]
           | _ ->
