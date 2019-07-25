@@ -2128,6 +2128,8 @@ let%test_module "test" =
       in
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
+    (*Same as gen_at_capacity except that the number of iterations[iters] is 
+    the function of [extra_block_count] and is same for all generated values*)
     let gen_at_capacity_fixed_blocks extra_block_count :
         ( Ledger.init_state
         * User_command.With_valid_signature.t list
