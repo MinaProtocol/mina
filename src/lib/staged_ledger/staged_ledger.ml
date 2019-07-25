@@ -2039,42 +2039,54 @@ let%test_module "test" =
         -> User_command.With_valid_signature.t list
         -> int option list
         -> Sl.t ref
+        -> ?expected_proof_count:int (*Number of ledger proofs expected*)
         -> Ledger.Mask.Attached.t
         -> [`One_prover | `Many_provers]
         -> (   Transaction_snark_work.Statement.t
             -> Transaction_snark_work.Checked.t option)
         -> unit Deferred.t =
-     fun init_state cmds cmd_iters sl test_mask provers stmt_to_work ->
+     fun init_state cmds cmd_iters sl ?(expected_proof_count = 0) test_mask
+         provers stmt_to_work ->
       let logger = Logger.null () in
-      iter_cmds cmds cmd_iters (fun cmds_left count_opt cmds_this_iter ->
-          let%bind ledger_proof, diff =
-            create_and_apply sl logger cmds_this_iter stmt_to_work
-          in
-          assert_fee_excess ledger_proof ;
-          let cmds_applied_this_iter =
-            List.length @@ Staged_ledger_diff.user_commands diff
-          in
-          let cb = coinbase_fee_transfers diff in
-          ( match provers with
-          | `One_prover ->
-              assert (cb = 1)
-          | `Many_provers ->
-              assert (cb > 0 && cb < 3) ) ;
-          ( match count_opt with
-          | Some _ ->
-              (* There is an edge case where cmds_applied_this_iter = 0, when
+      let%map total_ledger_proofs =
+        iter_cmds_acc cmds cmd_iters 0
+          (fun cmds_left count_opt cmds_this_iter proof_count ->
+            let%bind ledger_proof, diff =
+              create_and_apply sl logger cmds_this_iter stmt_to_work
+            in
+            let proof_count' =
+              proof_count + if Option.is_some ledger_proof then 1 else 0
+            in
+            assert_fee_excess ledger_proof ;
+            let cmds_applied_this_iter =
+              List.length @@ Staged_ledger_diff.user_commands diff
+            in
+            let cb = coinbase_fee_transfers diff in
+            ( match provers with
+            | `One_prover ->
+                assert (cb = 1)
+            | `Many_provers ->
+                assert (cb > 0 && cb < 3) ) ;
+            ( match count_opt with
+            | Some _ ->
+                (* There is an edge case where cmds_applied_this_iter = 0, when
                there is only enough space for coinbase transactions. *)
-              assert (cmds_applied_this_iter <= Sequence.length cmds_this_iter) ;
-              [%test_eq: User_command.t list]
-                (Staged_ledger_diff.user_commands diff)
-                ( Sequence.take cmds_this_iter cmds_applied_this_iter
-                  |> Sequence.to_list
-                  :> User_command.t list )
-          | None ->
-              () ) ;
-          assert_ledger test_mask !sl cmds_left cmds_applied_this_iter
-            (init_pks init_state) ;
-          return diff )
+                assert (
+                  cmds_applied_this_iter <= Sequence.length cmds_this_iter ) ;
+                [%test_eq: User_command.t list]
+                  (Staged_ledger_diff.user_commands diff)
+                  ( Sequence.take cmds_this_iter cmds_applied_this_iter
+                    |> Sequence.to_list
+                    :> User_command.t list )
+            | None ->
+                () ) ;
+            assert_ledger test_mask !sl cmds_left cmds_applied_this_iter
+              (init_pks init_state) ;
+            return (diff, proof_count') )
+      in
+      (*Should have enough blocks to generate at least expected_proof_count 
+      proofs*)
+      assert (total_ledger_proofs >= expected_proof_count)
 
     (* We use first class modules to compute some derived constants that depend
        on the scan state constants. *)
@@ -2090,15 +2102,15 @@ let%test_module "test" =
       (transaction_capacity_log_2 + 1) * (work_delay + 1)
 
     (* How many blocks to we need to produce to fully exercise the ledger
-       behavior? min_blocks_before_first_snarked_ledger_generic + n blocks for 
-       n ledger proofs *)
-    let max_blocks_for_coverage_generic (module C : Constants_intf) n =
-      min_blocks_before_first_snarked_ledger_generic (module C) + n
+       behavior? min_blocks_before_first_snarked_ledger_generic + 1*)
+    let max_blocks_for_coverage_generic (module C : Constants_intf) =
+      min_blocks_before_first_snarked_ledger_generic (module C) + 1
 
-    let max_blocks_for_coverage =
+    (* n extra blocks for n more ledger proofs *)
+    let max_blocks_for_coverage n =
       max_blocks_for_coverage_generic
         (module Transaction_snark_scan_state.Constants)
-        3
+      + n
 
     (** Generator for when we always have enough commands to fill all slots. *)
     let gen_at_capacity :
@@ -2108,7 +2120,22 @@ let%test_module "test" =
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
-      let%bind iters = Int.gen_incl 1 max_blocks_for_coverage in
+      let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
+      let%bind cmds =
+        User_command.With_valid_signature.Gen.sequence
+          ~length:(transaction_capacity * iters)
+          ~sign_type:`Real ledger_init_state
+      in
+      return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
+
+    let gen_at_capacity_fixed_blocks extra_block_count :
+        ( Ledger.init_state
+        * User_command.With_valid_signature.t list
+        * int option list )
+        Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
+      let iters = max_blocks_for_coverage extra_block_count in
       let%bind cmds =
         User_command.With_valid_signature.Gen.sequence
           ~length:(transaction_capacity * iters)
@@ -2121,7 +2148,7 @@ let%test_module "test" =
       let open Quickcheck.Generator.Let_syntax in
       let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
       let iters_max =
-        max_blocks_for_coverage * if extra_blocks then 4 else 2
+        max_blocks_for_coverage 0 * if extra_blocks then 4 else 2
       in
       let%bind iters = Int.gen_incl 1 iters_max in
       (* N.B. user commands per block is much less than transactions per block
@@ -2140,13 +2167,26 @@ let%test_module "test" =
       in
       return (ledger_init_state, cmds, List.map ~f:Option.some cmds_per_iter)
 
+    let%test_unit "Max throughput-ledger proof count-fixed blocks" =
+      let expected_proof_count = 3 in
+      Quickcheck.test (gen_at_capacity_fixed_blocks expected_proof_count)
+        ~sexp_of:
+          [%sexp_of:
+            Ledger.init_state
+            * Coda_base.User_command.With_valid_signature.t list
+            * int option list] ~trials:10
+        ~f:(fun (ledger_init_state, cmds, iters) ->
+          async_with_ledgers ledger_init_state (fun sl test_mask ->
+              test_simple ledger_init_state cmds iters sl ~expected_proof_count
+                test_mask `Many_provers stmt_to_work_random_prover ) )
+
     let%test_unit "Max throughput" =
       Quickcheck.test gen_at_capacity
         ~sexp_of:
           [%sexp_of:
             Ledger.init_state
             * Coda_base.User_command.With_valid_signature.t list
-            * int option list] ~trials:10
+            * int option list] ~trials:15
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_simple ledger_init_state cmds iters sl test_mask
