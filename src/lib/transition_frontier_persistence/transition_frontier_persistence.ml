@@ -41,7 +41,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
     with
     | Error e ->
         Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-          "Could not connect to worker" ;
+          "Could not connect to worker to handle mutant diff: $error"
+          ~metadata:[("error", `String (Error.to_string_hum e))] ;
         Error.raise e
     | Ok new_hash ->
         if Transition_frontier.Diff.Hash.equal new_hash ground_truth_hash then
@@ -149,7 +150,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     let log_error () =
       Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("hash", State_hash.to_yojson (With_hash.hash transition))]
-        "Failed to add breadcrumb into $hash"
+        "Failed to add breadcrumb to transition $hash"
     in
     (* TMP HACK: our transition is already validated, so we "downgrade" it's validation #2486 *)
     let mostly_validated_external_transition =

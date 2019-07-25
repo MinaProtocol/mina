@@ -17,7 +17,7 @@ type t =
   ; mutable reorganization_subscription: [`Changed] reader_and_writer list }
 
 let create ~logger ~wallets ~time_controller ~external_transition_database
-    ~new_blocks ~transition_frontier =
+    ~new_blocks ~transition_frontier ~is_storing_all =
   let subscribed_block_users =
     Public_key.Compressed.Table.of_alist_exn
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
@@ -32,13 +32,17 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
   in
   Strict_pipe.Reader.iter new_blocks
     ~f:(fun ({With_hash.data= _; hash} as new_block_with_hash) ->
-      match
-        Filtered_external_transition.of_transition
-          ~tracked_participants:
-            ( Public_key.Compressed.Set.of_list
-            @@ Hashtbl.keys subscribed_block_users )
-          new_block_with_hash
-      with
+      let filtered_external_transition_result =
+        if is_storing_all then
+          Filtered_external_transition.of_transition `All new_block_with_hash
+        else
+          Filtered_external_transition.of_transition
+            (`Some
+              ( Public_key.Compressed.Set.of_list
+              @@ Hashtbl.keys subscribed_block_users ))
+            new_block_with_hash
+      in
+      match filtered_external_transition_result with
       | Ok filtered_external_transition ->
           let block_time = Block_time.now time_controller in
           let filtered_external_transition_with_hash =

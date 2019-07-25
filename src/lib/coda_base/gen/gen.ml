@@ -27,9 +27,15 @@ let rec random_scalar () =
 
 let keypairs =
   let n = 120 in
-  List.init n ~f:(fun _ ->
-      let pk = random_scalar () in
-      Keypair.of_private_key_exn pk )
+  List.cons
+    (* FIXME #2936: remove this "precomputed VRF keypair" *)
+    (* This key is also at the start of all the release ledgers. It's needed to generate a valid genesis transition *)
+    (Keypair.of_private_key_exn
+       (Private_key.of_base58_check_exn
+          "2BRrzmLJrktDq33yDkAj6emp3gLwWbbCgkhKvDUUPRj49DDBAQfuyfWrdnqUv3DApQvYjsGgyhHLadYiX1zMuebqWqA9xbHJKxRJWxSxr3ZJyjCc7Fxtm4N1zBkcXhfTb1ffVjTvU6b2"))
+    (List.init n ~f:(fun _ ->
+         let sk = random_scalar () in
+         Keypair.of_private_key_exn sk ))
 
 let expr ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct

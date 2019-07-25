@@ -80,7 +80,10 @@ module With_private = struct
 end
 
 module Without_private = struct
-  type account_data = {pk: Public_key.Compressed.t; balance: int}
+  type account_data =
+    { pk: Public_key.Compressed.t
+    ; balance: int
+    ; delegate: Public_key.Compressed.t option }
 
   module type Source_intf = sig
     val accounts : account_data list
@@ -89,8 +92,10 @@ module Without_private = struct
   module Make (Source : Source_intf) : Intf.S = struct
     include Make_from_base (struct
       let accounts =
-        List.map Source.accounts ~f:(fun {pk; balance} ->
-            (None, Account.create pk (Balance.of_int balance)) )
+        List.map Source.accounts ~f:(fun {pk; balance; delegate} ->
+            let base_acct = Account.create pk (Balance.of_int balance) in
+            (None, {base_acct with delegate= Option.value ~default:pk delegate})
+        )
     end)
   end
 end

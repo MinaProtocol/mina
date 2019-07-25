@@ -535,6 +535,7 @@ module Base = struct
     Cached.Spec.create ~load ~name:"transaction-snark base keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
+      ~brew_install_path:Cache_dir.brew_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(tick_input ()) main))
@@ -819,6 +820,7 @@ module Merge = struct
     Cached.Spec.create ~load ~name:"transaction-snark merge keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
+      ~brew_install_path:Cache_dir.brew_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(input ()) main))
@@ -1066,6 +1068,7 @@ struct
     Cached.Spec.create ~load ~name:"transaction-snark wrap keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
+      ~brew_install_path:Cache_dir.brew_install_path
       ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
       ~input:(constraint_system ~exposing:wrap_input main)
       ~create_env:Keypair.generate

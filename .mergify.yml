@@ -1,11 +1,8 @@
 pull_request_rules:
     - name: automatically merge approved PRs with the ready-to-merge label
       conditions:
-          - "status-success=ci/circleci: build-artifacts--testnet_postake"
-          - "status-success=ci/circleci: build-artifacts--testnet_postake_many_proposers"
           - "status-success=ci/circleci: build-artifacts--testnet_postake_many_proposers_medium_curves"
           - "status-success=ci/circleci: build-artifacts--testnet_postake_medium_curves"
-          - "status-success=ci/circleci: build-artifacts--testnet_postake_snarkless_fake_hash"
           - "status-success=ci/circleci: build-wallet"
           - "status-success=ci/circleci: lint"
           - "status-success=ci/circleci: test--fake_hash"
