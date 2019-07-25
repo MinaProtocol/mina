@@ -172,16 +172,16 @@ let sync_status t =
                 ~location:__LOC__ "Coda daemon is now listening" ;
               `Listening )
             else `Offline
-        | `Online ->
-            Option.value_map active_status
-              ~default:
-                ( Logger.trace (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ "Coda daemon is now bootstrapping" ;
-                  `Bootstrap )
-              ~f:(fun _ ->
-                Logger.trace (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now synced" ;
-                `Synced ) )
+        | `Online -> (
+          match active_status with
+          | None ->
+              Logger.trace (Logger.create ()) ~module_:__MODULE__
+                ~location:__LOC__ "Coda daemon is now bootstrapping" ;
+              `Bootstrap
+          | Some _ ->
+              Logger.trace (Logger.create ()) ~module_:__MODULE__
+                ~location:__LOC__ "Coda daemon is now synced" ;
+              `Synced ) )
   in
   let observer = observe incremental_status in
   stabilize () ; observer
