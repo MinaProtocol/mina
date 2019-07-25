@@ -67,6 +67,9 @@ While you're waiting take a look at your daemon logs for new blocks being genera
 
 Finally we get to the good stuff, sending our first transaction! For testing purposes, there's already an [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service) set up that will immediately refund your payment minus the transaction fees.
 
+!!! warning
+    Currently, there is a known issue with the echo service that prevents it from sending multiple transactions within the same 5 minute window. As such, it may not return funds currently, but you will still receive Testnet Points[\*](#disclaimer) for completing the challenge.
+
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
     coda client send-payment \
@@ -98,3 +101,8 @@ We'll get a response that looks like this:
     Balance: 50 coda
 
 Once you feel comfortable with the basics of creating an address, and sending & receiving coda, we can move on to the truly unique parts of the Coda network - [participating in consensus and helping compress the blockchain](/docs/node-operator).
+
+<span id="disclaimer">
+\*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
+</span>
+
