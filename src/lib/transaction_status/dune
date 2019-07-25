@@ -1,0 +1,5 @@
+(library
+  (name transaction_status)
+  (public_name transaction_status)
+  (libraries core_kernel coda_base transition_frontier network_pool)
+  (preprocess (pps ppx_jane ppx_coda)))

@@ -26,7 +26,7 @@ let create () =
 let gen =
   let open Bignum_bigint in
   Quickcheck.Generator.map
-    (gen_incl one (Snark_params.Tick.Inner_curve.Scalar.size - one))
+    (gen_uniform_incl one (Snark_params.Tick.Inner_curve.Scalar.size - one))
     ~f:Snark_params.Tock.Bigint.(Fn.compose to_field of_bignum_bigint)
 
 let of_bigstring_exn = Binable.of_bigstring (module Stable.Latest)

@@ -5,6 +5,7 @@
 2. Navigate into `coda/frontend/website`
 3. Run `yarn` to install dependencies (alternatively `npm install`)
 4. Install [pandoc](https://pandoc.org/) via `brew install pandoc` or similar.
+5. Install [mkdocs](https://mkdocs.org) via `pip install mkdocs` or similar.
 
 **Develop:**
 

@@ -3,22 +3,6 @@ module Copy = {
   let make = _ => {
     ...component,
     render: _self => {
-      let largeLinkStyle =
-        Css.(
-          style([
-            Style.Typeface.ibmplexsans,
-            color(Style.Colors.hyperlink),
-            textDecoration(`none),
-            fontWeight(`medium),
-            fontSize(`rem(1.125)),
-            lineHeight(`rem(1.875)),
-            letterSpacing(`rem(-0.0125)),
-            hover([color(Style.Colors.hyperlinkHover)]),
-          ])
-        );
-
-      let heroSvgVar = "--svg-color-hero";
-
       <div
         className=Css.(
           style([
