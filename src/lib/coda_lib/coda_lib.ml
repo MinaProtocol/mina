@@ -370,11 +370,6 @@ let create (config : Config.t) =
           let%bind ledger_db, transition_frontier =
             create_genesis_frontier config ~verifier
           in
-          let ledger_db =
-            Ledger_transfer.transfer_accounts
-              ~src:(Lazy.force Genesis_ledger.t)
-              ~dest:ledger_db
-          in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
           in
