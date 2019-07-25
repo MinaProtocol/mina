@@ -16,7 +16,11 @@ module type S = sig
   val register_mask : t -> unattached_mask -> attached_mask
 
   (** raises an exception if mask is not registered *)
-  val unregister_mask_exn : t -> attached_mask -> unattached_mask
+  val unregister_mask_exn :
+       ?grandchildren:[`Check | `I_promise_I_am_reparenting_this]
+    -> t
+    -> attached_mask
+    -> unattached_mask
 
   (**
    *              o
