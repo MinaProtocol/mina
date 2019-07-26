@@ -131,6 +131,10 @@ jobs:
                 paths:
                     - "/Users/distiller/.opam"
             - run:
+                name: Build kademlia
+                command: make kademlia 2>&1 | tee /tmp/buildkademlia.log'
+                no_output_timeout: 1h
+            - run:
                 name: Build OCaml
                 command: bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h
@@ -145,10 +149,9 @@ jobs:
                     cd src
                     ls -l
                     cd build
-                    find .
-            - run: ls -l src/_build/default/src/app/cli/src
-            - run: cp src/_build/default/src/app/cli/src/coda.exe package/coda
-            - run: ls -l src/app/kademlia-haskell/result/bin/
+                    find . | grep kadem
+            - run: cp src/build/_build/default/app/cli/src/coda.exe package/coda
+           # - run: ls -l src/app/kademlia-haskell/result/bin/
 
             - run:
                 name: Publish to Artifactory
