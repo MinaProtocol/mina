@@ -14,6 +14,8 @@ module type Inputs_intf = sig
      and type key := Key.t
      and type key_set := Key.Set.t
      and type parent := Base.t
+
+  val mask_to_base : Mask.Attached.t -> Base.t
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -144,8 +146,8 @@ module Make (Inputs : Inputs_intf) = struct
     attached_mask
 
   (* TODO We have the parent already from mask.parent. remove extra param. *)
-  let unregister_mask_exn ?(grandchildren = `Check) (t : t)
-      (mask : Mask.Attached.t) =
+  let rec unregister_mask_exn ?(grandchildren = `Check) (t : t)
+      (mask : Mask.Attached.t) : Mask.unattached =
     let t_uuid = get_uuid t in
     let error_msg suffix =
       sprintf "Couldn't unregister mask with UUID %s from parent %s, %s"
@@ -169,7 +171,18 @@ module Make (Inputs : Inputs_intf) = struct
       | None ->
           () )
     | `I_promise_I_am_reparenting_this ->
-        () ) ;
+        ()
+    | `Recursive ->
+        (* You must not retain any references to children of the mask we're
+         unregistering if you pass `Recursive, so this is only used in
+         with_ephemeral_ledger. *)
+        List.iter
+          ( Hashtbl.find registered_masks (Mask.Attached.get_uuid mask)
+          |> Option.value ~default:[] )
+          ~f:(fun child_mask ->
+            ignore
+            @@ unregister_mask_exn ~grandchildren:`Recursive
+                 (mask_to_base mask) child_mask ) ) ;
     match Uuid.Table.find registered_masks t_uuid with
     | None ->
         failwith @@ error_msg "parent not in registered_masks"
