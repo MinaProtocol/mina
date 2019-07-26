@@ -181,6 +181,9 @@ module Types = struct
 
       let blockchain_length = int_option_entry "Block Height"
 
+      let highest_block_length_received =
+        int_entry "Maximum Block Length Encountered from a Valid Block"
+
       let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
 
       let ledger_merkle_root = string_option_entry "Ledger Merkle Root"
@@ -234,6 +237,7 @@ module Types = struct
     type t =
       { num_accounts: int option
       ; blockchain_length: int option
+      ; highest_block_length_received: int
       ; uptime_secs: int
       ; ledger_merkle_root: string option
       ; state_hash: string option
@@ -258,11 +262,11 @@ module Types = struct
         let get field = Field.get field s
       end) in
       let open M in
-      Fields.to_list ~sync_status ~num_accounts ~blockchain_length ~uptime_secs
-        ~ledger_merkle_root ~state_hash ~commit_id ~conf_dir ~peers
-        ~user_commands_sent ~run_snark_worker ~propose_pubkeys ~histograms
-        ~consensus_time_best_tip ~consensus_time_now ~consensus_mechanism
-        ~consensus_configuration
+      Fields.to_list ~sync_status ~num_accounts ~blockchain_length
+        ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
+        ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent
+        ~run_snark_worker ~propose_pubkeys ~histograms ~consensus_time_best_tip
+        ~consensus_time_now ~consensus_mechanism ~consensus_configuration
       |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =
