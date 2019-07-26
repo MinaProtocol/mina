@@ -197,7 +197,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   if
                     Int.equal (Hash_set.length t.peers)
                       disconnect_clear_threshold
-                  then Hash_set.clear t.disconnected_peers ) ;
+                  then Hash_set.clear t.disconnected_peers
+                  else Hash_set.remove t.disconnected_peers peer ) ;
               Deferred.unit
           | Disconnect peers ->
               Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
