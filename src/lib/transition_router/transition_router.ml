@@ -117,7 +117,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   let run ~logger ~trust_system ~verifier ~network ~time_controller
       ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
-      ~network_transition_reader ~proposer_transition_reader frontier =
+      ~network_transition_reader ~proposer_transition_reader
+      ~most_recent_valid_block:( most_recent_valid_block_reader
+                               , most_recent_valid_block_writer ) frontier =
     let clear_reader, clear_writer =
       Strict_pipe.create ~name:"clear" Synchronous
     in
@@ -185,6 +187,28 @@ module Make (Inputs : Inputs_intf) = struct
     Initial_validator.run ~logger ~trust_system ~verifier
       ~transition_reader:network_transition_reader
       ~valid_transition_writer:valid_protocol_state_transition_writer ;
+    let valid_protocol_state_transition_reader, valid_transition_reader =
+      Strict_pipe.Reader.Fork.two valid_protocol_state_transition_reader
+    in
+    Strict_pipe.Reader.iter valid_transition_reader
+      ~f:(fun transition_with_time ->
+        let `Transition enveloped_transition, _ = transition_with_time in
+        let transition =
+          Envelope.Incoming.data enveloped_transition |> fst |> With_hash.data
+        in
+        let current_consensus_state =
+          External_transition.consensus_state
+            (Broadcast_pipe.Reader.peek most_recent_valid_block_reader)
+        in
+        if
+          Consensus.Hooks.select ~existing:current_consensus_state
+            ~candidate:External_transition.(consensus_state transition)
+            ~logger
+          = `Take
+        then
+          Broadcast_pipe.Writer.write most_recent_valid_block_writer transition
+        else Deferred.unit )
+    |> don't_wait_for ;
     Strict_pipe.Reader.iter_without_pushback
       valid_protocol_state_transition_reader ~f:(fun transition_with_time ->
         let `Transition enveloped_transition, _ = transition_with_time in
