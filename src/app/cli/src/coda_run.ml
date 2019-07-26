@@ -336,11 +336,11 @@ let handle_crash e =
   Core.eprintf
     !{err|
 
-  ☠  Coda Daemon crashed. The Coda Protocol developers would like to know why!
+  ☠  Coda daemon crashed. The Coda Protocol developers would like to know why!
 
   Please:
     Open an issue:
-      https://github.com/CodaProtocol/coda/issues/new
+      <https://github.com/CodaProtocol/coda/issues/new>
 
     Briefly describe what you were doing, and include the last 20 lines from .coda-config/coda.log.
     And then paste the following:

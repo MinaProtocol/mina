@@ -173,49 +173,49 @@ module Types = struct
 
       let int_option_entry = option_entry ~f:Int.to_string
 
-      let num_accounts = int_option_entry "Global Number of Accounts"
+      let num_accounts = int_option_entry "Global number of accounts"
 
-      let blockchain_length = int_option_entry "Block Height"
+      let blockchain_length = int_option_entry "Block height"
 
       let highest_block_length_received =
-        int_entry "Maximum Block Length Encountered from a Valid Block"
+        int_entry "Maximum block length encountered from a valid block"
 
-      let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
+      let uptime_secs = map_entry "Local uptime" ~f:(sprintf "%ds")
 
-      let ledger_merkle_root = string_option_entry "Ledger Merkle Root"
+      let ledger_merkle_root = string_option_entry "Ledger Merkle root"
 
-      let staged_ledger_hash = string_option_entry "Staged-ledger Hash"
+      let staged_ledger_hash = string_option_entry "Staged-ledger hash"
 
-      let state_hash = string_option_entry "Staged Hash"
+      let state_hash = string_option_entry "Staged hash"
 
-      let commit_id = string_entry "GIT SHA1"
+      let commit_id = string_entry "Git SHA-1"
 
-      let conf_dir = string_entry "Configuration Directory"
+      let conf_dir = string_entry "Configuration directory"
 
       let peers =
         map_entry "Peers" ~f:(fun peers ->
             Printf.sprintf "Total: %d " (List.length peers)
             ^ List.to_string ~f:Fn.id peers )
 
-      let user_commands_sent = int_entry "User_commands Sent"
+      let user_commands_sent = int_entry "User_commands sent"
 
-      let run_snark_worker = bool_entry "Snark Worker Running"
+      let run_snark_worker = bool_entry "SNARK worker running"
 
-      let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
+      let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
-        map_entry "Block Producers Running" ~f:(fun keys ->
+        map_entry "Block producers running" ~f:(fun keys ->
             Printf.sprintf "Total: %d " (List.length keys)
             ^ List.to_string ~f:Public_key.Compressed.to_string keys )
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
       let consensus_time_best_tip =
-        string_option_entry "Best Tip Consensus Time (epoch:slot)"
+        string_option_entry "Best tip consensus time (epoch:slot)"
 
-      let consensus_time_now = string_entry "Consensus Time Now (epoch:slot)"
+      let consensus_time_now = string_entry "Consensus time now (epoch:slot)"
 
-      let consensus_mechanism = string_entry "Consensus Mechanism"
+      let consensus_mechanism = string_entry "Consensus mechanism"
 
       let consensus_configuration =
         let render conf =
@@ -227,7 +227,7 @@ module Types = struct
           | _ ->
               failwith "unexpected consensus configuration json format"
         in
-        map_entry "Consensus Configuration" ~f:render
+        map_entry "Consensus configuration" ~f:render
     end
 
     type t =
@@ -267,7 +267,7 @@ module Types = struct
 
     let to_text (t : t) =
       let title =
-        "Coda Daemon Status\n-----------------------------------\n"
+        "Coda daemon status\n-----------------------------------\n"
       in
       digest_entries ~title (entries t)
   end
