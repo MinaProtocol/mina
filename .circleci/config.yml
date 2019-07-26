@@ -94,16 +94,14 @@ jobs:
             OPAMYES: 1
         steps:
             # Attach workspace from linux build
+            - run: mkdir -p /tmp/artifacts
             - attach_workspace:
                 at: /tmp/workspace
-            - run:
-                name: ls -l /tmp/workspace
-                command: ls -l /tmp/workspace
-            - run:
-                name: Make /nix paths
-                command: |
-                    sudo mkdir /nix
-                    sudo chown distiller /nix
+            - run: mkdir /var/lib/coda
+            - run: tar xvf /tmp/workspace/coda -C /var/lib/coda/.
+            - run: ls -l /var/lib/coda
+            - run: sudo mkdir /nix
+            - run: sudo chown distiller /nix
             - checkout
             - restore_cache:
                 keys:
@@ -131,13 +129,15 @@ jobs:
                     - "/Users/distiller/.opam"
             - run:
                 name: Build OCaml
-                command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                command: bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h
                 environment:
                 DUNE_PROFILE: testnet_postake_medium_curves
-            - run:
-                name: Run all tests (on master)
-                command: echo "FIXME Tests not yet working on mac"
+            - run: mkdir -p package/keys
+            - run: cp /var/lib/coda/* package/keys/.
+            - run: ls -l _build/default/src/app/cli/src
+            - run: cp _build/default/src/app/cli/src/coda.exe package/coda
+            - run: ls -l src/app/kademlia-haskell/result/bin/
             - run:
                 name: Publish to Artifactory
                 command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
@@ -149,9 +149,7 @@ jobs:
             DUNE_PROFILE: testnet_postake_medium_curves
         steps:
             - checkout
-            - run:
-                  name: Create artifact directory
-                  command: mkdir -p /tmp/artifacts
+            - run: mkdir -p /tmp/artifacts
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
@@ -188,9 +186,7 @@ jobs:
             DUNE_PROFILE: testnet_postake_many_proposers_medium_curves
         steps:
             - checkout
-            - run:
-                  name: Create artifact directory
-                  command: mkdir -p /tmp/artifacts
+            - run: mkdir -p /tmp/artifacts
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
