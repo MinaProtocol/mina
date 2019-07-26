@@ -178,8 +178,31 @@ let daemon logger =
              () )
          else ()
        in
+       let stdout_log_processor =
+         if log_json then Logger.Processor.raw ()
+         else
+           Logger.Processor.pretty ~log_level
+             ~config:
+               { Logproc_lib.Interpolator.mode= Inline
+               ; max_interpolation_length= 50
+               ; pretty_print= true }
+       in
+       Logger.Consumer_registry.register ~id:"default"
+         ~processor:stdout_log_processor
+         ~transport:(Logger.Transport.stdout ()) ;
+       (* 512MB logrotate max size = 1GB max filesystem usage *)
+       let logrotate_max_size = 1024 * 1024 * 512 in
+       Logger.Consumer_registry.register ~id:"raw_persistent"
+         ~processor:(Logger.Processor.raw ())
+         ~transport:
+           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+              ~max_size:logrotate_max_size) ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-         "Coda daemon is booting up" ;
+         "Coda daemon is booting up; built with commit $commit on branch \
+          $branch"
+         ~metadata:
+           [ ("commit", `String Coda_version.commit_id)
+           ; ("branch", `String Coda_version.branch) ] ;
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
@@ -245,25 +268,6 @@ let daemon logger =
                ~metadata:[("config_directory", `String conf_dir)] ;
              make_version ~wipe_dir:false
        in
-       (* 512MB logrotate max size = 1GB max filesystem usage *)
-       let logrotate_max_size = 1024 * 1024 * 512 in
-       Logger.Consumer_registry.register ~id:"raw_persistent"
-         ~processor:(Logger.Processor.raw ())
-         ~transport:
-           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-              ~max_size:logrotate_max_size) ;
-       let stdout_log_processor =
-         if log_json then Logger.Processor.raw ()
-         else
-           Logger.Processor.pretty ~log_level
-             ~config:
-               { Logproc_lib.Interpolator.mode= Inline
-               ; max_interpolation_length= 50
-               ; pretty_print= true }
-       in
-       Logger.Consumer_registry.register ~id:"default"
-         ~processor:stdout_log_processor
-         ~transport:(Logger.Transport.stdout ()) ;
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
