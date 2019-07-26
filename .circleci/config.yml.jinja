@@ -139,6 +139,10 @@ jobs:
             - run: mkdir -p package/keys
             - run: cp /var/lib/coda/* package/keys/.
             - run: ls -l
+            - run: cd src
+            - run: ls -l
+            - run: cd build
+            - run: find .
             - run: ls -l src/_build/default/src/app/cli/src
             - run: cp src/_build/default/src/app/cli/src/coda.exe package/coda
             - run: ls -l src/app/kademlia-haskell/result/bin/
