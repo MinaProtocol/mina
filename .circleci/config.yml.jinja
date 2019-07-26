@@ -88,6 +88,7 @@ jobs:
       #      only: /^release.*/
         macos:
             xcode: "10.2.1"
+        resource_class: xlarge
         working_directory: /Users/distiller/coda
         environment:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
@@ -137,9 +138,11 @@ jobs:
                 DUNE_PROFILE: testnet_postake_medium_curves
             - run: mkdir -p package/keys
             - run: cp /var/lib/coda/* package/keys/.
-            - run: ls -l _build/default/src/app/cli/src
-            - run: cp _build/default/src/app/cli/src/coda.exe package/coda
+            - run: ls -l
+            - run: ls -l src/_build/default/src/app/cli/src
+            - run: cp src/_build/default/src/app/cli/src/coda.exe package/coda
             - run: ls -l src/app/kademlia-haskell/result/bin/
+
             - run:
                 name: Publish to Artifactory
                 command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
