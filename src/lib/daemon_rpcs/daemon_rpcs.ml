@@ -224,18 +224,17 @@ module Types = struct
           float_of_int i |> Time.Span.of_ms |> Time.Span.to_string
         in
         let render conf =
-          let use op field = op (Field.get field conf) in
+          let fmt_field name op field = (name, op (Field.get field conf)) in
           Consensus.Configuration.Fields.to_list
-            ~delta:(use (fun v -> ("Delta", string_of_int v)))
-            ~k:(use (fun v -> ("k", string_of_int v)))
-            ~c:(use (fun v -> ("c", string_of_int v)))
-            ~c_times_k:(use (fun v -> ("c * k", string_of_int v)))
-            ~slots_per_epoch:
-              (use (fun v -> ("Slots per epoch", string_of_int v)))
-            ~slot_duration:(use (fun v -> ("Slot duration", ms_to_string v)))
-            ~epoch_duration:(use (fun v -> ("Epoch duration", ms_to_string v)))
+            ~delta:(fmt_field "Delta" string_of_int)
+            ~k:(fmt_field "k" string_of_int)
+            ~c:(fmt_field "c" string_of_int)
+            ~c_times_k:(fmt_field "c * k" string_of_int)
+            ~slots_per_epoch:(fmt_field "Slots per epoch" string_of_int)
+            ~slot_duration:(fmt_field "Slot duration" ms_to_string)
+            ~epoch_duration:(fmt_field "Epoch duration" ms_to_string)
             ~acceptable_network_delay:
-              (use (fun v -> ("Acceptable network delay", ms_to_string v)))
+              (fmt_field "Acceptable network delay" ms_to_string)
           |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
           |> digest_entries ~title:""
         in
