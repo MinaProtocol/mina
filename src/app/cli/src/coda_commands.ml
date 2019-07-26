@@ -102,6 +102,40 @@ let get_keys_with_balances t =
       ( string_of_public_key account
       , account.Account.Poly.balance |> Currency.Balance.to_int ) )
 
+let get_inferred_nonce_from_transaction_pool_and_ledger t
+    (addr : Public_key.Compressed.t) =
+  let transaction_pool = Coda_lib.transaction_pool t in
+  let resource_pool =
+    Network_pool.Transaction_pool.resource_pool transaction_pool
+  in
+  let pooled_transactions =
+    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
+      addr
+  in
+  let txn_pool_nonce =
+    let nonces =
+      List.map pooled_transactions
+        ~f:(Fn.compose User_command.nonce User_command.forget_check)
+    in
+    List.max_elt nonces ~compare:Account.Nonce.compare
+  in
+  let ledger_nonce =
+    let open Option.Let_syntax in
+    let%map account =
+      Option.join (Participating_state.active (get_account t addr))
+    in
+    account.Account.Poly.nonce
+  in
+  match (txn_pool_nonce, ledger_nonce) with
+  | Some txn_nonce, Some ledger_nonce ->
+      Some Account.Nonce.(Account.Nonce.max (succ txn_nonce) ledger_nonce)
+  | Some txn_nonce, None ->
+      Some txn_nonce
+  | None, Some ledger_nonce ->
+      Some ledger_nonce
+  | None, None ->
+      None
+
 let get_nonce t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
