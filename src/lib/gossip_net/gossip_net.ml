@@ -221,7 +221,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       "Restarting Kademlia" ;
     let%bind () = Membership.stop t.membership in
     let%map new_membership =
-      let initial_peers = t.initial_peers @ disconnected_peers in
+      let initial_peers =
+        List.dedup_and_sort ~compare:Host_and_port.compare
+        @@ t.initial_peers @ disconnected_peers
+      in
       Membership.connect ~node_addrs_and_ports:t.addrs_and_ports ~initial_peers
         ~conf_dir:t.conf_dir ~logger:t.logger ~trust_system:t.trust_system
     in
