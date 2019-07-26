@@ -138,11 +138,14 @@ jobs:
                 DUNE_PROFILE: testnet_postake_medium_curves
             - run: mkdir -p package/keys
             - run: cp /var/lib/coda/* package/keys/.
-            - run: ls -l
-            - run: cd src
-            - run: ls -l
-            - run: cd build
-            - run: find .
+            - run:
+                command: |
+                    set +e
+                    ls -l
+                    cd src
+                    ls -l
+                    cd build
+                    find .
             - run: ls -l src/_build/default/src/app/cli/src
             - run: cp src/_build/default/src/app/cli/src/coda.exe package/coda
             - run: ls -l src/app/kademlia-haskell/result/bin/
@@ -150,6 +153,7 @@ jobs:
             - run:
                 name: Publish to Artifactory
                 command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
+                when: on_success
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
