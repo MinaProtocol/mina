@@ -229,6 +229,7 @@ module Consumer_registry = struct
     else t := List.Assoc.add !t id {processor; transport} ~equal:( = )
 
   let broadcast_log_message msg =
+    (* TODO: warn or fail if there's no registered consumer? Issue #3000 *)
     List.iter !t ~f:(fun (_id, consumer) ->
         let (Processor.T ((module Processor_mod), processor)) =
           consumer.processor
