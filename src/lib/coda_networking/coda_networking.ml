@@ -383,7 +383,8 @@ module Make (Inputs : Inputs_intf) = struct
         Transaction_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
     ; snark_pool_diffs:
         Snark_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
-    ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t }
+    ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
+    ; first_received_message: unit Ivar.t }
   [@@deriving fields]
 
   let offline_time =
@@ -499,7 +500,7 @@ module Make (Inputs : Inputs_intf) = struct
       return result
     in
     let transition_catchup_rpc conn ~version:_ hash =
-      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
         "Peer with IP %s sent transition_catchup" conn.Host_and_port.host ;
       let action_msg = "Transition catchup with hash $hash" in
       let msg_args = [("hash", State_hash.to_yojson hash)] in
@@ -509,7 +510,7 @@ module Make (Inputs : Inputs_intf) = struct
       record_unknown_item result sender action_msg msg_args
     in
     let get_ancestry_rpc conn ~version:_ query =
-      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
         "Sending root proof to peer with IP %s" conn.Host_and_port.host ;
       let action_msg = "Get_ancestry query: $query" in
       let msg_args = [("query", Rpcs.Get_ancestry.query_to_yojson query)] in
@@ -544,8 +545,10 @@ module Make (Inputs : Inputs_intf) = struct
     let online_status =
       online_broadcaster config.time_controller online_notifier
     in
+    let first_received_message = Ivar.create () in
     let states, snark_pool_diffs, transaction_pool_diffs =
       Strict_pipe.Reader.partition_map3 received_gossips ~f:(fun envelope ->
+          Ivar.fill_if_empty first_received_message () ;
           match Envelope.Incoming.data envelope with
           | New_state state ->
               Perf_histograms.add_span ~name:"external_transition_latency"
@@ -568,7 +571,12 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_pool_diffs= Strict_pipe.Reader.to_linear_pipe snark_pool_diffs
     ; transaction_pool_diffs=
         Strict_pipe.Reader.to_linear_pipe transaction_pool_diffs
-    ; online_status }
+    ; online_status
+    ; first_received_message }
+
+  let first_message {first_received_message; _} = first_received_message
+
+  let first_connection {gossip_net; _} = gossip_net.first_connect
 
   (* TODO: Have better pushback behavior *)
   let broadcast t msg =
@@ -767,7 +775,9 @@ module Make (Inputs : Inputs_intf) = struct
                      ~sender:(Envelope.Sender.Remote inet_addr))
             | Ok (Error e) ->
                 Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                  "Rpc error: %s" (Error.to_string_mach e) ;
+                  "Peer $peer didn't have enough information to answer \
+                   ledger_hash query. See error for more details: $error"
+                  ~metadata:[("error", `String (Error.to_string_hum e))] ;
                 Hash_set.add peers_tried peer ;
                 None
             | Error err ->
@@ -784,7 +794,8 @@ module Make (Inputs : Inputs_intf) = struct
             (fst query, snd query, answer)
       | None ->
           Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-            !"None of the peers I asked knew; trying more" ;
+            !"None of the peers contacted were able to answer ledger_hash \
+              query -- trying more" ;
           if ctr > retry_max then Deferred.unit
           else
             let%bind () = Clock.after retry_interval in

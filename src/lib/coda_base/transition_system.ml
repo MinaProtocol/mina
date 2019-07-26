@@ -179,8 +179,8 @@ struct
                       Sexp_diff_kernel.Algo.diff ~original ~updated ()
                     in
                     Logger.fatal logger
-                      "Out-of-snark (left) and in-snark (right) disagree on \
-                       what the next top_hash should be."
+                      "Out-of-SNARK and in-SNARK calculations of the next top \
+                       hash differ"
                       ~metadata:
                         [ ( "state_sexp_diff"
                           , `String
@@ -190,8 +190,9 @@ struct
                   return ()
               | None ->
                   Logger.error logger
-                    "expected_next_state is empty; this should only be true \
-                     during precomputed_values"
+                    "From the current prover state, got None for the expected \
+                     next state, which should be true only when calculating \
+                     precomputed values"
                     ~location:__LOC__ ~module_:__MODULE__ ;
                   return ()))
       in
@@ -258,13 +259,6 @@ struct
                     (Fn.compose Verifier.proof_of_backend_proof
                        Prover_state.proof))
         in
-        Logger.error ~module_:__MODULE__ ~location:__LOC__ (Logger.create ())
-          !"When wrap executes: Step_vk key is $step_vk"
-          ~metadata:
-            [ ( "step_vk"
-              , `String
-                  (Tick0.Verification_key.to_string Step_vk.verification_key)
-              ) ] ;
         Verifier.verify step_vk_constant step_vk_precomp [input] proof
       in
       with_label __LOC__ (Boolean.Assert.is_true result)
