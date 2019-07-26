@@ -95,9 +95,11 @@ jobs:
         steps:
             # Attach workspace from linux build
             - run: mkdir -p /tmp/artifacts
+            - run: sysctl -a | grep machdep.cpu
+            - run: sysctl hw.memsize
             - attach_workspace:
                 at: /tmp/workspace
-            - run: mkdir /var/lib/coda
+            - run: mkdir -p /var/lib/coda
             - run: tar xvf /tmp/workspace/coda -C /var/lib/coda/.
             - run: ls -l /var/lib/coda
             - run: sudo mkdir /nix
@@ -179,7 +181,7 @@ jobs:
                 root: /tmp/artifacts
                 paths: coda_pvkeys*
     build-artifacts--testnet_postake_many_proposers_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         environment:
