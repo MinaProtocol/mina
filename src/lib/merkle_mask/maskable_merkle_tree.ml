@@ -201,12 +201,14 @@ module Make (Inputs : Inputs_intf) = struct
         List.iter masks ~f:(fun mask ->
             Mask.Attached.parent_set_notify mask account )
 
-  (* TODO we have the children already, from the registered_masks table. remove children param. *)
-  let remove_and_reparent_exn t t_as_mask ~children =
+  let remove_and_reparent_exn t t_as_mask =
     let parent = Mask.Attached.get_parent t_as_mask in
     let merkle_root = Mask.Attached.merkle_root t_as_mask in
     (* we can only reparent if merkle roots are the same *)
     assert (Hash.equal (Base.merkle_root parent) merkle_root) ;
+    let children =
+      Hashtbl.find registered_masks (get_uuid t) |> Option.value ~default:[]
+    in
     let dangling_masks =
       List.map children ~f:(fun c ->
           unregister_mask_exn ~grandchildren:`I_promise_I_am_reparenting_this t

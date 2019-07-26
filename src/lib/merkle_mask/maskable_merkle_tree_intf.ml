@@ -32,11 +32,11 @@ module type S = sig
    *        mask  o
    *            children
    *
-   * removes the attached mask from the parent and attaches the children to the parent instead
-   * raises an exception the merkle roots of the mask and the parent are not the same.
+   * Removes the attached mask from its parent and attaches the children to the
+   * parent instead. Raises an exception if the merkle roots of the mask and the
+   * parent are not the same.
   *)
-  val remove_and_reparent_exn :
-    t -> attached_mask -> children:attached_mask list -> unit
+  val remove_and_reparent_exn : t -> attached_mask -> unit
 
   module Debug : sig
     val visualize : filename:string -> unit
