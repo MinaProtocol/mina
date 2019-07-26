@@ -730,12 +730,12 @@ let coda_commands logger =
 
 [%%endif]
 
-let print_version_help coda_exe =
+let print_version_help coda_exe version =
   (* mimic Jane Street command help *)
   let lines =
     [ "print version information"
     ; ""
-    ; sprintf "  %s version" (Filename.basename coda_exe)
+    ; sprintf "  %s %s" (Filename.basename coda_exe) version
     ; ""
     ; "=== flags ==="
     ; ""
@@ -758,14 +758,17 @@ let () =
   (* intercept command-line processing for "version", because we don't
      use the Jane Street scripts that generate their version information
    *)
-  ( match Sys.argv with
-  | [|_coda_exe; "version"|] ->
-      print_version_info ()
-  | [|coda_exe; "version"; s|]
-    when List.mem ["-help"; "-?"] s ~equal:String.equal ->
-      print_version_help coda_exe
-  | _ ->
-      Command.run
-        (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
-           (coda_commands logger)) ) ;
+  (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
+   let is_version_cmd = make_list_mem ["version"; "-version"] in
+   let is_help_flag = make_list_mem ["-help"; "-?"] in
+   match Sys.argv with
+   | [|_coda_exe; version|] when is_version_cmd version ->
+       print_version_info ()
+   | [|coda_exe; version; help|]
+     when is_version_cmd version && is_help_flag help ->
+       print_version_help coda_exe version
+   | _ ->
+       Command.run
+         (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
+            (coda_commands logger))) ;
   Core.exit 0
