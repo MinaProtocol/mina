@@ -206,8 +206,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               Deferred.unit )
         |> ignore )
 
-  let unmark_all_disconnected_peers t = Deferred.return (ignore t)
-    (*Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+  let unmark_all_disconnected_peers t =
+    Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Clearing disconnected peer set : %{sexp: Peer.t list}"
       (Hash_set.to_list t.disconnected_peers) ;
     let disconnected_peers =
@@ -229,7 +229,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         t.membership <- membership ;
         record_peer_events t
     | Error _ ->
-        failwith "Could not restart Kademlia"*)
+        failwith "Could not restart Kademlia"
 
   let is_unix_errno errno unix_errno =
     Int.equal (Unix.Error.compare errno unix_errno) 0
