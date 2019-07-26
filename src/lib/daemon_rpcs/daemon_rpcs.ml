@@ -226,20 +226,18 @@ module Types = struct
         let render conf =
           let use op field = op (Field.get field conf) in
           Consensus.Configuration.Fields.to_list
-            ~delta:(use (fun v -> sprintf "Delta: %d" v))
-            ~k:(use (fun v -> sprintf "k: %d" v))
-            ~c:(use (fun v -> sprintf "c: %d" v))
-            ~c_times_k:(use (fun v -> sprintf "c * k: %d" v))
-            ~slots_per_epoch:(use (fun v -> sprintf "Slots per epoch: %d" v))
-            ~slot_duration:
-              (use (fun v -> sprintf "Slot duration: %s" (ms_to_string v)))
-            ~epoch_duration:
-              (use (fun v -> sprintf "Epoch duration: %s" (ms_to_string v)))
+            ~delta:(use (fun v -> ("Delta", string_of_int v)))
+            ~k:(use (fun v -> ("k", string_of_int v)))
+            ~c:(use (fun v -> ("c", string_of_int v)))
+            ~c_times_k:(use (fun v -> ("c * k", string_of_int v)))
+            ~slots_per_epoch:
+              (use (fun v -> ("Slots per epoch", string_of_int v)))
+            ~slot_duration:(use (fun v -> ("Slot duration", ms_to_string v)))
+            ~epoch_duration:(use (fun v -> ("Epoch duration", ms_to_string v)))
             ~acceptable_network_delay:
-              (use (fun v ->
-                   sprintf "Acceptable network delay: %s" (ms_to_string v) ))
-          |> List.map ~f:(fun s -> "\n\t" ^ s)
-          |> String.concat ~sep:""
+              (use (fun v -> ("Acceptable network delay", ms_to_string v)))
+          |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
+          |> digest_entries ~title:""
         in
         map_entry "Consensus Configuration" ~f:render
     end
