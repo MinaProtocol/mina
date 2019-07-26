@@ -441,9 +441,11 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
   in
   Command.async ~summary
     (Cli_lib.Background_daemon.init flag
-       ~f:(fun port (body, _from_account, fee_opt, nonce_opt) ->
+       ~f:(fun port (body, from_account, fee_opt, nonce_opt) ->
          let open Deferred.Let_syntax in
-         let sender_kp = Genesis_ledger.largest_account_keypair_exn () in
+         let%bind sender_kp =
+           Secrets.Keypair.Terminal_stdin.read_exn from_account
+         in
          let%bind nonce =
            match nonce_opt with
            | Some nonce ->
@@ -451,7 +453,9 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            | None ->
                get_nonce_exn sender_kp.public_key port
          in
-         let fee = Option.value ~default:(Currency.Fee.of_int 1) fee_opt in
+         let fee =
+           Option.value ~default:Cli_lib.Fee.default_transaction fee_opt
+         in
          let command =
            Coda_commands.setup_user_command ~fee ~nonce
              ~memo:User_command_memo.dummy ~sender_kp body

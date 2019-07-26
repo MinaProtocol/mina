@@ -577,8 +577,11 @@ module Types = struct
         (module Numeric : Numeric_type with type t = t) =
       let lower_name = String.lowercase name in
       scalar name
-        ~doc:(sprintf "String representing a %s number in base 10" lower_name)
-        ~coerce:(fun key ->
+        ~doc:
+          (sprintf
+             "String or Integer representation of a %s number. If the input \
+              is String, the String must represent a the number in base 10"
+             lower_name) ~coerce:(fun key ->
           match key with
           | `String s ->
               result_of_exn Numeric.of_string s
@@ -1165,9 +1168,7 @@ module Mutations = struct
             (Set_delegate {new_delegate})
         in
         let nonce =
-          Option.value_map nonce_opt
-            ~f:(fun nonce32 ->
-              Account.Nonce.of_int @@ Unsigned.UInt32.to_int nonce32 )
+          Option.value_map nonce_opt ~f:Account.Nonce.of_uint32
             ~default:sender_account.nonce
         in
         build_user_command coda nonce sender_kp memo body fee )
@@ -1189,9 +1190,7 @@ module Mutations = struct
             {receiver; amount= Amount.of_uint64 amount}
         in
         let nonce =
-          Option.value_map nonce_opt
-            ~f:(fun nonce32 ->
-              Account.Nonce.of_int @@ Unsigned.UInt32.to_int nonce32 )
+          Option.value_map nonce_opt ~f:Account.Nonce.of_uint32
             ~default:sender_account.nonce
         in
         build_user_command coda nonce sender_kp memo body fee )
