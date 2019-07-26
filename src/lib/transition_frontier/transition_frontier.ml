@@ -372,6 +372,9 @@ module Make (Inputs : Inputs_intf) :
   let previous_root t =
     Extensions.Root_history.most_recent t.extensions.root_history
 
+  let oldest_breadcrumb_in_history t =
+    Extensions.Root_history.oldest t.extensions.root_history
+
   let get_path_inclusively_in_root_history t state_hash ~f =
     path_search t state_hash
       ~find:(fun t -> Extensions.Root_history.lookup t.extensions.root_history)
