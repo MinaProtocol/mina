@@ -99,8 +99,8 @@ jobs:
             - run: sysctl hw.memsize
             - attach_workspace:
                 at: /tmp/workspace
-            - run: mkdir -p /var/lib/coda
-            - run: tar xvf /tmp/workspace/coda -C /var/lib/coda/.
+            - run: sudo mkdir -p /var/lib/coda
+            - run: sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
             - run: ls -l /var/lib/coda
             - run: sudo mkdir /nix
             - run: sudo chown distiller /nix
