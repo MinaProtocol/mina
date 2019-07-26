@@ -82,9 +82,6 @@ jobs:
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
     build-macos:
-       # only run AFTER linux build
-        requires:
-            - build-artifacts--testnet_postake_medium_curves
       # only run when there's a 'release' tag
       # filters:
       #   tags:
@@ -284,7 +281,10 @@ workflows:
                     only: master
             - tracetool
             - build-wallet
-            - build-macos
+            - build-macos:
+                # only run AFTER linux build
+                requires:
+                    - build-artifacts--testnet_postake_medium_curves
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}
