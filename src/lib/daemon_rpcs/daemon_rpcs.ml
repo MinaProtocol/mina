@@ -180,7 +180,9 @@ module Types = struct
       let highest_block_length_received =
         int_entry "Maximum Block Length Encountered from a Valid Block"
 
-      let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
+      let uptime_secs =
+        map_entry "Local Uptime" ~f:(fun secs ->
+            Time.Span.to_string (Time.Span.of_int_sec secs) )
 
       let ledger_merkle_root = string_option_entry "Ledger Merkle Root"
 
@@ -188,7 +190,7 @@ module Types = struct
 
       let state_hash = string_option_entry "Staged Hash"
 
-      let commit_id = string_entry "GIT SHA1"
+      let commit_id = string_entry "GIT SHA-1"
 
       let conf_dir = string_entry "Configuration Directory"
 
@@ -204,28 +206,40 @@ module Types = struct
       let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
-        map_entry "Block Producers Running" ~f:(fun keys ->
+        map_entry "Block producers running" ~f:(fun keys ->
             Printf.sprintf "Total: %d " (List.length keys)
             ^ List.to_string ~f:Public_key.Compressed.to_string keys )
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
       let consensus_time_best_tip =
-        string_option_entry "Best Tip Consensus Time (epoch:slot)"
+        string_option_entry "Best Tip Consensus Time"
 
-      let consensus_time_now = string_entry "Consensus Time Now (epoch:slot)"
+      let consensus_time_now = string_entry "Consensus Time Now"
 
       let consensus_mechanism = string_entry "Consensus Mechanism"
 
       let consensus_configuration =
+        let ms_to_string i =
+          float_of_int i |> Time.Span.of_ms |> Time.Span.to_string
+        in
         let render conf =
-          match Consensus.Configuration.to_yojson conf with
-          | `Assoc ls ->
-              List.fold_left ls ~init:"" ~f:(fun acc (k, v) ->
-                  acc ^ sprintf "\n    %s = %s" k (Yojson.Safe.to_string v) )
-              ^ "\n"
-          | _ ->
-              failwith "unexpected consensus configuration json format"
+          let use op field = op (Field.get field conf) in
+          Consensus.Configuration.Fields.to_list
+            ~delta:(use (fun v -> sprintf "Delta: %d" v))
+            ~k:(use (fun v -> sprintf "k: %d" v))
+            ~c:(use (fun v -> sprintf "c: %d" v))
+            ~c_times_k:(use (fun v -> sprintf "c * k: %d" v))
+            ~slots_per_epoch:(use (fun v -> sprintf "Slots per epoch: %d" v))
+            ~slot_duration:
+              (use (fun v -> sprintf "Slot duration: %s" (ms_to_string v)))
+            ~epoch_duration:
+              (use (fun v -> sprintf "Epoch duration: %s" (ms_to_string v)))
+            ~acceptable_network_delay:
+              (use (fun v ->
+                   sprintf "Acceptable network delay: %s" (ms_to_string v) ))
+          |> List.map ~f:(fun s -> "\n\t" ^ s)
+          |> String.concat ~sep:""
         in
         map_entry "Consensus Configuration" ~f:render
     end

@@ -1879,7 +1879,7 @@ module Data = struct
       Core.Int.(checkpoint_window slot1 = checkpoint_window slot2)
 
     let time_hum (t : Value.t) =
-      sprintf "%d:%d"
+      sprintf "epoch:%d slot:%d"
         (Epoch.to_int t.curr_epoch)
         (Epoch.Slot.to_int t.curr_slot)
 
@@ -2973,7 +2973,7 @@ end
 
 let time_hum (now : Coda_base.Block_time.t) =
   let epoch, slot = Data.Epoch.epoch_and_slot_of_time_exn now in
-  Printf.sprintf "%d:%d" (Data.Epoch.to_int epoch)
+  Printf.sprintf "epoch:%d slot:%d" (Data.Epoch.to_int epoch)
     (Data.Epoch.Slot.to_int slot)
 
 let%test_module "Proof of stake tests" =
