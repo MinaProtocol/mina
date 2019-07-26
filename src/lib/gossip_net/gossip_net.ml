@@ -446,11 +446,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 ; ("peer", Peer.to_yojson peer) ] )
 
   let broadcast_random t n msg =
-    (* if no peers available, broadcast to disconnected peers *)
-    let peers =
-      if Hash_set.is_empty t.peers then t.disconnected_peers else t.peers
-    in
-    let selected_peers = random_sublist (Hash_set.to_list peers) n in
+    (* don't use disconnected peers here; because this function is called
+       repeatedly in the broadcast loop, that will quickly lead to a ban,
+       so we don't be able to re-connect to that peer
+     *)
+    let selected_peers = random_sublist (Hash_set.to_list t.peers) n in
     broadcast_selected t selected_peers msg
 
   let create (config : Config.t)
@@ -468,7 +468,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               membership
           | Error e ->
               failwith
-                (Printf.sprintf "Failed to connect to kademlia process: %s\n"
+                (Printf.sprintf "Failed to connect to Kademlia process: %s\n"
                    (Error.to_string_hum e))
         in
         let first_connect = Ivar.create () in
