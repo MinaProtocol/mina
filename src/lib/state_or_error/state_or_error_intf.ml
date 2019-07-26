@@ -28,9 +28,9 @@ module type S = sig
 end
 
 module type S2 = sig
-  type 'a state
-
   include Monad.S2
+
+  type 'a state
 
   val run_state : ('b, 'a) t -> state:'a state -> ('b * 'a state) Or_error.t
 

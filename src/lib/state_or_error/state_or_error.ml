@@ -1,7 +1,7 @@
 open Core_kernel
 
 module Make3 (State : State_or_error_intf.State_intf2) :
-  State_or_error_intf.S3 = struct
+  State_or_error_intf.S3 with type ('a, 'b) state = ('a, 'b) State.t = struct
   module T = struct
     type ('a, 'b) state = ('a, 'b) State.t
 
