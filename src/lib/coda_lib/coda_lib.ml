@@ -22,7 +22,7 @@ type components =
   ; transaction_pool: Network_pool.Transaction_pool.t
   ; snark_pool: Network_pool.Snark_pool.t
   ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
-  }
+  ; most_recent_valid_block: External_transition.t Broadcast_pipe.Reader.t }
 
 type pipes =
   { validated_transitions_reader:
@@ -43,7 +43,8 @@ type t =
   ; propose_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
-  ; subscriptions: Coda_subscriptions.t }
+  ; subscriptions: Coda_subscriptions.t
+  ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
 [@@deriving fields]
 
 let subscription t = t.subscriptions
@@ -105,26 +106,11 @@ let best_tip = compose_of_option best_tip_opt
 
 let root_length = compose_of_option root_length_opt
 
-module Incr = struct
-  open Coda_incremental.Status
-
-  let online_status t =
-    of_broadcast_pipe @@ Coda_networking.online_status t.components.net
-
-  let transition_frontier t =
-    of_broadcast_pipe @@ t.components.transition_frontier
-
-  let first_connection t =
-    of_ivar @@ Coda_networking.first_connection t.components.net
-
-  let first_message t =
-    of_ivar @@ Coda_networking.first_message t.components.net
-end
-
 [%%if
 mock_frontend_data]
 
-let sync_status _ =
+let create_sync_status_observer ~logger ~transition_frontier_incr
+    ~online_status_incr ~first_connection_incr ~first_message_incr =
   let variable = Coda_incremental.Status.Var.create `Offline in
   let incr = Coda_incremental.Status.Var.watch variable in
   let rec loop () =
@@ -151,42 +137,41 @@ let sync_status _ =
 
 [%%else]
 
-let sync_status t =
+let create_sync_status_observer ~logger ~transition_frontier_incr
+    ~online_status_incr ~first_connection_incr ~first_message_incr =
   let open Coda_incremental.Status in
-  let transition_frontier_incr = Var.watch @@ Incr.transition_frontier t in
   let incremental_status =
-    map4
-      (Var.watch @@ Incr.online_status t)
-      transition_frontier_incr
-      (Var.watch @@ Incr.first_connection t)
-      (Var.watch @@ Incr.first_message t)
+    map4 online_status_incr transition_frontier_incr first_connection_incr
+      first_message_incr
       ~f:(fun online_status active_status first_connection first_message ->
         match online_status with
         | `Offline ->
             if `Empty = first_connection then (
-              Logger.info (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__ "Coda daemon is now connecting" ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Coda daemon is now connecting" ;
               `Connecting )
             else if `Empty = first_message then (
-              Logger.info (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__ "Coda daemon is now listening" ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Coda daemon is now listening" ;
               `Listening )
             else `Offline
-        | `Online ->
-            Option.value_map active_status
-              ~default:
-                ( Logger.info (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ "Coda daemon is now bootstrapping" ;
-                  `Bootstrap )
-              ~f:(fun _ ->
-                Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now synced" ;
-                `Synced ) )
+        | `Online -> (
+          match active_status with
+          | None ->
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Coda daemon is now bootstrapping" ;
+              `Bootstrap
+          | Some _ ->
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Coda daemon is now synced" ;
+              `Synced ) )
   in
   let observer = observe incremental_status in
   stabilize () ; observer
 
 [%%endif]
+
+let sync_status t = t.sync_status
 
 let visualize_frontier ~filename =
   compose_of_option
@@ -251,6 +236,8 @@ let snark_work_fee t = t.config.snark_work_fee
 let receipt_chain_database t = t.config.receipt_chain_database
 
 let top_level_logger t = t.config.logger
+
+let most_recent_valid_transition t = t.components.most_recent_valid_block
 
 let staged_ledger_ledger_proof t =
   let open Option.Let_syntax in
@@ -393,6 +380,11 @@ let create (config : Config.t) =
           let%bind ledger_db, transition_frontier =
             create_genesis_frontier config ~verifier
           in
+          let genesis_transition =
+            Transition_frontier.(
+              root transition_frontier |> Breadcrumb.external_transition
+              |> External_transition.Validated.forget_validation)
+          in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
           in
@@ -454,6 +446,10 @@ let create (config : Config.t) =
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
+          let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
+              =
+            Broadcast_pipe.create genesis_transition
+          in
           let valid_transitions =
             Transition_router.run ~logger:config.logger
               ~trust_system:config.trust_system ~verifier ~network:net
@@ -465,6 +461,7 @@ let create (config : Config.t) =
                 (Strict_pipe.Reader.map external_transitions_reader
                    ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
               ~proposer_transition_reader transition_frontier
+              ~most_recent_valid_block
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -563,14 +560,28 @@ let create (config : Config.t) =
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_node
           in
-          return
+          let open Coda_incremental.Status in
+          let sync_status =
+            create_sync_status_observer ~logger:config.logger
+              ~transition_frontier_incr:
+                (Var.watch @@ of_broadcast_pipe frontier_broadcast_pipe_r)
+              ~online_status_incr:
+                ( Var.watch @@ of_broadcast_pipe
+                @@ Coda_networking.online_status net )
+              ~first_connection_incr:
+                (Var.watch @@ of_ivar @@ Coda_networking.first_connection net)
+              ~first_message_incr:
+                (Var.watch @@ of_ivar @@ Coda_networking.first_message net)
+          in
+          Deferred.return
             { config
             ; processes= {prover; verifier}
             ; components=
                 { net
                 ; transaction_pool
                 ; snark_pool
-                ; transition_frontier= frontier_broadcast_pipe_r }
+                ; transition_frontier= frontier_broadcast_pipe_r
+                ; most_recent_valid_block= most_recent_valid_block_reader }
             ; pipes=
                 { validated_transitions_reader= valid_transitions_for_api
                 ; proposer_transition_writer
@@ -580,4 +591,5 @@ let create (config : Config.t) =
             ; wallets
             ; propose_keypairs
             ; seen_jobs= Work_selector.State.init
-            ; subscriptions } ) )
+            ; subscriptions
+            ; sync_status } ) )
