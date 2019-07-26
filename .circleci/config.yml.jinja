@@ -97,6 +97,9 @@ jobs:
             - attach_workspace:
                 at: /tmp/workspace
             - run:
+                name: ls -l /tmp/workspace
+                command: ls -l /tmp/workspace
+            - run:
                 name: Make /nix paths
                 command: |
                     sudo mkdir /nix
