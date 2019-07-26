@@ -168,7 +168,7 @@ jobs:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     build-artifacts--testnet_postake_many_proposers_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         environment:
