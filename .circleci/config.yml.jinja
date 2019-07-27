@@ -132,7 +132,7 @@ jobs:
                     - "/Users/distiller/.opam"
             - run:
                 name: Build kademlia
-                command: make kademlia 2>&1 | tee /tmp/buildkademlia.log'
+                command: make kademlia 2>&1 | tee /tmp/buildkademlia.log
                 no_output_timeout: 1h
             - run:
                 name: Build OCaml
