@@ -173,6 +173,14 @@ module Types = struct
 
       let int_option_entry = option_entry ~f:Int.to_string
 
+      let list_entry name ~to_string =
+        map_entry name ~f:(fun keys ->
+            let len = List.length keys in
+            let list_str =
+              if len > 0 then " " ^ List.to_string ~f:to_string keys else ""
+            in
+            Printf.sprintf "%d%s" len list_str )
+
       let num_accounts = int_option_entry "Global Number of Accounts"
 
       let blockchain_length = int_option_entry "Block Height"
@@ -194,10 +202,7 @@ module Types = struct
 
       let conf_dir = string_entry "Configuration Directory"
 
-      let peers =
-        map_entry "Peers" ~f:(fun peers ->
-            Printf.sprintf "Total: %d " (List.length peers)
-            ^ List.to_string ~f:Fn.id peers )
+      let peers = list_entry "Peers" ~to_string:Fn.id
 
       let user_commands_sent = int_entry "User_commands Sent"
 
@@ -206,9 +211,8 @@ module Types = struct
       let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
-        map_entry "Block producers running" ~f:(fun keys ->
-            Printf.sprintf "Total: %d " (List.length keys)
-            ^ List.to_string ~f:Public_key.Compressed.to_string keys )
+        list_entry "Block Producers Running"
+          ~to_string:Public_key.Compressed.to_string
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
