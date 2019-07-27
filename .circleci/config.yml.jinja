@@ -96,8 +96,6 @@ jobs:
         steps:
             # Attach workspace from linux build
             - run: mkdir -p /tmp/artifacts
-            - run: sysctl -a | grep machdep.cpu
-            - run: sysctl hw.memsize
             - attach_workspace:
                 at: /tmp/workspace
             - run: sudo mkdir -p /var/lib/coda
@@ -105,6 +103,7 @@ jobs:
             - run: ls -l /var/lib/coda
             - run: sudo mkdir /nix
             - run: sudo chown distiller /nix
+            - run: curl https://nixos.org/nix/install | sh
             - checkout
             - restore_cache:
                 keys:
