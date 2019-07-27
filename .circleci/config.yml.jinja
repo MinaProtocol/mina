@@ -105,6 +105,11 @@ jobs:
             - run: sudo chown distiller /nix
             - run: curl https://nixos.org/nix/install | sh
             - checkout
+            - run:
+                name: Build kademlia
+                command: |
+                    . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
+                    make kademlia 2>&1 | tee /tmp/buildkademlia.log
             - restore_cache:
                 keys:
                     - homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
@@ -129,9 +134,7 @@ jobs:
                 key: opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                 paths:
                     - "/Users/distiller/.opam"
-            - run:
-                name: Build kademlia
-                command: make kademlia 2>&1 | tee /tmp/buildkademlia.log
+
                 no_output_timeout: 1h
             - run:
                 name: Build OCaml
