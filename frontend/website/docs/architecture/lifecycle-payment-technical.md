@@ -1,20 +1,30 @@
-# The Lifecycle of a Payment (technical)
+# The Lifecycle of a Payment - Technical Guide
 
-In Coda, payments pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single payment as it works it's way through our codebase. For a more high-level simple overview aimed at users who want to understand a little bit about how payments work check out the [lite lifecycle of a payment](lifecycle_of_a_payment_lite.md).
+In Coda, payments pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single payment as it works its way through the codebase. For a more high-level overview aimed at users who want to understand how payments work on a macroscopic level, check out the [lifecycle of a payment](/docs/architecture/lifecycle-payment).
 
-Let's say you want to send a payment in Coda, assuming you've already made you're account and you have funds.
+Let's say you want to send a payment in Coda, assuming you've already created an account and have received funds.
 Your friend gives you her public key -- it's `KEFLx5TOqJNzd6buc+dW3HCjkL57NjnZIaplYJ50DO1uTfogKfwAAAAA`.
 
 Then you invoke the following command:
 
 ```bash
-$ coda client send-payment -receiver PUBKEY -amount 10 -privkey-path ~/my-private-key
+$ coda client send-payment \
+    -amount 10 \
+    -receiver KEFLx5TOqJNzd6buc+dW3HCjkL57NjnZIaplYJ50DO1uTfogKfwAAAAA \
+    -fee 3 \
+    -privkey-path keys/my-wallet
 ```
 
-<a name="client"></a>
-## Coda client -- [client.ml](../src/app/cli/src/client.ml)
+Where:
+- `amount` is the amount of coda you are sending
+- `receiver` is the public key of the intended recipient
+- `fee` is the fee to be paid to the network to process the transaction
+- `privkey-path` is the filepath to the private key for your account
 
-[client.ml](../src/app/cli/src/client.ml) defines the CLI command parser for the `coda client` subcommands.
+<a name="client"></a>
+## Coda Client
+
+The [client.ml](https://github.com/CodaProtocol/coda/tree/master/src/app/cli/src/client.ml) file defines the CLI command parser for the `coda client` subcommands.
 We use [Jane Street](https://github.com/janestreet)'s standard libraries often.
 Specifically [Core](https://opensource.janestreet.com/core/) (common datastructures) and [Async](https://opensource.janestreet.com/async/) (asynchronous programming using the composable `Deferred.t` type) are used very often.
 On top of most files you'll see some variant of `open Core` and `open Async`.
