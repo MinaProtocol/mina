@@ -43,6 +43,7 @@ Add the Coda Debian repo and install.
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
 sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-43cb0790
+sudo apt-mark hold coda-testnet-postake-medium-curves
 ```
 
 You can `coda -help` to see if it works.
