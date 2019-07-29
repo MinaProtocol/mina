@@ -17,7 +17,9 @@ module type S = sig
 
   (** raises an exception if mask is not registered *)
   val unregister_mask_exn :
-       ?grandchildren:[`Check | `Recursive | `I_promise_I_am_reparenting_this]
+       ?grandchildren:[ `Check
+                      | `Recursive
+                      | `I_promise_I_am_reparenting_this_mask ]
     -> t
     -> attached_mask
     -> unattached_mask

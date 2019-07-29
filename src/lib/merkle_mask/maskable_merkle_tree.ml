@@ -145,7 +145,6 @@ module Make (Inputs : Inputs_intf) = struct
     Uuid.Table.add_multi registered_masks ~key:(get_uuid t) ~data:attached_mask ;
     attached_mask
 
-  (* TODO We have the parent already from mask.parent. remove extra param. *)
   let rec unregister_mask_exn ?(grandchildren = `Check) (t : t)
       (mask : Mask.Attached.t) : Mask.unattached =
     let t_uuid = get_uuid t in
@@ -165,12 +164,12 @@ module Make (Inputs : Inputs_intf) = struct
       | Some children ->
           failwith @@ error_msg
           @@ sprintf
-               !"it has children that must be unregistered first: %{sexp: \
+               !"mask has children that must be unregistered first: %{sexp: \
                  Uuid.t list}"
                (List.map ~f:Mask.Attached.get_uuid children)
       | None ->
           () )
-    | `I_promise_I_am_reparenting_this ->
+    | `I_promise_I_am_reparenting_this_mask ->
         ()
     | `Recursive ->
         (* You must not retain any references to children of the mask we're
@@ -224,8 +223,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let dangling_masks =
       List.map children ~f:(fun c ->
-          unregister_mask_exn ~grandchildren:`I_promise_I_am_reparenting_this t
-            c )
+          unregister_mask_exn
+            ~grandchildren:`I_promise_I_am_reparenting_this_mask t c )
     in
     ignore (unregister_mask_exn parent t_as_mask) ;
     List.iter dangling_masks ~f:(fun m -> ignore (register_mask parent m))
