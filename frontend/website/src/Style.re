@@ -161,7 +161,6 @@ module Typeface = {
           ),
         );
 
-      print_endline("hello");
       let _ =
         fontFamily(
           fontFace(
