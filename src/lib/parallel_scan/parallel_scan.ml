@@ -684,63 +684,72 @@ module Tree = struct
         (List.take a l, List.take (List.drop a l) r) )
 
   let reset_weights :
-         (*TODO: Add `Both`*)
-         [`Base | `Merge]
+         [`Base | `Merge | `Both]
       -> ('merge_t, 'base_t) t
       -> ('merge_t, 'base_t) t =
    fun weight_type tree ->
+    let set_all_zero weight = Weight.base.set 0 (Weight.merge.set 0 weight) in
     let f_base base =
-      let set_one (lens : (Weight.t, int) Lens.t) weight job =
-        ((lens.set 1 weight, job), (lens.set 1 weight, lens.set 0 weight))
+      let set_one (lens : (Weight.t, int) Lens.t) weight = lens.set 1 weight in
+      let set_zero (lens : (Weight.t, int) Lens.t) weight =
+        lens.set 0 weight
       in
-      let set_zero (lens : (Weight.t, int) Lens.t) weight job =
-        ((lens.set 0 weight, job), (lens.set 0 weight, lens.set 0 weight))
-      in
-      match weight_type with
-      | `Merge -> (
-        (*When updating the merge-weight of base nodes only the nodes with
+      let update_merge_weight weight =
+        (*When updating the merge-weight of base nodes, only the nodes with
         "Todo" status needs to be included*)
-        match base with
-        | weight, Base.Job.Full {status= Job_status.Todo; _} ->
-            set_one Weight.merge weight (snd base)
-        | weight, _ ->
-            set_zero Weight.merge weight (snd base) )
-      | `Base -> (
-        (*When updating the base-weight of base nodes only the Empty nodes need
-        to be included*)
-        match base with
-        | weight, Base.Job.Empty ->
-            set_one Weight.base weight (snd base)
-        | weight, _ ->
-            set_zero Weight.base weight (snd base) )
+        match snd base with
+        | Base.Job.Full {status= Job_status.Todo; _} ->
+            set_one Weight.merge weight
+        | _ ->
+            set_zero Weight.merge weight
+      in
+      let update_base_weight weight =
+        (*When updating the base-weight of base nodes, only the Empty nodes
+        need to be included*)
+        match snd base with
+        | Base.Job.Empty ->
+            set_one Weight.base weight
+        | _ ->
+            set_zero Weight.base weight
+      in
+      let new_weight, dummy_right_for_base_nodes =
+        match weight_type with
+        | `Merge ->
+            (update_merge_weight (fst base), set_zero Weight.merge (fst base))
+        | `Base ->
+            (update_base_weight (fst base), set_zero Weight.base (fst base))
+        | `Both ->
+            let w' = update_base_weight (fst base) in
+            (update_merge_weight w', set_all_zero w')
+      in
+      ((new_weight, snd base), (new_weight, dummy_right_for_base_nodes))
     in
     let f_merge lst m =
       let (w1, w2), (w3, w4) = lst in
-      match weight_type with
-      | `Merge -> (
-          (*When updating the merge-weight of merge nodes only the nodes with
-        "Todo" status needs to be included*)
-          let lens = Weight.merge in
-          match m with
-          | (w1', w2'), Merge.Job.Full {status= Job_status.Todo; _} ->
-              ( ((lens.set 1 w1', lens.set 0 w2'), snd m)
-              , (lens.set 1 w1', lens.set 0 w2') )
-          | (w1', w2'), _ ->
-              (* Weights of all other jobs is sum of weights of its children*)
-              ( ( ( lens.set (lens.get w1 + lens.get w2) w1'
-                  , lens.set (lens.get w3 + lens.get w4) w2' )
-                , snd m )
-              , ( lens.set (lens.get w1 + lens.get w2) w1'
-                , lens.set (lens.get w3 + lens.get w4) w2' ) ) )
-      | `Base ->
-          (* The base-weight of merge nodes is the sum of weights of its children*)
-          let lens = Weight.base in
-          let w1', w2' = fst m in
-          ( ( ( lens.set (lens.get w1 + lens.get w2) w1'
-              , lens.set (lens.get w3 + lens.get w4) w2' )
-            , snd m )
-          , ( lens.set (lens.get w1 + lens.get w2) w1'
-            , lens.set (lens.get w3 + lens.get w4) w2' ) )
+      let reset (lens : (Weight.t, int) Lens.t) (w, w') =
+        (* Weights of all other jobs is sum of weights of its children*)
+        ( lens.set (lens.get w1 + lens.get w2) w
+        , lens.set (lens.get w3 + lens.get w4) w' )
+      in
+      let w' =
+        match weight_type with
+        | `Merge -> (
+            (*When updating the merge-weight of merge nodes, only the nodes
+            with "Todo" status needs to be included*)
+            let lens = Weight.merge in
+            match m with
+            | (w1', w2'), Merge.Job.Full {status= Job_status.Todo; _} ->
+                (lens.set 1 w1', lens.set 0 w2')
+            | w, _ ->
+                reset lens w )
+        | `Base ->
+            (* The base-weight of merge nodes is the sum of weights of its
+            children*)
+            reset Weight.base (fst m)
+        | `Both ->
+            reset Weight.merge (reset Weight.base (fst m))
+      in
+      ((w', snd m), w')
     in
     fst (update_accumulate ~f_merge ~f_base tree)
 
@@ -1308,11 +1317,10 @@ let add_data : data:'base list -> (_, _, 'base) State_or_error.t =
                   (Error.to_string_hum e)))
             (tree, None)
     in
-    let tree = Tree.reset_weights `Merge tree in
     let updated_trees =
       if List.length base_jobs = available_space then
-        cons (create_tree ~depth) [Tree.reset_weights `Base tree]
-      else Non_empty_list.singleton tree
+        cons (create_tree ~depth) [Tree.reset_weights `Both tree]
+      else Non_empty_list.singleton (Tree.reset_weights `Merge tree)
     in
     let%map _ =
       State_or_error.put
