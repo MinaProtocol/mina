@@ -28,17 +28,23 @@ module Make
         type t =
           { protocol_state: Protocol_state.Value.Stable.V1.t
           ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-          ; staged_ledger_diff: Staged_ledger_diff.t }
+          ; staged_ledger_diff: Staged_ledger_diff.t
+          ; delta_transition_chain_witness:
+              State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list }
         [@@deriving sexp, fields, bin_io, version]
 
         type external_transition = t
 
         let to_yojson
-            {protocol_state; protocol_state_proof= _; staged_ledger_diff= _} =
+            { protocol_state
+            ; protocol_state_proof= _
+            ; staged_ledger_diff= _
+            ; delta_transition_chain_witness= _ } =
           `Assoc
             [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
             ; ("protocol_state_proof", `String "<opaque>")
-            ; ("staged_ledger_diff", `String "<opaque>") ]
+            ; ("staged_ledger_diff", `String "<opaque>")
+            ; ("delta_transition_chain_witness", `String "<opaque>") ]
 
         (* TODO: Important for bkase to review *)
         let compare t1 t2 =
@@ -87,7 +93,8 @@ module Make
   type t = Stable.Latest.t =
     { protocol_state: Protocol_state.Value.Stable.V1.t
     ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-    ; staged_ledger_diff: Staged_ledger_diff.t }
+    ; staged_ledger_diff: Staged_ledger_diff.t
+    ; delta_transition_chain_witness: State_hash.t * State_body_hash.t list }
   [@@deriving sexp]
 
   type external_transition = t
@@ -107,8 +114,12 @@ module Make
 
   include Comparable.Make (Stable.Latest)
 
-  let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff =
-    {protocol_state; protocol_state_proof; staged_ledger_diff}
+  let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
+      ~delta_transition_chain_witness =
+    { protocol_state
+    ; protocol_state_proof
+    ; staged_ledger_diff
+    ; delta_transition_chain_witness }
 
   let timestamp {protocol_state; _} =
     Protocol_state.blockchain_state protocol_state

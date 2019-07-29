@@ -231,10 +231,12 @@ struct
         Protocol_state.create_value ~previous_state_hash
           ~blockchain_state:next_blockchain_state ~consensus_state
       in
+      let state_hash = Protocol_state.hash protocol_state in
       let next_external_transition =
         External_transition.create ~protocol_state
           ~protocol_state_proof:Proof.dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
+          ~delta_transition_chain_witness:(state_hash, [])
       in
       (* We manually created a verified an external_transition *)
       let (`I_swear_this_is_safe_see_my_comment
@@ -327,7 +329,8 @@ struct
       External_transition.Validated.create_unsafe
         (External_transition.create ~protocol_state:genesis_protocol_state
            ~protocol_state_proof:Proof.dummy
-           ~staged_ledger_diff:dummy_staged_ledger_diff)
+           ~staged_ledger_diff:dummy_staged_ledger_diff
+           ~delta_transition_chain_witness:(genesis_protocol_state_hash, []))
     in
     let root_transition_with_data =
       {With_hash.data= root_transition; hash= genesis_protocol_state_hash}

@@ -256,7 +256,8 @@ module type Transition_chain_witness_intf = sig
   type external_transition
 
   val prove :
-       frontier:transition_frontier
+       ?length:int
+    -> frontier:transition_frontier
     -> State_hash.t
     -> (State_hash.t * State_body_hash.t List.t) Option.t
 
