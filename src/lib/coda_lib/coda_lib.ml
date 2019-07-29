@@ -188,7 +188,17 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 
 let best_ledger = compose_of_option best_ledger_opt
 
-let get_ledger t staged_ledger_hash =
+let get_ledger t staged_ledger_hash_opt =
+  let staged_ledger_hash =
+    Option.value staged_ledger_hash_opt
+      ~default:
+        ( match best_staged_ledger t with
+        | `Active staged_ledger ->
+            staged_ledger |> Staged_ledger.hash
+        | `Bootstrapping ->
+            failwith
+              "get_ledger: can't get staged ledger hash while bootstrapping" )
+  in
   let open Deferred.Or_error.Let_syntax in
   let%bind frontier =
     Deferred.return (t.components.transition_frontier |> peek_frontier)
@@ -207,7 +217,7 @@ let get_ledger t staged_ledger_hash =
       Deferred.return (Ok x)
   | None ->
       Deferred.Or_error.error_string
-        "staged ledger hash not found in transition frontier"
+        "get_ledger: staged ledger hash not found in transition frontier"
 
 let seen_jobs t = t.seen_jobs
 
