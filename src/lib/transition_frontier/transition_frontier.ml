@@ -348,7 +348,7 @@ module Make (Inputs : Inputs_intf) :
   let incr_num_catchup_jobs
       {num_catchup_jobs= {mvar; signal_writer; _}; logger; _} =
     let%bind current_num_catchup_jobs = Mvar.take mvar in
-    Logger.info logger "Incrementing num catch up jobs. Current number %i"
+    Logger.trace logger "Incrementing num catch up jobs. Current number %i"
       current_num_catchup_jobs ~module_:__MODULE__ ~location:__LOC__ ;
     let%bind () =
       if current_num_catchup_jobs = 0 then
@@ -360,7 +360,7 @@ module Make (Inputs : Inputs_intf) :
   let decr_num_catchup_jobs
       {num_catchup_jobs= {mvar; signal_writer; _}; logger; _} =
     let%bind current_num_catchup_jobs = Mvar.take mvar in
-    Logger.info logger "Decrementing num catch up jobs. Current number % i"
+    Logger.trace logger "Decrementing num catch up jobs. Current number % i"
       current_num_catchup_jobs ~module_:__MODULE__ ~location:__LOC__ ;
     [%test_pred: int]
       ~message:"The number of current catchup jobs cannot be negative"
