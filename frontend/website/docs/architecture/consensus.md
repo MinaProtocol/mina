@@ -1,5 +1,4 @@
-Consensus Mechanism Abstraction
-===============================
+# Consensus Mechanism Abstraction
 
 Consensus refers to the process by which the network determines which information will be retained in the blockchain. In a system such as a blockchain, the responsibility of extending the blockchain with new information is distributed across participating nodes throughout the network. These nodes cannot be assumed to be "honest" nodes on the network, and thus, "honest" participants of the network must work together in order to select which information proposed by various nodes will be kept. There are many different ways of achieving distributed consensus, which we refer to as consensus mechanisms. In our code base, we have built a single interface by which a consensus mechanism informs the rest of the protocol. Through this interface, various implementations of consensus mechanisms can be swapped out at compile time to allow us to write the rest of the protocol inedependent of the consensus mechanism being selected. As such, one can think about a consensus mechanism as something that, once defined, the rest of the protocol can be built on top of.
 
