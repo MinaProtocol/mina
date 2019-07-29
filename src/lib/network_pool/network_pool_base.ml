@@ -29,7 +29,7 @@ end)
           (Resource_pool.Diff.summary diff') ;
         Linear_pipe.write t.write_broadcasts diff'
     | Error e ->
-        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
           "Pool diff apply feedback: %s" (Error.to_string_hum e) ;
         Deferred.unit
 

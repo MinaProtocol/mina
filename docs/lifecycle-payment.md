@@ -1,4 +1,4 @@
-# The Lifecycle of a Payment (overview)
+# The Lifecycle of a Payment
 
 In Coda, payments pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single payment in a simplified overview to help users understand a little about how Coda payments work. It it not a comprehensive technical overview, but instead a simplified walkthrough for users. For a more detailed technical overview aimed at developers wishing to understand the codebase check out the [technical lifecycle of a payment](lifecycle_of_a_payment_technical.md).
 

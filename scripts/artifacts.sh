@@ -32,6 +32,6 @@ do_copy () {
 }
 
 case $CIRCLE_JOB in
-  "build-artifacts--testnet_postake" | "build-artifacts--testnet_postake_snarkless_fake_hash") do_copy;;
-   *) echo "Not an active testnet job, stopping." ; exit 0 ;;
+  "build-artifacts--testnet_postake" | "build-artifacts--testnet_postake_snarkless_fake_hash" | "build-artifacts--testnet_postake_medium_curves" |  "build-artifacts--testnet_postake_many_proposers_medium_curves") do_copy;;
+   *) echo "Not an active testnet job (${CIRCLE_JOB}), stopping." ; exit 0 ;;
 esac
