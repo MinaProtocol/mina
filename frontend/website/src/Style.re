@@ -138,46 +138,34 @@ module Typeface = {
       );
     ();
 
-    // Workaround to allow the website to be build for dev
-    // without needing the pragmatapro font.
-    // If you have the font asset, it will be used.
-    if (Node.Fs.existsSync(
-          Links.Cdn.localAssetPath(
-            "/static/font/Essential-PragmataPro-Regular.woff2",
-          ),
-        )
-        || Config.isProd) {
-      let _ =
-        fontFamily(
-          fontFace(
-            ~fontFamily="PragmataPro",
-            ~src=[
-              cdnUrl("/static/font/Essential-PragmataPro-Regular.woff2"),
-              cdnUrl("/static/font/Essential-PragmataPro-Regular.woff"),
-            ],
-            ~fontStyle=`normal,
-            ~fontWeight=`medium,
-            (),
-          ),
-        );
+    let _ =
+      fontFamily(
+        fontFace(
+          ~fontFamily="PragmataPro",
+          ~src=[
+            cdnUrl("/static/font/Essential-PragmataPro-Regular.woff2"),
+            cdnUrl("/static/font/Essential-PragmataPro-Regular.woff"),
+          ],
+          ~fontStyle=`normal,
+          ~fontWeight=`medium,
+          (),
+        ),
+      );
 
-      let _ =
-        fontFamily(
-          fontFace(
-            ~fontFamily="PragmataPro",
-            ~src=[
-              cdnUrl("/static/font/Essential-PragmataPro-Bold.woff2"),
-              cdnUrl("/static/font/Essential-PragmataPro-Bold.woff"),
-            ],
-            ~fontStyle=`normal,
-            ~fontWeight=`bold,
-            (),
-          ),
-        );
-      ();
-    } else {
-      print_endline("Warning: building without PragmataPro fonts");
-    };
+    let _ =
+      fontFamily(
+        fontFace(
+          ~fontFamily="PragmataPro",
+          ~src=[
+            cdnUrl("/static/font/Essential-PragmataPro-Bold.woff2"),
+            cdnUrl("/static/font/Essential-PragmataPro-Bold.woff"),
+          ],
+          ~fontStyle=`normal,
+          ~fontWeight=`bold,
+          (),
+        ),
+      );
+    ();
   };
 
   let ibmplexserif = fontFamily("IBM Plex Serif, serif");

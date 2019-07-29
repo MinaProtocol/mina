@@ -173,23 +173,14 @@ module Types = struct
 
       let int_option_entry = option_entry ~f:Int.to_string
 
-      let list_entry name ~to_string =
-        map_entry name ~f:(fun keys ->
-            let len = List.length keys in
-            let list_str =
-              if len > 0 then " " ^ List.to_string ~f:to_string keys else ""
-            in
-            Printf.sprintf "%d%s" len list_str )
-
       let num_accounts = int_option_entry "Global Number of Accounts"
 
       let blockchain_length = int_option_entry "Block Height"
 
-      let highest_block_length_received = int_entry "Max Observed Block Length"
+      let highest_block_length_received =
+        int_entry "Maximum Block Length Encountered from a Valid Block"
 
-      let uptime_secs =
-        map_entry "Local Uptime" ~f:(fun secs ->
-            Time.Span.to_string (Time.Span.of_int_sec secs) )
+      let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
 
       let ledger_merkle_root = string_option_entry "Ledger Merkle Root"
 
@@ -197,11 +188,14 @@ module Types = struct
 
       let state_hash = string_option_entry "Staged Hash"
 
-      let commit_id = string_entry "GIT SHA-1"
+      let commit_id = string_entry "GIT SHA1"
 
       let conf_dir = string_entry "Configuration Directory"
 
-      let peers = list_entry "Peers" ~to_string:Fn.id
+      let peers =
+        map_entry "Peers" ~f:(fun peers ->
+            Printf.sprintf "Total: %d " (List.length peers)
+            ^ List.to_string ~f:Fn.id peers )
 
       let user_commands_sent = int_entry "User_commands Sent"
 
@@ -210,36 +204,28 @@ module Types = struct
       let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
-        list_entry "Block Producers Running"
-          ~to_string:Public_key.Compressed.to_string
+        map_entry "Block Producers Running" ~f:(fun keys ->
+            Printf.sprintf "Total: %d " (List.length keys)
+            ^ List.to_string ~f:Public_key.Compressed.to_string keys )
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
       let consensus_time_best_tip =
-        string_option_entry "Best Tip Consensus Time"
+        string_option_entry "Best Tip Consensus Time (epoch:slot)"
 
-      let consensus_time_now = string_entry "Consensus Time Now"
+      let consensus_time_now = string_entry "Consensus Time Now (epoch:slot)"
 
       let consensus_mechanism = string_entry "Consensus Mechanism"
 
       let consensus_configuration =
-        let ms_to_string i =
-          float_of_int i |> Time.Span.of_ms |> Time.Span.to_string
-        in
         let render conf =
-          let fmt_field name op field = (name, op (Field.get field conf)) in
-          Consensus.Configuration.Fields.to_list
-            ~delta:(fmt_field "Delta" string_of_int)
-            ~k:(fmt_field "k" string_of_int)
-            ~c:(fmt_field "c" string_of_int)
-            ~c_times_k:(fmt_field "c * k" string_of_int)
-            ~slots_per_epoch:(fmt_field "Slots per epoch" string_of_int)
-            ~slot_duration:(fmt_field "Slot duration" ms_to_string)
-            ~epoch_duration:(fmt_field "Epoch duration" ms_to_string)
-            ~acceptable_network_delay:
-              (fmt_field "Acceptable network delay" ms_to_string)
-          |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
-          |> digest_entries ~title:""
+          match Consensus.Configuration.to_yojson conf with
+          | `Assoc ls ->
+              List.fold_left ls ~init:"" ~f:(fun acc (k, v) ->
+                  acc ^ sprintf "\n    %s = %s" k (Yojson.Safe.to_string v) )
+              ^ "\n"
+          | _ ->
+              failwith "unexpected consensus configuration json format"
         in
         map_entry "Consensus Configuration" ~f:render
     end

@@ -489,10 +489,8 @@ module type Staged_ledger_generalized_intf = sig
        Deferred.Or_error.t
 
   module For_tests : sig
-    val materialized_snarked_ledger_hash :
-         t
-      -> expected_target:Frozen_ledger_hash.t
-      -> Frozen_ledger_hash.t Or_error.t
+    val snarked_ledger :
+      t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t
   end
 
   val current_ledger_proof : t -> ledger_proof option
