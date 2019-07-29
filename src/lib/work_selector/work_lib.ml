@@ -1,3 +1,9 @@
+[%%import
+"../../config.mlh"]
+
+[%%inject
+"wait_time", snark_work_reassignment_wait]
+
 open Core_kernel
 open Currency
 
@@ -13,7 +19,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   module Job_status = struct
     type t = Assigned of Time.t
 
-    let max_age = Time.Span.of_min 2.
+    let max_age = Time.Span.of_ms (Float.of_int wait_time)
 
     let is_old t ~now =
       match t with

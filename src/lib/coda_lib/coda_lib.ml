@@ -274,7 +274,8 @@ let request_work t =
         Some staged_ledger
     | `Bootstrapping ->
         Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-          "Could not retrieve staged_ledger due to bootstrapping" ;
+          "Snark-work-request error: Could not retrieve staged_ledger due to \
+           bootstrapping" ;
         None
   in
   let fee = snark_work_fee t in
