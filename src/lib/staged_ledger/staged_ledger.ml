@@ -188,37 +188,45 @@ struct
           ~ledger_hash_begin:(Some (get_target proof))
 
   (* TODO: Remove this. This is deprecated *)
-  let snarked_ledger :
-      t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
-   fun {ledger; scan_state; _} ~snarked_ledger_hash:expected_target ->
+  let materialized_snarked_ledger_hash :
+         t
+      -> expected_target:Frozen_ledger_hash.t
+      -> Frozen_ledger_hash.t Or_error.t =
+   fun {ledger; scan_state; _} ~expected_target ->
     let open Or_error.Let_syntax in
     let txns_still_being_worked_on = Scan_state.staged_undos scan_state in
     let snarked_ledger = Ledger.register_mask ledger (Ledger.Mask.create ()) in
-    let%bind () =
-      Scan_state.Staged_undos.apply txns_still_being_worked_on snarked_ledger
-    in
-    let snarked_ledger_hash =
-      Ledger.merkle_root snarked_ledger |> Frozen_ledger_hash.of_ledger_hash
-    in
-    if not (Frozen_ledger_hash.equal snarked_ledger_hash expected_target) then
-      Or_error.errorf
-        !"Error materializing the snarked ledger, expecting  \
-          %{sexp:Frozen_ledger_hash.t} got %{sexp:Frozen_ledger_hash.t}: "
+    let res =
+      let%bind () =
+        Scan_state.Staged_undos.apply txns_still_being_worked_on snarked_ledger
+      in
+      let snarked_ledger_hash =
+        Ledger.merkle_root snarked_ledger |> Frozen_ledger_hash.of_ledger_hash
+      in
+      if not (Frozen_ledger_hash.equal snarked_ledger_hash expected_target)
+      then
+        Or_error.errorf
+          !"Error materializing the snarked ledger with hash \
+            %{sexp:Frozen_ledger_hash.t} got %{sexp:Frozen_ledger_hash.t}: "
         expected_target snarked_ledger_hash
-    else
-      match Scan_state.latest_ledger_proof scan_state with
-      | None ->
-          return snarked_ledger
-      | Some proof ->
-          let target = get_target proof in
-          if Frozen_ledger_hash.equal snarked_ledger_hash target then
-            return snarked_ledger
-          else
-            Or_error.errorf
-              !"Last snarked ledger (%{sexp: Frozen_ledger_hash.t}) is \
-                different from the one being requested ((%{sexp: \
-                Frozen_ledger_hash.t}))"
-              target expected_target
+      else
+        match Scan_state.latest_ledger_proof scan_state with
+        | None ->
+            return snarked_ledger_hash
+        | Some proof ->
+            let target = get_target proof in
+            if Frozen_ledger_hash.equal snarked_ledger_hash target then
+              return snarked_ledger_hash
+            else
+              Or_error.errorf
+                !"Last snarked ledger (%{sexp: Frozen_ledger_hash.t}) is \
+                  different from the one being requested ((%{sexp: \
+                  Frozen_ledger_hash.t}))"
+                target expected_target
+    in
+    (* Make sure we don't leak this mask. *)
+    Ledger.unregister_mask_exn ledger snarked_ledger |> ignore ;
+    res
 
   let statement_exn t =
     match Statement_scanner.scan_statement t.scan_state ~verifier:() with
@@ -233,7 +241,9 @@ struct
       ~scan_state ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let verify_snarked_ledger t snarked_ledger_hash =
-      match snarked_ledger t ~snarked_ledger_hash with
+      match
+        materialized_snarked_ledger_hash t ~expected_target:snarked_ledger_hash
+      with
       | Ok _ ->
           Ok ()
       | Error e ->
@@ -1323,7 +1333,7 @@ struct
     {Staged_ledger_diff.With_valid_signatures_and_proofs.diff; creator= self}
 
   module For_tests = struct
-    let snarked_ledger = snarked_ledger
+    let materialized_snarked_ledger_hash = materialized_snarked_ledger_hash
   end
 end
 
@@ -2334,16 +2344,14 @@ let%test_module "test" =
                       let last_snarked_ledger_hash =
                         (Tuple2.get1 proof).target
                       in
-                      let materialized_ledger =
+                      let materialized_snarked_ledger_hash =
                         Or_error.ok_exn
-                        @@ Sl.For_tests.snarked_ledger !sl
-                             ~snarked_ledger_hash:last_snarked_ledger_hash
+                        @@ Sl.For_tests.materialized_snarked_ledger_hash !sl
+                             ~expected_target:last_snarked_ledger_hash
                       in
                       assert (
-                        Ledger_hash.equal
-                          (Frozen_ledger_hash.to_ledger_hash
-                             last_snarked_ledger_hash)
-                          (Ledger.merkle_root materialized_ledger) ) ) ;
+                        Frozen_ledger_hash.equal last_snarked_ledger_hash
+                          materialized_snarked_ledger_hash ) ) ;
                   diff ) ) )
 
     let stmt_to_work_restricted work_list provers

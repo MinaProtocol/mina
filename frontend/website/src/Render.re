@@ -32,9 +32,9 @@ module Rimraf = {
   [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
 };
 
-let isProd = Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod";
-
-Links.Cdn.setPrefix(isProd ? "https://cdn.codaprotocol.com/website" : "");
+Links.Cdn.setPrefix(
+  Config.isProd ? "https://cdn.codaprotocol.com/website" : "",
+);
 
 Style.Typeface.load();
 
@@ -254,7 +254,7 @@ copyFolder("static");
 
 // Special-case the jsoo-compiled files for now
 // They can't be loaded from cdn so they get copied to the site separately
-if (!isProd) {
+if (!Config.isProd) {
   moveToSite("static/main.bc.js");
   moveToSite("static/verifier_main.bc.js");
 };
