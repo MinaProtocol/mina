@@ -8,7 +8,7 @@ import subprocess
 import sys
 from datetime import datetime
 
-output = subprocess.check_output(['coda', 'advanced', 'dump-ledger'])
+output = subprocess.check_output(['coda', 'advanced', 'dump-ledger', '-json'])
 accounts=output.split('\n')
 
 count=0
@@ -20,13 +20,14 @@ print ('open Coda_base')
 print ('open Functor')
 print ('')
 print ('let accounts = [')
-for account in accounts2 :
-    if count > 0 :
-        sys.stdout.write ('; ')
-    else :
-        sys.stdout.write ('  ')
-    print ('\"' + account.replace('\"','\\"') + '\"')
-    count = count + 1
+for account in accounts :
+    if not account == "" :
+        if count > 0 :
+            sys.stdout.write ('; ')
+        else :
+            sys.stdout.write ('  ')
+        print ('\"' + account.replace('\"','\\"') + '\"')
+        count = count + 1
 print (']')
 print ('')
 print ('module Accounts = struct')
