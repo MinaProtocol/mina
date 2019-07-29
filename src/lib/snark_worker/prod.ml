@@ -57,11 +57,14 @@ module Inputs = struct
         match k () with
         | Error e ->
             Logger.error (Logger.create ()) ~module_:__MODULE__
-              ~location:__LOC__
+              ~location:__LOC__ "SNARK worker failed: $error"
               ~metadata:
-                [ ( "spec"
-                  , `String (Sexp.to_string (sexp_of_single_spec single)) ) ]
-              "Worker failed: %s" (Error.to_string_hum e) ;
+                [ ("error", `String (Error.to_string_hum e))
+                ; ( "spec"
+                    (* the sexp_opaque in Work.Single.Spec.t means we can't derive yojson,
+		       so we use the less-desirable sexp here
+                    *)
+                  , `String (Sexp.to_string (sexp_of_single_spec single)) ) ] ;
             Error.raise e
         | Ok res ->
             Cache.add cache ~statement ~proof:res ;
