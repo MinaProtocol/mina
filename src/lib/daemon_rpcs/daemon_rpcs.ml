@@ -185,8 +185,7 @@ module Types = struct
 
       let blockchain_length = int_option_entry "Block Height"
 
-      let highest_block_length_received =
-        int_entry "Max Observed Block Length"
+      let highest_block_length_received = int_entry "Max Observed Block Length"
 
       let uptime_secs =
         map_entry "Local Uptime" ~f:(fun secs ->
