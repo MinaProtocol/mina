@@ -213,6 +213,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
       Cached.Spec.create ~load ~name:"blockchain-snark step keys"
         ~autogen_path:Cache_dir.autogen_path
         ~manual_install_path:Cache_dir.manual_install_path
+        ~brew_install_path:Cache_dir.brew_install_path
         ~digest_input:
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
         ~create_env:Tick.Keypair.generate
@@ -245,6 +246,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
         Cached.Spec.create ~load ~name:"blockchain-snark wrap keys"
           ~autogen_path:Cache_dir.autogen_path
           ~manual_install_path:Cache_dir.manual_install_path
+          ~brew_install_path:Cache_dir.brew_install_path
           ~digest_input:(fun () ->
             Tock.R1CS_constraint_system.digest (r1cs true) |> Md5.to_hex )
           ~create_env:(fun () -> Tock.Keypair.generate (r1cs false))
