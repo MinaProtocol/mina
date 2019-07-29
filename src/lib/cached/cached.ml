@@ -8,7 +8,7 @@ let try_load bin path =
   let controller = Storage.Disk.Controller.create ~logger bin in
   match%map Storage.Disk.load_with_checksum controller path with
   | Ok {Storage.Checked_data.data; checksum} ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
         "Loaded value successfully from %s" path ;
       Ok {path; value= data; checksum}
   | Error `Checksum_no_match ->
@@ -125,18 +125,20 @@ module Spec = struct
         ; name: string
         ; autogen_path: string
         ; manual_install_path: string
+        ; brew_install_path: string
         ; digest_input: 'input -> string
         ; create_env: 'input -> 'env
         ; input: 'input }
         -> 'a t
 
-  let create ~load ~name ~autogen_path ~manual_install_path ~digest_input
-      ~create_env ~input =
+  let create ~load ~name ~autogen_path ~manual_install_path ~brew_install_path
+      ~digest_input ~create_env ~input =
     T
       { load
       ; name
       ; autogen_path
       ; manual_install_path
+      ; brew_install_path
       ; digest_input
       ; create_env
       ; input }
@@ -148,6 +150,7 @@ let run
       ; name
       ; autogen_path
       ; manual_install_path
+      ; brew_install_path
       ; digest_input
       ; create_env
       ; input }) =
@@ -155,17 +158,28 @@ let run
   let hash = digest_input input in
   let base_path directory = directory ^/ hash in
   match%bind
-    With_components.load load ~base_path:(base_path manual_install_path)
+    Deferred.List.fold [manual_install_path; brew_install_path] ~init:None
+      ~f:(fun acc path ->
+        if is_some acc then return acc
+        else
+          match%map With_components.load load ~base_path:(base_path path) with
+          | Ok x ->
+              Core.printf "Loaded %s from the following path %s\n" name path ;
+              Some x
+          | Error _ ->
+              None )
   with
-  | Ok x ->
-      Core.printf "Loaded %s from manual installation path %s\n" name
-        manual_install_path ;
+  | Some x ->
       return x
-  | Error _e -> (
+  | None -> (
       Core.printf
-        "Could not load %s from manual installation path %s. Trying the \
-         autogen path %s...\n"
-        name manual_install_path autogen_path ;
+        "Could not load %s from the following path:\n\
+        \ \n\
+         %s\n\
+         %s\n\
+        \ \n\
+        \ Trying the autogen path %s...\n"
+        name manual_install_path brew_install_path autogen_path ;
       let base_path = base_path autogen_path in
       match%bind With_components.load load ~base_path with
       | Ok x ->

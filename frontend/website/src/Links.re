@@ -6,7 +6,18 @@ module Cdn = {
     [@bs.send] external digest: (t, string) => string = "";
   };
 
-  let prefix = ref("");
+  let prefix = ref(None);
+
+  let setPrefix = p => prefix := Some(p);
+
+  let prefix = () =>
+    switch (prefix^) {
+    | None =>
+      Js.Exn.raiseError(
+        "CDN Prefix unset -- Can't run Links.Cdn.url at the top level.",
+      )
+    | Some(prefix) => prefix
+    };
 
   let cache = Hashtbl.create(20);
 
@@ -36,7 +47,7 @@ module Cdn = {
     Hashtbl.find(cache, path);
   };
 
-  let url = path => prefix^ ++ getHashedPath(path);
+  let url = path => prefix() ++ getHashedPath(path);
 };
 
 module Named = {

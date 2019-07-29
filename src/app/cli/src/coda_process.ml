@@ -20,7 +20,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
 
 let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
     ~program_dir ~proposer ~snark_worker_config ~work_selection_method ~offset
-    ~trace_dir ~max_concurrent_connections () =
+    ~trace_dir ~max_concurrent_connections ~is_archive_node () =
   let conf_dir =
     Filename.temp_dir_name
     ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
@@ -47,6 +47,7 @@ let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
     ; trace_dir
     ; program_dir
     ; acceptable_delay
+    ; is_archive_node
     ; max_concurrent_connections }
   in
   config
@@ -104,6 +105,10 @@ let new_block_exn (conn, _proc, __) key =
       ~arg:key
   in
   Linear_pipe.wrap_reader r
+
+let get_all_transitions (conn, _proc, __) key =
+  Coda_worker.Connection.run_exn conn
+    ~f:Coda_worker.functions.get_all_transitions ~arg:key
 
 let root_diff_exn (conn, _proc, _) =
   let%map r =
