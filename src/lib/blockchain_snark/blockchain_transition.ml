@@ -68,8 +68,12 @@ module Keys = struct
     type t = {step: Tick.Verification_key.t; wrap: Tock.Verification_key.t}
 
     let dummy =
-      { step= Dummy_values.Tick.Groth16.verification_key
-      ; wrap= Dummy_values.Tock.Bowe_gabizon18.verification_key }
+      { step=
+          Tick_backend.Verification_key.dummy
+            ~input_size:Coda_base.Transition_system.step_input_size
+      ; wrap=
+          Tock_backend.Bowe_gabizon.Verification_key.dummy
+            ~input_size:Wrap_input.size }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
@@ -239,18 +243,14 @@ module Make (T : Transaction_snark.Verification.S) = struct
           in
           (verification, {proving with value= ()})
         in
-        let r1cs use_dummy_key =
-          Tock.constraint_system ~exposing:Wrap.input
-            (Wrap.main ~use_dummy_key)
-        in
         Cached.Spec.create ~load ~name:"blockchain-snark wrap keys"
           ~autogen_path:Cache_dir.autogen_path
           ~manual_install_path:Cache_dir.manual_install_path
           ~brew_install_path:Cache_dir.brew_install_path
-          ~digest_input:(fun () ->
-            Tock.R1CS_constraint_system.digest (r1cs true) |> Md5.to_hex )
-          ~create_env:(fun () -> Tock.Keypair.generate (r1cs false))
-          ~input:()
+          ~digest_input:(fun x ->
+            Md5.to_hex (Tock.R1CS_constraint_system.digest (Lazy.force x)) )
+          ~input:(lazy (Tock.constraint_system ~exposing:Wrap.input Wrap.main))
+          ~create_env:(fun x -> Tock.Keypair.generate (Lazy.force x))
       in
       let%map wrap_vk, wrap_pk = Cached.run wrap_cached in
       let location : Location.t =
@@ -274,7 +274,7 @@ let constraint_system_digests () =
     let keys = Transaction_snark.Keys.Verification.dummy
   end)) in
   let module W = M.Wrap_base (struct
-    let verification_key = Dummy_values.Tick.Groth16.verification_key
+    let verification_key = Keys.Verification.dummy.step
   end) in
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in
