@@ -88,6 +88,9 @@ val receipt_chain_database : t -> Receipt_chain_database.t
 
 val wallets : t -> Secrets.Wallets.t
 
+val most_recent_valid_transition :
+  t -> External_transition.t Broadcast_pipe.Reader.t
+
 val top_level_logger : t -> Logger.t
 
 val config : t -> Config.t

@@ -274,6 +274,12 @@ let get_status ~flag t =
     | `None ->
         None
   in
+  let highest_block_length_received =
+    Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
+    @@ Coda_transition.External_transition.consensus_state
+    @@ Pipe_lib.Broadcast_pipe.Reader.peek
+         (Coda_lib.most_recent_valid_transition t)
+  in
   let active_status () =
     let open Participating_state.Let_syntax in
     let%bind ledger = Coda_lib.best_ledger t in
@@ -336,6 +342,7 @@ let get_status ~flag t =
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; blockchain_length
+  ; highest_block_length_received
   ; uptime_secs
   ; ledger_merkle_root
   ; state_hash
