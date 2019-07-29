@@ -1129,8 +1129,8 @@ module Mutations = struct
         (Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger coda
            from)
         ~error:
-          "Couldn't not infer nonce for transaction from specified `sender` \
-           since `sender` is not in the ledger or sent a transaction in  \
+          "Couldn't infer nonce for transaction from specified `sender` since \
+           `sender` is not in the ledger or sent a transaction in  \
            transaction pool."
     in
     let%bind fee =
