@@ -439,8 +439,8 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
       ~doc:
         "NONCE Nonce that you would like to set for your transaction \
          (default: nonce of your account on the best ledger or the successor \
-         of highest value nonce of your sent transaction from the transaction \
-         pool )"
+         of highest value nonce of your sent transactions from the \
+         transaction pool )"
       (optional txn_nonce)
   in
   let flag =

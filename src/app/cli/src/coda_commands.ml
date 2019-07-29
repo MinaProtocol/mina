@@ -117,24 +117,18 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       List.map pooled_transactions
         ~f:(Fn.compose User_command.nonce User_command.forget_check)
     in
-    List.max_elt nonces ~compare:Account.Nonce.compare
+    (* The last nonce gives us the maximum nonce in the transaction pool *)
+    List.last nonces
   in
-  let ledger_nonce =
-    let open Option.Let_syntax in
-    let%map account =
-      Option.join (Participating_state.active (get_account t addr))
-    in
-    account.Account.Poly.nonce
-  in
-  match (txn_pool_nonce, ledger_nonce) with
-  | Some txn_nonce, Some ledger_nonce ->
-      Some Account.Nonce.(Account.Nonce.max (succ txn_nonce) ledger_nonce)
-  | Some txn_nonce, None ->
-      Some txn_nonce
-  | None, Some ledger_nonce ->
-      Some ledger_nonce
-  | None, None ->
-      None
+  match txn_pool_nonce with
+  | Some nonce ->
+      Some (Account.Nonce.succ nonce)
+  | None ->
+      let open Option.Let_syntax in
+      let%map account =
+        Option.join (Participating_state.active (get_account t addr))
+      in
+      account.Account.Poly.nonce
 
 let get_nonce t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
