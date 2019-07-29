@@ -7,13 +7,9 @@ Assuming basic familiarity with OCaml, here's some more info on how it is used i
 
 ## Code Structure
 
----
-
 See the [Repository Structure page](/docs/developers/directory-structure/).
 
 ## Compilation
-
----
 
 The OCaml compiler can target bytecode and native compilation. Our code statically links with some libraries so it can't compile to bytecode. Also our code doesn't play well with the REPL. Dune is our build system. Dune has a concept of folders representing modules in addition to each file representing a module. If the folder has a file with the same name, it's essentially equivalent to `index.js` in Node.
 
@@ -22,8 +18,6 @@ We also have interface files in OCaml -- they have the extension `.mli` which ju
 For the linking step, `dune` uses `ldd` under the hood. You can also use things like `-O3` for optimization. For debugging, you can use `gdb` which isn't fully supported by OCaml but it works. The upcoming release of OCaml (4.08) will be compatible with `gdb`.
 
 ## Documentation
-
----
 
 One difficult issue with learning OCaml is locating and reading documentation for libraries. One library in particular is the `Core` library, which has the following structure:
 
@@ -40,8 +34,6 @@ Instead of using the HTML documentation, a better way is to use editor integrati
 OPAM, which  is the package manager for OCaml. usually ships documentation with libraries. This can be accessed through `merlin`.
 
 ## Extensions
-
----
 
 OCaml has a notion of compiler plugins, known as a ppx. This is just a hook that allows compile time code generation. 
 
@@ -78,8 +70,6 @@ For an extension on a structure or a value, you use the following syntax.
 **TL;DR** Anytime you see `[@ ...]` `[@@ ...]` `[% ...]` `[%% ...]` it's a language extension.
 
 ## Monads
-
----
 
 Functional design patterns that allows you to write computation in a very generic way, that removes the need for boilerplate code. Monads allow us to abstract up to a higher level of computation, while taking care of all the glue for us. In other words, monads are programmable semicolons.
 
@@ -132,8 +122,6 @@ OCaml has a `ppx` that makes writing monads much easier to follow, using the let
 Essentially, this syntax takes the value from the let statement and places it on the left of the bind infix call, and puts the assignment into a lambda.
 
 ## Async
-
----
 
 Under the hood, Async uses Monads however Ivar's are the primitive.  `a' Ivar.t` is essentially a mutex that can only be filled once. Once the value from a computation returns, it then fills the Ivar. The rest of the syntactic sugar takes the Ivar and passes them through `Deferred` monads. 
 
