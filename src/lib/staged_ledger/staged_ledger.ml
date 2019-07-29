@@ -208,7 +208,7 @@ struct
         Or_error.errorf
           !"Error materializing the snarked ledger with hash \
             %{sexp:Frozen_ledger_hash.t} got %{sexp:Frozen_ledger_hash.t}: "
-        expected_target snarked_ledger_hash
+          expected_target snarked_ledger_hash
       else
         match Scan_state.latest_ledger_proof scan_state with
         | None ->
