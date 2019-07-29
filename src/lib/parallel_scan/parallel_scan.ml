@@ -911,6 +911,10 @@ module T = struct
 
       include T
 
+      (*Delete all the completed jobs because
+        1. They are completed
+        2. They are not required to create new jobs anymore
+        3. We are not exposing these jobs for any sort of computation as of now*)
       let with_leaner_trees ({trees; _} as t) =
         let trees =
           Non_empty_list.map trees ~f:(fun tree ->
