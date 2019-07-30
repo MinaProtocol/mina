@@ -1,13 +1,13 @@
 ## Summary
 [summary]: #summary
 
-Moving to a Git Flow based release process with a hardened release branch and nice release cadence.
+Moving to a Git Flow based release process with a hardened release branch and regular release cadence.
 
 ## Motivation
 
 [motivation]: #motivation
 
-We need a nice release process, and it's best to pick a standard rather than reinventing the wheel because there is nice tooling available and resources online to get help.
+We need a regular release process, and it's best to pick a standard rather than reinventing the wheel because there is stable tooling available and resources online to get help.
 
 ## Detailed design
 
@@ -23,13 +23,13 @@ During the period in which the release branch is open, any bugs assigned to you 
 
 ### Schedule
 
-For now, we'll plan on releasing every Monday @ 2pm, starting on 8/5
+For now, we'll plan on releasing every Tuesday @ 2pm, starting on 8/6
 
 #### Next week:
 
-- Monday day, move `master -> develop` and `stable -> master`
+- Tuesday morning, move `master -> develop` and `stable -> master`
     - This also entails fixing whatever tooling we have in place to point to the new branches, and updating the configuration of our documentation so the edit-button points to develop branch
-- Cut the new `release/*` branch on EOD Monday, and have a testnet candidate online by Tuesday
+- Cut the new `release/*` branch on EOD Monday (Tuesday morning), and have a testnet candidate online by Tuesday afternoon
     - This is earlier than "usual" as we haven't tested master in a few weeks
 
 #### Other weeks:
