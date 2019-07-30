@@ -150,6 +150,10 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           return
             (Coda_commands.get_nonce coda pk |> Participating_state.active_exn)
       )
+    ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () pk ->
+          return
+            (Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger
+               coda pk) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
           return (Coda_commands.get_status ~flag coda) )
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
