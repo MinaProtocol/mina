@@ -287,11 +287,14 @@ let verify_receipt =
          | Error e | Ok (Error e) ->
              eprintf "%s" (Error.to_string_hum e) ))
 
-let get_nonce addr port =
+let get_nonce :
+       rpc:(Public_key.Compressed.t, Account.Nonce.t option) Rpc.Rpc.t
+    -> Public_key.t
+    -> int
+    -> (Account.Nonce.t, string) Deferred.Result.t =
+ fun ~rpc addr port ->
   let open Deferred.Let_syntax in
-  match%map
-    dispatch Daemon_rpcs.Get_nonce.rpc (Public_key.compress addr) port
-  with
+  match%map dispatch rpc (Public_key.compress addr) port with
   | Ok (Some n) ->
       Ok n
   | Ok None ->
@@ -307,7 +310,7 @@ let get_nonce_cmd =
   in
   Command.async ~summary:"Get the current nonce for an account"
     (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
-         match%bind get_nonce address port with
+         match%bind get_nonce ~rpc:Daemon_rpcs.Get_nonce.rpc address port with
          | Error e ->
              eprintf "Failed to get nonce: %s\n" e ;
              exit 2
@@ -337,8 +340,8 @@ let status_clear_hist =
            (if performance then `Performance else `None)
            port ))
 
-let get_nonce_exn public_key port =
-  match%bind get_nonce public_key port with
+let get_nonce_exn ~rpc public_key port =
+  match%bind get_nonce ~rpc public_key port with
   | Error e ->
       eprintf "Failed to get nonce %s\n" e ;
       exit 3
@@ -390,7 +393,9 @@ let batch_send_payments =
     let open Deferred.Let_syntax in
     let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
     and infos = get_infos payments_path in
-    let%bind nonce0 = get_nonce_exn keypair.public_key port in
+    let%bind nonce0 =
+      get_nonce_exn ~rpc:Daemon_rpcs.Get_nonce.rpc keypair.public_key port
+    in
     let _, ts =
       List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
           ( Account.Nonce.succ nonce
@@ -433,7 +438,9 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
     flag "nonce"
       ~doc:
         "NONCE Nonce that you would like to set for your transaction \
-         (default: nonce of your account on the best ledger)"
+         (default: nonce of your account on the best ledger or the successor \
+         of highest value nonce of your sent transactions from the \
+         transaction pool )"
       (optional txn_nonce)
   in
   let flag =
@@ -451,7 +458,8 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            | Some nonce ->
                return nonce
            | None ->
-               get_nonce_exn sender_kp.public_key port
+               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
+                 sender_kp.public_key port
          in
          let fee =
            Option.value ~default:Cli_lib.Fee.default_transaction fee_opt
