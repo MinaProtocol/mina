@@ -57,6 +57,8 @@ module type External_transition_base_intf = sig
 
   val staged_ledger_diff : t -> staged_ledger_diff
 
+  val state_hash : t -> State_hash.t
+
   val parent_hash : t -> State_hash.t
 
   val consensus_state : t -> Consensus.Data.Consensus_state.Value.t

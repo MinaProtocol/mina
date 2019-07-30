@@ -233,11 +233,11 @@ end) :
         ->
           hash_root_data (hash, scan_state, pending_coinbase) acc
       | Add_transition {With_hash.hash; _} ->
-          Hash.merge acc (State_hash.to_bytes hash)
+          Hash.merge acc (State_hash.raw_hash_bytes hash)
       | Remove_transitions removed_transitions ->
           List.fold removed_transitions ~init:acc
             ~f:(fun acc_hash transition ->
-              Hash.merge acc_hash (State_hash.to_bytes transition) )
+              Hash.merge acc_hash (State_hash.raw_hash_bytes transition) )
       | Update_root
           { Root.Poly.root= new_hash
           ; scan_state= new_scan_state

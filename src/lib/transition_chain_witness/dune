@@ -1,0 +1,5 @@
+(library
+  (name transition_chain_witness)
+  (public_name transition_chain_witness)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries async_kernel core_kernel coda_intf coda_base transition_frontier consensus merkle_list))

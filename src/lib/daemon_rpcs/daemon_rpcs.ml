@@ -58,7 +58,9 @@ module Types = struct
         { get_staged_ledger_aux: Perf_histograms.Report.t option Rpc_pair.t
         ; answer_sync_ledger_query: Perf_histograms.Report.t option Rpc_pair.t
         ; get_ancestry: Perf_histograms.Report.t option Rpc_pair.t
-        ; transition_catchup: Perf_histograms.Report.t option Rpc_pair.t }
+        ; get_transition_chain_witness:
+            Perf_histograms.Report.t option Rpc_pair.t
+        ; get_transition_chain: Perf_histograms.Report.t option Rpc_pair.t }
       [@@deriving to_yojson, bin_io, fields]
 
       let to_text s =
@@ -85,8 +87,10 @@ module Types = struct
             ~answer_sync_ledger_query:(fun acc x ->
               add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc )
             ~get_ancestry:(fun acc x -> add_rpcs ~name:"Get Ancestry" (f x) acc)
-            ~transition_catchup:(fun acc x ->
-              add_rpcs ~name:"Transition Catchup" (f x) acc )
+            ~get_transition_chain_witness:(fun acc x ->
+              add_rpcs ~name:"Get transition chain witness" (f x) acc )
+            ~get_transition_chain:(fun acc x ->
+              add_rpcs ~name:"Get transition chain" (f x) acc )
           |> List.rev
         in
         digest_entries ~title:"RPCs" entries
@@ -411,6 +415,18 @@ module Prove_receipt = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Prove_receipt" ~version:0 ~bin_query ~bin_response
+end
+
+module Get_inferred_nonce = struct
+  type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
+
+  type response = Account.Nonce.Stable.Latest.t option [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_inferred_nonce" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Get_nonce = struct
