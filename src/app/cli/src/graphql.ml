@@ -217,7 +217,8 @@ module Types = struct
                ~histograms:(id ~typ:histograms) ~consensus_time_best_tip:string
                ~consensus_time_now:nn_string ~consensus_mechanism:nn_string
                ~consensus_configuration:
-                 (id ~typ:(non_null consensus_configuration)) )
+                 (id ~typ:(non_null consensus_configuration))
+               ~highest_block_length_received:nn_int )
   end
 
   let user_command : (Coda_lib.t, User_command.t option) typ =
