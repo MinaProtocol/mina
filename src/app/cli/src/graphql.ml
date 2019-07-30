@@ -458,7 +458,7 @@ module Types = struct
                  voting for"
               ~args:Arg.[]
               ~resolve:(fun _ {account; _} ->
-                Option.map ~f:Coda_base.State_hash.to_bytes
+                Option.map ~f:Coda_base.State_hash.to_base58_check
                   account.Account.Poly.voting_for )
           ; field "stakingActive" ~typ:(non_null bool)
               ~doc:
