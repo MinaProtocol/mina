@@ -12,6 +12,8 @@ The Coda public testnet beta is live. **Technical skill is not required**, and w
 
 Specifically, we need help in the form of reporting bugs, validating economic assumptions, testing out node infrastructure, and general participation in consensus and compressing the blockchain. Please join the [Discord server](https://bit.ly/CodaDiscord) and checkout the #testnet-general and #testnet-beta channel to get involved. You can also [sign up for the mailing list here](http://bit.ly/TestnetForm) and we'll keep you posted with updates!
 
+Head over to the [testnet landing page](/docs/coda-testnet/) to see how to participate in weekly challenges and get on the testnet leaderboard.
+
 ## Developers
 
 See the [Developers](../developers/) section for details on how to contribute code to the Coda protocol.
