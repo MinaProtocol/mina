@@ -134,7 +134,7 @@ jobs:
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
-        {%- if profile == "testnet_postake_medium_curves" %}
+        {%- if profile in medium_curve_profiles %}
         resource_class: xlarge
         {%- else %}
         resource_class: large
