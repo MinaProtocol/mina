@@ -2,7 +2,6 @@ open Default_backend.Backend
 open Arithmetic_circuit
 open Utils
 open Protocol
-
 module Srs = Srs.Make (Default_backend.Backend)
 
 let%test_unit "test protocol" =

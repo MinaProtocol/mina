@@ -29,7 +29,7 @@ module type Backend_intf = sig
   module Fqe : Fields.Extension_intf with type base = Fq.t
 
   module G1 : Group with type nat := N.t
-    
+
   module G2 : Group with type nat := N.t
 
   module Fq_target : sig

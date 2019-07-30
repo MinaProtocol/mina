@@ -33,9 +33,8 @@ let shift_y poly diff =
   let deg = Bivariate_fr_laurent.deg poly in
   let coeffs = Bivariate_fr_laurent.coeffs poly in
   let rec helper lst =
-    match lst with
-    | [] -> []
-    | hd::tl -> (shift hd diff) :: (helper tl) in
+    match lst with [] -> [] | hd :: tl -> shift hd diff :: helper tl
+  in
   Bivariate_fr_laurent.create deg (helper coeffs)
 
 let eval_on_y y l =
@@ -62,8 +61,7 @@ let eval_on_x x l =
   in
   ff deg coeffs
 
-let eval_on_x_y x y l =
-  Fr_laurent.eval (eval_on_y y l) x
+let eval_on_x_y x y l = Fr_laurent.eval (eval_on_y y l) x
 
 (* each constant coefficient in the univariate poly L becomes an equivalent
    constant poly in Y (as the coefficient of the same X term) *)

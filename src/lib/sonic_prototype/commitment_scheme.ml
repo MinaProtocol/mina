@@ -2,7 +2,6 @@ open Core
 
 module Make_commitment_scheme (Backend : Backend.Backend_intf) = struct
   open Backend
-
   module Srs = Srs.Make (Backend)
   open Srs
 
@@ -26,11 +25,11 @@ module Make_commitment_scheme (Backend : Backend.Backend_intf) = struct
       Fq_target.( * )
         (Pairing.reduced_pairing w h_alpha_x)
         (Pairing.reduced_pairing
-          (G1.( + )
+           (G1.( + )
               (G1.scale G1.one (Fr.to_bigint v))
               (G1.scale w (Fr.to_bigint (Fr.negate z))))
-          h_alpha)
+           h_alpha)
     in
     let second = Pairing.reduced_pairing commitment h in
     Fq_target.equal first second
-  end
+end

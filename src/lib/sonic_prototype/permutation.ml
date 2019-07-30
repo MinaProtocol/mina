@@ -24,23 +24,36 @@ end
 
 let psis_from_psi_sigma psi_sigma sigma =
   let n = List.length sigma in
-  let inv_sigma = List.map (List.sort (List.map2_exn sigma (List.range 1 (n + 1)) ~f:(fun a b -> (a, b))) ~compare:(fun (s1_a, _) (s2_a, _) -> s1_a - s2_a)) ~f:(fun (_, b) -> b) in
-  List.map inv_sigma ~f:(fun j -> (List.nth_exn psi_sigma (j - 1))) (* j s.t. sigma_j = i *)
+  let inv_sigma =
+    List.map
+      (List.sort
+         (List.map2_exn sigma (List.range 1 (n + 1)) ~f:(fun a b -> (a, b)))
+         ~compare:(fun (s1_a, _) (s2_a, _) -> s1_a - s2_a))
+      ~f:(fun (_, b) -> b)
+  in
+  List.map inv_sigma ~f:(fun j -> List.nth_exn psi_sigma (j - 1))
+
+(* j s.t. sigma_j = i *)
 
 let psi_sigma_from_psi_poly psi =
-  let sigma = List.map (Bivariate_fr_laurent.coeffs psi) ~f:(fun c -> Fr_laurent.deg c) in
-  let psi_sigma = List.map (Bivariate_fr_laurent.coeffs psi) ~f:(fun c -> List.hd_exn (Fr_laurent.coeffs c)) in
+  let sigma =
+    List.map (Bivariate_fr_laurent.coeffs psi) ~f:(fun c -> Fr_laurent.deg c)
+  in
+  let psi_sigma =
+    List.map (Bivariate_fr_laurent.coeffs psi) ~f:(fun c ->
+        List.hd_exn (Fr_laurent.coeffs c))
+  in
   let psi = psis_from_psi_sigma psi_sigma sigma in
-  psi, sigma
+  (psi, sigma)
 
 let psi_poly_from_sigma_psi sigma psi =
   let n = List.length sigma in
   Bivariate_fr_laurent.create 1
     (List.map
-        (List.range 1 (n + 1))
-        ~f:(fun i ->
-          let sigma_i = List.nth_exn sigma (i - 1) in
-          Fr_laurent.create sigma_i [List.nth_exn psi (sigma_i - 1)]))
+       (List.range 1 (n + 1))
+       ~f:(fun i ->
+         let sigma_i = List.nth_exn sigma (i - 1) in
+         Fr_laurent.create sigma_i [List.nth_exn psi (sigma_i - 1)]))
 
 let derive srs psi sigma =
   let n = List.length psi in
@@ -88,9 +101,7 @@ let perm_p (srs : Srs.t) y z psi_poly : Perm_proof.t =
   in
   let psi_eval, w = open_poly srs s z (eval_on_y y psi_poly) in
   let v, w_prime = open_poly srs s_prime u (eval_on_y y phi_poly) in
-  let _, q_prime =
-    open_poly srs p2 (Fr.( * ) u y) (Fr_laurent.create 1 psi)
-  in
+  let _, q_prime = open_poly srs p2 (Fr.( * ) u y) (Fr_laurent.create 1 psi) in
   let s_bar_poly_coeffs =
     List.map
       (List.range 1 (n + 1))

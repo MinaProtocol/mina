@@ -2,7 +2,6 @@ open Core
 open Default_backend.Backend
 open Hashtbl
 open Permutation
-
 module Srs = Srs.Make (Default_backend.Backend)
 
 let shuffle lst =
