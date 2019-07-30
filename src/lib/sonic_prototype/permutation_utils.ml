@@ -44,10 +44,18 @@ let convert_to_sigmas_psis poly n =
         (coeffs_list_to_triple deg coeffs) :: parse_coeffs tl in
   let input = parse_coeffs poly_coeffs in
 
-  let as_lists = List.concat (List.map input ~f:(fun (a, b, c) -> [a; b; c])) in
+  let rec pad lst n =
+    if (List.length lst) >= n then lst else
+    pad (lst @ [((0, Fr.zero), (0, Fr.zero), (0, Fr.zero))]) n in
+  let padded_input = pad input n in
+
+  List.iter padded_input ~f:(fun ((a, b), (c, d), (e, f)) -> Printf.printf "((%d, %s), (%d, %s), (%d, %s))\n" a (Fr.to_string b) c (Fr.to_string d) e (Fr.to_string f));
+
+  let as_lists = List.concat (List.map padded_input ~f:(fun (a, b, c) -> [a; b; c])) in
   
   (* remove all the "filler" terms with zero coefficients (added in ) *)
   let nonzero = List.filter as_lists ~f:(fun (_, b) -> (not Fr.(equal b zero))) in
+  List.iter nonzero ~f:(fun (a, b) -> Printf.printf "%d, %s\n" a (Fr.to_string b));
   
   (* list of all the powers j s.t. Y^j has non-zero coefficient (so we can count them) *)
   let all_powers = List.sort (List.map nonzero ~f:(fun (a, _) -> a)) ~compare:( - ) in
@@ -58,7 +66,7 @@ let convert_to_sigmas_psis poly n =
     | [] -> 0, []
     | hd::tl ->
       let count_in_remaining, new_lst = count_remove item tl in
-      if item = hd then 1 + count_in_remaining, new_lst else count_in_remaining, hd::new_lst in\
+      if item = hd then 1 + count_in_remaining, new_lst else count_in_remaining, hd::new_lst in
   
   (* turn list of powers Y^j into counts of how many there *)
   let rec count_all lst =
@@ -87,7 +95,9 @@ let convert_to_sigmas_psis poly n =
     let new_second, remaining2 = if Fr.(equal b2 zero) then ((List.hd_exn remaining1), Fr.zero), (List.tl_exn remaining1) else (b1, b2), remaining1 in
     let new_third, remaining3 = if Fr.(equal c2 zero) then ((List.hd_exn remaining2), Fr.zero), (List.tl_exn remaining2) else (c1, c2), remaining2 in
     (new_first, new_second, new_third) :: (fill_in tl remaining3) in
-  let filled_in = fill_in input all_to_fill_in in
+  let filled_in = fill_in padded_input all_to_fill_in in
+
+  List.iter filled_in ~f:(fun ((a, b), (c, d), (e, f)) -> Printf.printf "((%d, %s), (%d, %s), (%d, %s))\n" a (Fr.to_string b) c (Fr.to_string d) e (Fr.to_string f));
 
   (* all the possible ways to arrange the 3 Y^j powers for a given X^i *)
   let get_options first second third =
@@ -109,6 +119,10 @@ let convert_to_sigmas_psis poly n =
     | hd::tl ->
     let (first, second, third) = hd in
     let options = get_options first second third in
+    Printf.printf "First so far: "; List.iter first_so_far ~f:(fun (a, _) -> Printf.printf "%d, " a); Printf.printf "\n";
+    Printf.printf "Second so far: "; List.iter second_so_far ~f:(fun (a, _) -> Printf.printf "%d, " a); Printf.printf "\n";
+    Printf.printf "Third so far: "; List.iter third_so_far ~f:(fun (a, _) -> Printf.printf "%d, " a); Printf.printf "\n";
+    Printf.printf "First, second, third: "; Printf.printf "%d, %d, %d\n" (fst first) (fst second) (fst third);
     let good_option = List.find_exn options ~f:(fun (f, s, t) -> is_good f s t first_so_far second_so_far third_so_far) in
     let new_first, new_second, new_third = good_option in
     let new_first_so_far = first_so_far @ [new_first] in
@@ -123,9 +137,15 @@ let convert_to_sigmas_psis poly n =
   let psi_1 = List.map f ~f:snd in
   let psi_2 = List.map s ~f:snd in
   let psi_3 = List.map t ~f:snd in
+  Printf.printf "sigma_1: "; List.iter ~f:(Printf.printf "%d, ") sigma_1; Printf.printf "\n";
+  Printf.printf "sigma_2: "; List.iter ~f:(Printf.printf "%d, ") sigma_2; Printf.printf "\n";
+  Printf.printf "sigma_3: "; List.iter ~f:(Printf.printf "%d, ") sigma_3; Printf.printf "\n";
+  Printf.printf "psi_1: "; List.iter ~f:(fun s -> Printf.printf "%s, " (Fr.to_string s)) psi_1; Printf.printf "\n";
+  Printf.printf "psi_2: "; List.iter ~f:(fun s -> Printf.printf "%s, " (Fr.to_string s)) psi_2; Printf.printf "\n";
+  Printf.printf "psi_3: "; List.iter ~f:(fun s -> Printf.printf "%s, " (Fr.to_string s)) psi_3; Printf.printf "\n";
   sigma_1, sigma_2, sigma_3, psi_1, psi_2, psi_3
 
-let%test_unit "convert to sigmas/psis test" =
+(* let%test_unit "convert to sigmas/psis test" =
     let n = 15 in
     let poly = Bivariate_fr_laurent.create 1 [
       Fr_laurent.( + ) (Fr_laurent.create 1 [Fr.of_int 1]) (Fr_laurent.create 7 [Fr.of_int 1]) ;
@@ -150,4 +170,4 @@ let%test_unit "convert to sigmas/psis test" =
     Printf.printf "sigma_3: "; List.iter ~f:(Printf.printf "%d, ") sigma_3; Printf.printf "\n";
     Printf.printf "psi_1: "; List.iter ~f:(fun s -> Printf.printf "%s, " (Fr.to_string s)) psi_1; Printf.printf "\n";
     Printf.printf "psi_2: "; List.iter ~f:(fun s -> Printf.printf "%s, " (Fr.to_string s)) psi_2; Printf.printf "\n";
-    Printf.printf "psi_3: "; List.iter ~f:(fun s -> Printf.printf "%s, " (Fr.to_string s)) psi_3; Printf.printf "\n"
+    Printf.printf "psi_3: "; List.iter ~f:(fun s -> Printf.printf "%s, " (Fr.to_string s)) psi_3; Printf.printf "\n" *)

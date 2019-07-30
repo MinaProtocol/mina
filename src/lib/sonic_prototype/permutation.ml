@@ -1,10 +1,9 @@
 open Core
 open Snarkette
-open Srs
-open Commitment_scheme
 open Utils
 open Grand_product
 open Default_backend.Backend
+open Commitment_scheme
 
 let pair = Pairing.reduced_pairing
 

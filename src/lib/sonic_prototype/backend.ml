@@ -1,6 +1,24 @@
 open Snarkette
 open Laurent
 
+module type Group = sig
+  type t
+
+  type nat
+
+  val zero : t
+
+  val one : t
+
+  val ( * ) : nat -> t -> t
+
+  val ( + ) : t -> t -> t
+
+  val scale : t -> nat -> t
+
+  val scale_plus_minus : t -> nat -> t
+end
+
 module type Backend_intf = sig
   module N : Nat_intf.S
 
@@ -10,25 +28,9 @@ module type Backend_intf = sig
 
   module Fqe : Fields.Extension_intf with type base = Fq.t
 
-  module G1 : sig
-    type t
-
-    val zero : t
-
-    val ( * ) : N.t -> t -> t
-
-    val ( + ) : t -> t -> t
-  end
-
-  module G2 : sig
-    type t
-
-    val zero : t
-
-    val ( * ) : N.t -> t -> t
-
-    val ( + ) : t -> t -> t
-  end
+  module G1 : Group with type nat := N.t
+    
+  module G2 : Group with type nat := N.t
 
   module Fq_target : sig
     include Fields.Degree_2_extension_intf with type base = Fqe.t

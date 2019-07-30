@@ -1,8 +1,7 @@
 open Core
-open Commitment_scheme
-open Srs
 open Grand_product
 open Default_backend.Backend
+open Commitment_scheme
 
 let run_well_formed_test a_nums b_nums =
   let x = Fr.random () in

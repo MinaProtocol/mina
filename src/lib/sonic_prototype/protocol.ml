@@ -1,11 +1,10 @@
 open Core
-open Srs
 open Helped_signature
 open Utils
-open Commitment_scheme
 open Constraints
 open Arithmetic_circuit
 open Default_backend.Backend
+open Commitment_scheme
 
 module Proof = struct
   type t =

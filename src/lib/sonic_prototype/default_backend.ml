@@ -20,6 +20,7 @@ module Backend = struct
       else scale base s
   end
 
+  module Fq = Fq
   module Fqe = Fq3
   module Fq_target = Fq6
   module Fr = Snarkette.Mnt4_80.Fq

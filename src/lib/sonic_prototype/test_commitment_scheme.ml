@@ -1,8 +1,14 @@
 open Utils
-open Commitment_scheme
-open Srs
 open Constraints
 open Arithmetic_circuit
+
+(* module Verifier = struct
+  include Snarky_verifier.Sonic_commitment_scheme.Make (Snark_params.Tock.Pairing)
+end *)
+
+module Commitment_scheme = Commitment_scheme.Make_commitment_scheme (Default_backend.Backend)
+open Commitment_scheme
+
 open Default_backend.Backend
 
 let%test_unit "basic commitment scheme test" =

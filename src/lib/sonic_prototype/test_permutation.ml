@@ -1,8 +1,9 @@
 open Core
-open Srs
 open Default_backend.Backend
 open Hashtbl
 open Permutation
+
+module Srs = Srs.Make (Default_backend.Backend)
 
 let shuffle lst =
   List.sort lst ~compare:(fun a b -> hash (a, 123) - hash (b, 123))

@@ -1,9 +1,10 @@
 open Core
-open Srs
 open Permutation
 open Default_backend.Backend
 open Utils
 open Permutation_utils
+
+module Srs = Srs.Make (Default_backend.Backend)
 
 let shift_s_poly s_poly n =
   (* cancel out (-Y^i -Y^-i)X^i+n terms *)
@@ -50,6 +51,7 @@ let convert_to_psi_polys poly n =
 let sc_p (srs : Srs.t) y z psi_polys =
   let proofs = List.map psi_polys ~f:(fun psi_poly -> perm_p srs y z psi_poly) in
   let psi_evals = List.map proofs ~f:(fun (proof : Perm_proof.t) -> proof.perm_psi_eval) in
+  List.iter ~f:(fun x -> Printf.printf "psi_eval: %s\n" ((Fr.to_string x))) psi_evals;
   let s = List.fold_left ~init:Fr.zero ~f:Fr.( + ) psi_evals in
   (s, proofs)
 
