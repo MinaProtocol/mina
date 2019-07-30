@@ -150,6 +150,13 @@ let replace_proposers keys pks =
     (Keypair.And_compressed_pk.Set.of_list kps) ;
   kps |> List.map ~f:snd
 
+let setup_user_command ~fee ~nonce ~memo ~sender_kp user_command_body =
+  let payload =
+    User_command.Payload.create ~fee ~nonce ~memo ~body:user_command_body
+  in
+  let signed_user_command = User_command.sign sender_kp payload in
+  User_command.forget_check signed_user_command
+
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
   include Receipt.Chain_hash.Stable.V1
