@@ -59,7 +59,7 @@ module Make (Inputs : Inputs_intf) :
         {previous_state_hash; body= state_body_hash}
   end)
 
-  let prove ~frontier state_hash =
+  let prove ?length ~frontier state_hash =
     let open Option.Let_syntax in
     let%map requested_breadcrumb =
       Option.merge
@@ -72,7 +72,7 @@ module Make (Inputs : Inputs_intf) :
       |> With_hash.data |> External_transition.Validated.forget_validation
     in
     let merkle_list =
-      Merkle_list.prove ~context:frontier requested_transition
+      Merkle_list.prove ?length ~context:frontier requested_transition
     in
     let oldest_breadcrumb =
       Option.value ~default:(Transition_frontier.root frontier)

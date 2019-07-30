@@ -160,6 +160,7 @@ module type External_transition_intf = sig
        protocol_state:Protocol_state.Value.t
     -> protocol_state_proof:Proof.t
     -> staged_ledger_diff:staged_ledger_diff
+    -> delta_transition_chain_witness:State_hash.t * State_body_hash.t list
     -> t
 
   val timestamp : t -> Block_time.t

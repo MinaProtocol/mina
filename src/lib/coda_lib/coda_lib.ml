@@ -329,7 +329,9 @@ let create_genesis_frontier (config : Config.t) ~verifier =
     External_transition.Validated.create_unsafe
       (External_transition.create ~protocol_state:genesis_protocol_state
          ~protocol_state_proof:Precomputed_values.base_proof
-         ~staged_ledger_diff:empty_diff)
+         ~staged_ledger_diff:empty_diff
+         ~delta_transition_chain_witness:
+           (Protocol_state.previous_state_hash genesis_protocol_state, []))
   in
   let genesis_ledger = Lazy.force Genesis_ledger.t in
   let ledger_db =

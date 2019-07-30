@@ -39,7 +39,7 @@ module Make (Inputs : Inputs.S) :
   (* TODO: calculate a sensible value from postake consensus arguments *)
   let catchup_timeout_duration =
     Block_time.Span.of_ms
-      (Consensus.Constants.block_window_duration_ms * 2 |> Int64.of_int)
+      (Consensus.Constants.(delta * block_window_duration_ms) |> Int64.of_int)
 
   let cached_transform_deferred_result ~transform_cached ~transform_result
       cached =
