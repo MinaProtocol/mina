@@ -41,4 +41,9 @@ module type S = sig
     Coda_intf.Network_intf
     with type external_transition := External_transition.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+
+  module Transition_chain_witness :
+    Coda_intf.Transition_chain_witness_intf
+    with type transition_frontier := Transition_frontier.t
+     and type external_transition := External_transition.t
 end

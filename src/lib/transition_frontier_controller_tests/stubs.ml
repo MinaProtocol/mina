@@ -460,6 +460,11 @@ struct
     module Transition_frontier = Transition_frontier
   end)
 
+  module Transition_chain_witness = Transition_chain_witness.Make (struct
+    include Transition_frontier_inputs
+    module Transition_frontier = Transition_frontier
+  end)
+
   module Transaction_pool =
     Network_pool.Transaction_pool.Make (Staged_ledger) (Transition_frontier)
 
@@ -554,15 +559,6 @@ struct
       let peer_list = Hash_set.to_list peers in
       List.take (List.permute peer_list) num_peers
 
-    let catchup_transition {ip_table; _} peer state_hash =
-      Deferred.Result.return
-      @@
-      let open Option.Let_syntax in
-      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
-      Sync_handler.transition_catchup ~frontier state_hash
-
-    let mplus ma mb = if Option.is_some ma then ma else mb
-
     let query_peer {ip_table= _; _} _peer _f _r = failwith "..."
 
     let get_staged_ledger_aux_and_pending_coinbases_at_hash {ip_table; _}
@@ -585,6 +581,37 @@ struct
            (let open Option.Let_syntax in
            let%bind frontier = Hashtbl.find ip_table inet_addr in
            Root_prover.prove ~logger ~frontier consensus_state)
+
+    let get_transition_chain_witness {ip_table; _} peer requested_state_hash =
+      return
+      @@ Result.of_option
+           ~error:
+             (Error.of_string "Peer doesn't have the requested transition")
+      @@
+      let open Option.Let_syntax in
+      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
+      Transition_chain_witness.prove ~frontier requested_state_hash
+
+    let get_transition_chain {ip_table; _} peer hashes =
+      return
+      @@ Result.of_option
+           ~error:
+             (Error.of_string
+                "Peer doesn't have the requested chain of transitions")
+      @@
+      let open Option.Let_syntax in
+      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
+      Option.all
+      @@ List.map hashes ~f:(fun hash ->
+             Option.merge
+               (Transition_frontier.find frontier hash)
+               (Transition_frontier.find_in_root_history frontier hash)
+               ~f:Fn.const
+             |> Option.map ~f:(fun breadcrumb ->
+                    Transition_frontier.Breadcrumb.transition_with_hash
+                      breadcrumb
+                    |> With_hash.data
+                    |> External_transition.Validated.forget_validation ) )
 
     let glue_sync_ledger {ip_table; logger; _} query_reader response_writer :
         unit =
