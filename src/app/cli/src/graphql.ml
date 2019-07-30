@@ -174,7 +174,7 @@ module Types = struct
           List.rev
           @@ Rpc_timings.Fields.fold ~init:[] ~get_staged_ledger_aux:fd
                ~answer_sync_ledger_query:fd ~get_ancestry:fd
-               ~transition_catchup:fd )
+               ~get_transition_chain_witness:fd ~get_transition_chain:fd )
 
     module Histograms = Daemon_rpcs.Types.Status.Histograms
 
@@ -458,7 +458,7 @@ module Types = struct
                  voting for"
               ~args:Arg.[]
               ~resolve:(fun _ {account; _} ->
-                Option.map ~f:Coda_base.State_hash.to_bytes
+                Option.map ~f:Coda_base.State_hash.to_base58_check
                   account.Account.Poly.voting_for )
           ; field "stakingActive" ~typ:(non_null bool)
               ~doc:
@@ -1125,10 +1125,14 @@ module Mutations = struct
 
   let parse_user_command_input ~kind coda from to_ fee maybe_memo =
     let open Result.Let_syntax in
-    let%bind sender_account =
+    let%bind sender_nonce =
       Result.of_option
-        Partial_account.(of_pk coda from |> to_full_account)
-        ~error:"Couldn't find the account for specified `sender`."
+        (Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger coda
+           from)
+        ~error:
+          "Couldn't infer nonce for transaction from specified `sender` since \
+           `sender` is not in the ledger or sent a transaction in  \
+           transaction pool."
     in
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee
@@ -1149,7 +1153,7 @@ module Mutations = struct
           result_of_exn User_command_memo.create_by_digesting_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
-    (sender_account, sender_kp, memo, to_, fee)
+    (sender_nonce, sender_kp, memo, to_, fee)
 
   let send_delegation =
     io_field "sendDelegation"
@@ -1159,7 +1163,7 @@ module Mutations = struct
       ~resolve:
         (fun {ctx= coda; _} () (from, to_, fee, maybe_memo, nonce_opt) ->
         let open Deferred.Result.Let_syntax in
-        let%bind sender_account, sender_kp, memo, new_delegate, fee =
+        let%bind sender_nonce, sender_kp, memo, new_delegate, fee =
           Deferred.return
           @@ parse_user_command_input ~kind:"stake delegation" coda from to_
                fee maybe_memo
@@ -1170,7 +1174,7 @@ module Mutations = struct
         in
         let nonce =
           Option.value_map nonce_opt ~f:Account.Nonce.of_uint32
-            ~default:sender_account.nonce
+            ~default:sender_nonce
         in
         build_user_command coda nonce sender_kp memo body fee )
 
@@ -1181,7 +1185,7 @@ module Mutations = struct
       ~resolve:
         (fun {ctx= coda; _} () (from, to_, amount, fee, maybe_memo, nonce_opt) ->
         let open Deferred.Result.Let_syntax in
-        let%bind sender_account, sender_kp, memo, receiver, fee =
+        let%bind sender_nonce, sender_kp, memo, receiver, fee =
           Deferred.return
           @@ parse_user_command_input ~kind:"payment" coda from to_ fee
                maybe_memo
@@ -1192,7 +1196,7 @@ module Mutations = struct
         in
         let nonce =
           Option.value_map nonce_opt ~f:Account.Nonce.of_uint32
-            ~default:sender_account.nonce
+            ~default:sender_nonce
         in
         build_user_command coda nonce sender_kp memo body fee )
 
