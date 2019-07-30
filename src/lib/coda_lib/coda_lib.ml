@@ -591,6 +591,8 @@ let create (config : Config.t) =
                       external_transitions_writer }
             ; wallets
             ; propose_keypairs
-            ; seen_jobs= Work_selector.State.init
+            ; seen_jobs=
+                Work_selector.State.init
+                  ~reassignment_wait:config.work_reassignment_wait
             ; subscriptions
             ; sync_status } ) )
