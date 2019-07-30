@@ -330,6 +330,18 @@ Dgraph seems to work nicely with graphql. It doesn't require serializing and des
 
 JanusGraph is another graph database to consider. We can explicitly mention the relationship of each type of vertex (i.e. 1-to-1, Many-to-many). We can also indicate how each vertex can index their edges, which is useful for optimizing different relationship queries. JanusGraph has its own "functional" graph query language called Gremlin and it has good interoperability with common languages, such as Java, Python and Javascript. However, there are no bindings with OCaml, but we can lauch a Gremlin server and we can communicate with the server using HTTP requests, Graphson, or use it's own untyped DSL written in Groovy.
 
+## Consistency Issues
+
+This design does not address consistency issues that can arise. For example, a client can be offline during sometime and then come online and bootsrap. As a result, we would not be able to fully determine the consensus status of the external_transitions that were in the transition_frontier. Worse, we would not be able to determine which external_transtions became snarked. 
+
+We can have a third-party archived node tell a client the consensus_state of the external_transitions. Another option that we have is that we can create a P2P RPC call where we peers can give us a merkle list proof of a state_hash and all the state_hashes of the blocks on top of the state_hash. The merkle list will be bounded by length K. If the merkle list proof is size K, then the external_transition should be fully confirmed. Otherwise, the external_transition failed. 
+
+We can also have a third-part achrived node tell a client the snarked status of an external_transition. We can also create a heuristic that gives us a probability that an `external_transition` has been snarked. We can introduce a new nonce that indicates how many ledger proofs have been emitted from genesis to a certain external_transition. If the root external_transition emitted `N` ledger proofs, then all the external_transitions that have emitted less than `N` ledgers should have been snarked.
+
+## Making Client Queries on another Process
+
+Previously, we discussed about making queries in the same process and the queries do not fully take advantage of the in-memory datastructures of the daemon. In this section, we will discuss about t
+
 # Rationale and Alternatives
 
 - Makes it easy to perform difficult queries for our protocol
@@ -342,13 +354,6 @@ JanusGraph is another graph database to consider. We can explicitly mention the 
 - We can also stick with the same implementation we have, which is a bit limiting
 - We can use a counter cache to decrease the number of calls that we have to the SQL database
 
-## Consistency Issues
-
-This design does not address consistency issues that can arise. For example, a client can be offline during sometime and then come online and bootsrap. As a result, we would not be able to fully determine the consensus status of the external_transitions that were in the transition_frontier. Worse, we would not be able to determine which external_transtions became snarked. 
-
-We can have a third-party archived node tell a client the consensus_state of the external_transitions. Another option that we have is that we can create a P2P RPC call where we peers can give us a merkle list proof of a state_hash and all the state_hashes of the blocks on top of the state_hash. The merkle list will be bounded by length K. If the merkle list proof is size K, then the external_transition should be fully confirmed. Otherwise, the external_transition failed. 
-
-We can also have a third-part achrived node tell a client the snarked status of an external_transition. We can also create a heuristic that gives us a probability that an `external_transition` has been snarked. We can introduce a new nonce that indicates how many ledger proofs have been emitted from genesis to a certain external_transition. If the root external_transition emitted `N` ledger proofs, then all the external_transitions that have emitted less than `N` ledgers should have been snarked.
 
 # Prior Art
 

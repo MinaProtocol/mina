@@ -1,0 +1,58 @@
+digraph client_process {
+    	subgraph cluster_0 {
+		style=filled;
+		color=lightgrey;
+		node [style=filled,color=white];
+		transition_frontier;
+        transaction_pool;
+		label = "daemon";
+	}
+
+    subgraph cluster_1 {
+		style=filled;
+		color=lightgrey;
+		node [style=filled,color=white];
+
+        subgraph cluster_3 {
+            style=filled;
+            color=white
+            node [style=filled,color=lightgrey];
+            transition_frontier_copy;
+            
+            transaction_pool_copy;
+            in_memory_transition_to_transaction_table;
+            label = "In Memory Cache"
+        }
+		label = "Client";
+
+        subgraph cluster_2 {
+            style=filled;
+            color=white
+            node [style=filled,color=lightgrey];
+            external_transitions;
+            transactions;
+            transition_to_transaction_table;
+            transition_frontier_persistence;
+            label = "Database"
+        }
+
+        
+	}
+
+    // maybe have an account database that tells you the nonce of the transaction so that the 
+    // in_memory_transition_to_transaction_table does not have to make a lot of calls to transition_to_transaction_table
+    
+    transition_frontier_copy -> transition_frontier_persistence [ label="send updates to persistence database" ]
+    transition_frontier_copy -> in_memory_transition_to_transaction_table [ label="Add/delete transactions of\nexternal_transitions" ]
+    
+    {transition_frontier_copy} -> {external_transitions, transactions, transition_to_transaction_table} [color=purple]
+    transition_to_transaction_table -> in_memory_transition_to_transaction_table  [label="Determine if any other state_hashes\nneed to be added to the table\n when a transaction gets added "]
+
+    transaction_pool_copy -> transactions [label="persist all newly added transactions"]
+    transition_frontier -> transition_frontier_copy [ label="send diff" ]
+    transition_frontier_copy -> transition_frontier [ label="return and validate hash" ]
+    transaction_pool -> transaction_pool_copy [ label="send diff of transactions that\nclient is concerned about" ]
+    transaction_pool_copy -> transaction_pool [ label="return and validate hash" ]
+
+
+}
