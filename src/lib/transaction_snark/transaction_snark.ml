@@ -1069,11 +1069,6 @@ struct
       in
       (verification, {proving with value= ()})
     in
-    (* TODO: This constructs essentially the constraint system two times:
-
-       1. For the digest, with the verification keys stubbed out as dummys.
-       1. For the actual keypair, with the verification keys getting the actual values.
-    *)
     Cached.Spec.create ~load ~name:"transaction-snark wrap keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
