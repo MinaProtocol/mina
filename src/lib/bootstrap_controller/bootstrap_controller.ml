@@ -249,8 +249,8 @@ end = struct
     let initial_root_transition =
       External_transition.Validation.lower
         (Transition_frontier.Breadcrumb.transition_with_hash initial_breadcrumb)
-        ( (`Time_received, Truth.True)
-        , (`Proof, Truth.True)
+        ( (`Time_received, Truth.True ())
+        , (`Proof, Truth.True ())
         , (`Frontier_dependencies, Truth.False)
         , (`Staged_ledger_diff, Truth.False) )
     in
@@ -401,8 +401,8 @@ end = struct
       in
       let transition =
         External_transition.Validation.lower transition_with_hash
-          ( (`Time_received, Truth.True)
-          , (`Proof, Truth.True)
+          ( (`Time_received, Truth.True ())
+          , (`Proof, Truth.True ())
           , (`Frontier_dependencies, Truth.False)
           , (`Staged_ledger_diff, Truth.False) )
       in

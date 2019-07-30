@@ -174,8 +174,6 @@ module Make
 
     let fully_invalid = all Truth.False
 
-    let fully_valid = all Truth.True
-
     let wrap t = (t, fully_invalid)
 
     let lift (t, _) = t
@@ -198,7 +196,7 @@ module Make
           , proof
           , frontier_dependencies
           , staged_ledger_diff ) ->
-            ( (`Time_received, Truth.True)
+            ( (`Time_received, Truth.True ())
             , proof
             , frontier_dependencies
             , staged_ledger_diff )
@@ -221,7 +219,7 @@ module Make
           , frontier_dependencies
           , staged_ledger_diff ) ->
             ( time_received
-            , (`Proof, Truth.True)
+            , (`Proof, Truth.True ())
             , frontier_dependencies
             , staged_ledger_diff )
         | _ ->
@@ -244,7 +242,7 @@ module Make
           , staged_ledger_diff ) ->
             ( time_received
             , proof
-            , (`Frontier_dependencies, Truth.True)
+            , (`Frontier_dependencies, Truth.True ())
             , staged_ledger_diff )
         | _ ->
             failwith "why can't this be refuted?"
@@ -267,7 +265,7 @@ module Make
             ( time_received
             , proof
             , frontier_dependencies
-            , (`Staged_ledger_diff, Truth.True) )
+            , (`Staged_ledger_diff, Truth.True ()) )
         | _ ->
             failwith "why can't this be refuted?"
     end

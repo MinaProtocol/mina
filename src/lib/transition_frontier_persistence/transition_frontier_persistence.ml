@@ -156,9 +156,9 @@ module Make (Inputs : Intf.Main_inputs) = struct
     let mostly_validated_external_transition =
       ( With_hash.map ~f:External_transition.Validated.forget_validation
           transition
-      , ( (`Time_received, Truth.True)
-        , (`Proof, Truth.True)
-        , (`Frontier_dependencies, Truth.True)
+      , ( (`Time_received, Truth.True ())
+        , (`Proof, Truth.True ())
+        , (`Frontier_dependencies, Truth.True ())
         , (`Staged_ledger_diff, Truth.False) ) )
     in
     let%bind child_breadcrumb =
