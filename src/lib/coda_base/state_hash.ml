@@ -9,3 +9,7 @@ Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 Base58_check.String_ops.(to_string, of_string)]
 
 let zero = Snark_params.Tick.Pedersen.zero_hash
+
+let raw_hash_bytes = to_bytes
+
+let to_bytes = `Use_to_base58_check_or_raw_hash_bytes
