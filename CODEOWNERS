@@ -105,6 +105,7 @@
 /src/lib/receipt_chain_database_lib/ @johnwu93
 /src/lib/rocksdb/ @psteckler @nholland94
 /src/lib/root_prover/ @johnwu93 @bkase
+/src/lib/transition_chain_witness/ @ghost-not-in-the-shell
 /src/lib/rose_tree/ @bkase @nholland94
 /src/lib/secrets/ @cmr
 /src/lib/sgn/ @deepthiskumar @bkase

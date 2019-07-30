@@ -20,7 +20,11 @@ module Make_intf (Input : Inputs_intf) = struct
   module type S = sig
     val prove : context:Input.context -> Input.value -> Input.proof_elem list
 
-    val verify : init:Input.hash -> Input.proof_elem list -> Input.hash -> bool
+    val verify :
+         init:Input.hash
+      -> Input.proof_elem list
+      -> Input.hash
+      -> Input.hash Non_empty_list.t option
   end
 end
 
@@ -35,6 +39,12 @@ module Make (Input : Inputs_intf) : Make_intf(Input).S = struct
     List.rev (find_path last)
 
   let verify ~init (merkle_list : proof_elem list) underlying_hash =
-    let result_hash = List.fold merkle_list ~init ~f:hash in
-    equal_hash underlying_hash result_hash
+    let hashes =
+      List.fold merkle_list ~init:(Non_empty_list.singleton init)
+        ~f:(fun acc proof_elem ->
+          Non_empty_list.cons (hash (Non_empty_list.head acc) proof_elem) acc
+      )
+    in
+    if equal_hash underlying_hash (Non_empty_list.head hashes) then Some hashes
+    else None
 end
