@@ -150,6 +150,13 @@ let replace_proposers keys pks =
     (Keypair.And_compressed_pk.Set.of_list kps) ;
   kps |> List.map ~f:snd
 
+let setup_user_command ~fee ~nonce ~memo ~sender_kp user_command_body =
+  let payload =
+    User_command.Payload.create ~fee ~nonce ~memo ~body:user_command_body
+  in
+  let signed_user_command = User_command.sign sender_kp payload in
+  User_command.forget_check signed_user_command
+
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
   include Receipt.Chain_hash.Stable.V1
@@ -274,6 +281,12 @@ let get_status ~flag t =
     | `None ->
         None
   in
+  let highest_block_length_received =
+    Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
+    @@ Coda_transition.External_transition.consensus_state
+    @@ Pipe_lib.Broadcast_pipe.Reader.peek
+         (Coda_lib.most_recent_valid_transition t)
+  in
   let active_status () =
     let open Participating_state.Let_syntax in
     let%bind ledger = Coda_lib.best_ledger t in
@@ -334,6 +347,7 @@ let get_status ~flag t =
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; blockchain_length
+  ; highest_block_length_received
   ; uptime_secs
   ; ledger_merkle_root
   ; state_hash

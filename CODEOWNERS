@@ -101,7 +101,6 @@
 /src/lib/rc_pool/ @nholland94 @cmr
 /src/lib/receipt_chain_database_lib/ @johnwu93
 /src/lib/rocksdb/ @psteckler @nholland94
-/src/lib/root_history/ @cmr
 /src/lib/root_prover/ @johnwu93 @bkase
 /src/lib/rose_tree/ @bkase @nholland94
 /src/lib/secrets/ @cmr
