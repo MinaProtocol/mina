@@ -45,6 +45,8 @@ struct
 
   module Record_inst = Record.Make (Now)
 
+  let disable_bans = Record_inst.disable_bans
+
   let create ~db_dir =
     let reader, writer = Strict_pipe.create Strict_pipe.Synchronous in
     { db= Some (Db.create ~directory:db_dir)
