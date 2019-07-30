@@ -116,6 +116,8 @@ module SyncStatus = {
       | `OFFLINE => <Alert kind=`Danger message="Offline" />
       | `SYNCED => <Alert kind=`Success message="Synced" />
       | `BOOTSTRAP => <Alert kind=`Warning message="Syncing" />
+      | `CONNECTING => <Alert kind=`Success message="Connecting" />
+      | `LISTENING => <Alert kind=`Success message="Listening" />
       }
     };
   };
