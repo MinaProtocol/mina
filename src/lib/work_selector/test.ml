@@ -5,10 +5,16 @@ open Currency
 module Make_test (Make_selection_method : Intf.Make_selection_method_intf) =
 struct
   module T = Inputs.Test_inputs
-  module Lib = Work_lib.Make (T)
+
+  module Reassignment = struct
+    let wait_time = 2000
+  end
+
+  module Lib = Work_lib.Make_with_wait (Reassignment) (T)
   module Selection_method = Make_selection_method (T) (Lib)
 
   let gen_staged_ledger =
+    (*Staged_ledger for tests is a list of work specs*)
     Quickcheck.Generator.list
     @@ Snark_work_lib.Work.Single.Spec.gen Int.quickcheck_generator
          Int.quickcheck_generator Fee.gen
@@ -31,6 +37,33 @@ struct
               match stuff with [] -> return () | _ -> go (i + 1) seen
             in
             go 0 Lib.State.init ) )
+
+  let%test_unit "Reassign work after the wait time" =
+    Backtrace.elide := false ;
+    let snark_pool = T.Snark_pool.create () in
+    let fee = Currency.Fee.zero in
+    let send_work sl seen =
+      let rec go seen all_work =
+        let stuff, seen = Selection_method.work ~snark_pool ~fee sl seen in
+        match stuff with
+        | [] ->
+            (all_work, seen)
+        | _ ->
+            go seen (stuff @ all_work)
+      in
+      go seen []
+    in
+    Quickcheck.test gen_staged_ledger ~trials:10 ~f:(fun sl ->
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            let open Deferred.Let_syntax in
+            let work_sent, seen = send_work sl Lib.State.init in
+            (*wait for wait_time after which all the work will be reassigned*)
+            let%map () =
+              Async.after
+                (Time.Span.of_ms (Float.of_int Reassignment.wait_time))
+            in
+            let work_sent_again, _seen = send_work sl seen in
+            assert (List.length work_sent = List.length work_sent_again) ) )
 
   let gen_snark_pool works fee =
     let open Quickcheck.Generator.Let_syntax in

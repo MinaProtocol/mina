@@ -7,7 +7,11 @@
 open Core_kernel
 open Currency
 
-module Make (Inputs : Intf.Inputs_intf) = struct
+module Make_with_wait (Reassignment : sig
+  val wait_time : int (*Wait time in ms*)
+end)
+(Inputs : Intf.Inputs_intf) =
+struct
   module Work_spec = Snark_work_lib.Work.Single.Spec
 
   let statement_pair = function
@@ -19,7 +23,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   module Job_status = struct
     type t = Assigned of Time.t
 
-    let max_age = Time.Span.of_ms (Float.of_int wait_time)
+    let max_age = Time.Span.of_ms (Float.of_int Reassignment.wait_time)
 
     let is_old t ~now =
       match t with
@@ -94,3 +98,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     in
     unseen_jobs
 end
+
+module Make = Make_with_wait (struct
+  let wait_time = wait_time
+end)
