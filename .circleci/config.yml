@@ -46,7 +46,7 @@ jobs:
                   command: cd frontend/website && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && pip install mkdocs && yarn run build
             - run:
                   name: Deploy staging
-                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then yarn run deploy-ci; fi)
+                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "develop" ]; then yarn run deploy-ci; fi)
 
     lint:
         docker:
@@ -590,7 +590,7 @@ workflows:
             - update-branch-protection:
                 filters:
                   branches:
-                    only: master
+                    only: develop
             - tracetool
             - build-wallet
             - build-macos
@@ -617,8 +617,8 @@ workflows:
               filters:
                 branches:
                   only:
-                    - master
-                    - release/beta
+                    - develop
+                    - /release\/.*/
         jobs:
           - test-unit--test_postake_snarkless_medium_curves_unit_test
           - test-unit--dev_medium_curves
