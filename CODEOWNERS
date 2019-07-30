@@ -15,6 +15,9 @@
 /azure-pipelines.yml @jkrauska
 /.circleci @jkrauska @bkase
 
+
+/src/external/ @cmr @bkase @psteckler
+
 /src/app/cli/ @cmr @nholland94 @bkase
 /src/app/kademlia-haskell/ @bkase @enolan
 /src/app/logproc/ @nholland94
