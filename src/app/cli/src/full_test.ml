@@ -18,9 +18,20 @@ proof_level = "full"]
 
 let with_snark = true
 
+let with_check = false
+
+[%%elif
+proof_level = "check"]
+
+let with_snark = false
+
+let with_check = true
+
 [%%else]
 
 let with_snark = false
+
+let with_check = false
 
 [%%endif]
 
@@ -138,6 +149,10 @@ let run_test () : unit Deferred.t =
         `With_public_key
           (Public_key.compress largest_account_keypair.public_key)
       in
+      let fee = Currency.Fee.of_int in
+      let snark_work_fee, transaction_fee =
+        if with_snark then (fee 0, fee 0) else (fee 1, fee 2)
+      in
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~trust_system ~net_config
@@ -149,9 +164,9 @@ let run_test () : unit Deferred.t =
                (Public_key.compress largest_account_keypair.public_key)
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
-             ~time_controller ~receipt_chain_database
-             ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state
-             ~transaction_database ~external_transition_database ())
+             ~time_controller ~receipt_chain_database ~snark_work_fee
+             ~consensus_local_state ~transaction_database
+             ~external_transition_database ())
       in
       Coda_lib.start coda ;
       don't_wait_for
@@ -211,9 +226,9 @@ let run_test () : unit Deferred.t =
       let build_payment amount sender_sk receiver_pk fee =
         trace_recurring_task "build_payment" (fun () ->
             let nonce =
-              Coda_commands.get_nonce coda (pk_of_sk sender_sk)
-              |> Participating_state.active_exn
-              |> Option.value_exn ?here:None ?error:None ?message:None
+              Option.value_exn
+                ( Coda_commands.get_nonce coda (pk_of_sk sender_sk)
+                |> Participating_state.active_exn )
             in
             let payload : User_command.Payload.t =
               User_command.Payload.create ~fee ~nonce
@@ -225,13 +240,12 @@ let run_test () : unit Deferred.t =
       let assert_ok x = assert (Or_error.is_ok x) in
       let test_sending_payment sender_sk receiver_pk =
         let payment =
-          build_payment send_amount sender_sk receiver_pk
-            (Currency.Fee.of_int 0)
+          build_payment send_amount sender_sk receiver_pk transaction_fee
         in
         let prev_sender_balance =
-          Coda_commands.get_balance coda (pk_of_sk sender_sk)
-          |> Participating_state.active_exn
-          |> Option.value_exn ?here:None ?error:None ?message:None
+          Option.value_exn
+            ( Coda_commands.get_balance coda (pk_of_sk sender_sk)
+            |> Participating_state.active_exn )
         in
         let prev_receiver_balance =
           Coda_commands.get_balance coda receiver_pk
@@ -245,8 +259,7 @@ let run_test () : unit Deferred.t =
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
-          build_payment send_amount sender_sk receiver_pk
-            (Currency.Fee.of_int 0)
+          build_payment send_amount sender_sk receiver_pk transaction_fee
         in
         let%bind p2_res =
           Coda_commands.send_user_command coda (payment' :> User_command.t)
@@ -260,11 +273,13 @@ let run_test () : unit Deferred.t =
             ~initial_receiver_balance:prev_receiver_balance receiver_pk
         in
         assert_balance receiver_pk
-          ( Currency.Balance.( + ) prev_receiver_balance send_amount
-          |> Option.value_exn ?here:None ?error:None ?message:None ) ;
+          (Option.value_exn
+             (Currency.Balance.( + ) prev_receiver_balance send_amount)) ;
         assert_balance (pk_of_sk sender_sk)
-          ( Currency.Balance.( - ) prev_sender_balance send_amount
-          |> Option.value_exn ?here:None ?error:None ?message:None )
+          (Option.value_exn
+             (Currency.Balance.( - ) prev_sender_balance
+                (Option.value_exn
+                   (Currency.Amount.add_fee send_amount transaction_fee))))
       in
       let send_payment_update_balance_sheet sender_sk sender_pk receiver_pk
           amount balance_sheet fee =
@@ -375,7 +390,7 @@ let run_test () : unit Deferred.t =
         if with_snark then
           let accounts = List.take other_accounts 2 in
           let%bind blockchain_length' =
-            test_multiple_payments accounts ~txn_count:1 120.
+            test_multiple_payments accounts ~txn_count:2 120.
           in
           (*wait for a block after the ledger_proof is emitted*)
           let%map () =
@@ -388,6 +403,13 @@ let run_test () : unit Deferred.t =
                 |> Float.of_int )
           in
           assert (blockchain_length coda > blockchain_length')
+        else if with_check then
+          let%map _ =
+            test_multiple_payments other_accounts
+              ~txn_count:(List.length other_accounts / 2)
+              7.
+          in
+          ()
         else
           let%bind _ =
             test_multiple_payments other_accounts
