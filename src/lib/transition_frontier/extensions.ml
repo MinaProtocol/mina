@@ -114,26 +114,32 @@ end) :
   module Root_history = struct
     module Queue = Hash_queue.Make (State_hash)
 
-    type t =
-      { history: Breadcrumb.t Queue.t
-      ; capacity: int
-      ; mutable most_recent: Breadcrumb.t option }
+    type t = {history: Breadcrumb.t Queue.t; capacity: int}
 
     let create capacity =
       let history = Queue.create () in
-      {history; capacity; most_recent= None}
+      {history; capacity}
 
     let lookup {history; _} = Queue.lookup history
 
-    let most_recent {most_recent; _} = most_recent
+    let most_recent {history; _} =
+      let open Option.Let_syntax in
+      let%map state_hash, breadcrumb = Queue.dequeue_back_with_key history in
+      Queue.enqueue_back history state_hash breadcrumb |> ignore ;
+      breadcrumb
+
+    let oldest {history; _} =
+      let open Option.Let_syntax in
+      let%map state_hash, breadcrumb = Queue.dequeue_front_with_key history in
+      Queue.enqueue_front history state_hash breadcrumb |> ignore ;
+      breadcrumb
 
     let mem {history; _} = Queue.mem history
 
-    let enqueue ({history; capacity; _} as t) state_hash breadcrumb =
+    let enqueue {history; capacity} state_hash breadcrumb =
       if Queue.length history >= capacity then
         Queue.dequeue_front_exn history |> ignore ;
-      Queue.enqueue_back history state_hash breadcrumb |> ignore ;
-      t.most_recent <- Some breadcrumb
+      Queue.enqueue_back history state_hash breadcrumb |> ignore
 
     let is_empty {history; _} = Queue.is_empty history
   end

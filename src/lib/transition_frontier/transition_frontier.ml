@@ -370,6 +370,9 @@ module Make (Inputs : Inputs_intf) :
   let previous_root t =
     Extensions.Root_history.most_recent t.extensions.root_history
 
+  let oldest_breadcrumb_in_history t =
+    Extensions.Root_history.oldest t.extensions.root_history
+
   let get_path_inclusively_in_root_history t state_hash ~f =
     path_search t state_hash
       ~find:(fun t -> Extensions.Root_history.lookup t.extensions.root_history)
@@ -529,11 +532,6 @@ module Make (Inputs : Inputs_intf) :
     let soon_to_be_root =
       soon_to_be_root_node.breadcrumb |> Breadcrumb.staged_ledger
     in
-    let children =
-      List.map soon_to_be_root_node.successor_hashes ~f:(fun h ->
-          (Hashtbl.find_exn t.table h).breadcrumb |> Breadcrumb.staged_ledger
-          |> Staged_ledger.ledger )
-    in
     let root_ledger = Staged_ledger.ledger root in
     let soon_to_be_root_ledger = Staged_ledger.ledger soon_to_be_root in
     let soon_to_be_root_merkle_root =
@@ -557,7 +555,7 @@ module Make (Inputs : Inputs_intf) :
       soon_to_be_root_node.breadcrumb.transition_with_hash.hash
     in
     Ledger.remove_and_reparent_exn soon_to_be_root_ledger
-      soon_to_be_root_ledger ~children ;
+      soon_to_be_root_ledger ;
     Hashtbl.remove t.table t.root ;
     Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
     t.root <- new_root_hash ;

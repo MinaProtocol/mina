@@ -102,6 +102,34 @@ let get_keys_with_balances t =
       ( string_of_public_key account
       , account.Account.Poly.balance |> Currency.Balance.to_int ) )
 
+let get_inferred_nonce_from_transaction_pool_and_ledger t
+    (addr : Public_key.Compressed.t) =
+  let transaction_pool = Coda_lib.transaction_pool t in
+  let resource_pool =
+    Network_pool.Transaction_pool.resource_pool transaction_pool
+  in
+  let pooled_transactions =
+    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
+      addr
+  in
+  let txn_pool_nonce =
+    let nonces =
+      List.map pooled_transactions
+        ~f:(Fn.compose User_command.nonce User_command.forget_check)
+    in
+    (* The last nonce gives us the maximum nonce in the transaction pool *)
+    List.last nonces
+  in
+  match txn_pool_nonce with
+  | Some nonce ->
+      Some (Account.Nonce.succ nonce)
+  | None ->
+      let open Option.Let_syntax in
+      let%map account =
+        Option.join (Participating_state.active (get_account t addr))
+      in
+      account.Account.Poly.nonce
+
 let get_nonce t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
@@ -149,6 +177,13 @@ let replace_proposers keys pks =
   Coda_lib.replace_propose_keypairs keys
     (Keypair.And_compressed_pk.Set.of_list kps) ;
   kps |> List.map ~f:snd
+
+let setup_user_command ~fee ~nonce ~memo ~sender_kp user_command_body =
+  let payload =
+    User_command.Payload.create ~fee ~nonce ~memo ~body:user_command_body
+  in
+  let signed_user_command = User_command.sign sender_kp payload in
+  User_command.forget_check signed_user_command
 
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
