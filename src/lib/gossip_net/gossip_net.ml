@@ -143,12 +143,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   (* clear disconnect set if peer set is at least this large *)
   let disconnect_clear_threshold = 3
 
-  let create_connection_with_menu peer r w =
-    match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> peer) with
-    | Error exn ->
-        return (Or_error.of_exn exn)
-    | Ok conn ->
-        Versioned_rpc.Connection_with_menu.create conn
+  let to_where_to_connect (t : t) (peer : Peer.t) =
+    Tcp.Where_to_connect.of_host_and_port
+      ~bind_to_address:t.addrs_and_ports.bind_ip
+    @@ { Host_and_port.host= Unix.Inet_addr.to_string peer.host
+       ; port= peer.communication_port }
 
   (* remove peer from set of peers and peers_by_ip
 
@@ -238,41 +237,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let is_unix_errno errno unix_errno =
     Int.equal (Unix.Error.compare errno unix_errno) 0
 
-  let get_socket_reader_writer t peer =
-    (* Create a socket bound to the correct IP, for outgoing connections. *)
-    let socket =
-      let unbound_socket = Async.Socket.(create Type.tcp) in
-      (* Binding with a source port of 0 tells the kernel to pick a free one for
-       us. Because we're binding an address and port before the kernel knows
-       whether this will be a listen socket or an outgoing socket, it won't
-       allocate the same source port twice, even when the destination IP will be
-       different. So we could in very extreme cases run out of ephemeral ports.
-       The IP_BIND_ADDRESS_NO_PORT socket option informs the kernel we're
-       binding the socket to an IP and intending to make an outgoing connection,
-       but it only works on Linux. I think we don't need to worry about it,
-       there are a lot of ephemeral ports and we don't make very many
-       simultaneous connections.
-      *)
-      Async.Socket.bind_inet unbound_socket
-      @@ `Inet (t.addrs_and_ports.bind_ip, 0)
-    in
-    let peer_addr = `Inet (peer.Peer.host, peer.communication_port) in
-    try_with (fun () ->
-        let%map connected_socket = Async.Socket.connect socket peer_addr in
-        let fd = Socket.fd connected_socket in
-        (Reader.create fd, Writer.create fd) )
-
-  let close_connection reader writer =
-    Writer.close writer ~force_close:(Clock.after (sec 30.))
-    >>= fun () -> Reader.close reader
-
-  let collect_errors writer f =
-    let monitor = Writer.monitor writer in
-    ignore (Monitor.detach_and_get_error_stream monitor) ;
-    choose
-      [ choice (Monitor.get_next_error monitor) (fun e -> Error e)
-      ; choice (try_with ~name:"Tcp.collect_errors" f) Fn.id ]
-
   (* see if we can connect to a disconnected peer, every so often *)
   let retry_disconnected_peer t =
     let rec loop () =
@@ -285,25 +249,18 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           let peer =
             List.random_element_exn (Hash_set.to_list t.disconnected_peers)
           in
-          match%bind get_socket_reader_writer t peer with
-          | Ok (reader, writer) -> (
-              let connect () =
-                Rpc.Connection.create reader writer ~connection_state:(fun _ ->
-                    () )
-              in
-              let%bind conn_result = collect_errors writer connect in
-              let%bind () = close_connection reader writer in
-              match conn_result with
-              | Error _ ->
-                  return ()
-              | Ok _ ->
-                  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                    !"Reconnected to a random disconnected peer: %{sexp: \
-                      Peer.t}"
-                    peer ;
-                  unmark_all_disconnected_peers t )
-          | Error _ ->
-              return ()
+          Deferred.ignore
+            (Rpc.Connection.with_client (to_where_to_connect t peer)
+               (fun conn ->
+                 match%bind Versioned_rpc.Connection_with_menu.create conn with
+                 | Ok _conn' ->
+                     Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                       !"Reconnected to a random disconnected peer: %{sexp: \
+                         Peer.t}"
+                       peer ;
+                     unmark_all_disconnected_peers t
+                 | Error _ ->
+                     return () ))
         else return ()
       in
       loop ()
@@ -313,22 +270,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let try_call_rpc t (peer : Peer.t) dispatch query =
     (* use error collection, close connection strategy of Tcp.with_connection *)
     let call () =
-      try_with (fun () ->
-          let%bind reader, writer =
-            get_socket_reader_writer t peer >>| Result.ok_exn
-          in
-          let run_query () =
-            create_connection_with_menu peer reader writer
-            >>=? fun conn -> dispatch conn query
-          in
-          let result = collect_errors writer run_query in
-          Deferred.any
-            [ (result >>| fun (_ : ('a, exn) Result.t) -> ())
-            ; Reader.close_finished reader
-            ; Writer.close_finished writer ]
-          >>= fun () ->
-          close_connection reader writer
-          >>= fun () -> result >>| function Ok v -> v | Error e -> raise e )
+      Rpc.Connection.with_client (to_where_to_connect t peer) (fun conn ->
+          Versioned_rpc.Connection_with_menu.create conn
+          >>=? fun conn' -> dispatch conn' query )
       >>= function
       | Ok (Ok result) ->
           (* call succeeded, result is valid *)
@@ -609,7 +553,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                   "Rejecting connection from banned peer %s"
                   (Socket.Address.Inet.to_string client) ;
-                Reader.close reader >>= fun _ -> Writer.close writer )
+                Deferred.unit )
               else if
                 Option.is_some t.max_concurrent_connections
                 && Hashtbl.length conn_map
@@ -624,7 +568,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                     ; ( "max_connections"
                       , `Int (Option.value_exn t.max_concurrent_connections) )
                     ] ;
-                Reader.close reader >>= fun _ -> Writer.close writer )
+                Deferred.unit )
               else
                 let conn_id = Uuid_unix.create () in
                 Hashtbl.add_exn conn_map ~key:conn_id
