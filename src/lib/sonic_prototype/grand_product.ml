@@ -4,7 +4,7 @@ open Utils
 module Srs = Srs.Make (Default_backend.Backend)
 open Srs
 module Commitment_scheme =
-  Commitment_scheme.Make_commitment_scheme (Default_backend.Backend)
+  Commitment_scheme.Make (Default_backend.Backend)
 open Commitment_scheme
 open Default_backend.Backend
 

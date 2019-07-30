@@ -7,7 +7,7 @@ open Arithmetic_circuit
 end *)
 
 module Commitment_scheme =
-  Commitment_scheme.Make_commitment_scheme (Default_backend.Backend)
+  Commitment_scheme.Make (Default_backend.Backend)
 open Commitment_scheme
 open Default_backend.Backend
 

@@ -1,6 +1,6 @@
 open Core
 
-module Make_commitment_scheme (Backend : Backend.Backend_intf) = struct
+module Make (Backend : Backend.Backend_intf) = struct
   open Backend
   module Srs = Srs.Make (Backend)
   open Srs

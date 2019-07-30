@@ -3,7 +3,7 @@ open Utils
 open Default_backend.Backend
 module Srs = Srs.Make (Default_backend.Backend)
 module Commitment_scheme =
-  Commitment_scheme.Make_commitment_scheme (Default_backend.Backend)
+  Commitment_scheme.Make (Default_backend.Backend)
 open Commitment_scheme
 
 module Hsc_proof = struct
