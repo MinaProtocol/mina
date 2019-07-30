@@ -417,6 +417,18 @@ module Prove_receipt = struct
     Rpc.Rpc.create ~name:"Prove_receipt" ~version:0 ~bin_query ~bin_response
 end
 
+module Get_inferred_nonce = struct
+  type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
+
+  type response = Account.Nonce.Stable.Latest.t option [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_inferred_nonce" ~version:0 ~bin_query
+      ~bin_response
+end
+
 module Get_nonce = struct
   type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
