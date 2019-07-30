@@ -254,9 +254,9 @@ struct
           ~transition:
             (External_transition.Validation.lower
                next_verified_external_transition_with_hash
-               ( (`Time_received, Truth.True)
-               , (`Proof, Truth.True)
-               , (`Frontier_dependencies, Truth.True)
+               ( (`Time_received, Truth.True ())
+               , (`Proof, Truth.True ())
+               , (`Frontier_dependencies, Truth.True ())
                , (`Staged_ledger_diff, Truth.False) ))
           ~sender:None
       with
@@ -756,8 +756,8 @@ struct
         External_transition.Validation.lower
           ( Transition_frontier.find_exn frontier state_hash
           |> Transition_frontier.Breadcrumb.transition_with_hash )
-          ( (`Time_received, Truth.True)
-          , (`Proof, Truth.True)
+          ( (`Time_received, Truth.True ())
+          , (`Proof, Truth.True ())
           , (`Frontier_dependencies, Truth.False)
           , (`Staged_ledger_diff, Truth.False) )
       in

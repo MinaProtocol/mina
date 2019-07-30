@@ -123,8 +123,6 @@ module type External_transition_intf = sig
       (external_transition, State_hash.t) With_hash.t
       * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
 
-    val fully_valid : fully_valid
-
     val fully_invalid : fully_invalid
 
     val wrap :
