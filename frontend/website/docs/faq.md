@@ -6,7 +6,7 @@
 
 #### Do I need any specific hardware?
 
-Currently, you can use a CPU, and we recommend at least a 4-core processor and 8 GB's of RAM.  In the near future though, we may require the use of GPU's
+Currently, a 4-core processor and 8 GB of RAM are the minimum requirements.  In the near future though, GPUs may be required.
 
 #### What about software?
 
@@ -64,9 +64,9 @@ It very likely will. However, it is far less of an issue than it was a few years
 
 #### Does Coda support smart contracts? If so, what smart contracting languages does it support?
 
-Coda does not support smart contracts currently. There are plans to add smart contract functionality, and we will support using any language on top through the use of WASM ([https://webassembly.org/](https://webassembly.org/)).
+Coda does not support smart contracts currently. The development team is looking into smart contract models, and it is on the roadmap for future development.
 
 #### Does this protocol offer secret transactions, like in Zcash?
 
-No, Coda does not natively implement privacy features at the moment. However, privacy is key consideration for cryptocurrencies, and is on the roadmap for the future.
+No, Coda does not natively implement privacy features at the moment. However, privacy is key consideration for cryptocurrencies, and is also on the development roadmap.
 

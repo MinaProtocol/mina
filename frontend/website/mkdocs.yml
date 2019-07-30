@@ -3,7 +3,7 @@ theme:
   name: null
   custom_dir: 'docs-theme/'
 repo_url: https://github.com/codaprotocol/coda/
-edit_uri: edit/master/frontend/website/docs/
+edit_uri: edit/develop/frontend/website/docs/
 nav:
   - Overview: index.md
   - Hello Coda: coda-testnet.md

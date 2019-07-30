@@ -21,7 +21,6 @@ Where:
 - `fee` is the fee to be paid to the network to process the transaction
 - `privkey-path` is the filepath to the private key for your account
 
-<a name="client"></a>
 ## Coda Client
 
 The [client.ml](https://github.com/CodaProtocol/coda/tree/master/src/app/cli/src/client.ml) file defines the CLI command parser for the `coda client` subcommands.
@@ -33,7 +32,6 @@ If you scroll to the bottom of [client.ml](https://github.com/codaprotocol/coda/
 Here we describe the flags this action depends on: `receiver` a [public key](#public-key), a fee, an amount, and a path to your [private key](#private-key). These flag param kinds are defined in [daemon_rpcs.ml](https://github.com/codaprotocol/coda/tree/master/src/lib/daemon_rpcs.ml).
 In the body of `send_payment` we build a payment and send it over to the [daemon](#daemon).
 
-<a name="payment"></a>
 ## Payment
 
 In [payment.mli](https://github.com/codaprotocol/coda/tree/master/src/lib/coda_base/payment.mli), you'll see a couple important things. (1) we break down payments into a [payment payload](#payment-payload) (the part that needs to be [signed](#signature)) and the rest. and (2) you see the type defined in what will seem to be a strange manner, but is a common pattern in our codebase.
@@ -48,12 +46,10 @@ For more see:
 
 Let's dig into the payment payload:
 
-<a name="payment-payload"></a>
 ## Payment payload
 
 Check out [payment_payload.mli](https://github.com/codaprotocol/coda/tree/master/src/lib/coda_base/payment_payload.mli). Recall that a payload is the part of the payment the sender will sign with her private key. We see this is built up out of the receiver [public key](#public-key), [amount](#currency), [fee](#currency), and a [nonce](#account-nonce). Again the payload is SNARKable so it has a `type var`, and other important Snarkable functions (in a future RFC we will put this in a custom [ppx_deriving](#ppx-deriving).
 
-<a name="signature"></a>
 ## Signatures
 
 (TODO: @ihm can you correct any details I mess up here)
@@ -62,24 +58,20 @@ We use [Schnorr signatures](https://en.wikipedia.org/wiki/Schnorr_signature). A 
 
 This is the first time we see heavily functored code, so see [functors](/docs/developers/style-guide/#functors) if you're confused. This is also the first time we see custom SNARK circuit logic, see [custom SNARK circuit logic](/docs/developers/style-guide/#snark-checked) for more.
 
-<a name="private-key"></a>
 ## Private key
 
 In [private_key.ml](https://github.com/codaprotocol/coda/tree/master/src/lib/signature_lib/private_key.ml) we see a private key is a `Tick.Inner_curve.Scalar.t` or a  scalar on an elliptic curve. Let's break it down more precisely: Because we rely on [recursive zkSNARKs](https://eprint.iacr.org/2014/595) we actually have two elliptic curves called `Tick` and `Tock`. Most of our logic happens within `Tick` (TODO: @ihm expand on this). [Schnorr signatures](#signature) demand we use scalars for our private key.
 
-<a name="public-key"></a>
 ## Public key
 
 The public key corresponding to a [private key](#private-key) `p` is just $one^p$ in other words $one*one*one ...{p times}... one$. We can see this in [public_key.ml](https://github.com/codaprotocol/coda/tree/master/src/lib/signature_lib/public_key.ml). Remember group elements are non-zero curve points which is why we also `include Non_zero_curve_point`
 
 Public keys can also be compressed -- see [public_key.mli](https://github.com/codaprotocol/coda/tree/master/src/lib/signature_lib/public_key.mli). A point on an elliptic curve can unambiguously be represented by a single scalar field element and a boolean. This is the representation we use into the [payment payload](#payment-payload) because it's more efficient inside of SNARK circuits.
 
-<a name="currency"></a>
 ## Currency
 
 In [currency.mli](https://github.com/codaprotocol/coda/tree/master/src/lib/currency/currency.mli), we define [nominal types](https://en.wikipedia.org/wiki/Nominal_type_system) for fee, amount, and balance that handles overflow and underflow properly. Everything is backed by 64bit unsigned integers for now. Notice, that we again include SNARK circuit operations under the [Checked](#snark-checked) submodules within each of the types.
 
-<a name="account"></a>
 ## Account
 
 Payments are applied successfully only if certain properties hold of the account of the sender (and the receiver's balance doesn't overflow).
@@ -101,20 +93,17 @@ This is encoded inside the SNARK in [transaction_snark.ml](https://github.com/co
 
 It's captured outside the SNARK here: (TODO: where is this? Staged_ledger somewhere?)
 
-<a name="account-nonce"></a>
 ### Account Nonce
 
 The [account_nonce.mli](https://github.com/codaprotocol/coda/tree/master/src/lib/coda_numbers/account_nonce.mli) is just a [nominal type](https://en.wikipedia.org/wiki/Nominal_type_system) around a natural number. This is used for protection against double-application of payments.
 The account nonce is incremented in the sender's the account whenever a payment is applied.
 
-<a name="receipt-chain-hash"></a>
 ### Receipt Chain Hash
 
 The [receipt.mli](https://github.com/codaprotocol/coda/tree/master/src/lib/coda_base/receipt.mli) chain hash is the top hash of a [merkle list](#merkle-list) of payment payloads. This is used to prove that you actually made a payment to someone. Since Coda doesn't keep payment history, this is how you can prove to someone that your payment went through.
 
 How does it work?
 
-<a name="merkle-list"></a>
 A merkle list is like a [merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) but with one branch. As long as you keep your merkle list hashes, you can prove that any individual piece of data was part of the list if you know for sure what the top hash is.
 
 If it's important to prove your payment went through, you ask the receiver to start recording receipt chain hashs, and hand your payment payload over to the receiver. He can then check the top hash of their receipt chain to see if it includes your payload.
@@ -125,26 +114,22 @@ We've fully described all the components of a `Payment.t`. Congrats on making it
 
 After a break, we'll be ready to dive into the daemon code.
 
-<a name="daemon"></a>
 ## Daemon
 
 The coda daemon is defined inline in [coda.ml](https://github.com/codaprotocol/coda/tree/master/src/app/cli/src/coda.ml). Search for the `daemon` function to see the CLI flags we use there. The daemon is optionally auto-started by the client if it doesn't already exist. We get configuration from a JSON configuration file (try first from `-f`, then from `$XDG_CONFIG_DIR/coda/daemon.json`, then from `/etc/coda/daemon.json`). We do a lot of setup here which leads up to invoking `Coda_main.Coda.Make` and then `Run`ing it. The details of those are described below.
 
 When we have the `Run` module, we can make an instance of the coda daemon at the value level, and set up any background processes and services.
 
-<a name="main"></a>
 ## Main
 
 By the time you're reading this, hopefully we've tamed the beast that is [coda_main.ml](https://github.com/codaprotocol/coda/tree/master/src/app/cli/src/coda_main.ml). Here we wire the system together at the module level. What does this mean? We instantiate all the functors for the different subcomponents of the daemon. Eventually we create something that conforms to `Main_intf` (in this same file).
 
-<a name="run"></a>
 ### Run functor
 
 At the bottom of [coda_main.ml](https://github.com/codaprotocol/coda/tree/master/src/app/cli/src/coda_main.ml), we define a `Run` functor that finally has the other side of the `rpc` call that the client makes to `send_payment`. Run contains the server-side implementations of all the RPC calls the client makes. It also is responsible for logic of setting up any RPC/webservers servers and background processes.
 
 Let's assume we have an instance of `Run.t` already created, and we'll circle back later.
 
-<a name="client-rpc"></a>
 ### Client_rpc
 
 In [daemon_rpcs.ml](https://github.com/codaprotocol/coda/tree/master/src/lib/daemon_rpcs/daemon_rpcs.ml), we define the concrete RPC calls that the client uses to communicate to the daemon. We use [Async](https://opensource.janestreet.com/async/)'s RPC library for this. `Send_payments` defined the RPC call we use to send the payment: the query type is the input -- the payments we want to send -- and the response is the output -- in this case `unit`, because we don't get any meaningful feedback other than "the payment has been enqueued" on success.
@@ -153,7 +138,6 @@ In [daemon_rpcs.ml](https://github.com/codaprotocol/coda/tree/master/src/lib/dae
 
 Back in [coda_main.ml](https://github.com/codaprotocol/coda/tree/master/src/app/cli/src/coda_main.ml), we invoke `send_payment` in [Run](#run), that delegates to `schedule_payment` -- here we enqueue the payment into the [Transaction Pool](#transaction-pool).
 
-<a name="coda-lib"></a>
 ## Coda_lib
 
 To create a `Run` instance we'll need to go to [coda_lib.ml](https://github.com/codaprotocol/coda/tree/master/src/lib/coda_lib/coda_lib.ml) where we wire all subsystems together at the value level. This is in contrast to [coda_main.ml](#main) where we wire all the subsystems together at the module level.
@@ -165,32 +149,26 @@ It's here where we can trace the path of the payment from the transaction pool f
 3. The [network](#network) and the [proposer](#proposer) feed [external transitions](#external-transition) containing information on how to update a [staged-ledger](#staged-ledger) with the new payment buffered to the [ledger builder controller](#ledger-builder-controller)
 4. The [ledger builder controller](#ledger-builder-controller) figures out where this [external transition](#external-transition) fits in it's tree of possible forks. If this happens to extend our "best" path (the state upon which we will propose later) then we do an expensive materialization step to create a [tip](#tip) holding the new [staged ledger](#staged-ledger) and emit this strongest tip over the [network](#network). Healthy clients only forward tips they locally think are the strongest.
 
-<a name="transaction-pool"></a>
 ## Transaction Pool
 
 Open up [transaction_pool.ml](https://github.com/codaprotocol/coda/tree/master/src/lib/transaction_poll/transaction_pool.ml)... TODO
 
-<a name="network"></a>
 ## Network
 
 TODO
 
-<a name="proposer"></a>
 ## Proposer
 
 TODO
 
-<a name="external-transition"></a>
 ## External Transition
 
 TODO
 
-<a name="ledger-builder-controller"></a>
 ## Ledger-builder-controller
 
 TODO
 
-<a name="staged-ledger"></a>
 ## Staged-ledger
 A staged ledger can be regarded as a "Pending accounts database" that has transactions(payments, coinbase, and proof-fees) applied for which there are no snarks available yet.
 A staged ledger consists of the accounts state (what we currently call ledger) and a data structure called [parallel_scan.ml](https://github.com/codaprotocol/coda/tree/master/src/lib/parallel_scan/parallel_scan.ml). It keeps track of all the transactions that need to be snarked (grep for `Available_job.t`) to produce a single transaction snark that certifies a set of transactions. This is exposed as Aux in the staged ledger.
