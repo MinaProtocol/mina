@@ -112,6 +112,8 @@ module Ledger_inner = struct
     include Inputs
     module Base = Any_ledger.M
     module Mask = Mask
+
+    let mask_to_base m = Any_ledger.cast (module Mask.Attached) m
   end)
 
   include Mask.Attached
@@ -151,7 +153,8 @@ module Ledger_inner = struct
     try
       let result = f masked_ledger in
       let (_ : Mask.t) =
-        Maskable.unregister_mask_exn base_ledger masked_ledger
+        Maskable.unregister_mask_exn ~grandchildren:`Recursive base_ledger
+          masked_ledger
       in
       result
     with exn ->
@@ -166,8 +169,8 @@ module Ledger_inner = struct
 
   let unregister_mask_exn t mask = Maskable.unregister_mask_exn (packed t) mask
 
-  let remove_and_reparent_exn t t_as_mask ~children =
-    Maskable.remove_and_reparent_exn (packed t) t_as_mask ~children
+  let remove_and_reparent_exn t t_as_mask =
+    Maskable.remove_and_reparent_exn (packed t) t_as_mask
 
   type unattached_mask = Mask.t
 
