@@ -50,18 +50,15 @@ end) :
 
     type input = unit
 
-    let get_work (breadcrumb : Breadcrumb.t) : Work.t Sequence.t =
+    let get_work (breadcrumb : Breadcrumb.t) : Work.t list =
       let ledger = Inputs.Breadcrumb.staged_ledger breadcrumb in
       let scan_state = Inputs.Staged_ledger.scan_state ledger in
-      let work_to_do =
-        Inputs.Staged_ledger.Scan_state.all_work_to_do scan_state
-      in
-      Or_error.ok_exn work_to_do
+      Inputs.Staged_ledger.Scan_state.all_work_statements scan_state
 
     (** Returns true if this update changed which elements are in the table
     (but not if the same elements exist with a different reference count) *)
     let add_breadcrumb_to_ref_table table breadcrumb : bool =
-      Sequence.fold ~init:false (get_work breadcrumb) ~f:(fun acc work ->
+      List.fold ~init:false (get_work breadcrumb) ~f:(fun acc work ->
           match Work.Table.find table work with
           | Some count ->
               Work.Table.set table ~key:work ~data:(count + 1) ;
@@ -73,7 +70,7 @@ end) :
     (** Returns true if this update changed which elements are in the table
     (but not if the same elements exist with a different reference count) *)
     let remove_breadcrumb_from_ref_table table breadcrumb : bool =
-      Sequence.fold (get_work breadcrumb) ~init:false ~f:(fun acc work ->
+      List.fold (get_work breadcrumb) ~init:false ~f:(fun acc work ->
           match Work.Table.find table work with
           | Some 1 ->
               Work.Table.remove table work ;
