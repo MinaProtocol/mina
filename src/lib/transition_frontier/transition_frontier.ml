@@ -153,8 +153,7 @@ module Make (Inputs : Inputs_intf) :
 
     let parent_hash {transition_with_hash; _} =
       With_hash.data transition_with_hash
-      |> External_transition.Validated.protocol_state
-      |> Protocol_state.previous_state_hash
+      |> External_transition.Validated.parent_hash
 
     let mask = Fn.compose Staged_ledger.ledger staged_ledger
 

@@ -83,7 +83,11 @@ let%test_module "Bootstrap Controller" =
                   , (`Proof, Truth.True ())
                   , (`Frontier_dependencies, Truth.False)
                   , (`Staged_ledger_diff, Truth.False)
-                  , (`Delta_transition_chain_witness, Truth.True) ) )
+                  , ( `Delta_transition_chain_witness
+                    , Truth.True
+                        ( Non_empty_list.singleton
+                        @@ Transition_frontier.Breadcrumb.parent_hash
+                             breadcrumb ) ) ) )
               breadcrumbs
           in
           let envelopes =

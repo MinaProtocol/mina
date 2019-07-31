@@ -251,10 +251,6 @@ end = struct
     let initial_transition =
       Transition_frontier.Breadcrumb.transition_with_hash initial_breadcrumb
     in
-    let previous_state_hash =
-      With_hash.data initial_transition
-      |> External_transition.Validated.parent_hash
-    in
     let initial_root_transition =
       External_transition.Validation.lower initial_transition
         ( (`Time_received, Truth.True ())
@@ -263,7 +259,10 @@ end = struct
         , (`Staged_ledger_diff, Truth.False)
           (* This is a hack, but since we are bootstrapping. I am assuming this would be fine *)
         , ( `Delta_transition_chain_witness
-          , Truth.True (Non_empty_list.singleton previous_state_hash) ) )
+          , Truth.True
+              (Non_empty_list.singleton
+                 (Transition_frontier.Breadcrumb.parent_hash initial_breadcrumb))
+          ) )
     in
     let t =
       { network

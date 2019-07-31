@@ -317,6 +317,8 @@ module type Transition_frontier_breadcrumb_intf = sig
 
   val state_hash : t -> State_hash.t
 
+  val parent_hash : t -> State_hash.t
+
   val display : t -> display
 
   val name : t -> string

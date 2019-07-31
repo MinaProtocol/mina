@@ -101,7 +101,12 @@ let%test_module "Ledger catchup" =
                 ( (`Time_received, Truth.True ())
                 , (`Proof, Truth.True ())
                 , (`Frontier_dependencies, Truth.False)
-                , (`Staged_ledger_diff, Truth.False) )
+                , (`Staged_ledger_diff, Truth.False)
+                , ( `Delta_transition_chain_witness
+                  , Truth.True
+                      ( Non_empty_list.singleton
+                      @@ Transition_frontier.Breadcrumb.parent_hash
+                           best_breadcrumb ) ) )
             in
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
@@ -134,7 +139,12 @@ let%test_module "Ledger catchup" =
                 ( (`Time_received, Truth.True ())
                 , (`Proof, Truth.True ())
                 , (`Frontier_dependencies, Truth.False)
-                , (`Staged_ledger_diff, Truth.False) )
+                , (`Staged_ledger_diff, Truth.False)
+                , ( `Delta_transition_chain_witness
+                  , Truth.True
+                      ( Non_empty_list.singleton
+                      @@ Transition_frontier.Breadcrumb.parent_hash
+                           best_breadcrumb ) ) )
             in
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
@@ -174,7 +184,12 @@ let%test_module "Ledger catchup" =
                  ( (`Time_received, Truth.True ())
                  , (`Proof, Truth.True ())
                  , (`Frontier_dependencies, Truth.False)
-                 , (`Staged_ledger_diff, Truth.False) )
+                 , (`Staged_ledger_diff, Truth.False)
+                 , ( `Delta_transition_chain_witness
+                   , Truth.True
+                       ( Non_empty_list.singleton
+                       @@ Transition_frontier.Breadcrumb.parent_hash
+                            best_breadcrumb ) ) )
              in
              Envelope.Incoming.wrap ~data:transition
                ~sender:Envelope.Sender.Local)
@@ -222,7 +237,12 @@ let%test_module "Ledger catchup" =
                    ( (`Time_received, Truth.True ())
                    , (`Proof, Truth.True ())
                    , (`Frontier_dependencies, Truth.False)
-                   , (`Staged_ledger_diff, Truth.False) )
+                   , (`Staged_ledger_diff, Truth.False)
+                   , ( `Delta_transition_chain_witness
+                     , Truth.True
+                         ( Non_empty_list.singleton
+                         @@ Transition_frontier.Breadcrumb.parent_hash
+                              best_breadcrumb ) ) )
                in
                Envelope.Incoming.wrap ~data:transition
                  ~sender:Envelope.Sender.Local)
@@ -242,7 +262,13 @@ let%test_module "Ledger catchup" =
                    ( (`Time_received, Truth.True ())
                    , (`Proof, Truth.True ())
                    , (`Frontier_dependencies, Truth.False)
-                   , (`Staged_ledger_diff, Truth.False) )
+                   , (`Staged_ledger_diff, Truth.False)
+                   , ( `Delta_transition_chain_witness
+                     , Truth.True
+                         (Non_empty_list.singleton
+                            ( With_hash.data failing_transition
+                            |> External_transition.Validated.parent_hash )) )
+                   )
                in
                Envelope.Incoming.wrap ~data:transition
                  ~sender:Envelope.Sender.Local)
@@ -309,7 +335,13 @@ let%test_module "Ledger catchup" =
                     ( (`Time_received, Truth.True ())
                     , (`Proof, Truth.True ())
                     , (`Frontier_dependencies, Truth.False)
-                    , (`Staged_ledger_diff, Truth.False) )
+                    , (`Staged_ledger_diff, Truth.False)
+                    , ( `Delta_transition_chain_witness
+                      , Truth.True
+                          (Non_empty_list.singleton
+                             ( With_hash.data transition
+                             |> External_transition.Validated.parent_hash )) )
+                    )
                 in
                 Envelope.Incoming.wrap ~data:transition
                   ~sender:Envelope.Sender.Local
