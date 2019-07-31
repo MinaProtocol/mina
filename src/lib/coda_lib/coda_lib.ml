@@ -284,7 +284,8 @@ let request_work t =
         Some staged_ledger
     | `Bootstrapping ->
         Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-          "Could not retrieve staged_ledger due to bootstrapping" ;
+          "Snark-work-request error: Could not retrieve staged_ledger due to \
+           bootstrapping" ;
         None
   in
   let fee = snark_work_fee t in
@@ -611,6 +612,8 @@ let create (config : Config.t) =
                       external_transitions_writer }
             ; wallets
             ; propose_keypairs
-            ; seen_jobs= Work_selector.State.init
+            ; seen_jobs=
+                Work_selector.State.init
+                  ~reassignment_wait:config.work_reassignment_wait
             ; subscriptions
             ; sync_status } ) )
