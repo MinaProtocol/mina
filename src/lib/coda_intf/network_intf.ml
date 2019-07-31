@@ -15,6 +15,8 @@ module type Network_intf = sig
 
   type transaction_pool_diff
 
+  type ban_notification
+
   val states :
        t
     -> (external_transition Envelope.Incoming.t * Block_time.t)
@@ -58,6 +60,9 @@ module type Network_intf = sig
     -> (transaction_snark_scan_state * Ledger_hash.t * Pending_coinbase.t)
        Deferred.Or_error.t
 
+  val ban_notify :
+    t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
+
   val snark_pool_diffs :
     t -> snark_pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
 
@@ -89,6 +94,12 @@ module type Network_intf = sig
   val initial_peers : t -> Host_and_port.t list
 
   val peers_by_ip : t -> Unix.Inet_addr.t -> Network_peer.Peer.t list
+
+  val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
+
+  val banned_peer : ban_notification -> Network_peer.Peer.t
+
+  val banned_until : ban_notification -> Time.t
 
   module Gossip_net : sig
     module Config : Gossip_net.Config_intf

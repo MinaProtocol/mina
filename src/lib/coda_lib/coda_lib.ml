@@ -560,6 +560,18 @@ let create (config : Config.t) =
             (Strict_pipe.transfer
                (Coda_networking.states net)
                external_transitions_writer ~f:ident) ;
+          don't_wait_for
+            (Linear_pipe.iter (Coda_networking.ban_notification_reader net)
+               ~f:(fun notification ->
+                 let peer = Coda_networking.banned_peer notification in
+                 let banned_until =
+                   Coda_networking.banned_until notification
+                 in
+                 (* ignore RPC errors, not critical for notifications *)
+                 let%bind _ =
+                   Coda_networking.ban_notify net peer banned_until
+                 in
+                 Deferred.unit )) ;
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~logger:config.logger
               ~trust_system:config.trust_system

@@ -276,6 +276,53 @@ module Make_rpcs (Inputs : Base_inputs_intf) = struct
       include Register (T)
     end
   end
+
+  module Ban_notify = struct
+    module Master = struct
+      let name = "ban_notify"
+
+      module T = struct
+        (* "master" types, do not change *)
+
+        (* banned until this time *)
+        type query = Core.Time.Stable.V1.t [@@deriving sexp]
+
+        type response = unit
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include Master
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = Core.Time.Stable.V1.t
+        [@@deriving bin_io, sexp, version {rpc}]
+
+        type response = unit [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      include T
+      include Register (T)
+    end
+  end
 end
 
 module Make_message (Inputs : sig
@@ -405,6 +452,10 @@ module Make (Inputs : Inputs_intf) = struct
   type snark_pool_diff = Inputs.Snark_pool_diff.t
 
   type transaction_pool_diff = Inputs.Transaction_pool_diff.t
+
+  type ban_notification = Gossip_net.ban_notification =
+    {banned_peer: Peer.t; banned_until: Time.t}
+  [@@deriving fields]
 
   module Config : Config_intf with type gossip_config := Gossip_net.Config.t =
   struct
@@ -583,6 +634,17 @@ module Make (Inputs : Inputs_intf) = struct
       in
       record_unknown_item result sender action_msg msg_args
     in
+    let ban_notify_rpc conn ~version:_ ban_until =
+      (* the port in `conn' is an ephemeral port, not of interest *)
+      Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
+        "Node banned by peer ($peer) until $ban_until"
+        ~metadata:
+          [ ("peer", `String conn.Host_and_port.host)
+          ; ( "ban_until"
+            , `String (Time.to_string_abs ~zone:Time.Zone.utc ban_until) ) ] ;
+      (* no computation to do; we're just getting notification *)
+      Deferred.unit
+    in
     let implementations =
       List.concat
         [ Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
@@ -594,6 +656,7 @@ module Make (Inputs : Inputs_intf) = struct
         ; Rpcs.Get_transition_chain_witness.implement_multi
             get_transition_chain_witness_rpc
         ; Rpcs.Get_transition_chain.implement_multi get_transition_chain_rpc
+        ; Rpcs.Ban_notify.implement_multi ban_notify_rpc
         ; Consensus.Hooks.Rpcs.implementations ~logger:config.logger
             ~local_state:config.consensus_local_state ]
     in
@@ -694,6 +757,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   let initial_peers t = Gossip_net.initial_peers t.gossip_net
 
+  let ban_notification_reader t =
+    Gossip_net.ban_notification_reader t.gossip_net
+
   let online_status t = t.online_status
 
   let random_peers {gossip_net; _} = Gossip_net.random_peers gossip_net
@@ -732,6 +798,10 @@ module Make (Inputs : Inputs_intf) = struct
           peer
     | Error e ->
         Error e
+
+  let ban_notify t peer banned_until =
+    Gossip_net.query_peer t.gossip_net peer Rpcs.Ban_notify.dispatch_multi
+      banned_until
 
   let query_peer :
          t
