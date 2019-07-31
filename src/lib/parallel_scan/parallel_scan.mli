@@ -65,13 +65,13 @@ end
 module Weight : sig
   module Stable : sig
     module V1 : sig
-      type t = int [@@deriving sexp, bin_io, version]
+      type t = {base: int; merge: int} [@@deriving sexp, bin_io, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t = {base: int; merge: int} [@@deriving sexp]
 end
 
 (**Base Job: Proving new transactions*)
