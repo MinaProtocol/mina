@@ -17,6 +17,18 @@ BONUS: An additional 2000 pts to the first person to complete the challenge, and
 
 **Challenge #3: Join Discord** - 100 pts awarded for introducing yourself in the #testnet-general channel. Name, location and what you’re excited about are all good things to share in order to get the points!
 
+**Challenge #4 (on-going): Community MVP** - Each week, we will recognize the winners of the previous week based on the point values below. We may give out all the awards in a week, or none, or several at each level. The more active the community is, the more points[\*](#disclaimer) we can award in this category.
+
+Gold - 1000 pts - made a major, or on-going contribution to the community throughout the week. A major stand-out!
+
+Silver - 500 pts - always there, always helping, always positive!
+
+**Challenge #5 (on-going): Major and Minor Bug Bounties**
+
+Major - 2000 pts - reported a new daemon crash that wasn’t already on [the known issues list](http://bit.ly/CodaKnownIssues).
+
+Minor - 200 pts - reported a new issue related to minor bugs in the daemon, documentation, or testnet.
+
 ## Leaderboard
 
 You can track the Testnet Points[\*](#disclaimer) and current leaders in [the public leaderboard](http://bit.ly/TestnetBetaLeaderboard).
