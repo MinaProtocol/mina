@@ -7,17 +7,19 @@ type t =
   , Account.key
   , Account.t )
   Sparse_ledger_lib.Sparse_ledger.Poly.Stable.V1.t
-[@@deriving sexp]
+[@@deriving to_yojson, sexp]
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, sexp, version]
+    type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
   end
 
   module Latest = V1
 end
 
 val merkle_root : t -> Ledger_hash.t
+
+val get_exn : t -> int -> Account.t
 
 val path_exn :
   t -> int -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list

@@ -1,10 +1,9 @@
-open Protocols.Coda_transition_frontier
 open Coda_base
 open Async_kernel
 open Pipe_lib
 
 module type Transition_database_schema = sig
-  type external_transition
+  type external_transition_validated
 
   type state_hash
 
@@ -13,7 +12,9 @@ module type Transition_database_schema = sig
   type pending_coinbases
 
   type _ t =
-    | Transition : state_hash -> (external_transition * state_hash list) t
+    | Transition :
+        state_hash
+        -> (external_transition_validated * state_hash list) t
     | Root : (state_hash * scan_state * pending_coinbases) t
 
   include Rocksdb.Serializable.GADT.Key_intf with type 'a t := 'a t
@@ -43,7 +44,8 @@ module type Worker_inputs = sig
   module Transition_storage : sig
     module Schema :
       Transition_database_schema
-      with type external_transition := External_transition.Stable.Latest.t
+      with type external_transition_validated :=
+                  External_transition.Validated.Stable.Latest.t
        and type state_hash := State_hash.Stable.Latest.t
        and type scan_state := Staged_ledger.Scan_state.Stable.Latest.t
        and type pending_coinbases := Pending_coinbase.t
@@ -54,22 +56,18 @@ module type Worker_inputs = sig
   end
 
   module Transition_frontier :
-    Transition_frontier_intf
-    with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
-     and type ledger_database := Ledger.Db.t
+    Coda_intf.Transition_frontier_intf
+    with type external_transition_validated := External_transition.Validated.t
+     and type mostly_validated_external_transition :=
+                ( [`Time_received] * Truth.true_t
+                , [`Proof] * Truth.true_t
+                , [`Frontier_dependencies] * Truth.true_t
+                , [`Staged_ledger_diff] * Truth.false_t )
+                External_transition.Validation.with_transition
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
-     and type masked_ledger := Ledger.Mask.Attached.t
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type consensus_local_state := Consensus.Local_state.t
-     and type user_command := User_command.t
-     and type diff_mutant :=
-                ( External_transition.Stable.Latest.t
-                , State_hash.Stable.Latest.t )
-                With_hash.t
-                Diff_mutant.E.t
-     and module Extensions.Work = Transaction_snark_work.Statement
+     and type verifier := Verifier.t
 end
 
 module type Worker = sig
@@ -98,15 +96,15 @@ module type Main_inputs = sig
   module Make_worker (Inputs : Worker_inputs) : sig
     include
       Worker
-      with type hash := Inputs.Diff_hash.t
-       and type diff := State_hash.t Inputs.Diff_mutant.E.t
+      with type hash := Inputs.Transition_frontier.Diff.Hash.t
+       and type diff := Inputs.Transition_frontier.Diff.Mutant.E.t
        and type transition_storage := Inputs.Transition_storage.t
 
     val handle_diff :
          t
-      -> Inputs.Diff_hash.t
-      -> State_hash.t Inputs.Diff_mutant.E.t
-      -> Inputs.Diff_hash.t Deferred.Or_error.t
+      -> Inputs.Transition_frontier.Diff.Hash.t
+      -> Inputs.Transition_frontier.Diff.Mutant.E.t
+      -> Inputs.Transition_frontier.Diff.Hash.t Deferred.Or_error.t
   end
 end
 
@@ -115,26 +113,25 @@ module type S = sig
 
   type t
 
-  type 'output diff
+  type verifier
 
-  type diff_hash
-
-  type root_snarked_ledger
-
-  type consensus_local_state
-
-  val create : ?directory_name:string -> logger:Logger.t -> unit -> t
+  val create :
+       ?directory_name:string
+    -> logger:Logger.t
+    -> flush_capacity:int
+    -> max_buffer_capacity:int
+    -> unit
+    -> t
 
   val listen_to_frontier_broadcast_pipe :
-       logger:Logger.t
-    -> frontier option Broadcast_pipe.Reader.t
-    -> t
-    -> unit Deferred.t
+    frontier option Broadcast_pipe.Reader.t -> t -> unit Deferred.t
 
   val deserialize :
        directory_name:string
     -> logger:Logger.t
-    -> root_snarked_ledger:root_snarked_ledger
-    -> consensus_local_state:consensus_local_state
+    -> verifier:verifier
+    -> trust_system:Trust_system.t
+    -> root_snarked_ledger:Ledger.Db.t
+    -> consensus_local_state:Consensus.Data.Local_state.t
     -> frontier Deferred.t
 end

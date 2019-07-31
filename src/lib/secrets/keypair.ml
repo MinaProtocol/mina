@@ -18,9 +18,8 @@ let write_exn {Keypair.private_key; public_key} ~(privkey_path : string)
   let privkey_bytes =
     Private_key.to_bigstring private_key |> Bigstring.to_bytes
   in
-  let pubkey_bytes =
-    Public_key.Compressed.to_base64 (Public_key.compress public_key)
-    |> Bytes.of_string
+  let pubkey_string =
+    Public_key.Compressed.to_base58_check (Public_key.compress public_key)
   in
   match%bind
     Secret_file.write ~path:privkey_path ~mkdir:true ~plaintext:privkey_bytes
@@ -32,7 +31,7 @@ let write_exn {Keypair.private_key; public_key} ~(privkey_path : string)
        if the environment changes underneath us, and we won't have nice errors
        in that case. *)
       let%bind pubkey_f = Writer.open_file (privkey_path ^ ".pub") in
-      Writer.write_bytes pubkey_f pubkey_bytes ;
+      Writer.write_line pubkey_f pubkey_string ;
       Writer.close pubkey_f
   | Error e ->
       raise (Error.to_exn e)

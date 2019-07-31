@@ -20,8 +20,6 @@ open Snark_params.Tick
 
 type var = Inner_curve.Scalar.var * Inner_curve.Scalar.var
 
-val to_base64 : t -> string
-
-val of_base64_exn : string -> t
+include Codable.Base58_check_base_intf with type t := t
 
 val dummy : t

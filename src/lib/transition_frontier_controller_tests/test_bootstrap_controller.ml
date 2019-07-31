@@ -25,7 +25,6 @@ module Bootstrap_controller = Bootstrap_controller.Make (struct
   module Root_sync_ledger = Sync_ledger.Db
   module Network = Network
   module Time = Time
-  module Protocol_state_validator = Protocol_state_validator
   module Sync_handler = Sync_handler
   module Root_prover = Root_prover
 end)
@@ -41,7 +40,7 @@ let%test_module "Bootstrap Controller" =
       let logger = Logger.null () in
       let trust_system = Trust_system.null () in
       let network =
-        Network.create ~logger
+        Network.create_stub ~logger
           ~ip_table:(Hashtbl.create (module Unix.Inet_addr))
           ~peers:(Hash_set.create (module Network_peer.Peer) ())
       in
@@ -53,11 +52,10 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.root frontier
             |> Transition_frontier.Breadcrumb.transition_with_hash
             |> With_hash.data
-            |> External_transition.forget_consensus_state_verification
           in
           let bootstrap =
             Bootstrap_controller.For_tests.make_bootstrap ~logger ~trust_system
-              ~genesis_root ~network
+              ~verifier:() ~genesis_root ~network
           in
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger frontier
@@ -67,7 +65,7 @@ let%test_module "Bootstrap Controller" =
           in
           let parent_breadcrumb = Transition_frontier.best_tip frontier in
           let breadcrumbs_gen =
-            gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
+            gen_linear_breadcrumbs ~logger ~trust_system ~size:num_breadcrumbs
               ~accounts_with_secret_keys:Genesis_ledger.accounts
               parent_breadcrumb
             |> Quickcheck.Generator.with_size ~size:num_breadcrumbs
@@ -75,11 +73,16 @@ let%test_module "Bootstrap Controller" =
           let%bind breadcrumbs =
             Deferred.all @@ Quickcheck.random_value breadcrumbs_gen
           in
-          let input_transitions_verified =
+          let input_transitions =
             List.map
-              ~f:
-                (Fn.compose With_hash.data
-                   Transition_frontier.Breadcrumb.transition_with_hash)
+              ~f:(fun breadcrumb ->
+                External_transition.Validation.lower
+                  (Transition_frontier.Breadcrumb.transition_with_hash
+                     breadcrumb)
+                  ( (`Time_received, Truth.True)
+                  , (`Proof, Truth.True)
+                  , (`Frontier_dependencies, Truth.False)
+                  , (`Staged_ledger_diff, Truth.False) ) )
               breadcrumbs
           in
           let envelopes =
@@ -90,7 +93,7 @@ let%test_module "Bootstrap Controller" =
                 Envelope.Incoming.wrap ~data:x
                   ~sender:(Envelope.Sender.Remote Network_peer.Peer.local.host)
                 )
-              input_transitions_verified
+              input_transitions
           in
           let transition_reader, transition_writer =
             Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
@@ -113,15 +116,18 @@ let%test_module "Bootstrap Controller" =
           in
           let () = Pipe_lib.Strict_pipe.Writer.close transition_writer in
           let%map () = run_sync in
-          let saved_transitions_verified =
+          let saved_transitions =
             Bootstrap_controller.For_tests.Transition_cache.data
               transition_graph
-            |> List.map ~f:Envelope.Incoming.data
+            |> List.map ~f:(fun enveloped_transition ->
+                   Envelope.Incoming.data enveloped_transition
+                   |> fst |> With_hash.data )
           in
-          External_transition.Verified.Set.(
+          External_transition.Set.(
             equal
-              (of_list input_transitions_verified)
-              (of_list saved_transitions_verified)) )
+              (of_list
+                 (List.map ~f:(Fn.compose With_hash.data fst) input_transitions))
+              (of_list saved_transitions)) )
 
     let is_syncing = function
       | `Ignored ->
@@ -146,6 +152,7 @@ let%test_module "Bootstrap Controller" =
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
       let num_breadcrumbs = 10 in
       let accounts = Genesis_ledger.accounts in
       Thread_safe.block_on_async_exn (fun () ->
@@ -153,8 +160,8 @@ let%test_module "Bootstrap Controller" =
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
-                   ~accounts_with_secret_keys:accounts)
+                (gen_linear_breadcrumbs ~logger ~trust_system
+                   ~size:num_breadcrumbs ~accounts_with_secret_keys:accounts)
           in
           Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
             ~f:(fun breadcrumb ->
@@ -174,7 +181,8 @@ let%test_module "Bootstrap Controller" =
               let%map actual_staged_ledger =
                 Staged_ledger
                 .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
-                  ~snarked_ledger ~expected_merkle_root ~pending_coinbases
+                  ~logger ~verifier:() ~snarked_ledger ~expected_merkle_root
+                  ~pending_coinbases
                 |> Deferred.Or_error.ok_exn
               in
               assert (
@@ -190,7 +198,8 @@ let%test_module "Bootstrap Controller" =
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~num_breadcrumbs
+            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+              ~num_breadcrumbs
               ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
               ~target_accounts:Genesis_ledger.accounts
           in
@@ -203,10 +212,11 @@ let%test_module "Bootstrap Controller" =
           in
           let%map ( new_frontier
                   , (_ :
-                      External_transition.Verified.t Envelope.Incoming.t list)
-                  ) =
-            Bootstrap_controller.run ~logger ~trust_system ~network
-              ~frontier:syncing_frontier ~ledger_db ~transition_reader
+                      External_transition.with_initial_validation
+                      Envelope.Incoming.t
+                      list) ) =
+            Bootstrap_controller.run ~logger ~trust_system ~verifier:()
+              ~network ~frontier:syncing_frontier ~ledger_db ~transition_reader
           in
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
       )
@@ -227,7 +237,7 @@ let%test_module "Bootstrap Controller" =
       Thread_safe.block_on_async_exn (fun () ->
           let large_peer_accounts = Genesis_ledger.accounts in
           let%bind {me; peers; network} =
-            Network_builder.setup ~source_accounts ~logger
+            Network_builder.setup ~source_accounts ~logger ~trust_system
               [ { num_breadcrumbs= small_peer_num_breadcrumbs
                 ; accounts= small_peer_accounts }
               ; { num_breadcrumbs= large_peer_num_breadcrumbs
@@ -253,10 +263,11 @@ let%test_module "Bootstrap Controller" =
           in
           let%map ( new_frontier
                   , (_ :
-                      External_transition.Verified.t Envelope.Incoming.t list)
-                  ) =
-            Bootstrap_controller.run ~logger ~trust_system ~network
-              ~frontier:me ~ledger_db ~transition_reader
+                      External_transition.with_initial_validation
+                      Envelope.Incoming.t
+                      list) ) =
+            Bootstrap_controller.run ~logger ~trust_system ~verifier:()
+              ~network ~frontier:me ~ledger_db ~transition_reader
           in
           Ledger_hash.equal (root_hash new_frontier)
             (root_hash large_peer.frontier) )
@@ -267,8 +278,8 @@ let%test_module "Bootstrap Controller" =
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer_with_frontier, network =
-            Network_builder.setup_me_and_a_peer ~logger ~num_breadcrumbs
-              ~source_accounts:Genesis_ledger.accounts
+            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+              ~num_breadcrumbs ~source_accounts:Genesis_ledger.accounts
               ~target_accounts:Genesis_ledger.accounts
           in
           let root_sync_ledger =
@@ -286,17 +297,17 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.root syncing_frontier
             |> Transition_frontier.Breadcrumb.transition_with_hash
             |> With_hash.data
-            |> External_transition.forget_consensus_state_verification
           in
           let open Bootstrap_controller.For_tests in
           let bootstrap =
-            make_bootstrap ~logger ~trust_system ~genesis_root ~network
+            make_bootstrap ~logger ~trust_system ~verifier:() ~genesis_root
+              ~network
           in
           let best_transition =
             Transition_frontier.best_tip peer_with_frontier.frontier
             |> Transition_frontier.Breadcrumb.transition_with_hash
             |> With_hash.data
-            |> External_transition.forget_consensus_state_verification
+            |> External_transition.Validated.forget_validation
           in
           let%bind should_sync =
             Bootstrap_controller.For_tests.on_transition bootstrap
@@ -308,7 +319,7 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.root peer_with_frontier.frontier
             |> Transition_frontier.Breadcrumb.transition_with_hash
             |> With_hash.data
-            |> External_transition.forget_consensus_state_verification
+            |> External_transition.Validated.forget_validation
           in
           let%map should_not_sync =
             Bootstrap_controller.For_tests.on_transition bootstrap

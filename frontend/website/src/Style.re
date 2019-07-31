@@ -46,146 +46,137 @@ module Colors = {
   let tealAlpha = a => `rgba((71, 130, 160, a));
 
   let rosebud = `rgb((163, 83, 111));
+  let rosebudAlpha = a => `rgba((163, 83, 111, a));
 
   let blueBlue = `rgb((42, 81, 224));
   let midnight = `rgb((31, 45, 61));
+
+  let india = `rgb((242, 183, 5));
+  let indiaAlpha = a => `rgba((242, 183, 5, a));
+
+  let amber = `rgb((242, 149, 68));
+  let amberAlpha = a => `rgba((242, 149, 68, a));
+
+  let marine = `rgb((51, 104, 151));
+  let marineAlpha = a => `rgba((51, 104, 151, a));
+
+  let jungleAlpha = a => `rgba((47, 172, 70, a));
+  let jungle = jungleAlpha(1.);
 };
 
 module Typeface = {
   open Css;
-  // To prevent "flash of unstyled text" on some browsers (firefox), we need
-  // to do insane things to mitigate it. Even though the CSS working group
-  // created `font-display: block` for this purpose, Firefox chooses to not
-  // follow the standard "wait for 3seconds before showing fallback fonts."
-  //
-  // Instead we can base64 the woff and woff2 fonts and include those directly
-  // in our stylesheets. Now those browsers have no choice but to show us the
-  // font correctly.
-  //
-  // Scafolding code adapted from Bs-css Css.re.
-  module Loader = {
-    let string_of_fontWeight = x =>
-      switch (x) {
-      | `thin => "100"
-      | `extraLight => "200"
-      | `light => "300"
-      | `normal => "400"
-      | `medium => "500"
-      | `semiBold => "600"
-      | `bold => "700"
-      | `extraBold => "800"
-      };
 
-    let genFontFace = (~fontFamily, ~src, ~fontWeight=?, ()) => {
-      let src =
-        src
-        |> List.map(s => {
-             let ext = {
-               let arr = Js.String.split(".", s);
-               arr[Array.length(arr) - 1];
-             };
-             let b64 = Node.Fs.readFileSync("./" ++ s, `base64);
-             "url(\"data:font/"
-             ++ ext
-             ++ ";base64,"
-             ++ b64
-             ++ "\") format(\""
-             ++ ext
-             ++ "\")";
-           })
-        |> String.concat(", ");
+  let cdnUrl = u => url(Links.Cdn.url(u));
 
-      let fontWeight =
-        Belt.Option.mapWithDefault(fontWeight, "", w =>
-          "font-weight: " ++ string_of_fontWeight(w)
-        );
-      let asString = {j|@font-face {
-      font-family: $fontFamily;
-      src: $src;
-      font-display: block;
-      font-style: normal;
-      $(fontWeight);
-  }|j};
+  let weights = [
+    // The weights are intentionally shifted thinner one unit
+    (`thin, "Thin"),
+    (`extraLight, "Thin"),
+    (`light, "ExtraLight"),
+    (`normal, "Light"),
+    (`medium, "Regular"),
+    (`semiBold, "Medium"),
+    (`bold, "SemiBold"),
+    (`extraBold, "Bold"),
+  ];
 
-      asString;
-    };
-
-    let load = () => {
-      let weights = [
-        // The weights are intentionally shifted thinner one unit
-        (`thin, "Thin"),
-        (`extraLight, "Thin"),
-        (`light, "ExtraLight"),
-        (`normal, "Light"),
-        (`medium, "Regular"),
-        (`semiBold, "Medium"),
-        (`bold, "SemiBold"),
-        (`extraBold, "Bold"),
-      ];
-
-      String.concat(
-        "\n",
-        [
-          genFontFace(
-            ~fontFamily="PragmataPro",
+  let load = () => {
+    let () =
+      List.iter(
+        ((weight, name)) =>
+          ignore @@
+          fontFace(
+            ~fontFamily="IBM Plex Sans",
             ~src=[
-              "/static/font/Essential-PragmataPro-Regular.woff2",
-              "/static/font/Essential-PragmataPro-Regular.woff",
+              cdnUrl("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
+              cdnUrl("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
             ],
-            ~fontWeight=`normal,
+            ~fontStyle=`normal,
+            ~fontWeight=weight,
             (),
           ),
-          genFontFace(
+        weights,
+      );
+
+    let _ =
+      fontFace(
+        ~fontFamily="IBM Plex Mono",
+        ~src=[
+          cdnUrl("/static/font/IBMPlexMono-Medium-Latin1.woff2"),
+          cdnUrl("/static/font/IBMPlexMono-Medium-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`semiBold,
+        (),
+      );
+
+    let _ =
+      fontFace(
+        ~fontFamily="IBM Plex Mono",
+        ~src=[
+          cdnUrl("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
+          cdnUrl("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`bold,
+        (),
+      );
+
+    let _ =
+      fontFamily(
+        fontFace(
+          ~fontFamily="IBM Plex Serif",
+          ~src=[
+            cdnUrl("/static/font/IBMPlexSerif-Medium-Latin1.woff2"),
+            cdnUrl("/static/font/IBMPlexSerif-Medium-Latin1.woff"),
+          ],
+          ~fontStyle=`normal,
+          ~fontWeight=`medium,
+          (),
+        ),
+      );
+    ();
+
+    // Workaround to allow the website to be build for dev
+    // without needing the pragmatapro font.
+    // If you have the font asset, it will be used.
+    if (Node.Fs.existsSync(
+          Links.Cdn.localAssetPath(
+            "/static/font/Essential-PragmataPro-Regular.woff2",
+          ),
+        )
+        || Config.isProd) {
+      let _ =
+        fontFamily(
+          fontFace(
             ~fontFamily="PragmataPro",
             ~src=[
-              "/static/font/PragmataPro-Bold.woff2",
-              "/static/font/PragmataPro-Bold.woff",
+              cdnUrl("/static/font/Essential-PragmataPro-Regular.woff2"),
+              cdnUrl("/static/font/Essential-PragmataPro-Regular.woff"),
             ],
-            ~fontWeight=`bold,
-            (),
-          ),
-          genFontFace(
-            ~fontFamily="IBM Plex Serif",
-            ~src=[
-              "/static/font/IBMPlexSerif-Medium-Latin1.woff2",
-              "/static/font/IBMPlexSerif-Medium-Latin1.woff",
-            ],
+            ~fontStyle=`normal,
             ~fontWeight=`medium,
             (),
           ),
-          genFontFace(
-            ~fontFamily="IBM Plex Mono",
+        );
+
+      let _ =
+        fontFamily(
+          fontFace(
+            ~fontFamily="PragmataPro",
             ~src=[
-              "/static/font/IBMPlexMono-SemiBold-Latin1.woff2",
-              "/static/font/IBMPlexMono-SemiBold-Latin1.woff",
+              cdnUrl("/static/font/Essential-PragmataPro-Bold.woff2"),
+              cdnUrl("/static/font/Essential-PragmataPro-Bold.woff"),
             ],
+            ~fontStyle=`normal,
             ~fontWeight=`bold,
             (),
           ),
-          genFontFace(
-            ~fontFamily="IBM Plex Mono",
-            ~src=[
-              "/static/font/IBMPlexMono-Medium-Latin1.woff2",
-              "/static/font/IBMPlexMono-Medium-Latin1.woff",
-            ],
-            ~fontWeight=`semiBold,
-            (),
-          ),
-          ...List.map(
-               ((weight, name)) =>
-                 genFontFace(
-                   ~fontFamily="IBM Plex Sans",
-                   ~src=[
-                     "/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2",
-                     "/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff",
-                   ],
-                   ~fontWeight=weight,
-                   (),
-                 ),
-               weights,
-             ),
-        ],
-      );
+        );
+      ();
+    } else {
+      print_endline("Warning: building without PragmataPro fonts");
     };
   };
 
@@ -224,11 +215,13 @@ let paddingX = m => Css.[paddingLeft(m), paddingRight(m)];
 /** sets both paddingTop and paddingBottom, as one should */
 let paddingY = m => Css.[paddingTop(m), paddingBottom(m)];
 
+let generateStyles = rules => (Css.style(rules), rules);
+
 module Link = {
   open Css;
 
-  let init =
-    style([
+  let (init, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       color(Colors.hyperlink),
       textDecoration(`none),
@@ -249,8 +242,8 @@ module Link = {
 module H1 = {
   open Css;
 
-  let hero =
-    style([
+  let (hero, heroStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       fontWeight(`light),
       fontSize(`rem(2.25)),
@@ -270,8 +263,8 @@ module H1 = {
 module H2 = {
   open Css;
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       fontWeight(`normal),
       fontSize(`rem(2.25)),
@@ -297,8 +290,8 @@ module Technical = {
 module H3 = {
   open Css;
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       fontSize(`rem(1.25)),
       textAlign(`center),
@@ -358,12 +351,14 @@ module H3 = {
         style([
           color(Colors.white),
           lineHeight(`rem(1.5)),
-          display(`flex),
+          display(`inlineFlex),
           justifyContent(`center),
           alignItems(`center),
-          width(`rem(9.0625)),
+          minWidth(`rem(9.0625)),
           height(`rem(3.)),
           margin(`auto),
+          whiteSpace(`nowrap),
+          padding2(~v=`zero, ~h=`rem(1.)),
         ]),
       ]);
   };
@@ -372,8 +367,8 @@ module H3 = {
 module H4 = {
   open Css;
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       textAlign(`center),
       fontSize(`rem(1.0625)),
@@ -420,8 +415,8 @@ module Body = {
   open Css;
 
   module Technical = {
-    let basic =
-      style([
+    let (basic, basicStyles) =
+      generateStyles([
         Typeface.pragmataPro,
         color(Css.white),
         fontSize(`rem(1.)),
@@ -430,8 +425,8 @@ module Body = {
       ]);
   };
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       color(Colors.metallicBlue),
       fontSize(`rem(1.0)),

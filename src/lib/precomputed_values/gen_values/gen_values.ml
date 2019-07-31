@@ -6,6 +6,7 @@ open Asttypes
 open Parsetree
 open Longident
 open Core
+open Coda_state
 
 (* TODO: refactor to do compile time selection *)
 [%%if
@@ -30,13 +31,14 @@ module Dummy = struct
 
   let base_hash_expr = [%expr Snark_params.Tick.Field.zero]
 
-  let base_proof_expr = [%expr Dummy_values.Tock.GrothMaller17.proof]
+  let base_proof_expr = [%expr Dummy_values.Tock.Bowe_gabizon18.proof]
 end
 
 module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
-  let base_hash = Keys.Step.instance_hash Consensus.genesis_protocol_state.data
+  let base_hash =
+    Keys.Step.instance_hash (Lazy.force Genesis_protocol_state.t).data
 
   let base_hash_expr =
     [%expr
@@ -48,27 +50,37 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
   let wrap hash proof =
     let open Snark_params in
     let module Wrap = Keys.Wrap in
-    Tock.prove
-      (Tock.Keypair.pk Wrap.keys)
-      Wrap.input {Wrap.Prover_state.proof} Wrap.main
-      (Wrap_input.of_tick_field hash)
+    let input = Wrap_input.of_tick_field hash in
+    let proof =
+      Tock.prove
+        (Tock.Keypair.pk Wrap.keys)
+        Wrap.input {Wrap.Prover_state.proof} Wrap.main input
+    in
+    assert (Tock.verify proof (Tock.Keypair.vk Wrap.keys) Wrap.input input) ;
+    proof
 
   let base_proof_expr =
     let open Snark_params in
     let prover_state =
       { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state= Consensus.Protocol_state.negative_one
-      ; update= Consensus.Snark_transition.genesis }
+      ; prev_state= Lazy.force Protocol_state.negative_one
+      ; expected_next_state= None
+      ; update= Lazy.force Snark_transition.genesis }
     in
     let main x =
-      Tick.handle (Keys.Step.main x) Consensus.Prover_state.precomputed_handler
+      Tick.handle (Keys.Step.main x)
+        (Lazy.force Consensus.Data.Prover_state.precomputed_handler)
     in
     let tick =
       Tick.prove
         (Tick.Keypair.pk Keys.Step.keys)
         (Keys.Step.input ()) prover_state main base_hash
     in
+    assert (
+      Tick.verify tick
+        (Tick.Keypair.vk Keys.Step.keys)
+        (Keys.Step.input ()) base_hash ) ;
     let proof = wrap base_hash tick in
     [%expr
       Coda_base.Proof.Stable.V1.t_of_sexp

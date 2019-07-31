@@ -9,7 +9,10 @@ settings.json
 /lib
 /bundle
 /dist
+app.js
 *.exe
 *.cmi
 *.cmx
 *.o
+*.log
+coda-daemon-macos.zip

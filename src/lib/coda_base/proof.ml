@@ -11,20 +11,24 @@ module Stable = struct
       let to_string = Binable.to_string (module Tock_backend.Proof)
 
       let of_string = Binable.of_string (module Tock_backend.Proof)
+
+      let version_byte = Base58_check.Version_bytes.proof
     end
 
     include T
     include Sexpable.Of_stringable (T)
+    module Base58_check = Base58_check.Make (T)
 
-    let to_yojson s = `String (Base64.encode_string (to_string s))
+    let to_yojson s = `String (Base58_check.encode (to_string s))
 
     let of_yojson = function
       | `String s -> (
-        match Base64.decode s with
-        | Ok s ->
-            Ok (of_string s)
-        | Error (`Msg e) ->
-            Error (sprintf "bad base64: %s" e) )
+        try
+          let decoded = Base58_check.decode_exn s in
+          Ok (of_string decoded)
+        with exn ->
+          Error (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn))
+        )
       | _ ->
           Error "expected `String"
 

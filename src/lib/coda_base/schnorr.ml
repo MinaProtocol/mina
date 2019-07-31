@@ -23,9 +23,8 @@ module Message = struct
           User_command_payload.fold t +> group3 ~default:false (of_list nonce))
     in
     Scalar.of_bits
-      (Random_oracle.digest_field d |> Random_oracle.Digest.to_bits)
-
-  let () = assert Insecure.signature_hash_function
+      ( Random_oracle.digest_field d
+      |> Random_oracle.Digest.to_bits |> Array.to_list )
 
   let%snarkydef hash_checked t ~nonce =
     let init =

@@ -62,8 +62,8 @@ module Stable = struct
         ; nonce: Nonce.Stable.V1.t
         ; receipt_chain_hash: Receipt.Chain_hash.t
         ; delegate: Public_key.Compressed.Stable.V1.t
-        ; participated: bool }
-      [@@deriving bin_io, sexp, eq, version {asserted}]
+        ; voting_for: State_hash.t }
+      [@@deriving bin_io, sexp, to_yojson, eq, version {asserted}]
     end
 
     include T
@@ -72,7 +72,7 @@ module Stable = struct
   module Latest = V1
 end
 
-type t = Stable.Latest.t [@@deriving sexp, eq]
+type t = Stable.Latest.t [@@deriving sexp, to_yojson, eq]
 
 let fold
     { Stable.Latest.public_key
@@ -80,10 +80,10 @@ let fold
     ; nonce
     ; receipt_chain_hash
     ; delegate
-    ; participated } =
+    ; voting_for } =
   let open Fold_lib.Fold in
   Public_key.Compressed.fold public_key
   +> Balance.fold balance +> Nonce.fold nonce
   +> Receipt.Chain_hash.fold receipt_chain_hash
   +> Public_key.Compressed.fold delegate
-  +> Fold_lib.Fold.return (participated, false, false)
+  +> State_hash.fold voting_for

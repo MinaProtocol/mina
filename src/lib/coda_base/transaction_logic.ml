@@ -186,9 +186,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let sub_amount balance amount =
     error_opt "insufficient funds" (Balance.sub_amount balance amount)
 
-  let add_fee amount fee =
-    error_opt "add_fee: overflow" (Amount.add_fee amount fee)
-
   let validate_nonces txn_nonce account_nonce =
     if Account.Nonce.equal account_nonce txn_nonce then Or_error.return ()
     else

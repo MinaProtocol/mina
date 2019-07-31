@@ -12,3 +12,5 @@ src/external/ocaml-rocksdb/rocksdb
 /wallet-keys/
 test_logs
 .firebase/
+node_modules/
+.DS_Store

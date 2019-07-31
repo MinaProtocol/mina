@@ -72,6 +72,13 @@ build: git_hooks reformat-diff
 
 dev: codabuilder containerstart build
 
+macos-portable:
+	@rm -rf _build/coda-daemon-macos/
+	@rm -rf _build/coda-daemon-macos.zip
+	@./scripts/macos-portable.sh src/_build/default/app/cli/src/coda.exe src/app/kademlia-haskell/result/bin/kademlia _build/coda-daemon-macos
+	@zip -r _build/coda-daemon-macos.zip _build/coda-daemon-macos/
+	@echo Find coda-daemon-macos.zip inside _build/
+
 ########################################
 ## Lint
 
@@ -79,7 +86,7 @@ reformat: git_hooks
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
 
 reformat-diff:
-	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
+	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
@@ -160,20 +167,19 @@ containerstart: git_hooks
 ########################################
 ## Artifacts
 
+publish-macos:
+	@./scripts/publish-macos.sh
+
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
-	@cp src/_build/coda.deb /tmp/artifacts/.
+	@cp src/_build/coda*.deb /tmp/artifacts/.
+	@cp src/_build/coda_pvkeys_* /tmp/artifacts/.
 
 publish_deb:
 	@./scripts/publish-deb.sh
 
 publish_debs: publish_deb
-
-provingkeys:
-	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH)_$(CODA_CONSENSUS).tar.bz2  /tmp/coda_cache_dir ; \
-	mkdir -p /tmp/artifacts ; \
-	cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
@@ -197,6 +203,14 @@ test-ppx:
 
 web:
 	./scripts/web.sh
+
+
+########################################
+## Benchmarks
+
+benchmarks:
+	cd src && dune build app/benchmarks/main.exe
+
 
 ########################################
 # Coverage testing and output

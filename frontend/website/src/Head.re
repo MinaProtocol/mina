@@ -50,11 +50,6 @@ let make = (~extra, ~filename, _children) => {
       <link
         rel="stylesheet"
         type_="text/css"
-        href={Links.Cdn.url("/fonts.css")}
-      />
-      <link
-        rel="stylesheet"
-        type_="text/css"
         href="https://use.typekit.net/mta7mwm.css"
       />
       <link
@@ -101,12 +96,11 @@ let make = (~extra, ~filename, _children) => {
   gtag('js', new Date());
 
   gtag('config', 'UA-115553548-2');
-  var _gaq = document._gaq || [];
 
   document.addEventListener("DOMContentLoaded", function() {
     Array.from(document.getElementsByTagName('a')).forEach(e => {
       if (e.name != "") e.onclick = (event) => {
-          _gaq.push(['_trackEvent', 'coda', 'click', e.name, '0']);
+          gtag('event', 'link-click', { event_label: e.name });
       }
     })
   });

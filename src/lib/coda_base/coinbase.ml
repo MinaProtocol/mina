@@ -8,7 +8,7 @@ module Stable = struct
         { proposer: Public_key.Compressed.Stable.V1.t
         ; amount: Currency.Amount.Stable.V1.t
         ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
-      [@@deriving sexp, bin_io, compare, eq, version, hash]
+      [@@deriving sexp, bin_io, compare, eq, version, hash, yojson]
     end
 
     include T
@@ -56,7 +56,7 @@ type t = Stable.Latest.t =
   { proposer: Public_key.Compressed.Stable.V1.t
   ; amount: Currency.Amount.Stable.V1.t
   ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
-[@@deriving sexp, compare, eq, hash]
+[@@deriving sexp, compare, eq, hash, yojson]
 
 let is_valid = Stable.Latest.is_valid
 
@@ -92,7 +92,7 @@ let gen =
   let open Quickcheck.Let_syntax in
   let%bind proposer = Public_key.Compressed.gen in
   let%bind amount =
-    Currency.Amount.(gen_incl zero Protocols.Coda_praos.coinbase_amount)
+    Currency.Amount.(gen_incl zero Coda_compile_config.coinbase)
   in
   let fee =
     Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)

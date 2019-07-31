@@ -1,276 +1,244 @@
 open Core_kernel
 open Async_kernel
-open Coda_base
-open Protocols.Coda_pow
+open Coda_state
 open Pipe_lib
-open Protocols.Coda_transition_frontier
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
 
-  module Time : Time_intf
+  module Network : sig
+    type t
+  end
 
   module Transition_frontier :
-    Transition_frontier_intf
-    with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
-     and type ledger_database := Ledger.Db.t
-     and type staged_ledger := Staged_ledger.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
+    Coda_intf.Transition_frontier_intf
+    with type external_transition_validated := External_transition.Validated.t
+     and type mostly_validated_external_transition :=
+                ( [`Time_received] * Truth.true_t
+                , [`Proof] * Truth.true_t
+                , [`Frontier_dependencies] * Truth.true_t
+                , [`Staged_ledger_diff] * Truth.false_t )
+                External_transition.Validation.with_transition
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type masked_ledger := Coda_base.Ledger.t
-     and type consensus_local_state := Consensus.Local_state.t
-     and type user_command := User_command.t
-     and type diff_mutant :=
-                ( External_transition.Stable.Latest.t
-                , State_hash.Stable.Latest.t )
-                With_hash.t
-                Diff_mutant.E.t
-
-  module Network :
-    Network_intf
-    with type peer := Network_peer.Peer.t
-     and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
-     and type consensus_state := Consensus.Consensus_state.Value.t
-     and type state_body_hash := State_body_hash.t
-     and type ledger_hash := Ledger_hash.t
-     and type sync_ledger_query := Sync_ledger.Query.t
-     and type sync_ledger_answer := Sync_ledger.Answer.t
-     and type parallel_scan_state := Staged_ledger.Scan_state.t
-     and type pending_coinbases := Pending_coinbase.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
+     and type staged_ledger := Staged_ledger.t
+     and type verifier := Verifier.t
 
   module Transition_frontier_controller :
-    Transition_frontier_controller_intf
-    with type time_controller := Time.Controller.t
-     and type external_transition_verified := External_transition.Verified.t
+    Coda_intf.Transition_frontier_controller_intf
+    with type external_transition_validated := External_transition.Validated.t
+     and type external_transition_with_initial_validation :=
+                External_transition.with_initial_validation
      and type transition_frontier := Transition_frontier.t
-     and type time := Time.t
-     and type state_hash := State_hash.t
+     and type breadcrumb := Transition_frontier.Breadcrumb.t
      and type network := Network.t
+     and type verifier := Verifier.t
 
   module Bootstrap_controller :
-    Bootstrap_controller_intf
+    Coda_intf.Bootstrap_controller_intf
     with type network := Network.t
+     and type verifier := Verifier.t
      and type transition_frontier := Transition_frontier.t
-     and type external_transition_verified := External_transition.Verified.t
-     and type ledger_db := Ledger.Db.t
-
-  module State_proof :
-    Proof_intf
-    with type input := Consensus.Protocol_state.Value.t
-     and type t := Proof.t
-
-  module Protocol_state_validator :
-    Protocol_state_validator_intf
-    with type time := Time.t
-     and type state_hash := State_hash.t
-     and type trust_system := Trust_system.t
-     and type envelope_sender := Envelope.Sender.t
-     and type external_transition := External_transition.t
-     and type external_transition_proof_verified :=
-                External_transition.Proof_verified.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_with_initial_validation :=
+                External_transition.with_initial_validation
 end
 
-module Make (Inputs : Inputs_intf) :
-  Transition_router_intf
-  with type time_controller := Inputs.Time.Controller.t
-   and type external_transition := Inputs.External_transition.t
-   and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
-   and type transition_frontier := Inputs.Transition_frontier.t
-   and type time := Inputs.Time.t
-   and type state_hash := State_hash.t
-   and type network := Inputs.Network.t
-   and type ledger_db := Ledger.Db.t = struct
+module Make (Inputs : Inputs_intf) = struct
   open Inputs
   module Initial_validator = Initial_validator.Make (Inputs)
 
-  (* HACK: Bootstrap accepts unix_timestamp rather than Time.t *)
-  let to_unix_timestamp recieved_time =
-    recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
-    |> Unix_timestamp.of_int64
-
   let create_bufferred_pipe ?name () =
-    Strict_pipe.create ?name (Buffered (`Capacity 30, `Overflow Crash))
+    Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
-  let kill reader writer =
-    Strict_pipe.Reader.clear reader ;
-    Strict_pipe.Writer.close writer
-
-  let is_transition_for_bootstrap root_state new_transition =
-    let open External_transition.Verified in
+  let is_transition_for_bootstrap ~logger root_state new_transition =
+    let open External_transition in
     let new_state = protocol_state new_transition in
-    Consensus.should_bootstrap
-      ~existing:(External_transition.Protocol_state.consensus_state root_state)
-      ~candidate:(External_transition.Protocol_state.consensus_state new_state)
-
-  let is_bootstrapping = function
-    | `Bootstrap_controller (_, _) ->
-        true
-    | `Transition_frontier_controller (_, _, _) ->
-        false
+    Consensus.Hooks.should_bootstrap
+      ~existing:(Protocol_state.consensus_state root_state)
+      ~candidate:(Protocol_state.consensus_state new_state)
+      ~logger:
+        (Logger.extend logger
+           [ ( "selection_context"
+             , `String "Transition_router.is_transition_for_bootstrap" ) ])
 
   let get_root_state frontier =
     Transition_frontier.root frontier
     |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
-    |> External_transition.of_verified |> External_transition.protocol_state
+    |> External_transition.Validated.protocol_state
 
-  module Broadcaster = struct
-    type 'a t = {mutable var: 'a; f: 'a -> unit}
+  let start_transition_frontier_controller ~logger ~trust_system ~verifier
+      ~network ~time_controller ~proposer_transition_reader
+      ~verified_transition_writer ~clear_reader ~collected_transitions
+      ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Starting Transition Frontier Controller phase" ;
+    let ( transition_frontier_controller_reader
+        , transition_frontier_controller_writer ) =
+      create_bufferred_pipe ~name:"transition frontier controller pipe" ()
+    in
+    transition_reader_ref := transition_frontier_controller_reader ;
+    transition_writer_ref := transition_frontier_controller_writer ;
+    Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
+    let new_verified_transition_reader =
+      Transition_frontier_controller.run ~logger ~trust_system ~verifier
+        ~network ~time_controller ~collected_transitions ~frontier
+        ~network_transition_reader:!transition_reader_ref
+        ~proposer_transition_reader ~clear_reader
+    in
+    Strict_pipe.Reader.iter new_verified_transition_reader
+      ~f:
+        (Fn.compose Deferred.return
+           (Strict_pipe.Writer.write verified_transition_writer))
+    |> don't_wait_for
 
-    let create ~init ~f = {var= init; f}
+  let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
+      ~time_controller ~proposer_transition_reader ~verified_transition_writer
+      ~clear_reader ~transition_reader_ref ~transition_writer_ref ~ledger_db
+      ~frontier_w frontier =
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Starting Bootstrap Controller phase" ;
+    let bootstrap_controller_reader, bootstrap_controller_writer =
+      create_bufferred_pipe ~name:"bootstrap controller pipe" ()
+    in
+    transition_reader_ref := bootstrap_controller_reader ;
+    transition_writer_ref := bootstrap_controller_writer ;
+    Transition_frontier.close frontier ;
+    Broadcast_pipe.Writer.write frontier_w None |> don't_wait_for ;
+    upon
+      (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
+         ~ledger_db ~frontier ~transition_reader:!transition_reader_ref)
+      (fun (new_frontier, collected_transitions) ->
+        Strict_pipe.Writer.kill !transition_writer_ref ;
+        start_transition_frontier_controller ~logger ~trust_system ~verifier
+          ~network ~time_controller ~proposer_transition_reader
+          ~verified_transition_writer ~clear_reader ~collected_transitions
+          ~transition_reader_ref ~transition_writer_ref ~frontier_w
+          new_frontier )
 
-    let broadcast t value =
-      t.var <- value ;
-      t.f value
-
-    let get {var; _} = var
-  end
-
-  let set_bootstrap_phase ~controller_type root_state
-      bootstrap_controller_writer =
-    assert (not @@ is_bootstrapping (Broadcaster.get controller_type)) ;
-    Broadcaster.broadcast controller_type
-      (`Bootstrap_controller (root_state, bootstrap_controller_writer))
-
-  let set_transition_frontier_controller_phase ~controller_type new_frontier
-      reader writer =
-    assert (is_bootstrapping (Broadcaster.get controller_type)) ;
-    Broadcaster.broadcast controller_type
-      (`Transition_frontier_controller (new_frontier, reader, writer))
-
-  let peek_exn p = Broadcast_pipe.Reader.peek p |> Option.value_exn
-
-  let run ~logger ~trust_system ~network ~time_controller
+  let run ~logger ~trust_system ~verifier ~network ~time_controller
       ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
-      ~network_transition_reader ~proposer_transition_reader =
-    let clean_transition_frontier_controller_and_start_bootstrap
-        ~controller_type ~clear_writer ~transition_frontier_controller_reader
-        ~transition_frontier_controller_writer ~old_frontier
-        (`Transition _incoming_transition, `Time_received _tm) =
-      kill transition_frontier_controller_reader
-        transition_frontier_controller_writer ;
-      Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
-      let bootstrap_controller_reader, bootstrap_controller_writer =
-        Strict_pipe.create ~name:"bootstrap controller"
-          (Buffered (`Capacity 10, `Overflow Crash))
-      in
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Bootstrap state: starting." ;
-      let root_state = get_root_state old_frontier in
-      set_bootstrap_phase ~controller_type root_state
-        bootstrap_controller_writer ;
-      Strict_pipe.Writer.write bootstrap_controller_writer
-        ( `Transition _incoming_transition
-        , `Time_received (to_unix_timestamp _tm) ) ;
-      let%map new_frontier, collected_transitions =
-        Bootstrap_controller.run ~logger ~trust_system ~network ~ledger_db
-          ~frontier:old_frontier ~transition_reader:bootstrap_controller_reader
-      in
-      kill bootstrap_controller_reader bootstrap_controller_writer ;
-      ( new_frontier
-      , List.map collected_transitions ~f:(fun transition ->
-            Envelope.Incoming.wrap
-              ~sender:(Envelope.Incoming.sender transition)
-              ~data:
-                ( Envelope.Incoming.data transition
-                |> With_hash.of_data
-                     ~hash_data:
-                       (Fn.compose Consensus.Protocol_state.hash
-                          External_transition.Verified.protocol_state) ) ) )
-    in
-    let start_transition_frontier_controller ~verified_transition_writer
-        ~clear_reader ~collected_transitions frontier =
-      let transition_reader, transition_writer =
-        create_bufferred_pipe ~name:"network transitions" ()
-      in
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Starting Transition Frontier Controller phase" ;
-      let new_verified_transition_reader =
-        Transition_frontier_controller.run ~logger ~trust_system ~network
-          ~time_controller ~collected_transitions ~frontier
-          ~network_transition_reader:transition_reader
-          ~proposer_transition_reader ~clear_reader
-      in
-      Strict_pipe.Reader.iter new_verified_transition_reader
-        ~f:
-          (Fn.compose Deferred.return
-             (Strict_pipe.Writer.write verified_transition_writer))
-      |> don't_wait_for ;
-      (transition_reader, transition_writer)
-    in
+      ~network_transition_reader ~proposer_transition_reader
+      ~most_recent_valid_block:( most_recent_valid_block_reader
+                               , most_recent_valid_block_writer ) frontier =
     let clear_reader, clear_writer =
       Strict_pipe.create ~name:"clear" Synchronous
     in
     let verified_transition_reader, verified_transition_writer =
       create_bufferred_pipe ~name:"verified transitions" ()
     in
-    let ( transition_frontier_controller_reader
-        , transition_frontier_controller_writer ) =
-      start_transition_frontier_controller ~verified_transition_writer
-        ~clear_reader ~collected_transitions:[] (peek_exn frontier_r)
+    let transition_reader, transition_writer =
+      create_bufferred_pipe ~name:"transition pipe" ()
     in
-    let controller_type =
-      Broadcaster.create
-        ~init:
-          (`Transition_frontier_controller
-            ( peek_exn frontier_r
-            , transition_frontier_controller_reader
-            , transition_frontier_controller_writer ))
-        ~f:(function
-          | `Transition_frontier_controller (frontier, _, _) ->
-              don't_wait_for
-                (Broadcast_pipe.Writer.write frontier_w (Some frontier))
-          | `Bootstrap_controller (_, _) ->
-              Transition_frontier.close (peek_exn frontier_r) ;
-              don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) )
-    in
+    let transition_reader_ref = ref transition_reader in
+    let transition_writer_ref = ref transition_writer in
+    (* This might be unsafe. Image the following scenario:
+       If a node joined at the very end of the first epoch, and
+       it didn't receive any transition from network for a while.
+       Then it went to the second epoch and it could propose at
+       the second epoch. *)
+    let now = Coda_base.Block_time.now time_controller in
+    if
+      try Consensus.Hooks.is_genesis now
+      with Invalid_argument _ ->
+        (* if "now" is before the genesis timestamp, the calculation
+           of the proof-of-stake epoch results in an exception
+        *)
+        let module Time = Coda_base.Block_time in
+        let time_till_genesis =
+          Time.diff Consensus.Constants.genesis_state_timestamp now
+        in
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "time_till_genesis"
+              , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )
+            ]
+          "Node started before genesis: waiting $time_till_genesis \
+           milliseconds before running transition router" ;
+        let seconds_to_wait = 30 in
+        let milliseconds_to_wait = Int64.of_int_exn (seconds_to_wait * 1000) in
+        let rec wait_loop tm =
+          if Int64.(tm <= zero) then ()
+          else (
+            Core.Unix.sleep seconds_to_wait ;
+            let tm_remaining = Int64.(tm - milliseconds_to_wait) in
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              "Still waiting $tm_remaining milliseconds before running \
+               transition router"
+              ~metadata:[("tm_remaining", `Int (Int64.to_int_exn tm_remaining))] ;
+            wait_loop tm_remaining )
+        in
+        wait_loop @@ Time.Span.to_ms time_till_genesis ;
+        (* after waiting, we're at least at the genesis time, maybe a bit past it *)
+        Consensus.Hooks.is_genesis @@ Coda_base.Block_time.now time_controller
+    then
+      start_transition_frontier_controller ~logger ~trust_system ~verifier
+        ~network ~time_controller ~proposer_transition_reader
+        ~verified_transition_writer ~clear_reader ~collected_transitions:[]
+        ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier
+    else
+      start_bootstrap_controller ~logger ~trust_system ~verifier ~network
+        ~time_controller ~proposer_transition_reader
+        ~verified_transition_writer ~clear_reader ~transition_reader_ref
+        ~transition_writer_ref ~ledger_db ~frontier_w frontier ;
     let ( valid_protocol_state_transition_reader
         , valid_protocol_state_transition_writer ) =
       create_bufferred_pipe ~name:"valid transitions" ()
     in
-    Initial_validator.run ~logger ~trust_system
+    Initial_validator.run ~logger ~trust_system ~verifier
       ~transition_reader:network_transition_reader
       ~valid_transition_writer:valid_protocol_state_transition_writer ;
-    Strict_pipe.Reader.iter valid_protocol_state_transition_reader
-      ~f:(fun network_transition ->
-        let `Transition incoming_transition, `Time_received tm =
-          network_transition
+    let valid_protocol_state_transition_reader, valid_transition_reader =
+      Strict_pipe.Reader.Fork.two valid_protocol_state_transition_reader
+    in
+    Strict_pipe.Reader.iter valid_transition_reader
+      ~f:(fun transition_with_time ->
+        let `Transition enveloped_transition, _ = transition_with_time in
+        let transition =
+          Envelope.Incoming.data enveloped_transition |> fst |> With_hash.data
         in
-        let new_transition = Envelope.Incoming.data incoming_transition in
-        match Broadcaster.get controller_type with
-        | `Transition_frontier_controller
-            ( frontier
-            , transition_frontier_controller_reader
-            , transition_frontier_controller_writer ) ->
-            let root_state = get_root_state frontier in
-            if is_transition_for_bootstrap root_state new_transition then
-              let%map new_frontier, collected_transitions =
-                clean_transition_frontier_controller_and_start_bootstrap
-                  ~controller_type ~clear_writer
-                  ~transition_frontier_controller_reader
-                  ~transition_frontier_controller_writer ~old_frontier:frontier
-                  network_transition
-              in
-              let reader, writer =
-                start_transition_frontier_controller
-                  ~verified_transition_writer ~clear_reader
-                  ~collected_transitions new_frontier
-              in
-              set_transition_frontier_controller_phase ~controller_type
-                new_frontier reader writer
-            else (
-              Strict_pipe.Writer.write transition_frontier_controller_writer
-                network_transition ;
-              Deferred.unit )
-        | `Bootstrap_controller (root_state, bootstrap_controller_writer) ->
-            if is_transition_for_bootstrap root_state new_transition then
-              Strict_pipe.Writer.write bootstrap_controller_writer
-                ( `Transition incoming_transition
-                , `Time_received (to_unix_timestamp tm) ) ;
-            Deferred.unit )
+        let current_consensus_state =
+          External_transition.consensus_state
+            (Broadcast_pipe.Reader.peek most_recent_valid_block_reader)
+        in
+        if
+          Consensus.Hooks.select ~existing:current_consensus_state
+            ~candidate:External_transition.(consensus_state transition)
+            ~logger
+          = `Take
+        then
+          Broadcast_pipe.Writer.write most_recent_valid_block_writer transition
+        else Deferred.unit )
+    |> don't_wait_for ;
+    Strict_pipe.Reader.iter_without_pushback
+      valid_protocol_state_transition_reader ~f:(fun transition_with_time ->
+        let `Transition enveloped_transition, _ = transition_with_time in
+        let transition =
+          Envelope.Incoming.data enveloped_transition |> fst |> With_hash.data
+        in
+        ( match Broadcast_pipe.Reader.peek frontier_r with
+        | Some frontier ->
+            if
+              is_transition_for_bootstrap ~logger (get_root_state frontier)
+                transition
+            then (
+              Strict_pipe.Writer.kill !transition_writer_ref ;
+              Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
+              start_bootstrap_controller ~logger ~trust_system ~verifier
+                ~network ~time_controller ~proposer_transition_reader
+                ~verified_transition_writer ~clear_reader
+                ~transition_reader_ref ~transition_writer_ref ~ledger_db
+                ~frontier_w frontier )
+        | None ->
+            () ) ;
+        Strict_pipe.Writer.write !transition_writer_ref transition_with_time )
     |> don't_wait_for ;
     verified_transition_reader
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+  module Network = Coda_networking
+  module Transition_frontier_controller = Transition_frontier_controller
+  module Bootstrap_controller = Bootstrap_controller
+end)

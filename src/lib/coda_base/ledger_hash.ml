@@ -16,7 +16,7 @@ module Merkle_tree =
 
       let typ = Pedersen.Checked.Digest.typ
 
-      let hash ~height h1 h2 =
+      let merge ~height h1 h2 =
         let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =
           Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
             (bs :> Boolean.var list)
@@ -41,6 +41,18 @@ module Merkle_tree =
 let depth = Snark_params.ledger_depth
 
 include Data_hash.Make_full_size ()
+
+module T = struct
+  type t = Stable.Latest.t [@@deriving bin_io]
+
+  let version_byte = Base58_check.Version_bytes.ledger_hash
+end
+
+module Base58_check = Codable.Make_base58_check (T)
+
+let to_string t = Base58_check.String_ops.to_string t
+
+let of_string s = Base58_check.String_ops.of_string s
 
 let merge ~height (h1 : t) (h2 : t) =
   let open Tick.Pedersen in

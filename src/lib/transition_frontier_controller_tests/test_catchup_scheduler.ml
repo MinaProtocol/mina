@@ -1,5 +1,6 @@
 open Async
 open Core
+open Coda_base
 open Cache_lib
 open Pipe_lib
 
@@ -16,7 +17,8 @@ module Inputs = struct
   module Transition_frontier = Transition_frontier
 end
 
-module Catchup_scheduler = Transition_handler.Catchup_scheduler.Make (Inputs)
+module Catchup_scheduler =
+  Transition_handler.Components.Catchup_scheduler.Make (Inputs)
 module Transition_handler = Transition_handler.Make (Inputs)
 open Transition_handler
 
@@ -24,9 +26,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
   ( module struct
     let logger = Logger.null ()
 
-    let time_controller = Time.Controller.basic
+    let trust_system = Trust_system.null ()
 
-    let timeout_duration = Time.Span.of_ms 200L
+    let time_controller = Block_time.Controller.basic
+
+    let timeout_duration = Block_time.Span.of_ms 200L
 
     let accounts_with_secret_keys = Genesis_ledger.accounts
 
@@ -43,16 +47,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Quickcheck.Generator.with_size ~size:num_breadcrumbs
             @@ Quickcheck_lib.gen_imperative_ktree
                  (root_breadcrumb |> return |> Quickcheck.Generator.return)
-                 (gen_breadcrumb ~logger ~accounts_with_secret_keys) )
+                 (gen_breadcrumb ~logger ~trust_system
+                    ~accounts_with_secret_keys) )
           frontier
       in
       frontier
-
-    let transition_with_hash_enveloped
-        (transition_with_hash :
-          (External_transition.Verified.t, 'a) With_hash.t) =
-      Envelope.Incoming.wrap ~data:transition_with_hash
-        ~sender:Envelope.Sender.Local
 
     let extract_children_from ~reader ~root =
       let open Deferred.Let_syntax in
@@ -68,10 +67,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       let catchup_job_reader, catchup_job_writer =
-        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+          (Buffered (`Capacity 10, `Overflow Crash))
       in
       let _catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+          (Buffered (`Capacity 10, `Overflow Crash))
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
@@ -79,8 +80,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let trust_system = Trust_system.null () in
           let scheduler =
             Catchup_scheduler.create ~logger ~trust_system ~frontier
-              ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
-              ~clean_up_signal:(Ivar.create ())
+              ~verifier:() ~time_controller ~catchup_job_writer
+              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
@@ -89,7 +90,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind upcoming_breadcrumbs =
             Deferred.all
             @@ Quickcheck.random_value
-                 (gen_linear_breadcrumbs ~logger ~size:2
+                 (gen_linear_breadcrumbs ~logger ~trust_system ~size:2
                     ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let missing_hash =
@@ -99,11 +100,16 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let dangling_breadcrumb = List.nth_exn upcoming_breadcrumbs 1 in
           let dangling_transition =
-            let transition_with_hash =
-              Transition_frontier.Breadcrumb.transition_with_hash
-                dangling_breadcrumb
+            let transition =
+              External_transition.Validation.lower
+                (Transition_frontier.Breadcrumb.transition_with_hash
+                   dangling_breadcrumb)
+                ( (`Time_received, Truth.True)
+                , (`Proof, Truth.True)
+                , (`Frontier_dependencies, Truth.False)
+                , (`Staged_ledger_diff, Truth.False) )
             in
-            Envelope.Incoming.wrap ~data:transition_with_hash
+            Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
             |> Cached.pure
           in
@@ -125,10 +131,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                    catchup scheduler should not create duplicate jobs" =
       let logger = Logger.null () in
       let _catchup_job_reader, catchup_job_writer =
-        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+          (Buffered (`Capacity 10, `Overflow Crash))
       in
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+          (Buffered (`Capacity 10, `Overflow Crash))
       in
       let unprocessed_transition_cache =
         Unprocessed_transition_cache.create ~logger
@@ -138,9 +146,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind frontier = setup_random_frontier () in
           let trust_system = Trust_system.null () in
           let scheduler =
-            Catchup_scheduler.create ~logger ~trust_system ~frontier
-              ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
-              ~clean_up_signal:(Ivar.create ())
+            Catchup_scheduler.create ~logger ~verifier:() ~trust_system
+              ~frontier ~time_controller ~catchup_job_writer
+              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
@@ -150,7 +158,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind upcoming_breadcrumbs =
             Deferred.all
             @@ Quickcheck.random_value
-                 (gen_linear_breadcrumbs ~logger ~size
+                 (gen_linear_breadcrumbs ~logger ~trust_system ~size
                     ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let upcoming_transitions =
@@ -161,12 +169,18 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let missing_transition = List.hd_exn upcoming_transitions in
           let dangling_transitions = List.tl_exn upcoming_transitions in
           let cached_dangling_transitions =
-            List.map dangling_transitions
-              ~f:
-                (Fn.compose
-                   (Unprocessed_transition_cache.register_exn
-                      unprocessed_transition_cache)
-                   transition_with_hash_enveloped)
+            List.map dangling_transitions ~f:(fun transition ->
+                let transition =
+                  External_transition.Validation.lower transition
+                    ( (`Time_received, Truth.True)
+                    , (`Proof, Truth.True)
+                    , (`Frontier_dependencies, Truth.False)
+                    , (`Staged_ledger_diff, Truth.False) )
+                in
+                Envelope.Incoming.wrap ~data:transition
+                  ~sender:Envelope.Sender.Local
+                |> Unprocessed_transition_cache.register_exn
+                     unprocessed_transition_cache )
           in
           List.(
             iter (rev cached_dangling_transitions) ~f:(fun cached_transition ->
@@ -174,7 +188,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                   ~cached_transition ;
                 assert (
                   Catchup_scheduler.has_timeout scheduler
-                    (Cached.peek cached_transition) ) )) ;
+                    ( Cached.peek cached_transition
+                    |> Envelope.Incoming.data |> fst |> With_hash.data ) ) )) ;
           let%bind (_ : unit) =
             Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
           in
@@ -187,9 +202,17 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               ~root:
                 ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
-                    ( Transition_frontier.Breadcrumb.transition_with_hash
-                        missing_breadcrumb
-                    |> transition_with_hash_enveloped )
+                    (let transition =
+                       External_transition.Validation.lower
+                         (Transition_frontier.Breadcrumb.transition_with_hash
+                            missing_breadcrumb)
+                         ( (`Time_received, Truth.True)
+                         , (`Proof, Truth.True)
+                         , (`Frontier_dependencies, Truth.False)
+                         , (`Staged_ledger_diff, Truth.False) )
+                     in
+                     Envelope.Incoming.wrap ~data:transition
+                       ~sender:Envelope.Sender.Local)
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =
@@ -207,10 +230,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                    the missing node is received before the timeout expires, \
                    the timeout would be canceled" =
       let _catchup_job_reader, catchup_job_writer =
-        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+          (Buffered (`Capacity 10, `Overflow Crash))
       in
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+          (Buffered (`Capacity 10, `Overflow Crash))
       in
       let unprocessed_transition_cache =
         Unprocessed_transition_cache.create ~logger
@@ -220,9 +245,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind frontier = setup_random_frontier () in
           let trust_system = Trust_system.null () in
           let scheduler =
-            Catchup_scheduler.create ~logger ~trust_system ~frontier
-              ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
-              ~clean_up_signal:(Ivar.create ())
+            Catchup_scheduler.create ~logger ~trust_system ~verifier:()
+              ~frontier ~time_controller ~catchup_job_writer
+              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
@@ -231,8 +256,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind upcoming_rose_tree =
             Rose_tree.Deferred.all
             @@ Quickcheck.random_value
-                 (gen_tree ~logger ~size:5 ~accounts_with_secret_keys
-                    randomly_chosen_breadcrumb)
+                 (gen_tree ~logger ~trust_system ~size:5
+                    ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let upcoming_breadcrumbs = Rose_tree.flatten upcoming_rose_tree in
           let upcoming_transitions =
@@ -243,12 +268,18 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let missing_transition = List.hd_exn upcoming_transitions in
           let dangling_transitions = List.tl_exn upcoming_transitions in
           let cached_dangling_transitions =
-            List.map dangling_transitions
-              ~f:
-                (Fn.compose
-                   (Unprocessed_transition_cache.register_exn
-                      unprocessed_transition_cache)
-                   transition_with_hash_enveloped)
+            List.map dangling_transitions ~f:(fun transition ->
+                let transition =
+                  External_transition.Validation.lower transition
+                    ( (`Time_received, Truth.True)
+                    , (`Proof, Truth.True)
+                    , (`Frontier_dependencies, Truth.False)
+                    , (`Staged_ledger_diff, Truth.False) )
+                in
+                Envelope.Incoming.wrap ~data:transition
+                  ~sender:Envelope.Sender.Local
+                |> Unprocessed_transition_cache.register_exn
+                     unprocessed_transition_cache )
           in
           List.iter (List.permute cached_dangling_transitions)
             ~f:(fun cached_transition ->
@@ -267,9 +298,17 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               ~root:
                 ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
-                    ( Transition_frontier.Breadcrumb.transition_with_hash
-                        missing_breadcrumb
-                    |> transition_with_hash_enveloped )
+                    (let transition =
+                       External_transition.Validation.lower
+                         (Transition_frontier.Breadcrumb.transition_with_hash
+                            missing_breadcrumb)
+                         ( (`Time_received, Truth.True)
+                         , (`Proof, Truth.True)
+                         , (`Frontier_dependencies, Truth.False)
+                         , (`Staged_ledger_diff, Truth.False) )
+                     in
+                     Envelope.Incoming.wrap ~data:transition
+                       ~sender:Envelope.Sender.Local)
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =

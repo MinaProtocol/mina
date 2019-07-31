@@ -16,23 +16,12 @@ let wrap_input = Tock.Data_spec.[Wrap_input.typ]
 
 let exists' typ ~f = Tick.(exists typ ~compute:As_prover.(map get_state ~f))
 
-module Input = struct
-  (* TODO : version *)
-  type t =
-    { source: Frozen_ledger_hash.Stable.V1.t
-    ; target: Frozen_ledger_hash.Stable.V1.t
-    ; fee_excess: Currency.Amount.Signed.Stable.V1.t
-    ; pending_coinbase_before: Pending_coinbase.Stack.Stable.V1.t
-    ; pending_coinbase_after: Pending_coinbase.Stack.Stable.V1.t }
-  [@@deriving bin_io, sexp, compare]
-end
-
 module Proof_type = struct
   module Stable = struct
     module V1 = struct
       module T = struct
         type t = [`Base | `Merge]
-        [@@deriving bin_io, sexp, hash, compare, yojson, version]
+        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end
 
       include T
@@ -87,7 +76,7 @@ module Pending_coinbase_stack_state = struct
   type t = Stable.Latest.t =
     { source: Pending_coinbase.Stack.Stable.V1.t
     ; target: Pending_coinbase.Stack.Stable.V1.t }
-  [@@deriving sexp, hash, compare, eq, yojson]
+  [@@deriving sexp, hash, compare, yojson]
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
@@ -98,14 +87,14 @@ module Statement = struct
     module V1 = struct
       module T = struct
         type t =
-          { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-          ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
+          { source: Frozen_ledger_hash.Stable.V1.t
+          ; target: Frozen_ledger_hash.Stable.V1.t
           ; supply_increase: Currency.Amount.Stable.V1.t
           ; pending_coinbase_stack_state:
               Pending_coinbase_stack_state.Stable.V1.t
           ; fee_excess: Currency.Fee.Signed.Stable.V1.t
           ; proof_type: Proof_type.Stable.V1.t }
-        [@@deriving sexp, bin_io, hash, compare, yojson, version]
+        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end
 
       include T
@@ -126,8 +115,8 @@ module Statement = struct
 
   (* bin_io omitted *)
   type t = Stable.Latest.t =
-    { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-    ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
+    { source: Frozen_ledger_hash.Stable.V1.t
+    ; target: Frozen_ledger_hash.Stable.V1.t
     ; supply_increase: Currency.Amount.Stable.V1.t
     ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
@@ -160,8 +149,8 @@ module Statement = struct
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%map source = Coda_base.Frozen_ledger_hash.gen
-    and target = Coda_base.Frozen_ledger_hash.gen
+    let%map source = Frozen_ledger_hash.gen
+    and target = Frozen_ledger_hash.gen
     and fee_excess = Currency.Fee.Signed.gen
     and supply_increase = Currency.Amount.gen
     and pending_coinbase_before = Pending_coinbase.Stack.gen
@@ -278,7 +267,7 @@ module Verification_keys = struct
   let dummy : t =
     { merge= Dummy_values.Tick.Groth16.verification_key
     ; base= Dummy_values.Tick.Groth16.verification_key
-    ; wrap= Dummy_values.Tock.GrothMaller17.verification_key }
+    ; wrap= Dummy_values.Tock.Bowe_gabizon18.verification_key }
 end
 
 module Keys0 = struct
@@ -293,7 +282,7 @@ module Keys0 = struct
     let dummy =
       { merge= Dummy_values.Tick.Groth16.proving_key
       ; base= Dummy_values.Tick.Groth16.proving_key
-      ; wrap= Dummy_values.Tock.GrothMaller17.proving_key }
+      ; wrap= Dummy_values.Tock.Bowe_gabizon18.proving_key }
   end
 
   module T = struct
@@ -419,7 +408,7 @@ module Base = struct
              ; nonce= next_nonce
              ; receipt_chain_hash
              ; delegate
-             ; participated= account.participated }) )
+             ; voting_for= account.voting_for }) )
     in
     let%bind receiver =
       (* A stake delegation only uses the sender *)
@@ -512,8 +501,6 @@ module Base = struct
     in
     ()
 
-  let reduced_main = lazy (reduce_to_prover (tick_input ()) main)
-
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
   let transaction_union_proof ?(preeval = false) ~proving_key sok_digest state1
@@ -548,6 +535,7 @@ module Base = struct
     Cached.Spec.create ~load ~name:"transaction-snark base keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
+      ~brew_install_path:Cache_dir.brew_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(tick_input ()) main))
@@ -599,7 +587,7 @@ module Merge = struct
           ~f:(fun acc x -> Pedersen.Checked.Section.disjoint_union_exn acc x)
           ~init:s ss
 
-  module Verifier = Tick.Groth_maller_verifier
+  module Verifier = Tick.Verifier
 
   let vk_input_offset =
     Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
@@ -832,6 +820,7 @@ module Merge = struct
     Cached.Spec.create ~load ~name:"transaction-snark merge keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
+      ~brew_install_path:Cache_dir.brew_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(input ()) main))
@@ -1079,6 +1068,7 @@ struct
     Cached.Spec.create ~load ~name:"transaction-snark wrap keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
+      ~brew_install_path:Cache_dir.brew_install_path
       ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
       ~input:(constraint_system ~exposing:wrap_input main)
       ~create_env:Keypair.generate
@@ -1633,9 +1623,9 @@ let%test_module "transaction_snark" =
                 user_command wallets 1 0 8
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
-                  (User_command_memo.create_exn
+                  (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_size_in_bytes))
+                        ~len:User_command_memo.max_digestible_string_length))
               in
               let target =
                 Ledger.merkle_root_after_user_command_exn ledger t1
@@ -1667,17 +1657,17 @@ let%test_module "transaction_snark" =
                 user_command wallets 0 1 8
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
-                  (User_command_memo.create_exn
+                  (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_size_in_bytes))
+                        ~len:User_command_memo.max_digestible_string_length))
               in
               let t2 =
                 user_command wallets 1 2 3
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
-                  (User_command_memo.create_exn
+                  (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_size_in_bytes))
+                        ~len:User_command_memo.max_digestible_string_length))
               in
               let pending_coinbase_stack_state =
                 Pending_coinbase_stack_state.Stable.Latest.

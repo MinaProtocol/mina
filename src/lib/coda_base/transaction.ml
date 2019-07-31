@@ -7,7 +7,7 @@ module Stable = struct
         | User_command of User_command.With_valid_signature.Stable.V1.t
         | Fee_transfer of Fee_transfer.Stable.V1.t
         | Coinbase of Coinbase.Stable.V1.t
-      [@@deriving bin_io, sexp, version, compare, eq, hash]
+      [@@deriving bin_io, sexp, version, compare, eq, hash, yojson]
     end
 
     include T
@@ -22,10 +22,11 @@ module T = struct
       | User_command of User_command.With_valid_signature.Stable.Latest.t
       | Fee_transfer of Fee_transfer.Stable.Latest.t
       | Coinbase of Coinbase.Stable.Latest.t
-    [@@deriving sexp, compare, eq, hash]
+    [@@deriving sexp, compare, eq, hash, yojson]
   end
 
   include Hashable.Make (T0)
+  include Comparable.Make (T0)
   include T0
 end
 
