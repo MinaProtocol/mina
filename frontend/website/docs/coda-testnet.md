@@ -17,7 +17,7 @@ BONUS: An additional 2000 pts to the first person to complete the challenge, and
 
 **Challenge #3: Join Discord** - 100 pts awarded for introducing yourself in the #testnet-general channel. Name, location and what you’re excited about are all good things to share in order to get the points!
 
-**Challenge #4 (on-going): Community MVP** - Each week, we will recognize the winners of the previous week based on the point values below. We may give out all the awards in a week, or none, or several at each level. The more active the community is, the more points* we can award in this category.
+**Challenge #4 (on-going): Community MVP** - Each week, we will recognize the winners of the previous week based on the point values below. We may give out all the awards in a week, or none, or several at each level. The more active the community is, the more points[\*](#disclaimer) we can award in this category.
 
 Gold - 1000 pts - made a major, or on-going contribution to the community throughout the week. A major stand-out!
 
