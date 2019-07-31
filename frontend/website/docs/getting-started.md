@@ -30,8 +30,8 @@ The newest binary releases can be found below. Instructions are provided for mac
 Install using [brew](https://brew.sh).
 ```
 brew install codaprotocol/coda/coda
-``` 
-You can run `coda -help` to see if the works
+```
+You can run `coda -help` to see if it works.
 
 ### Ubuntu 18.04 / Debian 9
 
