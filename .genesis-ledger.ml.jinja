@@ -8,7 +8,8 @@ let accounts = [
 {%- for account in accounts %}
    {% if loop.first %}
      {{- '  ' + account }}
-   {%- elif loop.last %}
+   # discard empty strings
+   {%- elif account|length <= 2 %}
    {%- else %}
      {{- '; ' + account }}
    {%- endif %}

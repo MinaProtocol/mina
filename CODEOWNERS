@@ -14,7 +14,7 @@
 /README-dev.md @cmr @imeckler @o1pranay
 /azure-pipelines.yml @jkrauska
 /.circleci @jkrauska @bkase
-
+/.genesis-ledger.ml.jinja @psteckler
 
 /src/external/ @cmr @bkase @psteckler
 
