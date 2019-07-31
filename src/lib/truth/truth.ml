@@ -2,12 +2,10 @@ type true_ = unit
 
 type false_ = unit
 
-type ('witness, _) with_witness =
-  | True : 'witness -> ('witness, true_) with_witness
-  | False : ('witness, false_) with_witness
+type ('witness, _) t =
+  | True : 'witness -> ('witness, true_) t
+  | False : ('witness, false_) t
 
-type 'a t = (unit, 'a) with_witness
+type 'witness true_t = ('witness, true_) t
 
-type true_t = true_ t
-
-type false_t = false_ t
+type 'witness false_t = ('witness, false_) t

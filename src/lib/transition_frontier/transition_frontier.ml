@@ -10,10 +10,12 @@ module type Inputs_intf = Inputs.Inputs_intf
 module Make (Inputs : Inputs_intf) :
   Coda_intf.Transition_frontier_intf
   with type mostly_validated_external_transition :=
-              ( [`Time_received] * Truth.true_t
-              , [`Proof] * Truth.true_t
-              , [`Frontier_dependencies] * Truth.true_t
-              , [`Staged_ledger_diff] * Truth.false_t )
+              ( [`Time_received] * unit Truth.true_t
+              , [`Proof] * unit Truth.true_t
+              , [`Frontier_dependencies] * unit Truth.true_t
+              , [`Staged_ledger_diff] * unit Truth.false_t
+              , [`Delta_transition_chain_witness]
+                * State_hash.t Non_empty_list.t Truth.true_t )
               Inputs.External_transition.Validation.with_transition
    and type external_transition_validated :=
               Inputs.External_transition.Validated.t

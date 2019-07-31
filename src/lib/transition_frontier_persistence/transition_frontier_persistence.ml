@@ -153,13 +153,18 @@ module Make (Inputs : Intf.Main_inputs) = struct
         "Failed to add breadcrumb to transition $hash"
     in
     (* TMP HACK: our transition is already validated, so we "downgrade" it's validation #2486 *)
+    let previous_state_hash =
+      With_hash.data transition |> External_transition.Validated.parent_hash
+    in
     let mostly_validated_external_transition =
       ( With_hash.map ~f:External_transition.Validated.forget_validation
           transition
       , ( (`Time_received, Truth.True ())
         , (`Proof, Truth.True ())
         , (`Frontier_dependencies, Truth.True ())
-        , (`Staged_ledger_diff, Truth.False) ) )
+        , (`Staged_ledger_diff, Truth.False)
+        , ( `Delta_transition_chain_witness
+          , Truth.True (Non_empty_list.singleton previous_state_hash) ) ) )
     in
     let%bind child_breadcrumb =
       match%map

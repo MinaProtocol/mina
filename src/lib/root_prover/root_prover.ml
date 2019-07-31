@@ -10,10 +10,12 @@ module type Inputs_intf = sig
     Coda_intf.Transition_frontier_intf
     with type external_transition_validated := External_transition.Validated.t
      and type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
+                ( [`Time_received] * unit Truth.true_t
+                , [`Proof] * unit Truth.true_t
+                , [`Frontier_dependencies] * unit Truth.true_t
+                , [`Staged_ledger_diff] * unit Truth.false_t
+                , [`Delta_transition_chain_witness]
+                  * State_hash.t Non_empty_list.t Truth.true_t )
                 External_transition.Validation.with_transition
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -26,10 +28,12 @@ module Make (Inputs : Inputs_intf) :
   with type transition_frontier := Inputs.Transition_frontier.t
    and type external_transition := Inputs.External_transition.t
    and type external_transition_with_initial_validation :=
-              ( [`Time_received] * Truth.true_t
-              , [`Proof] * Truth.true_t
-              , [`Frontier_dependencies] * Truth.false_t
-              , [`Staged_ledger_diff] * Truth.false_t )
+              ( [`Time_received] * unit Truth.true_t
+              , [`Proof] * unit Truth.true_t
+              , [`Frontier_dependencies] * unit Truth.false_t
+              , [`Staged_ledger_diff] * unit Truth.false_t
+              , [`Delta_transition_chain_witness]
+                * State_hash.t Non_empty_list.t Truth.true_t )
               Inputs.External_transition.Validation.with_transition
    and type verifier := Inputs.Verifier.t = struct
   open Inputs
@@ -160,27 +164,26 @@ module Make (Inputs : Inputs_intf) :
         ( Merkle_list.verify ~init:root_hash merkle_list best_tip_hash
         |> Option.is_some )
     in
-    let root_with_validation =
-      External_transition.skip_time_received_validation
-        `This_transition_was_not_received_via_gossip
-        (External_transition.Validation.wrap root_transition_with_hash)
-    in
-    let best_tip_with_validation =
-      External_transition.skip_time_received_validation
-        `This_transition_was_not_received_via_gossip
-        (External_transition.Validation.wrap best_tip_with_hash)
-    in
-    let%bind validated_root =
-      Deferred.map
-        (External_transition.validate_proof ~verifier root_with_validation)
-        ~f:(Result.map_error ~f:(Fn.const (Error.of_string "invalid proof")))
-    in
-    let%map validated_best_tip =
-      Deferred.map
-        (External_transition.validate_proof ~verifier best_tip_with_validation)
-        ~f:(Result.map_error ~f:(Fn.const (Error.of_string "invalid proof")))
-    in
-    (validated_root, validated_best_tip)
+    let open Deferred.Result.Monad_infix in
+    External_transition.(
+      Deferred.Result.combine
+        ( Validation.wrap root_transition_with_hash
+        |> skip_time_received_validation
+             `This_transition_was_not_received_via_gossip
+        |> validate_proof ~verifier
+        >>= Fn.compose Deferred.return validate_delta_transition_chain_witness
+        )
+        ( Validation.wrap best_tip_with_hash
+        |> skip_time_received_validation
+             `This_transition_was_not_received_via_gossip
+        |> validate_proof ~verifier
+        >>= Fn.compose Deferred.return validate_delta_transition_chain_witness
+        )
+        ~ok:(fun validated_root validated_best_tip ->
+          (validated_root, validated_best_tip) )
+        ~err:Fn.const)
+    |> Deferred.map
+         ~f:(Result.map_error ~f:(Fn.const (Error.of_string "invalid proof")))
 end
 
 include Make (struct

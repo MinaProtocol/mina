@@ -30,10 +30,12 @@ module Make (Inputs : Inputs.S) :
     External_transition.Transition_frontier_validation (Transition_frontier)
 
   type external_transition_with_initial_validation =
-    ( [`Time_received] * Truth.true_t
-    , [`Proof] * Truth.true_t
-    , [`Frontier_dependencies] * Truth.false_t
-    , [`Staged_ledger_diff] * Truth.false_t )
+    ( [`Time_received] * unit Truth.true_t
+    , [`Proof] * unit Truth.true_t
+    , [`Frontier_dependencies] * unit Truth.false_t
+    , [`Staged_ledger_diff] * unit Truth.false_t
+    , [`Delta_transition_chain_witness]
+      * State_hash.t Non_empty_list.t Truth.true_t )
     External_transition.Validation.with_transition
 
   (* TODO: calculate a sensible value from postake consensus arguments *)

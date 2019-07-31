@@ -95,33 +95,58 @@ module type External_transition_intf = sig
     type ( 'time_received
          , 'proof
          , 'frontier_dependencies
-         , 'staged_ledger_diff )
+         , 'staged_ledger_diff
+         , 'delta_transition_chain_witness )
          t =
-      'time_received * 'proof * 'frontier_dependencies * 'staged_ledger_diff
-      constraint 'time_received = [`Time_received] * _ Truth.t
-      constraint 'proof = [`Proof] * _ Truth.t
-      constraint 'frontier_dependencies = [`Frontier_dependencies] * _ Truth.t
-      constraint 'staged_ledger_diff = [`Staged_ledger_diff] * _ Truth.t
+      'time_received
+      * 'proof
+      * 'frontier_dependencies
+      * 'staged_ledger_diff
+      * 'delta_transition_chain_witness
+      constraint 'time_received = [`Time_received] * (unit, _) Truth.t
+      constraint 'proof = [`Proof] * (unit, _) Truth.t
+      constraint
+        'frontier_dependencies =
+        [`Frontier_dependencies] * (unit, _) Truth.t
+      constraint
+        'staged_ledger_diff =
+        [`Staged_ledger_diff] * (unit, _) Truth.t
+      constraint
+        'delta_transition_chain_witness =
+        [`Delta_transition_chain_witness]
+        * (State_hash.t Non_empty_list.t, _) Truth.t
 
-    type 'a all =
-      ( [`Time_received] * 'a
-      , [`Proof] * 'a
-      , [`Frontier_dependencies] * 'a
-      , [`Staged_ledger_diff] * 'a )
+    type fully_invalid =
+      ( [`Time_received] * unit Truth.false_t
+      , [`Proof] * unit Truth.false_t
+      , [`Frontier_dependencies] * unit Truth.false_t
+      , [`Staged_ledger_diff] * unit Truth.false_t
+      , [`Delta_transition_chain_witness]
+        * State_hash.t Non_empty_list.t Truth.false_t )
       t
-      constraint 'a = _ Truth.t
 
-    type fully_invalid = Truth.false_t all
-
-    type fully_valid = Truth.true_t all
+    type fully_valid =
+      ( [`Time_received] * unit Truth.true_t
+      , [`Proof] * unit Truth.true_t
+      , [`Frontier_dependencies] * unit Truth.true_t
+      , [`Staged_ledger_diff] * unit Truth.true_t
+      , [`Delta_transition_chain_witness]
+        * State_hash.t Non_empty_list.t Truth.true_t )
+      t
 
     type ( 'time_received
          , 'proof
          , 'frontier_dependencies
-         , 'staged_ledger_diff )
+         , 'staged_ledger_diff
+         , 'delta_transition_chain_witness )
          with_transition =
       (external_transition, State_hash.t) With_hash.t
-      * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
+      * ( 'time_received
+        , 'proof
+        , 'frontier_dependencies
+        , 'staged_ledger_diff
+        , 'delta_transition_chain_witness )
+        t
 
     val fully_invalid : fully_invalid
 
@@ -138,20 +163,24 @@ module type External_transition_intf = sig
       -> ( 'time_received
          , 'proof
          , 'frontier_dependencies
-         , 'staged_ledger_diff )
+         , 'staged_ledger_diff
+         , 'delta_transition_chain_witness )
          t
       -> ( 'time_received
          , 'proof
          , 'frontier_dependencies
-         , 'staged_ledger_diff )
+         , 'staged_ledger_diff
+         , 'delta_transition_chain_witness )
          with_transition
   end
 
   type with_initial_validation =
-    ( [`Time_received] * Truth.true_t
-    , [`Proof] * Truth.true_t
-    , [`Frontier_dependencies] * Truth.false_t
-    , [`Staged_ledger_diff] * Truth.false_t )
+    ( [`Time_received] * unit Truth.true_t
+    , [`Proof] * unit Truth.true_t
+    , [`Frontier_dependencies] * unit Truth.false_t
+    , [`Staged_ledger_diff] * unit Truth.false_t
+    , [`Delta_transition_chain_witness]
+      * State_hash.t Non_empty_list.t Truth.true_t )
     Validation.with_transition
 
   val create :
@@ -165,59 +194,102 @@ module type External_transition_intf = sig
 
   val skip_time_received_validation :
        [`This_transition_was_not_received_via_gossip]
-    -> ( [`Time_received] * Truth.false_t
+    -> ( [`Time_received] * unit Truth.false_t
        , 'proof
        , 'frontier_dependencies
-       , 'staged_ledger_diff )
+       , 'staged_ledger_diff
+       , 'delta_transition_chain_witness )
        Validation.with_transition
-    -> ( [`Time_received] * Truth.true_t
+    -> ( [`Time_received] * unit Truth.true_t
        , 'proof
        , 'frontier_dependencies
-       , 'staged_ledger_diff )
+       , 'staged_ledger_diff
+       , 'delta_transition_chain_witness )
        Validation.with_transition
 
   val validate_time_received :
-       ( [`Time_received] * Truth.false_t
+       ( [`Time_received] * unit Truth.false_t
        , 'proof
        , 'frontier_dependencies
-       , 'staged_ledger_diff )
+       , 'staged_ledger_diff
+       , 'delta_transition_chain_witness )
        Validation.with_transition
     -> time_received:Block_time.t
-    -> ( ( [`Time_received] * Truth.true_t
+    -> ( ( [`Time_received] * unit Truth.true_t
          , 'proof
          , 'frontier_dependencies
-         , 'staged_ledger_diff )
+         , 'staged_ledger_diff
+         , 'delta_transition_chain_witness )
          Validation.with_transition
-       , [`Invalid_time_received of [`Too_early | `Too_late of int64]] )
+       , [> `Invalid_time_received of [`Too_early | `Too_late of int64]] )
        Result.t
 
   val skip_proof_validation :
        [`This_transition_was_generated_internally]
     -> ( 'time_received
-       , [`Proof] * Truth.false_t
+       , [`Proof] * unit Truth.false_t
        , 'frontier_dependencies
-       , 'staged_ledger_diff )
+       , 'staged_ledger_diff
+       , 'delta_transition_chain_witness )
        Validation.with_transition
     -> ( 'time_received
-       , [`Proof] * Truth.true_t
+       , [`Proof] * unit Truth.true_t
        , 'frontier_dependencies
-       , 'staged_ledger_diff )
+       , 'staged_ledger_diff
+       , 'delta_transition_chain_witness )
+       Validation.with_transition
+
+  val skip_delta_transition_chain_witness_validation :
+       [`This_transition_was_not_received_via_gossip]
+    -> ( 'time_received
+       , 'proof
+       , 'frontier_dependencies
+       , 'staged_ledger_diff
+       , [`Delta_transition_chain_witness]
+         * State_hash.t Non_empty_list.t Truth.false_t )
+       Validation.with_transition
+    -> ( 'time_received
+       , 'proof
+       , 'frontier_dependencies
+       , 'staged_ledger_diff
+       , [`Delta_transition_chain_witness]
+         * State_hash.t Non_empty_list.t Truth.true_t )
        Validation.with_transition
 
   val validate_proof :
        ( 'time_received
-       , [`Proof] * Truth.false_t
+       , [`Proof] * unit Truth.false_t
        , 'frontier_dependencies
-       , 'staged_ledger_diff )
+       , 'staged_ledger_diff
+       , 'delta_transition_chain_witness )
        Validation.with_transition
     -> verifier:verifier
     -> ( ( 'time_received
-         , [`Proof] * Truth.true_t
+         , [`Proof] * unit Truth.true_t
          , 'frontier_dependencies
-         , 'staged_ledger_diff )
+         , 'staged_ledger_diff
+         , 'delta_transition_chain_witness )
          Validation.with_transition
-       , [`Invalid_proof | `Verifier_error of Error.t] )
+       , [> `Invalid_proof | `Verifier_error of Error.t] )
        Deferred.Result.t
+
+  val validate_delta_transition_chain_witness :
+       ( 'time_received
+       , 'proof
+       , 'frontier_dependencies
+       , 'staged_ledger_diff
+       , [`Delta_transition_chain_witness]
+         * State_hash.t Non_empty_list.t Truth.false_t )
+       Validation.with_transition
+    -> ( ( 'time_received
+         , 'proof
+         , 'frontier_dependencies
+         , 'staged_ledger_diff
+         , [`Delta_transition_chain_witness]
+           * State_hash.t Non_empty_list.t Truth.true_t )
+         Validation.with_transition
+       , [> `Invalid_delta_transition_chain_witness] )
+       Result.t
 
   (* This functor is necessary to break the dependency cycle between the Transition_fronter and the External_transition *)
   module Transition_frontier_validation (Transition_frontier : sig
@@ -236,15 +308,17 @@ module type External_transition_intf = sig
     val validate_frontier_dependencies :
          ( 'time_received
          , 'proof
-         , [`Frontier_dependencies] * Truth.false_t
-         , 'staged_ledger_diff )
+         , [`Frontier_dependencies] * unit Truth.false_t
+         , 'staged_ledger_diff
+         , 'delta_transition_chain_witness )
          Validation.with_transition
       -> logger:Logger.t
       -> frontier:Transition_frontier.t
       -> ( ( 'time_received
            , 'proof
-           , [`Frontier_dependencies] * Truth.true_t
-           , 'staged_ledger_diff )
+           , [`Frontier_dependencies] * unit Truth.true_t
+           , 'staged_ledger_diff
+           , 'delta_transition_chain_witness )
            Validation.with_transition
          , [ `Already_in_frontier
            | `Parent_missing_from_frontier
@@ -256,13 +330,15 @@ module type External_transition_intf = sig
        [`This_transition_belongs_to_a_detached_subtree]
     -> ( 'time_received
        , 'proof
-       , [`Frontier_dependencies] * Truth.false_t
-       , 'staged_ledger_diff )
+       , [`Frontier_dependencies] * unit Truth.false_t
+       , 'staged_ledger_diff
+       , 'delta_transition_chain_witness )
        Validation.with_transition
     -> ( 'time_received
        , 'proof
-       , [`Frontier_dependencies] * Truth.true_t
-       , 'staged_ledger_diff )
+       , [`Frontier_dependencies] * unit Truth.true_t
+       , 'staged_ledger_diff
+       , 'delta_transition_chain_witness )
        Validation.with_transition
 
   (* TODO: this functor can be killed once Staged_ledger is defunctor *)
@@ -291,7 +367,8 @@ module type External_transition_intf = sig
          ( 'time_received
          , 'proof
          , 'frontier_dependencies
-         , [`Staged_ledger_diff] * Truth.false_t )
+         , [`Staged_ledger_diff] * unit Truth.false_t
+         , 'delta_transition_chain_witness )
          Validation.with_transition
       -> logger:Logger.t
       -> verifier:verifier
@@ -301,7 +378,8 @@ module type External_transition_intf = sig
                ( 'time_received
                , 'proof
                , 'frontier_dependencies
-               , [`Staged_ledger_diff] * Truth.true_t )
+               , [`Staged_ledger_diff] * unit Truth.true_t
+               , 'delta_transition_chain_witness )
                Validation.with_transition ]
            * [`Staged_ledger of Staged_ledger.t]
          , [ `Invalid_staged_ledger_diff of

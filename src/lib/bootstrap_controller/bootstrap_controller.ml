@@ -11,10 +11,12 @@ module type Inputs_intf = sig
     Coda_intf.Transition_frontier_intf
     with type external_transition_validated := External_transition.Validated.t
      and type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
+                ( [`Time_received] * unit Truth.true_t
+                , [`Proof] * unit Truth.true_t
+                , [`Frontier_dependencies] * unit Truth.true_t
+                , [`Staged_ledger_diff] * unit Truth.false_t
+                , [`Delta_transition_chain_witness]
+                  * State_hash.t Non_empty_list.t Truth.true_t )
                 External_transition.Validation.with_transition
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -246,13 +248,22 @@ end = struct
   let rec run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
       ~transition_reader =
     let initial_breadcrumb = Transition_frontier.root frontier in
+    let initial_transition =
+      Transition_frontier.Breadcrumb.transition_with_hash initial_breadcrumb
+    in
+    let previous_state_hash =
+      With_hash.data initial_transition
+      |> External_transition.Validated.parent_hash
+    in
     let initial_root_transition =
-      External_transition.Validation.lower
-        (Transition_frontier.Breadcrumb.transition_with_hash initial_breadcrumb)
+      External_transition.Validation.lower initial_transition
         ( (`Time_received, Truth.True ())
         , (`Proof, Truth.True ())
         , (`Frontier_dependencies, Truth.False)
-        , (`Staged_ledger_diff, Truth.False) )
+        , (`Staged_ledger_diff, Truth.False)
+          (* This is a hack, but since we are bootstrapping. I am assuming this would be fine *)
+        , ( `Delta_transition_chain_witness
+          , Truth.True (Non_empty_list.singleton previous_state_hash) ) )
     in
     let t =
       { network
@@ -404,7 +415,12 @@ end = struct
           ( (`Time_received, Truth.True ())
           , (`Proof, Truth.True ())
           , (`Frontier_dependencies, Truth.False)
-          , (`Staged_ledger_diff, Truth.False) )
+          , (`Staged_ledger_diff, Truth.False)
+          , ( `Delta_transition_chain_witness
+            , Truth.True
+                ( Non_empty_list.singleton
+                @@ External_transition.Validated.parent_hash genesis_root ) )
+          )
       in
       { logger
       ; trust_system

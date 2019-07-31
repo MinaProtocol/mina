@@ -352,6 +352,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                              `This_transition_was_not_received_via_gossip
                         |> External_transition.skip_proof_validation
                              `This_transition_was_generated_internally
+                        |> External_transition
+                           .skip_delta_transition_chain_witness_validation
+                             `This_transition_was_not_received_via_gossip
                         |> Transition_frontier_validation
                            .validate_frontier_dependencies ~logger ~frontier
                         |> Result.map_error ~f:(fun err ->

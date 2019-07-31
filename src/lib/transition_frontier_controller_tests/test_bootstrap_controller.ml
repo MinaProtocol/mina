@@ -82,7 +82,8 @@ let%test_module "Bootstrap Controller" =
                   ( (`Time_received, Truth.True ())
                   , (`Proof, Truth.True ())
                   , (`Frontier_dependencies, Truth.False)
-                  , (`Staged_ledger_diff, Truth.False) ) )
+                  , (`Staged_ledger_diff, Truth.False)
+                  , (`Delta_transition_chain_witness, Truth.True) ) )
               breadcrumbs
           in
           let envelopes =

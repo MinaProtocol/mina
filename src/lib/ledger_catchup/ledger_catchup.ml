@@ -60,7 +60,8 @@ module Make (Inputs : Inputs.S) :
     | `In_process of State_hash.t Cache_lib.Intf.final_state
     | `Disconnected
     | `Verifier_error of Error.t
-    | `Invalid_proof ]
+    | `Invalid_proof
+    | `Invalid_delta_transition_chain_witness ]
 
   type 'a verification_result = ('a, verification_error) Result.t
 
@@ -71,10 +72,13 @@ module Make (Inputs : Inputs.S) :
       let open Deferred.Result.Let_syntax in
       let transition = Envelope.Incoming.data enveloped_transition in
       let%bind initially_validated_transition =
-        ( External_transition.Validation.wrap transition
+        ( let open Deferred.Result.Monad_infix in
+          External_transition.Validation.wrap transition
           |> External_transition.skip_time_received_validation
                `This_transition_was_not_received_via_gossip
           |> External_transition.validate_proof ~verifier
+          >>= Fn.compose Deferred.return
+                External_transition.validate_delta_transition_chain_witness
           :> External_transition.with_initial_validation verification_result
              Deferred.t )
       in
@@ -127,6 +131,13 @@ module Make (Inputs : Inputs.S) :
             , Some ("invalid proof", []) )
         in
         Error (Error.of_string "invalid proof")
+    | Error `Invalid_delta_transition_chain_witness ->
+        let%map () =
+          Trust_system.record_envelope_sender trust_system logger sender
+            ( Trust_system.Actions.Gossiped_invalid_transition
+            , Some ("invalid delta transition chain witness", []) )
+        in
+        Error (Error.of_string "invalid delta transition chain witness")
     | Error `Disconnected ->
         Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
 

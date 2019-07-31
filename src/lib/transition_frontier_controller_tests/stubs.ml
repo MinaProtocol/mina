@@ -257,7 +257,12 @@ struct
                ( (`Time_received, Truth.True ())
                , (`Proof, Truth.True ())
                , (`Frontier_dependencies, Truth.True ())
-               , (`Staged_ledger_diff, Truth.False) ))
+               , (`Staged_ledger_diff, Truth.False)
+               , ( `Delta_transition_chain_witness
+                 , Truth.True
+                     (Non_empty_list.singleton
+                        (Transition_frontier.Breadcrumb.state_hash
+                           parent_breadcrumb)) ) ))
           ~sender:None
       with
       | Ok new_breadcrumb ->
@@ -753,13 +758,20 @@ struct
     let send_transition ~logger ~transition_writer ~peer:{peer; frontier}
         state_hash =
       let transition =
-        External_transition.Validation.lower
-          ( Transition_frontier.find_exn frontier state_hash
-          |> Transition_frontier.Breadcrumb.transition_with_hash )
+        let transition_with_hash =
+          Transition_frontier.find_exn frontier state_hash
+          |> Transition_frontier.Breadcrumb.transition_with_hash
+        in
+        External_transition.Validation.lower transition_with_hash
           ( (`Time_received, Truth.True ())
           , (`Proof, Truth.True ())
           , (`Frontier_dependencies, Truth.False)
-          , (`Staged_ledger_diff, Truth.False) )
+          , (`Staged_ledger_diff, Truth.False)
+          , ( `Delta_transition_chain_witness
+            , Truth.True
+                (Non_empty_list.singleton
+                   ( With_hash.data transition_with_hash
+                   |> External_transition.Validated.parent_hash )) ) )
       in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
