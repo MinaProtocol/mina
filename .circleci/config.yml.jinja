@@ -95,7 +95,8 @@ jobs:
             - run:
                 name: Build kademlia
                 command: |
-                    source ~/.profile
+                    . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
+                    source ~/.bash_profile
                     cd src/app/kademlia-haskell
                     nix-build release2.nix 2>&1 | tee /tmp/buildkademlia.log
 
