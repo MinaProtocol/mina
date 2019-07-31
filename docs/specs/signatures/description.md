@@ -1,6 +1,5 @@
-      BIP: ?
       Title: MNT6-753 Schnorr Signatures in Coda
-      Author: Izaak Mecklker <pieter.wuille@gmail.com>
+      Author: Izaak Mecklker <izaak@o1labs.org>
       Status: Draft
       Type: Informational
       License: BSD-2-Clause
@@ -178,7 +177,7 @@ To sign *m* for public key *dG*:
 -   Let *k' = int(blake2s(bytes(d) || m)) mod n*[^8].
 -   Fail if *k' = 0*.
 -   Let *R = k'G*.
--   Let ''k = k' '' if *y(R) is even 1*, otherwise let ''k = n - k'
+-   Let ''k = k' '' if *y(R) is even*, otherwise let ''k = n - k'
     ''.
 -   Let *e = int(hash(trytes(x(R)) || trytes(dG) || m)) mod n*.
 -   The signature is *bytes(x(R)) || bytes(k + ed mod n)*.
