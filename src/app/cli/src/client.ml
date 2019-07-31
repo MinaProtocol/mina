@@ -431,7 +431,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %d)"
-           (Currency.Fee.to_int Cli_lib.Fee.default_transaction))
+           (Currency.Fee.to_int Cli_lib.Default.transaction_fee))
       (optional txn_fee)
   in
   let nonce_flag =
@@ -462,7 +462,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
                  sender_kp.public_key port
          in
          let fee =
-           Option.value ~default:Cli_lib.Fee.default_transaction fee_opt
+           Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
          in
          let command =
            Coda_commands.setup_user_command ~fee ~nonce
