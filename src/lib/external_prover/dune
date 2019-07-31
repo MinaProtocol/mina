@@ -1,0 +1,6 @@
+(library
+  (name external_prover)
+  (public_name external_prover)
+  (libraries core async snarky)
+  (preprocess (pps ppx_jane ppx_deriving.std))
+  (inline_tests))
