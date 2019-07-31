@@ -106,7 +106,9 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.root frontier
       |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
     in
-    let merkle_list = Merkle_list.prove ~context:frontier best_verified_tip in
+    let _, merkle_list =
+      Merkle_list.prove ~context:frontier best_verified_tip
+    in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
         [ ( "merkle_list"

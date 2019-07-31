@@ -22,7 +22,7 @@ module Make_intf (Input : Inputs_intf) = struct
          ?length:int
       -> context:Input.context
       -> Input.value
-      -> Input.proof_elem list
+      -> Input.value * Input.proof_elem list
 
     val verify :
          init:Input.hash
@@ -37,14 +37,17 @@ module Make (Input : Inputs_intf) : Make_intf(Input).S = struct
 
   let prove ?length ~context last =
     let rec find_path ~length value =
-      if length = Some 0 then []
+      if length = Some 0 then (value, [])
       else
-        Option.value_map (get_previous ~context value) ~default:[]
+        Option.value_map (get_previous ~context value) ~default:(value, [])
           ~f:(fun parent ->
-            to_proof_elem value
-            :: find_path ~length:(Option.map length ~f:pred) parent )
+            let first, proofs =
+              find_path ~length:(Option.map length ~f:pred) parent
+            in
+            (first, to_proof_elem value :: proofs) )
     in
-    List.rev (find_path ~length last)
+    let first, proofs = find_path ~length last in
+    (first, List.rev proofs)
 
   let verify ~init (merkle_list : proof_elem list) underlying_hash =
     let hashes =

@@ -73,18 +73,10 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.Breadcrumb.transition_with_hash requested_breadcrumb
       |> With_hash.data |> External_transition.Validated.forget_validation
     in
-    let merkle_list =
+    let first_transition, merkle_list =
       Merkle_list.prove ?length ~context:frontier requested_transition
     in
-    let oldest_breadcrumb =
-      Option.value ~default:(Transition_frontier.root frontier)
-      @@ Transition_frontier.oldest_breadcrumb_in_history frontier
-    in
-    let oldest_state_hash =
-      Transition_frontier.Breadcrumb.transition_with_hash oldest_breadcrumb
-      |> With_hash.hash
-    in
-    (oldest_state_hash, merkle_list)
+    (External_transition.state_hash first_transition, merkle_list)
 
   let verify ~target_hash
       ~transition_chain_witness:(oldest_state_hash, merkle_list) =
