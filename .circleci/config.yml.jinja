@@ -87,6 +87,7 @@ jobs:
             xcode: "10.2.1"
         resource_class: large
         working_directory: /Users/distiller/coda
+        steps:
             - run: sudo mkdir /nix
             - run: sudo chown distiller /nix
             - run: curl https://nixos.org/nix/install | sh
