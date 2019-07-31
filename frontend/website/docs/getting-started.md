@@ -2,8 +2,6 @@
 
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
-Join the Coda server on [Discord](http://bit.ly/CodaDiscord) to connect with the community, get support, and learn about how you can participate in weekly challenges for [Testnet Points](/docs#testnet-points)[\*](#disclaimer). Check out the [Testnet Leaderboard](http://bit.ly/TestnetBetaLeaderboard) to see who is winning this week's challenges.
-
 !!! note
     This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for `v0.0.1-beta.1`.
 
@@ -67,8 +65,4 @@ For walk-through instructions see [this guide](/docs/troubleshooting/#port-forwa
 ## Next
 
 Now that you've installed Coda and configured your network, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!
-
-<span id="disclaimer">
-\*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
-</span>
 

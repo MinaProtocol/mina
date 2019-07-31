@@ -1358,7 +1358,7 @@ let reset_seq_no : type a b. (a, b) t -> (a, b) t =
         b
   in
   let next_seq_no, updated_trees =
-    Non_empty_list.fold ~init:(0, []) state.trees
+    List.fold ~init:(0, []) (Non_empty_list.to_list state.trees)
       ~f:(fun (max_seq, updated_trees) tree ->
         let tree' = Tree.map ~f_base ~f_merge tree in
         let seq_no =
@@ -1496,7 +1496,7 @@ let pending_data t =
   List.concat_map Non_empty_list.(to_list @@ rev t.trees) ~f:Tree.base_jobs
 
 let view_jobs_with_position (state : ('merge, 'base) State.t) fa fd =
-  Non_empty_list.fold ~init:[] state.trees ~f:(fun acc tree ->
+  List.fold ~init:[] (Non_empty_list.to_list state.trees) ~f:(fun acc tree ->
       Tree.view_jobs_with_position tree fa fd :: acc )
 
 let job_count t =
@@ -1749,8 +1749,8 @@ let%test_module "scans" =
           let g = Int.gen_incl 0 (Int.pow 2 p) in
           let max_base_jobs = Int.pow 2 p in
           let jobs state =
-            Non_empty_list.fold ~init:[] state.trees ~f:(fun acc tree ->
-                Tree.jobs_records tree :: acc )
+            List.fold ~init:[] (Non_empty_list.to_list state.trees)
+              ~f:(fun acc tree -> Tree.jobs_records tree :: acc)
           in
           let verify_sequence_number state =
             let state = reset_seq_no state in
