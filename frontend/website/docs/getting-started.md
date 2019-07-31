@@ -30,8 +30,8 @@ The newest binary releases can be found below. Instructions are provided for mac
 Install using [brew](https://brew.sh).
 ```
 brew install codaprotocol/coda/coda
-``` 
-You can run `coda -help` to see if the works
+```
+You can run `coda -help` to check if the installation succeeded.
 
 ### Ubuntu 18.04 / Debian 9
 
@@ -43,7 +43,7 @@ sudo apt-get update
 sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-43cb0790
 ```
 
-You can `coda -help` to see if it works.
+You can run `coda -help` to check if the installation succeeded.
 
 
 ### Windows

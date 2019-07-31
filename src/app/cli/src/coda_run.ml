@@ -283,7 +283,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                 in the whitelist."
               ~metadata:
                 [("$address", `String (Unix.Inet_addr.to_string address))] ;
-            Reader.close reader >>= fun _ -> Writer.close writer )
+            Deferred.unit )
           else
             Rpc.Connection.server_with_close reader writer
               ~implementations:
