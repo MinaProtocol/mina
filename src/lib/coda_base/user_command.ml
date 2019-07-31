@@ -85,10 +85,7 @@ let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
 module For_tests = struct
   (* Pretend to sign a command. Much faster than actually signing. *)
   let fake_sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
-    { payload
-    ; sender= kp.public_key
-    ; signature= Signature.dummy
-    }
+    {payload; sender= kp.public_key; signature= Signature.dummy}
 end
 
 module Gen = struct
