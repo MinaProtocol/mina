@@ -14,6 +14,7 @@ mkdir -p deploy
 echo "*** Building"
 
 yarn clean && yarn build $1
+yarn graphql-docs
 
 
 # Deploy cdn if prod

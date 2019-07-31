@@ -64,7 +64,12 @@ let%test_module "Command line tests" =
       match Core.Sys.is_file coda_exe with
       | `Yes ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              test_background_daemon () |> Deferred.map ~f:Result.is_ok )
+              match%map test_background_daemon () with
+              | Ok _ ->
+                  true
+              | Error e ->
+                  printf "Error: %s" (Error.to_string_hum e) ;
+                  false )
       | `No | `Unknown ->
           printf "Please build coda.exe in order to run this test\n%!" ;
           false

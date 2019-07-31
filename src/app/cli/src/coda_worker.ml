@@ -24,7 +24,8 @@ module Input = struct
     ; program_dir: string
     ; acceptable_delay: Time.Span.t
     ; peers: Host_and_port.t list
-    ; max_concurrent_connections: int option }
+    ; max_concurrent_connections: int option
+    ; is_archive_node: bool }
   [@@deriving bin_io]
 end
 
@@ -76,6 +77,14 @@ module T = struct
         ( 'worker
         , Public_key.Compressed.t
         , User_command.t list )
+        Rpc_parallel.Function.t
+    ; get_all_transitions:
+        ( 'worker
+        , Public_key.Compressed.t
+        , ( Auxiliary_database.Filtered_external_transition.t
+          , State_hash.t )
+          With_hash.t
+          list )
         Rpc_parallel.Function.t
     ; new_user_command:
         ( 'worker
@@ -136,6 +145,13 @@ module T = struct
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> Payment_proof.t Deferred.t
+    ; coda_get_all_transitions:
+           Public_key.Compressed.t
+        -> ( Auxiliary_database.Filtered_external_transition.t
+           , State_hash.t )
+           With_hash.t
+           list
+           Deferred.t
     ; coda_new_block:
            Account.key
         -> ( Auxiliary_database.Filtered_external_transition.t
@@ -208,6 +224,19 @@ module T = struct
 
     let best_path_impl ~worker_state ~conn_state:() () =
       worker_state.coda_best_path ()
+
+    let get_all_transitions_impl ~worker_state ~conn_state:() pk =
+      worker_state.coda_get_all_transitions pk
+
+    let get_all_transitions =
+      C.create_rpc ~f:get_all_transitions_impl
+        ~bin_input:Public_key.Compressed.Stable.V1.bin_t
+        ~bin_output:
+          [%bin_type_class:
+            ( Auxiliary_database.Filtered_external_transition.Stable.V1.t
+            , State_hash.Stable.V1.t )
+            With_hash.Stable.V1.t
+            list] ()
 
     let peers =
       C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t
@@ -306,7 +335,8 @@ module T = struct
       ; best_path
       ; sync_status
       ; new_user_command
-      ; get_all_user_commands }
+      ; get_all_user_commands
+      ; get_all_transitions }
 
     let init_worker_state
         { addrs_and_ports
@@ -317,6 +347,7 @@ module T = struct
         ; trace_dir
         ; peers
         ; max_concurrent_connections
+        ; is_archive_node
         ; _ } =
       let logger =
         Logger.create
@@ -423,7 +454,8 @@ module T = struct
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_propose_keypairs ~monitor ~consensus_local_state
-                 ~transaction_database ~external_transition_database ())
+                 ~transaction_database ~external_transition_database
+                 ~is_archive_node ~work_reassignment_wait:420000 ())
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
@@ -446,6 +478,14 @@ module T = struct
           in
           let coda_peers () = return (Coda_lib.peers coda) in
           let coda_start () = return (Coda_lib.start coda) in
+          let coda_get_all_transitions pk =
+            let external_transition_database =
+              Coda_lib.external_transition_database coda
+            in
+            Auxiliary_database.External_transition_database.get_values
+              external_transition_database pk
+            |> Deferred.return
+          in
           let coda_get_balance pk =
             return
               ( Coda_commands.get_balance coda pk
@@ -494,8 +534,10 @@ module T = struct
             with
             | Ok proof ->
                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  !"Constructed proof for receipt: %{sexp:Receipt.Chain_hash.t}"
-                  proving_receipt ;
+                  !"Constructed proof for receipt: $receipt_chain_hash"
+                  ~metadata:
+                    [ ( "receipt_chain_hash"
+                      , Receipt.Chain_hash.to_yojson proving_receipt ) ] ;
                 proof
             | Error e ->
                 failwithf
@@ -603,7 +645,8 @@ module T = struct
           ; coda_sync_status= with_monitor coda_sync_status
           ; coda_new_user_command= with_monitor coda_new_user_command
           ; coda_get_all_user_commands= with_monitor coda_get_all_user_commands
-          } )
+          ; coda_get_all_transitions= with_monitor coda_get_all_transitions }
+      )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

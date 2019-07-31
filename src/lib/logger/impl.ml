@@ -113,8 +113,19 @@ module Processor = struct
         | Error err ->
             Core.printf "logproc interpolation error: %s\n" err ;
             None
-        | Ok (str, _) ->
-            Some (Level.show msg.level ^ ": " ^ str)
+        | Ok (str, extra) ->
+            let formatted_extra =
+              extra
+              |> List.map ~f:(fun (k, v) -> "\n\t" ^ k ^ ": " ^ v)
+              |> String.concat ~sep:""
+            in
+            let time =
+              Core.Time.format msg.timestamp "%Y-%m-%d %H:%M:%S UTC"
+                ~zone:Time.Zone.utc
+            in
+            Some
+              ( time ^ " [" ^ Level.show msg.level ^ "] " ^ str
+              ^ formatted_extra )
   end
 
   let raw () = T ((module Raw), Raw.create ())
@@ -148,9 +159,9 @@ module Transport = struct
 
       let log_perm = 0o644
 
-      let primary_log_name = "coda.log.0"
+      let primary_log_name = "coda.log"
 
-      let secondary_log_name = "coda.log.1"
+      let secondary_log_name = "coda.log.0"
 
       type t =
         { directory: string
@@ -159,6 +170,12 @@ module Transport = struct
         ; mutable primary_log_size: int }
 
       let create ~directory ~max_size =
+        if not (Result.is_ok (access directory [`Exists])) then
+          mkdir_p ~perm:0o755 directory ;
+        if not (Result.is_ok (access directory [`Exists; `Read; `Write])) then
+          failwithf
+            "cannot create log files: read/write permissions required on %s"
+            directory () ;
         let primary_log_loc = Filename.concat directory primary_log_name in
         let primary_log_size, mode =
           if Result.is_ok (access primary_log_loc [`Exists; `Read; `Write])
@@ -183,6 +200,7 @@ module Transport = struct
 
       let transport t str =
         if t.primary_log_size > t.max_size then rotate t ;
+        let str = str ^ "\n" in
         let len = String.length str in
         if write t.primary_log ~buf:(Bytes.of_string str) ~len <> len then
           printf "unexpected error writing to persistent log" ;
@@ -211,7 +229,8 @@ module Consumer_registry = struct
     else t := List.Assoc.add !t id {processor; transport} ~equal:( = )
 
   let broadcast_log_message msg =
-    List.iter !t ~f:(fun (_, consumer) ->
+    (* TODO: warn or fail if there's no registered consumer? Issue #3000 *)
+    List.iter !t ~f:(fun (_id, consumer) ->
         let (Processor.T ((module Processor_mod), processor)) =
           consumer.processor
         in

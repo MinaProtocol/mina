@@ -29,12 +29,13 @@ module Test_inputs = struct
 
   module Snark_pool = struct
     module T = struct
-      type t = Ledger_proof.t list [@@deriving bin_io, hash, compare, sexp]
+      type t = Transaction_snark.Statement.Stable.Latest.t list
+      [@@deriving bin_io, hash, compare, sexp]
     end
 
     module Work = Hashable.Make_binable (T)
 
-    type t = Transaction_snark_work.t Work.Table.t
+    type t = Currency.Fee.t Work.Table.t
 
     let get_completed_work (t : t) = Work.Table.find t
 
@@ -44,9 +45,11 @@ module Test_inputs = struct
   end
 
   module Staged_ledger = struct
-    type t = int List.t
+    type t =
+      (int, int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t
+      List.t
 
-    let work i = Snark_work_lib.Work.Single.Spec.Transition (Fee.of_int i, i, i)
+    let work = Fn.id
 
     let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
@@ -68,7 +71,6 @@ end
 module Implementation_inputs = struct
   open Coda_base
   module Ledger_hash = Ledger_hash
-  module Ledger_proof_statement = Transaction_snark.Statement
   module Sparse_ledger = Sparse_ledger
   module Transaction = Transaction
   module Transaction_witness = Transaction_witness

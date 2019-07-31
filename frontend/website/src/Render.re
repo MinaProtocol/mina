@@ -32,11 +32,9 @@ module Rimraf = {
   [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
 };
 
-let isProd = Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod";
-
-if (isProd) {
-  Links.Cdn.prefix := "https://cdn.codaprotocol.com/website";
-};
+Links.Cdn.setPrefix(
+  Config.isProd ? "https://cdn.codaprotocol.com/website" : "",
+);
 
 Style.Typeface.load();
 
@@ -185,17 +183,6 @@ Router.(
             <Wrapped> <Careers jobOpenings /> </Wrapped>
           </Page>,
         ),
-        File(
-          "code",
-          <Page page=`Code name="code"> <Wrapped> <Code /> </Wrapped> </Page>,
-        ),
-        File(
-          "testnet",
-          <Page
-            page=`Testnet name="testnet" extraHeaders={Testnet.extraHeaders()}>
-            <Wrapped> <Testnet /> </Wrapped>
-          </Page>,
-        ),
         File("blog", blogPage("blog")),
         File(
           "privacy",
@@ -206,6 +193,23 @@ Router.(
         File(
           "tos",
           <Page page=`Tos name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
+        ),
+      |],
+    ),
+  )
+);
+
+Rimraf.sync("docs-theme");
+Router.(
+  generateStatic(
+    Dir(
+      "docs-theme",
+      [|
+        File(
+          "main",
+          <Page page=`Docs name="/docs/main">
+            <Wrapped> <Docs /> </Wrapped>
+          </Page>,
         ),
       |],
     ),
@@ -250,7 +254,15 @@ copyFolder("static");
 
 // Special-case the jsoo-compiled files for now
 // They can't be loaded from cdn so they get copied to the site separately
-if (!isProd) {
+if (!Config.isProd) {
   moveToSite("static/main.bc.js");
   moveToSite("static/verifier_main.bc.js");
 };
+
+// Run mkdocs to generate static docs site
+Markdown.Child_process.execSync(
+  "mkdocs build -d site/docs",
+  Markdown.Child_process.option(),
+);
+
+Fs.symlinkSync(Node.Process.cwd() ++ "/graphql-docs", "./site/docs/graphql");

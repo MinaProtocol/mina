@@ -173,17 +173,13 @@ publish-macos:
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
-	@cp src/_build/coda.deb /tmp/artifacts/.
+	@cp src/_build/coda*.deb /tmp/artifacts/.
+	@cp src/_build/coda_pvkeys_* /tmp/artifacts/.
 
 publish_deb:
 	@./scripts/publish-deb.sh
 
 publish_debs: publish_deb
-
-provingkeys:
-	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH)_$(CODA_CONSENSUS).tar.bz2  /tmp/coda_cache_dir ; \
-	mkdir -p /tmp/artifacts ; \
-	cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts

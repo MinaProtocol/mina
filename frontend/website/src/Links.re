@@ -6,19 +6,32 @@ module Cdn = {
     [@bs.send] external digest: (t, string) => string = "";
   };
 
-  let prefix = ref("");
+  let prefix = ref(None);
+
+  let setPrefix = p => prefix := Some(p);
+
+  let prefix = () =>
+    switch (prefix^) {
+    | None =>
+      Js.Exn.raiseError(
+        "CDN Prefix unset -- Can't run Links.Cdn.url at the top level.",
+      )
+    | Some(prefix) => prefix
+    };
 
   let cache = Hashtbl.create(20);
 
+  let localAssetPath = path =>
+    if (path.[0] == '/') {
+      "." ++ path;
+    } else {
+      prerr_endline({j|"Expected cdn path `$path` to begin with /"|j});
+      exit(1);
+    };
+
   let getHashedPath = path => {
     if (!Hashtbl.mem(cache, path)) {
-      let localPath =
-        if (path.[0] == '/') {
-          "." ++ path;
-        } else {
-          prerr_endline("Expected cdn url to begin with /");
-          exit(1);
-        };
+      let localPath = localAssetPath(path);
       // Get file contents
       let content = Node.Fs.readFileAsUtf8Sync(localPath);
       // Generate hash of file
@@ -36,7 +49,7 @@ module Cdn = {
     Hashtbl.find(cache, path);
   };
 
-  let url = path => prefix^ ++ getHashedPath(path);
+  let url = path => prefix() ++ getHashedPath(path);
 };
 
 module Named = {

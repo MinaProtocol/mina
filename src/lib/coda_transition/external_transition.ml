@@ -48,6 +48,8 @@ module Make
         let consensus_state {protocol_state; _} =
           Protocol_state.consensus_state protocol_state
 
+        let state_hash {protocol_state; _} = Protocol_state.hash protocol_state
+
         let parent_hash {protocol_state; _} =
           Protocol_state.previous_state_hash protocol_state
 
@@ -96,6 +98,7 @@ module Make
     , protocol_state_proof
     , staged_ledger_diff
     , consensus_state
+    , state_hash
     , parent_hash
     , proposer
     , user_commands
@@ -434,7 +437,7 @@ module Make
               ~f:target_hash_of_ledger_proof
               ~default:
                 (Frozen_ledger_hash.of_ledger_hash
-                   (Ledger.merkle_root Genesis_ledger.t))
+                   (Ledger.merkle_root (Lazy.force Genesis_ledger.t)))
         | Some (proof, _) ->
             target_hash_of_ledger_proof proof
       in

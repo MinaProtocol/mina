@@ -1,18 +1,9 @@
 include Data_hash.Full_size
 
-(** string encoding (Base58Check) *)
-val to_string : t -> string
-
-(** string (Base58Check) decoding *)
-val of_string : string -> t
-
-(** explicit Base58Check encoding *)
-val to_base58_check : t -> string
-
-(** Base58Check decoding *)
-val of_base58_check : string -> t Base.Or_error.t
-
-(** Base58Check decoding *)
-val of_base58_check_exn : string -> t
+include Codable.Base58_check_intf with type t := t
 
 val zero : Crypto_params.Tick0.field
+
+val raw_hash_bytes : t -> string
+
+val to_bytes : [`Use_to_base58_check_or_raw_hash_bytes]
