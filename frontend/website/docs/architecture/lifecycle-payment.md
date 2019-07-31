@@ -15,7 +15,7 @@ Let's walk through a scenario where a sender, Bob, wants to send a receiver, Ali
 Any member of the network can create a payment and share it with the Coda network. The payment is
 cryptographically signed with a private key so that the sender’s account can be verified. It is then sent out to peers on the network to be processed. The payment, when received by a peer, will exist in their local `transaction pool`, which is an in-memory store of all the transactions that peer has heard on the network.
 
-### Step 2: Proposing a Block - Bob’s payment gets put in a todo list
+### Step 2: Producing a Block - Bob’s payment gets put in a todo list
 A block producer node is chosen on the network for a given time slot. The currently active producer choses in-flight payments based on payment fees and places them in a list to be processed called a transition block. Block producers earn coda for building these blocks. The producer generates a SNARK defining the structure of the transition block as compared to the previous block (but not yet verifying these new payments). The producer transmits this new information for snark workers to process.
 
 ### Step 3: Transaction Snark Proving - Bob’s payment gets snark-signed
