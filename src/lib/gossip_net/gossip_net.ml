@@ -268,7 +268,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     loop ()
 
   let try_call_rpc t (peer : Peer.t) dispatch query =
-    (* use error collection, close connection strategy of Tcp.with_connection *)
     let call () =
       Rpc.Connection.with_client (to_where_to_connect t peer) (fun conn ->
           Versioned_rpc.Connection_with_menu.create conn
