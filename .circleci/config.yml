@@ -81,6 +81,23 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
+
+    build-macos-kademlia:
+        macos:
+            xcode: "10.2.1"
+        resource_class: large
+        working_directory: /Users/distiller/coda
+            - run: sudo mkdir /nix
+            - run: sudo chown distiller /nix
+            - run: curl https://nixos.org/nix/install | sh
+            - checkout
+            - run:
+                name: Build kademlia
+                command: |
+                    source ~/.profile
+                    cd src/app/kademlia-haskell
+                    nix-build release2.nix 2>&1 | tee /tmp/buildkademlia.log
+
     build-macos:
       # only run when there's a 'release' tag
       # filters:
@@ -103,13 +120,7 @@ jobs:
             - run: ls -l /var/lib/coda
             - run: sudo mkdir /nix
             - run: sudo chown distiller /nix
-            - run: curl https://nixos.org/nix/install | sh
             - checkout
-            - run:
-                name: Build kademlia
-                command: |
-                    . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
-                    make kademlia 2>&1 | tee /tmp/buildkademlia.log
             - restore_cache:
                 keys:
                     - homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
