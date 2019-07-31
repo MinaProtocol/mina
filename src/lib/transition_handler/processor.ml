@@ -97,15 +97,15 @@ module Make (Inputs : Inputs.S) :
               Trust_system.record_envelope_sender trust_system logger sender
                 ( Trust_system.Actions.Gossiped_invalid_transition
                 , Some
-                    ( "$state_hash was not selected over transition frontier \
-                       root"
+                    ( "The transition with hash $state_hash was not selected \
+                       over the transition frontier root"
                     , metadata ) )
             in
             Error ()
         | Error `Already_in_frontier ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
-              "refusing to process $state_hash because is is already in the \
-               transition frontier" ;
+              "Refusing to process the transition with hash $state_hash \
+               because is is already in the transition frontier" ;
             return (Error ())
         | Error `Parent_missing_from_frontier ->
             Catchup_scheduler.watch catchup_scheduler
@@ -134,13 +134,17 @@ module Make (Inputs : Inputs.S) :
                   ~metadata:
                     ( metadata
                     @ [("error", `String (Error.to_string_hum error))] )
-                  "error while building breadcrumb in processor: $error" ;
+                  "Error while building breadcrumb in the transition handler \
+                   processor: $error" ;
                 Deferred.return (Error ())
             | Error (`Fatal_error exn) ->
                 raise exn
             | Ok breadcrumb ->
                 Deferred.return (Ok breadcrumb) )
       in
+      Coda_metrics.(
+        Counter.inc_one
+          Transition_frontier_controller.breadcrumbs_built_by_processor) ;
       Deferred.map ~f:Result.return
         (add_and_finalize ~frontier ~catchup_scheduler
            ~processed_transition_writer ~only_if_present:false breadcrumb))
@@ -194,6 +198,9 @@ module Make (Inputs : Inputs.S) :
             * transition from the network) can happen iff there is another node
             * with the exact same private key and view of the transaction pool. *)
          [ Reader.map proposer_transition_reader ~f:(fun breadcrumb ->
+               Coda_metrics.(
+                 Gauge.inc_one
+                   Transition_frontier_controller.transitions_being_processed) ;
                `Proposed_breadcrumb (Cached.pure breadcrumb) )
          ; Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
                `Catchup_breadcrumbs cb )
@@ -219,22 +226,28 @@ module Make (Inputs : Inputs.S) :
                    | Error err ->
                        Logger.error logger ~module_:__MODULE__
                          ~location:__LOC__
-                         "failed to attach all catchup breadcrumbs to \
+                         "Error, failed to attach all catchup breadcrumbs to \
                           transition frontier: %s"
                          (Error.to_string_hum err) )
-               | `Proposed_breadcrumb breadcrumb -> (
-                   match%map
-                     add_and_finalize ~only_if_present:false breadcrumb
-                   with
-                   | Ok () ->
-                       ()
-                   | Error err ->
-                       Logger.error logger ~module_:__MODULE__
-                         ~location:__LOC__
-                         ~metadata:
-                           [("error", `String (Error.to_string_hum err))]
-                         "failed to attach breadcrumb proposed internally to \
-                          transition frontier: $error" )
+               | `Proposed_breadcrumb breadcrumb ->
+                   let%map () =
+                     match%map
+                       add_and_finalize ~only_if_present:false breadcrumb
+                     with
+                     | Ok () ->
+                         ()
+                     | Error err ->
+                         Logger.error logger ~module_:__MODULE__
+                           ~location:__LOC__
+                           ~metadata:
+                             [("error", `String (Error.to_string_hum err))]
+                           "Error, failed to attach proposed breadcrumb to \
+                            transition frontier: $error"
+                   in
+                   Coda_metrics.(
+                     Gauge.dec_one
+                       Transition_frontier_controller
+                       .transitions_being_processed)
                | `Partially_valid_transition transition ->
                    process_transition ~transition ) ))
 end

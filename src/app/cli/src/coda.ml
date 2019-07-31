@@ -26,9 +26,6 @@ let daemon logger =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional string)
-     and from_genesis =
-       flag "from-genesis"
-         ~doc:"Indicating that we are starting from genesis or not" no_arg
      and unsafe_track_propose_key =
        flag "unsafe-track-propose-key"
          ~doc:
@@ -39,16 +36,16 @@ let daemon logger =
      and propose_key =
        flag "propose-key"
          ~doc:
-           "KEYFILE Private key file for the proposing transitions. You \
-            cannot provide both `propose-key` and `propose-public-key`. \
-            (default:don't propose)"
+           "KEYFILE Private key file for the block producer. You cannot \
+            provide both `propose-key` and `propose-public-key`. \
+            (default:don't produce blocks)"
          (optional string)
      and propose_public_key =
        flag "propose-public-key"
          ~doc:
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both `propose-key` and \
-            `propose-public-key`. (default: don't propose)"
+            `propose-public-key`. (default: don't produce blocks)"
          (optional public_key_compressed)
      and initial_peers_raw =
        flag "peer"
@@ -86,6 +83,12 @@ let daemon logger =
            "PORT local REST-server for daemon interaction (default no \
             rest-server)"
          (optional int16)
+     and metrics_server_port =
+       flag "metrics-port"
+         ~doc:
+           "PORT metrics server for scraping via Prometheus (default no \
+            metrics-server)"
+         (optional int16)
      and external_ip_opt =
        flag "external-ip"
          ~doc:
@@ -97,12 +100,14 @@ let daemon logger =
          (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
+     and is_archive_node =
+       flag "archive" no_arg ~doc:"Archive all blocks heard"
      and log_json =
        flag "log-json" no_arg
          ~doc:"Print daemon log output as JSON (default: plain text)"
      and log_level =
        flag "log-level" (optional string)
-         ~doc:"Set daemon log level (default: Warn)"
+         ~doc:"Set daemon log level (default: Info)"
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
@@ -113,12 +118,23 @@ let daemon logger =
          (optional txn_fee)
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
+     and insecure_rest_server =
+       flag "insecure-rest-server" no_arg
+         ~doc:
+           "Have REST server listen on all addresses, not just localhost \
+            (this is INSECURE, make sure your firewall is configured \
+            correctly!)"
      and limit_connections =
        flag "limit-concurrent-connections"
          ~doc:
            "true|false Limit the number of concurrent connections per IP \
             address (default:true)"
          (optional bool)
+     and no_bans =
+       let module Expiration = struct
+         [%%expires_after "20190907"]
+       end in
+       flag "no-bans" no_arg ~doc:"don't ban peers (**TEMPORARY FOR TESTNET**)"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -128,7 +144,7 @@ let daemon logger =
        let%bind log_level =
          match log_level with
          | None ->
-             Deferred.return Logger.Level.Warn
+             Deferred.return Logger.Level.Info
          | Some log_level_str_with_case -> (
              let open Logger in
              let log_level_str = String.lowercase log_level_str_with_case in
@@ -143,27 +159,120 @@ let daemon logger =
              | Ok ll ->
                  Deferred.return ll )
        in
-       let logger_config =
-         if log_json then None
-         else
-           Some
-             { Logproc_lib.Interpolator.mode= Inline
-             ; max_interpolation_length= 30
-             ; pretty_print= true }
-       in
-       Logger.settings := (log_level, logger_config) ;
+       if no_bans then Trust_system.disable_bans () ;
        let%bind conf_dir =
-         if is_background then (
+         if is_background then
            let home = Core.Sys.home_directory () in
            let conf_dir = compute_conf_dir home in
+           Deferred.return conf_dir
+         else Sys.home_directory () >>| compute_conf_dir
+       in
+       let () =
+         match Core.Sys.file_exists conf_dir with
+         | `Yes ->
+             ()
+         | _ ->
+             Core.Unix.mkdir_p conf_dir
+       in
+       let () =
+         if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
              conf_dir ;
            Daemon.daemonize
              ~redirect_stdout:(`File_append (conf_dir ^/ "coda.log"))
              ~redirect_stderr:(`File_append (conf_dir ^/ "coda.log"))
-             () ;
-           Deferred.return conf_dir )
-         else Sys.home_directory () >>| compute_conf_dir
+             () )
+         else ()
+       in
+       let stdout_log_processor =
+         if log_json then Logger.Processor.raw ()
+         else
+           Logger.Processor.pretty ~log_level
+             ~config:
+               { Logproc_lib.Interpolator.mode= Inline
+               ; max_interpolation_length= 50
+               ; pretty_print= true }
+       in
+       Logger.Consumer_registry.register ~id:"default"
+         ~processor:stdout_log_processor
+         ~transport:(Logger.Transport.stdout ()) ;
+       (* 512MB logrotate max size = 1GB max filesystem usage *)
+       let logrotate_max_size = 1024 * 1024 * 512 in
+       Logger.Consumer_registry.register ~id:"raw_persistent"
+         ~processor:(Logger.Processor.raw ())
+         ~transport:
+           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+              ~max_size:logrotate_max_size) ;
+       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+         "Coda daemon is booting up; built with commit $commit on branch \
+          $branch"
+         ~metadata:
+           [ ("commit", `String Coda_version.commit_id)
+           ; ("branch", `String Coda_version.branch) ] ;
+       (* Check if the config files are for the current version.
+        * WARNING: Deleting ALL the files in the config directory if there is
+        * a version mismatch *)
+       (* When persistence is added back, this needs to be revisited
+        * to handle persistence related files properly *)
+       let%bind () =
+         let del_files dir =
+           let rec all_files dirname basename =
+             let fullname = Filename.concat dirname basename in
+             match%bind Sys.is_directory fullname with
+             | `Yes ->
+                 let%map dirs, files =
+                   Sys.ls_dir fullname
+                   >>= Deferred.List.map ~f:(all_files fullname)
+                   >>| List.unzip
+                 in
+                 let dirs =
+                   if String.equal dirname conf_dir then List.concat dirs
+                   else List.append (List.concat dirs) [fullname]
+                 in
+                 (dirs, List.concat files)
+             | _ ->
+                 Deferred.return ([], [fullname])
+           in
+           let%bind dirs, files = all_files dir "" in
+           let%bind () =
+             Deferred.List.iter files ~f:(fun file -> Sys.remove file)
+           in
+           Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
+         in
+         let make_version ~wipe_dir =
+           let%bind () =
+             if wipe_dir then del_files conf_dir else Deferred.unit
+           in
+           let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
+           Writer.write_line wr Coda_version.commit_id ;
+           Writer.close wr
+         in
+         match%bind
+           Monitor.try_with_or_error (fun () ->
+               let%bind r = Reader.open_file (conf_dir ^/ "coda.version") in
+               match%map Pipe.to_list (Reader.lines r) with
+               | [] ->
+                   ""
+               | s ->
+                   List.hd_exn s )
+         with
+         | Ok c ->
+             if String.equal c Coda_version.commit_id then return ()
+             else (
+               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                 "Different version of Coda detected in config directory \
+                  $config_directory, removing existing configuration"
+                 ~metadata:[("config_directory", `String conf_dir)] ;
+               make_version ~wipe_dir:true )
+         | Error e ->
+             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:[("error", `String (Error.to_string_mach e))]
+               "Error reading coda.version: $error" ;
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               "Failed to read coda.version, cleaning up the config directory \
+                $config_directory"
+               ~metadata:[("config_directory", `String conf_dir)] ;
+             make_version ~wipe_dir:false
        in
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
@@ -190,9 +299,8 @@ let daemon logger =
                Some c
            | Error e ->
                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "error reading daemon.json: %s" (Error.to_string_mach e) ;
-               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-                 "failed to read daemon.json, not using it" ;
+                 "Error reading daemon.json: $error"
+                 ~metadata:[("error", `String (Error.to_string_mach e))] ;
                None
          in
          let maybe_from_config (type a) (f : YJ.json -> a option)
@@ -212,8 +320,9 @@ let daemon logger =
            | Some x ->
                x
            | None ->
-               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                 "didn't find %s in the config file, using default" keyname ;
+               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                 "Key '$key' not found in the config file, using default"
+                 ~metadata:[("key", `String keyname)] ;
                default
          in
          let external_port : int =
@@ -255,7 +364,6 @@ let daemon logger =
                     "peers" None ~default:[] ]
          in
          let discovery_port = external_port + 1 in
-         let%bind () = Unix.mkdir ~p:() conf_dir in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
          let%bind initial_peers_cleaned =
            Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
@@ -273,9 +381,11 @@ let daemon logger =
                            ~port:(Host_and_port.port addr))
                | Error e ->
                    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                     "getaddr exception: %s" (Error.to_string_mach e) ;
+                     "Error on getaddr: $error"
+                     ~metadata:[("error", `String (Error.to_string_mach e))] ;
                    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                     "failed to look up address for %s, skipping" host ;
+                     "Failed to get address for host $host, skipping"
+                     ~metadata:[("host", `String host)] ;
                    return None )
          in
          let%bind () =
@@ -364,16 +474,17 @@ let daemon logger =
            (Async.Scheduler.long_cycles
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
-             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-               "long async cycle %s"
-               (Time_ns.Span.to_string span) ) ;
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               "Long async cycle: $span milliseconds"
+               ~metadata:[("span", `String (Time_ns.Span.to_string span))] ) ;
          let run_snark_worker_action =
            Option.value_map run_snark_worker_flag ~default:`Don't_run
              ~f:(fun k -> `With_public_key k)
          in
-         let trace_database_initialization typ location =
-           Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
-             ~location typ
+         let trace_database_initialization typ location directory =
+           Logger.trace logger ~module_:__MODULE__ ~location
+             "Creating database of type $typ in directory $directory"
+             ~metadata:[("typ", `String typ); ("directory", `String directory)]
          in
          let trust_dir = conf_dir ^/ "trust" in
          let () = Snark_params.set_chunked_hashing true in
@@ -452,7 +563,8 @@ let daemon logger =
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
                 ~transition_frontier_location ~time_controller
                 ~initial_propose_keypairs ~monitor ~consensus_local_state
-                ~transaction_database ~external_transition_database ())
+                ~transaction_database ~external_transition_database
+                ~is_archive_node ())
          in
          { Coda_initialization.coda
          ; client_whitelist
@@ -474,21 +586,19 @@ let daemon logger =
        in
        coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
-       let%bind () =
-         if from_genesis then Deferred.unit
-         else
-           after
-             ( Consensus.Constants.block_window_duration_ms * 2
-             |> Float.of_int |> Time.Span.of_ms )
-       in
        Coda_lib.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-         ~client_port () ;
+         ~insecure_rest_server ~client_port () ;
        Coda_run.run_snark_worker ~client_port run_snark_worker_action ;
+       let%bind () =
+         Option.map metrics_server_port ~f:(fun port ->
+             Coda_metrics.server ~port ~logger >>| ignore )
+         |> Option.value ~default:Deferred.unit
+       in
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-         "Running coda services" ;
+         "Daemon ready. Clients can now connect" ;
        Async.never ())
 
 [%%if
@@ -503,22 +613,30 @@ let rec ensure_testnet_id_still_good logger =
       (fun () -> don't_wait_for @@ ensure_testnet_id_still_good logger)
       ()
   in
+  let soon_minutes = Int.of_float (60.0 *. recheck_soon) in
   match%bind
     Monitor.try_with_or_error (fun () ->
         Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
   with
   | Error e ->
       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        "exception while trying to fetch testnet_id, trying again in 6 minutes" ;
+        "Exception while trying to fetch testnet_id: $error. Trying again in \
+         $retry_minutes minutes"
+        ~metadata:
+          [ ("error", `String (Error.to_string_hum e))
+          ; ("retry_minutes", `Int soon_minutes) ] ;
       try_later recheck_soon ;
       Deferred.unit
   | Ok (resp, body) -> (
       if resp.status <> `OK then (
-        try_later recheck_soon ;
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          "HTTP response status %s while getting testnet id, checking again \
-           in 6 minutes."
-          (Cohttp.Code.string_of_status resp.status) ;
+          "HTTP response status $HTTP_status while getting testnet id, \
+           checking again in $retry_minutes minutes."
+          ~metadata:
+            [ ( "HTTP_status"
+              , `String (Cohttp.Code.string_of_status resp.status) )
+            ; ("retry_minutes", `Int soon_minutes) ] ;
+        try_later recheck_soon ;
         Deferred.unit )
       else
         let%bind body_string = Body.to_string body in
@@ -574,8 +692,8 @@ let internal_commands =
   ; ("snark-hashes", snark_hashes) ]
 
 let coda_commands logger =
-  [ ("client", Client.command)
-  ; ("daemon", daemon logger)
+  [ ("daemon", daemon logger)
+  ; ("client", Client.command)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
@@ -609,7 +727,8 @@ let coda_commands logger =
         ; (module Coda_long_fork)
         ; (module Coda_delegation_test)
         ; (module Full_test)
-        ; (module Transaction_snark_profiler) ]
+        ; (module Transaction_snark_profiler)
+        ; (module Coda_archive_node_test) ]
         : (module Integration_test) list )
   in
   coda_commands logger
@@ -617,13 +736,45 @@ let coda_commands logger =
 
 [%%endif]
 
+let print_version_help coda_exe version =
+  (* mimic Jane Street command help *)
+  let lines =
+    [ "print version information"
+    ; ""
+    ; sprintf "  %s %s" (Filename.basename coda_exe) version
+    ; ""
+    ; "=== flags ==="
+    ; ""
+    ; "  [-help]  print this help text and exit"
+    ; "           (alias: -?)" ]
+  in
+  List.iter lines ~f:(Core.printf "%s\n%!")
+
+let print_version_info () =
+  Core.printf "Commit %s on branch %s\n"
+    (String.sub Coda_version.commit_id ~pos:0 ~len:7)
+    Coda_version.branch
+
 let () =
   Random.self_init () ;
-  let logger = Logger.create () in
+  let logger = Logger.create ~initialize_default_consumer:false () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
-  Command.run
-    (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
-       (coda_commands logger)) ;
+  (* intercept command-line processing for "version", because we don't
+     use the Jane Street scripts that generate their version information
+   *)
+  (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
+   let is_version_cmd = make_list_mem ["version"; "-version"] in
+   let is_help_flag = make_list_mem ["-help"; "-?"] in
+   match Sys.argv with
+   | [|_coda_exe; version|] when is_version_cmd version ->
+       print_version_info ()
+   | [|coda_exe; version; help|]
+     when is_version_cmd version && is_help_flag help ->
+       print_version_help coda_exe version
+   | _ ->
+       Command.run
+         (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
+            (coda_commands logger))) ;
   Core.exit 0

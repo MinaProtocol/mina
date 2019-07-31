@@ -18,7 +18,7 @@ module Poly = struct
           ; ledger_proof: Proof.Stable.V1.t option
           ; proposer: 'proposer_pk
           ; coinbase: 'amount }
-        [@@deriving bin_io, sexp, fields, version]
+        [@@deriving bin_io, to_yojson, sexp, fields, version]
       end
 
       include T
@@ -46,7 +46,7 @@ module Poly = struct
     ; ledger_proof: Proof.Stable.V1.t option
     ; proposer: 'proposer_pk
     ; coinbase: 'amount }
-  [@@deriving sexp, fields]
+  [@@deriving sexp, to_yojson, fields]
 end
 
 module Value = struct
@@ -60,7 +60,7 @@ module Value = struct
           , Currency.Amount.Stable.V1.t
           , Signature_lib.Public_key.Compressed.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, version {unnumbered}]
+        [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
       end
 
       include T
@@ -69,7 +69,7 @@ module Value = struct
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 end
 
 let ( blockchain_state
@@ -110,18 +110,19 @@ let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
   ; coinbase }
 
 let genesis =
-  { Poly.blockchain_state= Blockchain_state.genesis
-  ; consensus_transition= Consensus.Data.Consensus_transition.genesis
-  ; supply_increase= Currency.Amount.zero
-  ; sok_digest=
-      Sok_message.digest
-        { fee= Currency.Fee.zero
-        ; prover=
-            Account.public_key (List.hd_exn (Ledger.to_list Genesis_ledger.t))
-        }
-  ; ledger_proof= None
-  ; proposer= Signature_lib.Public_key.Compressed.empty
-  ; coinbase= Currency.Amount.zero }
+  lazy
+    { Poly.blockchain_state= Lazy.force Blockchain_state.genesis
+    ; consensus_transition= Consensus.Data.Consensus_transition.genesis
+    ; supply_increase= Currency.Amount.zero
+    ; sok_digest=
+        Sok_message.digest
+          { fee= Currency.Fee.zero
+          ; prover=
+              Account.public_key
+                (List.hd_exn (Ledger.to_list (Lazy.force Genesis_ledger.t))) }
+    ; ledger_proof= None
+    ; proposer= Signature_lib.Public_key.Compressed.empty
+    ; coinbase= Currency.Amount.zero }
 
 let to_hlist
     { Poly.blockchain_state

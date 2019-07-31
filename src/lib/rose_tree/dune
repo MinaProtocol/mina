@@ -1,5 +1,5 @@
 (library
   (name rose_tree)
   (public_name rose_tree)
-  (libraries core_kernel async_kernel)
+  (libraries core_kernel async_kernel non_empty_list)
   (preprocess (pps ppx_jane ppx_deriving_yojson)))

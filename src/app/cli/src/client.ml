@@ -3,6 +3,9 @@ open Async
 open Signature_lib
 open Coda_base
 
+let print_rpc_error error =
+  eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
+
 let dispatch rpc query port =
   Tcp.with_connection
     (Tcp.Where_to_connect.of_host_and_port (Cli_lib.Port.of_local port))
@@ -16,9 +19,9 @@ let dispatch rpc query port =
           Rpc.Rpc.dispatch rpc conn query )
 
 (** Call an RPC, passing handlers for a successful call and a failing one. Note
-   that a successful *call* may have failed on the server side and returned a
-   failing result. To deal with that, the success handler returns an
-   Or_error. *)
+    that a successful *call* may have failed on the server side and returned a
+    failing result. To deal with that, the success handler returns an
+    Or_error. *)
 let dispatch_with_message rpc query port ~success ~error =
   let fail err = eprintf "%s\n%!" err ; exit 14 in
   match%bind dispatch rpc query port with
@@ -75,11 +78,11 @@ let get_balance =
              port
          with
          | Ok (Some b) ->
-             printf "%s\n" (Currency.Balance.to_string b)
+             printf "Balance: %s coda\n" (Currency.Balance.to_string b)
          | Ok None ->
-             printf "No account found at that public_key (zero balance)\n"
+             printf "There are no funds in this account\n"
          | Error e ->
-             printf "Failed to get balance %s\n" (Error.to_string_hum e) ))
+             printf "Failed to get balance\n%s\n" (Error.to_string_hum e) ))
 
 let print_trust_status status json =
   if json then
@@ -284,11 +287,14 @@ let verify_receipt =
          | Error e | Ok (Error e) ->
              eprintf "%s" (Error.to_string_hum e) ))
 
-let get_nonce addr port =
+let get_nonce :
+       rpc:(Public_key.Compressed.t, Account.Nonce.t option) Rpc.Rpc.t
+    -> Public_key.t
+    -> int
+    -> (Account.Nonce.t, string) Deferred.Result.t =
+ fun ~rpc addr port ->
   let open Deferred.Let_syntax in
-  match%map
-    dispatch Daemon_rpcs.Get_nonce.rpc (Public_key.compress addr) port
-  with
+  match%map dispatch rpc (Public_key.compress addr) port with
   | Ok (Some n) ->
       Ok n
   | Ok None ->
@@ -304,7 +310,7 @@ let get_nonce_cmd =
   in
   Command.async ~summary:"Get the current nonce for an account"
     (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
-         match%bind get_nonce address port with
+         match%bind get_nonce ~rpc:Daemon_rpcs.Get_nonce.rpc address port with
          | Error e ->
              eprintf "Failed to get nonce: %s\n" e ;
              exit 2
@@ -334,8 +340,8 @@ let status_clear_hist =
            (if performance then `Performance else `None)
            port ))
 
-let get_nonce_exn public_key port =
-  match%bind get_nonce public_key port with
+let get_nonce_exn ~rpc public_key port =
+  match%bind get_nonce ~rpc public_key port with
   | Error e ->
       eprintf "Failed to get nonce %s\n" e ;
       exit 3
@@ -387,7 +393,9 @@ let batch_send_payments =
     let open Deferred.Let_syntax in
     let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
     and infos = get_infos payments_path in
-    let%bind nonce0 = get_nonce_exn keypair.public_key port in
+    let%bind nonce0 =
+      get_nonce_exn ~rpc:Daemon_rpcs.Get_nonce.rpc keypair.public_key port
+    in
     let _, ts =
       List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
           ( Account.Nonce.succ nonce
@@ -426,27 +434,47 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            (Currency.Fee.to_int Cli_lib.Fee.default_transaction))
       (optional txn_fee)
   in
-  let flag = Args.zip3 body_args Cli_lib.Flag.privkey_read_path amount_flag in
+  let nonce_flag =
+    flag "nonce"
+      ~doc:
+        "NONCE Nonce that you would like to set for your transaction \
+         (default: nonce of your account on the best ledger or the successor \
+         of highest value nonce of your sent transactions from the \
+         transaction pool )"
+      (optional txn_nonce)
+  in
+  let flag =
+    Args.zip4 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
+  in
   Command.async ~summary
     (Cli_lib.Background_daemon.init flag
-       ~f:(fun port (body, from_account, fee) ->
+       ~f:(fun port (body, from_account, fee_opt, nonce_opt) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp =
            Secrets.Keypair.Terminal_stdin.read_exn from_account
          in
-         let%bind nonce = get_nonce_exn sender_kp.public_key port in
-         let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
-         let payload : User_command.Payload.t =
-           User_command.Payload.create ~fee ~nonce
-             ~memo:User_command_memo.dummy ~body
+         let%bind nonce =
+           match nonce_opt with
+           | Some nonce ->
+               return nonce
+           | None ->
+               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
+                 sender_kp.public_key port
          in
-         let payment = User_command.sign sender_kp payload in
-         dispatch_with_message Daemon_rpcs.Send_user_command.rpc
-           (payment :> User_command.t)
-           port
+         let fee =
+           Option.value ~default:Cli_lib.Fee.default_transaction fee_opt
+         in
+         let command =
+           Coda_commands.setup_user_command ~fee ~nonce
+             ~memo:User_command_memo.dummy ~sender_kp body
+         in
+         dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
            ~success:
              (Or_error.map ~f:(fun receipt_chain_hash ->
-                  sprintf "Initiated %s\nReceipt chain hash: %s" label
+                  sprintf
+                    "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
+                    label
+                    (User_command.to_base58_check command)
                     (Receipt.Chain_hash.to_string receipt_chain_hash) ))
            ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
 
@@ -466,6 +494,26 @@ let send_payment =
   in
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
+
+let get_transaction_status =
+  Command.async ~summary:"Get the status of a transaction"
+    (Cli_lib.Background_daemon.init
+       Command.Param.(anon @@ ("txn" %: string))
+       ~f:(fun port serialized_transaction ->
+         match User_command.of_base58_check serialized_transaction with
+         | Ok user_command ->
+             dispatch_with_message Daemon_rpcs.Get_transaction_status.rpc
+               user_command port
+               ~success:
+                 (Or_error.map ~f:(fun status ->
+                      sprintf !"Transaction status : %s\n"
+                      @@ Transaction_status.State.to_string status ))
+               ~error:(fun e ->
+                 sprintf "Failed to get transaction status : %s"
+                   (Error.to_string_hum e) )
+         | Error _e ->
+             eprintf "Could not deserialize user command" ;
+             exit 16 ))
 
 let delegate_stake =
   let body =
@@ -527,7 +575,7 @@ let generate_keypair =
     let open Deferred.Let_syntax in
     let kp = Keypair.create () in
     let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
-    printf "Public key: %s\n"
+    printf "Keypair generated\nPublic key: %s\n"
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check ) ;
     exit 0)
@@ -546,9 +594,9 @@ let dump_ledger =
          dispatch Daemon_rpcs.Get_ledger.rpc sl_hash port
          >>| function
          | Error e ->
-             eprintf !"Error: %{sexp:Error.t}\n" e
+             print_rpc_error e
          | Ok (Error e) ->
-             printf !"Ledger not found: %{sexp:Error.t}\n" e
+             printf !"Ledger not found: %s\n" (Error.to_string_hum e)
          | Ok (Ok accounts) ->
              printf !"%{sexp:Account.t list}\n" accounts ))
 
@@ -575,7 +623,7 @@ let snark_job_list =
          | Ok str ->
              printf "%s" str
          | Error e ->
-             eprintf !"Error: %{sexp:Error.t}\n" e ))
+             print_rpc_error e ))
 
 let start_tracing =
   let open Deferred.Let_syntax in
@@ -586,7 +634,7 @@ let start_tracing =
          | Ok () ->
              printf "Daemon started tracing!"
          | Error e ->
-             eprintf !"Error: %{sexp:Error.t}\n" e ))
+             print_rpc_error e ))
 
 let stop_tracing =
   let open Deferred.Let_syntax in
@@ -597,7 +645,23 @@ let stop_tracing =
          | Ok () ->
              printf "Daemon stopped printing!"
          | Error e ->
-             eprintf !"Error: %{sexp:Error.t}\n" e ))
+             print_rpc_error e ))
+
+let set_staking =
+  let privkey_path = Cli_lib.Flag.privkey_write_path in
+  Command.async ~summary:"Set new block proposer keys"
+    (Cli_lib.Background_daemon.init privkey_path ~f:(fun port privkey_path ->
+         let%bind ({Keypair.public_key; _} as keypair) =
+           Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+         in
+         match%map dispatch Daemon_rpcs.Set_staking.rpc [keypair] port with
+         | Error e ->
+             print_rpc_error e
+         | Ok () ->
+             printf
+               !"New block proposer public key : %s\n"
+               (Public_key.Compressed.to_base58_check
+                  (Public_key.compress public_key)) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -650,6 +714,7 @@ let command =
     ; ("send-payment", send_payment)
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
+    ; ("set-staking", set_staking)
     ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
     ; ("stop-daemon", stop_daemon)

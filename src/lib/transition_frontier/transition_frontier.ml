@@ -127,7 +127,9 @@ module Make (Inputs : Inputs_intf) :
                           make_actions Sent_invalid_proof
                       | Pre_diff (Bad_signature _) ->
                           make_actions Sent_invalid_signature
-                      | Pre_diff _ | Non_zero_fee_excess _ ->
+                      | Pre_diff _
+                      | Non_zero_fee_excess _
+                      | Insufficient_work _ ->
                           make_actions Gossiped_invalid_transition
                       | Unexpected _ ->
                           failwith
@@ -151,6 +153,8 @@ module Make (Inputs : Inputs_intf) :
       With_hash.data transition_with_hash
       |> External_transition.Validated.protocol_state
       |> Protocol_state.previous_state_hash
+
+    let mask = Fn.compose Staged_ledger.ledger staged_ledger
 
     let equal breadcrumb1 breadcrumb2 =
       State_hash.equal (state_hash breadcrumb1) (state_hash breadcrumb2)
@@ -196,27 +200,13 @@ module Make (Inputs : Inputs_intf) :
       let open External_transition.Validated in
       let open Staged_ledger_diff in
       user_commands @@ staged_ledger_diff external_transition
+
+    let all_user_commands breadcrumbs =
+      Sequence.fold (Sequence.of_list breadcrumbs) ~init:User_command.Set.empty
+        ~f:(fun acc_set breadcrumb ->
+          let user_commands = to_user_commands breadcrumb in
+          Set.union acc_set (User_command.Set.of_list user_commands) )
   end
-
-  module Fake_db = struct
-    include Coda_base.Ledger.Db
-
-    type location = Location.t
-
-    let get_or_create ledger key =
-      let key, loc =
-        match
-          get_or_create_account_exn ledger key (Account.initialize key)
-        with
-        | `Existed, loc ->
-            ([], loc)
-        | `Added, loc ->
-            ([key], loc)
-      in
-      (key, get ledger loc |> Option.value_exn, loc)
-  end
-
-  module TL = Coda_base.Transaction_logic.Make (Fake_db)
 
   let max_length = max_length
 
@@ -342,9 +332,12 @@ module Make (Inputs : Inputs_intf) :
       Extensions.handle_diff t.extensions t.extension_writers
         (Diff.New_frontier root_breadcrumb)
     in
+    Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
     t
 
-  let close {extension_writers; _} = Extensions.close_pipes extension_writers
+  let close {extension_writers; _} =
+    Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
+    Extensions.close_pipes extension_writers
 
   let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -378,6 +371,9 @@ module Make (Inputs : Inputs_intf) :
 
   let previous_root t =
     Extensions.Root_history.most_recent t.extensions.root_history
+
+  let oldest_breadcrumb_in_history t =
+    Extensions.Root_history.oldest t.extensions.root_history
 
   let get_path_inclusively_in_root_history t state_hash ~f =
     path_search t state_hash
@@ -421,6 +417,8 @@ module Make (Inputs : Inputs_intf) :
 
   let best_tip t = find_exn t t.best_tip
 
+  let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
+
   let successor_hashes t hash =
     let node = Hashtbl.find_exn t.table hash in
     node.successor_hashes
@@ -454,12 +452,12 @@ module Make (Inputs : Inputs_intf) :
               | Some child_node ->
                   add_edge acc_graph node child_node
               | None ->
-                  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                     ~metadata:
                       [ ( "state_hash"
-                        , State_hash.to_yojson successor_state_hash ) ]
-                    "Could not visualize node $state_hash. Looks like the \
-                     node did not get garbage collected properly" ;
+                        , State_hash.to_yojson successor_state_hash )
+                      ; ("error", `String "missing from frontier") ]
+                    "Could not visualize state $state_hash: $error" ;
                   acc_graph ) )
   end
 
@@ -490,8 +488,8 @@ module Make (Inputs : Inputs_intf) :
       | Some x ->
           Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("state_hash", State_hash.to_yojson hash)]
-            "attach_node_to with breadcrumb for state $state_hash already \
-             present; catchup scheduler bug?" ;
+            "attach_node_to called with breadcrumb for state $state_hash \
+             which is already present; catchup scheduler bug?" ;
           Some x
       | None ->
           Hashtbl.set t.table ~key:parent_hash
@@ -512,6 +510,8 @@ module Make (Inputs : Inputs_intf) :
     let node =
       {Node.breadcrumb; successor_hashes= []; length= parent_node.length + 1}
     in
+    Coda_metrics.(Gauge.inc_one Transition_frontier.active_breadcrumbs) ;
+    Coda_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs) ;
     attach_node_to t ~parent_node ~node
 
   (** Given:
@@ -533,11 +533,6 @@ module Make (Inputs : Inputs_intf) :
     let root = root_breadcrumb |> Breadcrumb.staged_ledger in
     let soon_to_be_root =
       soon_to_be_root_node.breadcrumb |> Breadcrumb.staged_ledger
-    in
-    let children =
-      List.map soon_to_be_root_node.successor_hashes ~f:(fun h ->
-          (Hashtbl.find_exn t.table h).breadcrumb |> Breadcrumb.staged_ledger
-          |> Staged_ledger.ledger )
     in
     let root_ledger = Staged_ledger.ledger root in
     let soon_to_be_root_ledger = Staged_ledger.ledger soon_to_be_root in
@@ -562,10 +557,35 @@ module Make (Inputs : Inputs_intf) :
       soon_to_be_root_node.breadcrumb.transition_with_hash.hash
     in
     Ledger.remove_and_reparent_exn soon_to_be_root_ledger
-      soon_to_be_root_ledger ~children ;
+      soon_to_be_root_ledger ;
     Hashtbl.remove t.table t.root ;
     Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
     t.root <- new_root_hash ;
+    let num_finalized_staged_txns =
+      Breadcrumb.external_transition new_root
+      |> External_transition.Validated.staged_ledger_diff
+      |> Staged_ledger_diff.user_commands |> List.length |> Float.of_int
+    in
+    (* TODO: these metrics are too expensive to compute in this way, but it should be ok for beta *)
+    let root_snarked_ledger_accounts =
+      Ledger.Db.to_list t.root_snarked_ledger
+    in
+    Coda_metrics.(
+      Gauge.set Transition_frontier.recently_finalized_staged_txns
+        num_finalized_staged_txns) ;
+    Coda_metrics.(
+      Counter.inc Transition_frontier.finalized_staged_txns
+        num_finalized_staged_txns) ;
+    Coda_metrics.(
+      Gauge.set Transition_frontier.root_snarked_ledger_accounts
+        (Float.of_int @@ List.length root_snarked_ledger_accounts)) ;
+    Coda_metrics.(
+      Gauge.set Transition_frontier.root_snarked_ledger_total_currency
+        ( Float.of_int
+        @@ List.fold_left root_snarked_ledger_accounts ~init:0
+             ~f:(fun sum account ->
+               sum + Currency.Balance.to_int account.balance ) )) ;
+    Coda_metrics.(Counter.inc_one Transition_frontier.root_transitions) ;
     new_root_node
 
   let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
@@ -604,9 +624,9 @@ module Make (Inputs : Inputs_intf) :
       in
       go bc2 []
     in
-    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Common ancestor: %{sexp: State_hash.t}"
-      ancestor ;
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      "Common ancestor: $state_hash"
+      ~metadata:[("state_hash", State_hash.to_yojson ancestor)] ;
     ( path_from_to (find_exn t ancestor) bc1
     , path_from_to (find_exn t ancestor) bc2 )
 
@@ -614,21 +634,20 @@ module Make (Inputs : Inputs_intf) :
    *   1) attach the breadcrumb to the transition frontier
    *   2) calculate the distance from the new node to the parent and the
    *      best tip node
-   *   3) set the new node as the best tip if the new node has a greater length than
-   *      the current best tip
+   *   3) set the new node as the best tip if the new node is selected over the
+   *      old best tip by the Consensus module.
    *   4) move the root if the path to the new node is longer than the max length
    *       I   ) find the immediate successor of the old root in the path to the
    *             longest node (the heir)
    *       II  ) find all successors of the other immediate successors of the
    *             old root (bads)
-   *       III ) cleanup bad node masks, but don't garbage collect yet
+   *       III ) drop bad nodes from the hashtable and clean up their masks
    *       IV  ) move_root the breadcrumbs (rewires staged ledgers, cleans up heir)
-   *       V   ) garbage collect the bads
-   *       VI  ) grab the new root staged ledger
-   *       VII ) notify the consensus mechanism of the new root
-   *       VIII) if commit on an heir node that just emitted proof txns then
+   *       V   ) grab the new root staged ledger
+   *       VI  ) notify the consensus mechanism of the new root
+   *       VII ) if commit on an heir node that just emitted proof txns then
    *             write them to snarked ledger
-   *       XI  ) add old root to root_history
+   *       VIII) add old root to root_history
    *   5) return a diff object describing what changed (for use in updating extensions)
   *)
   let add_breadcrumb_exn t breadcrumb =
@@ -675,7 +694,7 @@ module Make (Inputs : Inputs_intf) :
               = `Take ) ) ;
         let node = Hashtbl.find_exn t.table hash in
         (* 2 *)
-        let distance_to_parent = node.length - root_node.length in
+        let distance_to_root = node.length - root_node.length in
         let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
         (* 3 *)
         let best_tip_change =
@@ -710,58 +729,69 @@ module Make (Inputs : Inputs_intf) :
         (* 4 *)
         (* note: new_root_node is the same as root_node if the root didn't change *)
         let garbage_breadcrumbs, new_root_node =
-          if distance_to_parent > max_length then (
-            Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-              !"Distance to parent: %d exceeded max_lenth %d"
-              distance_to_parent max_length ;
+          if distance_to_root > max_length then (
+            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+              "Moving the root of the transition frontier. The new node is \
+               $distance_to_root blocks after the root, which exceeds the max \
+               length of $max_length."
+              ~metadata:
+                [ ("distance_to_parent", `Int distance_to_root)
+                ; ("max_length", `Int max_length) ] ;
             (* 4.I *)
             let heir_hash = List.hd_exn (hash_path t node.breadcrumb) in
             let heir_node = Hashtbl.find_exn t.table heir_hash in
             (* 4.II *)
-            let bad_hashes =
+            let bad_children_hashes =
               List.filter root_node.successor_hashes
                 ~f:(Fn.compose not (State_hash.equal heir_hash))
             in
-            let bad_nodes =
-              List.map bad_hashes ~f:(Hashtbl.find_exn t.table)
+            let garbage_hashes =
+              bad_children_hashes
+              @ List.bind bad_children_hashes ~f:(successor_hashes_rec t)
+            in
+            let garbage_breadcrumbs =
+              List.map garbage_hashes ~f:(fun h ->
+                  Hashtbl.find_exn t.table h |> breadcrumb_of_node )
             in
             (* 4.III *)
-            let root_staged_ledger =
-              Breadcrumb.staged_ledger root_node.breadcrumb
+            let unregister_sl_mask breadcrumb =
+              let child = Breadcrumb.mask breadcrumb in
+              let parent =
+                Breadcrumb.mask @@ breadcrumb_of_node
+                @@ Hashtbl.find_exn t.table
+                @@ Breadcrumb.parent_hash breadcrumb
+              in
+              ignore @@ Ledger.unregister_mask_exn parent child
             in
-            let root_ledger = Staged_ledger.ledger root_staged_ledger in
-            List.map bad_nodes ~f:breadcrumb_of_node
-            |> List.iter ~f:(fun bad ->
-                   ignore
-                     (Ledger.unregister_mask_exn root_ledger
-                        (Breadcrumb.staged_ledger bad |> Staged_ledger.ledger))
-               ) ;
-            (* 4.IV *)
-            let new_root_node = move_root t heir_node in
-            (* 4.V *)
-            let garbage =
-              bad_hashes @ List.bind bad_hashes ~f:(successor_hashes_rec t)
+            let cleanup_bc bc =
+              unregister_sl_mask bc ;
+              Hashtbl.remove t.table (Breadcrumb.state_hash bc)
             in
             Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
-                [ ("garbage", `List (List.map garbage ~f:State_hash.to_yojson))
-                ; ("length_of_garbage", `Int (List.length garbage))
-                ; ( "bad_hashes"
-                  , `List (List.map bad_hashes ~f:State_hash.to_yojson) )
+                [ ( "all_garbage"
+                  , `List (List.map garbage_hashes ~f:State_hash.to_yojson) )
+                ; ("length_of_garbage", `Int (List.length garbage_hashes))
+                ; ( "garbage_direct_descendants"
+                  , `List
+                      (List.map bad_children_hashes ~f:State_hash.to_yojson) )
                 ; ( "local_state"
                   , Consensus.Data.Local_state.to_yojson
                       t.consensus_local_state ) ]
-              "collecting $length_of_garbage nodes rooted from $bad_hashes" ;
-            let garbage_breadcrumbs =
-              List.map garbage ~f:(fun g ->
-                  (Hashtbl.find_exn t.table g).breadcrumb )
-            in
-            List.iter garbage ~f:(Hashtbl.remove t.table) ;
-            (* 4.VI *)
+              "Removing $length_of_garbage nodes because the old root is one \
+               of their ancestors and we're deleting it" ;
+            List.iter (List.rev garbage_breadcrumbs) ~f:cleanup_bc ;
+            (* removing root + garbage, so total removed == 1 + #garbage *)
+            Coda_metrics.(
+              Gauge.dec Transition_frontier.active_breadcrumbs
+                (Float.of_int @@ (1 + List.length garbage_hashes))) ;
+            (* 4.IV *)
+            let new_root_node = move_root t heir_node in
+            (* 4.V *)
             let new_root_staged_ledger =
               Breadcrumb.staged_ledger new_root_node.breadcrumb
             in
-            (* 4.VII *)
+            (* 4.VI *)
             Consensus.Hooks.frontier_root_transition
               (Breadcrumb.consensus_state root_node.breadcrumb)
               (Breadcrumb.consensus_state new_root_node.breadcrumb)
@@ -803,7 +833,7 @@ module Make (Inputs : Inputs_intf) :
                       assert false )
                 | None ->
                     () ) ;
-            (* 4.VIII *)
+            (* 4.VII *)
             ( match
                 ( Staged_ledger.proof_txns new_root_staged_ledger
                 , heir_node.breadcrumb.just_emitted_a_proof )
@@ -820,20 +850,25 @@ module Make (Inputs : Inputs_intf) :
                   ~expect:(Ledger_proof.statement proof_data).source
                   ( Ledger.Db.merkle_root t.root_snarked_ledger
                   |> Frozen_ledger_hash.of_ledger_hash ) ;
-                let db_mask = Ledger.of_database t.root_snarked_ledger in
+                (* Apply all the transactions associated with the new ledger
+                   proof to the database-backed SNARKed ledger. We create a
+                   mask and apply them to that, then commit it to the DB. This
+                   saves a lot of IO since committing is batched. Would be even
+                   faster if we implemented #2760. *)
+                let db_casted =
+                  Ledger.Any_ledger.cast
+                    (module Ledger.Db)
+                    t.root_snarked_ledger
+                in
+                let db_mask =
+                  Ledger.Maskable.register_mask db_casted
+                    (Ledger.Mask.create ())
+                in
                 Non_empty_list.iter txns ~f:(fun txn ->
-                    (* TODO: @cmr use the ignore-hash ledger here as well *)
-                    TL.apply_transaction t.root_snarked_ledger txn
+                    Ledger.apply_transaction db_mask txn
                     |> Or_error.ok_exn |> ignore ) ;
-                (* TODO: See issue #1606 to make this faster *)
-
-                (*Ledger.commit db_mask ;*)
-                ignore
-                  (Ledger.Maskable.unregister_mask_exn
-                     (Ledger.Any_ledger.cast
-                        (module Ledger.Db)
-                        t.root_snarked_ledger)
-                     db_mask)
+                Ledger.commit db_mask ;
+                ignore @@ Ledger.Maskable.unregister_mask_exn db_casted db_mask
             | _, false | None, _ ->
                 () ) ;
             [%test_result: Frozen_ledger_hash.t]
@@ -845,7 +880,7 @@ module Make (Inputs : Inputs_intf) :
                    (Breadcrumb.blockchain_state new_root_node.breadcrumb))
               ( Ledger.Db.merkle_root t.root_snarked_ledger
               |> Frozen_ledger_hash.of_ledger_hash ) ;
-            (* 4.IX *)
+            (* 4.VIII *)
             let root_breadcrumb = Node.breadcrumb root_node in
             let root_state_hash = Breadcrumb.state_hash root_breadcrumb in
             Extensions.Root_history.enqueue t.extensions.root_history
@@ -879,9 +914,12 @@ module Make (Inputs : Inputs_intf) :
         add_breadcrumb_exn t breadcrumb
     | None ->
         Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
-          !"When trying to add breadcrumb, its parent had been removed from \
-            transition frontier: %{sexp: State_hash.t}"
-          parent_hash ;
+          "Failed to add breadcrumb for state $state_hash: $error"
+          ~metadata:
+            [ ("error", `String "parent missing")
+            ; ("parent_state_hash", State_hash.to_yojson parent_hash)
+            ; ( "state_hash"
+              , State_hash.to_yojson breadcrumb.transition_with_hash.hash ) ] ;
         Deferred.unit
 
   let best_tip_path_length_exn {table; root; best_tip; _} =
@@ -923,6 +961,8 @@ module Make (Inputs : Inputs_intf) :
     List.equal equal_breadcrumb
       (all_breadcrumbs t1 |> sort_breadcrumbs)
       (all_breadcrumbs t2 |> sort_breadcrumbs)
+
+  let all_user_commands t = Breadcrumb.all_user_commands (all_breadcrumbs t)
 
   module For_tests = struct
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger

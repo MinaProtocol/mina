@@ -73,7 +73,7 @@ let schedule_user_command t (txn : User_command.t) account_opt =
     in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("user_command", User_command.to_yojson txn)]
-      "Added command $user_command to pool successfully" ;
+      "Added transaction $user_command to transaction pool successfully" ;
     txn_count := !txn_count + 1 ;
     Or_error.return ()
 
@@ -101,6 +101,34 @@ let get_keys_with_balances t =
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
       , account.Account.Poly.balance |> Currency.Balance.to_int ) )
+
+let get_inferred_nonce_from_transaction_pool_and_ledger t
+    (addr : Public_key.Compressed.t) =
+  let transaction_pool = Coda_lib.transaction_pool t in
+  let resource_pool =
+    Network_pool.Transaction_pool.resource_pool transaction_pool
+  in
+  let pooled_transactions =
+    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
+      addr
+  in
+  let txn_pool_nonce =
+    let nonces =
+      List.map pooled_transactions
+        ~f:(Fn.compose User_command.nonce User_command.forget_check)
+    in
+    (* The last nonce gives us the maximum nonce in the transaction pool *)
+    List.last nonces
+  in
+  match txn_pool_nonce with
+  | Some nonce ->
+      Some (Account.Nonce.succ nonce)
+  | None ->
+      let open Option.Let_syntax in
+      let%map account =
+        Option.join (Participating_state.active (get_account t addr))
+      in
+      account.Account.Poly.nonce
 
 let get_nonce t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
@@ -136,6 +164,26 @@ let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Coda_lib.config t in
   let trust_system = config.trust_system in
   Trust_system.reset trust_system ip_address
+
+let replace_proposers keys pks =
+  let kps =
+    List.filter_map pks ~f:(fun pk ->
+        let open Option.Let_syntax in
+        let%map kps =
+          Coda_lib.wallets keys |> Secrets.Wallets.find ~needle:pk
+        in
+        (kps, pk) )
+  in
+  Coda_lib.replace_propose_keypairs keys
+    (Keypair.And_compressed_pk.Set.of_list kps) ;
+  kps |> List.map ~f:snd
+
+let setup_user_command ~fee ~nonce ~memo ~sender_kp user_command_body =
+  let payload =
+    User_command.Payload.create ~fee ~nonce ~memo ~body:user_command_body
+  in
+  let signed_user_command = User_command.sign sender_kp payload in
+  User_command.forget_check signed_user_command
 
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
@@ -204,7 +252,6 @@ type active_state_fields =
   { num_accounts: int option
   ; blockchain_length: int option
   ; ledger_merkle_root: string option
-  ; staged_ledger_hash: string option
   ; state_hash: string option
   ; consensus_time_best_tip: string option }
 
@@ -225,7 +272,9 @@ let get_status ~flag t =
   let run_snark_worker = Option.is_some (Coda_lib.snark_worker_key t) in
   let propose_pubkeys = Coda_lib.propose_public_keys t in
   let consensus_mechanism = Consensus.name in
-  let consensus_time_now = Consensus.time_hum (Core_kernel.Time.now ()) in
+  let consensus_time_now =
+    Consensus.time_hum (Block_time.now (Coda_lib.config t).time_controller)
+  in
   let consensus_configuration = Consensus.Configuration.t in
   let r = Perf_histograms.report in
   let histograms =
@@ -243,9 +292,13 @@ let get_status ~flag t =
           ; get_ancestry=
               { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_ancestry"
               ; impl= r ~name:"rpc_impl_get_ancestry" }
-          ; transition_catchup=
-              { Rpc_pair.dispatch= r ~name:"rpc_dispatch_transition_catchup"
-              ; impl= r ~name:"rpc_impl_transition_catchup" } }
+          ; get_transition_chain_witness=
+              { Rpc_pair.dispatch=
+                  r ~name:"rpc_dispatch_get_transition_chain_witness"
+              ; impl= r ~name:"rpc_impl_get_transition_chain_witness" }
+          ; get_transition_chain=
+              { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_transition_chain"
+              ; impl= r ~name:"rpc_impl_get_transition_chain" } }
         in
         Some
           { Daemon_rpcs.Types.Status.Histograms.rpc_timings
@@ -260,6 +313,12 @@ let get_status ~flag t =
     | `None ->
         None
   in
+  let highest_block_length_received =
+    Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
+    @@ Coda_transition.External_transition.consensus_state
+    @@ Pipe_lib.Broadcast_pipe.Reader.peek
+         (Coda_lib.most_recent_valid_transition t)
+  in
   let active_status () =
     let open Participating_state.Let_syntax in
     let%bind ledger = Coda_lib.best_ledger t in
@@ -268,30 +327,27 @@ let get_status ~flag t =
     in
     let num_accounts = Ledger.num_accounts ledger in
     let%bind state = Coda_lib.best_protocol_state t in
-    let state_hash =
-      Protocol_state.hash state |> [%sexp_of: State_hash.t] |> Sexp.to_string
-    in
+    let state_hash = Protocol_state.hash state |> State_hash.to_base58_check in
     let consensus_state = state |> Protocol_state.consensus_state in
     let blockchain_length =
       Length.to_int
       @@ Consensus.Data.Consensus_state.blockchain_length consensus_state
     in
-    let%bind sync_status =
+    let%map sync_status =
       Coda_incremental.Status.stabilize () ;
       match
         Coda_incremental.Status.Observer.value_exn @@ Coda_lib.sync_status t
       with
       | `Bootstrap ->
           `Bootstrapping
+      | `Connecting ->
+          `Active `Connecting
+      | `Listening ->
+          `Active `Listening
       | `Offline ->
           `Active `Offline
       | `Synced ->
           `Active `Synced
-    in
-    let%map staged_ledger = Coda_lib.best_staged_ledger t in
-    let staged_ledger_hash =
-      staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
-      |> Sexp.to_string
     in
     let consensus_time_best_tip =
       Consensus.Data.Consensus_state.time_hum consensus_state
@@ -300,7 +356,6 @@ let get_status ~flag t =
     , { num_accounts= Some num_accounts
       ; blockchain_length= Some blockchain_length
       ; ledger_merkle_root= Some ledger_merkle_root
-      ; staged_ledger_hash= Some staged_ledger_hash
       ; state_hash= Some state_hash
       ; consensus_time_best_tip= Some consensus_time_best_tip } )
   in
@@ -308,7 +363,6 @@ let get_status ~flag t =
       , { num_accounts
         ; blockchain_length
         ; ledger_merkle_root
-        ; staged_ledger_hash
         ; state_hash
         ; consensus_time_best_tip } ) =
     match active_status () with
@@ -319,16 +373,15 @@ let get_status ~flag t =
         , { num_accounts= None
           ; blockchain_length= None
           ; ledger_merkle_root= None
-          ; staged_ledger_hash= None
           ; state_hash= None
           ; consensus_time_best_tip= None } )
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; blockchain_length
+  ; highest_block_length_received
   ; uptime_secs
   ; ledger_merkle_root
-  ; staged_ledger_hash
   ; state_hash
   ; consensus_time_best_tip
   ; commit_id

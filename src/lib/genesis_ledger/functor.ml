@@ -14,11 +14,13 @@ end
 module Make_from_base (Base : Base_intf) : Intf.S = struct
   include Base
 
+  (* TODO: #1488 compute this at compile time instead of lazily *)
   let t =
-    let ledger = Ledger.create_ephemeral () in
-    List.iter accounts ~f:(fun (_, account) ->
-        Ledger.create_new_account_exn ledger account.public_key account ) ;
-    ledger
+    lazy
+      (let ledger = Ledger.create_ephemeral () in
+       List.iter accounts ~f:(fun (_, account) ->
+           Ledger.create_new_account_exn ledger account.public_key account ) ;
+       ledger)
 
   let find_account_record_exn ~f =
     List.find_exn accounts ~f:(fun (_, account) -> f account)
@@ -78,7 +80,10 @@ module With_private = struct
 end
 
 module Without_private = struct
-  type account_data = {pk: Public_key.Compressed.t; balance: int}
+  type account_data =
+    { pk: Public_key.Compressed.t
+    ; balance: int
+    ; delegate: Public_key.Compressed.t option }
 
   module type Source_intf = sig
     val accounts : account_data list
@@ -87,8 +92,10 @@ module Without_private = struct
   module Make (Source : Source_intf) : Intf.S = struct
     include Make_from_base (struct
       let accounts =
-        List.map Source.accounts ~f:(fun {pk; balance} ->
-            (None, Account.create pk (Balance.of_int balance)) )
+        List.map Source.accounts ~f:(fun {pk; balance; delegate} ->
+            let base_acct = Account.create pk (Balance.of_int balance) in
+            (None, {base_acct with delegate= Option.value ~default:pk delegate})
+        )
     end)
   end
 end

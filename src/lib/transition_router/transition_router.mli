@@ -62,6 +62,9 @@ module Make (Inputs : Inputs_intf) : sig
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:Transition_frontier.Breadcrumb.t
                                   Strict_pipe.Reader.t
+    -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
+                               * External_transition.t Broadcast_pipe.Writer.t
+    -> Transition_frontier.t
     -> (External_transition.Validated.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 end
@@ -85,5 +88,8 @@ val run :
                                Strict_pipe.Reader.t
   -> proposer_transition_reader:Transition_frontier.Breadcrumb.t
                                 Strict_pipe.Reader.t
+  -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
+                             * External_transition.t Broadcast_pipe.Writer.t
+  -> Transition_frontier.t
   -> (External_transition.Validated.t, State_hash.t) With_hash.t
      Strict_pipe.Reader.t
