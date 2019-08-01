@@ -97,11 +97,6 @@ jobs:
                     . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
                     nix-env -iA cachix -f https://cachix.org/api/v1/install
             - checkout
-            {# - restore_cache:
-                keys:
-                    - kademlia-nix-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
-                    - kademlia-nix-{{'{{'}} checksum "src/app/kademlia-haskell/app/Main.hs" {{'}}'}}
-                    - kademlia-nix-{{'{{'}} .Branch {{'}}'}} #}
             - run:
                 name: Build kademlia
                 command: |
@@ -110,10 +105,22 @@ jobs:
                     cd src/app/kademlia-haskell
                     cachix use codaprotocol
                     nix-build release2.nix 2>&1 | tee /tmp/buildkademlia.log
-            {# - save_cache:
-                key: kademlia-nix-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
-                paths:
-                    - "/nix/store" #}
+            - run:
+                name: Update dynamic lib pointers
+                command: |
+                    cp src/app/kademlia-haskell/result/bin/kademlia .
+                    chmod +w kademlia
+                    ./scripts librewrite-macos.sh kademlia
+            - run:
+                name: Copy artifacts
+                command: |
+                    mkdir -p /tmp/artifacts
+                    cp kademlia /tmp/artifacts/.
+                    tar -cvf coda-kademlia.tar.gz kademlia
+                    openssl dgst -sha256 coda-kademlia.tar.gz > coda-kademlia.tar.gz.sha256
+                    cp coda-kademlia.tar.gz coda-kademlia.tar.gz.sha256 /tmp/artifacts/.
+            - store_artifacts:
+                  path: /tmp/artifacts
 
     build-macos:
       # only run when there's a 'release' tag
