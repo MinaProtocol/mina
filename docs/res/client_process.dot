@@ -20,7 +20,7 @@ digraph client_process {
             node [style=filled,color=lightgrey];
                 transition_frontier_copy [label="Transition frontier handler"];
                 in_memory_receipt_chain_table [label="receipt chain hashes"];
-                in_memory_transition_to_transaction_table [label="transition to transaction table"];
+                in_memory_transition_to_transaction_table [label="transition to transaction"];
                 in_memory_transactions [label="transactions"]
             label = "In Memory Cache (Client's Transition Frontier)"
         }
