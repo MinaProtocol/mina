@@ -79,7 +79,7 @@ module type Transition_handler_validator_intf = sig
     -> ( ( external_transition_with_initial_validation Envelope.Incoming.t
          , State_hash.t )
          Cached.t
-       , [ `In_frontier of State_hash.t
+       , [> `In_frontier of State_hash.t
          | `In_process of State_hash.t Cache_lib.Intf.final_state
          | `Disconnected ] )
        Result.t

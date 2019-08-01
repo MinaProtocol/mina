@@ -55,16 +55,6 @@ module Make (Inputs : Inputs.S) :
    and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
-  type verification_error =
-    [ `In_frontier of State_hash.t
-    | `In_process of State_hash.t Cache_lib.Intf.final_state
-    | `Disconnected
-    | `Verifier_error of Error.t
-    | `Invalid_proof
-    | `Invalid_delta_transition_chain_witness ]
-
-  type 'a verification_result = ('a, verification_error) Result.t
-
   let verify_transition ~logger ~trust_system ~verifier ~frontier
       ~unprocessed_transition_cache enveloped_transition =
     let sender = Envelope.Incoming.sender enveloped_transition in
@@ -72,28 +62,22 @@ module Make (Inputs : Inputs.S) :
       let open Deferred.Result.Let_syntax in
       let transition = Envelope.Incoming.data enveloped_transition in
       let%bind initially_validated_transition =
-        ( let open Deferred.Result.Monad_infix in
-          External_transition.Validation.wrap transition
-          |> External_transition.skip_time_received_validation
-               `This_transition_was_not_received_via_gossip
-          |> External_transition.validate_proof ~verifier
-          >>= Fn.compose Deferred.return
-                External_transition.validate_delta_transition_chain_witness
-          :> External_transition.with_initial_validation verification_result
-             Deferred.t )
+        let open Deferred.Result.Monad_infix in
+        External_transition.Validation.wrap transition
+        |> External_transition.skip_time_received_validation
+             `This_transition_was_not_received_via_gossip
+        |> External_transition.validate_proof ~verifier
+        >>= Fn.compose Deferred.return
+              External_transition.validate_delta_transition_chain_witness
       in
       let enveloped_initially_validated_transition =
         Envelope.Incoming.map enveloped_transition
           ~f:(Fn.const initially_validated_transition)
       in
       Deferred.return
-        ( Transition_handler_validator.validate_transition ~logger ~frontier
-            ~unprocessed_transition_cache
-            enveloped_initially_validated_transition
-          :> ( External_transition.with_initial_validation Envelope.Incoming.t
-             , State_hash.t )
-             Cached.t
-             verification_result )
+      @@ Transition_handler_validator.validate_transition ~logger ~frontier
+           ~unprocessed_transition_cache
+           enveloped_initially_validated_transition
     in
     let open Deferred.Let_syntax in
     match%bind cached_initially_validated_transition_result with
@@ -188,7 +172,9 @@ module Make (Inputs : Inputs.S) :
               ignore
                 Trust_system.(
                   record trust_system logger peer.host
-                    Actions.(Violated_protocol, Some (error_msg, []))) ;
+                    Actions.
+                      ( Sent_invalid_transition_chain_witness
+                      , Some (error_msg, []) )) ;
               Deferred.Or_error.error_string error_msg
         in
         Deferred.return
