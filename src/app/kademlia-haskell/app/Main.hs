@@ -35,7 +35,7 @@ import           Network                   (PortNumber)
 import qualified Network.Kademlia          as K
 import qualified Network.Kademlia.HashNodeId as KH
 import           System.Environment        (getArgs)
-import           System.Exit               (die)
+import           System.Exit               (exitSuccess, die)
 import           System.Random             (mkStdGen)
 import           System.IO                 (stdout, hFlush)
 
@@ -166,8 +166,8 @@ main = do
       hFlush stdout
 
       {- finish if just dumping peers -}
-      when (state == "dump-peers") $
-        die "EXIT"
+      when (state == "dump-peers")
+        exitSuccess
 
       {- Forever, once a second, check to see if anything changed, and dump it -}
       finally
