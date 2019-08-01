@@ -2,6 +2,10 @@ open Core_kernel
 
 type t = Big_int.big_int
 
+let zero = Big_int.zero_big_int
+
+let negate = Big_int.minus_big_int
+
 let equal = Big_int.eq_big_int
 
 let num_bits = Big_int.num_bits_big_int
@@ -49,6 +53,19 @@ let ( < ) = Big_int.lt_big_int
 let to_int_exn = Big_int.int_of_big_int
 
 let compare = Big_int.compare_big_int
+
+let random_bytes num_bytes =
+  of_bytes
+    (String.init num_bytes ~f:(fun _ -> Char.of_int_exn (Random.int 250)))
+
+let random bound =
+  let n = num_bits bound in
+  let num_bytes = Int.((n + 7) / 8) in
+  let rand = ref (random_bytes num_bytes) in
+  while bound < !rand do
+    rand := random_bytes num_bytes
+  done ;
+  !rand
 
 module String_hum = struct
   type nonrec t = t

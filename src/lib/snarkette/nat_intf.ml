@@ -5,6 +5,10 @@ module type S = sig
 
   include Stringable.S with type t := t
 
+  val zero : t
+
+  val negate : t -> t
+
   val of_int : int -> t
 
   val to_int_exn : t -> int
@@ -32,4 +36,6 @@ module type S = sig
   val test_bit : t -> int -> bool
 
   val num_bits : t -> int
+
+  val random : t -> t
 end

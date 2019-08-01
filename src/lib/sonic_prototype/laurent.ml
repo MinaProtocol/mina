@@ -19,7 +19,7 @@ module type Ring = sig
 
   val one : t
 
-  val to_string : t -> string
+  (* val to_string : t -> string *)
 end
 
 module type Field = sig
@@ -63,7 +63,7 @@ module type Laurent = sig
 
   val ( / ) : t -> t -> t
 
-  val to_string : t -> string
+  (* val to_string : t -> string *)
 end
 
 module Make_laurent (N : sig
@@ -206,7 +206,7 @@ end)
     in
     pow poly_a (N.to_int_exn n)
 
-  let to_string poly =
+  (* let to_string poly =
     let starting_degree, coefficients = poly in
     let rec print_loop deg coeffs =
       match coeffs with
@@ -226,7 +226,7 @@ end)
           in
           Printf.sprintf "%s%s" first (print_loop Int.(deg + 1) tl)
     in
-    print_loop starting_degree coefficients
+    print_loop starting_degree coefficients *)
 
   let ( / ) poly_a poly_b =
     let rec div poly_a poly_b =

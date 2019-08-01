@@ -328,23 +328,60 @@ module Tock = struct
 
     module G2 = struct
       type t = Pairing.G2.t
+
+      let add_unsafe a b = run_checked (Pairing.G2.add_unsafe a b)
+
+      let add_exn a b =
+        match run_checked (Pairing.G2.add_unsafe a b) with
+        | `I_thought_about_this_very_carefully x -> x
+
+      let typ = Pairing.G2.typ
+
+      module Unchecked = Pairing.G2.Unchecked
+
       let scale a b c ~init = run_checked (Pairing.G2.scale a b c ~init)
     end
 
     module Fqe = struct
-      type t = Pairing.Fqe.t
+      type 'a t_ = 'a Pairing.Fqe.t_
+
+      let real_part = Pairing.Fqe.real_part
+
+      let to_list = Pairing.Fqe.to_list
+
+      let if_ b ~then_ ~else_ = run_checked (Pairing.Fqe.if_ b ~then_ ~else_)
     end
 
     module Fqk = struct
       type t = Pairing.Fqk.t
+
+      let typ = Pairing.Fqk.typ
+
+      module Unchecked = Pairing.Fqk.Unchecked
+
+      let ( * ) a b = run_checked (Pairing.Fqk.( * ) a b)
+
+      let equal a b = run_checked (Pairing.Fqk.equal a b)
+
+      let one = Pairing.Fqk.one
+
+      let if_ b ~then_ ~else_ = run_checked (Pairing.Fqk.if_ b ~then_ ~else_)
     end
 
     module G1_precomputation = struct
       type t = Pairing.G1_precomputation.t
+
+      let create = Pairing.G1_precomputation.create
     end
 
     module G2_precomputation = struct
       type t = Pairing.G2_precomputation.t
+
+      let if_ b ~then_ ~else_ = run_checked (Pairing.G2_precomputation.if_ b ~then_ ~else_)
+
+      let create_constant = Pairing.G2_precomputation.create_constant
+
+      let create g = run_checked (Pairing.G2_precomputation.create g)
     end
 
     module Impl = struct
@@ -374,29 +411,6 @@ module Tock = struct
     include Snarky_verifier.Sonic_commitment_scheme.Make (Pairing_run)
   end
 end
-
-module Srs = Sonic_prototype.Srs.Make (Pairing)
-module Commitment_scheme = Sonic_prototype.Commitment_scheme.Make (Pairing)
-
-let%test_unit "sonic test" =
-  let module M = Snarky.Snark.Run.Make (Tock_backend) (Unit) in
-  Quickcheck.test ~trials:3 Quickcheck.Generator.(tuple3 Tock0.Field.gen Tock0.Field.gen Tock0.Field.gen) ~f:(fun x z alpha ->
-      let (), checked_output =
-        M.run_and_check
-          (fun () ->
-            let open Srs in
-            let open Commitment_scheme in
-            let d = 15 in
-            let srs = Srs.create d x alpha in
-            let f = Fr_laurent.create 1 [Fr.of_int 10] in
-            let commitment = commit_poly srs f in
-            let opening = open_poly srs commitment z f in
-            pc_v srs commitment z opening )
-          ()
-        |> Or_error.ok_exn
-      in
-      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output
-        (Group_map.to_group (module Tick0.Field) ~params t) )
 
 module Tick = struct
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
@@ -791,6 +805,46 @@ module Tick = struct
       ; alpha_beta= Pairing.Fqk.constant vk.alpha_beta }
   end
 end
+
+module Sonic_backend = struct
+  include Tock.Pairing_run
+
+  module Fr = struct
+    include Tick.Pairing.Fq
+
+    let ( / ) a b = ( * ) a (run_checked (inv_exn b))
+  end
+  
+  module Fr_laurent = Sonic_prototype.Laurent.Make_laurent (N) (Fr)
+
+  module Bivariate_fr_laurent = Sonic_prototype.Laurent.Make_laurent (N) (Fr_laurent)
+  
+  module Fq_target = Fqk
+end
+
+module Srs = Sonic_prototype.Srs.Make (Sonic_backend)
+module Commitment_scheme = Sonic_prototype.Commitment_scheme.Make (Sonic_backend)
+
+let%test_unit "sonic test" =
+  let module M = Snarky.Snark.Run.Make (Tock_backend) (Unit) in
+  Quickcheck.test ~trials:3 Quickcheck.Generator.(tuple3 Tock0.Field.gen Tock0.Field.gen Tock0.Field.gen) ~f:(fun x z alpha ->
+      let (), checked_output =
+        M.run_and_check
+          (fun () ->
+            let open Srs in
+            let open Commitment_scheme in
+            let d = 15 in
+            let srs = Srs.create d x alpha in
+            let f = Fr_laurent.create 1 [Fr.of_int 10] in
+            let commitment = commit_poly srs f in
+            let opening = open_poly srs commitment z f in
+            pc_v srs commitment z opening )
+          ()
+        |> Or_error.ok_exn
+      in
+      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output
+        (Group_map.to_group (module Tick0.Field) ~params t) )
+
 
 let tock_vk_to_bool_list vk =
   let vk = Tick.Verifier.vk_of_backend_vk vk in
