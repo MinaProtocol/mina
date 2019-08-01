@@ -97,7 +97,7 @@ jobs:
             - checkout
             - restore_cache:
                 keys:
-                    - kademlia-nix-{{'{{'}} checksum "src/app/kademlia-haskell" {{'}}'}}
+                    - kademlia-nix-{{'{{'}} checksum "src/app/kademlia-haskell/app/Main.hs" {{'}}'}}
                     - kademlia-nix-{{'{{'}} .Branch {{'}}'}}
             - run:
                 name: Build kademlia
@@ -107,7 +107,7 @@ jobs:
                     cd src/app/kademlia-haskell
                     nix-build release2.nix 2>&1 | tee /tmp/buildkademlia.log
             - save_cache:
-                key: kademlia-nix-{{'{{'}} checksum "src/app/kademlia-haskell" {{'}}'}}
+                key: kademlia-nix-{{'{{'}} checksum "src/app/kademlia-haskell/app/Main.hs" {{'}}'}}
                 paths:
                     - "/nix/store"
 
