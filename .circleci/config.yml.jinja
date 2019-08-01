@@ -89,27 +89,31 @@ jobs:
         working_directory: /Users/distiller/coda
         steps:
             - run:
-                name: Setup nix
+                name: Setup nix and cachix
                 command: |
                     sudo mkdir /nix
                     sudo chown distiller /nix
                     curl https://nixos.org/nix/install | sh
+                    . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
+                    nix-env -iA cachix -f https://cachix.org/api/v1/install
             - checkout
-            - restore_cache:
+            {# - restore_cache:
                 keys:
+                    - kademlia-nix-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
                     - kademlia-nix-{{'{{'}} checksum "src/app/kademlia-haskell/app/Main.hs" {{'}}'}}
-                    - kademlia-nix-{{'{{'}} .Branch {{'}}'}}
+                    - kademlia-nix-{{'{{'}} .Branch {{'}}'}} #}
             - run:
                 name: Build kademlia
                 command: |
-                    . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
                     source ~/.bash_profile
+                    . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
                     cd src/app/kademlia-haskell
+                    cachix use codaprotocol
                     nix-build release2.nix 2>&1 | tee /tmp/buildkademlia.log
-            - save_cache:
-                key: kademlia-nix-{{'{{'}} checksum "src/app/kademlia-haskell/app/Main.hs" {{'}}'}}
+            {# - save_cache:
+                key: kademlia-nix-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
                 paths:
-                    - "/nix/store"
+                    - "/nix/store" #}
 
     build-macos:
       # only run when there's a 'release' tag
