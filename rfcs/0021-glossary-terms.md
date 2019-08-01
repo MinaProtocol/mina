@@ -9,8 +9,6 @@ However, it is advisable that over time the codebase also migrates to this share
 
 [motivation]: #motivation
 
-<!-- Why are we doing this? What use cases does it support? What is the expected outcome? -->
-
 Currently, multiple terms exist for several concepts in the Coda protocol, and they are used interchangeably when communicating to the world. This has some downsides as there is a lack of clarity on which terms to use, and could potentially cause confusion for people unfamiliar with the protocol. 
 
 As such, the motivation of this RFC is to standardize the naming convention for various concepts into a unified glossary that can be used in documentation, user-facing copy, and marketing channels. The expected outcome is unified language when communicating to the public and in developing Coda related products. This can then lead to more clarity and easier onboarding.
@@ -18,12 +16,6 @@ As such, the motivation of this RFC is to standardize the naming convention for 
 ## Detailed design
 
 [detailed-design]: #detailed-design
-
-<!-- This is the technical portion of the RFC. Explain the design in sufficient detail that:
-
-* Its interaction with other features is clear.
-* It is reasonably clear how the feature would be implemented.
-* Corner cases are dissected by example. -->
 
 The proposal contains the suggested term with it's associated concept it encapsulates, as well as alternative terms and the rationale for  the suggestion.
 
@@ -113,30 +105,19 @@ The terms proposed are below:
 ## Drawbacks
 [drawbacks]: #drawbacks
 
-<!-- Why should we *not* do this? -->
-
 The drawback to aligning on language is that we lose some specificity that comes with each specific term, relative to the others. However, this concern is minor, and is superceded by the need for consistent language.
 
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-<!-- * Why is this design the best in the space of possible designs? -->
-<!-- * What other designs have been considered and what is the rationale for not choosing them? -->
-<!-- * What is the impact of not doing this? -->
 See [design section](#detailed-design) for rationale and alternatives.
 
 ## Prior art
 [prior-art]: #prior-art
 
-<!-- Discuss prior art, both the good and the bad, in relation to this proposal. -->
-
 - Previous RFC regarding nomenclature in code: https://github.com/CodaProtocol/coda/blob/develop/rfcs/0018-postake-naming-conventions.md
 
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
-
-<!-- * What parts of the design do you expect to resolve through the RFC process before this gets merged? -->
-<!-- * What parts of the design do you expect to resolve through the implementation of this feature before merge? -->
-<!-- * What related issues do you consider out of scope for this RFC that could be addressed in the future independently of the solution that comes out of this RFC? -->
 
 There will likely be other terms we will need to converge on.
