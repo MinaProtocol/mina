@@ -336,7 +336,11 @@ let run_snark_worker ?shutdown_on_disconnect:(s = true) ~client_port
       create_snark_worker ~shutdown_on_disconnect:s ~public_key ~client_port
       |> ignore
 
-let handle_crash e =
+let handle_crash e ~top_logger =
+  let exn_string = Exn.to_string e in
+  Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
+    "Unhandled top-level exception"
+    ~metadata:[("exn", `String exn_string)] ;
   Core.eprintf
     !{err|
 
@@ -351,12 +355,12 @@ let handle_crash e =
 
     %s
 %!|err}
-    (Exn.to_string e)
+    exn_string
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       log_shutdown ~conf_dir ~top_logger coda_ref ;
-      handle_crash exn ;
+      handle_crash exn ~top_logger ;
       Stdlib.exit 1 ) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->
