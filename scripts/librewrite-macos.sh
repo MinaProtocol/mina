@@ -3,17 +3,35 @@
 # xcode technique to rewrite dynamic lib links
 # tweaks kademlia binaries built with nix to work with os installed libs
 
-BUILD_DIR_NAME=package
-
-relib() {
-  NAME="$1"
-  REWRITE_PATH="$2"
-  OLD_PATH=$(otool -l ${BUILD_DIR_NAME}/kademlia | grep -E '\s+name' | grep '/nix' | grep "$NAME" |  awk '{print $2}')
-
-  install_name_tool -change "$OLD_PATH" "$REWRITE_PATH" "${BUILD_DIR_NAME}/kademlia"
+check_file() {
+  mybin="$1"
+  if [ ! -f ${mybin} ]; then
+    echo "ERROR: ${mybin} missing"
+    exit 1
+  fi
 }
 
-relib 'libgmp' "/usr/local/opt/gmp/lib/libgmp.10.dylib"
-relib 'libffi' "/usr/local/opt/libffi/lib/libffi.6.dylib"
-relib 'libSystem' "/usr/lib/libSystem.B.dylib"
-relib 'libiconv' "/usr/lib/libiconv.dylib"
+# check for xcode tools
+for mybin in /usr/bin/install_name_tool /usr/bin/otool
+do
+  check_file $mybin
+done
+
+BUILD_DIR_NAME=package
+
+# Swap nix libs for brew libs (ugly hack)
+rewrite_lib() {
+  TARGET="$1"
+  LIB_NAME="$2"
+  NEW_PATH="$3"
+  check_file ${NEW_PATH}
+  OLD_PATH=$(/usr/bin/otool -X -L ${TARGET} | grep "${LIB_NAME}" | grep '/nix'  | awk '{print $1}')
+  echo "Updating ${TARGET} - rewriting ${OLD_PATH} to ${NEW_PATH}"
+  /usr/bin/install_name_tool -change "$OLD_PATH" "$NEW_PATH" "${TARGET}"
+}
+
+# rewrite the libs
+rewrite_lib kademlia 'libgmp' "/usr/local/opt/gmp/lib/libgmp.10.dylib"
+rewrite_lib kademlia 'libffi' "/usr/local/opt/libffi/lib/libffi.6.dylib"
+rewrite_lib kademlia 'libSystem' "/usr/lib/libSystem.B.dylib"
+rewrite_lib kademlia 'libiconv' "/usr/lib/libiconv.dylib"

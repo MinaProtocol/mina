@@ -110,7 +110,7 @@ jobs:
                 command: |
                     cp src/app/kademlia-haskell/result/bin/kademlia .
                     chmod +w kademlia
-                    ./scripts librewrite-macos.sh kademlia
+                    ./scripts/librewrite-macos.sh kademlia
             - run:
                 name: Copy artifacts
                 command: |
@@ -141,9 +141,6 @@ jobs:
                 at: /tmp/workspace
             - run: sudo mkdir -p /var/lib/coda
             - run: sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
-            - run: ls -l /var/lib/coda
-            - run: sudo mkdir /nix
-            - run: sudo chown distiller /nix
             - checkout
             - restore_cache:
                 keys:
@@ -182,13 +179,9 @@ jobs:
             - run:
                 command: |
                     set +e
-                    ls -l
-                    cd src
-                    ls -l
-                    cd build
-                    find . | grep kadem
-            - run: cp src/build/_build/default/app/cli/src/coda.exe package/coda
-           # - run: ls -l src/app/kademlia-haskell/result/bin/
+                    set +x
+                    find . | grep coda.exe
+                    cp src/build/_build/default/app/cli/src/coda.exe package/coda
 
             - run:
                 name: Publish to Artifactory
