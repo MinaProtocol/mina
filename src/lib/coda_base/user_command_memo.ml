@@ -13,7 +13,8 @@ module Stable = struct
 
       let to_string (memo : t) : string = Base58_check.encode memo
 
-      let of_string (s : string) : t = Base58_check.decode_exn s
+      let of_string (s : string) : t =
+        Base58_check.decode_with_target_exn s ~target:"User command memo"
     end
 
     include T

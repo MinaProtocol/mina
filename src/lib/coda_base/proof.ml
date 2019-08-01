@@ -27,7 +27,8 @@ module Stable = struct
           let decoded = Base58_check.decode_exn s in
           Ok (of_string decoded)
         with exn ->
-          Error (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn))
+          Error
+            (sprintf "Proof of_yojson, bad Base58Check: %s" (Exn.to_string exn))
         )
       | _ ->
           Error "expected `String"

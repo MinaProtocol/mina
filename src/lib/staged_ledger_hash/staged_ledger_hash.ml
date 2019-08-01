@@ -28,8 +28,8 @@ module Aux_hash = struct
             try Ok (Base58_check.decode_exn s)
             with exn ->
               Error
-                (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn))
-            )
+                (sprintf "Aux_hash of_yojson, bad Base58Check: %s"
+                   (Exn.to_string exn)) )
           | _ ->
               Error "expected `String"
       end
@@ -82,8 +82,8 @@ module Pending_coinbase_aux = struct
             try Ok (Base58_check.decode_exn s)
             with exn ->
               Error
-                (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn))
-            )
+                (sprintf "Pending_coinbase_aux of_yojson, bad Base58Check: %s"
+                   (Exn.to_string exn)) )
           | _ ->
               Error "expected `String"
       end

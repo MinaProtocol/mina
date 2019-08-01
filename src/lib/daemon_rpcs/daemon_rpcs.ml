@@ -302,7 +302,7 @@ end
 module Send_user_commands = struct
   type query = User_command.Stable.Latest.t list [@@deriving bin_io]
 
-  type response = unit [@@deriving bin_io]
+  type response = unit Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -325,9 +325,10 @@ end
 module Get_balance = struct
   type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Currency.Balance.Stable.Latest.t option [@@deriving bin_io]
+  type error = string [@@deriving bin_io]
 
-  type error = unit [@@deriving bin_io]
+  type response = Currency.Balance.Stable.Latest.t option Or_error.t
+  [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_balance" ~version:0 ~bin_query ~bin_response
@@ -402,7 +403,8 @@ end
 module Get_nonce = struct
   type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.Nonce.Stable.Latest.t option [@@deriving bin_io]
+  type response = Account.Nonce.Stable.Latest.t option Or_error.t
+  [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -436,7 +438,7 @@ end
 module Get_public_keys_with_balances = struct
   type query = unit [@@deriving bin_io]
 
-  type response = (string * int) list [@@deriving bin_io, sexp]
+  type response = (string * int) list Or_error.t [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
 
@@ -448,7 +450,7 @@ end
 module Get_public_keys = struct
   type query = unit [@@deriving bin_io]
 
-  type response = string list [@@deriving bin_io, sexp]
+  type response = string list Or_error.t [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
 
@@ -470,7 +472,7 @@ end
 module Snark_job_list = struct
   type query = unit [@@deriving bin_io]
 
-  type response = string [@@deriving bin_io]
+  type response = string Or_error.t [@@deriving bin_io]
 
   type error = unit
 

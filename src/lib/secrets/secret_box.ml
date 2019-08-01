@@ -12,7 +12,9 @@ module BytesWr = struct
 
   let of_yojson = function
     | `String s ->
-        Ok (Base58_check.decode_exn s |> Bytes.of_string)
+        Ok
+          ( Base58_check.decode_with_target_exn s ~target:"BytesWr"
+          |> Bytes.of_string )
     | _ ->
         Error "Bytes.of_yojson needs a string"
 end

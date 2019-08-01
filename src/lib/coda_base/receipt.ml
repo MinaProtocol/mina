@@ -13,7 +13,8 @@ module Chain_hash = struct
     Binable.to_string (module Stable.Latest) t |> Base58_check.encode
 
   let of_string s =
-    Base58_check.decode_exn s |> Binable.of_string (module Stable.Latest)
+    Base58_check.decode_with_target_exn s ~target:"Receipt chain hash"
+    |> Binable.of_string (module Stable.Latest)
 
   include Codable.Make_of_string (struct
     type nonrec t = t

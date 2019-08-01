@@ -41,5 +41,5 @@ let to_base58_check t =
   Base58_check.encode (to_bigstring t |> Bigstring.to_string)
 
 let of_base58_check_exn s =
-  let decoded = Base58_check.decode_exn s in
+  let decoded = Base58_check.decode_with_target_exn s ~target:"Private key" in
   decoded |> Bigstring.of_string |> of_bigstring_exn

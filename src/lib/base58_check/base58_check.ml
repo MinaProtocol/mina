@@ -75,6 +75,13 @@ struct
         Or_error.error_string
           (sprintf "Invalid base58 version byte \\x%02X, expected \\x%02X"
              (Char.to_int ch) (Char.to_int version_byte))
+
+  let decode_with_target_exn s ~target =
+    match decode s with
+    | Ok x ->
+        x
+    | Error e ->
+        Error.(raise (of_string (sprintf "%s: %s" target (to_string_hum e))))
 end
 
 module Version_bytes = Version_bytes
