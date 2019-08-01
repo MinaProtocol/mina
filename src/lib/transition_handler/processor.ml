@@ -109,11 +109,33 @@ module Make (Inputs : Inputs.S) :
               "Refusing to process the transition with hash $state_hash \
                because is is already in the transition frontier" ;
             return (Error ())
-        | Error `Parent_missing_from_frontier ->
-            Catchup_scheduler.watch catchup_scheduler
-              ~timeout_duration:catchup_timeout_duration
-              ~cached_transition:cached_initially_validated_transition ;
-            return (Error ())
+        | Error `Parent_missing_from_frontier -> (
+            let _, validation =
+              Cached.peek cached_initially_validated_transition
+              |> Envelope.Incoming.data
+            in
+            match validation with
+            | ( _
+              , _
+              , _
+              , _
+              , (`Delta_transition_chain_witness, Truth.True delta_state_hashes)
+              ) ->
+                let timeout_duration =
+                  Option.fold
+                    (Transition_frontier.find frontier
+                       (Non_empty_list.head delta_state_hashes))
+                    ~init:(Block_time.Span.of_ms 0L)
+                    ~f:(fun _ _ -> catchup_timeout_duration)
+                in
+                Catchup_scheduler.watch catchup_scheduler ~timeout_duration
+                  ~cached_transition:cached_initially_validated_transition ;
+                return (Error ())
+            | _ ->
+                failwith
+                  "This is impossible since the transition just passed \
+                   initial_validation so delta_transition_chain_witness must \
+                   be true" )
       in
       (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
       let parent_hash =
