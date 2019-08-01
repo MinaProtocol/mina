@@ -88,10 +88,18 @@ jobs:
         resource_class: large
         working_directory: /Users/distiller/coda
         steps:
-            - run: sudo mkdir /nix
-            - run: sudo chown distiller /nix
-            - run: curl https://nixos.org/nix/install | sh
+            - run:
+                name: Setup nix
+                command: |
+                    sudo mkdir /nix
+                    sudo chown distiller /nix
+                    curl https://nixos.org/nix/install | sh
+            - restore_cache:
+                keys:
+                    - kademlia-nix-{{ checksum "src/app/kademlia-haskell" }}
+                    - kademlia-nix-{{ .Branch }}
             - checkout
+
             - run:
                 name: Build kademlia
                 command: |
@@ -99,6 +107,10 @@ jobs:
                     source ~/.bash_profile
                     cd src/app/kademlia-haskell
                     nix-build release2.nix 2>&1 | tee /tmp/buildkademlia.log
+            - save_cache:
+                key: kademlia-nix-{{ checksum "src/app/kademlia-haskell" }}
+                paths:
+                    - "/nix/store"
 
     build-macos:
       # only run when there's a 'release' tag
