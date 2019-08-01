@@ -1,5 +1,3 @@
-open Core
-
 (* This module implements a snarky function for the gammaless Groth16 verifier. *)
 module Make (Inputs : Inputs.S_run) = struct
   open Inputs

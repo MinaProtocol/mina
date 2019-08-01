@@ -48,6 +48,11 @@ module Tock0 = struct
   module Snarkable = Make_snarkable (Crypto_params.Tock0)
 end
 
+module Tock0_run = struct
+  include Crypto_params.Tock0_run
+  module Snarkable = Make_snarkable (Crypto_params.Tock0)
+end
+
 module Tick0 = struct
   include Crypto_params.Tick0
   module Snarkable = Make_snarkable (Crypto_params.Tick0)
@@ -294,52 +299,101 @@ module Tock = struct
     let final_exponentiation = FE.final_exponentiation4
   end
 
+  module Run = Snarky.Snark.Run.Make (Tock_backend) (Unit)
+
+  module Pairing_run = struct
+    include Run
+
+    module G1 = struct
+      type t = Pairing.G1.t
+
+      let add_unsafe a b = run_checked (Pairing.G1.add_unsafe a b)
+      
+      let add_exn a b =
+        match run_checked (Pairing.G1.add_unsafe a b) with
+        | `I_thought_about_this_very_carefully x -> x
+
+      let typ = Pairing.G1.typ
+
+      module Unchecked = Pairing.G1.Unchecked
+      
+      let scale a b ~init =
+        let (module Shifted) = run_checked (Pairing.G1.Shifted.create ()) in
+        Shifted.unshift_nonzero
+        (run_checked (Pairing.G1.scale (module Shifted) a b ~init:(run_checked (Shifted.(add zero init)))))
+    end
+
+    module G2 = struct
+      type t = Pairing.G2.t
+      let scale a b c ~init = run_checked (Pairing.G2.scale a b c ~init)
+    end
+
+    module Fqe = struct
+      type t = Pairing.Fqe.t
+    end
+
+    module Fqk = struct
+      type t = Pairing.Fqk.t
+    end
+
+    module G1_precomputation = struct
+      type t = Pairing.G1_precomputation.t
+    end
+
+    module G2_precomputation = struct
+      type t = Pairing.G2_precomputation.t
+    end
+
+    module Impl = struct
+      include Tock0_run
+
+      (* let run_checked = Run.run_checked
+
+      let make_checked = Run.make_checked
+
+      type prover_state = Run.prover_state
+
+      module Internal_Basic = Run.Internal_Basic *)
+    end
+
+    let final_exponentiation a = run_checked (Pairing.final_exponentiation a)
+
+    let batch_miller_loop a = run_checked (Pairing.batch_miller_loop a)
+  end
+
   module Proof = struct
     include Tock0.Proof
 
     let dummy = Dummy_values.Tock.Bowe_gabizon18.proof
   end
 
-  module Groth_verifier = struct
-    include Snarky_verifier.Groth.Make (Pairing)
-
-    let conv_fqe v =
-      let v = Tick_backend.Full.Fqe.to_vector v in
-      Field.Vector.(get v 0, get v 1)
-
-    let conv_g2 p =
-      let x, y = Tock_backend.Inner_twisted_curve.to_affine_exn p in
-      Pairing.G2.Unchecked.of_affine (conv_fqe x, conv_fqe y)
-
-    let conv_fqk p =
-      let v = Tick_backend.Full.Fqk.to_elts p in
-      let f i =
-        let x j = Tock0.Field.Vector.get v ((2 * i) + j) in
-        (x 0, x 1)
-      in
-      (f 0, f 1)
-
-    let proof_of_backend_proof p =
-      let open Tick_backend.Full.Groth16_proof_accessors in
-      {Proof.a= a p; b= conv_g2 (b p); c= c p}
-
-    let vk_of_backend_vk vk =
-      let open Tick_backend.Full.Groth16_verification_key_accessors in
-      let open Inner_curve.Vector in
-      let q = query vk in
-      { Verification_key.query_base= get q 0
-      ; query= List.init (length q - 1) ~f:(fun i -> get q (i + 1))
-      ; delta= conv_g2 (delta vk)
-      ; alpha_beta= conv_fqk (alpha_beta vk) }
-
-    let constant_vk vk =
-      let open Verification_key in
-      { query_base= Inner_curve.Checked.constant vk.query_base
-      ; query= List.map ~f:Inner_curve.Checked.constant vk.query
-      ; delta= Pairing.G2.constant vk.delta
-      ; alpha_beta= Pairing.Fqk.constant vk.alpha_beta }
+  module Sonic_verifier = struct
+    include Snarky_verifier.Sonic_commitment_scheme.Make (Pairing_run)
   end
 end
+
+module Srs = Sonic_prototype.Srs.Make (Pairing)
+module Commitment_scheme = Sonic_prototype.Commitment_scheme.Make (Pairing)
+
+let%test_unit "sonic test" =
+  let module M = Snarky.Snark.Run.Make (Tock_backend) (Unit) in
+  Quickcheck.test ~trials:3 Quickcheck.Generator.(tuple3 Tock0.Field.gen Tock0.Field.gen Tock0.Field.gen) ~f:(fun x z alpha ->
+      let (), checked_output =
+        M.run_and_check
+          (fun () ->
+            let open Srs in
+            let open Commitment_scheme in
+            let d = 15 in
+            let srs = Srs.create d x alpha in
+            let f = Fr_laurent.create 1 [Fr.of_int 10] in
+            let commitment = commit_poly srs f in
+            let opening = open_poly srs commitment z f in
+            pc_v srs commitment z opening )
+          ()
+        |> Or_error.ok_exn
+      in
+      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output
+        (Group_map.to_group (module Tick0.Field) ~params t) )
 
 module Tick = struct
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
@@ -545,6 +599,8 @@ module Tick = struct
       module Impl = Tick0
       open Snarky_field_extensions.Field_extensions
       module Fq = Fq
+
+      module Fr = Snarkette.Mnt4_80.Fq
 
       let conv_field =
         Fn.compose Tick0.Field.of_string Snarkette_tick.Fq.to_string
