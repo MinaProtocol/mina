@@ -567,11 +567,11 @@ let create (config : Config.t) =
                  let banned_until =
                    Coda_networking.banned_until notification
                  in
-                 (* ignore RPC errors, not critical for notifications *)
-                 let%bind _ =
+                 (* if RPC call fails, will be logged in gossip net code *)
+                 let%map _ =
                    Coda_networking.ban_notify net peer banned_until
                  in
-                 Deferred.unit )) ;
+                 () )) ;
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~logger:config.logger
               ~trust_system:config.trust_system

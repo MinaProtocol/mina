@@ -637,7 +637,7 @@ module Make (Inputs : Inputs_intf) = struct
     let ban_notify_rpc conn ~version:_ ban_until =
       (* the port in `conn' is an ephemeral port, not of interest *)
       Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
-        "Node banned by peer ($peer) until $ban_until"
+        "Node banned by peer $peer until $ban_until"
         ~metadata:
           [ ("peer", `String conn.Host_and_port.host)
           ; ( "ban_until"
