@@ -1,16 +1,18 @@
 # Summary
 
-The Coda protocol contains many different types of objects (external_transitions, transactions, accounts) and these objects have relationships with each other. A client communicating with the protocol would often make queries involving the relationship of these objects (i.e. Find the 10 most recent transactions that Alice sent after sending transaction, TXN). This RFC will discuss how we can take advantage of these relationships by using relational/graph databases. This will accelerate our process in writing concise and maintainable queries that are extremeley performant. We will also discuss further the pros and cons of these databases as well as some slight architectual modifications to the GraphQL server and its dependencies.
+The Coda protocol contains many different types of objects (external_transitions, transactions, accounts) and these objects have relationships with each other. A client communicating with the protocol would often make queries involving the relationship of these objects (i.e. Find the 10 most recent transactions that Alice sent after sending transaction, TXN). This RFC will discuss how we can take advantage of these relationships by using relational databases. This will accelerate our process in writing concise and maintainable queries that are extremely performant. Additionally, there are extra tasks that the daemon has to make these client operations performant. This in hand can slow down the performance of the daemon and can be remedied by offloading these operations into a client process.  We will also discuss further the pros and cons of this design as well as some slight architectual modifications to the GraphQL server and its dependencies.
 
 # Motivation
 
-The primary database that we store transactions and external_transitions is Rocksdb. When we load the databases, we read all of the key-value pairs and load them into an in-memory cache that is designed for making fast in-memory reads and pagination queries. The downside of this is that this design limits us from making complex queries. Namely, we make a pagination query that is sent from or received by a public key, but not strictly one or the other. Additionally, the indexes for the current design is limited to the keys of the database. This enables to answer queries about which transactions are in an external_transition but not the other way around (i.e. for a given transaction, which external_transitions have the transition). We can put this auxilary information that tells us which external_transitions contain a certain transaction in the value of the transaction database. However, this results in verbose code and extra invariants to take care, leading to potential bugs. Relational/graph databases are good at taking care of these type of details. Relational/graph databases can give us more indexes and they can grant us more flexible and fast queries with less code.
+The primary database that we store transactions and external_transitions is Rocksdb. When we load the databases, we read all of the key-value pairs and load them into an in-memory cache that is designed for making fast in-memory reads and pagination queries. The downside of this is that this design limits us from making complex queries. Namely, we make a pagination query that is sent from or received by a public key, but not strictly one or the other. Additionally,the indexes for the current design is limited to the keys of the database. This enables to answer queries about which transactions are in an `external_transition` but not the other way around (i.e. for a given transaction, which external_transitions have the transition). We can put this auxilary information that tells us which `external_transition`s contain a certain transaction in the value of the transaction database. However, this results in verbose code and extra invariants to take care, leading to potential bugs. Relational databases are good at taking care of these type of details. Relational databases can give us more indexes and they can grant us more flexible and fast queries with less code.
 
 This RFC will also formally define some GraphQL APIs as some of them were losely defined in the past. This would give us more robustness for this RFC's design and less reason to refactor the architecture in the long run.
 
 # Detailed Design
 
-The first section will talk about the requirements and basic primitives that a client should be able to do when interacting with the protocol. This will make a good segueway to explaining the design details of integrating relational databases into our codebase. The next section will discuss about the other option of using graph databases. The last section will discuss consistency issues that could occur with this design.
+The first section will talk about the requirements and basic primitives that a client should be able to do when interacting with the protocol. This will make a good segueway to explaining the proposed design. The last section will discuss consistency issues that could occur with this design.
+
+<a href="requirements"></a>
 
 ## Requirements
 
@@ -39,7 +41,7 @@ module Fee_transfer {
 }
 ```
 
-Additionally, clients should be able to know which external_transitions contains a transaction. These blocks can gives us useful information of a transaction, like the number of block confirmations that is on top of a certain transaction and the "status" of a transaction. Therefore, a client should be able to store a record of these interested external_transitions and look them up easily in a container. Here is the type of an external_transition:
+Additionally, clients should be able to know which `external_transition`s contains a transaction. These transitions can gives us useful information of a transaction, like the number of block confirmations that is on top of a certain transaction and the "status" of a transaction. Therefore, a client should be able to store a record of these interested external_transitions and look them up easily in a container. Here is the type of an external_transition:
 
 ```ocaml
 module Protocol_state = struct
@@ -61,7 +63,7 @@ module External_transition = struct
 end
 ```
 
-The OCaml implementation of `External_transition` is different from the presented `external_transition` type as it has the field `is_snarked` and `status` to make it easy to compute the `transactionStatus` query, which will tell us if a transaction is snarked and its `consensus_status`. `consensus_status` is variant type and is described below:
+The OCaml implementation of an `external_transition` is different from the presented `external_transition` type as it has the field `is_snarked` and `status` to make it easy to compute the `transactionStatus` query, which will tell us if a transaction is snarked and its `consensus_status`. `consensus_status` for an `external_transition` is variant type and is described below:
 
 ```ocaml
 type consensus_status =
@@ -73,18 +75,18 @@ type consensus_status =
 
 Notice that `PENDING` in `consensus_status` is the number of block confirmations for a block. This position has nothing to do with a block being snarked or not, so `Snarked` is not a constructor of this variant.
 
-With the `external_transitions` and `conseus_status`, we can compute the status of a transaction. We will denote the status of transaction as the type `transaction_status` and below is the type:
+With the `external_transitions` and `consensus_status`, we can compute the status of a transaction. We will denote the status of transaction as the type `transaction_status` and below is the type:
 
 ```ocaml
 type transaction_status =
-  | Failed (* The transaction has been evicted by the `transaction_pool` but never gotten added to a block OR all of the external_transitions containing that transaction have the status Failed *)
+  | Failed (* The transaction has been evicted by the `transaction_pool` but never gotten added to a block OR all of the transitions containing that transaction have the status Failed *)
   | Confirmed (* One of the transitions containing the transaction is confirmed *)
-  | Pending of int (* The transaction is in the transition_frontier and all of transitions are in the pending state. The block confirmation number of this transaction is minimum of all block confirmation number of all the transitions *)
-  | Scheduled (* Is in the transaction_pool and not in the transition_frontier. *)
+  | Pending of int (* The transaction is in the `transition_frontier` and all of transitions are in the pending state. The block confirmation number of this transaction is minimum of all block confirmation number of all the transitions *)
+  | Scheduled (* Is in the `transaction_pool` and not in the `transition_frontier`. *)
   | Unknown
 ```
 
-We also have the `receipt_chain` object and is used to prove the execution of an `user_command`. It does this by forming a merkle list of `user_command`s from some `proving_receipt` to a `resulting_receipt`. The `resulting_receipt` is typically the `receipt_chain_hash` of a user's account on the best tip.
+We also have the `receipt_chain_hash` object and is used to prove a `user_command` made it into a block. It does this by forming a merkle list of `user_command`s from some `proving_receipt` to a `resulting_receipt`. The `resulting_receipt` is typically the `receipt_chain_hash` of a user's account on the best tip ledger. More info about about `receipt_chain_hash` can be found on this [RFC](rfcs/0006-receipt-chain-proving.md) and this [OCaml file](../src/lib/receipt_chain_database_lib/intf.ml).
 
 Below is an OCaml API of involving `receipt_chain_hash` type:
 
@@ -101,13 +103,25 @@ end
 
 These containers should also have performant pagination queries, which is essentially a single contiguous range of sorted elements. `external_transitions` and `transactions` should be ordered by block length. Previously, we sorted these objects by time. Block length can arguably be a better ordering for transitions because clients can receive transitions at different times, but what remains constant is the block length that the transition appears in the blockchain. Additionally, we can sort transactions by the minimum block length of the `external_transition`s that they appear in. Typically, a client would expect to recieve a transaction at the soonest block, which is the block with the smallest block length. If they do not appear in an `external_transition`, they will not appear in the sorting. A drawback with sorting `external_transitions` and `transactions` based on date is that if the client wants to add an arbitrary `transactions` and `external_transition` and persist them, then they would not have the extra burden of tagging these objects with a timestamp for pagination. Block length alliviates this use.
 
-<a href="relational-database-implementation"></a>
+## Implementation
 
-## Relational Database Implementation
+This section will discuss a proposal to make the querying done on a different process, which will be called the client process, and it will take advantage of in-memory data structures as well persistent databases.
 
-`SQLite` would be the best relational database for our use case because it has an Apache 2 license and its a very small binary (3.7MB on my Macbook). `SQLite` has a considerably good amount of support for OCaml compared to the other databases that will be discussed and it would be relatively easy to get `SQLite` working off. There is even a nice OCaml library called [ocaml-sqlexpr](https://github.com/mfp/ocaml-sqlexpr) that enables us to embed type-safe `SQLite` queries onto our OCaml code.
+A persistent database that we would like to introduce into our codebase is `SQLite`. `SQLite` would be the best relational database for our use case because it has an Apache 2 license and its a very small binary (3.7MB on my Macbook). `SQLite` has a considerably good amount of support for OCaml compared to the other databases that will be discussed and it would be relatively easy to get `SQLite` working off. There is even a nice OCaml library called [ocaml-sqlexpr](https://github.com/mfp/ocaml-sqlexpr) that enables us to embed type-safe `SQLite` queries onto our OCaml code.
 
-For the objects discussed in the previous section, we can embed them as tables in one global SQL database. Below are the schemas of the tables:
+Some of these in-memory data structures leverage Redis as an in-memory database. Redis has a BSD license and is a few MBs.
+
+Below is a diagram of the new process and shows how different components from the new process and the exist process communicate with each other:
+
+![Client process](../docs/res/client_process.dot.png)
+
+The black lines represents how a component communicates and update another component component.
+
+The purple line represents that the `transition_frontier` data will get updated whenever a transition gets removed from the `transition_frontier`.
+
+Notably, we have an in-memory and disk versions for `transitions_to_transactions`, `transactions` and `receipt_chain_hashes` table. The functionalities and operations of these tables will be discussed later.
+
+For persistently storing objects discussed in the [Requirements section](#requirements), We can model them with the schemas below:
 
 ```
 Enum consensus_status {
@@ -135,14 +149,15 @@ Table user_commands {
   amount int64 [not null]
   fee int64 [not null]
   memo string [not null]
+  is_added_manually bool [not null]
 }
-
 Table fee_transfers {
   id string [pk]
   fee int64 [not null]
   receiver string [not null]
 }
 
+// Use Rocksdb for this
 Table receipt_chain_hashes {
   hash string [pk]
   previous_hash string
@@ -161,215 +176,16 @@ Table transition_to_transactions {
     (sender, block_length) [name: "fast_sender_pagination"]
   }
 }
+
 // Rows are uniquely identified by `state_hash` and `transaction_id`
 ```
 
-Here is a picture of the database:
+Notice that all the possible joins that we have to run is through the `transition_to_transactions` table. The `transaction_id` and `state_hash` columns are indexed to make it fast to compute which transactions are in an `external_transition` and which `external_transition`s  have a certain transaction for the `transactionStatus` query. We have multicolumns indexes for `(receiver, date)` and `(sender, date)` to boost the performance of pagination queries.
 
-![database](../docs/res/coda_sqlite.png)
-
-Here is a link to an interactive version of the image:
-https://dbdiagram.io/d/5d30b14cced98361d6dccbc8
-
-These tables are assumed to be purely on-disk files, except for the table `receipt_chain_hashes`. When are trying to prove the existence of a payment, we would do many reads to the `receipt_chain_hashes` table. We can prevent this by having `receipt_chain_hashes` be an in-memory database and back it up to disk files whenever we make a write. The API for backing up an in-memory database can be seen [here](https://www.sqlite.org/backup.html).
-
-Notice that all the possible joins that we have to run is through the `transition_to_transactions` table. The `transaction_id` and `state_hash` columns are indexed to make it fast to compute which transactions are in an `external_transition` and which external_transitions  have a certain transaction for the `transactionStatus` query. We have multicolumns indexes for `(receiver, date)` and `(sender, date)` to boost the performance of pagination queries.
-
-The client will persist a transaction involving public keys in their white list whenever they see the transaction gets gossipped to them or they schedule a sent transaction. Below is psuedocode for persisting a transaction:
-
-```ocaml
-let write_transaction_with_no_commit sqlite txn account_before_sending_txn external_transition_opt =
-  Sqlite.write sqlite['transaction'] txn;
-  let (state_hash, block_length) =
-    match external_transition_opt with
-    | None -> (None, None)
-    | Some (With_hash.{data; hash}) ->
-      (hash, Consensus_status.block_length @@ External_transition.consensus_state data)
-  in
-  Sqlite.write sqlite['transition_to_transactions']
-    {transaction_id=Transaction.hash_id(txn); state_hash = None; sender= Some (txn.sender); receiver = txn.receiver; block_length = None  }
-  let new_receipt_chain_hash = Receipt.Chain_hash.hash account_before_sending_txn.receipt_chain_hash txn in
-  
-  Sqlite.write sqlite['state_hash']
-  {hash=new_receipt_chain_hash; previous_hash=account_before_sending_txn.receipt_chain_hash}
-
-let write_transaction sqlite txn account_before_sending_txn =
-  write_transaction_with_no_commit sqlite txn account_before_sending_txn None
-  Sqlite.commit sqlite
-```
-
-The client will similarly persist an external_transition along with its transactions involving public keys in their white list when it gets added to the transition_frontier. Below is psuedocode for persisting an external_transition:
-
-```ocaml
-let write_transition sqlite breadcrumb previous_ledger =
-  let ({With_hash.data=external_transition; hash=state_hash} as transition_with_hash) = breadcrumb.transition_with_hash in
-  let transactions = Staged_ledger_diff.transactions External_transition.staged_ledger_diff in
-  let saved_external_transition = {
-    state_hash = State_hash.to_string state_hash;
-    creator = Staged_ledger_diff.proposer (External_transition.staged_ledger_diff)
-    is_snarked=breadcrumb.just_emitted_a_proof
-    status=Pending
-    ...
-  } in
-  
-  Sqlite.write sqlite['external_transition']  saved_external_transition;
-  
-  if breadcrumb.just_emitted_a_proof then mark_all_subsequent_transitions_as_snarked sqlite state_hash;
-  
-  List.iter transactions ~f:(fun transaction ->
-    let location = Option.value_exn (Ledger.get_account_location ledger transaction.sender) in
-    let previous_sender_account = Option.value_exn (Ledger.get_account ledger location) in
-    write_transaction_with_no_commit sqlite transaction previous_sender_account transition_with_hash
-  )
-  Sqlite.commit sqlite
-```
-
-When a transition reaches finality or gets removed, the transition status will get updated in the database.
-
-For this design, we are assuming that objects will never get deleted because the client will only be following transactions involving a small number of public keys. These transactions cannot be deleted because they a components used to prove the existence of transaction. We could delete external_transitions that failed to reach finality and the transaction involving them. However, it outside of the scope of this RFC.
-
-We can create another Transition_frontier extension to make these database updates. They will essentially listen to diffs that add external_transitions and remove external_transitions and we will make the database updates accordingly.
-
-Below are SQL queries that will assist us in implementing several GraphQL services:
-
-### Queries
-
-#### Transaction_status
-
-This service can tell us the consensus status of transaction as well as if it is snarked or not. These values is based on which external_transitions that they are in. Below is the SQL query that can help us compute the status of a transaction.
-
-```SQL
--- transaction_status
-SELECT state_hash, is_snarked, status FROM
-external_transitions
-INNER JOIN transition_to_transactions on
-  transition_to_transactions.transaction_id = $TRANSACTION_ID
-```
-
-We can use this query in psuedocode as the following:
-
-```ocaml
-
-val compute_block_confirmations Transition_frontier.t -> State_hash.t list -> (State_hash.t * int) list
-let compute_block_confirmations frontier state_hashes =
-  failwith("Need to implement: For a given set of state_hashes, compute their block confirmation number in a memorized manner")
-
-
-let get_transaction_status ~frontier ~sql ~txn_pool txn : (bool * transaction_status) =
-  let sql_result = transaction_status_sql_query sql txn_id in
-  match sql_result with
-  | [] -> if Transaction_pool.member txn_pool txn then
-    (false, Scheduled) else (false, Unknown)
-  | xs ->
-      let state_hashes, snarked_statuses, consensus_statuses = List.unzip3 xs in
-      let transaction_status =
-        if List.for_all consensus_statuses ~f:(Consensus_status.equal Failed) then
-          Transaction_status.Failed
-        else if List.exists consensus_statuses ~f:(Consensus_status.equal Confirmed) then
-          Transaction_status.Confirmed
-        else (* Transaction is in the transition_frontier *)
-          let block_confirmations = c ompute_block_confirmations frontier state_hashes in
-          let block_confirmation = List.fold block_confirmations ~f:(fun acc (_, confirmations) -> Int.max acc confirmations  ) in
-          Transaction_status.Pending block_confirmation
-      in
-      let snarked_status = List.exists snarked_statuses ~f:(Fn.id) in
-      (snarked_status, transaction_status)
-```
-
-### Pagination Queries
-
-We make the pagination `blocks` query using the following SQL query
-
-```SQL
--- blocks
-
-SELECT state_hash, transaction_ids, date, creator, ....FROM
-(
-SELECT state_hash, CONCAT(transition_to_transactions.transaction_id) as transaction_ids, MIN (transition_to_transactions.block_length) as block_length
-FROM transition_to_transactions
-GROUPBY transition_to_transactions.state_hash
-HAVING ((transition_to_transactions.sender IN $SENDERS) OR (transition_to_transactions.receiver IN $RECEIVERS))
-) as group_by
-INNER JOIN
-external_transitions
-ON group_by.state_hash = external_transitions.state_hash
-WHERE group_by.block_length > $BLOCK_LENGTH
-ORDER BY block_length
-LIMIT 10
--- Would need to use a groupby query to make query the transactions as well
-```
-
-From this command, we can further query the actual transactions in a block using the following lookup:
-
-```SQL
-SELECT id, nonce, amount, ... FROM
-user_commands
-WHERE id IN $TRANSACTION_IDS
-```
-
-### Disadvantages
-
-The cons of using `SQLite` is that we have to make expensive join queries particularly for pagination queries and the `transactionStatus` query. Also, theres extra bloat having the `transition_to_transactions` table. Writing to the databases maybe slow because of the multiple indexes from the `transition_to_transactions` table.
-
-## Graph databases
-
-To address the join issues with `SQLite`, we can also consider using Graph Databases. particularly, Dgraph and Janus graph, which Apache 2 licensed. Ideally, we would have different types of vertices which are the tables described in the subsection, `Schema`. The edges of the graph are the following:
-
-External Transitions <--> User_commands
-
-User_commands <[receipt_chain_id:id]> Receipt_chain_hash
-
-Receipt_chain_hash <[previous_id:id]> Receipt_chain_hash
-
-Account <Receipt_chain_hash> transaction
-
-An additional advantage of using a graph database is that they often have a visual showing how nodes and edges are connected in the graph database. This can serve as a useful tool for debugging the entire blockchain and as a block explorer.
-
-The disadvantage of these graph databasess is that there isn't much support for both of these databases. Namely, the DSL queries are not strongly typed and we would have to make our own custom OCaml bindings to call these databases.
-
-Dgraph seems to work nicely with graphql. It doesn't require serializing and deserializing the data. The output is just pure JSON and we can easily return that to the client. The main disadvantage is that vertices cannot have fields so all the fields of a vertex are actual vertices.
-
-JanusGraph is another graph database to consider. We can explicitly mention the relationship of each type of vertex (i.e. 1-to-1, Many-to-many). We can also indicate how each vertex can index their edges, which is useful for optimizing different relationship queries. JanusGraph has its own "functional" graph query language called Gremlin and it has good interoperability with common languages, such as Java, Python and Javascript. However, there are no bindings with OCaml, but we can lauch a Gremlin server and we can communicate with the server using HTTP requests, Graphson, or use it's own untyped DSL written in Groovy.
-
-## New Client Process
-
-Previously, we discussed about making queries in the same process and the queries do not fully take advantage of the in-memory datastructures of the daemon. This section will discuss a proposal to make the querying done on a different process, which will be called the client process, and it wil will take advantage of these in-memory data structures.
-
-Some of these in-memory data structures leverage Redis as an in-memory database. Redis has a BSD License and is a small executable (2 - 4 MBs).
-
-Below is a diagram of the new process:
-
-![Client process](../docs/res/client_process.dot.png)
-
-The black lines represents how a component communicates and update another component component.
-
-The purple line represents that the `transition_frontier` data will get updated whenever a transition gets removed from the `transition_frontier`.
-
-Notably, we have an in-memory and disk versions for both `transitions_to_transactions` table and `receipt_chain_table`. The functionalities and operations of these tables will be discussed later.
-
-The schema for the databases that uses a relational structure are almost identical to the schemas discussed in the [Relational Database Implementation section](#relational-database-implementation). Except that the `user_commands` table is modeled as the following
+The in-memory cache data structures are also similar to their disk counterparts, but they use the actual OCaml pointers as values or  have extra fields added to them for reducing the number of disk reads that cache has to make. The have the following schemas:
 
 ```
-Table user_commands {
-  id string [pk]
-  is_delegation bool [not null]
-  nonce int64 [not null]
-  from string [not null]
-  to string [not null]
-  amount int64 [not null]
-  fee int64 [not null]
-  memo string [not null]
-  is_added_manually bool [not null]
-}
-// Rows are uniquely identified by `state_hash` and `transaction_id`
-```
-
-We will discuss later why `is_added_manually` got added to the `user_commands`.
-
-The in-memory cache data structures are also similar to their disk counterparts, but they have extra fields added to them for reducing the number of disk reads that cache has to make. The have the following schemas:
-
-```
-// Use Rocksdb
+// Use OCaml Hashtbl
 Table receipt_chain_hashes {
   hash string [pk]
   previous_hash string [not null]
@@ -391,9 +207,17 @@ Table transition_to_transactions {
     (sender, block_length) [name: "fast_sender_pagination"]
   }
 }
-```
 
-We would not need a `pending` status for transition because all pending transitions would appear in the replicated `transition_frontier`.
+// Use OCaml Hashtbl
+Table transaction {
+  id: Transaction_id.t -> Transaction.t
+}
+
+// Use OCaml Hashtbl
+Table transition {
+  id: State_hash.t -> external_transition
+}
+```
 
 ### Replicated transition frontier
 
@@ -468,15 +292,17 @@ Since a node can go offline, it can miss gossipped objects. If this happens, a c
 
 For adding arbitrary transactions, the client could simply add it to the `transactions` database with `is_manually_added=true`. We can add arbitrary `receipt_chain_hashes` along with its parents to the `receipt_chain` database. The user can arbitrary transitions along with their transactions into the `transitions_to_transactions` table, `external_transitions` and `transactions` database. When we add a transition whose block length is greater than root length, the `transition` will be added added through the `transition_frontier_controller`. Namely, the `transition` will be added to the `network_transition_writer` pipe in `Coda_networking.ml`.
 
+<a href="bootstrap"></a>
+
 ### Running Bootstrap
 
 If a client finds out that they have to bootstrap, then they would not have a `transition_frontier`. Therefore, we would have to store all the objects in the `transition_frontier` into the databases. Additionally, we would not know the `consensus_state` of the saved `transitions`, so the `consensus_state` would be set to `UNKNOWN`.
 
 ## Consistency Issues
 
-This design does not address consistency issues that can arise. For example, a client can be offline during sometime and then come online and bootsrap. As a result, we would not be able to fully determine the consensus status of the external_transitions that were in the transition_frontier. Worse, we would not be able to determine which external_transtions became snarked.
+As a mentioned in the [Running Bootstrap section](#bootstrap), we would not be able to fully determine the consensus status of the external_transitions that were in the transition_frontier. Worse, we would not be able to determine which external_transtions became snarked.
 
-We can have a third-party archived node tell a client the consensus_state of the external_transitions. Another option that we have is that we can create a P2P RPC call where peers can give a client a merkle list proof of a state_hash and all the state_hashes of the blocks on top of the state_hash. The merkle list will be bounded by length K. If the merkle list proof is size K, then the external_transition should be fully confirmed. Otherwise, the external_transition failed.
+We can have a third-party archived node tell a client the consensus_state of the external_transitions. Another option that we have is that we can create a P2P RPC call where peers can give a client a merkle list proof of a state_hash and all the state_hashes of the blocks on top of the state_hash. The merkle list will be bounded by length K, the amount of block confirmations to garuntee finality with a very high probablity. If the merkle list proof is size K, then the external_transition should be fully confirmed. Otherwise, the external_transition failed.
 
 We can also have a third-party archive node tell a client the snarked status of an `external_transition`. We can also create a heuristic that gives us a probability that an `external_transition` has been snarked. We can introduce a new nonce that indicates how many ledger proofs have been emitted from genesis to a certain external_transition. If the root external_transition emitted `N` ledger proofs, then all the external_transitions that have emitted less than `N` ledgers should have been snarked.
 
@@ -484,13 +310,9 @@ We can also have a third-party archive node tell a client the snarked status of 
 
 - Makes it easy to perform difficult queries for our protocol
 - Current implementation takes a lot of work and it is quite limited for a certain use case.
-- We can migrate to SQLite which has more support (and its less likely to encounter a bug).
-  - If we use SQLite we can have many different tables. 
-    - Have to worry about updating multiple tables and have to use primitives such as 2 phase commit
-    - Join queries would be not be too performant
-    - Writes might be slow because of many indexes.
 - We can also stick with the same implementation we have, which is a bit limiting
-- We can use a counter cache to decrease the number of calls that we have to the SQL database
+- Other alternatives are discussed in the previous commits of this [RFC](https://github.com/CodaProtocol/coda/pull/2901)
+- In an ideal world where we have an infinite amount of time, we would implement our own native graph database leverage the `transition_frontier` as an in-memory cache.
 
 # Prior Art
 
@@ -500,10 +322,7 @@ Coinbase also uses MongoDB to store all of the data in a blockchain.
 
 # Unresolved questions
 
-- Can we use the transition frontier and transaction pool as a cache layer to reduce the number of queries that hit the database? (I've thought about this deeply and have made a design solution extending the solution discussed in this RFC. I have not written out the full details of this solution.)
 - How can we extend this design so that a client has multiple devices (i.e. Desktop application, mobile, etc...).
-- There is a possibility for inconsistent queries for `snarked` and reach root.
-  Maybe we can have a notification telling us about that and then there would be a service that recomputes the status of these queries.
 
 # Appendix
 
