@@ -1,6 +1,6 @@
 # Summary
 
-The Coda protocol contains many different types of objects (external_transitions, transactions, accounts) and these objects have relationships with each other. A client communicating with the protocol would often make queries involving the relationship of these objects (i.e. Find the 10 most recent transactions that Alice sent after sending transaction, TXN). This RFC will discuss how we can take advantage of these relationships by using relational databases. This will accelerate our process in writing concise and maintainable queries that are extremely performant. Additionally, there are extra tasks that the daemon has to make these client operations performant. This in hand can slow down the performance of the daemon and can be remedied by offloading these operations into a client process.  We will also discuss further the pros and cons of this design as well as some slight architectual modifications to the GraphQL server and its dependencies.
+The Coda protocol contains many different types of objects (external_transitions, transactions, accounts) and these objects have relationships with each other. A client communicating with the protocol would often make queries involving the relationship of these objects (i.e. Find the 10 most recent transactions that Alice sent after sending transaction, TXN). This RFC will discuss how we can take advantage of these relationships by using relational databases. This will accelerate our process in writing concise and maintainable queries that are extremely performant. Additionally, there are extra tasks that the daemon has to make these client operations performant. This in hand can slow down the performance of the daemon and can be remedied by offloading these operations into another process.  We will also discuss further the pros and cons of this design as well as some slight architectual modifications to the GraphQL server and its dependencies.
 
 # Motivation
 
@@ -16,7 +16,7 @@ The first section will talk about the requirements and basic primitives that a c
 
 ## Requirements
 
-__NOTE: The types presented in OCaml code are disk-representations of the types__
+__NOTE: The types presented in OCaml code are disk representations of the types__
 
 In the Coda blockchain, there would be many different transactions sent and received from various people in the network. We would only be interested in hearing about several transactions involving certain people (i.e. friends). Therefore, a client should only keep a persistent record of transactions involving a white list of people and they should be able to look up the contents of these transactions from a container. Here are the records for a transaction. Note that transactions could be either user_commands or fee_transfers for this design:
 
