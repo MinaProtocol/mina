@@ -24,7 +24,8 @@ rewrite_lib() {
   TARGET="$1"
   LIB_NAME="$2"
   NEW_PATH="$3"
-  check_file ${NEW_PATH}
+  # build env may not have these libs
+  #check_file ${NEW_PATH}
   OLD_PATH=$(/usr/bin/otool -X -L ${TARGET} | grep "${LIB_NAME}" | grep '/nix'  | awk '{print $1}')
   echo "Updating ${TARGET} - rewriting ${OLD_PATH} to ${NEW_PATH}"
   /usr/bin/install_name_tool -change "$OLD_PATH" "$NEW_PATH" "${TARGET}"
