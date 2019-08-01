@@ -123,17 +123,20 @@ module Haskell_process = struct
   type t =
     { failure_response: [`Die | `Ignore] ref
     ; process: Process.t
+    ; mutable already_waited: bool
     ; lock_path: string }
 
-  let kill {failure_response; process; lock_path} =
+  let kill {failure_response; process; lock_path; already_waited} =
     failure_response := `Ignore ;
-    let%bind _ =
-      Process.run_exn ~prog:"kill"
-        ~args:[Pid.to_string (Process.pid process)]
-        ()
-    in
-    let%bind _ = Process.wait process in
-    Sys.remove lock_path
+    if not already_waited then
+      let%bind _ =
+        Process.run_exn ~prog:"kill"
+          ~args:[Pid.to_string (Process.pid process)]
+          ()
+      in
+      let%bind _ = Process.wait process in
+      Sys.remove lock_path
+    else Deferred.unit
 
   let cli_format : Unix.Inet_addr.t -> int -> string =
    fun host discovery_port ->
@@ -215,22 +218,28 @@ module Haskell_process = struct
                    None ) ])
           ~f:(fun prog -> Process.create ~prog ~args ())
         |> Deferred.Or_error.map ~f:(fun process ->
-               {failure_response= ref `Die; process; lock_path} )
+               { failure_response= ref `Die
+               ; process
+               ; lock_path
+               ; already_waited= false } )
       with
       | Ok p ->
           (* If the Kademlia process dies, kill the parent daemon process. Fix
          * for #550 *)
-          Deferred.upon (Process.wait p.process) (fun code ->
+          Deferred.bind (Process.wait p.process) ~f:(fun code ->
+              p.already_waited <- true ;
               match (!(p.failure_response), code) with
               | `Ignore, _ | _, Ok () ->
-                  ()
+                  return ()
               | `Die, (Error _ as e) ->
                   Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
                     "Kademlia process died: $exit_or_signal"
                     ~metadata:
                       [ ( "exit_or_signal"
                         , `String (Unix.Exit_or_signal.to_string_hum e) ) ] ;
-                  raise Child_died ) ;
+                  let%map () = Sys.remove lock_path in
+                  raise Child_died )
+          |> don't_wait_for ;
           Ok p
       | Error e ->
           Or_error.error_string
@@ -265,7 +274,7 @@ module Haskell_process = struct
     with
     | `Yes ->
         let%bind t = run_kademlia () in
-        let {failure_response= _; process; lock_path} = t in
+        let {failure_response= _; process; lock_path; already_waited= _} = t in
         let%map () =
           write_lock_file lock_path (Process.pid process)
           |> Deferred.map ~f:Or_error.return
@@ -275,7 +284,8 @@ module Haskell_process = struct
              (Reader.pipe (Process.stderr process))
              ~f:(fun str ->
                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                 "Kademlia stderr output: %s" str )) ;
+                 ~metadata:[("str", `String str)]
+                 "Kademlia stderr output: $str" )) ;
         t
     | _ ->
         Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir

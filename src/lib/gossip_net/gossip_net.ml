@@ -206,23 +206,14 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               Deferred.unit )
         |> ignore )
 
-  let unmark_all_disconnected_peers t =
-    Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Clearing disconnected peer set : %{sexp: Peer.t list}"
-      (Hash_set.to_list t.disconnected_peers) ;
-    let disconnected_peers =
-      List.map
-        (Hash_set.to_list t.disconnected_peers)
-        ~f:Peer.to_communications_host_and_port
-    in
-    Hash_set.clear t.disconnected_peers ;
+  let restart_kademlia t addl_peers =
     Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
       "Restarting Kademlia" ;
     let%bind () = Membership.stop t.membership in
     let%map new_membership =
       let initial_peers =
         List.dedup_and_sort ~compare:Host_and_port.compare
-        @@ t.initial_peers @ disconnected_peers
+        @@ t.initial_peers @ addl_peers
       in
       Membership.connect ~node_addrs_and_ports:t.addrs_and_ports ~initial_peers
         ~conf_dir:t.conf_dir ~logger:t.logger ~trust_system:t.trust_system
@@ -233,6 +224,18 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         record_peer_events t
     | Error _ ->
         failwith "Could not restart Kademlia"
+
+  let unmark_all_disconnected_peers t =
+    Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+      !"Clearing disconnected peer set : %{sexp: Peer.t list}"
+      (Hash_set.to_list t.disconnected_peers) ;
+    let disconnected_peers =
+      List.map
+        (Hash_set.to_list t.disconnected_peers)
+        ~f:Peer.to_communications_host_and_port
+    in
+    Hash_set.clear t.disconnected_peers ;
+    restart_kademlia t disconnected_peers
 
   let is_unix_errno errno unix_errno =
     Int.equal (Unix.Error.compare errno unix_errno) 0
@@ -402,21 +405,63 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let create (config : Config.t)
       (implementation_list : Host_and_port.t Rpc.Implementation.t list) =
+    let t_for_restarting = ref None in
     trace_task "gossip net" (fun () ->
+        let fail m =
+          failwith
+            (Printf.sprintf "Failed to connect to Kademlia process: %s\n" m)
+        in
+        let restart_counter = ref 0 in
+        let rec handle_exn e =
+          incr restart_counter ;
+          if !restart_counter > 5 then
+            failwithf
+              "Already restarted Kademlia subprocess 5 times, dying with \
+               exception %s"
+              (Exn.to_string e) () ;
+          match Monitor.extract_exn e with
+          | Kademlia.Membership.Child_died ->
+              let t = Option.value_exn !t_for_restarting in
+              let peers =
+                List.map (Hash_set.to_list t.peers)
+                  ~f:Peer.to_communications_host_and_port
+              in
+              ( match%map
+                  Monitor.try_with ~extract_exn:true
+                    (fun () ->
+                      let%bind () = after Time.Span.second in
+                      restart_kademlia t peers )
+                    ~rest:(`Call handle_exn)
+                with
+              | Error Kademlia.Membership.Child_died ->
+                  handle_exn Kademlia.Membership.Child_died
+              | Ok () ->
+                  ()
+              | Error e ->
+                  failwithf "Unhandled Membership.connect exception: %s"
+                    (Exn.to_string e) () )
+              |> don't_wait_for
+          | _ ->
+              failwithf "Unhandled Membership.connect exception: %s"
+                (Exn.to_string e) ()
+        in
         let%bind membership =
           match%map
-            trace_task "membership" (fun () ->
-                Membership.connect ~initial_peers:config.initial_peers
-                  ~node_addrs_and_ports:config.addrs_and_ports
-                  ~conf_dir:config.conf_dir ~logger:config.logger
-                  ~trust_system:config.trust_system )
+            Monitor.try_with
+              (fun () ->
+                trace_task "membership" (fun () ->
+                    Membership.connect ~initial_peers:config.initial_peers
+                      ~node_addrs_and_ports:config.addrs_and_ports
+                      ~conf_dir:config.conf_dir ~logger:config.logger
+                      ~trust_system:config.trust_system ) )
+              ~rest:(`Call handle_exn)
           with
-          | Ok membership ->
+          | Ok (Ok membership) ->
               membership
+          | Ok (Error e) ->
+              fail (Error.to_string_hum e)
           | Error e ->
-              failwith
-                (Printf.sprintf "Failed to connect to Kademlia process: %s\n"
-                   (Error.to_string_hum e))
+              fail (Exn.to_string e)
         in
         let first_connect = Ivar.create () in
         let broadcast_reader, broadcast_writer = Linear_pipe.create () in
@@ -442,6 +487,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; max_concurrent_connections= config.max_concurrent_connections
           ; first_connect }
         in
+        t_for_restarting := Some t ;
         don't_wait_for
           (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
              ~f:(fun addr ->
