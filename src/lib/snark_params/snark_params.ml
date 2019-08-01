@@ -318,9 +318,12 @@ module Tock = struct
       module Unchecked = Pairing.G1.Unchecked
       
       let scale a b ~init =
-        let (module Shifted) = run_checked (Pairing.G1.Shifted.create ()) in
-        Shifted.unshift_nonzero
-        (run_checked (Pairing.G1.scale (module Shifted) a b ~init:(run_checked (Shifted.(add zero init)))))
+        run_checked begin
+          let open Let_syntax in
+          let%bind (module Shifted) = Pairing.G1.Shifted.create () in
+          let%bind init = Shifted.(add zero init) in
+          Pairing.G1.scale (module Shifted) a b ~init >>= Shifted.unshift_nonzero
+        end
     end
 
     module G2 = struct
