@@ -28,30 +28,15 @@ module User_commands = struct
     to: Public_key.Compressed.t;
     amount: Unsigned64.t;
     fee: Unsigned64.t;
-    memo: string;
-    receipt_chain_hash: string
+    memo: string
   }
-
 end
 
 module Fee_transfer {
   id: string;
   fee: Int64.t;
-  receiver: Public_key.Compressed.t; 
+  receiver: Public_key.Compressed.t;
 }
-```
-
-You may notice that the user_commands type has the field receipt_chain_hash. This is a reference to a `receipt_chain_hash` which is used to prove the payment of a transaction. The API for proving the existence of a payment, `prove_payment`, would now require `payment_id` as an argument (See Appendix for the API of `prove_payment`). There is also an `addPaymentReceipt` API that allows a client to add an arbitrary transaction along with the date that the client saw the transaction. However, the transaction input itself cannot just be used to prove that a transaction has been sent. To prove a transaction, we need use current receipt_chain_hash of a transaction and its previous receipt_chain_hash. Therefore, inputs for the `addPaymentReceipt` API should be a receipt_chain and its parent.
-
-Below is the type of a `receipt_chain_hash`:
-
-```ocaml
-module Receipt_chain_hash = struct
-  type t = {
-    hash: string
-    previous_hash: string
-  }
-end
 ```
 
 Additionally, clients should be able to know which external_transitions contains a transaction. These blocks can gives us useful information of a transaction, like the number of block confirmations that is on top of a certain transaction and the "status" of a transaction. Therefore, a client should be able to store a record of these interested external_transitions and look them up easily in a container. Here is the type of an external_transition:
@@ -86,24 +71,41 @@ type consensus_status =
   | Unknown (* Could not compute status of transaction i.e. We don't have a record of it *)
 ```
 
-Notice that `consensus_status` is a block's position in Nakamoto consensus. This position has nothing to do with a block being snarked or not, so `Snarked` is not a constructor of this variant. 
+Notice that `PENDING` in `consensus_status` is the number of block confirmations for a block. This position has nothing to do with a block being snarked or not, so `Snarked` is not a constructor of this variant.
 
 With the `external_transitions` and `conseus_status`, we can compute the status of a transaction. We will denote the status of transaction as the type `transaction_status` and below is the type:
 
 ```ocaml
 type transaction_status =
-  | Failed (* All of the external_transitions have the status Failed, so the transaction failed *)
-  | Confirmed (* One of the transitions is confirmed *)
+  | Failed (* The transaction has been evicted by the `transaction_pool` but never gotten added to a block OR all of the external_transitions containing that transaction have the status Failed *)
+  | Confirmed (* One of the transitions containing the transaction is confirmed *)
   | Pending of int (* The transaction is in the transition_frontier and all of transitions are in the pending state. The block confirmation number of this transaction is minimum of all block confirmation number of all the transitions *)
   | Scheduled (* Is in the transaction_pool and not in the transition_frontier. *)
   | Unknown
 ```
 
-These containers should also have performant pagination queries, which is essentially a single contiguous range of sorted elements. `External_transitions` should be ordered date, which is the time a node aded the `external_transition` to its `transition_frontier`. Transactions should also be sorted by the time that the client first receives it. It should be noted that the `external_transitions` can be sorted by block length. Block length can arguably be a better ordering for transitions because clients can receive transitions at different times, but what remains constant is the block length that the transition appears in the block chain. Additionally, we can sort transactions by the minimum block length of the `external_transition`s that they appear in. Typically, a client would expect to recieve a transaction at the soonest block, which is the block with the smallest block length. If they do not appear in an `external_transition` they will not appear in the sorting. If we plan to let the client add arbitrary `transactions` and `external_transition` and persist them, then they would not have the extra burden of tagging these objects with a timestamp for pagination. They can just use block length. 
+We also have the `receipt_chain` object and is used to prove the execution of an `user_command`. It does this by forming a merkle list of `user_command`s from some `proving_receipt` to a `resulting_receipt`. The `resulting_receipt` is typically the `receipt_chain_hash` of a user's account on the best tip.
+
+Below is an OCaml API of involving `receipt_chain_hash` type:
+
+```ocaml
+module Receipt_chain_hash = struct
+  type t = {
+    hash: string
+    previous_hash: string
+  }
+
+  val compute_receipt : ~prev:t -> User_command.t -> t
+end
+```
+
+These containers should also have performant pagination queries, which is essentially a single contiguous range of sorted elements. `external_transitions` and `transactions` should be ordered by block length. Previously, we sorted these objects by time. Block length can arguably be a better ordering for transitions because clients can receive transitions at different times, but what remains constant is the block length that the transition appears in the blockchain. Additionally, we can sort transactions by the minimum block length of the `external_transition`s that they appear in. Typically, a client would expect to recieve a transaction at the soonest block, which is the block with the smallest block length. If they do not appear in an `external_transition`, they will not appear in the sorting. A drawback with sorting `external_transitions` and `transactions` based on date is that if the client wants to add an arbitrary `transactions` and `external_transition` and persist them, then they would not have the extra burden of tagging these objects with a timestamp for pagination. Block length alliviates this use.
+
+<a href="relational-database-implementation"></a>
 
 ## Relational Database Implementation
 
-`SQLite` would be the best relational database for our use case because it has an Apache 2 liscense and its a very small binary (3.7MB on my Macbook). `SQLite` has a considerably good amount of support for OCaml compared to the other databases that will be discussed and it would be relatively easy to get `SQLite` working off. There is even a nice OCaml library called [ocaml-sqlexpr](https://github.com/mfp/ocaml-sqlexpr) that enables us to embed type-safe `SQLite` queries onto our OCaml code.
+`SQLite` would be the best relational database for our use case because it has an Apache 2 license and its a very small binary (3.7MB on my Macbook). `SQLite` has a considerably good amount of support for OCaml compared to the other databases that will be discussed and it would be relatively easy to get `SQLite` working off. There is even a nice OCaml library called [ocaml-sqlexpr](https://github.com/mfp/ocaml-sqlexpr) that enables us to embed type-safe `SQLite` queries onto our OCaml code.
 
 For the objects discussed in the previous section, we can embed them as tables in one global SQL database. Below are the schemas of the tables:
 
@@ -112,12 +114,13 @@ Enum consensus_status {
   confirmed [note: "The transitions has reached finality by passing the root"]
   pending [note: "Still in the transition frontier. There is no annotation "]
   failure [note: "Got removed from the transition frontier"]
+  unknown [note: "After becoming online and bootstrapping, we may note know what will happen to a transition"]
 }
 
 Table external_transition {
   state_hash string [pk]
   creator string [not null]
-  protocol_state string [not null]
+  protocol_state string [not null] // we should write out all of the components of protocol_state as columns
   is_snarked bool [not null]
   status consensus_status [not null]
   block_length int [not null]
@@ -125,14 +128,13 @@ Table external_transition {
 
 Table user_commands {
   id string [pk]
-  is_delegation bool [not null] 
+  is_delegation bool [not null]
   nonce int64 [not null]
   from string [not null]
   to string [not null]
   amount int64 [not null]
   fee int64 [not null]
   memo string [not null]
-  receipt_chain_hash string [not null]
 }
 
 Table fee_transfers {
@@ -248,27 +250,27 @@ We can use this query in psuedocode as the following:
 
 ```ocaml
 
-val compute_block_confirmations Transition_frontier.t -> State_hash.t list -> (State_hash.t * int) list 
-let compute_block_confirmations frontier state_hashes = 
+val compute_block_confirmations Transition_frontier.t -> State_hash.t list -> (State_hash.t * int) list
+let compute_block_confirmations frontier state_hashes =
   failwith("Need to implement: For a given set of state_hashes, compute their block confirmation number in a memorized manner")
 
 
 let get_transaction_status ~frontier ~sql ~txn_pool txn : (bool * transaction_status) =
   let sql_result = transaction_status_sql_query sql txn_id in
   match sql_result with
-  | [] -> if Transaction_pool.member txn_pool txn then 
+  | [] -> if Transaction_pool.member txn_pool txn then
     (false, Scheduled) else (false, Unknown)
-  | xs -> 
-      let state_hashes, snarked_statuses, consensus_statuses = List.unzip3 xs in 
-      let transaction_status = 
+  | xs ->
+      let state_hashes, snarked_statuses, consensus_statuses = List.unzip3 xs in
+      let transaction_status =
         if List.for_all consensus_statuses ~f:(Consensus_status.equal Failed) then
           Transaction_status.Failed
         else if List.exists consensus_statuses ~f:(Consensus_status.equal Confirmed) then
           Transaction_status.Confirmed
         else (* Transaction is in the transition_frontier *)
-          let block_confirmations = compute_block_confirmations frontier state_hashes in 
+          let block_confirmations = c ompute_block_confirmations frontier state_hashes in
           let block_confirmation = List.fold block_confirmations ~f:(fun acc (_, confirmations) -> Int.max acc confirmations  ) in
-          Transaction_status.Pending block_confirmation 
+          Transaction_status.Pending block_confirmation
       in
       let snarked_status = List.exists snarked_statuses ~f:(Fn.id) in
       (snarked_status, transaction_status)
@@ -330,17 +332,156 @@ Dgraph seems to work nicely with graphql. It doesn't require serializing and des
 
 JanusGraph is another graph database to consider. We can explicitly mention the relationship of each type of vertex (i.e. 1-to-1, Many-to-many). We can also indicate how each vertex can index their edges, which is useful for optimizing different relationship queries. JanusGraph has its own "functional" graph query language called Gremlin and it has good interoperability with common languages, such as Java, Python and Javascript. However, there are no bindings with OCaml, but we can lauch a Gremlin server and we can communicate with the server using HTTP requests, Graphson, or use it's own untyped DSL written in Groovy.
 
+## New Client Process
+
+Previously, we discussed about making queries in the same process and the queries do not fully take advantage of the in-memory datastructures of the daemon. This section will discuss a proposal to make the querying done on a different process, which will be called the client process, and it wil will take advantage of these in-memory data structures.
+
+Some of these in-memory data structures leverage Redis as an in-memory database. Redis has a BSD License and is a small executable (2 - 4 MBs).
+
+Below is a diagram of the new process:
+
+![](../docs/res/client_process.dot.png)
+
+The black lines represents how a component communicates and update another component component.
+
+The purple line represents that the `transition_frontier` data will get updated whenever a transition gets removed from the `transition_frontier`.
+
+Notably, we have an in-memory and disk versions for both `transitions_to_transactions` table and `receipt_chain_table`. The functionalities and operations of these tables will be discussed later.
+
+The schema for the databases that uses a relational structure are almost identical to the schemas discussed in the [Relational Database Implementation section](#relational-database-implementation). Except that the `user_commands` table is modeled as the following
+
+```
+Table user_commands {
+  id string [pk]
+  is_delegation bool [not null]
+  nonce int64 [not null]
+  from string [not null]
+  to string [not null]
+  amount int64 [not null]
+  fee int64 [not null]
+  memo string [not null]
+  is_added_manually bool [not null]
+}
+// Rows are uniquely identified by `state_hash` and `transaction_id`
+```
+
+We will discuss why `is_added_manually` got added to the `user_commands`.
+
+The in-memory cache data structures are also similar to their disk counterparts, but they have extra fields added to them for reducing the number of disk reads that cache has to make. The have the following schemas:
+
+```
+// Use Rocksdb
+Table receipt_chain_hashes {
+  hash string [pk]
+  previous_hash string [not null]
+  count int [not null]
+}
+
+// Use Redis
+Table transition_to_transactions {
+  state_hash string [ref: > external_transition.state_hash]
+  transaction_id int [not null, ref: > user_commands.id, ref: > fee_transfers.id]
+  sender string
+  receiver string [not null]
+  block_length length
+    Indexes {
+    state_hash [name:"external_transition"]
+    transaction_id [name: "transaction"]
+    (receiver, block_length) [name: "fast_receiver_pagination"]
+    (sender, block_length) [name: "fast_sender_pagination"]
+  }
+}
+```
+
+We would not need a `pending` status for transition because all pending transitions would appear in the replicated `transition_frontier`.
+
+### Replicated transition frontier
+
+To offload the client computation from the daemon, we are going to duplicate the state of the `transition_frontier`. The replication process will be very similar to the replication process of `transition_frontier_peristence`. In the current implementation of `transition_frontier_persistence`, we gather the diffs and apply them in batches to prevent overflowing async pipes and to prevent the system from slowing down. However in this design, every time the `transition_frontier` in the daemon produces a diff, it will immediately send that diff to the client along its mutant diff hash. It should mitigate the issue of slowing down the system because the client process would be in a different core and therefore parallelizing replication and persistenence. Currently, the diffs contain breadcrumbs and we cannot serialize breadcrumbs, so the diffs that clients will be receiving will be the following:
+
+```ocaml
+module Transition_frontier_diff = struct
+  type t =
+    | Breadcrumb_added of  external_transition
+    | Root_transitioned: of {new_: state_hash; garbage: state_hash.t list}
+    | Best_tip_changed of state_hash
+end
+```
+
+<!-- Should talk about replicating things correctly -->
+
+The daemon code for sending diffs to the client will look like the following:
+
+```ocaml
+Broadcast_pipe.Reader.fold diff_pipe ~init:init_hash ~f:(fun diff_hash diff ->
+  let client_diff = to_client_diff diff in
+  
+  (* This is an asynchronous pipe *)
+  let mutant = Diff_mutant.get_mutant transition_frontier diff in
+  let new_hash = Diff_mutant.(hash (hash diff_hash mutant) diff) in
+  Strict_pipe.Writer.write persistence_pipe (diff_hash, client_diff);
+  Deferred.return new_hash
+) |> Deferred.ignore |> don't_wait_for
+```
+
+Once the client receives the diff, it will apply the diff that it receives from the daemon. If the hash value that it computed is different from the daemon, then both the daemon and the client will crash because of inconsistent state.
+
+The state of the daemon's `transition_frontier` consist of a tree of breadcrumbs. However, the client does not need to know about the proofs of the breadcrumbs. Instead, the client's transition frontier can just build the ledger of breadcrumb rather than the entire breadcrumb itself using the diff it received from the daemon. This would be useful for making queries about a ledger for a breadcrumb. The would also be useful for computing `receipt_chain_hashes` which is discussed in a later section.
+
+We need to make lookups to `transitions` that appear in `external_transitions` in the `transition_frontier`. We can simply create a hashtable that can look up `transactions` in the `transition_frontier` based on their `transaction_id`. Thus, the key of the table will be the `transaction_id` and the value will be an OCaml pointer to the actual transaction data. The table will only contain transactions involving partipants that a client is interested in following
+
+ We would also need an in-memory `transition_to_transactions` table to find which `external_transitions` contain a transaction. The table should leverage in-memory database like Redis since it offers multiple indices and does not require implenting this. When we want to make a query involving the in-memory and disk versions of the `transition_to_transaction` table,it could involve making reads to both of the versions since transaction that we are searching up could appea in the in disk version, but it did not appear in the in-memory version. We can reduce the number of reads as we can use serveral optimization tricks.
+
+We can keep an in-memory key-value table of interested public keys mapping to their maximum nonce in the `transaction_table`. This will be denoted as `maxmimum_nonce`. The in-memory `transitions_to_transactions` table would have an extra column, which indicates if a transaction is in the current `transition_frontier` or not. When we add a transaction to the in-memory `transitions_to_transactions` table, we can also look at the disk `transitions_to_transactions` table to see if there are any transitions referring to the `transaction`. We can limit the number of times that we look at the disk `transitions_to_transactions` table by getting the maximum nonce of the sender from `maximum_nonce`. If the sender's nonce is greater than the maximum nonce, then we know that `transaction` would not exist in the disk `transitions_to_transactions` table. Once a transaction gets removed from the `transition_frontier`, it will get removed from the in-memory `transitions_to_transactions` table and get added to the disk `transition_to_transactions_table`. If there are anymore rows that contain the same transaction id as the deleted transaction but are not in the transition_frontier, then they are all deleted from the in-memory `transitions_to_transactions` table.
+
+Whenever a `transition` gets evicted from the client `transitition_frontier`, we would write the transitions into the `transition` database and the `transition` along with the `transactions` into the disk `transitions_to_transactions` table. The `transition`s themselves would be written to the `transaction_database`.
+
+### Receipt chain hashes
+
+Additionally, we can use the accounts in the ledgers to correctly compute `receipt_chain_hashes` for the public keys that we are interested in. To optimize in-memory reads, we can store all the `receipt_chain_hashes` corresponding to the transactions that we are interested in and are in the `transition_frontier` in an `in_memory_receipt_chain_table`. Specifically, these `receipt_chain_hashes` will be added to the table whenever the `New_breadcrumb` diff is applied to the `transition_frontier` and will be removed whenever the hashes do not appear again in for any `external_transition`. We can use a hashtable to represent this `in_memory_receipt_chain_table`. Namely, the keys of the table will be an underlying `receipt_chain_hash` and the values will be the parent of the `receipt_chain_hash` and a counter of the number of times that the `receipt_chain_hash` appear.
+
+### Transaction pool
+
+There are also a couple of enhancements to have performant querying and database updates involving the `transaction_pool`. The queries involving the `transaction_pool` would be `pooled_user_commands` and `transaction_status`. In order to get the status of a transaction, we need to see if it's in the `transaction_pool`. If it is in the `transaction_pool`, then the transaction would be considered `Scheduled`. However, if the transaction is in the `transaction_database` with the `went_to_transaction_pool=true` and does not appear in the `transaction_pool` or is not associated with any transitions in the in-memory or disk `transition_to_transactions_table`, then the transaction status is considered to be `Failed`.
+
+We would also want to write transactions from the `transaction_pool` to the `transaction_database`. We should write these transactions into the database only when they get evicted from the `transaction_pool` since we make queries about a transaction either from the `transition_frontier` or `transaction_pool`.
+
+Since the `transaction_database` would be receiving many redundant writes of the same object from the `transaction_pool` and the `transition_frontier`, the `transaction_database` would need an in-memory LRU cache to prevent these writes. Specifically, the LRU does not have a `transaction`, the cache would write the `transaction` into the database and into the LRU cache. The `transaction_database` may benefit from leveraging the root history, which is a queue of the most recent transitions, to prevent these redundant writes.
+
+TODO: We can possibly split this into three sections, receipt_chain, transition_frontier and transition_to_transactions
+
+### Running Bootstrap and Offline Recovery
+
+### Adding Arbitrary Data
+
+Since a node can go offline, it can miss gossipped objects. If this happens, a client would be interested in adding manually adding these objects into the client storage system. This storage system has the flexibility to do this.
+
+For adding arbitrary transactions, the client could simply add it to the `transactions` database with `IS_ADDED_MANUALLY=true`. We can add arbitrary `receipt_chain_hashes` along with its parents to the `receipt_chain` database. The user can arbitrary transitions along with their transactions into the `transitions_to_transactions` table, `external_transitions` and `transactions` database. When we add a transition whose block length is greater than root length, the `transition` will be added added through the `transition_frontier_controller`. Namely, the `transition` will be added to the `network_transition_writer` pipe in `Coda_networking.ml`.
+
+### Invariants
+
+- The external transitions in the transition frontier will not appear in the `external_transition` database
+- `receipt_chains` from the transition_frontier `transition_frontier` will appear in the database.
+
+### Disk Components
+
+- After the transition have been finalized or deleted, the `external_transitions`, `transactions`, `receipt_chain_table` and `transitions_to_transactions` table will be persisted to the their own databases. The objects in the database will follow the schema discussed above. Therefore, the `transitions` that are in the `external_transitions` table and the `transition_frontier_copy` are disjoint.
+- When the `transition_frontier` goes into bootstrap phase, all the transitions and the `external_transition`s will get persisted. However, the consensus state will be marked as unknown since we do not know what happens to the transitions.
+- If a client wants to add `receipt_chain` hashes, then it will get stored directly into the `transition_frontier`.
+
+
+- High level description of architecture using the diagram
+- Sample code of queries of `transaction_status` and `blocks` pagination
+
+- If we have infinite amount of time doing this, I would recommend us creating our own graph database in some low-level language (namely, Rust) that leverages the in-memory `transition frontier and using the low-level language to specific the actual location of our data
+
 ## Consistency Issues
 
-This design does not address consistency issues that can arise. For example, a client can be offline during sometime and then come online and bootsrap. As a result, we would not be able to fully determine the consensus status of the external_transitions that were in the transition_frontier. Worse, we would not be able to determine which external_transtions became snarked. 
+This design does not address consistency issues that can arise. For example, a client can be offline during sometime and then come online and bootsrap. As a result, we would not be able to fully determine the consensus status of the external_transitions that were in the transition_frontier. Worse, we would not be able to determine which external_transtions became snarked.
 
-We can have a third-party archived node tell a client the consensus_state of the external_transitions. Another option that we have is that we can create a P2P RPC call where we peers can give us a merkle list proof of a state_hash and all the state_hashes of the blocks on top of the state_hash. The merkle list will be bounded by length K. If the merkle list proof is size K, then the external_transition should be fully confirmed. Otherwise, the external_transition failed. 
+We can have a third-party archived node tell a client the consensus_state of the external_transitions. Another option that we have is that we can create a P2P RPC call where we peers can give us a merkle list proof of a state_hash and all the state_hashes of the blocks on top of the state_hash. The merkle list will be bounded by length K. If the merkle list proof is size K, then the external_transition should be fully confirmed. Otherwise, the external_transition failed.
 
 We can also have a third-part achrived node tell a client the snarked status of an external_transition. We can also create a heuristic that gives us a probability that an `external_transition` has been snarked. We can introduce a new nonce that indicates how many ledger proofs have been emitted from genesis to a certain external_transition. If the root external_transition emitted `N` ledger proofs, then all the external_transitions that have emitted less than `N` ledgers should have been snarked.
-
-## Making Client Queries on another Process
-
-Previously, we discussed about making queries in the same process and the queries do not fully take advantage of the in-memory datastructures of the daemon. In this section, we will discuss about t
 
 # Rationale and Alternatives
 
@@ -354,10 +495,9 @@ Previously, we discussed about making queries in the same process and the querie
 - We can also stick with the same implementation we have, which is a bit limiting
 - We can use a counter cache to decrease the number of calls that we have to the SQL database
 
-
 # Prior Art
 
-Ethereum is representing their data as patricia tries and are storing them in LevelDB. 
+Ethereum is representing their data as patricia tries and are storing them in LevelDB.
 
 Coinbase also uses MongoDB to store all of the data in a blockchain.
 
