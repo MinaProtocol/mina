@@ -343,11 +343,26 @@ let create_genesis_frontier (config : Config.t) ~verifier =
          ~staged_ledger_diff:empty_diff)
   in
   let genesis_ledger = Lazy.force Genesis_ledger.t in
-  let ledger_db =
-    Ledger.Db.create ?directory_name:config.ledger_db_location ()
+  let load () =
+    let ledger_db =
+      Ledger.Db.create ?directory_name:config.ledger_db_location ()
+    in
+    ( ledger_db
+    , Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db )
   in
-  let root_snarked_ledger =
-    Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db
+  let%bind root_snarked_ledger =
+    match load () with
+    | _, Ok l ->
+        return l
+    | ledger_db, Error _ ->
+        (* Persisted state was bogus. Give up on the ledger contents, we'll bootstrap. *)
+        Ledger.Db.close ledger_db ;
+        let%map () =
+          Option.map ~f:File_system.remove_dir config.ledger_db_location
+          |> Option.value ~default:Deferred.unit
+        in
+        snd (load ()) |> Or_error.ok_exn
+    (* If it fails again, something is very wrong. Die. *)
   in
   let snarked_ledger_hash =
     Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root genesis_ledger
