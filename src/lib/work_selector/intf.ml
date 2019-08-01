@@ -57,7 +57,7 @@ end
 module type State_intf = sig
   type t
 
-  val init : t
+  val init : reassignment_wait:int -> t
 end
 
 module type Lib_intf = sig

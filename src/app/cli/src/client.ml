@@ -431,7 +431,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %d)"
-           (Currency.Fee.to_int Cli_lib.Fee.default_transaction))
+           (Currency.Fee.to_int Cli_lib.Default.transaction_fee))
       (optional txn_fee)
   in
   let nonce_flag =
@@ -462,7 +462,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
                  sender_kp.public_key port
          in
          let fee =
-           Option.value ~default:Cli_lib.Fee.default_transaction fee_opt
+           Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
          in
          let command =
            Coda_commands.setup_user_command ~fee ~nonce
@@ -581,24 +581,34 @@ let generate_keypair =
     exit 0)
 
 let dump_ledger =
-  let sl_hash =
-    let open Command.Param in
-    let h =
-      Arg_type.create (fun s ->
-          Sexp.of_string_conv_exn s Staged_ledger_hash.Stable.V1.t_of_sexp )
-    in
-    anon ("staged-ledger-hash" %: h)
+  let sl_hash_flag =
+    Command.Param.(
+      flag "staged-ledger-hash (default: hash of best staged ledger)"
+        ~doc:"STAGED-LEDGER-HASH Staged ledger hash" (optional string))
   in
-  Command.async ~summary:"Print the ledger with given merkle root as a sexp"
-    (Cli_lib.Background_daemon.init sl_hash ~f:(fun port sl_hash ->
-         dispatch Daemon_rpcs.Get_ledger.rpc sl_hash port
+  let json_flag = Cli_lib.Flag.json in
+  let flags = Args.zip2 sl_hash_flag json_flag in
+  Command.async ~summary:"Print the ledger with given Merkle root"
+    (Cli_lib.Background_daemon.init flags ~f:(fun port (sl_hash, json) ->
+         (* TODO: allow input in Base58Check format: issue #3036 *)
+         let staged_ledger_hash =
+           Option.map sl_hash ~f:(fun s ->
+               Sexp.of_string_conv_exn s Staged_ledger_hash.Stable.V1.t_of_sexp
+           )
+         in
+         dispatch Daemon_rpcs.Get_ledger.rpc staged_ledger_hash port
          >>| function
          | Error e ->
              print_rpc_error e
          | Ok (Error e) ->
              printf !"Ledger not found: %s\n" (Error.to_string_hum e)
          | Ok (Ok accounts) ->
-             printf !"%{sexp:Account.t list}\n" accounts ))
+             if json then
+               List.iter accounts ~f:(fun acct ->
+                   printf "%s\n"
+                     (Yojson.Safe.to_string
+                        (Account.Stable.Latest.to_yojson acct)) )
+             else printf !"%{sexp:Account.t list}\n" accounts ))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
