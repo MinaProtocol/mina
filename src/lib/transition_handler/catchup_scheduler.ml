@@ -72,7 +72,7 @@ module Make (Inputs : Inputs.S) = struct
       ~(catchup_breadcrumbs_writer :
          ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
            list
-           * (unit -> unit Deferred.t)
+           * [`Ledger_catchup of unit Ivar.t | `Catchup_scheduler]
          , crash buffered
          , unit )
          Writer.t) ~clean_up_signal =
@@ -93,7 +93,7 @@ module Make (Inputs : Inputs.S) = struct
           with
           | Ok trees_of_breadcrumbs ->
               Writer.write catchup_breadcrumbs_writer
-                (trees_of_breadcrumbs, Fn.const Deferred.unit)
+                (trees_of_breadcrumbs, `Catchup_scheduler)
           | Error err ->
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                 !"Error during buildup breadcrumbs inside catchup_scheduler: %s"

@@ -72,11 +72,16 @@ let%test_module "Ledger catchup" =
       Strict_pipe.Reader.iter catchup_breadcrumbs_reader ~f:(fun rose_tree ->
           Deferred.return @@ Ivar.fill result_ivar rose_tree )
       |> don't_wait_for ;
-      let%map cached_catchup_breadcrumbs =
-        let%bind breadcrumbs, decr = Ivar.read result_ivar in
-        let%map () = decr () in
+      let%bind cached_catchup_breadcrumbs =
+        let%map breadcrumbs, catchup_signal = Ivar.read result_ivar in
+        ( match catchup_signal with
+        | `Catchup_scheduler ->
+            failwith "Did not expect a catchup scheduler action"
+        | `Ledger_catchup ivar ->
+            Ivar.fill ivar () ) ;
         List.hd_exn breadcrumbs
       in
+      let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
       let catchup_breadcrumbs =
         Rose_tree.map cached_catchup_breadcrumbs
           ~f:Cache_lib.Cached.invalidate_with_success
@@ -348,7 +353,7 @@ let%test_module "Ledger catchup" =
           in
           let finished = Ivar.create () in
           Strict_pipe.Reader.iter catchup_breadcrumbs_reader
-            ~f:(fun (rose_trees, decr) ->
+            ~f:(fun (rose_trees, catchup_signal) ->
               let catchup_breadcrumb_tree =
                 Rose_tree.map (List.hd_exn rose_trees)
                   ~f:Cache_lib.Cached.invalidate_with_success
@@ -367,13 +372,18 @@ let%test_module "Ledger catchup" =
                   catchup_breadcrumb ) ;
               Transition_frontier.add_breadcrumb_exn me expected_breadcrumb
               |> ignore ;
-              let%bind () = decr () in
+              ( match catchup_signal with
+              | `Catchup_scheduler ->
+                  failwith "Did not expect a catchup scheduler action"
+              | `Ledger_catchup ivar ->
+                  Ivar.fill ivar () ) ;
               if
                 Transition_frontier.Breadcrumb.equal expected_breadcrumb
                   last_breadcrumb
               then Ivar.fill finished () ;
               Deferred.unit )
           |> don't_wait_for ;
-          let%map () = Ivar.read finished in
+          let%bind () = Ivar.read finished in
+          let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_catchup_jobs_are_flushed me )
   end )

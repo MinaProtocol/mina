@@ -305,7 +305,7 @@ module Make (Inputs : Inputs.S) :
          ( (Inputs.Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
            Rose_tree.t
            list
-           * (unit -> unit Deferred.t)
+           * [`Ledger_catchup of unit Ivar.t | `Catchup_scheduler]
          , Strict_pipe.crash Strict_pipe.buffered
          , unit )
          Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
@@ -363,12 +363,12 @@ module Make (Inputs : Inputs.S) :
                   closed pipe" ;
                garbage_collect_subtrees ~logger ~subtrees:trees_of_breadcrumbs ;
                Transition_frontier.decr_num_catchup_jobs frontier )
-             else (
+             else
+               let ivar = Ivar.create () in
                Strict_pipe.Writer.write catchup_breadcrumbs_writer
-                 ( trees_of_breadcrumbs
-                 , fun () -> Transition_frontier.decr_num_catchup_jobs frontier
-                 ) ;
-               Deferred.unit )
+                 (trees_of_breadcrumbs, `Ledger_catchup ivar) ;
+               let%bind () = Ivar.read ivar in
+               Transition_frontier.decr_num_catchup_jobs frontier
          | Error e ->
              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                ~metadata:[("error", `String (Error.to_string_hum e))]

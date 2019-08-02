@@ -170,12 +170,12 @@ module Make (Inputs : Inputs.S) :
       ~(catchup_breadcrumbs_reader :
          ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
            list
-         * (unit -> unit Deferred.t) )
+         * [`Ledger_catchup of unit Ivar.t | `Catchup_scheduler] )
          Reader.t)
       ~(catchup_breadcrumbs_writer :
          ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
            list
-           * (unit -> unit Deferred.t)
+           * [`Ledger_catchup of unit Ivar.t | `Catchup_scheduler]
          , crash buffered
          , unit )
          Writer.t) ~processed_transition_writer =
@@ -214,7 +214,7 @@ module Make (Inputs : Inputs.S) :
            trace_recurring_task "transition_handler_processor" (fun () ->
                match msg with
                | `Catchup_breadcrumbs
-                   (breadcrumb_subtrees, catchup_breadcrumbs_callback) ->
+                   (breadcrumb_subtrees, subsequent_callback_action) -> (
                    ( match%map
                        Deferred.Or_error.List.iter breadcrumb_subtrees
                          ~f:(fun subtree ->
@@ -233,7 +233,12 @@ module Make (Inputs : Inputs.S) :
                          "Error, failed to attach all catchup breadcrumbs to \
                           transition frontier: %s"
                          (Error.to_string_hum err) )
-                   >>= catchup_breadcrumbs_callback
+                   >>| fun () ->
+                   match subsequent_callback_action with
+                   | `Ledger_catchup decrement_signal ->
+                       Ivar.fill decrement_signal ()
+                   | `Catchup_scheduler ->
+                       () )
                | `Proposed_breadcrumb breadcrumb ->
                    let%map () =
                      match%map
