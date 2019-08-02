@@ -181,8 +181,10 @@ jobs:
                     set +e
                     set +x
                     find . | grep coda.exe
-                    cp src/build/_build/default/app/cli/src/coda.exe package/coda
-
+                    cp src/_build/default/app/cli/src/coda.exe package/coda
+		    
+            - store_artifacts:
+                  path: package
             - run:
                 name: Publish to Artifactory
                 command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
