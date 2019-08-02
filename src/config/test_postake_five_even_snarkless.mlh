@@ -5,7 +5,7 @@
 [%%import "config/debug_level/some.mlh"]
 [%%import "config/proof_level/none.mlh"]
 [%%import "config/txpool_size.mlh"]
-[%%import "config/curve_size/small.mlh"]
+[%%import "config/curve/small.mlh"]
 
 [%%define time_offsets true]
 [%%define fake_hash true]

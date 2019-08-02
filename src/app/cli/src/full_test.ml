@@ -166,7 +166,7 @@ let run_test () : unit Deferred.t =
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
-             ~external_transition_database ())
+             ~external_transition_database ~work_reassignment_wait:420000 ())
       in
       Coda_lib.start coda ;
       don't_wait_for
