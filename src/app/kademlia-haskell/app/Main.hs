@@ -99,7 +99,7 @@ dumpFormat evt K.Node{peer=peer,nodeId=(KH.HashId bs)} = show peer ++ " " ++ (sh
 hasPeers :: K.KademliaInstance KH.HashId KademliaValue -> IO Bool
 hasPeers inst = do
   peers <- K.dumpPeers inst
-  return $ length peers > 0
+  return $ not $ null peers
 
 formatAddress :: (Show a, Show b) => a -> b -> B.ByteString -> String
 formatAddress ip port key = show ip ++ ":" ++ show port ++ ", " ++ show (B64.encode key)
@@ -130,28 +130,26 @@ main = do
       logInfo $ "Creating instance"
       kInstance <- K.createL (bindIp, myPort) (externalIp, myPort) myKey config logTrace logError
 
-      {- If this is an initial peer, then don't try to connect to others -}
-      _ <- if length peers == 0 then return () else do
-        {- Try to join one of the peers in the peer list -}
-        r <- foldM (\acc -> \((peerIp,peerPort), peerKey) ->
-          case acc of
-            K.JoinSuccess -> return acc
-            _ -> do
+      {- If no peers given, don't check that the instance has peers -}
+      () <- if null peers then return () else do
+        {- Try to join all of the peers in the peer list -}
+        r <- foldM (\acc -> \((peerIp,peerPort), peerKey) -> do
               let KH.HashId peerKeyBytes = peerKey
               when (BOOL.not $ KH.verifyAddress peerKeyBytes) $ do
                 die $ "Invalid address on initial peer: " ++ formatAddress peerIp peerPort peerKeyBytes
               logInfo $ "Attempting to connecting to peer: " ++ formatAddress peerIp peerPort peerKeyBytes
-              r' <- connectToPeer kInstance peerIp (fromIntegral peerPort) peerKey
-              didGetPeers <- hasPeers kInstance
-              {- If someone connected to us, while we were in the process of handshaking we're in the network -}
-              let r = if didGetPeers then K.JoinSuccess else r'
+              r <- connectToPeer kInstance peerIp (fromIntegral peerPort) peerKey
               when (r /= K.JoinSuccess) $
                   logError . ("Connection to peer failed "++) . show $ r
-              return r) K.NodeDown (zip peers peerKeys)
+              return $ if (acc == K.JoinSuccess) then acc else r)
+              K.NodeDown (zip peers peerKeys)
 
         hFlush stdout
 
-        when (r /= K.JoinSuccess) $
+        {- If someone connected to us, while we were in the process of handshaking we're in the network -}
+        didGetPeers <- hasPeers kInstance
+
+        when (not didGetPeers && r /= K.JoinSuccess) $
           die "All peers failed to respond!"
 
       logInfo $ "Dumping initial live peers"
