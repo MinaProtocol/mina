@@ -188,8 +188,18 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 
 let best_ledger = compose_of_option best_ledger_opt
 
-let get_ledger t staged_ledger_hash =
+let get_ledger t staged_ledger_hash_opt =
   let open Deferred.Or_error.Let_syntax in
+  let%bind staged_ledger_hash =
+    Option.value_map staged_ledger_hash_opt ~f:Deferred.Or_error.return
+      ~default:
+        ( match best_staged_ledger t with
+        | `Active staged_ledger ->
+            Deferred.Or_error.return (Staged_ledger.hash staged_ledger)
+        | `Bootstrapping ->
+            Deferred.Or_error.error_string
+              "get_ledger: can't get staged ledger hash while bootstrapping" )
+  in
   let%bind frontier =
     Deferred.return (t.components.transition_frontier |> peek_frontier)
   in
@@ -204,10 +214,10 @@ let get_ledger t staged_ledger_hash =
         else None )
   with
   | Some x ->
-      Deferred.return (Ok x)
+      Deferred.Or_error.return x
   | None ->
       Deferred.Or_error.error_string
-        "staged ledger hash not found in transition frontier"
+        "get_ledger: staged ledger hash not found in transition frontier"
 
 let seen_jobs t = t.seen_jobs
 
@@ -284,7 +294,8 @@ let request_work t =
         Some staged_ledger
     | `Bootstrapping ->
         Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-          "Could not retrieve staged_ledger due to bootstrapping" ;
+          "Snark-work-request error: Could not retrieve staged_ledger due to \
+           bootstrapping" ;
         None
   in
   let fee = snark_work_fee t in
@@ -420,15 +431,6 @@ let create (config : Config.t) =
                                !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
                                Coda_networking.refused_answer_query_string
                                ledger_hash)) )
-              ~transition_catchup:(fun enveloped_hash ->
-                let open Deferred.Option.Let_syntax in
-                let hash = Envelope.Incoming.data enveloped_hash in
-                let%bind frontier =
-                  Deferred.return
-                  @@ Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Deferred.return
-                @@ Sync_handler.transition_catchup ~frontier hash )
               ~get_ancestry:(fun query_env ->
                 let consensus_state = Envelope.Incoming.data query_env in
                 Deferred.return
@@ -439,6 +441,36 @@ let create (config : Config.t) =
                 in
                 Root_prover.prove ~logger:config.logger ~frontier
                   consensus_state )
+              ~get_transition_chain_witness:(fun query ->
+                let state_hash = Envelope.Incoming.data query in
+                Deferred.return
+                @@
+                let open Option.Let_syntax in
+                let%bind frontier =
+                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                in
+                Transition_chain_witness.prove ~frontier state_hash )
+              ~get_transition_chain:(fun request ->
+                let hashes = Envelope.Incoming.data request in
+                Deferred.return
+                @@
+                let open Option.Let_syntax in
+                let%bind frontier =
+                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                in
+                Option.all
+                @@ List.map hashes ~f:(fun hash ->
+                       Option.merge
+                         (Transition_frontier.find frontier hash)
+                         (Transition_frontier.find_in_root_history frontier
+                            hash)
+                         ~f:Fn.const
+                       |> Option.map ~f:(fun breadcrumb ->
+                              Transition_frontier.Breadcrumb
+                              .transition_with_hash breadcrumb
+                              |> With_hash.data
+                              |> External_transition.Validated
+                                 .forget_validation ) ) )
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~logger:config.logger
@@ -590,6 +622,8 @@ let create (config : Config.t) =
                       external_transitions_writer }
             ; wallets
             ; propose_keypairs
-            ; seen_jobs= Work_selector.State.init
+            ; seen_jobs=
+                Work_selector.State.init
+                  ~reassignment_wait:config.work_reassignment_wait
             ; subscriptions
             ; sync_status } ) )

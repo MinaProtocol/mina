@@ -15,15 +15,22 @@ let to_yojson conv t = display_to_yojson conv (to_display t)
 let of_yojson conv json =
   Result.map ~f:of_display (display_of_yojson conv json)
 
-let rec of_list_exn = function
+let rec of_list_exn ?(subtrees = []) = function
   | [] ->
       raise
         (Invalid_argument
            "Rose_tree.of_list_exn: cannot construct rose tree from empty list")
   | [h] ->
-      T (h, [])
+      T (h, subtrees)
   | h :: t ->
-      T (h, [of_list_exn t])
+      T (h, [of_list_exn t ~subtrees])
+
+let of_non_empty_list ?(subtrees = []) =
+  Fn.compose
+    (Non_empty_list.fold
+       ~init:(fun x -> T (x, subtrees))
+       ~f:(fun acc x -> T (x, [acc])))
+    Non_empty_list.rev
 
 let rec equal ~f (T (value1, children1)) (T (value2, children2)) =
   f value1 value2 && List.equal (equal ~f) children1 children2
