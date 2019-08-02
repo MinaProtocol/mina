@@ -34,8 +34,8 @@ MERGE_INTO_BRANCH=`curl -s ${GH_API}/${PR_NUMBER} | jq -r .base.ref`
 
 # Iterate over a few name variations until you a match?
 NAME_VARIATIONS="
-keys-${MERGE_INTO_BRANCH}-${DUNE_PROFILE}.tar.bz2
 keys-${CIRCLE_BRANCH}-${DUNE_PROFILE}.tar.bz2
+keys-${MERGE_INTO_BRANCH}-${DUNE_PROFILE}.tar.bz2
 keys-temporary_hack-${DUNE_PROFILE}.tar.bz2
 NOTFOUND
 "
