@@ -51,7 +51,7 @@ fi
 if [[ $COMPILE_THINGS == "YES" ]]; then
   opam update
   # This is dirty, keep the OCaml project version up to date!
-  opam switch create 4.07.1 || true 
+  opam switch create 4.07.1 || true
   opam switch 4.07.1
   # All our ocaml packages
   env TERM=xterm opam switch -y import src/opam.export
@@ -73,8 +73,9 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   # Kademlia
   curl https://nixos.org/nix/install | sh
   touch ~/.profile
+  set +u
   . ~/.nix-profile/etc/profile.d/nix.sh
-
+  set -u
   # cachix nix binary cache
   nix-env -iA cachix -f https://cachix.org/api/v1/install
   cachix use codaprotocol
