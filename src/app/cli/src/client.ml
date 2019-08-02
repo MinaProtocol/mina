@@ -43,10 +43,11 @@ let dispatch_with_message rpc query port ~success ~error
 
 let dispatch_pretty_message (type t)
     (module Print : Cli_lib.Render.Printable_intf with type t = t)
-    ?(json = true) ~(join_error : 'a Or_error.t -> t Or_error.t) rpc query port
-    =
+    ?(json = true) ~(join_error : 'a Or_error.t -> t Or_error.t) ~error_ctx rpc
+    query port =
   let%bind res = dispatch rpc query port in
-  Cli_lib.Render.print (module Print) json (join_error res) |> Deferred.return
+  Cli_lib.Render.print (module Print) json (join_error res) ~error_ctx
+  |> Deferred.return
 
 module Args = struct
   open Command.Param
@@ -101,16 +102,6 @@ let get_balance =
          printf "%s"
            (or_error_str res ~f_ok:balance_str ~error:"Failed to get balance")
      ))
-
-(*| Ok (Ok (Some b)) ->
-             printf "Balance: %s coda\n" (Currency.Balance.to_string b)
-         | Ok (Ok None) ->
-             printf "There are no funds in this account\n"
-         | Ok (Error e) ->
-             printf "Failed to get balance\n%s\n" (Error.to_string_hum e)
-         | Error e ->
-             printf "Failed to get balance\n Unexpected error: %s\n"
-               (Error.to_string_hum e) ))*)
 
 let print_trust_status status json =
   if json then
@@ -233,16 +224,17 @@ let get_public_keys =
     flag "with-balances" no_arg
       ~doc:"Show corresponding balances to public keys"
   in
+  let error_ctx = "Failed to get public-keys" in
   Command.async ~summary:"Get public keys"
     (Cli_lib.Background_daemon.init
        (Args.zip2 with_balances_flag Cli_lib.Flag.json)
        ~f:(fun port (is_balance_included, json) ->
          if is_balance_included then
-           dispatch_pretty_message ~json ~join_error:Or_error.join
+           dispatch_pretty_message ~json ~join_error:Or_error.join ~error_ctx
              (module Cli_lib.Render.Public_key_with_balances)
              Get_public_keys_with_balances.rpc () port
          else
-           dispatch_pretty_message ~json ~join_error:Or_error.join
+           dispatch_pretty_message ~json ~join_error:Or_error.join ~error_ctx
              (module Cli_lib.Render.String_list_formatter)
              Get_public_keys.rpc () port ))
 
@@ -268,9 +260,18 @@ let generate_receipt =
            ~success:Cli_lib.Render.Prove_receipt.to_text
            ~error:Error.to_string_hum ~join_error:Or_error.join ))
 
-let read_json filepath =
-  let%map json_contents = Reader.file_contents filepath in
-  Yojson.Safe.from_string json_contents
+let read_json filepath ~flag =
+  let%map res =
+    Deferred.Or_error.try_with (fun () ->
+        let%map json_contents = Reader.file_contents filepath in
+        Ok (Yojson.Safe.from_string json_contents) )
+  in
+  match res with
+  | Ok c ->
+      c
+  | Error e ->
+      Or_error.errorf "Could not read %s at %s\n%s" flag filepath
+        (Error.to_string_hum e)
 
 let verify_receipt =
   let open Deferred.Let_syntax in
@@ -295,17 +296,28 @@ let verify_receipt =
     (Cli_lib.Background_daemon.init
        (Args.zip3 payment_path_flag proof_path_flag address_flag)
        ~f:(fun port (payment_path, proof_path, pk) ->
-         let%bind payment_json = read_json payment_path
-         and proof_json = read_json proof_path in
          let dispatch_result =
            let open Deferred.Or_error.Let_syntax in
-           let to_deferred_or_error result =
-             Result.map_error result ~f:Error.of_string |> Deferred.return
+           let%bind payment_json =
+             read_json payment_path ~flag:"payment-path"
+           in
+           let%bind proof_json = read_json proof_path ~flag:"proof-path" in
+           let to_deferred_or_error result ~error =
+             Result.map_error result ~f:(fun s ->
+                 Error.of_string (sprintf "%s: %s" error s) )
+             |> Deferred.return
            in
            let%bind payment =
-             User_command.of_yojson payment_json |> to_deferred_or_error
+             User_command.of_yojson payment_json
+             |> to_deferred_or_error
+                  ~error:
+                    (sprintf "Payment file %s has invalid json format"
+                       payment_path)
            and proof =
-             Payment_proof.of_yojson proof_json |> to_deferred_or_error
+             Payment_proof.of_yojson proof_json
+             |> to_deferred_or_error
+                  ~error:
+                    (sprintf "Proof file %s has invalid json format" proof_path)
            in
            dispatch Verify_proof.rpc (pk, payment, proof) port
          in
@@ -313,7 +325,8 @@ let verify_receipt =
          | Ok (Ok ()) ->
              printf "Payment is valid on the existing blockchain!\n"
          | Error e | Ok (Error e) ->
-             eprintf "%s" (Error.to_string_hum e) ))
+             eprintf "Error verifying the receipt: %s\n"
+               (Error.to_string_hum e) ))
 
 let get_nonce addr port =
   let open Deferred.Let_syntax in
@@ -338,7 +351,7 @@ let get_nonce_cmd =
     (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
          match%bind get_nonce address port with
          | Error e ->
-             eprintf "Failed to get nonce: %s\n" e ;
+             eprintf "Failed to get nonce\n%s\n" e ;
              exit 2
          | Ok nonce ->
              printf "%s\n" (Account.Nonce.to_string nonce) ;
@@ -350,6 +363,7 @@ let status =
   Command.async ~summary:"Get running daemon status"
     (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json ~join_error:Fn.id
+           ~error_ctx:"Failed to get status"
            (module Daemon_rpcs.Types.Status)
            Get_status.rpc
            (if performance then `Performance else `None)
@@ -361,6 +375,7 @@ let status_clear_hist =
   Command.async ~summary:"Clear histograms reported in status"
     (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json ~join_error:Fn.id
+           ~error_ctx:"Failed to clear histograms reported in status"
            (module Daemon_rpcs.Types.Status)
            Clear_hist_status.rpc
            (if performance then `Performance else `None)
@@ -369,7 +384,7 @@ let status_clear_hist =
 let get_nonce_exn public_key port =
   match%bind get_nonce public_key port with
   | Error e ->
-      eprintf "Failed to get nonce %s\n" e ;
+      eprintf "Failed to get nonce\n%s\n" e ;
       exit 3
   | Ok nonce ->
       return nonce
