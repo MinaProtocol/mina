@@ -182,7 +182,6 @@ jobs:
                     set +x
                     find . | grep coda.exe
                     cp src/_build/default/app/cli/src/coda.exe package/coda
-		    
             - store_artifacts:
                   path: package
             - run:
