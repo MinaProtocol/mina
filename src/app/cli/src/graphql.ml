@@ -1135,8 +1135,8 @@ module Mutations = struct
       | `Active None ->
           Error
             "Couldn't infer nonce for transaction from specified `sender` \
-             since `sender` is not in the ledger or sent a transaction in\n\
-            \           transaction pool."
+             since `sender` is not in the ledger or sent a transaction in \
+             transaction pool."
       | `Bootstrapping ->
           Error "Node is still bootstrapping"
     in
