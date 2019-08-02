@@ -455,7 +455,7 @@ module T = struct
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_propose_keypairs ~monitor ~consensus_local_state
                  ~transaction_database ~external_transition_database
-                 ~is_archive_node ())
+                 ~is_archive_node ~work_reassignment_wait:420000 ())
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger

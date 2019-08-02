@@ -192,6 +192,12 @@ codaslim:
 	@./scripts/rebuild-docker.sh codaslim dockerfiles/Dockerfile-codaslim
 	@rm coda.deb
 
+##############################################
+## Genesis ledger in OCaml from running daemon
+
+genesis-ledger-ocaml:
+	@./scripts/generate-genesis-ledger.py .genesis-ledger.ml.jinja
+
 ########################################
 ## Tests
 

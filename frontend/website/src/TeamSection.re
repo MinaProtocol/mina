@@ -469,6 +469,38 @@ let make = _children => {
        experience design. Regardless of the medium, the end goal is for the \
        well-being of the user."
         />
+        <Member
+          name="Carey Janecka"
+          title="Product Engineer"
+          description="Carey loves working on crazy ideas. He's designed and \
+        built products for SpaceX, Coinbase and a variety of early-stage \
+        companies. Nothing gets him more excited than working on simple user \
+        interfaces for complex systems. He's excited for the applications that \
+        can be built on top of Coda and enabling others to build cool things."
+        />
+        <Member
+          name="Connor Swann"
+          title="Protocol Reliability Eng"
+          description="Conner is an infrastructure enthusiast with extensive \
+          experience operating distributed systems at scale. His journey \
+          through the technology sector has taken him from People Analytics \
+          to Healthcare Tech and now to the Crypto space. He enjoys the challenge \
+          of applying DevOps methodologies and tooling to emerging industries, and \
+          looks forward to contributing back to the wider Open Source community. \
+          Conner is a California Native and has a BSc in Computer Science from \
+          Northern Arizona University."
+        />
+        <Member
+          name={js|Emre Tekişalp|js}
+          title="Head of Business Development"
+          description="Emre's career has focused on bringing new economic \
+        opportunities to societies using the power of technology. Before O(1) \
+        Labs, he spent two years at Coinbase's Business Development team where \
+        he led a number of strategic programs during a period when the company \
+        grew 10x. Before Coinbase, Emre was a Product Manager at Intel's wearable \
+        devices group. Originally from Istanbul, Turkey, Emre has an MBA degree \
+        from Columbia University."
+        />
       </Section>
       <Section name="Advisors">
         <Member

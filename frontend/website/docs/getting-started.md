@@ -2,8 +2,6 @@
 
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
-Join the Coda server on [Discord](http://bit.ly/CodaDiscord) to connect with the community, get support, and learn about how you can participate in weekly challenges for [Testnet Points](/docs#testnet-points)[\*](#disclaimer). Check out the [Testnet Leaderboard](http://bit.ly/TestnetBetaLeaderboard) to see who is winning this week's challenges.
-
 !!! note
     This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for `v0.0.1-beta.1`.
 
@@ -32,8 +30,8 @@ The newest binary releases can be found below. Instructions are provided for mac
 Install using [brew](https://brew.sh).
 ```
 brew install codaprotocol/coda/coda
-``` 
-You can run `coda -help` to see if the works
+```
+You can run `coda -help` to check if the installation succeeded.
 
 ### Ubuntu 18.04 / Debian 9
 
@@ -43,9 +41,10 @@ Add the Coda Debian repo and install.
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
 sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-43cb0790
+sudo apt-mark hold coda-testnet-postake-medium-curves
 ```
 
-You can `coda -help` to see if it works.
+You can run `coda -help` to check if the installation succeeded.
 
 
 ### Windows
@@ -67,8 +66,4 @@ For walk-through instructions see [this guide](/docs/troubleshooting/#port-forwa
 ## Next
 
 Now that you've installed Coda and configured your network, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!
-
-<span id="disclaimer">
-\*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
-</span>
 

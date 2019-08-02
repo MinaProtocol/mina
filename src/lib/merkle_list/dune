@@ -2,4 +2,4 @@
 (name merkle_list)
   (public_name merkle_list)
   (preprocess (pps ppx_jane ppx_deriving.eq))
-  (libraries core_kernel))
+  (libraries core_kernel non_empty_list))
