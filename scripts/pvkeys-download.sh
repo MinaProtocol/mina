@@ -28,20 +28,21 @@ set +e
 
 # Derive branch being merged in to
 # Usually a fix/feature branch PR won't have PV keys
-PR_NUMBER=`basename ${CIRCLE_PULL_REQUEST}`
+PR_NUMBER=`basename ${CIRCLE_PULL_REQUEST:-NOPR}`
 GH_API="https://api.github.com/repos/CodaProtocol/coda/pulls"
 MERGE_INTO_BRANCH=`curl -s ${GH_API}/${PR_NUMBER} | jq -r .base.ref`
 
 # Iterate over a few name variations until you a match?
 NAME_VARIATIONS="
-keys-${CIRCLE_BRANCH}-${DUNE_PROFILE}.tar.bz2
-keys-${MERGE_INTO_BRANCH}-${DUNE_PROFILE}.tar.bz2
-keys-temporary_hack-${DUNE_PROFILE}.tar.bz2
+keys-${CIRCLE_BRANCH:-NOBRANCH}-${DUNE_PROFILE:-NOPROFILE}.tar.bz2
+keys-${MERGE_INTO_BRANCH:-NOBRANCH}-${DUNE_PROFILE:-NOPROFILE}.tar.bz2
+keys-temporary_hack-${DUNE_PROFILE:-NOPROFILE}.tar.bz2
 NOTFOUND
 "
 
 for TARBALL in ${NAME_VARIATIONS}
 do
+    echo "Checking for ${TARBALL}"
     if gsutil -q stat gs://proving-keys-stable/$TARBALL
     then
         # Found a file matching this name, keep it
@@ -53,7 +54,6 @@ if [[ $TARBALL = "NOTFOUND" ]]; then
     echo "No usable PV tarball found"
     exit 0
 fi
-
 
 URI="gs://proving-keys-stable/${TARBALL}"
 gsutil cp ${URI} /tmp/.
