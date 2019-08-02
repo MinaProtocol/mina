@@ -21,7 +21,7 @@ let ip_service_result {uri; body_handler} ~logger =
       v
   | Error e ->
       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        "failed to query our own IP from $provider: $exn"
+        "Failed to query our own IP from $provider: $exn"
         ~metadata:
           [("exn", `String (Exn.to_string e)); ("provider", `String uri)] ;
       None
@@ -38,5 +38,5 @@ let find ~logger =
   Unix.Inet_addr.of_string
   @@ Option.value_exn
        ~message:
-         "couldn't determine our IP from the internet, use -external-ip flag"
+         "Couldn't determine our IP from the internet, use -external-ip flag"
        our_ip_maybe
