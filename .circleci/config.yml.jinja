@@ -81,47 +81,6 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
-
-    build-macos-kademlia:
-        macos:
-            xcode: "10.2.1"
-        resource_class: large
-        working_directory: /Users/distiller/coda
-        steps:
-            - run:
-                name: Setup nix and cachix
-                command: |
-                    sudo mkdir /nix
-                    sudo chown distiller /nix
-                    curl https://nixos.org/nix/install | sh
-                    . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
-                    nix-env -iA cachix -f https://cachix.org/api/v1/install
-            - checkout
-            - run:
-                name: Build kademlia
-                command: |
-                    source ~/.bash_profile
-                    . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
-                    cd src/app/kademlia-haskell
-                    cachix use codaprotocol
-                    nix-build release2.nix 2>&1 | tee /tmp/buildkademlia.log
-            - run:
-                name: Update dynamic lib pointers
-                command: |
-                    cp src/app/kademlia-haskell/result/bin/kademlia .
-                    chmod +w kademlia
-                    ./scripts/librewrite-macos.sh kademlia
-            - run:
-                name: Copy artifacts
-                command: |
-                    mkdir -p /tmp/artifacts
-                    cp kademlia /tmp/artifacts/.
-                    tar -cvf coda-kademlia.tar.gz kademlia
-                    openssl dgst -sha256 coda-kademlia.tar.gz > coda-kademlia.tar.gz.sha256
-                    cp coda-kademlia.tar.gz coda-kademlia.tar.gz.sha256 /tmp/artifacts/.
-            - store_artifacts:
-                  path: /tmp/artifacts
-
     build-macos:
       # only run when there's a 'release' tag
       # filters:
@@ -135,38 +94,45 @@ jobs:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
             OPAMYES: 1
         steps:
-            # Attach workspace from linux build
-            - run: mkdir -p /tmp/artifacts
+            # Attach workspace from prior linux build
             - attach_workspace:
                 at: /tmp/workspace
-            - run: sudo mkdir -p /var/lib/coda
-            - run: sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
+            - run:
+                name: Unpack Workspace PV Keys
+                command: |
+                    sudo mkdir -p /var/lib/coda
+                    sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
             - checkout
             - restore_cache:
+                name: Restoring cached homebrew
                 keys:
                     - homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
                     - homebrew-v1-
             - restore_cache:
+                name: Restoring cached opam
                 keys:
                     - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                     - opam-v3-
-            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Download Deps -- make macos-setup-download
+                name: Updating git submodules
+                command: git submodule sync && git submodule update --init --recursive
+            - run:
+                name: Download mac deps -- make macos-setup-download
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
             - run:
-                name: Compile Deps -- make macos-setup-compile
+                name: Compile mac deps -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
+                name: Saving homebrew cache
                 key: homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
             - save_cache:
+                name: Saving opam cache
                 key: opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                 paths:
                     - "/Users/distiller/.opam"
-
                 no_output_timeout: 1h
             - run:
                 name: Build OCaml
@@ -174,14 +140,27 @@ jobs:
                 no_output_timeout: 1h
                 environment:
                 DUNE_PROFILE: testnet_postake_medium_curves
-            - run: mkdir -p package/keys
-            - run: cp /var/lib/coda/* package/keys/.
             - run:
+                name: Collect PV Keys
                 command: |
-                    set +e
-                    set +x
-                    find . | grep coda.exe
+                    mkdir -p package/keys
+                    cp /var/lib/coda/* package/keys/.
+            - run:
+                name: Collect and rewrite kademlia
+                command: |
+                    cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
+                    chmod +w package/kademlia
+                    ./scripts/librewrite-macos.sh package/kademlia
+            - run:
+                name: Collect coda binary
+                command: |
                     cp src/_build/default/app/cli/src/coda.exe package/coda
+            - run:
+                name: Create homebrew package
+                command: |
+                    tar czvf homebrew-coda.tar.gz package
+                    openssl dgst -sha256 homebrew-coda.tar.gz > homebrew-coda.tar.gz.sha256
+                    cp homebrew-coda.tar.gz package/.
             - store_artifacts:
                   path: package
             - run:
