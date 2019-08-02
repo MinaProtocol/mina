@@ -58,6 +58,11 @@ module Tick0 = struct
   module Snarkable = Make_snarkable (Crypto_params.Tick0)
 end
 
+module Tick0_run = struct
+  include Crypto_params.Tick0_run
+  module Snarkable = Make_snarkable (Crypto_params.Tick0)
+end
+
 let%test_unit "group-map test" =
   let params =
     Group_map.Params.create
@@ -299,10 +304,11 @@ module Tock = struct
     let final_exponentiation = FE.final_exponentiation4
   end
 
-  module Run = Snarky.Snark.Run.Make (Tock_backend) (Unit)
+  module Tock_run = Snarky.Snark.Run.Make (Tock_backend) (Unit)
+  module Tick_run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
 
   module Pairing_run = struct
-    include Run
+    include Tock_run
 
     module G1 = struct
       type t = Pairing.G1.t
@@ -386,14 +392,6 @@ module Tock = struct
 
     module Impl = struct
       include Tock0_run
-
-      (* let run_checked = Run.run_checked
-
-      let make_checked = Run.make_checked
-
-      type prover_state = Run.prover_state
-
-      module Internal_Basic = Run.Internal_Basic *)
     end
 
     let final_exponentiation a = run_checked (Pairing.final_exponentiation a)
@@ -807,19 +805,44 @@ module Tick = struct
 end
 
 module Sonic_backend = struct
-  include Tock.Pairing_run
+  (* include Tock.Pairing_run *)
 
-  module Fr = struct
+  (* module N = Snarkette.Mnt6_80.N *)
+
+  include Snarkette.Mnt6753
+
+  module Fr = Snarkette.Mnt4753.Fq
+
+  (* module Fr = struct
     include Tick.Pairing.Fq
 
-    let ( / ) a b = ( * ) a (run_checked (inv_exn b))
-  end
+    let ( / ) a b = ( * ) a (Tick0_run.run_checked (inv_exn b))
+
+    let ( ** ) x n =
+      let k = N.num_bits n in
+      let rec go acc i =
+        if Int.(i < 0) then acc
+        else
+          let acc = (Tick0_run.run_checked (acc * acc)) in
+          let acc = if N.test_bit n i then (Tick0_run.run_checked (acc * x)) else acc in
+          go acc Int.(i - 1)
+      in
+      go one Int.(k - 1)
+
+    let equal a b = Tick0_run.As_prover.read Impl.Boolean.typ (Tick0_run.run_checked (equal a b))
+
+    let ( * ) a b = Tick0_run.run_checked (a * b)
+
+    let ( / ) a b = Tick0_run.run_checked (a / b)
+  end *)
+
+  module Fqe = Fq3
   
   module Fr_laurent = Sonic_prototype.Laurent.Make_laurent (N) (Fr)
 
   module Bivariate_fr_laurent = Sonic_prototype.Laurent.Make_laurent (N) (Fr_laurent)
   
-  module Fq_target = Fqk
+  module Fq_target = Fq6
 end
 
 module Srs = Sonic_prototype.Srs.Make (Sonic_backend)
@@ -827,7 +850,7 @@ module Commitment_scheme = Sonic_prototype.Commitment_scheme.Make (Sonic_backend
 
 let%test_unit "sonic test" =
   let module M = Snarky.Snark.Run.Make (Tock_backend) (Unit) in
-  Quickcheck.test ~trials:3 Quickcheck.Generator.(tuple3 Tock0.Field.gen Tock0.Field.gen Tock0.Field.gen) ~f:(fun x z alpha ->
+  Quickcheck.test ~trials:3 Quickcheck.Generator.(tuple3 Tock0.Field.gen Tock0.Field.gen Tock0.Field.gen) ~f:(fun (x, z, alpha) ->
       let (), checked_output =
         M.run_and_check
           (fun () ->

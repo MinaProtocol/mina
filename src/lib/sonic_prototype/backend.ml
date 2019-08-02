@@ -15,8 +15,6 @@ module type Group = sig
   val ( + ) : t -> t -> t
 
   val scale : t -> nat -> t
-
-  val scale_plus_minus : t -> nat -> t
 end
 
 module type Backend_intf = sig

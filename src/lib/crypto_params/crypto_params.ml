@@ -82,6 +82,7 @@ end
 
 module Tock0 = Snarky.Snark.Make (Tock_backend)
 module Tock0_run = Snarky.Snark.Run.Make (Tock_backend) (Unit)
+module Tick0_run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
 
 module Wrap_input = struct
   (*
