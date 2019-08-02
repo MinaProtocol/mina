@@ -59,20 +59,19 @@ module External_transition = struct
   state_hash: string;
   creator: Public_key.Compressed.t
   protocol_state: Protocol_state.t [not null]
-  is_snarked bool [not null]
+  emitted_ledger_proof bool [not null]
   status consensus_status [not null]
-  time time [not null]
 end
 ```
 
-The OCaml implementation of an `external_transition` is different from the presented `external_transition` type as it has the field `is_snarked` and `status` to make it easy to compute the `transactionStatus` query, which will tell us if a transaction is snarked and its `consensus_status`. `consensus_status` for an `external_transition` is variant type and is described below:
+The OCaml implementation of an `external_transition` is different from the presented `external_transition` type as it has the field `emitted_ledger_proof` and `status` to make it easy to compute the `transactionStatus` query, which will tell us if a transaction is snarked and its `consensus_status`. `consensus_status` for an `external_transition` is variant type and is described below:
 
 ```ocaml
 type consensus_status =
   | Failed (* frontier removed transition and never reached finality *)
   | Confirmed (* Transition reached finality by passing the root *)
   | Pending of int (* Transition is somewhere in the frontier and has a block confirmation number *)
-  | Unknown (* Could not compute status of transaction i.e. We don't have a record of it *)
+  | Unknown (* Could not compute status of transition i.e. This can happen after we bootstrap and we do not have a `transition_frontier` anymore *)
 ```
 
 Notice that `PENDING` in `consensus_status` is the number of block confirmations for a block. This position has nothing to do with a block being snarked or not, so `Snarked` is not a constructor of this variant.
@@ -137,7 +136,7 @@ Table external_transition {
   state_hash string [pk]
   creator string [not null]
   protocol_state string [not null] // we should write out all of the components of protocol_state as columns
-  is_snarked bool [not null]
+  emitted_ledger_proof bool [not null]
   status consensus_status [not null]
   block_length int [not null]
 }
@@ -259,7 +258,8 @@ module Client_breadcrumb = struct
   type t = {
     transition_with_hash: (external_transition, State_hash.t) With_hash.t;
     just_emitted_a_proof: bool;
-    ledger: merkle_mask_ledger
+    ledger: merkle_mask_ledger;
+    mutable block_confirmation_number: int [@default 0]
   }
 end
 ```
@@ -274,7 +274,9 @@ We can keep an in-memory key-value table where the keys are public keys that a c
 
 Whenever a `transition` gets evicted from the client `transitition_frontier`, we would write the transitions into the `transition` database and their transactions into the `transaction_database`.
 
-When we add a transition by applying the `Breadcrumb_added` diff and it emitted a `ledger_proof`, we can set the client breadcrumb as `is_snarked` and recursively do this for all ancestor breadcrumbs until the recursion reaches a breadcrumb that has already been snarked. The recursion can refer to transitions outside of the `transition_frontier` and in the `transition` database. We can create a recursive SQL query to the transitions as `is_snarked`.
+When we add a transition by applying the `Breadcrumb_added` diff and it emitted a `ledger_proof`, we can set the client breadcrumb as `emitted_ledger_proof` and recursively do this for all ancestor breadcrumbs until the recursion reaches a breadcrumb that has already been snarked. The recursion can refer to transitions outside of the `transition_frontier` and in the `transition` database. We can create a recursive SQL query to the transitions as `emitted_ledger_proof`.
+
+Every time an `external_transition` is added onto the `transition_frontier`, each one of its ancestor's transition will get their block confirmation number incrementally. This block confirmation number will be added as a mutable field to the client breadcrumb type.
 
 ### Receipt chain hashes
 
