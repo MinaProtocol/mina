@@ -9,6 +9,8 @@ exception Invalid_base58_version_byte of char
 exception Invalid_base58_check_length
 
 module Make (M : sig
+  val description : string
+
   val version_byte : char
 end) : sig
   (** apply Base58Check algorithm to version byte and payload *)
@@ -17,9 +19,6 @@ end) : sig
   (** decode Base58Check result into payload; can raise the above
    * exceptions and a B58.Invalid_base58_character *)
   val decode_exn : string -> string
-
-  (** Same as decode_exn but with [target] specified in the error message *)
-  val decode_with_target_exn : string -> target:string -> string
 
   (** decode Base58Check result into payload *)
   val decode : string -> string Or_error.t

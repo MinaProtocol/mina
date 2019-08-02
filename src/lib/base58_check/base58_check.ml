@@ -20,6 +20,8 @@ let version_len = 1
 let checksum_len = 4
 
 module Make (M : sig
+  val description : string
+
   val version_byte : char
 end) =
 struct
@@ -64,24 +66,19 @@ struct
     payload
 
   let decode s =
+    let error_str str = sprintf "Invalid base58 %s in %s" str M.description in
     try Ok (decode_exn s) with
     | B58.Invalid_base58_character ->
-        Or_error.error_string "Invalid base58 character"
+        Or_error.error_string (error_str "character")
     | Invalid_base58_check_length ->
-        Or_error.error_string "Invalid base58 check length"
+        Or_error.error_string (error_str "check length")
     | Invalid_base58_checksum ->
-        Or_error.error_string "Invalid base58 checksum"
+        Or_error.error_string (error_str "checksum")
     | Invalid_base58_version_byte ch ->
         Or_error.error_string
-          (sprintf "Invalid base58 version byte \\x%02X, expected \\x%02X"
-             (Char.to_int ch) (Char.to_int version_byte))
-
-  let decode_with_target_exn s ~target =
-    match decode s with
-    | Ok x ->
-        x
-    | Error e ->
-        Error.(raise (of_string (sprintf "%s: %s" target (to_string_hum e))))
+          (error_str
+             (sprintf "version byte \\x%02X, expected \\x%02X" (Char.to_int ch)
+                (Char.to_int version_byte)))
 end
 
 module Version_bytes = Version_bytes
@@ -89,6 +86,8 @@ module Version_bytes = Version_bytes
 let%test_module "base58check tests" =
   ( module struct
     module Base58_check = Make (struct
+      let description = "Base58check tests"
+
       let version_byte = '\x53'
     end)
 

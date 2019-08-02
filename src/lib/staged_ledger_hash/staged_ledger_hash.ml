@@ -17,6 +17,8 @@ module Aux_hash = struct
         type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
         module Base58_check = Base58_check.Make (struct
+          let description = "Aux hash"
+
           let version_byte =
             Base58_check.Version_bytes.staged_ledger_hash_aux_hash
         end)
@@ -71,6 +73,8 @@ module Pending_coinbase_aux = struct
         type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
         module Base58_check = Base58_check.Make (struct
+          let description = "Pending coinbase aux"
+
           let version_byte =
             Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
         end)

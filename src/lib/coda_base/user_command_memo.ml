@@ -5,6 +5,8 @@ module Stable = struct
   module V1 = struct
     module T = struct
       module Base58_check = Base58_check.Make (struct
+        let description = "User command memo"
+
         let version_byte = Base58_check.Version_bytes.user_command_memo
       end)
 
@@ -13,8 +15,7 @@ module Stable = struct
 
       let to_string (memo : t) : string = Base58_check.encode memo
 
-      let of_string (s : string) : t =
-        Base58_check.decode_with_target_exn s ~target:"User command memo"
+      let of_string (s : string) : t = Base58_check.decode_exn s
     end
 
     include T

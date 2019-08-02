@@ -13,6 +13,8 @@ module Stable = struct
       let of_string = Binable.of_string (module Tock_backend.Proof)
 
       let version_byte = Base58_check.Version_bytes.proof
+
+      let description = "Tock proof"
     end
 
     include T

@@ -13,6 +13,8 @@ module Digest = struct
       include T
 
       module Base58_check = Base58_check.Make (struct
+        let description = "Random oracle digest"
+
         let version_byte = Base58_check.Version_bytes.random_oracle_base
       end)
 

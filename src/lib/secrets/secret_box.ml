@@ -5,6 +5,8 @@ module BytesWr = struct
   include Bytes
 
   module Base58_check = Base58_check.Make (struct
+    let description = "Secret box"
+
     let version_byte = Base58_check.Version_bytes.secret_box_byteswr
   end)
 
@@ -12,9 +14,7 @@ module BytesWr = struct
 
   let of_yojson = function
     | `String s ->
-        Ok
-          ( Base58_check.decode_with_target_exn s ~target:"BytesWr"
-          |> Bytes.of_string )
+        Ok (Base58_check.decode_exn s |> Bytes.of_string)
     | _ ->
         Error "Bytes.of_yojson needs a string"
 end
