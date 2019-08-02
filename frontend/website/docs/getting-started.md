@@ -57,7 +57,7 @@ If you're running another Linux distro or a different version of macOS, you can 
 
 ## Set up port forwarding and any firewalls
 
-If you are running a firewall, you should allow traffic on TCP port 8302 and UDP port 8303. Additionally, unless the `-external-ip YOUR_IP` flag is provided, the daemon will use HTTPS (443) and HTTP (80) to try and determine its own IP.
+If you are running a firewall, you should allow traffic on TCP port 8302 and UDP port 8303. Additionally, unless the `-external-ip YOUR_IP` flag is provided, the daemon will use HTTPS (443) and HTTP (80) to try and determine its own IP address.
 
 You may need to configure your router's port forwarding to allow inbound traffic to the following ports through your **external** IP address.
 
