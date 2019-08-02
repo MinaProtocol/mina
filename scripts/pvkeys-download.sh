@@ -26,20 +26,34 @@ echo "Downloading keys"
 
 set +e
 
-# Look for tar based on branch name
-if gsutil -q stat gs://proving-keys-stable/keys-${CIRCLE_BRANCH}-${DUNE_PROFILE}.tar.bz2
-then
-    TARBALL="keys-${CIRCLE_BRANCH}-${DUNE_PROFILE}.tar.bz2"
-# Fall back to old tar based on just DUNE_PROFILE
-elif gsutil -q stat gs://proving-keys-stable/keys-temporary_hack-${DUNE_PROFILE}.tar.bz2
-then
-    TARBALL="keys-temporary_hack-${DUNE_PROFILE}.tar.bz2"
-else
-    echo "PV Archive not found - Skipping"
+# Derive branch being merged in to
+# Usually a fix/feature branch PR won't have PV keys
+PR_NUMBER=`basename ${CIRCLE_PULL_REQUEST}`
+GH_API="https://api.github.com/repos/CodaProtocol/coda/pulls"
+MERGE_INTO_BRANCH=`curl -s ${GH_API}/${PR_NUMBER} | jq -r .base.ref`
+
+# Iterate over a few name variations until you a match?
+NAME_VARIATIONS="
+keys-${MERGE_INTO_BRANCH}-${DUNE_PROFILE}.tar.bz2
+keys-${CIRCLE_BRANCH}-${DUNE_PROFILE}.tar.bz2
+keys-temporary_hack-${DUNE_PROFILE}.tar.bz2
+NOTFOUND
+"
+
+for TARBALL in ${NAME_VARIATIONS}
+do
+    if gsutil -q stat gs://proving-keys-stable/$TARBALL
+    then
+        # Found a file matching this name, keep it
+        break
+    fi
+done
+
+if [[ $TARBALL = "NOTFOUND" ]]; then
+    echo "No usable PV tarball found"
     exit 0
 fi
 
-echo "Found ${TARBALL}"
 
 URI="gs://proving-keys-stable/${TARBALL}"
 gsutil cp ${URI} /tmp/.
