@@ -19,7 +19,7 @@ let run ~f port arg =
         if has_daemon then go Run_client else go No_daemon
     | No_daemon ->
         Print.printf
-          !"Error: Daemon not running on port %d. See `coda daemon -h`\n"
+          !"Error: Daemon not running on port %d. See `coda daemon -help`\n"
           port ;
         go Abort
     | Run_client ->
