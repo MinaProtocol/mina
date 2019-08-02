@@ -300,7 +300,8 @@ let request_work t =
   in
   let fee = snark_work_fee t in
   let instances, seen_jobs =
-    Work_selection_method.work ~fee ~snark_pool:(snark_pool t) sl (seen_jobs t)
+    Work_selection_method.work ~logger:t.config.logger ~fee
+      ~snark_pool:(snark_pool t) sl (seen_jobs t)
   in
   set_seen_jobs t seen_jobs ;
   if List.is_empty instances then None
