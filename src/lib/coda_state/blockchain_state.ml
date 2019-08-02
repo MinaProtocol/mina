@@ -120,7 +120,7 @@ let negative_one =
       ; snarked_ledger_hash=
           Frozen_ledger_hash.of_ledger_hash
           @@ Ledger.merkle_root (Lazy.force Genesis_ledger.t)
-      ; timestamp= Consensus.Constants.genesis_state_timestamp }
+      ; timestamp= Block_time.of_time Time.epoch }
 
 (* negative_one and genesis blockchain states are equivalent *)
 let genesis = negative_one
@@ -149,7 +149,7 @@ module Message = struct
   let hash t ~nonce =
     let d =
       Pedersen.digest_fold Hash_prefix.signature
-        Fold.(fold t +> Fold.(group3 ~default:false (of_list nonce)))
+        Fold.(fold t +> Fold.(of_list nonce))
     in
     List.take (Field.unpack d) Inner_curve.Scalar.length_in_bits
     |> Inner_curve.Scalar.of_bits
@@ -158,8 +158,7 @@ module Message = struct
     let%bind trips = var_to_triples t in
     let%bind hash =
       Pedersen.Checked.digest_triples ~init:Hash_prefix.signature
-        ( trips
-        @ Fold.(to_list (group3 ~default:Boolean.false_ (of_list nonce))) )
+        (trips @ nonce)
     in
     let%map bs = Pedersen.Checked.Digest.choose_preimage hash in
     Bitstring.Lsb_first.of_list

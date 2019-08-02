@@ -85,11 +85,14 @@ val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
 
 val get_ledger :
-  t -> Staged_ledger_hash.t -> Account.t list Deferred.Or_error.t
+  t -> Staged_ledger_hash.t option -> Account.t list Deferred.Or_error.t
 
 val receipt_chain_database : t -> Receipt_chain_database.t
 
 val wallets : t -> Secrets.Wallets.t
+
+val most_recent_valid_transition :
+  t -> External_transition.t Broadcast_pipe.Reader.t
 
 val top_level_logger : t -> Logger.t
 

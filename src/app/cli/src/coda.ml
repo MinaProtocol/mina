@@ -114,8 +114,14 @@ let daemon logger =
            (Printf.sprintf
               "FEE Amount a worker wants to get compensated for generating a \
                snark proof (default: %d)"
-              (Currency.Fee.to_int Cli_lib.Fee.default_snark_worker))
+              (Currency.Fee.to_int Cli_lib.Default.snark_worker_fee))
          (optional txn_fee)
+     and work_reassignment_wait =
+       flag "work-reassignment-wait" (optional int)
+         ~doc:
+           (Printf.sprintf
+              "WAIT-TIME in ms before a snark-work is reassigned (default:%dms)"
+              Cli_lib.Default.work_reassignment_wait)
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
      and insecure_rest_server =
@@ -130,6 +136,11 @@ let daemon logger =
            "true|false Limit the number of concurrent connections per IP \
             address (default:true)"
          (optional bool)
+     and no_bans =
+       let module Expiration = struct
+         [%%expires_after "20190907"]
+       end in
+       flag "no-bans" no_arg ~doc:"don't ban peers (**TEMPORARY FOR TESTNET**)"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -154,6 +165,7 @@ let daemon logger =
              | Ok ll ->
                  Deferred.return ll )
        in
+       if no_bans then Trust_system.disable_bans () ;
        let%bind conf_dir =
          if is_background then
            let home = Core.Sys.home_directory () in
@@ -178,8 +190,31 @@ let daemon logger =
              () )
          else ()
        in
+       let stdout_log_processor =
+         if log_json then Logger.Processor.raw ()
+         else
+           Logger.Processor.pretty ~log_level
+             ~config:
+               { Logproc_lib.Interpolator.mode= Inline
+               ; max_interpolation_length= 50
+               ; pretty_print= true }
+       in
+       Logger.Consumer_registry.register ~id:"default"
+         ~processor:stdout_log_processor
+         ~transport:(Logger.Transport.stdout ()) ;
+       (* 512MB logrotate max size = 1GB max filesystem usage *)
+       let logrotate_max_size = 1024 * 1024 * 512 in
+       Logger.Consumer_registry.register ~id:"raw_persistent"
+         ~processor:(Logger.Processor.raw ())
+         ~transport:
+           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+              ~max_size:logrotate_max_size) ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-         "Coda daemon is booting up" ;
+         "Coda daemon is booting up; built with commit $commit on branch \
+          $branch"
+         ~metadata:
+           [ ("commit", `String Coda_version.commit_id)
+           ; ("branch", `String Coda_version.branch) ] ;
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
@@ -245,25 +280,6 @@ let daemon logger =
                ~metadata:[("config_directory", `String conf_dir)] ;
              make_version ~wipe_dir:false
        in
-       (* 512MB logrotate max size = 1GB max filesystem usage *)
-       let logrotate_max_size = 1024 * 1024 * 512 in
-       Logger.Consumer_registry.register ~id:"raw_persistent"
-         ~processor:(Logger.Processor.raw ())
-         ~transport:
-           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-              ~max_size:logrotate_max_size) ;
-       let stdout_log_processor =
-         if log_json then Logger.Processor.raw ()
-         else
-           Logger.Processor.pretty ~log_level
-             ~config:
-               { Logproc_lib.Interpolator.mode= Inline
-               ; max_interpolation_length= 50
-               ; pretty_print= true }
-       in
-       Logger.Consumer_registry.register ~id:"default"
-         ~processor:stdout_log_processor
-         ~transport:(Logger.Transport.stdout ()) ;
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
@@ -328,7 +344,7 @@ let daemon logger =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
            in
            or_from_config json_to_currency_fee_option "snark-worker-fee"
-             ~default:Cli_lib.Fee.default_snark_worker snark_work_fee
+             ~default:Cli_lib.Default.snark_worker_fee snark_work_fee
          in
          let max_concurrent_connections =
            if
@@ -343,6 +359,11 @@ let daemon logger =
                 (Fn.compose work_selection_method_val YJ.Util.to_string))
              "work-selection" ~default:Cli_lib.Arg_type.Sequence
              work_selection_method_flag
+         in
+         let work_reassignment_wait =
+           or_from_config YJ.Util.to_int_option "work-reassignment-wait"
+             ~default:Cli_lib.Default.work_reassignment_wait
+             work_reassignment_wait
          in
          let initial_peers_raw =
            List.concat
@@ -554,7 +575,7 @@ let daemon logger =
                 ~transition_frontier_location ~time_controller
                 ~initial_propose_keypairs ~monitor ~consensus_local_state
                 ~transaction_database ~external_transition_database
-                ~is_archive_node ())
+                ~is_archive_node ~work_reassignment_wait ())
          in
          { Coda_initialization.coda
          ; client_whitelist
@@ -726,12 +747,12 @@ let coda_commands logger =
 
 [%%endif]
 
-let print_version_help coda_exe =
+let print_version_help coda_exe version =
   (* mimic Jane Street command help *)
   let lines =
     [ "print version information"
     ; ""
-    ; sprintf "  %s version" (Filename.basename coda_exe)
+    ; sprintf "  %s %s" (Filename.basename coda_exe) version
     ; ""
     ; "=== flags ==="
     ; ""
@@ -754,14 +775,17 @@ let () =
   (* intercept command-line processing for "version", because we don't
      use the Jane Street scripts that generate their version information
    *)
-  ( match Sys.argv with
-  | [|_coda_exe; "version"|] ->
-      print_version_info ()
-  | [|coda_exe; "version"; s|]
-    when List.mem ["-help"; "-?"] s ~equal:String.equal ->
-      print_version_help coda_exe
-  | _ ->
-      Command.run
-        (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
-           (coda_commands logger)) ) ;
+  (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
+   let is_version_cmd = make_list_mem ["version"; "-version"] in
+   let is_help_flag = make_list_mem ["-help"; "-?"] in
+   match Sys.argv with
+   | [|_coda_exe; version|] when is_version_cmd version ->
+       print_version_info ()
+   | [|coda_exe; version; help|]
+     when is_version_cmd version && is_help_flag help ->
+       print_version_help coda_exe version
+   | _ ->
+       Command.run
+         (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
+            (coda_commands logger))) ;
   Core.exit 0
