@@ -49,12 +49,21 @@ fi
 
 # Compile things
 if [[ $COMPILE_THINGS == "YES" ]]; then
+
+  # Keep compile dirs to avoid recompiles
+  OPAMKEEPBUILDDIR='true'
+  OPAMREUSEBUILDDIR='true'
+
+  # Set term to xterm if not set
+  TERM=${TERM:-xterm}
+
   opam update
   # This is dirty, keep the OCaml project version up to date!
   opam switch create 4.07.1 || true
   opam switch 4.07.1
+
   # All our ocaml packages
-  env TERM=xterm opam switch -y import src/opam.export
+  opam switch -y import src/opam.export
   eval $(opam config env)
 
   # Extlib gets automatically installed, but we want our pin, so we should
@@ -62,12 +71,12 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   opam uninstall -y extlib
 
   # Our pins
-  env TERM=xterm opam pin -y add src/external/ocaml-sodium
-  env TERM=xterm opam pin -y add src/external/rpc_parallel
-  env TERM=xterm opam pin -y add src/external/ocaml-extlib
-  env TERM=xterm opam pin -y add src/external/digestif
-  env TERM=xterm opam pin -y add src/external/async_kernel
-  env TERM=xterm opam pin -y add src/external/coda_base58
+  opam pin -y add src/external/ocaml-sodium
+  opam pin -y add src/external/rpc_parallel
+  opam pin -y add src/external/ocaml-extlib
+  opam pin -y add src/external/digestif
+  opam pin -y add src/external/async_kernel
+  opam pin -y add src/external/coda_base58
   eval $(opam config env)
 
   # Kademlia
