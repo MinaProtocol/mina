@@ -41,7 +41,12 @@ module Test_inputs = struct
 
     let create () = Work.Table.create ()
 
-    let add_snark t ~work ~fee = Work.Table.add_exn t ~key:work ~data:fee
+    let add_snark t ~work ~fee =
+      Work.Table.update t work ~f:(function
+        | None ->
+            fee
+        | Some fee' ->
+            Currency.Fee.min fee fee' )
   end
 
   module Staged_ledger = struct
