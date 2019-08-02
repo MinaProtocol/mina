@@ -35,7 +35,7 @@ import           Network                   (PortNumber)
 import qualified Network.Kademlia          as K
 import qualified Network.Kademlia.HashNodeId as KH
 import           System.Environment        (getArgs)
-import           System.Exit               (die)
+import           System.Exit               (exitSuccess, die)
 import           System.Random             (mkStdGen)
 import           System.IO                 (stdout, hFlush)
 
@@ -114,7 +114,7 @@ main = do
      -  3. Make the ping time WAY slower (use the kDefaultConfig raw -- ala
      -    Cardano) ~1hour heartbeats
      -}
-    when (state == "test") $ do
+    when (state == "test" || state == "dump-peers") $ do
       let ((externalIp, myPort) : peers) = map read rest
       let
           nonceGen  = \x -> KH.Nonce $ evalRand (generateByteString nonceSize) (mkStdGen $ makeSeed x)
@@ -125,7 +125,8 @@ main = do
       let logError = putStrLn . ("EROR: " ++)
       let logInfo = putStrLn . ("DBUG: " ++)
       let logData = putStrLn . ("DATA: " ++)
-      let logTrace = putStrLn . ("TRAC: " ++)
+      {- don't log trace if dumping peers only -}
+      let logTrace = if (state == "dump-peers") then \_ -> return () else putStrLn . ("TRAC: " ++)
 
       logInfo $ "Creating instance"
       kInstance <- K.createL (bindIp, myPort) (externalIp, myPort) myKey config logTrace logError
@@ -161,6 +162,10 @@ main = do
         mapM_ logData $ (dumpFormat Live) <$> initialPeers
 
       hFlush stdout
+
+      {- finish if just dumping peers -}
+      when (state == "dump-peers")
+        exitSuccess
 
       {- Forever, once a second, check to see if anything changed, and dump it -}
       finally
