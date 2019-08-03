@@ -38,10 +38,6 @@ if [[ $DOWNLOAD_THINGS == "YES" ]]; then
   else
     echo 'All brew packages have already been installed.'
   fi
-
-  # ocaml downloading
-  OPAMYES=1 opam init
-  eval $(opam config env)
 else
   echo 'Not running download step'
 fi
@@ -53,9 +49,14 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   # Keep compile dirs to avoid recompiles
   export OPAMKEEPBUILDDIR='true'
   export OPAMREUSEBUILDDIR='true'
+  export OPAMYES=1
 
   # Set term to xterm if not set
   export TERM=${TERM:-xterm}
+
+  # ocaml downloading
+  opam init
+  eval $(opam config env)
 
   opam update
   # This is dirty, keep the OCaml project version up to date!

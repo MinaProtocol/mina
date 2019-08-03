@@ -106,6 +106,7 @@ jobs:
             - restore_cache:
                 name: Restoring cached homebrew
                 keys:
+                    - homebrew-v5-{{ checksum "scripts/macos-setup.sh" }}
                     - homebrew-v4-{{ checksum "scripts/macos-setup.sh" }}
                     - homebrew-v3-{{ checksum "scripts/macos-setup.sh" }}
             - run:
@@ -113,7 +114,7 @@ jobs:
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
             - save_cache:
                 name: Saving homebrew cache
-                key: homebrew-v4-{{ checksum "scripts/macos-setup.sh" }}
+                key: homebrew-v5-{{ checksum "scripts/macos-setup.sh" }}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
@@ -121,6 +122,7 @@ jobs:
             - restore_cache:
                 name: Restoring cached opam
                 keys:
+                    - opam-v5-{{ checksum "src/opam.export" }}
                     - opam-v4-{{ checksum "src/opam.export" }}
                     - opam-v3-{{ checksum "src/opam.export" }}
             - run:
@@ -129,14 +131,15 @@ jobs:
             - run:
                 name: opam perms hack?
                 command: |
-                    find /Users/distiller/.opam/4.07.1/.opam-switch
+                    set +e
+                    id
                     chown u+w -R distiller /Users/distiller/.opam/4.07.1/.opam-switch/build
             - run:
                 name: Compile mac deps -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
                 name: Saving opam cache
-                key: opam-v4-{{ checksum "src/opam.export" }}
+                key: opam-v5-{{ checksum "src/opam.export" }}
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
@@ -215,15 +218,17 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
+                  background: true
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - store_artifacts:
-                  path: /tmp/artifacts
             - run:
                   name: Copy artifacts to cloud
+                  bsckground: true
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - persist_to_workspace:
                 root: /tmp/artifacts
                 paths: coda_pvkeys*
+            - store_artifacts:
+                  path: /tmp/artifacts
     build-artifacts--testnet_postake_many_proposers_medium_curves:
         resource_class: xlarge
         docker:
@@ -252,15 +257,17 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
+                  background: true
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - store_artifacts:
-                  path: /tmp/artifacts
             - run:
                   name: Copy artifacts to cloud
+                  bsckground: true
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - persist_to_workspace:
                 root: /tmp/artifacts
                 paths: coda_pvkeys*
+            - store_artifacts:
+                  path: /tmp/artifacts
     test-unit--test_postake_snarkless_unittest:
         resource_class: large
         docker:
