@@ -107,12 +107,12 @@ jobs:
                 name: Restoring cached homebrew
                 keys:
                     - homebrew-v4-{{ checksum "scripts/macos-setup.sh" }}
-                    - homebrew-v4-
+                    - homebrew-v3-{{ checksum "scripts/macos-setup.sh" }}
             - restore_cache:
                 name: Restoring cached opam
                 keys:
                     - opam-v4-{{ checksum "src/opam.export" }}
-                    - opam-v4-
+                    - opam-v3-{{ checksum "src/opam.export" }}
             - run:
                 name: Updating git submodules
                 command: git submodule sync && git submodule update --init --recursive
