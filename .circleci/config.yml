@@ -135,6 +135,19 @@ jobs:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
             - run:
+                name: Install Nix and cachix
+                command: |
+                    curl https://nixos.org/nix/install | sh
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build kademlia
+                command: |
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/kademlia-haskell
+                    nix-build release2.nix
+            - run:
                 name: Build OCaml
                 command: bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h

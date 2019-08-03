@@ -51,11 +51,11 @@ fi
 if [[ $COMPILE_THINGS == "YES" ]]; then
 
   # Keep compile dirs to avoid recompiles
-  OPAMKEEPBUILDDIR='true'
-  OPAMREUSEBUILDDIR='true'
+  export OPAMKEEPBUILDDIR='true'
+  export OPAMREUSEBUILDDIR='true'
 
   # Set term to xterm if not set
-  TERM=${TERM:-xterm}
+  export TERM=${TERM:-xterm}
 
   opam update
   # This is dirty, keep the OCaml project version up to date!
@@ -79,17 +79,6 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   opam pin -y add src/external/coda_base58
   eval $(opam config env)
 
-  # Kademlia
-  curl https://nixos.org/nix/install | sh
-  touch ~/.profile
-  set +u
-  . ~/.nix-profile/etc/profile.d/nix.sh
-  set -u
-  # cachix nix binary cache
-  nix-env -iA cachix -f https://cachix.org/api/v1/install
-  cachix use codaprotocol
-
-  make kademlia
 else
   echo 'Not running compile step.'
 fi
