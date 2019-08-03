@@ -129,9 +129,8 @@ jobs:
             - run:
                 name: opam perms hack?
                 command: |
-                    ls -l /Users/distiller/.opam/4.07.1/.opam-switch
-                    ls -l /Users/distiller/.opam
-                    chown u+w -R /Users/distiller/.opam/4.07.1/.opam-switch/build
+                    find /Users/distiller/.opam/4.07.1/.opam-switch
+                    chown u+w -R distiller /Users/distiller/.opam/4.07.1/.opam-switch/build
             - run:
                 name: Compile mac deps -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
