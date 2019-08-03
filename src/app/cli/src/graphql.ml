@@ -98,10 +98,23 @@ module Types = struct
       | Banned_until tm ->
           Some (date tm)
 
-    module State_hash = Codable.Make_base58_check (State_hash.Stable.V1)
-    module Ledger_hash = Codable.Make_base58_check (Ledger_hash.Stable.V1)
-    module Frozen_ledger_hash =
-      Codable.Make_base58_check (Frozen_ledger_hash.Stable.V1)
+    module State_hash = Codable.Make_base58_check (struct
+      include State_hash.Stable.V1
+
+      let description = "State hash"
+    end)
+
+    module Ledger_hash = Codable.Make_base58_check (struct
+      include Ledger_hash.Stable.V1
+
+      let description = "Ledger hash"
+    end)
+
+    module Frozen_ledger_hash = Codable.Make_base58_check (struct
+      include Frozen_ledger_hash.Stable.V1
+
+      let description = "Frozen ledger hash"
+    end)
   end
 
   let public_key =
