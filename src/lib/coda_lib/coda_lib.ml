@@ -396,11 +396,6 @@ let create (config : Config.t) =
               root transition_frontier |> Breadcrumb.external_transition
               |> External_transition.Validated.forget_validation)
           in
-          let ledger_db =
-            Ledger_transfer.transfer_accounts
-              ~src:(Lazy.force Genesis_ledger.t)
-              ~dest:ledger_db
-          in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
           in
