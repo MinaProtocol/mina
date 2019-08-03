@@ -11,6 +11,9 @@ check_file() {
   fi
 }
 
+# Allow for specific target
+TARGET=${1:-kademlia}
+
 # check for xcode tools
 for mybin in /usr/bin/install_name_tool /usr/bin/otool
 do
@@ -32,7 +35,7 @@ rewrite_lib() {
 }
 
 # rewrite the libs
-rewrite_lib kademlia 'libgmp' "/usr/local/opt/gmp/lib/libgmp.10.dylib"
-rewrite_lib kademlia 'libffi' "/usr/local/opt/libffi/lib/libffi.6.dylib"
-rewrite_lib kademlia 'libSystem' "/usr/lib/libSystem.B.dylib"
-rewrite_lib kademlia 'libiconv' "/usr/lib/libiconv.dylib"
+rewrite_lib $TARGET 'libgmp' "/usr/local/opt/gmp/lib/libgmp.10.dylib"
+rewrite_lib $TARGET 'libffi' "/usr/local/opt/libffi/lib/libffi.6.dylib"
+rewrite_lib $TARGET 'libSystem' "/usr/lib/libSystem.B.dylib"
+rewrite_lib $TARGET 'libiconv' "/usr/lib/libiconv.dylib"

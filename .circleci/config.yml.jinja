@@ -173,8 +173,7 @@ jobs:
                 command: |
                     cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
                     chmod +w package/kademlia
-                    cd package
-                    ./scripts/librewrite-macos.sh kademlia
+                    ./scripts/librewrite-macos.sh package/kademlia
             - run:
                 name: Collect coda binary
                 command: |
@@ -184,7 +183,7 @@ jobs:
                 command: |
                     tar czvf homebrew-coda.tar.gz package
                     openssl dgst -sha256 homebrew-coda.tar.gz > homebrew-coda.tar.gz.sha256
-                    cp homebrew-coda.tar.gz package/.
+                    cp homebrew-coda.tar.gz* package/.
             - store_artifacts:
                   path: package
             - run:
