@@ -337,8 +337,22 @@ let run_snark_worker ?shutdown_on_disconnect:(s = true) ~client_port
       |> ignore
 
 let handle_crash e =
-  Core.eprintf
-    !{err|
+  match Monitor.extract_exn e with
+  | Coda_networking.No_initial_peers ->
+      Core.eprintf
+        !{err|
+
+  ☠  Coda Daemon failed to connect to any initial peers.
+
+  This may mean your daemon tried to join a network for a different chain.
+
+  Or, the network may be incorrectly configured. See
+  https://codaprotocol.com/docs/troubleshooting/ for help configuring the network.
+
+%!|err}
+  | _ ->
+      Core.eprintf
+        !{err|
 
   ☠  Coda Daemon crashed. The Coda Protocol developers would like to know why!
 
@@ -351,7 +365,7 @@ let handle_crash e =
 
     %s
 %!|err}
-    (Exn.to_string e)
+        (Exn.to_string e)
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->

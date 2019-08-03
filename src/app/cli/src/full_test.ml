@@ -132,6 +132,7 @@ let run_test () : unit Deferred.t =
               ; target_peer_count= 8
               ; initial_peers= []
               ; conf_dir= temp_conf_dir
+              ; chain_id= "bogus chain id for testing"
               ; addrs_and_ports=
                   { external_ip= Unix.Inet_addr.localhost
                   ; bind_ip= Unix.Inet_addr.localhost
