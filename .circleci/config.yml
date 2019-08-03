@@ -106,13 +106,13 @@ jobs:
             - restore_cache:
                 name: Restoring cached homebrew
                 keys:
-                    - homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
-                    - homebrew-v1-
+                    - homebrew-v4-{{ checksum "scripts/macos-setup.sh" }}
+                    - homebrew-v4-
             - restore_cache:
                 name: Restoring cached opam
                 keys:
-                    - opam-v3-{{ checksum "src/opam.export" }}
-                    - opam-v3-
+                    - opam-v4-{{ checksum "src/opam.export" }}
+                    - opam-v4-
             - run:
                 name: Updating git submodules
                 command: git submodule sync && git submodule update --init --recursive
@@ -124,13 +124,13 @@ jobs:
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
                 name: Saving homebrew cache
-                key: homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
+                key: homebrew-v4-{{ checksum "scripts/macos-setup.sh" }}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
             - save_cache:
                 name: Saving opam cache
-                key: opam-v3-{{ checksum "src/opam.export" }}
+                key: opam-v4-{{ checksum "src/opam.export" }}
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
@@ -163,7 +163,8 @@ jobs:
                 command: |
                     cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
                     chmod +w package/kademlia
-                    ./scripts/librewrite-macos.sh package/kademlia
+                    cd package
+                    ./scripts/librewrite-macos.sh kademlia
             - run:
                 name: Collect coda binary
                 command: |
