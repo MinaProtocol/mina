@@ -103,6 +103,9 @@ jobs:
                     sudo mkdir -p /var/lib/coda
                     sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
             - checkout
+            - run:
+                name: Updating git submodules
+                command: git submodule sync && git submodule update --init --recursive
             - restore_cache:
                 name: Restoring cached homebrew
                 keys:
@@ -126,14 +129,11 @@ jobs:
                     - opam-v4-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                     - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
             - run:
-                name: Updating git submodules
-                command: git submodule sync && git submodule update --init --recursive
-            - run:
                 name: opam perms hack?
                 command: |
                     set +e
                     id
-                    chown u+w -R distiller /Users/distiller/.opam/4.07.1/.opam-switch/build
+                    chown -R u+w distiller /Users/distiller/.opam/
             - run:
                 name: Compile mac deps -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
