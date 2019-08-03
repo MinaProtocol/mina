@@ -108,6 +108,16 @@ jobs:
                 keys:
                     - homebrew-v4-{{ checksum "scripts/macos-setup.sh" }}
                     - homebrew-v3-{{ checksum "scripts/macos-setup.sh" }}
+            - run:
+                name: Download mac deps -- make macos-setup-download
+                command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
+            - save_cache:
+                name: Saving homebrew cache
+                key: homebrew-v4-{{ checksum "scripts/macos-setup.sh" }}
+                paths:
+                    - "/usr/local/Homebrew"
+                    - "/Users/distiller/Library/Caches/Homebrew"
+
             - restore_cache:
                 name: Restoring cached opam
                 keys:
@@ -117,17 +127,14 @@ jobs:
                 name: Updating git submodules
                 command: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Download mac deps -- make macos-setup-download
-                command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
+                name: opam perms hack?
+                command: |
+                    ls -l /Users/distiller/.opam/4.07.1/.opam-switch
+                    ls -l /Users/distiller/.opam
+                    chown u+w -R /Users/distiller/.opam/4.07.1/.opam-switch/build
             - run:
                 name: Compile mac deps -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
-            - save_cache:
-                name: Saving homebrew cache
-                key: homebrew-v4-{{ checksum "scripts/macos-setup.sh" }}
-                paths:
-                    - "/usr/local/Homebrew"
-                    - "/Users/distiller/Library/Caches/Homebrew"
             - save_cache:
                 name: Saving opam cache
                 key: opam-v4-{{ checksum "src/opam.export" }}
