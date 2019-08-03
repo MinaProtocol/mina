@@ -2,11 +2,13 @@ open Core_kernel
 
 (* base58_check.mli -- implementation of Base58Check algorithm *)
 
-exception Invalid_base58_checksum
+exception Invalid_base58_checksum of string
 
-exception Invalid_base58_version_byte of char
+exception Invalid_base58_version_byte of (char * string)
 
-exception Invalid_base58_check_length
+exception Invalid_base58_check_length of string
+
+exception Invalid_base58_character of string
 
 module Make (M : sig
   val description : string
