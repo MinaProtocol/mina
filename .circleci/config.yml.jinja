@@ -104,61 +104,60 @@ jobs:
                     sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
             - checkout
             - run:
-                name: Updating git submodules
+                name: Update git submodules
                 command: git submodule sync && git submodule update --init --recursive
             - restore_cache:
-                name: Restoring cached homebrew
+                name: Restore cache - homebrew
                 keys:
                     - homebrew-v5-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
                     - homebrew-v4-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
                     - homebrew-v3-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
             - run:
-                name: Download mac deps -- make macos-setup-download
+                name: Install macos dependancies - homebrew - make macos-setup-download
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
             - save_cache:
-                name: Saving homebrew cache
+                name: Save cache - homebrew
                 key: homebrew-v5-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
 
             - restore_cache:
-                name: Restoring cached opam
+                name: Restore cache - opam
                 keys:
                     - opam-v5-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                     - opam-v4-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                     - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
             - run:
-                name: opam perms hack?
+                name: Ensure opam permisssions
                 command: |
                     set +e
-                    id
                     sudo chown -R distiller /Users/distiller/.opam
                     sudo chmod -R u+w /Users/distiller/.opam
             - run:
-                name: Compile mac deps -- make macos-setup-compile
+                name: Install macos dependancies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
-                name: Saving opam cache
+                name: Save cache - opam
                 key: opam-v5-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
             - run:
-                name: Install Nix and cachix
+                name: Install nix and cachix
                 command: |
                     curl https://nixos.org/nix/install | sh
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     nix-env -iA cachix -f https://cachix.org/api/v1/install
             - run:
-                name: Build kademlia
+                name: Build kademlia using cachix
                 command: |
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     cachix use codaprotocol
                     cd src/app/kademlia-haskell
                     nix-build release2.nix
             - run:
-                name: Build OCaml
+                name: Build ocaml
                 command: bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h
                 environment:
@@ -167,7 +166,7 @@ jobs:
                 name: Collect PV Keys
                 command: |
                     mkdir -p package/keys
-                    cp /var/lib/coda/* package/keys/.
+                    mv /var/lib/coda/* package/keys/.
             - run:
                 name: Collect and rewrite kademlia
                 command: |
@@ -179,7 +178,7 @@ jobs:
                 command: |
                     cp src/_build/default/app/cli/src/coda.exe package/coda
             - run:
-                name: Create homebrew package
+                name: Build homebrew package
                 command: |
                     tar czvf homebrew-coda.tar.gz package
                     openssl dgst -sha256 homebrew-coda.tar.gz > homebrew-coda.tar.gz.sha256
