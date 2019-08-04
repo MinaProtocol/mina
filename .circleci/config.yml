@@ -183,6 +183,10 @@ jobs:
                     tar czvf homebrew-coda.tar.gz package
                     openssl dgst -sha256 homebrew-coda.tar.gz > homebrew-coda.tar.gz.sha256
                     cp homebrew-coda.tar.gz* package/.
+            - run:
+                  name: Copy artifacts to cloud
+                  bsckground: true
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - store_artifacts:
                   path: package
             - run:

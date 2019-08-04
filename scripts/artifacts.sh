@@ -21,18 +21,22 @@ do_copy () {
     echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
     /usr/bin/gcloud auth activate-service-account --key-file=google_creds.json
 
-    SOURCES="/tmp/artifacts/*"
+    SOURCES="/tmp/artifacts/* packages/*"
     DESTINATION="gs://network-debug/${CIRCLE_BUILD_NUM}/build/"
 
     for SOURCE in $SOURCES
     do
+        set +e
         echo "Copying ${SOURCE} to ${DESTINATION}"
         gsutil -o GSUtil:parallel_composite_upload_threshold=100M -q cp ${SOURCE} ${DESTINATION}
         gsutil ls ${DESTINATION}
+        set -e
     done
 }
 
 case $CIRCLE_JOB in
-  "build-artifacts--testnet_postake" | "build-artifacts--testnet_postake_snarkless_fake_hash" | "build-artifacts--testnet_postake_medium_curves" |  "build-artifacts--testnet_postake_many_proposers_medium_curves") do_copy;;
-   *) echo "Not an active testnet job (${CIRCLE_JOB}), stopping." ; exit 0 ;;
+    "build-artifacts--testnet_postake_medium_curves") do_copy;;
+    "build-artifacts--testnet_postake_many_proposers_medium_curves") do_copy;;
+    "build-macos") do_copy;;
+    *) echo "Not an active testnet job (${CIRCLE_JOB}), stopping." ; exit 0 ;;
 esac
