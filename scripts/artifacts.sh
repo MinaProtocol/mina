@@ -31,7 +31,7 @@ do_copy () {
     echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
     gcloud auth activate-service-account --key-file=google_creds.json
 
-    SOURCES="/tmp/artifacts/* packages/*"
+    SOURCES="/tmp/artifacts/* package/*"
     DESTINATION="gs://network-debug/${CIRCLE_BUILD_NUM}/build/"
 
     for SOURCE in $SOURCES
