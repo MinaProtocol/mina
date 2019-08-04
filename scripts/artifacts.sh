@@ -17,9 +17,19 @@ if [[ -z "$JSON_GCLOUD_CREDENTIALS" || "$JSON_GCLOUD_CREDENTIALS" == "" ]]; then
 fi
 
 do_copy () {
-    # GC credentials
+
+    # GC and credentials
+    set +e
+    path_to_gcloud=$(which gcloud)
+    if [ -x "$path_to_gcloud" ] ; then
+        echo "Found gcloud: $path_to_glcoud"
+    else
+        brew cask install google-cloud-sdk
+    fi
+    set -e
+
     echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
-    /usr/bin/gcloud auth activate-service-account --key-file=google_creds.json
+    gcloud auth activate-service-account --key-file=google_creds.json
 
     SOURCES="/tmp/artifacts/* packages/*"
     DESTINATION="gs://network-debug/${CIRCLE_BUILD_NUM}/build/"

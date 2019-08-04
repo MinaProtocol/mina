@@ -110,8 +110,7 @@ jobs:
                 name: Restore cache - homebrew
                 keys:
                     - homebrew-v5-{{ checksum "scripts/macos-setup.sh" }}
-                    - homebrew-v4-{{ checksum "scripts/macos-setup.sh" }}
-                    - homebrew-v3-{{ checksum "scripts/macos-setup.sh" }}
+                    - homebrew-v5-
             - run:
                 name: Install macos dependancies - homebrew - make macos-setup-download
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
