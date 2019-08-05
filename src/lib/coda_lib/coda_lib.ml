@@ -358,8 +358,15 @@ let create_genesis_frontier (config : Config.t) ~verifier =
         (* Persisted state was bogus. Give up on the ledger contents, we'll bootstrap. *)
         Ledger.Db.close ledger_db ;
         let%map () =
-          Option.map ~f:File_system.remove_dir config.ledger_db_location
-          |> Option.value ~default:Deferred.unit
+          match config.ledger_db_location with
+          | Some ledger_db_location ->
+              Logger.error config.logger
+                "Failed to load genesis ledger, deleting $dir and trying again."
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("dir", `String ledger_db_location)] ;
+              File_system.remove_dir ledger_db_location
+          | None ->
+              Deferred.unit
         in
         snd (load ()) |> Or_error.ok_exn
     (* If it fails again, something is very wrong. Die. *)
