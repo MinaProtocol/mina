@@ -10,6 +10,25 @@ open Module_version
 module Time = Coda_base.Block_time
 module Run = Snark_params.Tick.Run
 
+module Quotient (M : sig
+  type t [@@deriving eq, compare, hash]
+end) (Q : sig
+  type t
+
+  val quotient : t -> M.t
+end) =
+struct
+  open Q
+
+  let equal x1 x2 = M.equal (quotient x1) (quotient x2)
+
+  let compare = Comparable.lift M.compare ~f:quotient
+
+  let hash_fold_t s x = M.hash_fold_t s (quotient x)
+
+  let hash x = M.hash (quotient x)
+end
+
 let m : Run.field Snarky.Snark.m = (module Run)
 
 let make_checked t =
@@ -206,11 +225,11 @@ module Data = struct
       let in_seed_update_range (slot : t) =
         let ck = Constants.(c * k |> UInt32.of_int) in
         let open UInt32.Infix in
-        ck <= slot && slot < ck * UInt32.of_int 2
+        (* TODO: < or <= ? *)
+        slot < ck * UInt32.of_int 2
 
       let in_seed_update_range_var (slot : Unpacked.var) =
         let open Snark_params.Tick in
-        let open Snark_params.Tick.Let_syntax in
         let uint32_msb x =
           List.init 32 ~f:(fun i ->
               UInt32.Infix.((x lsr Int.sub 31 i) land UInt32.one = UInt32.one)
@@ -219,15 +238,13 @@ module Data = struct
         in
         let ( < ) = Bitstring_checked.lt_value in
         let ck = Constants.(c * k) |> UInt32.of_int in
-        let ck_bitstring = uint32_msb ck
-        and ck_times_2 = uint32_msb UInt32.(Infix.(of_int 2 * ck)) in
+        let ck_times_2 = uint32_msb UInt32.(Infix.(of_int 2 * ck)) in
         let slot_msb =
           Bitstring_lib.Bitstring.Msb_first.of_lsb_first
             (Unpacked.var_to_bits slot)
         in
-        let%bind slot_gte_ck = slot_msb < ck_bitstring >>| Boolean.not
-        and slot_lt_ck_times_2 = slot_msb < ck_times_2 in
-        Boolean.(slot_gte_ck && slot_lt_ck_times_2)
+        let%map slot_lt_ck_times_2 = slot_msb < ck_times_2 in
+        slot_lt_ck_times_2
 
       let gen =
         let open Quickcheck.Let_syntax in
@@ -1033,8 +1050,20 @@ module Data = struct
       module V1 = struct
         module T = struct
           type t = Coda_base.State_hash.Stable.V1.t option
-          [@@deriving
-            sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+          [@@deriving sexp, bin_io, to_yojson, version {unnumbered}]
+
+          include Quotient
+                    (Coda_base.State_hash.Stable.V1)
+                    (struct
+                      type nonrec t = t
+
+                      let quotient = function
+                        | None ->
+                            Coda_base.State_hash.of_hash
+                              Outside_pedersen_image.t
+                        | Some x ->
+                            x
+                    end)
         end
 
         include T
@@ -1054,18 +1083,21 @@ module Data = struct
     let typ : (var, value) Typ.t =
       let there = function
         | None ->
-            Coda_base.State_hash.(of_hash zero)
+            Coda_base.State_hash.(of_hash Outside_pedersen_image.t)
         | Some h ->
             h
       in
       let back h =
-        if Coda_base.State_hash.(equal h (of_hash zero)) then None else Some h
+        if Coda_base.State_hash.(equal h (of_hash Outside_pedersen_image.t))
+        then None
+        else Some h
       in
       Typ.transport Coda_base.State_hash.typ ~there ~back
 
     let fold =
       Fn.compose Coda_base.State_hash.fold
-        (Option.value ~default:Coda_base.State_hash.(of_hash zero))
+        (Option.value
+           ~default:Coda_base.State_hash.(of_hash Outside_pedersen_image.t))
   end
 
   module Epoch_data = struct
@@ -1083,6 +1115,8 @@ module Data = struct
               ; seed: 'epoch_seed
               ; start_checkpoint: 'start_checkpoint
               ; lock_checkpoint: 'lock_checkpoint
+                    (* The lock checkpoint is the hash of the latest state in the seed update range, not including
+                 the current state. *)
               ; epoch_length: 'length }
             [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
           end
@@ -1283,7 +1317,8 @@ module Data = struct
               Lazy.force Epoch_ledger.genesis
               (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
           ; seed= Epoch_seed.initial
-          ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
+          ; start_checkpoint=
+              Coda_base.State_hash.(of_hash Outside_pedersen_image.t)
           ; lock_checkpoint= Lock_checkpoint.null
           ; epoch_length= Length.of_int 1 }
     end
@@ -1291,7 +1326,7 @@ module Data = struct
     module Staking = Make (struct
       include Coda_base.State_hash
 
-      let null = Coda_base.State_hash.(of_hash zero)
+      let null = Coda_base.State_hash.(of_hash Outside_pedersen_image.t)
     end)
 
     module Next = Make (struct
@@ -1308,7 +1343,8 @@ module Data = struct
                    implementation. We should change it once Issue #2328
                    is properly addressed. *)
             Option.value next.lock_checkpoint
-              ~default:Coda_base.State_hash.(of_hash zero) }
+              ~default:Coda_base.State_hash.(of_hash Outside_pedersen_image.t)
+        }
 
     let update_pair
         ((staking_data, next_data) : Staking.Value.t * Next.Value.t)
@@ -2068,11 +2104,11 @@ module Data = struct
           ~prev:(Global_slot.Checked.create ~epoch:prev_epoch ~slot:prev_slot)
           ~next:(Global_slot.Checked.create ~epoch:next_epoch ~slot:next_slot)
       in
+      let%bind in_seed_update_range =
+        Epoch.Slot.in_seed_update_range_var prev_slot
+      in
       let%bind next_epoch_data =
         let%map seed =
-          let%bind in_seed_update_range =
-            Epoch.Slot.in_seed_update_range_var prev_slot
-          in
           let%bind base =
             Epoch_seed.if_ epoch_increased
               ~then_:Epoch_seed.(var_of_t initial)
@@ -2105,11 +2141,10 @@ module Data = struct
           let%bind base =
             (* TODO: Should this be zero or some other sentinel value? *)
             Coda_base.State_hash.if_ epoch_increased
-              ~then_:Coda_base.State_hash.(var_of_t (of_hash zero))
+              ~then_:
+                Coda_base.State_hash.(
+                  var_of_t (of_hash Outside_pedersen_image.t))
               ~else_:previous_state.next_epoch_data.lock_checkpoint
-          in
-          let%bind in_seed_update_range =
-            Epoch.Slot.in_seed_update_range_var previous_state.curr_slot
           in
           Coda_base.State_hash.if_ in_seed_update_range
             ~then_:previous_protocol_state_hash ~else_:base
@@ -2988,7 +3023,9 @@ let%test_module "Proof of stake tests" =
         Frozen_ledger_hash.of_ledger_hash
           (Ledger.merkle_root (Lazy.force Genesis_ledger.t))
       in
-      let previous_protocol_state_hash = State_hash.(of_hash zero) in
+      let previous_protocol_state_hash =
+        State_hash.(of_hash Outside_pedersen_image.t)
+      in
       let previous_consensus_state =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
@@ -3017,7 +3054,8 @@ let%test_module "Proof of stake tests" =
         |> Ledger.Addr.to_int
       in
       let proposer_vrf_result =
-        Vrf.eval ~private_key {epoch; slot; seed= Epoch_seed.initial; delegator}
+        let seed = previous_consensus_state.next_epoch_data.seed in
+        Vrf.eval ~private_key {epoch; slot; seed; delegator}
       in
       let next_consensus_state =
         update ~previous_consensus_state ~consensus_transition
@@ -3074,6 +3112,18 @@ let%test_module "Proof of stake tests" =
         Or_error.ok_exn
         @@ Snark_params.Tick.run_and_check checked_computation ()
       in
-      assert (Value.equal checked_value next_consensus_state) ;
-      ()
+      let diff =
+        Sexp_diff_kernel.Algo.diff
+          ~original:(Value.sexp_of_t checked_value)
+          ~updated:(Value.sexp_of_t next_consensus_state)
+          ()
+      in
+      if not (Value.equal checked_value next_consensus_state) then (
+        eprintf "Different states:\n%s\n%!"
+          (Sexp_diff_kernel.Display.display_with_ansi_colors
+             ~display_options:
+               (Sexp_diff_kernel.Display.Display_options.create
+                  ~collapse_threshold:1000 ())
+             diff) ;
+        failwith "Test failed" )
   end )
