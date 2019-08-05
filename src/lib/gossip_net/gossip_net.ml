@@ -39,6 +39,8 @@ end
 module type S = sig
   type msg
 
+  type ban_notification = {banned_peer: Peer.t; banned_until: Time.t}
+
   module Connection_with_state : sig
     type t = Banned | Allowed of Rpc.Connection.t Ivar.t
   end
@@ -56,6 +58,8 @@ module type S = sig
     ; peers: Peer.Hash_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
     ; disconnected_peers: Peer.Hash_set.t
+    ; ban_notification_reader: ban_notification Linear_pipe.Reader.t
+    ; ban_notification_writer: ban_notification Linear_pipe.Writer.t
     ; mutable membership: Membership.t
     ; connections:
         ( Unix.Inet_addr.t
@@ -84,6 +88,8 @@ module type S = sig
 
   val initial_peers : t -> Host_and_port.t list
 
+  val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
+
   val query_peer :
     t -> Peer.t -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t
 
@@ -92,6 +98,8 @@ module type S = sig
 end
 
 module Make (Message : Message_intf) : S with type msg := Message.msg = struct
+  type ban_notification = {banned_peer: Peer.t; banned_until: Time.t}
+
   module Connection_with_state = struct
     type t = Banned | Allowed of Rpc.Connection.t Ivar.t
 
@@ -112,6 +120,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     ; peers: Peer.Hash_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
     ; disconnected_peers: Peer.Hash_set.t
+    ; ban_notification_reader: ban_notification Linear_pipe.Reader.t
+    ; ban_notification_writer: ban_notification Linear_pipe.Writer.t
     ; mutable membership: Membership.t
     ; connections:
         ( Unix.Inet_addr.t
@@ -400,6 +410,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let selected_peers = random_sublist (Hash_set.to_list t.peers) n in
     broadcast_selected t selected_peers msg
 
+  let send_ban_notification t banned_peer banned_until =
+    Linear_pipe.write_without_pushback t.ban_notification_writer
+      {banned_peer; banned_until}
+
   let create (config : Config.t)
       (implementation_list : Host_and_port.t Rpc.Implementation.t list) =
     trace_task "gossip net" (fun () ->
@@ -424,6 +438,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           Strict_pipe.create ~name:"received gossip messages"
             (Buffered (`Capacity 64, `Overflow Crash))
         in
+        let ban_notification_reader, ban_notification_writer =
+          Linear_pipe.create ()
+        in
         let t =
           { timeout= config.timeout
           ; logger= config.logger
@@ -437,6 +454,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; initial_peers= config.initial_peers
           ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
           ; disconnected_peers= Peer.Hash_set.create ()
+          ; ban_notification_reader
+          ; ban_notification_writer
           ; membership
           ; connections= Hashtbl.create (module Unix.Inet_addr)
           ; max_concurrent_connections= config.max_concurrent_connections
@@ -444,7 +463,15 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         in
         don't_wait_for
           (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
-             ~f:(fun addr ->
+             ~f:(fun (addr, banned_until) ->
+               (* all peers at banned IP *)
+               let peers =
+                 Option.value_map
+                   (Hashtbl.find t.peers_by_ip addr)
+                   ~default:[] ~f:Fn.id
+               in
+               List.iter peers ~f:(fun peer ->
+                   send_ban_notification t peer banned_until ) ;
                match Hashtbl.find t.connections addr with
                | None ->
                    Deferred.unit
@@ -620,6 +647,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let peers t = Hash_set.to_list t.peers
 
   let initial_peers t = t.initial_peers
+
+  let ban_notification_reader t = t.ban_notification_reader
 
   let broadcast_all t msg =
     let to_broadcast = ref (List.permute (Hash_set.to_list t.peers)) in
