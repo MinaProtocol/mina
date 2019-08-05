@@ -8,7 +8,7 @@ We’re seeking a full-stack product engineer who is also excited about building
 
 - Developer tools and SDKs to build applications on top of Coda
 - The command-line interface (CLI) to interact with the Coda client and daemon
-- Bots and services that react and cause to events on the Coda network
+- Automated services and bots that allows users to engage with the Coda network
 
 ## Requirements
 
