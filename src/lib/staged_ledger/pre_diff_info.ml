@@ -87,6 +87,7 @@ end = struct
         (Currency.Amount.sub a1 a2)
         ~f:(fun x -> Ok x)
     in
+    let state_body_hash = State_body_hash.dummy in
     let two_parts amt (ft1 : Fee_transfer.Single.t option) ft2 =
       let%bind rem_coinbase = overflow_err coinbase amt in
       let%bind _ =
@@ -96,10 +97,12 @@ end = struct
       in
       let%bind cb1 =
         coinbase_or_error
-          (Coinbase.create ~amount:amt ~proposer ~fee_transfer:ft1)
+          (Coinbase.create ~amount:amt ~proposer ~fee_transfer:ft1
+             ~state_body_hash)
       in
       let%map cb2 =
         Coinbase.create ~amount:rem_coinbase ~proposer ~fee_transfer:ft2
+          ~state_body_hash
         |> coinbase_or_error
       in
       [cb1; cb2]
@@ -110,6 +113,7 @@ end = struct
     | `One x ->
         let%map cb =
           Coinbase.create ~amount:coinbase ~proposer ~fee_transfer:x
+            ~state_body_hash
           |> coinbase_or_error
         in
         [cb]

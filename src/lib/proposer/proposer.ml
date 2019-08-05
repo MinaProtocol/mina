@@ -138,6 +138,9 @@ let generate_next_state ~previous_protocol_state ~time_controller
       , is_new_stack
       , coinbase_amount ))
   in
+  let coinbase_state_body_hash =
+    Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
+  in
   let%bind protocol_state, consensus_transition_data =
     lift_sync (fun () ->
         let previous_ledger_hash =
@@ -201,7 +204,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
               ~blockchain_state:
                 (Protocol_state.blockchain_state protocol_state)
               ~consensus_transition:consensus_transition_data ~proposer:self
-              ~coinbase:coinbase_amount ()
+              ~coinbase_amount ~coinbase_state_body_hash ()
           in
           let internal_transition =
             Internal_transition.create ~snark_transition

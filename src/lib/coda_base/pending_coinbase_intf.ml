@@ -31,11 +31,12 @@ module type S = sig
   end
 
   module Coinbase_data : sig
-    type t = Public_key.Compressed.t * Amount.t [@@deriving bin_io, sexp]
+    type t = Public_key.Compressed.t * Amount.t * State_body_hash.t
+    [@@deriving bin_io, sexp]
 
     type value [@@deriving bin_io, sexp]
 
-    type var = Public_key.Compressed.var * Amount.var
+    type var = Public_key.Compressed.var * Amount.var * State_body_hash.var
 
     val typ : (var, t) Typ.t
 
@@ -148,7 +149,7 @@ module type S = sig
     val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
     (**
-       [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
+       [update_stack t ~is_new_stack updated_stack] implements the following spec:
        - gets the address[addr] of the latest stack or a new stack
        - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
        - returns a root [t'] of the tree
