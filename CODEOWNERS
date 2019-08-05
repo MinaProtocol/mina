@@ -36,6 +36,7 @@
 /src/lib/chunked_triples/ @psteckler @rbkhmrcr @vanishreerao
 /src/lib/cli_lib/ @johnwu93
 /src/lib/coda_base/ @cmr @nholland94 @bkase
+/src/lib/coda_lib/ @cmr @nholland94 @bkase
 /src/lib/coda_compile_config/ @nholland94
 /src/lib/coda_debug/ @nholland94
 /src/lib/coda_networking/ @cmr
