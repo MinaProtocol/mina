@@ -16,7 +16,7 @@ We’re seeking a full-stack product engineer who is also excited about building
     - Bonus: Experience building developer-facing APIs and libraries
 - Willingness to work on-site in a San Francisco based office
 - Exposure to a declarative frontend framework, such as React, Angular, Vue, Elm etc.
-    - Bonus for experience with React Hooks or GraphQL
+    - Bonus: Experience with React Hooks or GraphQL
 - Familiarity with functional programming, know your way around map and reduce.
 
 ## Nice to have (at least one of the following)
