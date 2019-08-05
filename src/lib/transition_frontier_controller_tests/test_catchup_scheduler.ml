@@ -198,7 +198,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           |> ignore ;
           assert (Catchup_scheduler.is_empty scheduler) ;
           let%map cached_received_rose_tree =
-            extract_children_from ~reader:catchup_breadcrumbs_reader
+            extract_children_from
+              ~reader:
+                (Strict_pipe.Reader.map catchup_breadcrumbs_reader
+                   ~f:(fun (rose_trees, _) -> rose_trees))
               ~root:
                 ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
@@ -294,7 +297,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           |> ignore ;
           assert (Catchup_scheduler.is_empty scheduler) ;
           let%map cached_received_rose_tree =
-            extract_children_from ~reader:catchup_breadcrumbs_reader
+            extract_children_from
+              ~reader:
+                (Strict_pipe.Reader.map catchup_breadcrumbs_reader
+                   ~f:(fun (rose_trees, _) -> rose_trees))
               ~root:
                 ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
