@@ -2,7 +2,7 @@
 title: Product Engineer (Full-stack)
 date: 2019-08-04
 ---
-Help us build accessible, usable, delightful products on top of the Coda Cryptocurrency Protocol!
+Help us build accessible, usable, delightful products on top of the Coda Protocol!
 
 We’re seeking a full-stack product engineer who is also excited by building productivity tools for developers. While it's hard to say exactly what we'll work on given that we are such an early-stage startup, we expect projects to include:
 
