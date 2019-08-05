@@ -167,23 +167,20 @@ module Make (Inputs : Inputs_intf) :
         |> Option.is_some )
     in
     let open Deferred.Result.Monad_infix in
-    External_transition.(
-      Deferred.Result.combine
-        ( Validation.wrap root_transition_with_hash
+    let validate transition =
+      External_transition.(
+        Validation.wrap root_transition_with_hash
         |> skip_time_received_validation
              `This_transition_was_not_received_via_gossip
         |> validate_proof ~verifier
-        >>= Fn.compose Deferred.return validate_delta_transition_chain_witness
-        )
-        ( Validation.wrap best_tip_with_hash
-        |> skip_time_received_validation
-             `This_transition_was_not_received_via_gossip
-        |> validate_proof ~verifier
-        >>= Fn.compose Deferred.return validate_delta_transition_chain_witness
-        )
-        ~ok:(fun validated_root validated_best_tip ->
-          (validated_root, validated_best_tip) )
-        ~err:Fn.const)
+        >>= Fn.compose Deferred.return validate_delta_transition_chain_witness)
+    in
+    Deferred.Result.combine
+      (validate root_transition_with_hash)
+      (validate best_tip_with_hash)
+      ~ok:(fun validated_root validated_best_tip ->
+        (validated_root, validated_best_tip) )
+      ~err:Fn.const
     |> Deferred.map
          ~f:(Result.map_error ~f:(Fn.const (Error.of_string "invalid proof")))
 end

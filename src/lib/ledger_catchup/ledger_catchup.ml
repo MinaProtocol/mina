@@ -62,7 +62,6 @@ module Make (Inputs : Inputs.S) :
       let open Deferred.Result.Let_syntax in
       let transition = Envelope.Incoming.data enveloped_transition in
       let%bind initially_validated_transition =
-        let open Deferred.Result.Monad_infix in
         External_transition.Validation.wrap transition
         |> External_transition.skip_time_received_validation
              `This_transition_was_not_received_via_gossip
