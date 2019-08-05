@@ -169,7 +169,7 @@ module Make (Inputs : Inputs_intf) :
     let open Deferred.Result.Monad_infix in
     let validate transition =
       External_transition.(
-        Validation.wrap root_transition_with_hash
+        Validation.wrap transition
         |> skip_time_received_validation
              `This_transition_was_not_received_via_gossip
         |> validate_proof ~verifier
