@@ -28,7 +28,6 @@ do_copy () {
     do
         echo "Copying ${SOURCE} to ${DESTINATION}"
         gsutil -o GSUtil:parallel_composite_upload_threshold=100M -q cp ${SOURCE} ${DESTINATION}
-        gsutil ls ${DESTINATION}
     done
 }
 
