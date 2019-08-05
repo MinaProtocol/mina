@@ -32,6 +32,15 @@ end)
 
 let%test_module "Ledger catchup" =
   ( module struct
+    let assert_catchup_jobs_are_flushed transition_frontier =
+      [%test_result: [`Normal | `Catchup]]
+        ~message:
+          "Transition_frontier should not have any more catchup jobs at the \
+           end of the test"
+        ~equal:( = ) ~expect:`Normal
+        ( Broadcast_pipe.Reader.peek
+        @@ Transition_frontier.catchup_signal transition_frontier )
+
     let test_catchup ~logger ~trust_system ~network
         (me : Transition_frontier.t) transition expected_breadcrumbs =
       let catchup_job_reader, catchup_job_writer =
@@ -63,13 +72,21 @@ let%test_module "Ledger catchup" =
       Strict_pipe.Reader.iter catchup_breadcrumbs_reader ~f:(fun rose_tree ->
           Deferred.return @@ Ivar.fill result_ivar rose_tree )
       |> don't_wait_for ;
-      let%map cached_catchup_breadcrumbs =
-        Ivar.read result_ivar >>| List.hd_exn
+      let%bind cached_catchup_breadcrumbs =
+        let%map breadcrumbs, catchup_signal = Ivar.read result_ivar in
+        ( match catchup_signal with
+        | `Catchup_scheduler ->
+            failwith "Did not expect a catchup scheduler action"
+        | `Ledger_catchup ivar ->
+            Ivar.fill ivar () ) ;
+        List.hd_exn breadcrumbs
       in
+      let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
       let catchup_breadcrumbs =
         Rose_tree.map cached_catchup_breadcrumbs
           ~f:Cache_lib.Cached.invalidate_with_success
       in
+      assert_catchup_jobs_are_flushed me ;
       Rose_tree.equal expected_breadcrumbs catchup_breadcrumbs
         ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
           let to_transition =
@@ -336,7 +353,7 @@ let%test_module "Ledger catchup" =
           in
           let finished = Ivar.create () in
           Strict_pipe.Reader.iter catchup_breadcrumbs_reader
-            ~f:(fun rose_trees ->
+            ~f:(fun (rose_trees, catchup_signal) ->
               let catchup_breadcrumb_tree =
                 Rose_tree.map (List.hd_exn rose_trees)
                   ~f:Cache_lib.Cached.invalidate_with_success
@@ -355,11 +372,18 @@ let%test_module "Ledger catchup" =
                   catchup_breadcrumb ) ;
               Transition_frontier.add_breadcrumb_exn me expected_breadcrumb
               |> ignore ;
+              ( match catchup_signal with
+              | `Catchup_scheduler ->
+                  failwith "Did not expect a catchup scheduler action"
+              | `Ledger_catchup ivar ->
+                  Ivar.fill ivar () ) ;
               if
                 Transition_frontier.Breadcrumb.equal expected_breadcrumb
                   last_breadcrumb
               then Ivar.fill finished () ;
               Deferred.unit )
           |> don't_wait_for ;
-          Ivar.read finished )
+          let%bind () = Ivar.read finished in
+          let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
+          assert_catchup_jobs_are_flushed me )
   end )

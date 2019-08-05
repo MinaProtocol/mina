@@ -10,16 +10,33 @@ let services =
   ; { uri= "http://ifconfig.co/ip"
     ; body_handler= String.rstrip ~drop:(fun c -> c = '\n') } ]
 
-let ip_service_result {uri; body_handler} =
-  let%bind resp, body = Client.get (Uri.of_string uri) in
-  Body.to_string body >>| body_handler
-  >>| fun s -> if resp.status = `OK then Some s else None
+let ip_service_result {uri; body_handler} ~logger =
+  match%map
+    Monitor.try_with (fun () ->
+        let%bind resp, body = Client.get (Uri.of_string uri) in
+        let%map body = Body.to_string body in
+        if resp.status = `OK then Some (body_handler body) else None )
+  with
+  | Ok v ->
+      v
+  | Error e ->
+      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        "Failed to query our own IP from $provider: $exn"
+        ~metadata:
+          [("exn", `String (Exn.to_string e)); ("provider", `String uri)] ;
+      None
 
-let find () =
+let find ~logger =
   let handler acc elem =
-    match acc with None -> ip_service_result elem | Some _ -> return acc
+    match acc with
+    | None ->
+        ip_service_result elem ~logger
+    | Some _ ->
+        return acc
   in
-  Deferred.List.fold services ~init:None ~f:handler
-  >>| fun x ->
+  let%map our_ip_maybe = Deferred.List.fold services ~init:None ~f:handler in
   Unix.Inet_addr.of_string
-  @@ Option.value_exn ~message:"couldn't determine our IP from the internet" x
+  @@ Option.value_exn
+       ~message:
+         "Couldn't determine our IP from the internet, use -external-ip flag"
+       our_ip_maybe
