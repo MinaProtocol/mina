@@ -13,7 +13,7 @@ We’re seeking a full-stack product engineer who is also excited about building
 ## Requirements
 
 - 2+ years engineering experience
-    - Bonus: Worked on developer tooling before
+    - Bonus: Experience building developer-facing APIs and libraries
 - Willingness to work on-site in a San Francisco based office
 - Exposure to a declarative frontend framework, such as React, Angular, Vue, Elm etc.
     - Bonus for experience with React Hooks or GraphQL
