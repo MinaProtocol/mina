@@ -19,7 +19,7 @@ We’re seeking a full-stack product engineer who is also excited about building
     - Bonus for experience with React Hooks or GraphQL
 - Familiarity with functional programming, know your way around map and reduce.
 
-## Grab Bag (at least one of the following)
+## Nice to have (at least one of the following)
 
 - Experience working on multiple collaborative projects with a product team containing at least one additional developer (or larger team-based projects at university or a bootcamp program).
 - Exposure to working with cryptocurrencies
