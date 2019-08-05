@@ -27,13 +27,15 @@ module Aux_hash = struct
 
         let of_yojson = function
           | `String s -> (
-            try Ok (Base58_check.decode_exn s)
-            with exn ->
-              Error
-                (sprintf "Aux_hash of_yojson, bad Base58Check: %s"
-                   (Exn.to_string exn)) )
+            match Base58_check.decode s with
+            | Error e ->
+                Error
+                  (sprintf "Aux_hash.of_yojson, bad Base58Check:%s"
+                     (Error.to_string_hum e))
+            | Ok x ->
+                Ok x )
           | _ ->
-              Error "expected `String"
+              Error "Aux_hash.of_yojson expected `String"
       end
 
       include T
@@ -83,13 +85,15 @@ module Pending_coinbase_aux = struct
 
         let of_yojson = function
           | `String s -> (
-            try Ok (Base58_check.decode_exn s)
-            with exn ->
-              Error
-                (sprintf "Pending_coinbase_aux of_yojson, bad Base58Check: %s"
-                   (Exn.to_string exn)) )
+            match Base58_check.decode s with
+            | Ok x ->
+                Ok x
+            | Error e ->
+                Error
+                  (sprintf "Pending_coinbase_aux.of_yojson, bad Base58Check:%s"
+                     (Error.to_string_hum e)) )
           | _ ->
-              Error "expected `String"
+              Error "Pending_coinbase_aux.of_yojson expected `String"
       end
 
       include T
