@@ -121,6 +121,6 @@ val transfer :
 
 val transfer_while_writer_alive :
      'a Reader.t
-  -> ('b, synchronous, unit Deferred.t) Writer.t
+  -> ('b, 'type_, 'write_return) Writer.t
   -> f:('a -> 'b)
   -> unit Deferred.t
