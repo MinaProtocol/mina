@@ -13,13 +13,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   module Job_status = struct
     type t = Assigned of Time.t
 
-    let max_age = Time.Span.of_min 2.
-
-    let is_old t ~now =
-      match t with
-      | Assigned at_time ->
-          let delta = Time.diff now at_time in
-          Time.Span.( > ) delta max_age
+    let is_old (Assigned at_time) ~now ~reassignment_wait =
+      let max_age = Time.Span.of_ms (Float.of_int reassignment_wait) in
+      let delta = Time.diff now at_time in
+      Time.Span.( > ) delta max_age
   end
 
   module State = struct
@@ -34,17 +31,21 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       include Comparable.Make (T)
     end
 
-    type t = Job_status.t Seen_key.Map.t
+    type t = {jobs_seen: Job_status.t Seen_key.Map.t; reassignment_wait: int}
 
-    let init = Seen_key.Map.empty
+    let init ~reassignment_wait =
+      {jobs_seen= Seen_key.Map.empty; reassignment_wait}
 
-    let remove_old_assignments t =
+    let remove_old_assignments {jobs_seen; reassignment_wait} =
       let now = Time.now () in
-      Map.filter t ~f:(fun status -> not (Job_status.is_old status ~now))
+      Map.filter jobs_seen ~f:(fun status ->
+          not (Job_status.is_old status ~now ~reassignment_wait) )
 
     let set t x =
-      Map.set t ~key:(statement_pair x)
-        ~data:(Job_status.Assigned (Time.now ()))
+      { t with
+        jobs_seen=
+          Map.set t.jobs_seen ~key:(statement_pair x)
+            ~data:(Job_status.Assigned (Time.now ())) }
   end
 
   let pair_to_list = function j, Some j' -> [j; j'] | j, None -> [j]

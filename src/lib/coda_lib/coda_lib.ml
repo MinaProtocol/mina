@@ -109,8 +109,9 @@ let root_length = compose_of_option root_length_opt
 [%%if
 mock_frontend_data]
 
-let create_sync_status_observer ~logger ~transition_frontier_incr
-    ~online_status_incr ~first_connection_incr ~first_message_incr =
+let create_sync_status_observer ~logger
+    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
+    ~first_connection_incr ~first_message_incr =
   let variable = Coda_incremental.Status.Var.create `Offline in
   let incr = Coda_incremental.Status.Var.watch variable in
   let rec loop () =
@@ -137,12 +138,13 @@ let create_sync_status_observer ~logger ~transition_frontier_incr
 
 [%%else]
 
-let create_sync_status_observer ~logger ~transition_frontier_incr
-    ~online_status_incr ~first_connection_incr ~first_message_incr =
+let create_sync_status_observer ~logger
+    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
+    ~first_connection_incr ~first_message_incr =
   let open Coda_incremental.Status in
   let incremental_status =
-    map4 online_status_incr transition_frontier_incr first_connection_incr
-      first_message_incr
+    map4 online_status_incr transition_frontier_and_catchup_signal_incr
+      first_connection_incr first_message_incr
       ~f:(fun online_status active_status first_connection first_message ->
         match online_status with
         | `Offline ->
@@ -158,13 +160,19 @@ let create_sync_status_observer ~logger ~transition_frontier_incr
         | `Online -> (
           match active_status with
           | None ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Coda daemon is now bootstrapping" ;
+              Logger.info (Logger.create ()) ~module_:__MODULE__
+                ~location:__LOC__ "Coda daemon is now bootstrapping" ;
               `Bootstrap
-          | Some _ ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Coda daemon is now synced" ;
-              `Synced ) )
+          | Some (_, catchup_signal) -> (
+            match catchup_signal with
+            | `Catchup ->
+                Logger.info (Logger.create ()) ~module_:__MODULE__
+                  ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
+                `Catchup
+            | `Normal ->
+                Logger.info (Logger.create ()) ~module_:__MODULE__
+                  ~location:__LOC__ "Coda daemon is now synced" ;
+                `Synced ) ) )
   in
   let observer = observe incremental_status in
   stabilize () ; observer
@@ -188,8 +196,18 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 
 let best_ledger = compose_of_option best_ledger_opt
 
-let get_ledger t staged_ledger_hash =
+let get_ledger t staged_ledger_hash_opt =
   let open Deferred.Or_error.Let_syntax in
+  let%bind staged_ledger_hash =
+    Option.value_map staged_ledger_hash_opt ~f:Deferred.Or_error.return
+      ~default:
+        ( match best_staged_ledger t with
+        | `Active staged_ledger ->
+            Deferred.Or_error.return (Staged_ledger.hash staged_ledger)
+        | `Bootstrapping ->
+            Deferred.Or_error.error_string
+              "get_ledger: can't get staged ledger hash while bootstrapping" )
+  in
   let%bind frontier =
     Deferred.return (t.components.transition_frontier |> peek_frontier)
   in
@@ -204,10 +222,10 @@ let get_ledger t staged_ledger_hash =
         else None )
   with
   | Some x ->
-      Deferred.return (Ok x)
+      Deferred.Or_error.return x
   | None ->
       Deferred.Or_error.error_string
-        "staged ledger hash not found in transition frontier"
+        "get_ledger: staged ledger hash not found in transition frontier"
 
 let seen_jobs t = t.seen_jobs
 
@@ -284,7 +302,8 @@ let request_work t =
         Some staged_ledger
     | `Bootstrapping ->
         Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-          "Could not retrieve staged_ledger due to bootstrapping" ;
+          "Snark-work-request error: Could not retrieve staged_ledger due to \
+           bootstrapping" ;
         None
   in
   let fee = snark_work_fee t in
@@ -553,6 +572,18 @@ let create (config : Config.t) =
             (Strict_pipe.transfer
                (Coda_networking.states net)
                external_transitions_writer ~f:ident) ;
+          don't_wait_for
+            (Linear_pipe.iter (Coda_networking.ban_notification_reader net)
+               ~f:(fun notification ->
+                 let peer = Coda_networking.banned_peer notification in
+                 let banned_until =
+                   Coda_networking.banned_until notification
+                 in
+                 (* if RPC call fails, will be logged in gossip net code *)
+                 let%map _ =
+                   Coda_networking.ban_notify net peer banned_until
+                 in
+                 () )) ;
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~logger:config.logger
               ~trust_system:config.trust_system
@@ -586,10 +617,23 @@ let create (config : Config.t) =
               ~is_storing_all:config.is_archive_node
           in
           let open Coda_incremental.Status in
+          let transition_frontier_incr =
+            Var.watch @@ of_broadcast_pipe frontier_broadcast_pipe_r
+          in
+          let transition_frontier_and_catchup_signal_incr =
+            transition_frontier_incr
+            >>= function
+            | Some transition_frontier ->
+                Transition_frontier.catchup_signal transition_frontier
+                |> of_broadcast_pipe |> Var.watch
+                >>| fun catchup_signal ->
+                Some (transition_frontier, catchup_signal)
+            | None ->
+                return None
+          in
           let sync_status =
             create_sync_status_observer ~logger:config.logger
-              ~transition_frontier_incr:
-                (Var.watch @@ of_broadcast_pipe frontier_broadcast_pipe_r)
+              ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:
                 ( Var.watch @@ of_broadcast_pipe
                 @@ Coda_networking.online_status net )
@@ -615,6 +659,8 @@ let create (config : Config.t) =
                       external_transitions_writer }
             ; wallets
             ; propose_keypairs
-            ; seen_jobs= Work_selector.State.init
+            ; seen_jobs=
+                Work_selector.State.init
+                  ~reassignment_wait:config.work_reassignment_wait
             ; subscriptions
             ; sync_status } ) )

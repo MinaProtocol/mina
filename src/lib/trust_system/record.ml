@@ -11,6 +11,8 @@ module type S = sig
 
   val disable_bans : unit -> unit
 
+  val get_bans_disabled : unit -> bool
+
   val add_trust : t -> float -> t
 
   val to_peer_status : t -> Peer_status.t
@@ -38,6 +40,8 @@ end) : S = struct
 
   let disable_bans () = bans_disabled := true
 
+  let get_bans_disabled () = !bans_disabled
+
   let clamp_trust trust = Float.clamp_exn trust ~min:(-1.0) ~max:1.0
 
   (* Update a trust record. This must be called by every function that reads
@@ -54,10 +58,8 @@ end) : S = struct
     ; banned_until_opt=
         ( match banned_until_opt with
         | Some banned_until ->
-            if
-              (not !bans_disabled)
-              && Time.is_later banned_until ~than:(Now.now ())
-            then Some banned_until
+            if Time.is_later banned_until ~than:(Now.now ()) then
+              Some banned_until
             else None
         | None ->
             None ) }
@@ -78,7 +80,7 @@ end) : S = struct
     { new_record with
       trust= new_trust
     ; banned_until_opt=
-        ( if new_trust <=. -1. then
+        ( if (not !bans_disabled) && new_trust <=. -1. then
           Some (Time.add new_record.trust_last_updated Time.Span.day)
         else new_record.banned_until_opt ) }
 
