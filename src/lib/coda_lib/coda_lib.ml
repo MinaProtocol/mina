@@ -109,8 +109,9 @@ let root_length = compose_of_option root_length_opt
 [%%if
 mock_frontend_data]
 
-let create_sync_status_observer ~logger ~transition_frontier_incr
-    ~online_status_incr ~first_connection_incr ~first_message_incr =
+let create_sync_status_observer ~logger
+    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
+    ~first_connection_incr ~first_message_incr =
   let variable = Coda_incremental.Status.Var.create `Offline in
   let incr = Coda_incremental.Status.Var.watch variable in
   let rec loop () =
@@ -137,12 +138,13 @@ let create_sync_status_observer ~logger ~transition_frontier_incr
 
 [%%else]
 
-let create_sync_status_observer ~logger ~transition_frontier_incr
-    ~online_status_incr ~first_connection_incr ~first_message_incr =
+let create_sync_status_observer ~logger
+    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
+    ~first_connection_incr ~first_message_incr =
   let open Coda_incremental.Status in
   let incremental_status =
-    map4 online_status_incr transition_frontier_incr first_connection_incr
-      first_message_incr
+    map4 online_status_incr transition_frontier_and_catchup_signal_incr
+      first_connection_incr first_message_incr
       ~f:(fun online_status active_status first_connection first_message ->
         match online_status with
         | `Offline ->
@@ -158,13 +160,19 @@ let create_sync_status_observer ~logger ~transition_frontier_incr
         | `Online -> (
           match active_status with
           | None ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Coda daemon is now bootstrapping" ;
+              Logger.info (Logger.create ()) ~module_:__MODULE__
+                ~location:__LOC__ "Coda daemon is now bootstrapping" ;
               `Bootstrap
-          | Some _ ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Coda daemon is now synced" ;
-              `Synced ) )
+          | Some (_, catchup_signal) -> (
+            match catchup_signal with
+            | `Catchup ->
+                Logger.info (Logger.create ()) ~module_:__MODULE__
+                  ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
+                `Catchup
+            | `Normal ->
+                Logger.info (Logger.create ()) ~module_:__MODULE__
+                  ~location:__LOC__ "Coda daemon is now synced" ;
+                `Synced ) ) )
   in
   let observer = observe incremental_status in
   stabilize () ; observer
@@ -605,10 +613,23 @@ let create (config : Config.t) =
               ~is_storing_all:config.is_archive_node
           in
           let open Coda_incremental.Status in
+          let transition_frontier_incr =
+            Var.watch @@ of_broadcast_pipe frontier_broadcast_pipe_r
+          in
+          let transition_frontier_and_catchup_signal_incr =
+            transition_frontier_incr
+            >>= function
+            | Some transition_frontier ->
+                Transition_frontier.catchup_signal transition_frontier
+                |> of_broadcast_pipe |> Var.watch
+                >>| fun catchup_signal ->
+                Some (transition_frontier, catchup_signal)
+            | None ->
+                return None
+          in
           let sync_status =
             create_sync_status_observer ~logger:config.logger
-              ~transition_frontier_incr:
-                (Var.watch @@ of_broadcast_pipe frontier_broadcast_pipe_r)
+              ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:
                 ( Var.watch @@ of_broadcast_pipe
                 @@ Coda_networking.online_status net )
