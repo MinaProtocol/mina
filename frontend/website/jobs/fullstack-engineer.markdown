@@ -21,7 +21,7 @@ We’re seeking a full-stack product engineer who is also excited about building
 
 ## Nice to have (at least one of the following)
 
-- Experience working on multiple collaborative projects with a product team containing at least one additional developer (or larger team-based projects at university or a bootcamp program).
+- Experience working on collaborative projects with a product team (or larger team-based projects at a university/bootcamp)
 - Exposure to working with cryptocurrencies
 - Experience with ReasonML, OCaml, Haskell, or Rust
 - Early stage startup experience
