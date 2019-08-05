@@ -24,6 +24,7 @@ do_copy () {
     if [ -x "$path_to_gcloud" ] ; then
         echo "Found gcloud: $path_to_glcoud"
     else
+        export HOMEBREW_NO_AUTO_UPDATE=1
         brew cask install google-cloud-sdk
     fi
     set -e
