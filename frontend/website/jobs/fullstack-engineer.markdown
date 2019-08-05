@@ -6,7 +6,7 @@ Help us build accessible, usable, delightful products on top of the Coda Protoco
 
 We’re seeking a full-stack product engineer who is also excited about building productivity tools for developers. While it's hard to say exactly what we'll work on given that we are such an early-stage startup, we expect projects to include:
 
-- Developer tools and SDKs on top of Coda
+- Developer tools and SDKs to build applications on top of Coda
 - The command-line-interface for the Coda client and daemon
 - Bots and services that react and cause to events on the Coda network
 
