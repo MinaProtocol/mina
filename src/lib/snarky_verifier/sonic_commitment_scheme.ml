@@ -1,3 +1,5 @@
+
+
 (* open Snarkette
 
 module Backend = Sonic_prototype.Default_backend.Backend
@@ -56,6 +58,7 @@ module Make (Inputs : Inputs.S_run) = struct
     |> Fqk.(equal one)
 end
 
+
 (* 
 let%test_unit "checked-unchecked equivalence" =
 (* let open Quickcheck in
@@ -78,3 +81,4 @@ test ~trials:20 (Generator.tuple2 gen User_command_payload.gen)
     in
     assert (equal unchecked checked)
  *)
+

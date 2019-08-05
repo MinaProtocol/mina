@@ -811,7 +811,39 @@ module Sonic_backend = struct
 
   include Snarkette.Mnt6753
 
-  module Fr = Snarkette.Mnt4753.Fq
+  module Fr = struct
+    include Tock.Field
+
+    let length_in_bits = size_in_bits
+
+    let order = Snarkette.Mnt4753.Fq.order
+
+    let ( ** ) x n =
+      let rec go acc i =
+        if i < 0
+        then acc 
+        else
+          let acc = square acc in 
+          let acc = if N.test_bit n i then mul acc x else acc in
+          go acc Int.(i - 1)
+      in 
+      go one (Int.(-) (N.num_bits n) 1)
+
+    open Fold_lib
+
+    let fold_bits = Fn.compose Fold.of_list unpack
+
+    let to_bits = unpack
+
+    let of_bits x = Some (project x)
+
+    (* TODO Fix *)
+    let to_bigint = Fn.compose N.of_string to_string
+
+    let to_yojson x = `String (to_string x)
+
+    let fold x = Fold.group3 ~default:false (fold_bits x)
+  end
 
   (* module Fr = struct
     include Tick.Pairing.Fq
@@ -854,20 +886,19 @@ let%test_unit "sonic test" =
       let (), checked_output =
         M.run_and_check
           (fun () ->
-            let open Srs in
+            let open Sonic_backend in
             let open Commitment_scheme in
             let d = 15 in
             let srs = Srs.create d x alpha in
             let f = Fr_laurent.create 1 [Fr.of_int 10] in
             let commitment = commit_poly srs f in
             let opening = open_poly srs commitment z f in
-            pc_v srs commitment z opening )
+            fun () -> pc_v srs commitment z opening )
           ()
         |> Or_error.ok_exn
       in
-      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output
-        (Group_map.to_group (module Tick0.Field) ~params t) )
-
+      assert checked_output
+  )
 
 let tock_vk_to_bool_list vk =
   let vk = Tick.Verifier.vk_of_backend_vk vk in
