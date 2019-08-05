@@ -50,7 +50,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
             - run:
@@ -201,7 +201,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -249,7 +249,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -268,7 +268,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -287,7 +287,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
             - run:
@@ -306,7 +306,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
             - run:
