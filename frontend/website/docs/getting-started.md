@@ -3,7 +3,7 @@
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
 !!! note
-    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for `v0.0.1-beta.1`.
+    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for `v0.0.1-beta.2`.
 
 ## Requirements
 
@@ -40,7 +40,7 @@ Add the Coda Debian repo and install.
 ```
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
-sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-43cb0790
+sudo apt-get install -t release coda-testnet-postake-medium-curves_0.0.1-release-0.0.1-beta.2-fd4fb398
 sudo apt-mark hold coda-testnet-postake-medium-curves
 ```
 
