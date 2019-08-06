@@ -9,7 +9,10 @@ let init () = Parallel.init_master ()
 let net_configs n =
   let external_ports = List.init n ~f:(fun i -> 23000 + (i * 2)) in
   let discovery_ports = List.init n ~f:(fun i -> 23000 + 1 + (i * 2)) in
-  let ips = List.init n ~f:(fun _i -> Unix.Inet_addr.of_string "127.0.0.1") in
+  let ips =
+    List.init n ~f:(fun i ->
+        Unix.Inet_addr.of_string @@ sprintf !"127.0.0.%i" i )
+  in
   let addrs_and_ports_list =
     List.map3_exn external_ports discovery_ports ips
       ~f:(fun communication_port discovery_port ip ->
