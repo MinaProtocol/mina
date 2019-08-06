@@ -152,6 +152,7 @@ with `dune`, so you need to add them manually:
 * `opam pin add src/external/rpc_parallel`
 * `opam pin add src/external/ocaml-extlib`
 * `opam pin add src/external/coda_base58`
+* `opam pin add src/external/graphql_ppx`
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
