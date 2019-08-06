@@ -38,7 +38,7 @@ A consensus mechanism controls many aspects in a protocol which is built on top 
 ## Hooks
 [hooks]: #hooks
 
-![](res/consensus_hooks.dot.png)
+<!-- ![](res/consensus_hooks.dot.png) -->
 
 ### generate\_transition
 
@@ -48,7 +48,7 @@ The `generate_transition` hook fully generates a new protocol state and consensu
 
 The `next_proposal` hook informs the protocol when it is valid to generate and propose the next transition. This hook may either return a time to propose a transition at, or a time to check the hook again. This allows a consensus mechanism to space out proposals, as well as control more advanced scheduling of proposals based on other information in the protocol.
 
-<sup>_For more information on how the `next_proposal` hook interacts the `Proposer`, see the [`Proposer` documentation](proposer.md#proposal-scheduling)._</sup>
+<!-- <sup>_For more information on how the `next_proposal` hook interacts the `Proposer`, see the [`Proposer` documentation](proposer.md#proposal-scheduling)._</sup> -->
 
 ### next\_state\_checked
 

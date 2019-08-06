@@ -305,6 +305,7 @@ module Make (Inputs : Inputs.S) :
          ( (Inputs.Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
            Rose_tree.t
            list
+           * [`Ledger_catchup of unit Ivar.t | `Catchup_scheduler]
          , Strict_pipe.crash Strict_pipe.buffered
          , unit )
          Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
@@ -312,64 +313,70 @@ module Make (Inputs : Inputs.S) :
     let maximum_download_size = 100 in
     Strict_pipe.Reader.iter_without_pushback catchup_job_reader
       ~f:(fun (target_hash, subtrees) ->
-        ( match%map
-            let open Deferred.Or_error.Let_syntax in
-            let%bind preferred_peer, hashes_of_missing_transitions =
-              download_state_hashes ~logger ~trust_system ~network ~frontier
-                ~num_peers ~target_hash
-            in
-            let num_of_missing_transitions =
-              List.length hashes_of_missing_transitions
-            in
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "hashes_of_missing_transitions"
-                  , `List
-                      (List.map hashes_of_missing_transitions ~f:(fun hash ->
-                           `String (State_hash.to_base58_check hash) )) ) ]
-              !"Number of missing transitions is %d"
-              num_of_missing_transitions ;
-            let%bind transitions =
-              if num_of_missing_transitions <= 0 then
-                Deferred.Or_error.return []
-              else
-                download_transitions ~logger ~trust_system ~network ~num_peers
-                  ~preferred_peer ~maximum_download_size
-                  ~hashes_of_missing_transitions
-            in
-            verify_transitions_and_build_breadcrumbs ~logger ~trust_system
-              ~verifier ~frontier ~unprocessed_transition_cache ~transitions
-              ~target_hash ~subtrees
-          with
-        | Ok trees_of_breadcrumbs ->
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "hashes of transitions"
-                  , `List
-                      (List.map trees_of_breadcrumbs ~f:(fun tree ->
-                           Rose_tree.to_yojson
-                             (fun breadcrumb ->
-                               Cached.peek breadcrumb
-                               |> Transition_frontier.Breadcrumb.state_hash
-                               |> State_hash.to_base58_check
-                               |> fun str -> `String str )
-                             tree )) ) ]
-              "about to write to the catchup breadcrumbs pipe" ;
-            if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
-              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                "catchup breadcrumbs pipe was closed; attempt to write to \
-                 closed pipe" ;
-              garbage_collect_subtrees ~logger ~subtrees:trees_of_breadcrumbs )
-            else
-              Strict_pipe.Writer.write catchup_breadcrumbs_writer
-                trees_of_breadcrumbs
-        | Error e ->
-            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:[("error", `String (Error.to_string_hum e))]
-              "Catchup process failed -- unable to receive valid data from \
-               peers or transition frontier progressed faster than catchup \
-               data received. See error for details: $error" ;
-            garbage_collect_subtrees ~logger ~subtrees )
+        (let%bind () = Transition_frontier.incr_num_catchup_jobs frontier in
+         match%bind
+           let open Deferred.Or_error.Let_syntax in
+           let%bind preferred_peer, hashes_of_missing_transitions =
+             download_state_hashes ~logger ~trust_system ~network ~frontier
+               ~num_peers ~target_hash
+           in
+           let num_of_missing_transitions =
+             List.length hashes_of_missing_transitions
+           in
+           Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+             ~metadata:
+               [ ( "hashes_of_missing_transitions"
+                 , `List
+                     (List.map hashes_of_missing_transitions ~f:(fun hash ->
+                          `String (State_hash.to_base58_check hash) )) ) ]
+             !"Number of missing transitions is %d"
+             num_of_missing_transitions ;
+           let%bind transitions =
+             if num_of_missing_transitions <= 0 then
+               Deferred.Or_error.return []
+             else
+               download_transitions ~logger ~trust_system ~network ~num_peers
+                 ~preferred_peer ~maximum_download_size
+                 ~hashes_of_missing_transitions
+           in
+           verify_transitions_and_build_breadcrumbs ~logger ~trust_system
+             ~verifier ~frontier ~unprocessed_transition_cache ~transitions
+             ~target_hash ~subtrees
+         with
+         | Ok trees_of_breadcrumbs ->
+             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:
+                 [ ( "hashes of transitions"
+                   , `List
+                       (List.map trees_of_breadcrumbs ~f:(fun tree ->
+                            Rose_tree.to_yojson
+                              (fun breadcrumb ->
+                                Cached.peek breadcrumb
+                                |> Transition_frontier.Breadcrumb.state_hash
+                                |> State_hash.to_base58_check
+                                |> fun str -> `String str )
+                              tree )) ) ]
+               "about to write to the catchup breadcrumbs pipe" ;
+             if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                 "catchup breadcrumbs pipe was closed; attempt to write to \
+                  closed pipe" ;
+               garbage_collect_subtrees ~logger ~subtrees:trees_of_breadcrumbs ;
+               Transition_frontier.decr_num_catchup_jobs frontier )
+             else
+               let ivar = Ivar.create () in
+               Strict_pipe.Writer.write catchup_breadcrumbs_writer
+                 (trees_of_breadcrumbs, `Ledger_catchup ivar) ;
+               let%bind () = Ivar.read ivar in
+               Transition_frontier.decr_num_catchup_jobs frontier
+         | Error e ->
+             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:[("error", `String (Error.to_string_hum e))]
+               "Catchup process failed -- unable to receive valid data from \
+                peers or transition frontier progressed faster than catchup \
+                data received. See error for details: $error" ;
+             garbage_collect_subtrees ~logger ~subtrees ;
+             Transition_frontier.decr_num_catchup_jobs frontier)
         |> don't_wait_for )
     |> don't_wait_for
 end

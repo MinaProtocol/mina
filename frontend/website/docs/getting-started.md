@@ -55,9 +55,11 @@ Windows is not yet supported. If you have any interest in developing Coda for Wi
 
 If you're running another Linux distro or a different version of macOS, you can [try building Coda from source code](https://github.com/CodaProtocol/coda/blob/master/README-dev.md#building-coda). Please note that other operating systems haven't been tested thoroughly, and may have issues. Feel free to share any logs and get troubleshooting help in the Discord channel.
 
-## Set up port forwarding
+## Set up port forwarding and any firewalls
 
-You must allow inbound traffic to the following ports through your **external** IP address.
+If you are running a firewall, you should allow traffic on TCP port 8302 and UDP port 8303. Additionally, unless the `-external-ip YOUR_IP` flag is provided, the daemon will use HTTPS (443) and HTTP (80) to try and determine its own IP address.
+
+You may need to configure your router's port forwarding to allow inbound traffic to the following ports through your **external** IP address.
 
 - `TCP` port `8302`
 - `UDP` port `8303`
