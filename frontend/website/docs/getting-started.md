@@ -27,10 +27,16 @@ The newest binary releases can be found below. Instructions are provided for mac
 
 ### macOS
 
-Install using [brew](https://brew.sh).
+Install using [Homebrew](https://brew.sh).
 ```
 brew install codaprotocol/coda/coda
 ```
+
+If you already have `coda` installed from a previous release, run:
+```
+brew upgrade coda
+```
+
 You can run `coda -help` to check if the installation succeeded.
 
 ### Ubuntu 18.04 / Debian 9
