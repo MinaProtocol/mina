@@ -95,14 +95,14 @@ let%test_module "Bootstrap Controller" =
                 )
               input_transitions
           in
-          let transition_reader, transition_writer =
+          let sync_ledger_reader, sync_ledger_writer =
             Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               Synchronous
           in
           let () =
             List.iter
               ~f:(fun x ->
-                Pipe_lib.Strict_pipe.Writer.write transition_writer x
+                Pipe_lib.Strict_pipe.Writer.write sync_ledger_writer x
                 |> don't_wait_for )
               (List.zip_exn
                  (List.map ~f:(fun e -> `Transition e) envelopes)
@@ -112,9 +112,9 @@ let%test_module "Bootstrap Controller" =
           in
           let run_sync =
             Bootstrap_controller.For_tests.sync_ledger bootstrap
-              ~root_sync_ledger ~transition_graph ~transition_reader
+              ~root_sync_ledger ~transition_graph ~sync_ledger_reader
           in
-          let () = Pipe_lib.Strict_pipe.Writer.close transition_writer in
+          let () = Pipe_lib.Strict_pipe.Writer.close sync_ledger_writer in
           let%map () = run_sync in
           let saved_transitions =
             Bootstrap_controller.For_tests.Transition_cache.data
