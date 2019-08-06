@@ -113,6 +113,10 @@ let jobOpenings = [|
   ),
   ("frontend-engineer", "Product Engineer (Frontend) (San Francisco)."),
   ("fullstack-engineer", "Product Engineer (Full-stack) (San Francisco)."),
+  (
+    "marketing-and-community-manager",
+    "Marketing and Community Manager (San Francisco).",
+  ),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
 |];
 
