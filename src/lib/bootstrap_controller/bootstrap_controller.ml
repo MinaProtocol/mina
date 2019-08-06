@@ -394,7 +394,7 @@ end = struct
            from the peer or received faulty scan state: $error. Retry \
            bootstrap" ;
         Writer.close sync_ledger_writer ;
-        let ask_best_tip_signal = Ivar.create () in
+        let ask_best_tip_signal = Ivar.create_full () in
         run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
           ~transition_reader ~ask_best_tip_signal
     | Ok root_staged_ledger -> (
@@ -454,7 +454,7 @@ end = struct
               ~metadata:[("error", `String (Error.to_string_hum e))]
               "Local state sync failed: $error. Retry bootstrap" ;
             Writer.close sync_ledger_writer ;
-            let ask_best_tip_signal = Ivar.create () in
+            let ask_best_tip_signal = Ivar.create_full () in
             run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
               ~transition_reader ~ask_best_tip_signal
         | Ok () ->
