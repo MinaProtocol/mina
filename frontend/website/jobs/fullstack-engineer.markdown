@@ -2,26 +2,27 @@
 title: Product Engineer (Full-stack)
 date: 2019-08-04
 ---
-Help us build accessible, usable, delightful products on top of the Coda Cryptocurrency Protocol!
+Help us build accessible, usable, delightful products on top of the Coda Protocol!
 
-We’re seeking a full-stack product engineer who is also excited by building productivity tools for developers. While it's hard to say exactly what we'll work on given that we are such an early-stage startup, we expect projects to include:
+We’re seeking a full-stack product engineer who is also excited about building productivity tools for developers. While it's hard to say exactly what we'll work on given that we are such an early-stage startup, we expect projects to include:
 
-- Developer tools and SDKs on top of Coda
-- The command-line-interface for the Coda client and daemon
-- Bots and services that react and cause to events on the Coda network
+- Developer tools and SDKs to build applications on top of Coda
+- The command-line interface (CLI) to interact with the Coda client and daemon
+- Automated services and bots that allows users to engage with the Coda network
 
 ## Requirements
 
 - 2+ years engineering experience
-    - Bonus: Worked on developer tooling before
+    - Bonus: Experience building developer-facing APIs and libraries
 - Willingness to work on-site in a San Francisco based office
 - Exposure to a declarative frontend framework, such as React, Angular, Vue, Elm etc.
-    - Bonus for experience with React Hooks or GraphQL
+    - Bonus: Experience with React Hooks or GraphQL
+- Experience with AWS or other public cloud providers
 - Familiarity with functional programming, know your way around map and reduce.
 
-## Grab Bag (at least one of the following)
+## Nice to have (at least one of the following)
 
-- Experience working on multiple collaborative projects with a product team containing at least one additional developer (or larger team-based projects at university or a bootcamp program).
+- Experience working on collaborative projects with a product team (or larger team-based projects at a university/bootcamp)
 - Exposure to working with cryptocurrencies
 - Experience with ReasonML, OCaml, Haskell, or Rust
 - Early stage startup experience
