@@ -408,8 +408,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let t_for_restarting = ref None in
     trace_task "gossip net" (fun () ->
         let fail m =
-          failwith
-            (Printf.sprintf "Failed to connect to Kademlia process: %s\n" m)
+          failwithf "Failed to connect to Kademlia process: %s" m ()
         in
         let restart_counter = ref 0 in
         let rec handle_exn e =
