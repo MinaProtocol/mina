@@ -22,8 +22,10 @@ GPUs aren't currently required, but may be required for node operators when the 
 
 The newest binary releases can be found below. Instructions are provided for macOS and Linux below:
 
-!!! note
-    This is a large download, around 1GB, so the install might take some time.
+This is a large download, around 1GB, so the install might take some time.
+
+!!! warning
+    If you installed `coda` from a previous release, you'll need to upgrade it so that you won't get banned by the network for using an older client. See instructions below for upgrading both macOS and Linux builds.
 
 ### macOS
 
@@ -41,16 +43,17 @@ You can run `coda -help` to check if the installation succeeded.
 
 ### Ubuntu 18.04 / Debian 9
 
-Add the Coda Debian repo and install.
+Add the Coda Debian repo and install:
 
 ```
 echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
-sudo apt-get install -t release coda-testnet-postake-medium-curves
+sudo apt-get install -t release coda-testnet-postake-medium-curves=0.0.1-beta.2-fd4fb398
 ```
 
-You can run `coda -help` to check if the installation succeeded.
+If you already have `coda` installed from a previous release, running the above commands should automatically uninstall and reinstall the newest version.
 
+You can run `coda -help` to check if the installation succeeded.
 
 ### Windows
 
