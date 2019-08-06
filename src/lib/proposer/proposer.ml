@@ -356,6 +356,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       | Error `Already_in_frontier ->
                           Logger.error logger ~module_:__MODULE__
                             ~location:__LOC__
+                            ~metadata:
+                              [ ( "protocol_state"
+                                , Protocol_state.value_to_yojson protocol_state
+                                ) ]
                             "%sproposed transition is already in transition \
                              frontier"
                             error_msg_prefix ;
