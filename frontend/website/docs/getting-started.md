@@ -38,9 +38,9 @@ You can run `coda -help` to check if the installation succeeded.
 Add the Coda Debian repo and install.
 
 ```
-echo "deb [trusted=yes] http://packages.o1test.net unstable main" | sudo tee /etc/apt/sources.list.d/coda.list
+echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
-sudo apt-get install -t release coda-testnet-postake-medium-curves_0.0.1-release-0.0.1-beta.2-fd4fb398
+sudo apt-get install -t release coda-testnet-postake-medium-curves
 sudo apt-mark hold coda-testnet-postake-medium-curves
 ```
 
