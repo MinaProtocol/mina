@@ -98,15 +98,7 @@ Do you want the application "coda" to accept incoming network connections?
 ```
 
 ### Failure on daemon restart
-If you restart the Coda daemon and it fails, then try deleting your `~/.coda-config` directory and starting it again.
+If you restart the Coda daemon and it fails, then try deleting your config folder by running `rm -rf ~/.coda-config` directory and starting the daemon again.
 
 ### Daemon restart on computer sleep
 If the machine running your Coda node enters sleep mode or hibernates, you will need to restart the Coda daemon once the machine becomes active.
-
-## Daemon crashes and can't restart
-
-Some users have reported daemon crashes and inability to restart the node, sometimes accompanied by this error:
-
-`Merkle roots differ after transfer: got unexpected result`
-
-If you see this, one way to reset the daemon is to save the logfile and then delete ~/.coda-config. This should allow the daemon to start up properly again. Kindly add the logfile to a gist and [share with the Coda developers on Github](https://github.com/CodaProtocol/coda/issues) - there is likely already an issue filed with the same crash, so please add your log files as a comment.
