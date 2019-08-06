@@ -29,7 +29,7 @@ Major - 2000 pts - reported a new daemon crash that wasn’t already on [the kno
 
 Minor - 200 pts - reported a new issue related to minor bugs in the daemon, documentation, or testnet.
 
-**Challenge #6:** 100 pts - Join our new forum (https://forums.codaprotocol.com/) and introduce yourself in the Introductions thread to the community! Your name, location, and what you’re excited about are all good things to share in order to get the points!
+**Challenge #6:** 100 pts - [Join the new Coda forum](https://forums.codaprotocol.com/) and introduce yourself in the Introductions thread to the community! Your name, location, and what you’re excited about are all good things to share in order to get the points!
 
 **Challenge #7:** Contribute documentation / material to help others to get started on the Testnet. We see that many people are interested in running a node on Coda’s Testnet [Beta], but some need a bit of extra help to do this. We want to reward the community members who are helping out others to set up a node on the Testnet.
 
