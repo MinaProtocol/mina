@@ -486,7 +486,7 @@ module Types = struct
               Currency.Fee.to_uint64 fee ) ] )
 
   module Payload = struct
-    let add_wallet : (Coda_lib.t, Account.key sexp_option) typ =
+    let add_wallet : (Coda_lib.t, Account.key option) typ =
       obj "AddWalletPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
               ~doc:"Public key of the newly-created wallet"
@@ -767,7 +767,7 @@ module Types = struct
     module Make (Inputs : Inputs_intf) = struct
       open Inputs
 
-      let edge : (Coda_lib.t, Type.t Edge.t sexp_option) typ =
+      let edge : (Coda_lib.t, Type.t Edge.t option) typ =
         obj (Type.name ^ "Edge")
           ~doc:"Connection Edge as described by the Relay connections spec"
           ~fields:(fun _ ->

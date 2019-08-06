@@ -324,7 +324,7 @@ module type Sync_handler_intf = sig
   val get_transition_chain :
        frontier:transition_frontier
     -> State_hash.t sexp_list
-    -> external_transition sexp_list sexp_option
+    -> external_transition sexp_list option
 
   module Root :
     Consensus_best_tip_prover_intf
@@ -356,7 +356,7 @@ module type Sync_handler_intf = sig
         -> ( external_transition
            , State_body_hash.t list * external_transition )
            Proof_carrying_data.t
-           sexp_option
+           option
 
       val verify :
            logger:Logger.t
@@ -409,7 +409,7 @@ module type Best_tip_retriever_intf = sig
     -> ( external_transition
        , State_body_hash.t list * external_transition )
        Proof_carrying_data.t
-       sexp_option
+       option
 
   (* TODO: probably make a type to make the output into a record *)
   val verify :
