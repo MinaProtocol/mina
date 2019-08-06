@@ -1,6 +1,6 @@
-# Hello Coda
+# Coda Public Testnet Beta
 
-Coda's public testnet beta `Hello Coda` is now live! This means that anyone can download the Coda daemon and connect to other peers in the network. You can send and receive coda, participate in consensus, and help compress the blockchain by generating SNARKs!
+Coda's public testnet beta is now live! This means that anyone can download the Coda daemon and connect to other peers in the network. You can send and receive coda, participate in consensus, and help compress the blockchain by generating SNARKs!
 
 Join the [Coda server on Discord](http://bit.ly/CodaDiscord) to connect with the community, get support, and learn about how you can participate in weekly challenges for Testnet Points[\*](#disclaimer). Check out the [Testnet Leaderboard](#leaderboard) to see who is winning this week's challenges.
 
