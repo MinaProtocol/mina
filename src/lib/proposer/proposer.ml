@@ -120,7 +120,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
       in
       let%map ( `Hash_after_applying next_staged_ledger_hash
               , `Ledger_proof ledger_proof_opt
-              , `Staged_ledger _transitioned_staged_ledger
+              , `Staged_ledger transitioned_staged_ledger
               , `Pending_coinbase_data (is_new_stack, coinbase_amount) ) =
         let%map or_error =
           Staged_ledger.apply_diff_unchecked staged_ledger diff
@@ -128,6 +128,10 @@ let generate_next_state ~previous_protocol_state ~time_controller
         Or_error.ok_exn or_error
       in
       (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
+      ignore
+      @@ Ledger.unregister_mask_exn
+           (Staged_ledger.ledger staged_ledger)
+           (Staged_ledger.ledger transitioned_staged_ledger) ;
       ( diff
       , next_staged_ledger_hash
       , ledger_proof_opt
