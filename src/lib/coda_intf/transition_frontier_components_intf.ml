@@ -233,46 +233,39 @@ module type Transition_handler_intf = sig
      and type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 end
 
-module type Sync_handler_intf = sig
-  type transition_frontier
-
-  type external_transition
-
-  type external_transition_validated
-
-  type parallel_scan_state
-
-  val answer_query :
-       frontier:transition_frontier
-    -> Ledger_hash.t
-    -> Sync_ledger.Query.t Envelope.Incoming.t
-    -> logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> Sync_ledger.Answer.t option Deferred.t
-
-  val get_staged_ledger_aux_and_pending_coinbases_at_hash :
-       frontier:transition_frontier
-    -> State_hash.t
-    -> (parallel_scan_state * Ledger_hash.t * Pending_coinbase.t) Option.t
+module Best_tip_verification_result = struct
+  type 'external_transition t =
+    {root: 'external_transition; best_tip: 'external_transition}
 end
 
-module type Transition_chain_witness_intf = sig
+module type Best_tip_prover_intf = sig
   type transition_frontier
 
   type external_transition
+
+  type external_transition_with_initial_validation
+
+  type verifier
 
   val prove :
-       frontier:transition_frontier
-    -> State_hash.t
-    -> (State_hash.t * State_body_hash.t List.t) Option.t
+       logger:Logger.t
+    -> transition_frontier
+    -> ( external_transition
+       , State_body_hash.t list * external_transition )
+       Proof_carrying_data.t
+       option
 
   val verify :
-       target_hash:State_hash.t
-    -> transition_chain_witness:State_hash.t * State_body_hash.t List.t
-    -> State_hash.t Non_empty_list.t option
+       verifier:verifier
+    -> ( external_transition
+       , State_body_hash.t list * external_transition )
+       Proof_carrying_data.t
+    -> external_transition_with_initial_validation
+       Best_tip_verification_result.t
+       Deferred.Or_error.t
 end
 
-module type Root_prover_intf = sig
+module type Consensus_best_tip_prover_intf = sig
   type transition_frontier
 
   type external_transition
@@ -293,10 +286,139 @@ module type Root_prover_intf = sig
   val verify :
        logger:Logger.t
     -> verifier:verifier
-    -> observed_state:Consensus.Data.Consensus_state.Value.t
-    -> peer_root:( external_transition
-                 , State_body_hash.t list * external_transition )
-                 Proof_carrying_data.t
+    -> Consensus.Data.Consensus_state.Value.t
+    -> ( external_transition
+       , State_body_hash.t list * external_transition )
+       Proof_carrying_data.t
+    -> external_transition_with_initial_validation
+       Best_tip_verification_result.t
+       Deferred.Or_error.t
+end
+
+module type Sync_handler_intf = sig
+  type transition_frontier
+
+  type external_transition
+
+  type external_transition_with_initial_validation
+
+  type external_transition_validated
+
+  type parallel_scan_state
+
+  type verifier
+
+  val answer_query :
+       frontier:transition_frontier
+    -> Ledger_hash.t
+    -> Sync_ledger.Query.t Envelope.Incoming.t
+    -> logger:Logger.t
+    -> trust_system:Trust_system.t
+    -> Sync_ledger.Answer.t option Deferred.t
+
+  val get_staged_ledger_aux_and_pending_coinbases_at_hash :
+       frontier:transition_frontier
+    -> State_hash.t
+    -> (parallel_scan_state * Ledger_hash.t * Pending_coinbase.t) Option.t
+
+  val get_transition_chain :
+       frontier:transition_frontier
+    -> State_hash.t sexp_list
+    -> external_transition sexp_list sexp_option
+
+  module Root :
+    Consensus_best_tip_prover_intf
+    with type transition_frontier := transition_frontier
+     and type external_transition := external_transition
+     and type external_transition_with_initial_validation :=
+                external_transition_with_initial_validation
+     and type verifier := verifier
+
+  module Bootstrappable_best_tip : sig
+    include
+      Consensus_best_tip_prover_intf
+      with type transition_frontier := transition_frontier
+       and type external_transition := external_transition
+       and type external_transition_with_initial_validation :=
+                  external_transition_with_initial_validation
+       and type verifier := verifier
+
+    module For_tests : sig
+      val prove :
+           logger:Logger.t
+        -> should_select_tip:(   existing:Consensus.Data.Consensus_state.Value.t
+                              -> candidate:Consensus.Data.Consensus_state.Value
+                                           .t
+                              -> logger:Logger.t
+                              -> bool)
+        -> frontier:transition_frontier
+        -> Consensus.Data.Consensus_state.Value.t
+        -> ( external_transition
+           , State_body_hash.t list * external_transition )
+           Proof_carrying_data.t
+           sexp_option
+
+      val verify :
+           logger:Logger.t
+        -> should_select_tip:(   existing:Consensus.Data.Consensus_state.Value.t
+                              -> candidate:Consensus.Data.Consensus_state.Value
+                                           .t
+                              -> logger:Logger.t
+                              -> bool)
+        -> verifier:verifier
+        -> Consensus.Data.Consensus_state.Value.t
+        -> ( external_transition
+           , State_body_hash.t list * external_transition )
+           Proof_carrying_data.t
+        -> external_transition_with_initial_validation
+           Best_tip_verification_result.t
+           Deferred.Or_error.t
+    end
+  end
+end
+
+module type Transition_chain_witness_intf = sig
+  type transition_frontier
+
+  type external_transition
+
+  val prove :
+       frontier:transition_frontier
+    -> State_hash.t
+    -> (State_hash.t * State_body_hash.t List.t) Option.t
+
+  val verify :
+       target_hash:State_hash.t
+    -> transition_chain_witness:State_hash.t * State_body_hash.t List.t
+    -> State_hash.t Non_empty_list.t option
+end
+
+module type Best_tip_retriever_intf = sig
+  type transition_frontier
+
+  type external_transition
+
+  type external_transition_with_initial_validation
+
+  type verifier
+
+  val prove :
+       logger:Logger.t
+    -> frontier:transition_frontier
+    -> Consensus.Data.Consensus_state.Value.t
+    -> ( external_transition
+       , State_body_hash.t list * external_transition )
+       Proof_carrying_data.t
+       sexp_option
+
+  (* TODO: probably make a type to make the output into a record *)
+  val verify :
+       logger:Logger.t
+    -> existing_state:Consensus.Data.Consensus_state.Value.t
+    -> verifier:verifier
+    -> peer_best_tip:( external_transition
+                     , State_body_hash.t list * external_transition )
+                     Proof_carrying_data.t
     -> ( external_transition_with_initial_validation
        * external_transition_with_initial_validation )
        Deferred.Or_error.t
@@ -323,6 +445,7 @@ module type Bootstrap_controller_intf = sig
                               Envelope.Incoming.t ]
                          * [< `Time_received of Block_time.t] )
                          Strict_pipe.Reader.t
+    -> ask_best_tip_signal:unit Ivar.t
     -> ( transition_frontier
        * external_transition_with_initial_validation Envelope.Incoming.t list
        )

@@ -26,7 +26,6 @@ module Bootstrap_controller = Bootstrap_controller.Make (struct
   module Network = Network
   module Time = Time
   module Sync_handler = Sync_handler
-  module Root_prover = Root_prover
 end)
 
 let%test_module "Bootstrap Controller" =
@@ -190,7 +189,7 @@ let%test_module "Bootstrap Controller" =
                   (Staged_ledger.hash staged_ledger)
                   (Staged_ledger.hash actual_staged_ledger) ) ) )
 
-    let%test "sync with one node correctly" =
+    let%test "sync with one node after receiving a transition" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       let logger = Logger.null () in
@@ -210,6 +209,7 @@ let%test_module "Bootstrap Controller" =
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
+          let ask_best_tip_signal = Ivar.create () in
           let%map ( new_frontier
                   , (_ :
                       External_transition.with_initial_validation
@@ -217,6 +217,43 @@ let%test_module "Bootstrap Controller" =
                       list) ) =
             Bootstrap_controller.run ~logger ~trust_system ~verifier:()
               ~network ~frontier:syncing_frontier ~ledger_db ~transition_reader
+              ~ask_best_tip_signal
+          in
+          Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
+      )
+
+    let%test "sync with one node eagerly" =
+      Backtrace.elide := false ;
+      Printexc.record_backtrace true ;
+      let logger = Logger.create () in
+      let trust_system = Trust_system.null () in
+      let num_breadcrumbs = (2 * max_length) + Consensus.Constants.delta + 2 in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind syncing_frontier, peer, network =
+            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+              ~num_breadcrumbs
+              ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
+              ~target_accounts:Genesis_ledger.accounts
+          in
+          let transition_reader, _ = make_transition_pipe () in
+          let ledger_db =
+            Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
+          in
+          let ask_best_tip_signal = Ivar.create () in
+          upon
+            (after (Core.Time.Span.of_sec 5.0))
+            (fun () ->
+              Logger.info logger "Asking peers their best tip to bootstrap"
+                ~module_:__MODULE__ ~location:__LOC__ ;
+              Ivar.fill ask_best_tip_signal () ) ;
+          let%map ( new_frontier
+                  , (_ :
+                      External_transition.with_initial_validation
+                      Envelope.Incoming.t
+                      list) ) =
+            Bootstrap_controller.run ~logger ~trust_system ~verifier:()
+              ~network ~frontier:syncing_frontier ~ledger_db ~transition_reader
+              ~ask_best_tip_signal
           in
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
       )
@@ -261,6 +298,7 @@ let%test_module "Bootstrap Controller" =
               ~peer:large_peer
               (get_best_tip_hash large_peer)
           in
+          let ask_best_tip_signal = Ivar.create () in
           let%map ( new_frontier
                   , (_ :
                       External_transition.with_initial_validation
@@ -268,6 +306,7 @@ let%test_module "Bootstrap Controller" =
                       list) ) =
             Bootstrap_controller.run ~logger ~trust_system ~verifier:()
               ~network ~frontier:me ~ledger_db ~transition_reader
+              ~ask_best_tip_signal
           in
           Ledger_hash.equal (root_hash new_frontier)
             (root_hash large_peer.frontier) )

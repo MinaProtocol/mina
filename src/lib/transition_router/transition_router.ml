@@ -104,10 +104,11 @@ module Make (Inputs : Inputs_intf) = struct
     transition_writer_ref := bootstrap_controller_writer ;
     Transition_frontier.close frontier ;
     Broadcast_pipe.Writer.write frontier_w None |> don't_wait_for ;
+    let ask_best_tip_signal = Ivar.create_full () in
     upon
       (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
-         ~ledger_db ~frontier ~transition_reader:!transition_reader_ref)
-      (fun (new_frontier, collected_transitions) ->
+         ~ledger_db ~frontier ~transition_reader:!transition_reader_ref
+         ~ask_best_tip_signal) (fun (new_frontier, collected_transitions) ->
         Strict_pipe.Writer.kill !transition_writer_ref ;
         start_transition_frontier_controller ~logger ~trust_system ~verifier
           ~network ~time_controller ~proposer_transition_reader
