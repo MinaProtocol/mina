@@ -202,7 +202,7 @@ end = struct
               candidate_state peer_root_with_proof
           with
           | Ok {Coda_intf.Best_tip_verification_result.root; best_tip} ->
-              sync_with_peer ~sender ~root_sync_ledger t root best_tip
+              sync_with_peer ~sender ~root_sync_ledger t best_tip root
           | Error e ->
               return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
