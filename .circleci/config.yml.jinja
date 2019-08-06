@@ -91,7 +91,6 @@ jobs:
         resource_class: large
         working_directory: /Users/distiller/coda
         environment:
-            DUNE_PROFILE: testnet_postake_medium_curves
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
             OPAMYES: 1
         steps:
@@ -158,6 +157,8 @@ jobs:
                     nix-build release2.nix
             - run:
                 name: Build ocaml
+                environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
                 command: bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h
             - run:
