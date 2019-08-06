@@ -201,18 +201,18 @@ let reset_trust_status =
 let get_public_keys =
   let open Daemon_rpcs in
   let open Command.Param in
-  let with_balances_flag =
-    flag "with-balances" no_arg
-      ~doc:"Show corresponding balances to public keys"
+  let with_details_flag =
+    flag "with-details" no_arg
+      ~doc:"Show extra details (eg. balance, nonce) in addition to public keys"
   in
   Command.async ~summary:"Get public keys"
     (Cli_lib.Background_daemon.init
-       (Args.zip2 with_balances_flag Cli_lib.Flag.json)
+       (Args.zip2 with_details_flag Cli_lib.Flag.json)
        ~f:(fun port (is_balance_included, json) ->
          if is_balance_included then
            dispatch_pretty_message ~json
-             (module Cli_lib.Render.Public_key_with_balances)
-             Get_public_keys_with_balances.rpc () port
+             (module Cli_lib.Render.Public_key_with_details)
+             Get_public_keys_with_details.rpc () port
          else
            dispatch_pretty_message ~json
              (module Cli_lib.Render.String_list_formatter)
