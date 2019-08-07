@@ -15,9 +15,6 @@ module Make (N : sig
   val random : unit -> t
 end)
 (Bits : Bits_intf.S with type t := N.t) =
-(*Bits_snarkable : Snark_params.Tick.Snarkable.Bits.Small
-                  with type Packed.value = N.t
-                   and type Unpacked.value = N.t*)
 struct
   module Stable = struct
     module V1 = struct

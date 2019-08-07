@@ -15,14 +15,6 @@ val to_epoch_and_slot : t -> Epoch.t * Slot.t
 module Checked : sig
   include Coda_numbers.Nat.S_checked with type unchecked := t
 
-  (*
-  val create
-    : epoch:Epoch.Checked.t
-    -> slot:Slot.Checked.t
-    -> t
-
-*)
-
   open Snark_params.Tick
 
   val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
