@@ -466,15 +466,16 @@ module Clear_hist_status = struct
       ~bin_response
 end
 
-module Get_public_keys_with_balances = struct
+module Get_public_keys_with_details = struct
   type query = unit [@@deriving bin_io]
 
-  type response = (string * int) list Or_error.t [@@deriving bin_io, sexp]
+  type response = (string * int * string) list Or_error.t
+  [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_public_keys_with_balances" ~version:0 ~bin_query
+    Rpc.Rpc.create ~name:"Get_public_keys_with_details" ~version:0 ~bin_query
       ~bin_response
 end
 

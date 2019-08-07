@@ -38,12 +38,15 @@ module Prove_receipt = struct
       (to_yojson proof |> Yojson.Safe.pretty_to_string)
 end
 
-module Public_key_with_balances = struct
+module Public_key_with_details = struct
   module Pretty_account = struct
-    type t = string * int
+    type t = string * int * string
 
-    let to_yojson (public_key, balance) =
-      Yojson.Safe.from_string (sprintf !"{\"%s\":%d}" public_key balance)
+    let to_yojson (public_key, balance, nonce) =
+      Yojson.Safe.from_string
+        (sprintf
+           !"\"%s\" : {\"balance\": %d, \"nonce\": %s }"
+           public_key balance nonce)
   end
 
   type t = Pretty_account.t list [@@deriving to_yojson]
@@ -53,7 +56,7 @@ module Public_key_with_balances = struct
   let to_yojson t = format_to_yojson {accounts= t}
 
   let to_text account =
-    List.map account ~f:(fun (public_key, balance) ->
-        sprintf !"%s, %d" public_key balance )
+    List.map account ~f:(fun (public_key, balance, nonce) ->
+        sprintf !"%s, %d, %s" public_key balance nonce )
     |> String.concat ~sep:"\n"
 end
