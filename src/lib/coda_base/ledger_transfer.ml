@@ -22,7 +22,12 @@ end = struct
     List.iter sorted ~f:(fun (_addr, account) ->
         let key = Account.public_key account in
         ignore (Dest.get_or_create_account_exn dest key account) ) ;
-    if not (Ledger_hash.equal (Source.merkle_root src) (Dest.merkle_root dest))
-    then Or_error.error_string "Merkle roots differ after transfer"
+    let src_hash = Source.merkle_root src in
+    let dest_hash = Dest.merkle_root dest in
+    if not (Ledger_hash.equal src_hash dest_hash) then
+      Or_error.errorf
+        "Merkle roots differ after transfer: expected %s, actual %s"
+        (Ledger_hash.to_string src_hash)
+        (Ledger_hash.to_string dest_hash)
     else Ok dest
 end
