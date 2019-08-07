@@ -371,6 +371,7 @@ struct
           Ledger_transfer.transfer_accounts
             ~src:(Lazy.force Genesis_ledger.t)
             ~dest:ledger_db
+          |> Or_error.ok_exn
         in
         let consensus_local_state =
           Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
