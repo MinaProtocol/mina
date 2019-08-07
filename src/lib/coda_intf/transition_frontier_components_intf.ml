@@ -268,23 +268,6 @@ module type Transition_chain_prover_intf = sig
     -> (State_hash.t * State_body_hash.t list) option
 end
 
-module type Transition_chain_witness_intf = sig
-  type transition_frontier
-
-  type external_transition
-
-  val prove :
-       ?length:int
-    -> frontier:transition_frontier
-    -> State_hash.t
-    -> (State_hash.t * State_body_hash.t List.t) Option.t
-
-  val verify :
-       target_hash:State_hash.t
-    -> transition_chain_witness:State_hash.t * State_body_hash.t List.t
-    -> State_hash.t Non_empty_list.t option
-end
-
 module type Root_prover_intf = sig
   type transition_frontier
 
