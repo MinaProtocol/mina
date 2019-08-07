@@ -13,7 +13,7 @@ set +u
 # Identify All Artifacts by Branch and Git Hash
 
 PVKEYHASH=$(./default/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
-VERSION="${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}-${CIRCLE_BUILD_NUM}"
+VERSION="${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
 
 BUILDDIR="${PROJECT}_${VERSION}"
 
