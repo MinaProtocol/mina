@@ -20,6 +20,8 @@ val to_field : 'f t -> 'f Cvar.t
 
 val create : value:'f Cvar.t -> upper_bound:Bigint.t -> 'f t
 
+val strict_upper_bound : _ t -> Bigint.t
+
 val min : m:'f m -> 'f t -> 'f t -> 'f t
 
 val if_ : m:'f m -> 'f Cvar.t Boolean.t -> then_:'f t -> else_:'f t -> 'f t

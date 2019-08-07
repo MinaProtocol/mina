@@ -1512,7 +1512,8 @@ module Data = struct
                  t =
               { blockchain_length: 'length
               ; epoch_count: 'length
-              ; min_epoch_length: 'length
+              ; min_window_length: 'length
+              ; curr_window_length: 'length
               ; last_vrf_output: 'vrf_output
               ; total_currency: 'amount
               ; curr_global_slot: 'global_slot
@@ -1549,7 +1550,8 @@ module Data = struct
             Stable.Latest.t =
         { blockchain_length: 'length
         ; epoch_count: 'length
-        ; min_epoch_length: 'length
+        ; min_window_length: 'length
+        ; curr_window_length: 'length
         ; last_vrf_output: 'vrf_output
         ; total_currency: 'amount
         ; curr_global_slot: 'global_slot
@@ -1613,7 +1615,8 @@ module Data = struct
     let to_hlist
         { Poly.blockchain_length
         ; epoch_count
-        ; min_epoch_length
+        ; min_window_length
+        ; curr_window_length
         ; last_vrf_output
         ; total_currency
         ; curr_global_slot
@@ -1624,7 +1627,8 @@ module Data = struct
       let open Coda_base.H_list in
       [ blockchain_length
       ; epoch_count
-      ; min_epoch_length
+      ; min_window_length
+        ; curr_window_length
       ; last_vrf_output
       ; total_currency
       ; curr_global_slot
@@ -1636,6 +1640,7 @@ module Data = struct
     let of_hlist :
            ( unit
            ,    'length
+             -> 'length
              -> 'length
              -> 'length
              -> 'vrf_output
@@ -1659,7 +1664,8 @@ module Data = struct
      fun Coda_base.H_list.
            [ blockchain_length
            ; epoch_count
-           ; min_epoch_length
+           ; min_window_length
+           ; curr_window_length
            ; last_vrf_output
            ; total_currency
            ; curr_global_slot
@@ -1669,7 +1675,8 @@ module Data = struct
            ; checkpoints ] ->
       { blockchain_length
       ; epoch_count
-      ; min_epoch_length
+      ; min_window_length
+           ; curr_window_length
       ; last_vrf_output
       ; total_currency
       ; curr_global_slot
@@ -1681,6 +1688,7 @@ module Data = struct
     let data_spec =
       let open Snark_params.Tick.Data_spec in
       [ Length.typ
+      ; Length.typ
       ; Length.typ
       ; Length.typ
       ; Vrf.Output.typ
@@ -1699,7 +1707,8 @@ module Data = struct
     let var_to_triples
         { Poly.blockchain_length
         ; epoch_count
-        ; min_epoch_length
+        ; min_window_length
+        ; curr_window_length
         ; last_vrf_output
         ; total_currency
         ; curr_global_slot
@@ -1710,12 +1719,13 @@ module Data = struct
       let open Snark_params.Tick.Checked.Let_syntax in
       let%map blockchain_length = Length.Checked.to_triples blockchain_length
       and epoch_count = Length.Checked.to_triples epoch_count
-      and min_epoch_length = Length.Checked.to_triples min_epoch_length
+      and min_window_length = Length.Checked.to_triples min_window_length
+      and curr_window_length = Length.Checked.to_triples curr_window_length
       and curr_global_slot = Global_slot.Checked.to_triples curr_global_slot
       and staking_epoch_data = Epoch_data.var_to_triples staking_epoch_data
       and next_epoch_data = Epoch_data.var_to_triples next_epoch_data
       and checkpoints = Checkpoints.Hash.var_to_triples checkpoints in
-      blockchain_length @ epoch_count @ min_epoch_length
+      blockchain_length @ epoch_count @ min_window_length @ curr_window_length
       @ Vrf.Output.Checked.to_triples last_vrf_output
       @ curr_global_slot
       @ Amount.var_to_triples total_currency
@@ -1726,7 +1736,8 @@ module Data = struct
     let fold
         ({ Poly.blockchain_length
          ; epoch_count
-         ; min_epoch_length
+         ; min_window_length
+         ; curr_window_length
          ; last_vrf_output
          ; total_currency
          ; curr_global_slot
@@ -1738,7 +1749,8 @@ module Data = struct
       let open Fold in
       Length.fold blockchain_length
       +> Length.fold epoch_count
-      +> Length.fold min_epoch_length
+      +> Length.fold min_window_length
+      +> Length.fold curr_window_length
       +> Vrf.Output.fold last_vrf_output
       +> Global_slot.fold curr_global_slot
       +> Amount.fold total_currency
@@ -1808,16 +1820,30 @@ module Data = struct
           Checkpoints.cons previous_protocol_state_hash
             previous_consensus_state.checkpoints
       in
+      let min_window_length, curr_window_length = 
+        (* Three cases:
+           - same window
+           - successor window
+           - skipped a window *)
+        let prev = (prev_epoch, Window.of_slot prev_slot) in
+        let next = (next_epoch, Window.of_slot next_slot) in
+        if Epoch_and_window.equal prev next
+        then
+          ( previous_consensus_state.min_window_length
+          , Length.succ previous_consensus_state.curr_window_length)
+        else if Epoch_and_window.(equal (succ prev) next)
+        then 
+          ( Length.min
+            previous_consensus_state.min_window_length
+            previous_consensus_state.curr_window_length
+          , Length.of_int 1 )
+        else (Length.zero, Length.of_int 1)
+      in
       { Poly.blockchain_length=
           Length.succ previous_consensus_state.blockchain_length
       ; epoch_count
-      ; min_epoch_length=
-          ( if Epoch.equal prev_epoch next_epoch then
-            previous_consensus_state.min_epoch_length
-          else if Epoch.(equal next_epoch (succ prev_epoch)) then
-            Length.min previous_consensus_state.min_epoch_length
-              previous_consensus_state.next_epoch_data.epoch_length
-          else Length.zero )
+      ; min_window_length
+      ; curr_window_length
       ; last_vrf_output= proposer_vrf_result
       ; total_currency
       ; curr_global_slot= consensus_transition
@@ -1853,10 +1879,12 @@ module Data = struct
       make_checked (fun () -> same_checkpoint_window ~prev ~next)
 
     let negative_one : Value.t Lazy.t =
-      lazy
+      lazy (
+      let max_window_length =Length.of_int (UInt32.to_int Constants.slots_per_window) in
         { Poly.blockchain_length= Length.zero
         ; epoch_count= Length.zero
-        ; min_epoch_length= Length.of_int (UInt32.to_int Constants.Epoch.size)
+        ; min_window_length= max_window_length
+        ; curr_window_length= max_window_length
         ; last_vrf_output= Vrf.Output.dummy
         ; total_currency= Lazy.force genesis_ledger_total_currency
         ; curr_global_slot= Global_slot.zero
@@ -1864,6 +1892,7 @@ module Data = struct
         ; next_epoch_data= Lazy.force Epoch_data.Next.genesis
         ; has_ancestor_in_same_checkpoint_window= false
         ; checkpoints= Checkpoints.empty }
+      )
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
         ~consensus_transition : Value.t =
@@ -1991,7 +2020,7 @@ module Data = struct
         Amount.Checked.add previous_state.total_currency supply_increase
       and epoch_count =
         Length.Checked.succ_if previous_state.epoch_count epoch_increased
-      and min_epoch_length =
+      and min_window_length =
         let if_ b ~then_ ~else_ =
           let%bind b = b and then_ = then_ and else_ = else_ in
           Length.Checked.if_ b ~then_ ~else_
@@ -1999,12 +2028,12 @@ module Data = struct
         let return = Checked.return in
         if_
           (return Boolean.(not epoch_increased))
-          ~then_:(return previous_state.min_epoch_length)
+          ~then_:(return previous_state.min_window_length)
           ~else_:
             (if_
                (Epoch.Checked.is_succ ~pred:prev_epoch ~succ:next_epoch)
                ~then_:
-                 (Length.Checked.min previous_state.min_epoch_length
+                 (Length.Checked.min previous_state.min_window_length
                     previous_state.next_epoch_data.epoch_length)
                ~else_:(return Length.Checked.zero))
       in
@@ -2012,7 +2041,7 @@ module Data = struct
         ( `Success threshold_satisfied
         , { Poly.blockchain_length
           ; epoch_count
-          ; min_epoch_length
+          ; min_window_length
           ; last_vrf_output= vrf_result
           ; curr_global_slot= next_global_slot
           ; total_currency= new_total_currency
@@ -2497,9 +2526,9 @@ module Hooks = struct
                       (* There is a gap of an entire epoch *)
                     else if Epoch.(succ curr_epoch = newest_epoch) then
                       Length.(
-                        min s.min_epoch_length s.next_epoch_data.epoch_length)
+                        min s.min_window_length s.next_epoch_data.epoch_length)
                       (* Imagine the latest epoch was padded out with zeros to reach the newest_epoch *)
-                    else s.min_epoch_length
+                    else s.min_window_length
                   in
                   Length.(
                     virtual_min_length existing < virtual_min_length candidate))
@@ -2833,10 +2862,10 @@ module Hooks = struct
           in
           { Poly.blockchain_length
           ; epoch_count
-          ; min_epoch_length=
-              ( if Epoch.equal prev_epoch curr_epoch then prev.min_epoch_length
+          ; min_window_length=
+              ( if Epoch.equal prev_epoch curr_epoch then prev.min_window_length
               else if Epoch.(equal curr_epoch (succ prev_epoch)) then
-                Length.min prev.min_epoch_length
+                Length.min prev.min_window_length
                   prev.next_epoch_data.epoch_length
               else Length.zero )
           ; last_vrf_output= proposer_vrf_result
