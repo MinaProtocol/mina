@@ -27,8 +27,7 @@ if (fs.existsSync(endpoint)) {
   })
   .then(res => res.json())
   .then(json => {
-    console.log(JSON.stringify(json.data, null, 2));
-    // writeSchema(json.data)
+    writeSchema(json.data)
   }).catch(e => {
     console.error("Error in query: " + e);
   })
