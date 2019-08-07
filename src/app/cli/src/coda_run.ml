@@ -98,7 +98,6 @@ let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
     ^ Time.to_filename_string ~zone:Time.Zone.utc crash_time
     ^ ".tar.xz"
   in
-  Core.printf "Here\n%!" ;
   (*Coda status*)
   let status_file = temp_config ^/ "coda_status.json" in
   let status =
