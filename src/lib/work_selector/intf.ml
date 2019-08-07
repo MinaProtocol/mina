@@ -123,7 +123,8 @@ module type Lib_intf = sig
        list
 
   val all_works :
-       Staged_ledger.t
+       logger:Logger.t
+    -> Staged_ledger.t
     -> State.t
     -> ( ( Transaction.t
          , Transaction_witness.t
@@ -161,6 +162,7 @@ module type Selection_method_intf = sig
   val work :
        snark_pool:snark_pool
     -> fee:Currency.Fee.t
+    -> logger:Logger.t
     -> staged_ledger
     -> State.t
     -> work list * State.t

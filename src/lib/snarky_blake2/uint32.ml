@@ -59,7 +59,7 @@ module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
     let rec go i =
       if i < 0 then return res
       else
-        let%bind ri = Boolean.(t1.(i) lxor t2.(i)) in
+        let%bind ri = Boolean.( lxor ) t1.(i) t2.(i) in
         res.(i) <- ri ;
         go (i - 1)
     in
