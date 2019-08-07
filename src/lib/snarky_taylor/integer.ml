@@ -75,7 +75,7 @@ let div_mod (type f) ~m:((module M) as m : f m) a b =
   (* This assertion checkes that the multiplication q * b is safe. *)
   assert (q_bit_length + b_bit_length + 1 < Field.Constant.size_in_bits) ;
   assert_r1cs q b.value Field.(a.value - r) ;
-  ( {value= q; upper_bound= B.(one lsl b_bit_length); bits= Some q_bits}
+  ( {value= q; upper_bound= B.(one lsl q_bit_length); bits= Some q_bits}
   , {value= r; upper_bound= b.upper_bound; bits= Some r_bits} )
 
 let to_bits (type f) ~m:((module M) : f m) t =
