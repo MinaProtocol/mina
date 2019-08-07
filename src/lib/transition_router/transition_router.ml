@@ -8,6 +8,8 @@ module type Inputs_intf = sig
 
   module Network : sig
     type t
+
+    val first_connection : t -> unit Ivar.t
   end
 
   module Transition_frontier :
@@ -105,7 +107,8 @@ module Make (Inputs : Inputs_intf) = struct
     Transition_frontier.close frontier ;
     Broadcast_pipe.Writer.write frontier_w None |> don't_wait_for ;
     upon
-      (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
+      (let%bind () = Ivar.read (Network.first_connection network) in
+       Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
          ~ledger_db ~frontier ~transition_reader:!transition_reader_ref)
       (fun (new_frontier, collected_transitions) ->
         Strict_pipe.Writer.kill !transition_writer_ref ;
