@@ -23,19 +23,17 @@ module type Inputs_intf = sig
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_intf.Transition_chain_witness_intf
+  Coda_intf.Transition_chain_prover_intf
   with type transition_frontier := Inputs.Transition_frontier.t
    and type external_transition := Inputs.External_transition.t = struct
   open Inputs
 
-  module Merkle_list = Merkle_list.Make (struct
+  module Merkle_list = Merkle_list_prover.Make (struct
     type value = External_transition.t
 
     type context = Transition_frontier.t
 
     type proof_elem = State_body_hash.t
-
-    type hash = State_hash.t [@@deriving eq]
 
     let to_proof_elem transition =
       transition |> External_transition.protocol_state |> Protocol_state.body
@@ -55,10 +53,6 @@ module Make (Inputs : Inputs_intf) :
       in
       Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
       |> With_hash.data |> External_transition.Validated.forget_validation
-
-    let hash previous_state_hash state_body_hash =
-      Protocol_state.hash_abstract ~hash_body:Fn.id
-        {previous_state_hash; body= state_body_hash}
   end)
 
   let prove ?length ~frontier state_hash =
@@ -77,10 +71,6 @@ module Make (Inputs : Inputs_intf) :
       Merkle_list.prove ?length ~context:frontier requested_transition
     in
     (External_transition.state_hash first_transition, merkle_list)
-
-  let verify ~target_hash
-      ~transition_chain_witness:(oldest_state_hash, merkle_list) =
-    Merkle_list.verify ~init:oldest_state_hash merkle_list target_hash
 end
 
 include Make (struct

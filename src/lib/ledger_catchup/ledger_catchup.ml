@@ -12,7 +12,7 @@ open Coda_base
     asking for. Upon receiving the merkle path/list, it will do the following:
     
     1. verify the merkle path/list is correct by calling
-    [Transition_chain_witness.verify]. This function would returns a list
+    [Transition_chain_verifier.verify]. This function would returns a list
     of state hashes if the verification is successful.
     
     2. using the list of state hashes to poke a transition frontier
@@ -157,7 +157,7 @@ module Make (Inputs : Inputs.S) :
         (* a list of state_hashes from new to old *)
         let%bind hashes =
           match
-            Transition_chain_witness.verify ~target_hash
+            Transition_chain_verifier.verify ~target_hash
               ~transition_chain_witness
           with
           | Some hashes ->
@@ -385,5 +385,4 @@ include Make (struct
   module Transition_handler_validator = Transition_handler.Validator
   module Breadcrumb_builder = Transition_handler.Breadcrumb_builder
   module Network = Coda_networking
-  module Transition_chain_witness = Transition_chain_witness
 end)

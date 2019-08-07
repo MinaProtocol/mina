@@ -399,25 +399,17 @@ module Make
     (* I didn't use the Transition_chain_witness.verify function because otherwise it
        would include a cyclic dependencies *)
     let transition = With_hash.data t in
-    let init, merkle_list = transition.delta_transition_chain_witness in
-    let hashes =
-      List.fold merkle_list ~init:(Non_empty_list.singleton init)
-        ~f:(fun acc proof_elem ->
-          Non_empty_list.cons
-            (Protocol_state.hash_abstract ~hash_body:Fn.id
-               {previous_state_hash= Non_empty_list.head acc; body= proof_elem})
-            acc )
-    in
-    if
-      State_hash.equal
-        (Protocol_state.previous_state_hash transition.protocol_state)
-        (Non_empty_list.head hashes)
-    then
-      Ok
-        ( t
-        , Validation.Unsafe.set_valid_delta_transition_chain_witness validation
-            hashes )
-    else Error `Invalid_delta_transition_chain_witness
+    match
+      Transition_chain_verifier.verify ~target_hash:(parent_hash transition)
+        ~transition_chain_witness:transition.delta_transition_chain_witness
+    with
+    | Some hashes ->
+        Ok
+          ( t
+          , Validation.Unsafe.set_valid_delta_transition_chain_witness
+              validation hashes )
+    | None ->
+        Error `Invalid_delta_transition_chain_witness
 
   let skip_frontier_dependencies_validation
       `This_transition_belongs_to_a_detached_subtree (t, validation) =

@@ -335,7 +335,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         Protocol_state.hash protocol_state
                       in
                       let delta_transition_chain_witness =
-                        Transition_chain_witness.prove
+                        Transition_chain_prover.prove
                           ~length:(Consensus.Constants.delta - 1)
                           ~frontier
                           (Protocol_state.hash previous_protocol_state)

@@ -1,6 +1,6 @@
-type true_ = unit
+type true_
 
-type false_ = unit
+type false_
 
 type ('witness, _) t =
   | True : 'witness -> ('witness, true_) t

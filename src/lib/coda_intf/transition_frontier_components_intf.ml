@@ -256,6 +256,18 @@ module type Sync_handler_intf = sig
     -> (parallel_scan_state * Ledger_hash.t * Pending_coinbase.t) Option.t
 end
 
+module type Transition_chain_prover_intf = sig
+  type transition_frontier
+
+  type external_transition
+
+  val prove :
+       ?length:int
+    -> frontier:transition_frontier
+    -> State_hash.t
+    -> (State_hash.t * State_body_hash.t list) option
+end
+
 module type Transition_chain_witness_intf = sig
   type transition_frontier
 

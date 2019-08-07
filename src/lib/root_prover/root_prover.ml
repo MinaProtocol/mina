@@ -45,14 +45,12 @@ module Make (Inputs : Inputs_intf) :
     External_transition.(
       protocol_state transition |> Protocol_state.consensus_state)
 
-  module Merkle_list = Merkle_list.Make (struct
+  module Merkle_list_prover = Merkle_list_prover.Make (struct
     type value = External_transition.Validated.t
 
     type context = Transition_frontier.t
 
     type proof_elem = State_body_hash.t
-
-    type hash = State_hash.t [@@deriving eq]
 
     let to_proof_elem external_transition =
       external_transition |> External_transition.Validated.protocol_state
@@ -67,6 +65,12 @@ module Make (Inputs : Inputs_intf) :
       let%map breadcrumb = Transition_frontier.find context parent_hash in
       With_hash.data
       @@ Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
+  end)
+
+  module Merkle_list_verifier = Merkle_list_verifier.Make (struct
+    type proof_elem = State_body_hash.t
+
+    type hash = State_hash.t [@@deriving eq]
 
     let hash acc body_hash =
       Protocol_state.hash_abstract ~hash_body:Fn.id
@@ -107,7 +111,7 @@ module Make (Inputs : Inputs_intf) :
       |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
     in
     let _, merkle_list =
-      Merkle_list.prove ~context:frontier best_verified_tip
+      Merkle_list_prover.prove ~context:frontier best_verified_tip
     in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
@@ -163,7 +167,7 @@ module Make (Inputs : Inputs_intf) :
     in
     let%bind () =
       check_error ~message:"Peer gave an invalid proof of it's root"
-        ( Merkle_list.verify ~init:root_hash merkle_list best_tip_hash
+        ( Merkle_list_verifier.verify ~init:root_hash merkle_list best_tip_hash
         |> Option.is_some )
     in
     let open Deferred.Result.Monad_infix in

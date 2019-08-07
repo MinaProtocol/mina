@@ -27,7 +27,6 @@ module Ledger_catchup = Ledger_catchup.Make (struct
     Transition_handler.Unprocessed_transition_cache
   module Transition_handler_validator = Transition_handler.Validator
   module Breadcrumb_builder = Transition_handler.Breadcrumb_builder
-  module Transition_chain_witness = Transition_chain_witness
 end)
 
 let%test_module "Ledger catchup" =

@@ -459,7 +459,7 @@ let create (config : Config.t) =
                 let%bind frontier =
                   Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                 in
-                Transition_chain_witness.prove ~frontier state_hash )
+                Transition_chain_prover.prove ~frontier state_hash )
               ~get_transition_chain:(fun request ->
                 let hashes = Envelope.Incoming.data request in
                 Deferred.return

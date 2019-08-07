@@ -468,7 +468,7 @@ struct
     module Transition_frontier = Transition_frontier
   end)
 
-  module Transition_chain_witness = Transition_chain_witness.Make (struct
+  module Transition_chain_prover = Transition_chain_prover.Make (struct
     include Transition_frontier_inputs
     module Transition_frontier = Transition_frontier
   end)
@@ -614,7 +614,7 @@ struct
       @@
       let open Option.Let_syntax in
       let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
-      Transition_chain_witness.prove ~frontier requested_state_hash
+      Transition_chain_prover.prove ~frontier requested_state_hash
 
     let get_transition_chain {ip_table; _} peer hashes =
       return
