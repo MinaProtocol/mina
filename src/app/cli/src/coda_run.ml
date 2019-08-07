@@ -89,7 +89,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
 let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
   Logger.info top_logger ~module_:__MODULE__ ~location:__LOC__
     "Generating crash report" ;
-  let temp_config = Core.Unix.mkdtemp (conf_dir ^/ "coda_config_temp") in
+  let temp_config = Core.Unix.mkdtemp "coda_config_tempXXXXXX" in
   (*Transition frontier and ledger visualization*)
   log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
   let crash_time = Time.now () in
