@@ -86,9 +86,13 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
         Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
           (Visualization_message.bootstrap "transition frontier") )
 
+let remove_prev_crash_reports ~conf_dir =
+  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*.tar.xz" conf_dir)
+
 let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
   Logger.info top_logger ~module_:__MODULE__ ~location:__LOC__
     "Generating crash report" ;
+  let _ = remove_prev_crash_reports ~conf_dir in
   let temp_config = Core.Unix.mkdtemp "coda_config_tempXXXXXX" in
   (*Transition frontier and ledger visualization*)
   log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
