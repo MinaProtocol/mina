@@ -67,6 +67,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   in
   let frontier_file = conf_dir ^/ "frontier.dot" in
   let mask_file = conf_dir ^/ "registered_masks.dot" in
+  (* ledger visualization *)
   Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
     (Visualization_message.success "registered masks" mask_file) ;
   Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
@@ -75,6 +76,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
       Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
         "Shutdown before Coda instance was created, not saving a visualization"
   | Some t -> (
+    (*Transition frontier visualization*)
     match Coda_lib.visualize_frontier ~filename:frontier_file t with
     | `Active () ->
         Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
@@ -82,6 +84,83 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
     | `Bootstrapping ->
         Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
           (Visualization_message.bootstrap "transition frontier") )
+
+let make_report_and_log_shutdown e ~conf_dir ~top_logger coda_ref =
+  let temp_config = Core.Unix.mkdtemp "coda_config_temp" in
+  (*Transition frontier and ledger visualization*)
+  log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
+  let crash_time = Time.now () in
+  let report_file =
+    conf_dir ^/ "coda_crash_report_"
+    ^ Time.to_filename_string ~zone:Time.Zone.utc crash_time
+    ^ ".tar.xz"
+  in
+  let status_file = temp_config ^/ "coda_status.json" in
+  let () =
+    Option.value_map !coda_ref ~default:() ~f:(fun t ->
+        Coda_commands.get_status ~flag:`Performance t
+        |> Daemon_rpcs.Types.Status.to_yojson
+        |> Yojson.Safe.to_file status_file )
+  in
+  (*coda logs*)
+  let coda_log = conf_dir ^/ "coda.log" in
+  let coda_short_log = temp_config ^/ "coda_short.log" in
+  (*get the last 4MB of the log*)
+  let log_size = 4 * 1024 * 1024 |> Int64.of_int in
+  let log =
+    In_channel.with_file coda_log ~f:(fun in_chan ->
+        let len = In_channel.length in_chan in
+        In_channel.seek in_chan
+          Int64.(max 0L (Int64.( + ) len (Int64.neg log_size))) ;
+        In_channel.input_all in_chan )
+  in
+  Out_channel.write_all coda_short_log ~data:log ;
+  (*System info/crash summary*)
+  let uname = Core.Unix.uname () in
+  let daemon_command = sprintf !"Command: %{sexp: string array}" Sys.argv in
+  let sys_info : Yojson.json =
+    `Assoc
+      [ ("OS_type", `String Sys.os_type)
+      ; ("Release", `String (Core.Unix.Utsname.release uname))
+      ; ("Machine", `String (Core.Unix.Utsname.machine uname))
+      ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
+      ; ("Crash_time", `String (Time.to_string crash_time))
+      ; ("Exception", `String (Exn.to_string e))
+      ; ("Command", `String daemon_command) ]
+  in
+  Yojson.to_file (temp_config ^/ "crash_summary.json") sys_info ;
+  (*Zip them all up*)
+  let files =
+    [ "coda_short.log"
+    ; "coda.version"
+    ; "registered_mask.dot"
+    ; "frontier.dot"
+    ; "daemon.json"
+    ; "coda_status.json"
+    ; "crash_summary.json" ]
+    |> List.map ~f:(fun f -> temp_config ^/ f)
+    |> String.concat ~sep:" "
+  in
+  let tar_command =
+    sprintf "tar  -C %s -cJf %s %s" conf_dir report_file files
+  in
+  let exit = Core.Sys.command tar_command in
+  if exit <> 0 then
+    Core.eprintf
+      !"Error running the tar command %s. Exit code: %d\n"
+      tar_command exit ;
+  Core.eprintf
+    !{err|
+
+  ☠  Coda Daemon crashed. The Coda Protocol developers would like to know why!
+
+  Please:
+    Open an issue:
+      https://github.com/CodaProtocol/coda/issues/new
+
+    Briefly describe what you were doing and attach the crash report %s
+    %!|err}
+    report_file
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_whitelist = []) ?rest_server_port
@@ -336,27 +415,9 @@ let run_snark_worker ?shutdown_on_disconnect:(s = true) ~client_port
       create_snark_worker ~shutdown_on_disconnect:s ~public_key ~client_port
       |> ignore
 
-let handle_crash e =
-  Core.eprintf
-    !{err|
-
-  ☠  Coda Daemon crashed. The Coda Protocol developers would like to know why!
-
-  Please:
-    Open an issue:
-      https://github.com/CodaProtocol/coda/issues/new
-
-    Briefly describe what you were doing, and include the last 20 lines from .coda-config/coda.log.
-    And then paste the following:
-
-    %s
-%!|err}
-    (Exn.to_string e)
-
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-      log_shutdown ~conf_dir ~top_logger coda_ref ;
-      handle_crash exn ;
+      make_report_and_log_shutdown exn ~conf_dir ~top_logger coda_ref ;
       Stdlib.exit 1 ) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->
