@@ -45,6 +45,8 @@ include Data_hash.Make_full_size ()
 module T = struct
   type t = Stable.Latest.t [@@deriving bin_io]
 
+  let description = "Ledger hash"
+
   let version_byte = Base58_check.Version_bytes.ledger_hash
 end
 

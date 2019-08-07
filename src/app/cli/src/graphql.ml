@@ -98,10 +98,23 @@ module Types = struct
       | Banned_until tm ->
           Some (date tm)
 
-    module State_hash = Codable.Make_base58_check (State_hash.Stable.V1)
-    module Ledger_hash = Codable.Make_base58_check (Ledger_hash.Stable.V1)
-    module Frozen_ledger_hash =
-      Codable.Make_base58_check (Frozen_ledger_hash.Stable.V1)
+    module State_hash = Codable.Make_base58_check (struct
+      include State_hash.Stable.V1
+
+      let description = "State hash"
+    end)
+
+    module Ledger_hash = Codable.Make_base58_check (struct
+      include Ledger_hash.Stable.V1
+
+      let description = "Ledger hash"
+    end)
+
+    module Frozen_ledger_hash = Codable.Make_base58_check (struct
+      include Frozen_ledger_hash.Stable.V1
+
+      let description = "Frozen ledger hash"
+    end)
   end
 
   let public_key =
@@ -1126,13 +1139,19 @@ module Mutations = struct
   let parse_user_command_input ~kind coda from to_ fee maybe_memo =
     let open Result.Let_syntax in
     let%bind sender_nonce =
-      Result.of_option
-        (Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger coda
-           from)
-        ~error:
-          "Couldn't infer nonce for transaction from specified `sender` since \
-           `sender` is not in the ledger or sent a transaction in  \
-           transaction pool."
+      match
+        Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger coda
+          from
+      with
+      | `Active (Some nonce) ->
+          Ok nonce
+      | `Active None ->
+          Error
+            "Couldn't infer nonce for transaction from specified `sender` \
+             since `sender` is not in the ledger or sent a transaction in \
+             transaction pool."
+      | `Bootstrapping ->
+          Error "Node is still bootstrapping"
     in
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee
