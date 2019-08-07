@@ -200,7 +200,11 @@ jobs:
             DUNE_PROFILE: testnet_postake_medium_curves
         steps:
             - checkout
-            - run: mkdir -p /tmp/artifacts
+            - run:
+                  name: Artifacts
+                  command: |
+                      mkdir -p /tmp/artifacts
+                      touch /tmp/artifacts/coda_pvkeys_dummy
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
@@ -239,7 +243,11 @@ jobs:
             DUNE_PROFILE: testnet_postake_many_proposers_medium_curves
         steps:
             - checkout
-            - run: mkdir -p /tmp/artifacts
+            - run:
+                  name: Artifacts
+                  command: |
+                      mkdir -p /tmp/artifacts
+                      touch /tmp/artifacts/coda_pvkeys_dummy
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
