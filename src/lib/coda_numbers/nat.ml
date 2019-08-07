@@ -62,7 +62,7 @@ struct
         (pack_var x :> Field.Var.t)
         (pack_var y :> Field.Var.t)
     in
-    if_ c.less_or_equal ~then_:x ~else_:y
+    Bits_snarkable.if_ c.less_or_equal ~then_:x ~else_:y
 
   module Bits = Bits
 

@@ -50,7 +50,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
+            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
             - checkout
             - run:
@@ -157,10 +157,10 @@ jobs:
                     nix-build release2.nix
             - run:
                 name: Build ocaml
+                environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
                 command: bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h
-                environment:
-                DUNE_PROFILE: testnet_postake_medium_curves
             - run:
                 name: Collect PV Keys
                 command: |
@@ -201,12 +201,16 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
+            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
             - checkout
-            - run: mkdir -p /tmp/artifacts
+            - run:
+                  name: Artifacts
+                  command: |
+                      mkdir -p /tmp/artifacts
+                      touch /tmp/artifacts/coda_pvkeys_dummy
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
@@ -249,7 +253,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
+            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -268,7 +272,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
+            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -287,7 +291,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
+            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
             - checkout
             - run:
@@ -306,7 +310,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e855336d087a679f76f2dd2bbdc3fdfea9303be3
+            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
             - checkout
             - run:

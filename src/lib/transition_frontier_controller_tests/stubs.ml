@@ -363,6 +363,7 @@ struct
           Ledger_transfer.transfer_accounts
             ~src:(Lazy.force Genesis_ledger.t)
             ~dest:ledger_db
+          |> Or_error.ok_exn
         in
         let consensus_local_state =
           Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
@@ -534,6 +535,22 @@ struct
         [@@deriving make]
       end
     end
+
+    (* ban notification not implemented for these tests; satisfy interface *)
+    module Ban_notification = struct
+      type ban_notification = unit
+
+      let banned_until _ = failwith "banned_until: not implemented"
+
+      let banned_peer _ = failwith "banned_peer: not implemented"
+
+      let ban_notification_reader _ =
+        failwith "ban_notification_reader: not implemented"
+
+      let ban_notify _ = failwith "ban_notify: not implemented"
+    end
+
+    include Ban_notification
 
     module Config = struct
       type t =

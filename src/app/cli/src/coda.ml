@@ -114,8 +114,14 @@ let daemon logger =
            (Printf.sprintf
               "FEE Amount a worker wants to get compensated for generating a \
                snark proof (default: %d)"
-              (Currency.Fee.to_int Cli_lib.Fee.default_snark_worker))
+              (Currency.Fee.to_int Cli_lib.Default.snark_worker_fee))
          (optional txn_fee)
+     and work_reassignment_wait =
+       flag "work-reassignment-wait" (optional int)
+         ~doc:
+           (Printf.sprintf
+              "WAIT-TIME in ms before a snark-work is reassigned (default:%dms)"
+              Cli_lib.Default.work_reassignment_wait)
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
      and insecure_rest_server =
@@ -338,7 +344,7 @@ let daemon logger =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
            in
            or_from_config json_to_currency_fee_option "snark-worker-fee"
-             ~default:Cli_lib.Fee.default_snark_worker snark_work_fee
+             ~default:Cli_lib.Default.snark_worker_fee snark_work_fee
          in
          let max_concurrent_connections =
            if
@@ -353,6 +359,11 @@ let daemon logger =
                 (Fn.compose work_selection_method_val YJ.Util.to_string))
              "work-selection" ~default:Cli_lib.Arg_type.Sequence
              work_selection_method_flag
+         in
+         let work_reassignment_wait =
+           or_from_config YJ.Util.to_int_option "work-reassignment-wait"
+             ~default:Cli_lib.Default.work_reassignment_wait
+             work_reassignment_wait
          in
          let initial_peers_raw =
            List.concat
@@ -400,7 +411,7 @@ let daemon logger =
          let%bind external_ip =
            match external_ip_opt with
            | None ->
-               Find_ip.find ()
+               Find_ip.find ~logger
            | Some ip ->
                return @@ Unix.Inet_addr.of_string ip
          in
@@ -564,7 +575,7 @@ let daemon logger =
                 ~transition_frontier_location ~time_controller
                 ~initial_propose_keypairs ~monitor ~consensus_local_state
                 ~transaction_database ~external_transition_database
-                ~is_archive_node ())
+                ~is_archive_node ~work_reassignment_wait ())
          in
          { Coda_initialization.coda
          ; client_whitelist

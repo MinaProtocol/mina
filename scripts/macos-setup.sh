@@ -78,6 +78,7 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   opam pin -y add src/external/digestif
   opam pin -y add src/external/async_kernel
   opam pin -y add src/external/coda_base58
+  opam pin -y add src/external/graphql_ppx
   eval $(opam config env)
 
 else

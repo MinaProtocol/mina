@@ -17,7 +17,7 @@ module Styles = {
       selector(
         ".headerlink",
         [
-          display(`none),
+          display(`inlineBlock),
           width(rem(1.)),
           height(rem(1.)),
           marginLeft(rem(0.5)),
@@ -121,6 +121,10 @@ module Styles = {
           ),
         ],
       ),
+      media(
+        Style.MediaQuery.somewhatLarge,
+        [selector(".headerlink", [display(`none)])],
+      ),
     ]);
 
   let sideNav =
@@ -129,6 +133,7 @@ module Styles = {
       selector("ul", [listStyleType(`none)]),
       selector("ul:first-child", [marginLeft(`zero)]),
       selector("li > ul", [marginLeft(rem(1.))]),
+      selector("a", [display(`inlineBlock), height(rem(1.5))]),
       selector("li", [marginBottom(rem(0.5))]),
       selector(
         ".current > a",
@@ -163,7 +168,12 @@ module Styles = {
       ),
       media(
         Style.MediaQuery.somewhatLarge,
-        [marginRight(rem(2.)), marginTop(rem(3.))],
+        [
+          marginRight(rem(2.)),
+          marginTop(rem(2.)),
+          position(`sticky),
+          top(rem(2.5)),
+        ],
       ),
     ]);
 };
@@ -281,14 +291,14 @@ let make = _children => {
           )>
           {ReasonReact.string("{% if page.previous_page %}")}
           <A name="next_page" href="{{ page.previous_page.url|url }}">
-            {ReasonReact.string({js|⟵ {{ page.previous_page.title }}|js})}
+            {ReasonReact.string({js|← {{ page.previous_page.title }}|js})}
           </A>
           {ReasonReact.string("{% else %}")}
           <span />
           {ReasonReact.string("{% endif %}")}
           {ReasonReact.string("{% if page.next_page %}")}
           <A name="next_page" href="{{ page.next_page.url|url }}">
-            {ReasonReact.string({js|{{ page.next_page.title }} ⟶|js})}
+            {ReasonReact.string({js|{{ page.next_page.title }} →|js})}
           </A>
           {ReasonReact.string("{% else %}")}
           <span />
