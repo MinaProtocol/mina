@@ -348,6 +348,8 @@ let get_status ~flag t =
           `Active `Offline
       | `Synced ->
           `Active `Synced
+      | `Catchup ->
+          `Active `Catchup
     in
     let consensus_time_best_tip =
       Consensus.Data.Consensus_state.time_hum consensus_state

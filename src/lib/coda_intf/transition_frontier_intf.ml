@@ -454,6 +454,12 @@ module type Transition_frontier_intf = sig
   val persistence_diff_pipe :
     t -> Diff.Persistence_diff.view Broadcast_pipe.Reader.t
 
+  val catchup_signal : t -> [`Normal | `Catchup] Broadcast_pipe.Reader.t
+
+  val incr_num_catchup_jobs : t -> unit Deferred.t
+
+  val decr_num_catchup_jobs : t -> unit Deferred.t
+
   val new_transition :
     t -> external_transition_validated Coda_incremental.New_transition.t
 
