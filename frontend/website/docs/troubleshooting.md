@@ -44,7 +44,7 @@ If you are on a shared network (like an office wireless network), you may get th
 AddPortMapping(8302, 8302, 192.168.101.7) failed with code 718 (ConflictInMappingEntry)
 ```
 
-If this happens, you can run the daemon with different ports, as long as they are unused by another application. If you forward custom ports, keep in mind:
+If this happens, you can run the daemon with different ports and forward them, as long as they are unused by another application. If you forward custom ports, keep in mind:
 
 - The UDP port forwarded has to be the next consecutive port from the TCP mapping.
 - When running Coda daemon commands in the next step, you'll need to add the flag `-external-port <custom-TCP-port>` passing in the TCP port forwarded.
