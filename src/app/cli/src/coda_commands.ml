@@ -123,12 +123,10 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
   in
   match txn_pool_nonce with
   | Some nonce ->
-      Some (Account.Nonce.succ nonce)
+      Participating_state.Option.return (Account.Nonce.succ nonce)
   | None ->
-      let open Option.Let_syntax in
-      let%map account =
-        Option.join (Participating_state.active (get_account t addr))
-      in
+      let open Participating_state.Option.Let_syntax in
+      let%map account = get_account t addr in
       account.Account.Poly.nonce
 
 let get_nonce t (addr : Public_key.Compressed.t) =

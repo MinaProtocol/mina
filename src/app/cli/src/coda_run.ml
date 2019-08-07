@@ -218,15 +218,15 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
   let client_impls =
     [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
           let%map result = Coda_commands.send_user_command coda tx in
-          result |> Participating_state.active_exn )
+          result |> Participating_state.active_error |> Or_error.join )
     ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-          Coda_commands.schedule_user_commands coda ts
-          |> Participating_state.active_exn ;
-          Deferred.unit )
+          return
+            ( Coda_commands.schedule_user_commands coda ts
+            |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
           return
             ( Coda_commands.get_balance coda pk
-            |> Participating_state.active_exn ) )
+            |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_trust_status.rpc (fun () ip_address ->
           return (Coda_commands.get_trust_status coda ip_address) )
     ; implement Daemon_rpcs.Get_trust_status_all.rpc (fun () () ->
@@ -236,19 +236,21 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
     ; implement Daemon_rpcs.Verify_proof.rpc (fun () (pk, tx, proof) ->
           return
             ( Coda_commands.verify_payment coda pk tx proof
-            |> Participating_state.active_exn ) )
+            |> Participating_state.active_error |> Or_error.join ) )
     ; implement Daemon_rpcs.Prove_receipt.rpc (fun () (proving_receipt, pk) ->
           let open Deferred.Or_error.Let_syntax in
-          let%bind account =
+          let%bind acc_opt =
             Coda_commands.get_account coda pk
-            |> Participating_state.active_exn
-            |> Result.of_option
-                 ~error:
-                   (Error.of_string
-                      (sprintf
-                         !"Could not find account of public key %{sexp: \
-                           Public_key.Compressed.t}"
-                         pk))
+            |> Participating_state.active_error |> Deferred.return
+          in
+          let%bind account =
+            Result.of_option acc_opt
+              ~error:
+                (Error.of_string
+                   (sprintf
+                      !"Could not find account of public key %{sexp: \
+                        Public_key.Compressed.t}"
+                      pk))
             |> Deferred.return
           in
           Coda_commands.prove_receipt coda ~proving_receipt
@@ -256,19 +258,20 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
     ; implement Daemon_rpcs.Get_public_keys_with_details.rpc (fun () () ->
           return
             ( Coda_commands.get_keys_with_details coda
-            |> Participating_state.active_exn ) )
+            |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
           return
             ( Coda_commands.get_public_keys coda
-            |> Participating_state.active_exn ) )
+            |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
           return
-            (Coda_commands.get_nonce coda pk |> Participating_state.active_exn)
-      )
+            ( Coda_commands.get_nonce coda pk
+            |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () pk ->
           return
-            (Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger
-               coda pk) )
+            ( Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger
+                coda pk
+            |> Participating_state.active_error ) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
           return (Coda_commands.get_status ~flag coda) )
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
@@ -279,7 +282,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
           Deferred.unit )
     ; implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
-          return (snark_job_list_json coda |> Participating_state.active_exn)
+          return (snark_job_list_json coda |> Participating_state.active_error)
       )
     ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
           let open Coda_lib.Config in
