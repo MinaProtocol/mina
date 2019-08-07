@@ -98,9 +98,8 @@ let%test_module "Sync_handler" =
             Option.value_exn ~message:"Could not produce an ancestor proof"
               (Sync_handler.Root.prove ~logger ~frontier observed_state)
           in
-          let%map ( ( (`Root (root_transition, _) as root_with_validation)
-                    , `Best_tip (best_tip_transition, _) ) as
-                  best_tip_with_validation ) =
+          let%map `Root (root_transition, _), `Best_tip (best_tip_transition, _)
+              =
             Sync_handler.Root.verify ~logger ~verifier:() observed_state
               root_with_proof
             |> Deferred.Or_error.ok_exn

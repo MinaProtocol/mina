@@ -363,10 +363,9 @@ end = struct
     let root_sync_ledger =
       Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
     in
-    ( if not should_ask_best_tip then Deferred.unit
-    else request_and_sync_best_tip t root_sync_ledger initial_root_transition
-    )
-    |> don't_wait_for ;
+    if should_ask_best_tip then
+      don't_wait_for
+      @@ request_and_sync_best_tip t root_sync_ledger initial_root_transition ;
     let%bind synced_db, (hash, sender, expected_staged_ledger_hash) =
       sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
       |> don't_wait_for ;
