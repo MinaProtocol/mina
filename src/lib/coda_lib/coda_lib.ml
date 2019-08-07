@@ -308,7 +308,8 @@ let request_work t =
   in
   let fee = snark_work_fee t in
   let instances, seen_jobs =
-    Work_selection_method.work ~fee ~snark_pool:(snark_pool t) sl (seen_jobs t)
+    Work_selection_method.work ~logger:t.config.logger ~fee
+      ~snark_pool:(snark_pool t) sl (seen_jobs t)
   in
   set_seen_jobs t seen_jobs ;
   if List.is_empty instances then None
@@ -351,11 +352,33 @@ let create_genesis_frontier (config : Config.t) ~verifier =
          ~staged_ledger_diff:empty_diff)
   in
   let genesis_ledger = Lazy.force Genesis_ledger.t in
-  let ledger_db =
-    Ledger.Db.create ?directory_name:config.ledger_db_location ()
+  let load () =
+    let ledger_db =
+      Ledger.Db.create ?directory_name:config.ledger_db_location ()
+    in
+    ( ledger_db
+    , Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db )
   in
-  let root_snarked_ledger =
-    Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db
+  let%bind root_snarked_ledger =
+    match load () with
+    | _, Ok l ->
+        return l
+    | ledger_db, Error _ ->
+        (* Persisted state was bogus. Give up on the ledger contents, we'll bootstrap. *)
+        Ledger.Db.close ledger_db ;
+        let%map () =
+          match config.ledger_db_location with
+          | Some ledger_db_location ->
+              Logger.error config.logger
+                "Failed to load genesis ledger, deleting $dir and trying again."
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("dir", `String ledger_db_location)] ;
+              File_system.remove_dir ledger_db_location
+          | None ->
+              Deferred.unit
+        in
+        snd (load ()) |> Or_error.ok_exn
+    (* If it fails again, something is very wrong. Die. *)
   in
   let snarked_ledger_hash =
     Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root genesis_ledger

@@ -215,6 +215,8 @@ let daemon logger =
          ~metadata:
            [ ("commit", `String Coda_version.commit_id)
            ; ("branch", `String Coda_version.branch) ] ;
+       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+         "Booting may take several seconds, please wait" ;
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
