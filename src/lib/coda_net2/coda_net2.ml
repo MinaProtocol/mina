@@ -4,8 +4,6 @@ open Async_unix
 open Deferred.Let_syntax
 open Pipe_lib
 
-[@@@ocaml.warning "-27"]
-
 exception Child_died
 
 (* BTC alphabet *)
@@ -18,7 +16,7 @@ let of_b58_data = function
     try Ok (Bytes.of_string s |> B58.decode alphabet |> Bytes.to_string)
     with B58.Invalid_base58_character ->
       Or_error.error_string "invalid base58" )
-  | j ->
+  | _ ->
       Or_error.error_string "expected a string"
 
 let to_b58_data (s : string) =
@@ -52,12 +50,7 @@ module Helper = struct
     ; logger: Logger.t
     ; mutable me_keypair: keypair option
     ; subscriptions:
-        ( int
-        , ( string Envelope.Incoming.t
-          , Strict_pipe.crash Strict_pipe.buffered
-          , unit )
-          Strict_pipe.Writer.t
-          * subscription )
+        ( int , subscription )
         Hashtbl.t
     ; validators:
         (string, peerid:string -> data:string -> bool Deferred.t) Hashtbl.t
@@ -131,7 +124,9 @@ module Helper = struct
     end
 
     module Generate_keypair = struct
-      type input = unit [@@deriving yojson]
+      type input = unit
+
+      let input_to_yojson () = `Assoc []
 
       type output = {sk: string; pk: string; peer_id: string}
       [@@deriving yojson]
@@ -321,7 +316,7 @@ module Helper = struct
         let%bind idx = v |> member "subscription_idx" |> to_int_res in
         let%bind data = v |> member "data" |> of_b58_data in
         match Hashtbl.find t.subscriptions idx with
-        | Some (pipe, sub) ->
+        | Some sub ->
             if not sub.closed then
               (* TAKE CARE: doing anything with the return value here is UNSOUND
                because write_pipe has a cast type. We don't remember what the
@@ -362,7 +357,6 @@ module Helper = struct
                validator for %s"
               topic )
     | "incomingStream" -> (
-        let%bind peer = v |> member "remote_maddr" |> to_string_res in
         let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
         let%bind protocol = v |> member "protocol" |> to_string_res in
         let%bind remote_addr = v |> member "remote_addr" |> to_string_res in
@@ -398,7 +392,7 @@ module Helper = struct
                       ( do_rpc t (module Rpcs.Remove_stream_handler) {protocol}
                       >>| fun _ -> Hashtbl.remove t.protocol_handlers protocol
                       ) ;
-                    raise e )) ;
+                    raise handler_exn )) ;
               Ok () )
             else
               (* silently ignore new streams for closed protocol handlers *)
@@ -419,6 +413,7 @@ module Helper = struct
     | "streamLost" ->
         let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
         let%bind reason = v |> member "reason" |> to_string_res in
+        Logger.warn t.logger "Encountered error while reading stream: $error" ~module_:__MODULE__ ~location:__LOC__ ~metadata:["error", `String reason] ;
         let ret =
           if Hashtbl.mem t.streams stream_idx then Ok ()
           else
@@ -577,33 +572,6 @@ module Pubsub = struct
     let message_pipe {read_pipe; _} = read_pipe
   end
 
-  let subscribe (net : net) (topic : string) =
-    let subscription_idx = Helper.genseq net in
-    let read_pipe, write_pipe =
-      Strict_pipe.create
-        ~name:(sprintf "subscription to topic «%s»" topic)
-        Strict_pipe.(Buffered (`Capacity 64, `Overflow Crash))
-    in
-    let sub =
-      { Subscription.net
-      ; closed= false
-      ; topic
-      ; idx= subscription_idx
-      ; write_pipe
-      ; read_pipe }
-    in
-    (* TODO: check if already subscribed to topic, fail. *)
-    Hashtbl.add_exn net.subscriptions ~key:subscription_idx
-      ~data:(write_pipe, sub) ;
-    match%map
-      Helper.do_rpc net (module Helper.Rpcs.Subscribe) {topic; subscription_idx}
-      |> Deferred.Or_error.ok_exn
-    with
-    | "subscribe success" ->
-        Ok sub
-    | v ->
-        failwithf "helper broke RPC protocol: unsubscribe got %s" v ()
-
   let register_validator (net : net) topic ~f =
     match Hashtbl.find net.validators topic with
     | Some _ ->
@@ -621,6 +589,34 @@ module Pubsub = struct
         | v ->
             failwithf "helper broke RPC protocol: registerValidator got %s" v
               () )
+
+  let subscribe (net : net) (topic : string) ~should_forward_message =
+    let subscription_idx = Helper.genseq net in
+    let read_pipe, write_pipe =
+      Strict_pipe.create
+        ~name:(sprintf "subscription to topic «%s»" topic)
+        Strict_pipe.(Buffered (`Capacity 64, `Overflow Crash))
+    in
+    let sub =
+      { Subscription.net
+      ; closed= false
+      ; topic
+      ; idx= subscription_idx
+      ; write_pipe
+      ; read_pipe }
+    in
+    (* TODO: check if already subscribed to topic, fail. *)
+    Hashtbl.add_exn net.subscriptions ~key:subscription_idx
+      ~data:sub ;
+    match%map
+      Helper.do_rpc net (module Helper.Rpcs.Subscribe) {topic; subscription_idx}
+      |> Deferred.Or_error.ok_exn
+    with
+    | "subscribe success" ->
+        Ok sub
+    | v ->
+        failwithf "helper broke RPC protocol: unsubscribe got %s" v ()
+
 end
 
 let me (net : Helper.t) = net.me_keypair
@@ -643,7 +639,7 @@ let configure net ~me ~maddrs ~network_id =
       Error e
 
 (** TODO: do we need this? *)
-let peers net = Deferred.return []
+let peers _ = Deferred.return []
 
 let listen_on net iface =
   match%map Helper.do_rpc net (module Helper.Rpcs.Listen) {iface} with
@@ -694,17 +690,17 @@ module Protocol_handler = struct
 
   let is_closed ({closed; _} : t) = closed
 
-  let close_connections (net : net) for_real for_protocol =
-    if for_real then
-      Hashtbl.filter_inplace net.streams
-        ~f:(fun ({protocol; idx; _} as stream) ->
-          if protocol <> for_protocol then false
-          else (
-            Stream.reset stream >>| Fn.const () |> don't_wait_for ;
-            true ) )
+  let close_connections (net : net) for_protocol =
+    Hashtbl.filter_inplace net.streams
+      ~f:(fun stream ->
+        if stream.protocol <> for_protocol then false
+        else (
+          don't_wait_for (let%map _ = Stream.reset stream in ()) ;
+          true ) )
 
   let close ?(reset_existing_streams = false) ({net; protocol_name; _} : t) =
     Hashtbl.remove net.protocol_handlers protocol_name ;
+    let close_connections = if reset_existing_streams then close_connections else fun _ _ -> () in
     match%map
       Helper.do_rpc net
         (module Helper.Rpcs.Remove_stream_handler)
@@ -712,9 +708,9 @@ module Protocol_handler = struct
       |> Deferred.Or_error.ok_exn
     with
     | "removeStreamHandler success" ->
-        close_connections net reset_existing_streams protocol_name
+        close_connections net protocol_name
     | v ->
-        close_connections net reset_existing_streams protocol_name ;
+        close_connections net protocol_name ;
         failwithf "helper broke RPC protocol: addStreamHandler got %s" v ()
 end
 
@@ -843,12 +839,12 @@ let create ~logger ~conf_dir =
         match%bind Process.run ~prog:"kill" ~args:[p] () with
         | Ok _ ->
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "Killing Dead libp2p_helper Process %s" p ;
+              "Killing dead libp2p_helper process %s" p ;
             let%map () = Sys.remove lock_path in
             Ok ()
         | Error _ ->
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "Process %s does not exists and will not be killed" p ;
+              "Process %s does not exist and will not be killed" p ;
             return @@ Ok () )
     | _ ->
         return @@ Ok ()
@@ -872,7 +868,7 @@ let%test_module "coda network tests" =
 
     let () = Async.Scheduler.set_record_backtraces true
 
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let testmsg =
       "This is a test. This is a test of the Outdoor Warning System. This is \
@@ -894,13 +890,12 @@ let%test_module "coda network tests" =
       let%bind kp_a = Keypair.random a in
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
-      let network_id = "test_stream" in
       let%bind () =
         configure a ~me:kp_a ~maddrs ~network_id >>| Or_error.ok_exn
+        and () = configure b ~me:kp_b ~maddrs ~network_id >>| Or_error.ok_exn
       in
-      let%map () =
-        configure b ~me:kp_b ~maddrs ~network_id >>| Or_error.ok_exn
-      in
+      (* Give the helpers time to announce and discover each other on localhost *)
+      let%map () = after (Time.Span.of_sec 0.5) in
       (a, b)
 
     let%test_unit "stream" =
@@ -908,7 +903,6 @@ let%test_module "coda network tests" =
         let open Deferred.Let_syntax in
         let%bind a, b = setup_two_nodes "test_stream" in
         let a_peerid = Keypair.to_peerid (me a |> Option.value_exn) in
-        (* Give the libp2p helpers time to see each other. *)
         let%bind () = after (sec 0.5) in
         let handler_finished = ref false in
         let%bind echo_handler =
@@ -917,7 +911,7 @@ let%test_module "coda network tests" =
               let r, w = Stream.pipes stream in
               let%map () = Pipe.transfer r w ~f:Fn.id in
               Pipe.close w ;
-              handler_finished := true )
+              handler_finished := true ) |> Deferred.Or_error.ok_exn
         in
         let%bind stream =
           open_stream b ~protocol:"echo" a_peerid >>| Or_error.ok_exn
@@ -929,6 +923,7 @@ let%test_module "coda network tests" =
         let msg = Queue.to_list msg |> String.concat in
         assert (msg = testmsg) ;
         assert !handler_finished ;
+        let%bind () = Protocol_handler.close echo_handler in
         let%bind () = shutdown a in
         let%map () = shutdown b in
         ()
@@ -947,13 +942,14 @@ let%test_module "coda network tests" =
       let test_def =
         let open Deferred.Let_syntax in
         let%bind a, b = setup_two_nodes "test_pubsub" in
+        let should_forward_message ~sender ~data = return true in
         (* Give the libp2p helpers time to see each other. *)
         let%bind () = after (sec 0.5) in
         let%bind a_sub =
-          Pubsub.subscribe a "test" |> Deferred.Or_error.ok_exn
+          Pubsub.subscribe a "test" ~should_forward_message |> Deferred.Or_error.ok_exn
         in
         let%bind b_sub =
-          Pubsub.subscribe b "test" |> Deferred.Or_error.ok_exn
+          Pubsub.subscribe b "test" ~should_forward_message |> Deferred.Or_error.ok_exn
         in
         let a_r = Pubsub.Subscription.message_pipe a_sub in
         let b_r = Pubsub.Subscription.message_pipe b_sub in

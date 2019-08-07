@@ -54,7 +54,6 @@ const (
 	publish
 	subscribe
 	unsubscribe
-	registerValidator
 	validationComplete
 	generateKeypair
 	openStream
@@ -221,6 +220,28 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
+		app.writeMsg(validateUpcall{
+			PeerID: id.Pretty(),
+			Data:   b58.Encode(msg.Data),
+			Seqno:  seq,
+			Upcall: "validate",
+			Idx:    s.Subscription,
+			Topic:  r.Topic,
+		})
+
+		select {
+		case <-ctx.Done():
+			return false
+		case res := <-ch:
+			return res
+		}
+	}, pubsub.WithValidatorConcurrency(1), pubsub.WithValidatorTimeout(5*time.Second))
+
+	if err != nil {
+		return nil, badp2p(err)
+    }
+
 	sub, err := app.P2p.Pubsub.Subscribe(s.Topic)
 	if err != nil {
 		return nil, badp2p(err)
@@ -270,56 +291,18 @@ func (u *unsubscribeMsg) run(app *app) (interface{}, error) {
 	return nil, badRPC(errors.New("subscription not found"))
 }
 
-type registerValidatorMsg struct {
-	Topic string `json:"topic"`
-	Idx   int    `json:"validator_idx"`
-}
-
 type validateUpcall struct {
 	PeerID string `json:"peer_id"`
 	Data   string `json:"data"`
 	Seqno  int    `json:"seqno"`
 	Upcall string `json:"upcall"`
-	Idx    int    `json:"validator_idx"`
+	Idx    int    `json:"subscription_idx"`
 	Topic  string `json:"topic"`
 }
 
 type validationCompleteMsg struct {
 	Seqno int  `json:"seqno"`
 	Valid bool `json:"is_valid"`
-}
-
-func (r *registerValidatorMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-	ch := make(chan bool)
-
-	seq := <-seqs
-	app.Validators[seq] = ch
-
-	err := app.P2p.Pubsub.RegisterTopicValidator(r.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
-		app.writeMsg(validateUpcall{
-			PeerID: id.Pretty(),
-			Data:   b58.Encode(msg.Data),
-			Seqno:  seq,
-			Upcall: "validate",
-			Idx:    r.Idx,
-			Topic:  r.Topic,
-		})
-
-		select {
-		case <-ctx.Done():
-			return false
-		case res := <-ch:
-			return res
-		}
-	}, pubsub.WithValidatorConcurrency(1), pubsub.WithValidatorTimeout(5*time.Second))
-
-	if err != nil {
-		return nil, badp2p(err)
-	}
-	return "register validator success", nil
 }
 
 func (r *validationCompleteMsg) run(app *app) (interface{}, error) {
@@ -406,7 +389,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 				app.writeMsg(incomingMsgUpcall{
 					Upcall:    "incomingStreamMsg",
 					Data:      b58.Encode(buf[:len]),
-					StreamIdx: idx,
+                    StreamIdx: idx,
 				})
 			}
 
@@ -419,6 +402,12 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			StreamIdx: idx,
 		})
 	}()
+}
+
+type openStreamResult struct {
+    StreamIdx int `json:"stream_idx"`
+    RemoteAddr string `json:"remote_addr"`
+    RemotePeerID string `json:"remote_peerid"`
 }
 
 func (o *openStreamMsg) run(app *app) (interface{}, error) {
@@ -441,7 +430,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 
 	app.Streams[streamIdx] = stream
 	handleStreamReads(app, stream, streamIdx)
-	return streamIdx, nil
+	return openStreamResult { StreamIdx: streamIdx, RemoteAddr: stream.Conn().RemoteMultiaddr().String(), RemotePeerID: stream.Conn().RemotePeer().String() }, nil
 }
 
 type closeStreamMsg struct {
@@ -510,7 +499,8 @@ type addStreamHandlerMsg struct {
 
 type incomingStreamUpcall struct {
 	Upcall    string `json:"upcall"`
-	Remote    string `json:"remote_maddr"`
+    RemoteAddr    string `json:"remote_addr"`
+    RemotePeerID  string `json:"remote_peerid"`
 	StreamIdx int    `json:"stream_idx"`
 	Protocol  string `json:"protocol"`
 }
@@ -524,7 +514,8 @@ func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
 		app.Streams[streamIdx] = stream
 		app.writeMsg(incomingStreamUpcall{
 			Upcall:    "incomingStream",
-			Remote:    stream.Conn().RemoteMultiaddr().String(),
+            RemoteAddr:    stream.Conn().RemoteMultiaddr().String(),
+            RemotePeerID: stream.Conn().RemotePeer().String(),
 			StreamIdx: streamIdx,
 			Protocol:  as.Protocol,
 		})
@@ -553,7 +544,6 @@ var msgHandlers = map[methodIdx]func() action{
 	publish:             func() action { return &publishMsg{} },
 	subscribe:           func() action { return &subscribeMsg{} },
 	unsubscribe:         func() action { return &unsubscribeMsg{} },
-	registerValidator:   func() action { return &registerValidatorMsg{} },
 	validationComplete:  func() action { return &validationCompleteMsg{} },
 	generateKeypair:     func() action { return &generateKeypairMsg{} },
 	openStream:          func() action { return &openStreamMsg{} },
@@ -609,10 +599,12 @@ func main() {
 				Body: &raw,
 			}
 			if err := json.Unmarshal([]byte(line), &env); err != nil {
+                log.Print("when unmarshaling the envelope...")
 				log.Fatal(err)
 			}
 			msg := msgHandlers[env.Method]()
 			if err := json.Unmarshal(raw, msg); err != nil {
+                log.Print("when unmarshaling the method invocation...")
 				log.Fatal(err)
 			}
 			res, err := msg.run(app)

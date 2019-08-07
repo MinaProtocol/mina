@@ -3,5 +3,5 @@ buildGoModule rec {
   name = "libp2p_helper-${version}";
   version = "0.1";
   src = ./src;
-  modSha256 = "0vcxbf0i97x5qwrz5r8lh54inwrcczwx9iap8fpcdhgi5myb01wg";
+  modSha256 = "00kqp7y8igafnajddcqzqplrsfls4a67n2ivsq1ifw3dfviqwx7n";
 }

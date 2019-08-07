@@ -100,28 +100,18 @@ module Pubsub : sig
     * Fails if already subscribed. If it succeeds, incoming messages for that
     * topic will be written to the pipe. Returned deferred is resolved with [Ok
     * sub] as soon as the subscription is enqueued.
+    *
+    * [should_forward_message] will be called once per new message, and will
+    * not be called again until the deferred it returns is resolved. The helper
+    * process waits 5 seconds for the result of [should_forward_message] to be
+    * reported, otherwise it will not forward it.
     *)
   val subscribe :
        net
     -> string
+    -> should_forward_message:(sender:PeerID.t -> data:string -> bool Deferred.t)
     -> Subscription.t Deferred.Or_error.t
 
-  (** [register_validator net topic f] validates messages on [topic] with [f] before forwarding them.
-    *
-    * [f] will be called once per new message, and will not be called again until
-    * the deferred it returns is resolved. The helper process waits 5 seconds for
-    * the result of [f] to be reported, otherwise it considers the message invalid.
-    *
-    * If multiple validators are registered for a topic, they will all be called. If
-    * any of them return [false] the message is considered invalid.
-    *
-    * If no validators are registered for a topic, all messages will be forwarded.
-    *)
-  val register_validator :
-       net
-    -> string
-    -> f:(peerid:PeerID.t -> data:string -> bool Deferred.t)
-    -> unit Deferred.Or_error.t
 end
 
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
