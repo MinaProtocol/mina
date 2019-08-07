@@ -21,11 +21,23 @@ If the fix for some critical bug is too complicated, the offending commit, if it
 
 During the period in which the release branch is open, any bugs assigned to you should be considered very high priority.
 
+### Specifics
+
+Release branch naming scheme is still in flux due to some issues with how deb repos think about versions. For now we'll use the following format:
+
+```
+release/0.0.x-beta
+```
+
+Where `x` is replaced with the number of the release (one-indexed). For example, on 8/7 we will cut `release/0.0.3-beta` after code freeze.
+
+Releases will typically be deployed the night before a release (for now, Monday @ 6pm). If the builds are all successful and one can connect to that network we'll move forward using that as this week's testnet.
+
 ### Schedule
 
 For now, we'll plan on releasing every Tuesday @ 2pm, starting on 8/6
 
-#### Next week:
+#### Next week: (week 4 july)
 
 - Tuesday morning, move `master -> develop` and `stable -> master`
     - This also entails fixing whatever tooling we have in place to point to the new branches, and updating the configuration of our documentation so the edit-button points to develop branch
