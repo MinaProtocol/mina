@@ -6,14 +6,14 @@ module type Printable_intf = sig
   val to_text : t -> string
 end
 
-let print (type t) (module Print : Printable_intf with type t = t) is_json =
-  function
+let print (type t) (module Print : Printable_intf with type t = t) ~error_ctx
+    is_json = function
   | Ok t ->
       if is_json then
         printf "%s\n" (Print.to_yojson t |> Yojson.Safe.pretty_to_string)
       else printf "%s\n" (Print.to_text t)
   | Error e ->
-      eprintf "%s" (Error.to_string_hum e)
+      eprintf "%s\n%s\n" error_ctx (Error.to_string_hum e)
 
 module String_list_formatter = struct
   type t = string list [@@deriving yojson]
