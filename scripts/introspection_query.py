@@ -1,6 +1,8 @@
 import http.client
 import json
 
+# This introspection query is the typical one, taken from graphql_ppx
+# copied into a python script to avoid adding a nodejs dep to our dune build
 introspection_query = """
 query IntrospectionQuery {
     __schema {
