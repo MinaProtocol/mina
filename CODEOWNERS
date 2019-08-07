@@ -18,23 +18,24 @@
 
 /src/external/ @cmr @bkase @psteckler
 
-/src/app/cli/ @cmr @nholland94 @bkase
+/src/app/cli/ @cmr @nholland94 @bkase @wu-s-john
 /src/app/kademlia-haskell/ @bkase @enolan
 /src/app/logproc/ @nholland94
 /src/app/reformat/ @bkase
-/src/app/testone/ @johnwu93
+/src/app/testone/ @wu-s-john
 /src/app/trace-tool/ @cmr
 /src/app/website/ @bkase @schmavery @figitaki
 
 /src/lib/base58_check/ @psteckler @cmr
+/src/lib/best_tip_prover/ @wu-s-john
 /src/lib/bignum_bigint/ @nholland94 @bkase
 /src/lib/blake2/ @rbkhmrcr @vanishreerao
 /src/lib/blockchain_snark/ @nholland94 @bkase
-/src/lib/bootstrap_controller/ @nholland94 @johnwu93
+/src/lib/bootstrap_controller/ @nholland94 @wu-s-john
 /src/lib/cache_dir/ @cmr
 /src/lib/cache_lib/ @nholland94
 /src/lib/chunked_triples/ @psteckler @rbkhmrcr @vanishreerao
-/src/lib/cli_lib/ @johnwu93
+/src/lib/cli_lib/ @wu-s-john
 /src/lib/coda_base/ @cmr @nholland94 @bkase
 /src/lib/coda_compile_config/ @nholland94
 /src/lib/coda_debug/ @nholland94
@@ -43,20 +44,20 @@
 /src/lib/coda_state/ @nholland94
 /src/lib/coda_transition/ @nholland94
 /src/lib/coda_version/ @nholland94 @cmr
-/src/lib/codable/ @johnwu93 @bkase
+/src/lib/codable/ @wu-s-john @bkase
 /src/lib/consensus/ @nholland94
 /src/lib/crs/ @rbkhmrcr @vanishreerao
 /src/lib/crypto_params/ @rbkhmrcr @vanishreerao @mrmr1993
 /src/lib/currency/ @bkase @nholland94
-/src/lib/daemon_rpcs/ @johnwu93 @bkase
+/src/lib/daemon_rpcs/ @wu-s-john @bkase
 /src/lib/debug_assert/ @nholland94 @bkase @cmr
 /src/lib/direction/ @cmr
 /src/lib/distributed_dsl/ @bkase
 /src/lib/dummy_values/ @bkase
-/src/lib/dyn_array/ @johnwu93
-/src/lib/empty_hashes/ @johnwu93
+/src/lib/dyn_array/ @wu-s-john
+/src/lib/empty_hashes/ @wu-s-john
 /src/lib/envelope/ @psteckler @cmr
-/src/lib/file_system/ @johnwu93 @bkase
+/src/lib/file_system/ @wu-s-john @bkase
 /src/lib/genesis_ledger/ @nholland94 @bkase @cmr
 /src/lib/global_signer_private_key/ @nholland94
 /src/lib/gossip_net/ @cmr
@@ -65,9 +66,9 @@
 /src/lib/immutable_array/ @nholland94
 /src/lib/interruptible/ @bkase
 /src/lib/kademlia @bkase @cmr @enolan
-/src/lib/key_value_database/ @johnwu93 @bkase
+/src/lib/key_value_database/ @wu-s-john @bkase
 /src/lib/keys_lib/ @cmr @mrmr1993
-/src/lib/ledger_catchup/ @nholland94 @johnwu93
+/src/lib/ledger_catchup/ @nholland94 @wu-s-john
 /src/lib/ledger_proof/ @nholland94
 /src/lib/linked_tree/ @cmr
 /src/lib/lite_base/ @bkase @cmr
@@ -75,9 +76,9 @@
 /src/lib/lite_params/ @rbkhmrcr @vanishreerao
 /src/lib/logger/ @nholland94
 /src/lib/logproc_lib/ @nholland94
-/src/lib/merkle_address/ @cmr @bkase @nholland94 @johnwu93
+/src/lib/merkle_address/ @cmr @bkase @nholland94 @wu-s-john
 /src/lib/merkle_ledger/ @cmr @nholland94
-/src/lib/merkle_list/ @johnwu93 @cmr
+/src/lib/merkle_list/ @wu-s-john @cmr
 /src/lib/merkle_mask/ @nholland94 @psteckler
 /src/lib/module_version/ @psteckler @mrmr1993
 /src/lib/network_peer/ @nholland94 @cmr
@@ -102,9 +103,8 @@
 /src/lib/quickcheck_lib/ @nholland94 @ghost-not-in-the-shell
 /src/lib/random_oracle/ @cmr
 /src/lib/rc_pool/ @nholland94 @cmr
-/src/lib/receipt_chain_database_lib/ @johnwu93
+/src/lib/receipt_chain_database_lib/ @wu-s-john
 /src/lib/rocksdb/ @psteckler @nholland94
-/src/lib/root_prover/ @johnwu93 @bkase
 /src/lib/transition_chain_witness/ @ghost-not-in-the-shell
 /src/lib/rose_tree/ @bkase @nholland94
 /src/lib/secrets/ @cmr
@@ -130,18 +130,18 @@
 /src/lib/staged_ledger/ @deepthiskumar @cmr
 /src/lib/staged_ledger_diff/ @deepthiskumar @cmr
 /src/lib/storage/ @bkase
-/src/lib/sync_handler/ @cmr
-/src/lib/sync_status/ @johnwu93
+/src/lib/sync_handler/ @cmr @wu-s-john
+/src/lib/sync_status/ @wu-s-john
 /src/lib/syncable_ledger/ @cmr @enolan
 /src/lib/test_util/ @nholland94
 /src/lib/time_simulator/ @bkase
-/src/lib/auxiliary_database/ @johnwu93 @bkase
+/src/lib/auxiliary_database/ @wu-s-john @bkase
 /src/lib/transaction_snark/ @deepthiskumar @bkase
 /src/lib/transaction_snark_scan_state/ @deepthiskumar
 /src/lib/transaction_snark_work/ @deepthiskumar
 /src/lib/transition_frontier/ @nholland94
 /src/lib/transition_frontier_controller/ @nholland94
-/src/lib/transition_frontier_controller_tests/ @nholland94 @johnwu93
+/src/lib/transition_frontier_controller_tests/ @nholland94 @wu-s-john
 /src/lib/transition_frontier_persistence/ @nholland94
 /src/lib/transition_handler/ @nholland94
 /src/lib/transition_router/ @nholland94
@@ -149,13 +149,10 @@
 /src/lib/truth/ @nholland94
 /src/lib/unix_timestamp/ @nholland94
 /src/lib/unsigned_extended/ @bkase
-/src/lib/visualization/ @johnwu93
+/src/lib/visualization/ @wu-s-john
 /src/lib/vrf_lib/ @nholland94 @mrmr1993 @bkase
-/src/lib/web_client_pipe/ @johnwu93 @bkase
-/src/lib/web_request/ @johnwu93 @bkase
+/src/lib/web_client_pipe/ @wu-s-john @bkase
+/src/lib/web_request/ @wu-s-john @bkase
 /src/lib/webkit_trace_event/ @mrmr1993 @cmr
 /src/lib/with_hash/ @bkase @nholland94 @cmr
 /src/lib/work_selector/ @deepthiskumar
-
-
-
