@@ -163,12 +163,7 @@ let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
     ; "coda_status.json"
     ; "crash_summary.json"
     ; "daemon.json" ]
-    |> List.filter ~f:(fun f ->
-           match Core.Sys.file_exists (temp_config ^/ f) with
-           | `Yes ->
-               true
-           | _ ->
-               false )
+    |> List.filter ~f:(fun f -> Core.Sys.file_exists (temp_config ^/ f) = `Yes)
   in
   let files = tmp_files |> String.concat ~sep:" " in
   let tar_command =
