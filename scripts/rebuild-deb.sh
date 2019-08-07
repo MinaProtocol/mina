@@ -12,7 +12,8 @@ GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!;
 set +u
 # Identify All Artifacts by Branch and Git Hash
 
-VERSION="0.0.1-${GITBRANCH}-${GITHASH}"
+PVKEYHASH=$(./default/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
+VERSION="${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
 
 BUILDDIR="${PROJECT}_${VERSION}"
 

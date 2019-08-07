@@ -2,8 +2,6 @@
 
 ## Testnet
 
----
-
 #### Do I need any specific hardware?
 
 Currently, a 4-core processor and 8 GB of RAM are the minimum requirements.  In the near future though, GPUs may be required.
@@ -43,8 +41,6 @@ First, check out [Github issues](https://github.com/codaprotocol/coda/issues) to
 - If you need to get in touch privately, you can email: contact@codaprotocol.org
 
 ## General Questions
-
----
 
 #### What consensus algorithm does Coda use?
 
