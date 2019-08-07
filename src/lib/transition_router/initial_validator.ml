@@ -125,8 +125,8 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
       let consensus_state =
         External_transition.consensus_state external_transition
       in
-      let epoch = curr_epoch consensus_state in
-      let slot = curr_slot consensus_state in
+      let epoch = curr_epoch consensus_state |> Unsigned.UInt32.to_int in
+      let slot = curr_slot consensus_state |> Unsigned.UInt32.to_int in
       let proposer = External_transition.proposer external_transition in
       let proposal = Proposals.{epoch; slot; proposer} in
       (* try table GC *)
