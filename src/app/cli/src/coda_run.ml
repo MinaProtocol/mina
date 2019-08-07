@@ -60,6 +60,7 @@ let get_lite_chain :
       let proof = Lite_compat.proof proof in
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
+(*TODO check deferred now and copy theose files to the temp directory*)
 let log_shutdown ~conf_dir ~top_logger coda_ref =
   let logger =
     Logger.extend top_logger
@@ -85,8 +86,10 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
         Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
           (Visualization_message.bootstrap "transition frontier") )
 
-let make_report_and_log_shutdown e ~conf_dir ~top_logger coda_ref =
-  let temp_config = Core.Unix.mkdtemp "coda_config_temp" in
+let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
+  Logger.info top_logger ~module_:__MODULE__ ~location:__LOC__
+    "Generating crash report" ;
+  let temp_config = Core.Unix.mkdtemp (conf_dir ^/ "coda_config_temp") in
   (*Transition frontier and ledger visualization*)
   log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
   let crash_time = Time.now () in
@@ -95,26 +98,36 @@ let make_report_and_log_shutdown e ~conf_dir ~top_logger coda_ref =
     ^ Time.to_filename_string ~zone:Time.Zone.utc crash_time
     ^ ".tar.xz"
   in
+  Core.printf "Here\n%!" ;
+  (*Coda status*)
   let status_file = temp_config ^/ "coda_status.json" in
-  let () =
-    Option.value_map !coda_ref ~default:() ~f:(fun t ->
+  let status =
+    Option.value_map !coda_ref
+      ~default:(`String "Shutdown before Coda instance was created")
+      ~f:(fun t ->
         Coda_commands.get_status ~flag:`Performance t
-        |> Daemon_rpcs.Types.Status.to_yojson
-        |> Yojson.Safe.to_file status_file )
+        |> Daemon_rpcs.Types.Status.to_yojson )
   in
+  Yojson.Safe.to_file status_file status ;
   (*coda logs*)
   let coda_log = conf_dir ^/ "coda.log" in
-  let coda_short_log = temp_config ^/ "coda_short.log" in
-  (*get the last 4MB of the log*)
-  let log_size = 4 * 1024 * 1024 |> Int64.of_int in
-  let log =
-    In_channel.with_file coda_log ~f:(fun in_chan ->
-        let len = In_channel.length in_chan in
-        In_channel.seek in_chan
-          Int64.(max 0L (Int64.( + ) len (Int64.neg log_size))) ;
-        In_channel.input_all in_chan )
+  let () =
+    match Core.Sys.file_exists coda_log with
+    | `Yes ->
+        let coda_short_log = temp_config ^/ "coda_short.log" in
+        (*get the last 4MB of the log*)
+        let log_size = 4 * 1024 * 1024 |> Int64.of_int in
+        let log =
+          In_channel.with_file coda_log ~f:(fun in_chan ->
+              let len = In_channel.length in_chan in
+              In_channel.seek in_chan
+                Int64.(max 0L (Int64.( + ) len (Int64.neg log_size))) ;
+              In_channel.input_all in_chan )
+        in
+        Out_channel.write_all coda_short_log ~data:log
+    | _ ->
+        ()
   in
-  Out_channel.write_all coda_short_log ~data:log ;
   (*System info/crash summary*)
   let uname = Core.Unix.uname () in
   let daemon_command = sprintf !"Command: %{sexp: string array}" Sys.argv in
@@ -125,30 +138,49 @@ let make_report_and_log_shutdown e ~conf_dir ~top_logger coda_ref =
       ; ("Machine", `String (Core.Unix.Utsname.machine uname))
       ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
       ; ("Crash_time", `String (Time.to_string crash_time))
-      ; ("Exception", `String (Exn.to_string e))
+      ; ("Exception", `String exn_str)
       ; ("Command", `String daemon_command) ]
   in
   Yojson.to_file (temp_config ^/ "crash_summary.json") sys_info ;
+  (*copy daemon_json to the temp dir *)
+  let daemon_config = conf_dir ^/ "daemon.json" in
+  let _ =
+    match Core.Sys.file_exists daemon_config with
+    | `Yes ->
+        Core.Sys.command
+          (sprintf "cp %s %s" daemon_config (temp_config ^/ "daemon.json"))
+    | _ ->
+        0
+  in
   (*Zip them all up*)
-  let files =
+  let tmp_files =
     [ "coda_short.log"
-    ; "coda.version"
     ; "registered_mask.dot"
     ; "frontier.dot"
-    ; "daemon.json"
     ; "coda_status.json"
-    ; "crash_summary.json" ]
-    |> List.map ~f:(fun f -> temp_config ^/ f)
-    |> String.concat ~sep:" "
+    ; "crash_summary.json"
+    ; "daemon.json" ]
   in
+  let files = tmp_files |> String.concat ~sep:" " in
   let tar_command =
-    sprintf "tar  -C %s -cJf %s %s" conf_dir report_file files
+    sprintf "tar  -C %s -cJf %s %s" temp_config report_file files
   in
   let exit = Core.Sys.command tar_command in
-  if exit <> 0 then
-    Core.eprintf
-      !"Error running the tar command %s. Exit code: %d\n"
-      tar_command exit ;
+  let action_string =
+    if exit = 2 then (
+      Core.eprintf !"Error making the crash report. Exit code: %d\n" exit ;
+      sprintf
+        "include the last 20 lines from .coda-config/coda.log and then paste \
+         the following:\n\
+         Status:\n\
+         %s\n\
+         Exception:\n\
+         %s\n"
+        (Yojson.Safe.to_string status)
+        exn_str )
+    else sprintf "attach the crash report %s" report_file
+  in
+  let _ = Core.Sys.command (sprintf "rm -rf %s" temp_config) in
   Core.eprintf
     !{err|
 
@@ -158,9 +190,9 @@ let make_report_and_log_shutdown e ~conf_dir ~top_logger coda_ref =
     Open an issue:
       https://github.com/CodaProtocol/coda/issues/new
 
-    Briefly describe what you were doing and attach the crash report %s
-    %!|err}
-    report_file
+    Briefly describe what you were doing and %s
+%!|err}
+    action_string
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_whitelist = []) ?rest_server_port
@@ -417,7 +449,8 @@ let run_snark_worker ?shutdown_on_disconnect:(s = true) ~client_port
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-      make_report_and_log_shutdown exn ~conf_dir ~top_logger coda_ref ;
+      make_report_and_log_shutdown (Exn.to_string exn) ~conf_dir ~top_logger
+        coda_ref ;
       Stdlib.exit 1 ) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->
