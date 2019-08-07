@@ -14,30 +14,40 @@ let dispatch rpc query port =
       let open Deferred.Let_syntax in
       match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
       | Error exn ->
-          return (Or_error.of_exn exn)
+          return
+            (Or_error.errorf
+               !"Error connecting to the daemon on port %d: %s"
+               port (Exn.to_string exn))
       | Ok conn ->
           Rpc.Rpc.dispatch rpc conn query )
+
+let dispatch_join_errors rpc query port =
+  let open Deferred.Let_syntax in
+  let%map res = dispatch rpc query port in
+  Or_error.join res
 
 (** Call an RPC, passing handlers for a successful call and a failing one. Note
     that a successful *call* may have failed on the server side and returned a
     failing result. To deal with that, the success handler returns an
     Or_error. *)
-let dispatch_with_message rpc query port ~success ~error =
+let dispatch_with_message rpc query port ~success ~error
+    ~(join_error : 'a Or_error.t -> 'b Or_error.t) =
   let fail err = eprintf "%s\n%!" err ; exit 14 in
-  match%bind dispatch rpc query port with
-  | Ok x -> (
-    match success x with
-    | Ok res ->
-        printf "%s\n" res ; Deferred.unit
-    | Error e ->
-        fail (Error.to_string_hum e) )
+  let%bind res = dispatch rpc query port in
+  match join_error res with
+  | Ok x ->
+      printf "%s\n" (success x) ;
+      Deferred.unit
   | Error e ->
       fail (error e)
 
 let dispatch_pretty_message (type t)
     (module Print : Cli_lib.Render.Printable_intf with type t = t)
-    ?(json = true) rpc query port =
-  dispatch rpc query port >>| Cli_lib.Render.print (module Print) json
+    ?(json = true) ~(join_error : 'a Or_error.t -> t Or_error.t) ~error_ctx rpc
+    query port =
+  let%bind res = dispatch rpc query port in
+  Cli_lib.Render.print (module Print) json (join_error res) ~error_ctx
+  |> Deferred.return
 
 module Args = struct
   open Command.Param
@@ -50,17 +60,23 @@ module Args = struct
     return (fun a b c d -> (a, b, c, d)) <*> arg1 <*> arg2 <*> arg3 <*> arg4
 end
 
+let or_error_str ~f_ok ~error = function
+  | Ok x ->
+      f_ok x
+  | Error e ->
+      sprintf "%s\n%s\n" error (Error.to_string_hum e)
+
 let stop_daemon =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
   Command.async ~summary:"Stop the daemon"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
-         match%map dispatch Stop_daemon.rpc () port with
-         | Ok () ->
-             printf "Daemon stopping\n"
-         | Error e ->
-             printf "Daemon likely stopped: %s\n" (Error.to_string_hum e) ))
+         let%map res = dispatch Stop_daemon.rpc () port in
+         printf "%s"
+           (or_error_str res
+              ~f_ok:(fun _ -> "Daemon stopping\n")
+              ~error:"Daemon likely stopped") ))
 
 let get_balance =
   let open Command.Param in
@@ -72,17 +88,20 @@ let get_balance =
   in
   Command.async ~summary:"Get balance associated with a public key"
     (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
-         match%map
-           dispatch Daemon_rpcs.Get_balance.rpc
+         let%map res =
+           dispatch_join_errors Daemon_rpcs.Get_balance.rpc
              (Public_key.compress address)
              port
-         with
-         | Ok (Some b) ->
-             printf "Balance: %s coda\n" (Currency.Balance.to_string b)
-         | Ok None ->
-             printf "There are no funds in this account\n"
-         | Error e ->
-             printf "Failed to get balance\n%s\n" (Error.to_string_hum e) ))
+         in
+         let balance_str = function
+           | Some b ->
+               sprintf "Balance: %s coda\n" (Currency.Balance.to_string b)
+           | None ->
+               "There are no funds in this account\n"
+         in
+         printf "%s"
+           (or_error_str res ~f_ok:balance_str ~error:"Failed to get balance")
+     ))
 
 let print_trust_status status json =
   if json then
@@ -205,16 +224,17 @@ let get_public_keys =
     flag "with-details" no_arg
       ~doc:"Show extra details (eg. balance, nonce) in addition to public keys"
   in
+  let error_ctx = "Failed to get public-keys" in
   Command.async ~summary:"Get public keys"
     (Cli_lib.Background_daemon.init
        (Args.zip2 with_details_flag Cli_lib.Flag.json)
        ~f:(fun port (is_balance_included, json) ->
          if is_balance_included then
-           dispatch_pretty_message ~json
+           dispatch_pretty_message ~json ~join_error:Or_error.join ~error_ctx
              (module Cli_lib.Render.Public_key_with_details)
              Get_public_keys_with_details.rpc () port
          else
-           dispatch_pretty_message ~json
+           dispatch_pretty_message ~json ~join_error:Or_error.join ~error_ctx
              (module Cli_lib.Render.String_list_formatter)
              Get_public_keys.rpc () port ))
 
@@ -237,12 +257,21 @@ let generate_receipt =
     (Cli_lib.Background_daemon.init (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
          dispatch_with_message Prove_receipt.rpc (receipt_chain_hash, pk) port
-           ~success:(Or_error.map ~f:Cli_lib.Render.Prove_receipt.to_text)
-           ~error:Error.to_string_hum ))
+           ~success:Cli_lib.Render.Prove_receipt.to_text
+           ~error:Error.to_string_hum ~join_error:Or_error.join ))
 
-let read_json filepath =
-  let%map json_contents = Reader.file_contents filepath in
-  Yojson.Safe.from_string json_contents
+let read_json filepath ~flag =
+  let%map res =
+    Deferred.Or_error.try_with (fun () ->
+        let%map json_contents = Reader.file_contents filepath in
+        Ok (Yojson.Safe.from_string json_contents) )
+  in
+  match res with
+  | Ok c ->
+      c
+  | Error e ->
+      Or_error.errorf "Could not read %s at %s\n%s" flag filepath
+        (Error.to_string_hum e)
 
 let verify_receipt =
   let open Deferred.Let_syntax in
@@ -267,17 +296,28 @@ let verify_receipt =
     (Cli_lib.Background_daemon.init
        (Args.zip3 payment_path_flag proof_path_flag address_flag)
        ~f:(fun port (payment_path, proof_path, pk) ->
-         let%bind payment_json = read_json payment_path
-         and proof_json = read_json proof_path in
          let dispatch_result =
            let open Deferred.Or_error.Let_syntax in
-           let to_deferred_or_error result =
-             Result.map_error result ~f:Error.of_string |> Deferred.return
+           let%bind payment_json =
+             read_json payment_path ~flag:"payment-path"
+           in
+           let%bind proof_json = read_json proof_path ~flag:"proof-path" in
+           let to_deferred_or_error result ~error =
+             Result.map_error result ~f:(fun s ->
+                 Error.of_string (sprintf "%s: %s" error s) )
+             |> Deferred.return
            in
            let%bind payment =
-             User_command.of_yojson payment_json |> to_deferred_or_error
+             User_command.of_yojson payment_json
+             |> to_deferred_or_error
+                  ~error:
+                    (sprintf "Payment file %s has invalid json format"
+                       payment_path)
            and proof =
-             Payment_proof.of_yojson proof_json |> to_deferred_or_error
+             Payment_proof.of_yojson proof_json
+             |> to_deferred_or_error
+                  ~error:
+                    (sprintf "Proof file %s has invalid json format" proof_path)
            in
            dispatch Verify_proof.rpc (pk, payment, proof) port
          in
@@ -285,16 +325,20 @@ let verify_receipt =
          | Ok (Ok ()) ->
              printf "Payment is valid on the existing blockchain!\n"
          | Error e | Ok (Error e) ->
-             eprintf "%s" (Error.to_string_hum e) ))
+             eprintf "Error verifying the receipt: %s\n"
+               (Error.to_string_hum e) ))
 
 let get_nonce :
-       rpc:(Public_key.Compressed.t, Account.Nonce.t option) Rpc.Rpc.t
+       rpc:( Public_key.Compressed.t
+           , Account.Nonce.t option Or_error.t )
+           Rpc.Rpc.t
     -> Public_key.t
     -> int
     -> (Account.Nonce.t, string) Deferred.Result.t =
  fun ~rpc addr port ->
   let open Deferred.Let_syntax in
-  match%map dispatch rpc (Public_key.compress addr) port with
+  let%map res = dispatch rpc (Public_key.compress addr) port in
+  match Or_error.join res with
   | Ok (Some n) ->
       Ok n
   | Ok None ->
@@ -312,7 +356,7 @@ let get_nonce_cmd =
     (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
          match%bind get_nonce ~rpc:Daemon_rpcs.Get_nonce.rpc address port with
          | Error e ->
-             eprintf "Failed to get nonce: %s\n" e ;
+             eprintf "Failed to get nonce\n%s\n" e ;
              exit 2
          | Ok nonce ->
              printf "%s\n" (Account.Nonce.to_string nonce) ;
@@ -323,7 +367,8 @@ let status =
   let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Get running daemon status"
     (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
-         dispatch_pretty_message ~json
+         dispatch_pretty_message ~json ~join_error:Fn.id
+           ~error_ctx:"Failed to get status"
            (module Daemon_rpcs.Types.Status)
            Get_status.rpc
            (if performance then `Performance else `None)
@@ -334,7 +379,8 @@ let status_clear_hist =
   let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Clear histograms reported in status"
     (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
-         dispatch_pretty_message ~json
+         dispatch_pretty_message ~json ~join_error:Fn.id
+           ~error_ctx:"Failed to clear histograms reported in status"
            (module Daemon_rpcs.Types.Status)
            Clear_hist_status.rpc
            (if performance then `Performance else `None)
@@ -343,7 +389,7 @@ let status_clear_hist =
 let get_nonce_exn ~rpc public_key port =
   match%bind get_nonce ~rpc public_key port with
   | Error e ->
-      eprintf "Failed to get nonce %s\n" e ;
+      eprintf "Failed to get nonce\n%s\n" e ;
       exit 3
   | Ok nonce ->
       return nonce
@@ -411,10 +457,10 @@ let batch_send_payments =
     dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
       (ts :> User_command.t list)
       port
-      ~success:(fun () ->
-        Or_error.return "Successfully enqueued payments in pool" )
+      ~success:(fun _ -> "Successfully enqueued payments in pool")
       ~error:(fun e ->
         sprintf "Failed to send payments %s" (Error.to_string_hum e) )
+      ~join_error:Or_error.join
   in
   Command.async ~summary:"Send multiple payments from a file"
     (Cli_lib.Background_daemon.init
@@ -469,14 +515,13 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
              ~memo:User_command_memo.dummy ~sender_kp body
          in
          dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
-           ~success:
-             (Or_error.map ~f:(fun receipt_chain_hash ->
-                  sprintf
-                    "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
-                    label
-                    (User_command.to_base58_check command)
-                    (Receipt.Chain_hash.to_string receipt_chain_hash) ))
-           ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
+           ~success:(fun receipt_chain_hash ->
+             sprintf "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
+               label
+               (User_command.to_base58_check command)
+               (Receipt.Chain_hash.to_string receipt_chain_hash) )
+           ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e))
+           ~join_error:Or_error.join ))
 
 let send_payment =
   let body =
@@ -504,13 +549,13 @@ let get_transaction_status =
          | Ok user_command ->
              dispatch_with_message Daemon_rpcs.Get_transaction_status.rpc
                user_command port
-               ~success:
-                 (Or_error.map ~f:(fun status ->
-                      sprintf !"Transaction status : %s\n"
-                      @@ Transaction_status.State.to_string status ))
+               ~success:(fun status ->
+                 sprintf !"Transaction status : %s\n"
+                 @@ Transaction_status.State.to_string status )
                ~error:(fun e ->
                  sprintf "Failed to get transaction status : %s"
                    (Error.to_string_hum e) )
+               ~join_error:Or_error.join
          | Error _e ->
              eprintf "Could not deserialize user command" ;
              exit 16 ))
@@ -629,7 +674,9 @@ let snark_job_list =
   let open Command.Param in
   Command.async ~summary:"List of snark jobs in JSON format"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
-         match%map dispatch Daemon_rpcs.Snark_job_list.rpc () port with
+         match%map
+           dispatch_join_errors Daemon_rpcs.Snark_job_list.rpc () port
+         with
          | Ok str ->
              printf "%s" str
          | Error e ->

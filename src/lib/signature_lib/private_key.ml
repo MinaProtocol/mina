@@ -34,6 +34,8 @@ let of_bigstring_exn = Binable.of_bigstring (module Stable.Latest)
 let to_bigstring = Binable.to_bigstring (module Stable.Latest)
 
 module Base58_check = Base58_check.Make (struct
+  let description = "Private key"
+
   let version_byte = Base58_check.Version_bytes.private_key
 end)
 
