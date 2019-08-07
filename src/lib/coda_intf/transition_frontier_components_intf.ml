@@ -233,11 +233,8 @@ module type Transition_handler_intf = sig
      and type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 end
 
-module Best_tip_verification_result = struct
-  type 'external_transition t =
-    {root: 'external_transition; best_tip: 'external_transition}
-end
-
+(** Interface that allows a peer to prove their best_tip in the
+    transition_frontier *)
 module type Best_tip_prover_intf = sig
   type transition_frontier
 
@@ -260,11 +257,14 @@ module type Best_tip_prover_intf = sig
     -> ( external_transition
        , State_body_hash.t list * external_transition )
        Proof_carrying_data.t
-    -> external_transition_with_initial_validation
-       Best_tip_verification_result.t
+    -> ( [`Root of external_transition_with_initial_validation]
+       * [`Best_tip of external_transition_with_initial_validation] )
        Deferred.Or_error.t
 end
 
+(** Interface that allows a peer to prove their best_tip in the
+    transition_frontier based off of a condition on the consensus_state from
+    the requesting node *)
 module type Consensus_best_tip_prover_intf = sig
   type transition_frontier
 
@@ -290,8 +290,8 @@ module type Consensus_best_tip_prover_intf = sig
     -> ( external_transition
        , State_body_hash.t list * external_transition )
        Proof_carrying_data.t
-    -> external_transition_with_initial_validation
-       Best_tip_verification_result.t
+    -> ( [`Root of external_transition_with_initial_validation]
+       * [`Best_tip of external_transition_with_initial_validation] )
        Deferred.Or_error.t
 end
 
@@ -326,6 +326,8 @@ module type Sync_handler_intf = sig
     -> State_hash.t sexp_list
     -> external_transition sexp_list option
 
+  (** Allows a peer to prove to a node that they can bootstrap from transition
+      that they have gossiped to the network *)
   module Root :
     Consensus_best_tip_prover_intf
     with type transition_frontier := transition_frontier
@@ -334,6 +336,8 @@ module type Sync_handler_intf = sig
                 external_transition_with_initial_validation
      and type verifier := verifier
 
+  (** Allows a node to ask peers for their best tip in order to help them
+      bootstrap *)
   module Bootstrappable_best_tip : sig
     include
       Consensus_best_tip_prover_intf
@@ -370,8 +374,8 @@ module type Sync_handler_intf = sig
         -> ( external_transition
            , State_body_hash.t list * external_transition )
            Proof_carrying_data.t
-        -> external_transition_with_initial_validation
-           Best_tip_verification_result.t
+        -> ( [`Root of external_transition_with_initial_validation]
+           * [`Best_tip of external_transition_with_initial_validation] )
            Deferred.Or_error.t
     end
   end
@@ -445,7 +449,6 @@ module type Bootstrap_controller_intf = sig
                               Envelope.Incoming.t ]
                          * [< `Time_received of Block_time.t] )
                          Strict_pipe.Reader.t
-    -> ask_best_tip_signal:unit Ivar.t
     -> ( transition_frontier
        * external_transition_with_initial_validation Envelope.Incoming.t list
        )

@@ -134,7 +134,7 @@ module Make (Inputs : Inputs_intf) :
         (validate_proof ~verifier root_transition_with_hash)
         (validate_proof ~verifier best_tip_with_hash)
     in
-    {Coda_intf.Best_tip_verification_result.root; best_tip}
+    (`Root root, `Best_tip best_tip)
 end
 
 include Make (struct

@@ -81,6 +81,24 @@ module Make (Inputs : Inputs_intf) : sig
       -> [> `Syncing_new_snarked_ledger | `Updating_root_transition | `Ignored]
          Deferred.t
 
+    val run :
+         logger:Logger.t
+      -> trust_system:Trust_system.t
+      -> verifier:Verifier.t
+      -> network:Network.t
+      -> frontier:Transition_frontier.t
+      -> ledger_db:Ledger.Db.t
+      -> transition_reader:( [< `Transition of
+                                External_transition.with_initial_validation
+                                Envelope.Incoming.t ]
+                           * [< `Time_received of Block_time.t] )
+                           Pipe_lib.Strict_pipe.Reader.t
+      -> should_ask_best_tip:bool
+      -> ( Transition_frontier.t
+         * External_transition.with_initial_validation Envelope.Incoming.t list
+         )
+         Deferred.t
+
     module Transition_cache :
       Transition_cache.S
       with type external_transition_with_initial_validation :=
@@ -201,7 +219,7 @@ end = struct
             Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
               candidate_state peer_root_with_proof
           with
-          | Ok {Coda_intf.Best_tip_verification_result.root; best_tip} ->
+          | Ok (`Root root, `Best_tip best_tip) ->
               sync_with_peer ~sender ~root_sync_ledger t best_tip root
           | Error e ->
               return (received_bad_proof t sender e |> Fn.const `Ignored) )
@@ -259,8 +277,9 @@ end = struct
           Sync_handler.Bootstrappable_best_tip.verify ~logger ~verifier
             initial_consensus_state peer_best_tip
         with
-        | Ok {Coda_intf.Best_tip_verification_result.best_tip; root} ->
-            Deferred.Or_error.return (best_tip, root, peer)
+        | Ok verified_witness ->
+            Deferred.Or_error.return
+              (`Verified_witness verified_witness, `Queried_peer peer)
         | Error e ->
             let error_msg =
               sprintf
@@ -276,8 +295,47 @@ end = struct
                   Actions.(Violated_protocol, Some (error_msg, []))) ;
             Deferred.return (Error e) )
 
+  let request_and_sync_best_tip t root_sync_ledger initial_root_transition =
+    Logger.info t.logger
+      "Requesting peers for their best tip to eagerly start bootstrap"
+      ~module_:__MODULE__ ~location:__LOC__ ;
+    match%bind
+      download_best_tip ~network:t.network ~logger:t.logger
+        ~trust_system:t.trust_system ~verifier:t.verifier
+        initial_root_transition
+    with
+    | Ok
+        ( `Verified_witness
+            ( `Root root_with_validation
+            , `Best_tip ((best_tip, _) as best_tip_with_validation) )
+        , `Queried_peer queried_peer ) ->
+        Logger.info t.logger
+          "Syncing with peer's best tip after asking other peers"
+          ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ("peer", Network_peer.Peer.to_yojson queried_peer)
+            ; ("best tip", External_transition.to_yojson best_tip.data) ] ;
+        (* We do not wait for sync_with_peer because it takes a long time to
+           sync a snarked_ledger and we get rolling updates from the network on
+           the snarked_ledger. The output of sync_status will implicitly
+           surface when calling Root_sync_ledger.valid_tree *)
+        don't_wait_for
+          (Deferred.ignore
+             (sync_with_peer ~sender:queried_peer.host ~root_sync_ledger t
+                best_tip_with_validation root_with_validation)) ;
+        Deferred.unit
+    | Error e ->
+        Logger.info t.logger
+          "A sample subset of peers could not give their valid best tip"
+          ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("error", `String (Error.to_string_hum e))] ;
+        Deferred.unit
+
+  (* We conditionally ask other peers for their best tip. This is for testing
+     eager bootstrapping and the regular functionalities of bootstrapping in
+     isolation *)
   let rec run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
-      ~transition_reader ~ask_best_tip_signal =
+      ~transition_reader ~should_ask_best_tip =
     let sync_ledger_reader, sync_ledger_writer =
       create ~name:"sync ledger pipe"
         (Buffered (`Capacity 50, `Overflow Crash))
@@ -302,45 +360,14 @@ end = struct
       ; current_root= initial_root_transition }
     in
     let transition_graph = Transition_cache.create () in
+    let root_sync_ledger =
+      Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
+    in
+    ( if not should_ask_best_tip then Deferred.unit
+    else request_and_sync_best_tip t root_sync_ledger initial_root_transition
+    )
+    |> don't_wait_for ;
     let%bind synced_db, (hash, sender, expected_staged_ledger_hash) =
-      let root_sync_ledger =
-        Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
-      in
-      (let%bind () = Ivar.read ask_best_tip_signal in
-       Logger.info logger
-         "Requesting peers for their best tip to eargly start bootstrap"
-         ~module_:__MODULE__ ~location:__LOC__ ;
-       match%bind
-         download_best_tip ~network ~logger ~trust_system ~verifier
-           initial_root_transition
-       with
-       | Ok
-           ( ((peer_best_tip, _) as peer_best_tip_with_validation)
-           , peer_root_with_validation
-           , peer ) ->
-           let best_tip_candidate_state =
-             External_transition.consensus_state peer_best_tip.data
-           in
-           if not @@ worth_getting_root t best_tip_candidate_state then
-             Deferred.unit
-           else (
-             Logger.info logger
-               "Syncing with peer's best tip after asking other peers"
-               ~module_:__MODULE__ ~location:__LOC__
-               ~metadata:
-                 [ ("peer", Network_peer.Peer.to_yojson peer)
-                 ; ( "best tip"
-                   , External_transition.to_yojson peer_best_tip.data ) ] ;
-             Deferred.ignore
-               (sync_with_peer ~sender:peer.host ~root_sync_ledger t
-                  peer_best_tip_with_validation peer_root_with_validation) )
-       | Error e ->
-           Logger.info logger
-             "A sample subset of peers could not give their valid best tip"
-             ~module_:__MODULE__ ~location:__LOC__
-             ~metadata:[("error", `String (Error.to_string_hum e))] ;
-           Deferred.unit)
-      |> don't_wait_for ;
       sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
       |> don't_wait_for ;
       let%map synced_db, root_data =
@@ -394,9 +421,8 @@ end = struct
            from the peer or received faulty scan state: $error. Retry \
            bootstrap" ;
         Writer.close sync_ledger_writer ;
-        let ask_best_tip_signal = Ivar.create_full () in
         run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
-          ~transition_reader ~ask_best_tip_signal
+          ~transition_reader ~should_ask_best_tip
     | Ok root_staged_ledger -> (
         let%bind () =
           Trust_system.(
@@ -454,9 +480,8 @@ end = struct
               ~metadata:[("error", `String (Error.to_string_hum e))]
               "Local state sync failed: $error. Retry bootstrap" ;
             Writer.close sync_ledger_writer ;
-            let ask_best_tip_signal = Ivar.create_full () in
             run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
-              ~transition_reader ~ask_best_tip_signal
+              ~transition_reader ~should_ask_best_tip
         | Ok () ->
             let%map new_frontier =
               Transition_frontier.create ~logger ~root_transition:new_root
@@ -496,7 +521,11 @@ end = struct
     module Transition_cache = Transition_cache
 
     let sync_ledger = sync_ledger
+
+    let run = run
   end
+
+  let run = run ~should_ask_best_tip:true
 end
 
 include Make (struct

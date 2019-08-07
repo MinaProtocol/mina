@@ -98,19 +98,19 @@ let%test_module "Sync_handler" =
             Option.value_exn ~message:"Could not produce an ancestor proof"
               (Sync_handler.Root.prove ~logger ~frontier observed_state)
           in
-          let%map { Coda_intf.Best_tip_verification_result.root=
-                      root_with_validation
-                  ; best_tip= best_tip_with_validation } =
+          let%map ( ( (`Root (root_transition, _) as root_with_validation)
+                    , `Best_tip (best_tip_transition, _) ) as
+                  best_tip_with_validation ) =
             Sync_handler.Root.verify ~logger ~verifier:() observed_state
               root_with_proof
             |> Deferred.Or_error.ok_exn
           in
           External_transition.(
             equal
-              (With_hash.data (fst root_with_validation))
+              (With_hash.data root_transition)
               (to_external_transition (Transition_frontier.root frontier))
             && equal
-                 (With_hash.data (fst best_tip_with_validation))
+                 (With_hash.data best_tip_transition)
                  (to_external_transition
                     (Transition_frontier.best_tip frontier))) )
 

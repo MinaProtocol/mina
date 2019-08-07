@@ -209,15 +209,14 @@ let%test_module "Bootstrap Controller" =
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
-          let ask_best_tip_signal = Ivar.create () in
           let%map ( new_frontier
                   , (_ :
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
-            Bootstrap_controller.run ~logger ~trust_system ~verifier:()
-              ~network ~frontier:syncing_frontier ~ledger_db ~transition_reader
-              ~ask_best_tip_signal
+            Bootstrap_controller.For_tests.run ~logger ~trust_system
+              ~verifier:() ~network ~frontier:syncing_frontier ~ledger_db
+              ~transition_reader ~should_ask_best_tip:false
           in
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
       )
@@ -239,21 +238,14 @@ let%test_module "Bootstrap Controller" =
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
-          let ask_best_tip_signal = Ivar.create () in
-          upon
-            (after (Core.Time.Span.of_sec 5.0))
-            (fun () ->
-              Logger.info logger "Asking peers their best tip to bootstrap"
-                ~module_:__MODULE__ ~location:__LOC__ ;
-              Ivar.fill ask_best_tip_signal () ) ;
           let%map ( new_frontier
                   , (_ :
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
-            Bootstrap_controller.run ~logger ~trust_system ~verifier:()
-              ~network ~frontier:syncing_frontier ~ledger_db ~transition_reader
-              ~ask_best_tip_signal
+            Bootstrap_controller.For_tests.run ~logger ~trust_system
+              ~verifier:() ~network ~frontier:syncing_frontier ~ledger_db
+              ~transition_reader ~should_ask_best_tip:true
           in
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
       )
@@ -298,15 +290,14 @@ let%test_module "Bootstrap Controller" =
               ~peer:large_peer
               (get_best_tip_hash large_peer)
           in
-          let ask_best_tip_signal = Ivar.create () in
           let%map ( new_frontier
                   , (_ :
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
-            Bootstrap_controller.run ~logger ~trust_system ~verifier:()
-              ~network ~frontier:me ~ledger_db ~transition_reader
-              ~ask_best_tip_signal
+            Bootstrap_controller.For_tests.run ~logger ~trust_system
+              ~verifier:() ~network ~frontier:me ~ledger_db ~transition_reader
+              ~should_ask_best_tip:false
           in
           Ledger_hash.equal (root_hash new_frontier)
             (root_hash large_peer.frontier) )

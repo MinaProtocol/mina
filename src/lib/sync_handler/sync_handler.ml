@@ -130,16 +130,16 @@ module Make (Inputs : Inputs_intf) :
 
     let verify ~logger ~verifier observed_state peer_root =
       let open Deferred.Result.Let_syntax in
-      let%bind ( { Coda_intf.Best_tip_verification_result.best_tip=
-                     best_tip, _validation
-                 ; _ } as verification_result ) =
+      let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
+               verified_witness ) =
         Best_tip_prover.verify ~verifier peer_root
       in
       let is_before_best_tip candidate =
         Consensus.Hooks.select
           ~logger:
             (Logger.extend logger [("selection_context", `String "Root.verify")])
-          ~existing:(External_transition.consensus_state best_tip.data)
+          ~existing:
+            (External_transition.consensus_state best_tip_transition.data)
           ~candidate
         = `Keep
       in
@@ -150,9 +150,9 @@ module Make (Inputs : Inputs_intf) :
              ~error:
                (Error.createf
                   !"Peer lied about it's best tip %{sexp:State_hash.t}"
-                  best_tip.hash))
+                  best_tip_transition.hash))
       in
-      verification_result
+      verified_witness
   end
 
   module Bootstrappable_best_tip = struct
