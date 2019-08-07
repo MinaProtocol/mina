@@ -11,7 +11,7 @@ let net_configs n =
   let discovery_ports = List.init n ~f:(fun i -> 23000 + 1 + (i * 2)) in
   let ips =
     List.init n ~f:(fun i ->
-        Unix.Inet_addr.of_string @@ sprintf !"127.0.0.%i" i )
+        Unix.Inet_addr.of_string @@ sprintf "127.0.0.%d" (i + 10) )
   in
   let addrs_and_ports_list =
     List.map3_exn external_ports discovery_ports ips
