@@ -352,11 +352,33 @@ let create_genesis_frontier (config : Config.t) ~verifier =
          ~staged_ledger_diff:empty_diff)
   in
   let genesis_ledger = Lazy.force Genesis_ledger.t in
-  let ledger_db =
-    Ledger.Db.create ?directory_name:config.ledger_db_location ()
+  let load () =
+    let ledger_db =
+      Ledger.Db.create ?directory_name:config.ledger_db_location ()
+    in
+    ( ledger_db
+    , Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db )
   in
-  let root_snarked_ledger =
-    Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db
+  let%bind root_snarked_ledger =
+    match load () with
+    | _, Ok l ->
+        return l
+    | ledger_db, Error _ ->
+        (* Persisted state was bogus. Give up on the ledger contents, we'll bootstrap. *)
+        Ledger.Db.close ledger_db ;
+        let%map () =
+          match config.ledger_db_location with
+          | Some ledger_db_location ->
+              Logger.error config.logger
+                "Failed to load genesis ledger, deleting $dir and trying again."
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("dir", `String ledger_db_location)] ;
+              File_system.remove_dir ledger_db_location
+          | None ->
+              Deferred.unit
+        in
+        snd (load ()) |> Or_error.ok_exn
+    (* If it fails again, something is very wrong. Die. *)
   in
   let snarked_ledger_hash =
     Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root genesis_ledger
@@ -408,20 +430,23 @@ let create (config : Config.t) =
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
           in
+          let handle_request ~f query_env =
+            let input = Envelope.Incoming.data query_env in
+            Deferred.return
+            @@
+            let open Option.Let_syntax in
+            let%bind frontier =
+              Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+            in
+            f ~frontier input
+          in
           let%bind net =
             Coda_networking.create config.net_config
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
-                (fun enveloped_hash ->
-                let hash = Envelope.Incoming.data enveloped_hash in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Sync_handler
-                .get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier
-                  hash )
+                (handle_request
+                   ~f:
+                     Sync_handler
+                     .get_staged_ledger_aux_and_pending_coinbases_at_hash)
               ~answer_sync_ledger_query:(fun query_env ->
                 let open Deferred.Or_error.Let_syntax in
                 let ledger_hash, _ = Envelope.Incoming.data query_env in
@@ -440,46 +465,18 @@ let create (config : Config.t) =
                                !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
                                Coda_networking.refused_answer_query_string
                                ledger_hash)) )
-              ~get_ancestry:(fun query_env ->
-                let consensus_state = Envelope.Incoming.data query_env in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Root_prover.prove ~logger:config.logger ~frontier
-                  consensus_state )
-              ~get_transition_chain_witness:(fun query ->
-                let state_hash = Envelope.Incoming.data query in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Transition_chain_witness.prove ~frontier state_hash )
-              ~get_transition_chain:(fun request ->
-                let hashes = Envelope.Incoming.data request in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Option.all
-                @@ List.map hashes ~f:(fun hash ->
-                       Option.merge
-                         (Transition_frontier.find frontier hash)
-                         (Transition_frontier.find_in_root_history frontier
-                            hash)
-                         ~f:Fn.const
-                       |> Option.map ~f:(fun breadcrumb ->
-                              Transition_frontier.Breadcrumb
-                              .transition_with_hash breadcrumb
-                              |> With_hash.data
-                              |> External_transition.Validated
-                                 .forget_validation ) ) )
+              ~get_ancestry:
+                (handle_request
+                   ~f:(Sync_handler.Root.prove ~logger:config.logger))
+              ~get_bootstrappable_best_tip:
+                (handle_request
+                   ~f:
+                     (Sync_handler.Bootstrappable_best_tip.prove
+                        ~logger:config.logger))
+              ~get_transition_chain_witness:
+                (handle_request ~f:Transition_chain_witness.prove)
+              ~get_transition_chain:
+                (handle_request ~f:Sync_handler.get_transition_chain)
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~logger:config.logger
