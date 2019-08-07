@@ -820,6 +820,12 @@ module Make (Inputs : Inputs_intf) :
                 ; ( "garbage_direct_descendants"
                   , `List
                       (List.map bad_children_hashes ~f:State_hash.to_yojson) )
+                ; ( "all_masks"
+                  , `List
+                      (List.map garbage_breadcrumbs ~f:(fun crumb ->
+                           `String
+                             ( Breadcrumb.mask crumb |> Ledger.get_uuid
+                             |> Uuid.to_string_hum ) )) )
                 ; ( "local_state"
                   , Consensus.Data.Local_state.to_yojson
                       t.consensus_local_state ) ]

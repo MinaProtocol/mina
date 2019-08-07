@@ -95,12 +95,13 @@ let get_public_keys t =
   let%map account = get_accounts t in
   List.map account ~f:string_of_public_key
 
-let get_keys_with_balances t =
+let get_keys_with_details t =
   let open Participating_state.Let_syntax in
   let%map accounts = get_accounts t in
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
-      , account.Account.Poly.balance |> Currency.Balance.to_int ) )
+      , account.Account.Poly.balance |> Currency.Balance.to_int
+      , account.Account.Poly.nonce |> Account.Nonce.to_string ) )
 
 let get_inferred_nonce_from_transaction_pool_and_ledger t
     (addr : Public_key.Compressed.t) =
