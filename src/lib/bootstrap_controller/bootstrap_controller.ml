@@ -99,11 +99,11 @@ module Make (Inputs : Inputs_intf) : sig
                           * Staged_ledger_hash.t )
                           Root_sync_ledger.t
       -> transition_graph:Transition_cache.t
-      -> transition_reader:( [< `Transition of
-                                External_transition.with_initial_validation
-                                Envelope.Incoming.t ]
-                           * [< `Time_received of 'a] )
-                           Pipe_lib.Strict_pipe.Reader.t
+      -> sync_ledger_reader:( [< `Transition of
+                                 External_transition.with_initial_validation
+                                 Envelope.Incoming.t ]
+                            * [< `Time_received of 'a] )
+                            Pipe_lib.Strict_pipe.Reader.t
       -> unit Deferred.t
   end
 end = struct
@@ -211,11 +211,11 @@ end = struct
           | Error e ->
               return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
-  let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader =
+  let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
     let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
     let response_writer = Root_sync_ledger.answer_writer root_sync_ledger in
     Network.glue_sync_ledger t.network query_reader response_writer ;
-    Reader.iter transition_reader
+    Reader.iter sync_ledger_reader
       ~f:(fun (`Transition incoming_transition, `Time_received _) ->
         let ({With_hash.data= transition; hash= _}, _)
               : External_transition.with_initial_validation =
@@ -245,6 +245,12 @@ end = struct
 
   let rec run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
       ~transition_reader =
+    let sync_ledger_reader, sync_ledger_writer =
+      create ~name:"sync ledger pipe"
+        (Buffered (`Capacity 50, `Overflow Crash))
+    in
+    transfer_while_writer_alive transition_reader sync_ledger_writer ~f:Fn.id
+    |> don't_wait_for ;
     let initial_breadcrumb = Transition_frontier.root frontier in
     let initial_root_transition =
       External_transition.Validation.lower
@@ -267,7 +273,7 @@ end = struct
       let root_sync_ledger =
         Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
       in
-      sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
+      sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
       |> don't_wait_for ;
       let%map synced_db, root_data =
         Root_sync_ledger.valid_tree root_sync_ledger
@@ -319,6 +325,7 @@ end = struct
           "Failed to find scan state for the transition with hash $state_hash \
            from the peer or received faulty scan state: $error. Retry \
            bootstrap" ;
+        Writer.close sync_ledger_writer ;
         run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
           ~transition_reader
     | Ok root_staged_ledger -> (
@@ -377,6 +384,7 @@ end = struct
             Logger.error logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("error", `String (Error.to_string_hum e))]
               "Local state sync failed: $error. Retry bootstrap" ;
+            Writer.close sync_ledger_writer ;
             run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
               ~transition_reader
         | Ok () ->

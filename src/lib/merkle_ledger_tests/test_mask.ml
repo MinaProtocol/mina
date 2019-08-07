@@ -689,7 +689,7 @@ module Make (Test : Test_intf) = struct
             Mask.Attached.commit m1 ;
             [%test_result: Account.t option] ~message:"a2 is in base"
               ~expect:(Some a2) (Test.Base.get base loc2) ;
-            Maskable.remove_and_reparent_exn mask_as_base m1 ~children:[m2] ;
+            Maskable.remove_and_reparent_exn mask_as_base m1 ;
             [%test_result: Account.t option] ~message:"a1 is in base"
               ~expect:(Some a1) (Test.Base.get base loc1) ;
             [%test_result: Account.t option] ~message:"a2 is in base"
@@ -782,6 +782,8 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     include Inputs
     module Base = Base
     module Mask = Mask
+
+    let mask_to_base m = Any_base.cast (module Mask.Attached) m
   end)
 
   (* test runner *)

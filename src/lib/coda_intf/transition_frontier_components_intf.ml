@@ -36,6 +36,8 @@ module type Catchup_intf = sig
                                     Cached.t
                                     Rose_tree.t
                                     list
+                                    * [ `Ledger_catchup of unit Ivar.t
+                                      | `Catchup_scheduler ]
                                   , Strict_pipe.crash Strict_pipe.buffered
                                   , unit )
                                   Strict_pipe.Writer.t
@@ -145,17 +147,21 @@ module type Transition_handler_processor_intf = sig
                           , Strict_pipe.crash Strict_pipe.buffered
                           , unit )
                           Strict_pipe.Writer.t
-    -> catchup_breadcrumbs_reader:( transition_frontier_breadcrumb
-                                  , State_hash.t )
-                                  Cached.t
-                                  Rose_tree.t
-                                  list
+    -> catchup_breadcrumbs_reader:( ( transition_frontier_breadcrumb
+                                    , State_hash.t )
+                                    Cached.t
+                                    Rose_tree.t
+                                    list
+                                  * [ `Ledger_catchup of unit Ivar.t
+                                    | `Catchup_scheduler ] )
                                   Strict_pipe.Reader.t
     -> catchup_breadcrumbs_writer:( ( transition_frontier_breadcrumb
                                     , State_hash.t )
                                     Cached.t
                                     Rose_tree.t
                                     list
+                                    * [ `Ledger_catchup of unit Ivar.t
+                                      | `Catchup_scheduler ]
                                   , Strict_pipe.crash Strict_pipe.buffered
                                   , unit )
                                   Strict_pipe.Writer.t
@@ -244,15 +250,26 @@ module type Sync_handler_intf = sig
     -> trust_system:Trust_system.t
     -> Sync_ledger.Answer.t option Deferred.t
 
-  val transition_catchup :
-       frontier:transition_frontier
-    -> State_hash.t
-    -> external_transition Non_empty_list.t option
-
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        frontier:transition_frontier
     -> State_hash.t
     -> (parallel_scan_state * Ledger_hash.t * Pending_coinbase.t) Option.t
+end
+
+module type Transition_chain_witness_intf = sig
+  type transition_frontier
+
+  type external_transition
+
+  val prove :
+       frontier:transition_frontier
+    -> State_hash.t
+    -> (State_hash.t * State_body_hash.t List.t) Option.t
+
+  val verify :
+       target_hash:State_hash.t
+    -> transition_chain_witness:State_hash.t * State_body_hash.t List.t
+    -> State_hash.t Non_empty_list.t option
 end
 
 module type Root_prover_intf = sig

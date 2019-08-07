@@ -24,17 +24,25 @@ module Make (Inputs : Inputs.S) :
       match Transition_frontier.find frontier initial_hash with
       | None ->
           let msg =
-            sprintf
+            Printf.sprintf
               "Transition frontier already garbage-collected the parent of %s"
               (Coda_base.State_hash.to_base58_check initial_hash)
           in
           Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-            "Transition frontier already garbage-collected the parent of \
-             $initial_hash"
             ~metadata:
-              [ ( "initial_hash"
-                , `String (Coda_base.State_hash.to_base58_check initial_hash)
-                ) ] ;
+              [ ( "hashes of transitions"
+                , `List
+                    (List.map subtrees_of_enveloped_transitions
+                       ~f:(fun subtree ->
+                         Rose_tree.to_yojson
+                           (fun enveloped_transitions ->
+                             Cached.peek enveloped_transitions
+                             |> Envelope.Incoming.data |> fst |> With_hash.hash
+                             |> fun hash ->
+                             `String
+                               (Coda_base.State_hash.to_base58_check hash) )
+                           subtree )) ) ]
+            !"%s" msg ;
           Or_error.error_string msg
       | Some breadcrumb ->
           Or_error.return breadcrumb

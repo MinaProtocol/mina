@@ -43,7 +43,8 @@ type t =
   ; propose_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
-  ; subscriptions: Coda_subscriptions.t }
+  ; subscriptions: Coda_subscriptions.t
+  ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
 [@@deriving fields]
 
 let subscription t = t.subscriptions
@@ -105,26 +106,12 @@ let best_tip = compose_of_option best_tip_opt
 
 let root_length = compose_of_option root_length_opt
 
-module Incr = struct
-  open Coda_incremental.Status
-
-  let online_status t =
-    of_broadcast_pipe @@ Coda_networking.online_status t.components.net
-
-  let transition_frontier t =
-    of_broadcast_pipe @@ t.components.transition_frontier
-
-  let first_connection t =
-    of_ivar @@ Coda_networking.first_connection t.components.net
-
-  let first_message t =
-    of_ivar @@ Coda_networking.first_message t.components.net
-end
-
 [%%if
 mock_frontend_data]
 
-let sync_status _ =
+let create_sync_status_observer ~logger
+    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
+    ~first_connection_incr ~first_message_incr =
   let variable = Coda_incremental.Status.Var.create `Offline in
   let incr = Coda_incremental.Status.Var.watch variable in
   let rec loop () =
@@ -151,42 +138,48 @@ let sync_status _ =
 
 [%%else]
 
-let sync_status t =
+let create_sync_status_observer ~logger
+    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
+    ~first_connection_incr ~first_message_incr =
   let open Coda_incremental.Status in
-  let transition_frontier_incr = Var.watch @@ Incr.transition_frontier t in
   let incremental_status =
-    map4
-      (Var.watch @@ Incr.online_status t)
-      transition_frontier_incr
-      (Var.watch @@ Incr.first_connection t)
-      (Var.watch @@ Incr.first_message t)
+    map4 online_status_incr transition_frontier_and_catchup_signal_incr
+      first_connection_incr first_message_incr
       ~f:(fun online_status active_status first_connection first_message ->
         match online_status with
         | `Offline ->
             if `Empty = first_connection then (
-              Logger.trace (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__ "Coda daemon is now connecting" ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Coda daemon is now connecting" ;
               `Connecting )
             else if `Empty = first_message then (
-              Logger.trace (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__ "Coda daemon is now listening" ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Coda daemon is now listening" ;
               `Listening )
             else `Offline
-        | `Online ->
-            Option.value_map active_status
-              ~default:
-                ( Logger.trace (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ "Coda daemon is now bootstrapping" ;
-                  `Bootstrap )
-              ~f:(fun _ ->
-                Logger.trace (Logger.create ()) ~module_:__MODULE__
+        | `Online -> (
+          match active_status with
+          | None ->
+              Logger.info (Logger.create ()) ~module_:__MODULE__
+                ~location:__LOC__ "Coda daemon is now bootstrapping" ;
+              `Bootstrap
+          | Some (_, catchup_signal) -> (
+            match catchup_signal with
+            | `Catchup ->
+                Logger.info (Logger.create ()) ~module_:__MODULE__
+                  ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
+                `Catchup
+            | `Normal ->
+                Logger.info (Logger.create ()) ~module_:__MODULE__
                   ~location:__LOC__ "Coda daemon is now synced" ;
-                `Synced ) )
+                `Synced ) ) )
   in
   let observer = observe incremental_status in
   stabilize () ; observer
 
 [%%endif]
+
+let sync_status t = t.sync_status
 
 let visualize_frontier ~filename =
   compose_of_option
@@ -203,8 +196,18 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 
 let best_ledger = compose_of_option best_ledger_opt
 
-let get_ledger t staged_ledger_hash =
+let get_ledger t staged_ledger_hash_opt =
   let open Deferred.Or_error.Let_syntax in
+  let%bind staged_ledger_hash =
+    Option.value_map staged_ledger_hash_opt ~f:Deferred.Or_error.return
+      ~default:
+        ( match best_staged_ledger t with
+        | `Active staged_ledger ->
+            Deferred.Or_error.return (Staged_ledger.hash staged_ledger)
+        | `Bootstrapping ->
+            Deferred.Or_error.error_string
+              "get_ledger: can't get staged ledger hash while bootstrapping" )
+  in
   let%bind frontier =
     Deferred.return (t.components.transition_frontier |> peek_frontier)
   in
@@ -219,10 +222,10 @@ let get_ledger t staged_ledger_hash =
         else None )
   with
   | Some x ->
-      Deferred.return (Ok x)
+      Deferred.Or_error.return x
   | None ->
       Deferred.Or_error.error_string
-        "staged ledger hash not found in transition frontier"
+        "get_ledger: staged ledger hash not found in transition frontier"
 
 let seen_jobs t = t.seen_jobs
 
@@ -299,12 +302,14 @@ let request_work t =
         Some staged_ledger
     | `Bootstrapping ->
         Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-          "Could not retrieve staged_ledger due to bootstrapping" ;
+          "Snark-work-request error: Could not retrieve staged_ledger due to \
+           bootstrapping" ;
         None
   in
   let fee = snark_work_fee t in
   let instances, seen_jobs =
-    Work_selection_method.work ~fee ~snark_pool:(snark_pool t) sl (seen_jobs t)
+    Work_selection_method.work ~logger:t.config.logger ~fee
+      ~snark_pool:(snark_pool t) sl (seen_jobs t)
   in
   set_seen_jobs t seen_jobs ;
   if List.is_empty instances then None
@@ -347,11 +352,33 @@ let create_genesis_frontier (config : Config.t) ~verifier =
          ~staged_ledger_diff:empty_diff)
   in
   let genesis_ledger = Lazy.force Genesis_ledger.t in
-  let ledger_db =
-    Ledger.Db.create ?directory_name:config.ledger_db_location ()
+  let load () =
+    let ledger_db =
+      Ledger.Db.create ?directory_name:config.ledger_db_location ()
+    in
+    ( ledger_db
+    , Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db )
   in
-  let root_snarked_ledger =
-    Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db
+  let%bind root_snarked_ledger =
+    match load () with
+    | _, Ok l ->
+        return l
+    | ledger_db, Error _ ->
+        (* Persisted state was bogus. Give up on the ledger contents, we'll bootstrap. *)
+        Ledger.Db.close ledger_db ;
+        let%map () =
+          match config.ledger_db_location with
+          | Some ledger_db_location ->
+              Logger.error config.logger
+                "Failed to load genesis ledger, deleting $dir and trying again."
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("dir", `String ledger_db_location)] ;
+              File_system.remove_dir ledger_db_location
+          | None ->
+              Deferred.unit
+        in
+        snd (load ()) |> Or_error.ok_exn
+    (* If it fails again, something is very wrong. Die. *)
   in
   let snarked_ledger_hash =
     Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root genesis_ledger
@@ -400,11 +427,6 @@ let create (config : Config.t) =
               root transition_frontier |> Breadcrumb.external_transition
               |> External_transition.Validated.forget_validation)
           in
-          let ledger_db =
-            Ledger_transfer.transfer_accounts
-              ~src:(Lazy.force Genesis_ledger.t)
-              ~dest:ledger_db
-          in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
           in
@@ -440,15 +462,6 @@ let create (config : Config.t) =
                                !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
                                Coda_networking.refused_answer_query_string
                                ledger_hash)) )
-              ~transition_catchup:(fun enveloped_hash ->
-                let open Deferred.Option.Let_syntax in
-                let hash = Envelope.Incoming.data enveloped_hash in
-                let%bind frontier =
-                  Deferred.return
-                  @@ Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Deferred.return
-                @@ Sync_handler.transition_catchup ~frontier hash )
               ~get_ancestry:(fun query_env ->
                 let consensus_state = Envelope.Incoming.data query_env in
                 Deferred.return
@@ -459,6 +472,36 @@ let create (config : Config.t) =
                 in
                 Root_prover.prove ~logger:config.logger ~frontier
                   consensus_state )
+              ~get_transition_chain_witness:(fun query ->
+                let state_hash = Envelope.Incoming.data query in
+                Deferred.return
+                @@
+                let open Option.Let_syntax in
+                let%bind frontier =
+                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                in
+                Transition_chain_witness.prove ~frontier state_hash )
+              ~get_transition_chain:(fun request ->
+                let hashes = Envelope.Incoming.data request in
+                Deferred.return
+                @@
+                let open Option.Let_syntax in
+                let%bind frontier =
+                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                in
+                Option.all
+                @@ List.map hashes ~f:(fun hash ->
+                       Option.merge
+                         (Transition_frontier.find frontier hash)
+                         (Transition_frontier.find_in_root_history frontier
+                            hash)
+                         ~f:Fn.const
+                       |> Option.map ~f:(fun breadcrumb ->
+                              Transition_frontier.Breadcrumb
+                              .transition_with_hash breadcrumb
+                              |> With_hash.data
+                              |> External_transition.Validated
+                                 .forget_validation ) ) )
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~logger:config.logger
@@ -548,6 +591,18 @@ let create (config : Config.t) =
             (Strict_pipe.transfer
                (Coda_networking.states net)
                external_transitions_writer ~f:ident) ;
+          don't_wait_for
+            (Linear_pipe.iter (Coda_networking.ban_notification_reader net)
+               ~f:(fun notification ->
+                 let peer = Coda_networking.banned_peer notification in
+                 let banned_until =
+                   Coda_networking.banned_until notification
+                 in
+                 (* if RPC call fails, will be logged in gossip net code *)
+                 let%map _ =
+                   Coda_networking.ban_notify net peer banned_until
+                 in
+                 () )) ;
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~logger:config.logger
               ~trust_system:config.trust_system
@@ -580,7 +635,33 @@ let create (config : Config.t) =
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_node
           in
-          return
+          let open Coda_incremental.Status in
+          let transition_frontier_incr =
+            Var.watch @@ of_broadcast_pipe frontier_broadcast_pipe_r
+          in
+          let transition_frontier_and_catchup_signal_incr =
+            transition_frontier_incr
+            >>= function
+            | Some transition_frontier ->
+                Transition_frontier.catchup_signal transition_frontier
+                |> of_broadcast_pipe |> Var.watch
+                >>| fun catchup_signal ->
+                Some (transition_frontier, catchup_signal)
+            | None ->
+                return None
+          in
+          let sync_status =
+            create_sync_status_observer ~logger:config.logger
+              ~transition_frontier_and_catchup_signal_incr
+              ~online_status_incr:
+                ( Var.watch @@ of_broadcast_pipe
+                @@ Coda_networking.online_status net )
+              ~first_connection_incr:
+                (Var.watch @@ of_ivar @@ Coda_networking.first_connection net)
+              ~first_message_incr:
+                (Var.watch @@ of_ivar @@ Coda_networking.first_message net)
+          in
+          Deferred.return
             { config
             ; processes= {prover; verifier}
             ; components=
@@ -597,5 +678,8 @@ let create (config : Config.t) =
                       external_transitions_writer }
             ; wallets
             ; propose_keypairs
-            ; seen_jobs= Work_selector.State.init
-            ; subscriptions } ) )
+            ; seen_jobs=
+                Work_selector.State.init
+                  ~reassignment_wait:config.work_reassignment_wait
+            ; subscriptions
+            ; sync_status } ) )

@@ -4,6 +4,7 @@ open Coda_base
 open Coda_state
 open Coda_transition
 open Coda_incremental
+open Pipe_lib
 
 module type Inputs_intf = Inputs.Inputs_intf
 
@@ -127,7 +128,9 @@ module Make (Inputs : Inputs_intf) :
                           make_actions Sent_invalid_proof
                       | Pre_diff (Bad_signature _) ->
                           make_actions Sent_invalid_signature
-                      | Pre_diff _ | Non_zero_fee_excess _ ->
+                      | Pre_diff _
+                      | Non_zero_fee_excess _
+                      | Insufficient_work _ ->
                           make_actions Gossiped_invalid_transition
                       | Unexpected _ ->
                           failwith
@@ -251,6 +254,11 @@ module Make (Inputs : Inputs_intf) :
 
   let breadcrumb_of_node {Node.breadcrumb; _} = breadcrumb
 
+  type num_catchup_jobs =
+    { mvar: int Mvar.Read_write.t
+    ; signal_reader: [`Normal | `Catchup] Broadcast_pipe.Reader.t
+    ; signal_writer: [`Normal | `Catchup] Broadcast_pipe.Writer.t }
+
   (* Invariant: The path from the root to the tip inclusively, will be max_length + 1 *)
   (* TODO: Make a test of this invariant *)
   type t =
@@ -262,7 +270,8 @@ module Make (Inputs : Inputs_intf) :
     ; consensus_local_state: Consensus.Data.Local_state.t
     ; extensions: Extensions.t
     ; extension_readers: Extensions.readers
-    ; extension_writers: Extensions.writers }
+    ; extension_writers: Extensions.writers
+    ; num_catchup_jobs: num_catchup_jobs }
 
   let logger t = t.logger
 
@@ -315,6 +324,12 @@ module Make (Inputs : Inputs_intf) :
     in
     let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
     let extension_readers, extension_writers = Extensions.make_pipes () in
+    let%bind num_catchup_jobs =
+      let signal_reader, signal_writer = Broadcast_pipe.create `Normal in
+      let mvar = Mvar.create () in
+      let%map () = Mvar.put mvar 0 in
+      {mvar; signal_reader; signal_writer}
+    in
     let t =
       { logger
       ; root_snarked_ledger
@@ -324,7 +339,8 @@ module Make (Inputs : Inputs_intf) :
       ; consensus_local_state
       ; extensions= Extensions.create root_breadcrumb
       ; extension_readers
-      ; extension_writers }
+      ; extension_writers
+      ; num_catchup_jobs }
     in
     let%map () =
       Extensions.handle_diff t.extensions t.extension_writers
@@ -333,8 +349,39 @@ module Make (Inputs : Inputs_intf) :
     Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
     t
 
-  let close {extension_writers; _} =
+  let incr_num_catchup_jobs
+      {num_catchup_jobs= {mvar; signal_writer; _}; logger; _} =
+    let%bind current_num_catchup_jobs = Mvar.take mvar in
+    Logger.trace logger "Incrementing num catch up jobs. Current number %i"
+      current_num_catchup_jobs ~module_:__MODULE__ ~location:__LOC__ ;
+    let%bind () =
+      if current_num_catchup_jobs = 0 then
+        Broadcast_pipe.Writer.write signal_writer `Catchup
+      else Deferred.unit
+    in
+    Mvar.put mvar (current_num_catchup_jobs + 1)
+
+  let decr_num_catchup_jobs
+      {num_catchup_jobs= {mvar; signal_writer; _}; logger; _} =
+    let%bind current_num_catchup_jobs = Mvar.take mvar in
+    Logger.trace logger "Decrementing num catch up jobs. Current number % i"
+      current_num_catchup_jobs ~module_:__MODULE__ ~location:__LOC__ ;
+    [%test_pred: int]
+      ~message:"The number of current catchup jobs cannot be negative"
+      (fun num_catchup_jobs -> num_catchup_jobs > 0)
+      current_num_catchup_jobs ;
+    let%bind () =
+      if current_num_catchup_jobs = 1 then
+        Broadcast_pipe.Writer.write signal_writer `Normal
+      else Deferred.unit
+    in
+    Mvar.put mvar (current_num_catchup_jobs - 1)
+
+  let catchup_signal {num_catchup_jobs= {signal_reader; _}; _} = signal_reader
+
+  let close {extension_writers; num_catchup_jobs= {signal_writer; _}; _} =
     Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
+    Broadcast_pipe.Writer.close signal_writer ;
     Extensions.close_pipes extension_writers
 
   let consensus_local_state {consensus_local_state; _} = consensus_local_state
@@ -369,6 +416,9 @@ module Make (Inputs : Inputs_intf) :
 
   let previous_root t =
     Extensions.Root_history.most_recent t.extensions.root_history
+
+  let oldest_breadcrumb_in_history t =
+    Extensions.Root_history.oldest t.extensions.root_history
 
   let get_path_inclusively_in_root_history t state_hash ~f =
     path_search t state_hash
@@ -529,11 +579,6 @@ module Make (Inputs : Inputs_intf) :
     let soon_to_be_root =
       soon_to_be_root_node.breadcrumb |> Breadcrumb.staged_ledger
     in
-    let children =
-      List.map soon_to_be_root_node.successor_hashes ~f:(fun h ->
-          (Hashtbl.find_exn t.table h).breadcrumb |> Breadcrumb.staged_ledger
-          |> Staged_ledger.ledger )
-    in
     let root_ledger = Staged_ledger.ledger root in
     let soon_to_be_root_ledger = Staged_ledger.ledger soon_to_be_root in
     let soon_to_be_root_merkle_root =
@@ -557,7 +602,7 @@ module Make (Inputs : Inputs_intf) :
       soon_to_be_root_node.breadcrumb.transition_with_hash.hash
     in
     Ledger.remove_and_reparent_exn soon_to_be_root_ledger
-      soon_to_be_root_ledger ~children ;
+      soon_to_be_root_ledger ;
     Hashtbl.remove t.table t.root ;
     Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
     t.root <- new_root_hash ;
@@ -775,6 +820,12 @@ module Make (Inputs : Inputs_intf) :
                 ; ( "garbage_direct_descendants"
                   , `List
                       (List.map bad_children_hashes ~f:State_hash.to_yojson) )
+                ; ( "all_masks"
+                  , `List
+                      (List.map garbage_breadcrumbs ~f:(fun crumb ->
+                           `String
+                             ( Breadcrumb.mask crumb |> Ledger.get_uuid
+                             |> Uuid.to_string_hum ) )) )
                 ; ( "local_state"
                   , Consensus.Data.Local_state.to_yojson
                       t.consensus_local_state ) ]
