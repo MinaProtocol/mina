@@ -222,7 +222,7 @@ end = struct
       in
       let%map fee_transfers =
         create_fee_transfers completed_works_others delta proposer
-          (coinbase_fts : Fee_transfer.Single.t sexp_list)
+          (coinbase_fts : Fee_transfer.Single.t list)
       in
       let transactions =
         List.map user_commands ~f:(fun t -> Transaction.User_command t)

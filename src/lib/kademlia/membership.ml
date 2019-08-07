@@ -339,7 +339,7 @@ module Make
   module For_tests : sig
     val node :
          Node_addrs_and_ports.t
-      -> Host_and_port.t sexp_list
+      -> Host_and_port.t list
       -> string
       -> Trust_system.t
       -> t Deferred.t
