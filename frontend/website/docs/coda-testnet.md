@@ -14,7 +14,7 @@ The current challenges are:
 
 BONUS: An additional 2000 pts to the first person to complete the challenge, and an additional 1000 points to the second person to complete the challenge.
   
-  - NOTE: Degraded to 50% of original point value
+  - NOTE: Degraded to 50% of original point value and bonus has expired.
 
 **Challenge #2 (on-going): Community Helper** - 300 pts are awarded to anyone who helps another member of the community. This could include answering a question, helping them navigate the docs, and generally giving support and encouragement for those trying hard to get involved. We can only award points for what we see, so make sure you’re doing it in one of the official testnet channels so everyone can learn! 
 
