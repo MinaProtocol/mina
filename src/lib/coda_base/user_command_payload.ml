@@ -78,8 +78,7 @@ module Common = struct
     in
     Poly.{fee; nonce; memo}
 
-  type var =
-    (Currency.Fee.var, Account_nonce.Unpacked.var, Memo.Checked.t) Poly.t
+  type var = (Currency.Fee.var, Account_nonce.Checked.t, Memo.Checked.t) Poly.t
 
   let to_hlist Poly.{fee; nonce; memo} = H_list.[fee; nonce; memo]
 
@@ -90,20 +89,19 @@ module Common = struct
 
   let typ =
     Typ.of_hlistable
-      [Currency.Fee.typ; Account_nonce.Unpacked.typ; Memo.typ]
+      [Currency.Fee.typ; Account_nonce.typ; Memo.typ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
   module Checked = struct
     let constant ({fee; nonce; memo} : t) : var =
       { fee= Currency.Fee.var_of_t fee
-      ; nonce= Account_nonce.Unpacked.var_of_value nonce
+      ; nonce= Account_nonce.Checked.constant nonce
       ; memo= Memo.Checked.constant memo }
 
     let to_triples ({fee; nonce; memo} : var) =
-      Currency.Fee.var_to_triples fee
-      @ Account_nonce.Unpacked.var_to_triples nonce
-      @ Memo.Checked.to_triples memo
+      let%map nonce = Account_nonce.Checked.to_triples nonce in
+      Currency.Fee.var_to_triples fee @ nonce @ Memo.Checked.to_triples memo
   end
 end
 

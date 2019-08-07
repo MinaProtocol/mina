@@ -290,8 +290,9 @@ end
 
 module Checked = struct
   let to_triples ({common; body} : var) =
-    let%map body = Body.Checked.to_triples body in
-    User_command_payload.Common.Checked.to_triples common @ body
+    let%map common = User_command_payload.Common.Checked.to_triples common
+    and body = Body.Checked.to_triples body in
+    common @ body
 
   let constant ({common; body} : t) : var =
     { common= User_command_payload.Common.Checked.constant common
