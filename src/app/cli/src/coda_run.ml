@@ -150,6 +150,10 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           return
             (Coda_commands.get_nonce coda pk |> Participating_state.active_exn)
       )
+    ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () pk ->
+          return
+            (Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger
+               coda pk) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
           return (Coda_commands.get_status ~flag coda) )
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
@@ -187,14 +191,21 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           let r = Coda_lib.request_work coda in
           Option.iter r ~f:(fun r ->
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
-                r ) ;
+                ~metadata:
+                  [ ( "work_spec"
+                    , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r)
+                    ) ]
+                "responding to a Get_work request with some new work" ) ;
           return r )
     ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-            !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
-            work.spec ;
+            "received completed work from a snark worker"
+            ~metadata:
+              [ ( "work_spec"
+                , `String
+                    (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" work.spec) )
+              ] ;
           List.iter work.metrics ~f:(fun (total, tag) ->
               match tag with
               | `Merge ->

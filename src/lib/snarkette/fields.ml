@@ -49,6 +49,8 @@ module type Fp_intf = sig
 
   val fold : t -> bool Triple.t Fold.t
 
+  val to_bits : t -> bool list
+
   val length_in_bits : int
 
   val is_square : t -> bool
@@ -107,6 +109,8 @@ module Make_fp
             else go (f acc (N.test_bit n i)) (i + 1)
           in
           go init 0 ) }
+
+  let to_bits = Fn.compose Fold_lib.Fold.to_list fold_bits
 
   let fold n = Fold_lib.Fold.group3 ~default:false (fold_bits n)
 

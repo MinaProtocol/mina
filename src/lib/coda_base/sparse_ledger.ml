@@ -121,8 +121,6 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
   let nonce = User_command.Payload.nonce payload in
   let fee = User_command.Payload.fee payload in
   assert (Account.Nonce.equal sender_account.nonce nonce) ;
-  if not Insecure.fee_collection then
-    failwith "Bundle.Sparse_ledger: Insecure.fee_collection" ;
   let open Currency in
   let sender_account =
     { sender_account with

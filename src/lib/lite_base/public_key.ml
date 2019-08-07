@@ -1,9 +1,9 @@
 open Fold_lib
 open Sexplib.Std
 open Bin_prot.Std
-module Field = Lite_params.Tock.Fq
+module Field = Crypto_params.Tock.Fq
 
-type t = Lite_params.Tock.G1.t
+type t = Crypto_params.Tock.G1.t
 
 module Compressed = struct
   module Stable = struct

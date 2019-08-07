@@ -4,14 +4,14 @@ let%test_module "merkle_tree" =
   ( module struct
     open Snarky.Merkle_tree
 
-    let compress x y = Free_hash.Compress (x, y)
+    let merge x y = Free_hash.Merge (x, y)
 
     let hash =
       Option.value_map ~default:Free_hash.Hash_empty ~f:(fun x ->
           Free_hash.Hash_value x )
 
     let create_tree n =
-      let tree = create ~hash ~compress 0 in
+      let tree = create ~hash ~merge 0 in
       add_many tree (List.init (n - 1) ~f:(fun i -> i + 1))
 
     let n = 10
@@ -37,6 +37,6 @@ let%test_module "merkle_tree" =
     let%test_unit "merkle_root" =
       for key = 0 to n - 1 do
         let path = get_path tree key in
-        assert (implied_root ~compress key (hash (Some key)) path = root tree)
+        assert (implied_root ~merge key (hash (Some key)) path = root tree)
       done
   end )

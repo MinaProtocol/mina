@@ -120,7 +120,7 @@ let negative_one =
       ; snarked_ledger_hash=
           Frozen_ledger_hash.of_ledger_hash
           @@ Ledger.merkle_root (Lazy.force Genesis_ledger.t)
-      ; timestamp= Consensus.Constants.genesis_state_timestamp }
+      ; timestamp= Block_time.of_time Time.epoch }
 
 (* negative_one and genesis blockchain states are equivalent *)
 let genesis = negative_one
@@ -153,8 +153,6 @@ module Message = struct
     in
     List.take (Field.unpack d) Inner_curve.Scalar.length_in_bits
     |> Inner_curve.Scalar.of_bits
-
-  let () = assert Insecure.signature_hash_function
 
   let%snarkydef hash_checked t ~nonce =
     let%bind trips = var_to_triples t in

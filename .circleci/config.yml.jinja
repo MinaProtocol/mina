@@ -43,10 +43,10 @@ jobs:
                   command: cd frontend/website && yarn run reformat && git diff --exit-code src
             - run:
                   name: Build website
-                  command: cd frontend/website && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && yarn run build
+                  command: cd frontend/website && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && pip install mkdocs && yarn run build
             - run:
                   name: Deploy staging
-                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then yarn run deploy-ci; fi)
+                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "develop" ]; then yarn run deploy-ci; fi)
 
     lint:
         docker:
@@ -134,7 +134,7 @@ jobs:
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
-        {%- if profile == "testnet_postake_medium_curves" %}
+        {%- if profile in medium_curve_profiles %}
         resource_class: xlarge
         {%- else %}
         resource_class: large
@@ -193,6 +193,7 @@ jobs:
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
     {%- endfor %}
@@ -265,7 +266,7 @@ workflows:
             - update-branch-protection:
                 filters:
                   branches:
-                    only: master
+                    only: develop
             - tracetool
             - build-wallet
             - build-macos
@@ -285,8 +286,8 @@ workflows:
               filters:
                 branches:
                   only:
-                    - master
-                    - release/beta
+                    - develop
+                    - /release\/.*/
         jobs:
           {%- for profile in unit_test_profiles_medium_curves %}
           - test-unit--{{profile}}

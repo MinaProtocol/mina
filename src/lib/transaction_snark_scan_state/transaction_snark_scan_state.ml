@@ -1,4 +1,5 @@
 open Core_kernel
+open Coda_base
 open Module_version
 
 let option lab =
@@ -27,12 +28,11 @@ module Make
     end) :
   Coda_intf.Transaction_snark_scan_state_generalized_intf
   with type transaction_snark_work := Inputs.Transaction_snark_work.t
-   and type transaction_snark_statement := Inputs.Transaction_snark_statement.t
+   and type transaction_snark_statement := Transaction_snark.Statement.t
    and type sok_message := Inputs.Sok_message.t
-   and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
-   and type ledger_undo := Inputs.Ledger.Undo.t
-   and type transaction := Inputs.Transaction.t
-   and type transaction_witness := Inputs.Transaction_witness.t
+   and type frozen_ledger_hash := Frozen_ledger_hash.t
+   and type ledger_undo := Ledger.Undo.t
+   and type transaction := Transaction.t
    and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
    and type ledger_proof := Inputs.Ledger_proof.t = struct
   open Inputs
@@ -56,7 +56,7 @@ module Make
           (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
           type t =
             { transaction_with_info: Ledger.Undo.Stable.V1.t
-            ; statement: Transaction_snark_statement.Stable.V1.t
+            ; statement: Transaction_snark.Statement.Stable.V1.t
             ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
           [@@deriving sexp, bin_io, version]
         end
@@ -79,7 +79,7 @@ module Make
 
     type t = Stable.Latest.t =
       { transaction_with_info: Ledger.Undo.t
-      ; statement: Transaction_snark_statement.t
+      ; statement: Transaction_snark.Statement.t
       ; witness: Transaction_witness.t }
     [@@deriving sexp]
   end
@@ -122,12 +122,12 @@ module Make
   module Space_partition = Parallel_scan.Space_partition
 
   module Job_view = struct
-    type t = Transaction_snark_statement.t Parallel_scan.Job_view.t
+    type t = Transaction_snark.Statement.t Parallel_scan.Job_view.t
     [@@deriving sexp]
 
     let to_yojson ((pos, job) : t) : Yojson.Safe.json =
       let hash_string h = Sexp.to_string (Frozen_ledger_hash.sexp_of_t h) in
-      let statement_to_yojson (s : Transaction_snark_statement.t) =
+      let statement_to_yojson (s : Transaction_snark.Statement.t) =
         `Assoc
           [ ("Source", `String (hash_string s.source))
           ; ("Target", `String (hash_string s.target))
@@ -264,18 +264,19 @@ module Make
     let pending_coinbase_after =
       match transaction with
       | Coinbase c ->
-          Pending_coinbase_stack.push pending_coinbase_before c
+          Pending_coinbase.Stack.push pending_coinbase_before c
       | _ ->
           pending_coinbase_before
     in
     let%bind fee_excess = Transaction.fee_excess transaction in
     let%map supply_increase = Transaction.supply_increase transaction in
-    { Transaction_snark_statement.source
+    { Transaction_snark.Statement.source
     ; target
     ; fee_excess
     ; supply_increase
     ; pending_coinbase_stack_state=
-        { Pending_coinbase_stack_state.source= pending_coinbase_before
+        { Transaction_snark.Pending_coinbase_stack_state.source=
+            pending_coinbase_before
         ; target= pending_coinbase_after }
     ; proof_type= `Base }
 
@@ -298,7 +299,7 @@ module Make
           |> option "Error adding supply_increases"
         in
         let statement =
-          { Transaction_snark_statement.source= s.source
+          { Transaction_snark.Statement.source= s.source
           ; target= s'.target
           ; supply_increase
           ; pending_coinbase_stack_state=
@@ -323,7 +324,7 @@ module Make
           val verify :
                verifier:t
             -> proof:Ledger_proof.t
-            -> statement:Transaction_snark_statement.t
+            -> statement:Transaction_snark.Statement.t
             -> message:Sok_message.t
             -> sexp_bool M.t
       end) =
@@ -332,7 +333,7 @@ module Make
 
     (*TODO: fold over the pending_coinbase tree and validate the statements?*)
     let scan_statement {tree; _} ~verifier :
-        (Transaction_snark_statement.t, [`Error of Error.t | `Empty]) Result.t
+        (Transaction_snark.Statement.t, [`Error of Error.t | `Empty]) Result.t
         M.t =
       let write_error description =
         sprintf !"Staged_ledger.scan_statement: %s\n" description
@@ -343,8 +344,8 @@ module Make
         Result.map_error result ~f:(fun e ->
             Error.createf !"%s: %{sexp:Error.t}" (write_error message) e )
       in
-      let merge_acc ~verify_proof (acc : Transaction_snark_statement.t option)
-          s2 : Transaction_snark_statement.t option M.Or_error.t =
+      let merge_acc ~verify_proof (acc : Transaction_snark.Statement.t option)
+          s2 : Transaction_snark.Statement.t option M.Or_error.t =
         let with_verification ~f =
           M.map (verify_proof ()) ~f:(fun is_verified ->
               if not is_verified then
@@ -359,7 +360,7 @@ module Make
             | Some s1 ->
                 with_verification ~f:(fun () ->
                     let%map merged_statement =
-                      Transaction_snark_statement.merge s1 s2
+                      Transaction_snark.Statement.merge s1 s2
                     in
                     Some merged_statement ) )
       in
@@ -378,7 +379,7 @@ module Make
             let open M.Or_error.Let_syntax in
             let%bind merged_statement =
               M.return
-              @@ Transaction_snark_statement.merge
+              @@ Transaction_snark.Statement.merge
                    (Ledger_proof.statement proof_1)
                    (Ledger_proof.statement proof_2)
             in
@@ -402,7 +403,7 @@ module Make
                   M.return (create_expected_statement transaction)
                 in
                 if
-                  Transaction_snark_statement.equal transaction.statement
+                  Transaction_snark.Statement.equal transaction.statement
                     expected_statement
                 then
                   merge_acc
@@ -473,7 +474,7 @@ module Make
           ()
   end
 
-  let statement_of_job : job -> Transaction_snark_statement.t option = function
+  let statement_of_job : job -> Transaction_snark.Statement.t option = function
     | Base ({statement; _}, _) ->
         Some statement
     | Merge ((p1, _), (p2, _), _) ->
@@ -490,7 +491,7 @@ module Make
         and supply_increase =
           Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
         in
-        { Transaction_snark_statement.source= stmt1.source
+        { Transaction_snark.Statement.source= stmt1.source
         ; target= stmt2.target
         ; supply_increase
         ; pending_coinbase_stack_state=

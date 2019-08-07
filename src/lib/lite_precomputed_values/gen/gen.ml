@@ -30,7 +30,7 @@ let wrap_vk ~loc =
   let vk_base58 =
     Base58_check.encode
       (Binable.to_string
-         (module Lite_params.Tock.Groth_maller.Verification_key)
+         (module Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key)
          vk)
   in
   let%map () =
@@ -47,7 +47,7 @@ let wrap_vk ~loc =
   let open E in
   [%expr
     Core_kernel.Binable.of_string
-      (module Lite_params.Tock.Groth_maller.Verification_key)
+      (module Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key)
       (Base58_check.decode_exn [%e estring vk_base58])]
 
 let protocol_state (s : Protocol_state.Value.t) : Lite_base.Protocol_state.t =

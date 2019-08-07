@@ -206,26 +206,6 @@ module Make (Inputs : Inputs_intf) :
           Set.union acc_set (User_command.Set.of_list user_commands) )
   end
 
-  module Fake_db = struct
-    include Coda_base.Ledger.Db
-
-    type location = Location.t
-
-    let get_or_create ledger key =
-      let key, loc =
-        match
-          get_or_create_account_exn ledger key (Account.initialize key)
-        with
-        | `Existed, loc ->
-            ([], loc)
-        | `Added, loc ->
-            ([key], loc)
-      in
-      (key, get ledger loc |> Option.value_exn, loc)
-  end
-
-  module TL = Coda_base.Transaction_logic.Make (Fake_db)
-
   let max_length = max_length
 
   module Diff = Diff.Make (struct
@@ -390,6 +370,9 @@ module Make (Inputs : Inputs_intf) :
   let previous_root t =
     Extensions.Root_history.most_recent t.extensions.root_history
 
+  let oldest_breadcrumb_in_history t =
+    Extensions.Root_history.oldest t.extensions.root_history
+
   let get_path_inclusively_in_root_history t state_hash ~f =
     path_search t state_hash
       ~find:(fun t -> Extensions.Root_history.lookup t.extensions.root_history)
@@ -549,11 +532,6 @@ module Make (Inputs : Inputs_intf) :
     let soon_to_be_root =
       soon_to_be_root_node.breadcrumb |> Breadcrumb.staged_ledger
     in
-    let children =
-      List.map soon_to_be_root_node.successor_hashes ~f:(fun h ->
-          (Hashtbl.find_exn t.table h).breadcrumb |> Breadcrumb.staged_ledger
-          |> Staged_ledger.ledger )
-    in
     let root_ledger = Staged_ledger.ledger root in
     let soon_to_be_root_ledger = Staged_ledger.ledger soon_to_be_root in
     let soon_to_be_root_merkle_root =
@@ -577,7 +555,7 @@ module Make (Inputs : Inputs_intf) :
       soon_to_be_root_node.breadcrumb.transition_with_hash.hash
     in
     Ledger.remove_and_reparent_exn soon_to_be_root_ledger
-      soon_to_be_root_ledger ~children ;
+      soon_to_be_root_ledger ;
     Hashtbl.remove t.table t.root ;
     Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
     t.root <- new_root_hash ;
@@ -870,20 +848,25 @@ module Make (Inputs : Inputs_intf) :
                   ~expect:(Ledger_proof.statement proof_data).source
                   ( Ledger.Db.merkle_root t.root_snarked_ledger
                   |> Frozen_ledger_hash.of_ledger_hash ) ;
-                let db_mask = Ledger.of_database t.root_snarked_ledger in
+                (* Apply all the transactions associated with the new ledger
+                   proof to the database-backed SNARKed ledger. We create a
+                   mask and apply them to that, then commit it to the DB. This
+                   saves a lot of IO since committing is batched. Would be even
+                   faster if we implemented #2760. *)
+                let db_casted =
+                  Ledger.Any_ledger.cast
+                    (module Ledger.Db)
+                    t.root_snarked_ledger
+                in
+                let db_mask =
+                  Ledger.Maskable.register_mask db_casted
+                    (Ledger.Mask.create ())
+                in
                 Non_empty_list.iter txns ~f:(fun txn ->
-                    (* TODO: @cmr use the ignore-hash ledger here as well *)
-                    TL.apply_transaction t.root_snarked_ledger txn
+                    Ledger.apply_transaction db_mask txn
                     |> Or_error.ok_exn |> ignore ) ;
-                (* TODO: See issue #1606 to make this faster *)
-
-                (*Ledger.commit db_mask ;*)
-                ignore
-                  (Ledger.Maskable.unregister_mask_exn
-                     (Ledger.Any_ledger.cast
-                        (module Ledger.Db)
-                        t.root_snarked_ledger)
-                     db_mask)
+                Ledger.commit db_mask ;
+                ignore @@ Ledger.Maskable.unregister_mask_exn db_casted db_mask
             | _, false | None, _ ->
                 () ) ;
             [%test_result: Frozen_ledger_hash.t]

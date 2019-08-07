@@ -225,7 +225,7 @@ module type State_hooks_intf = sig
   val generate_transition :
        previous_protocol_state:protocol_state
     -> blockchain_state:blockchain_state
-    -> time:Unix_timestamp.t
+    -> current_time:Unix_timestamp.t
     -> proposal_data:proposal_data
     -> transactions:Coda_base.User_command.t list
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t

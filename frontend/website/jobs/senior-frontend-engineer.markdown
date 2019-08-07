@@ -8,27 +8,29 @@ Help us build accessible, usable, delightful products on top of the Coda Protoco
 We’re seeking a senior product engineer who is also excited by building beautiful products. While it's hard to say exactly what we'll work on given that we are such an early-stage startup, we expect projects to include:
 
 - Wallet software that is a joy to use, with innovative onboarding and account recovery mechanisms.
-- The product side of developer tools and SDKs
+- Developer tools and SDKs
 - Imaginative cryptocurrency applications that showcase what’s possible with a lightweight blockchain
 
 ## Requirements
 
 - 3+ years working on product
 - Willingness to work on-site in a San Francisco based office
-- Familiarity with functional programming, know your way around map and reduce.
-- CSS chops, should be comfortable with Flexbox.
-- Exposure to a declarative frontend framework, such as React, Angular, Vue, Elm etc.
+- Familiarity with functional programming, know your way around map and reduce
+- Comfortable with modern CSS (including Flexbox)
+- Exposure to a declarative frontend framework, such as React, Angular, Vue, Elm
     - Bonus: Experience with React Hooks or GraphQL
-- Experience working on multiple collaborative projects with a product team containing at least one additional developer or designer.
+- Experience working on collaborative projects with a product team
 
 ## Nice to have
 
 - Exposure to working with cryptocurrencies
-- Experience with ReasonML, OCaml, Elm, or Purescript
-- Early stage startup experience
+- Experience with ReasonML, OCaml, Elm, or Purescript (we like to use ReasonReact!)
+- Experience developing accessible products
+- Early-stage startup experience
 - Experience with contributing to open source
 
 ## About us
+
 
 O(1) Labs is aiming to develop the first cryptocurrency protocol that can deliver on the promise of supporting real-world applications and widespread use. Our team is based in San Francisco, and we are funded by top investors (including Polychain, Metastable, Max Levchin, and Naval Ravikant).
 

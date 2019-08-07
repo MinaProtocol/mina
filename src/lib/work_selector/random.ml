@@ -10,9 +10,9 @@ struct
     match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
     | [] ->
         ([], state)
-    | _ ->
-        let i = Random.int (List.length unseen_jobs) in
-        let x = List.nth_exn unseen_jobs i in
+    | expensive_work ->
+        let i = Random.int (List.length expensive_work) in
+        let x = List.nth_exn expensive_work i in
         (Lib.pair_to_list x, Lib.State.set state x)
 end
 
