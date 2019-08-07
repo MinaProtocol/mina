@@ -148,6 +148,9 @@ let benefits =
       </div>
       <ul className="mt0 mb0 ph0 w-70">
         <li className="lh-copy list mb0 mt0">
+          {ReasonReact.string("Relocation package")}
+        </li>
+        <li className="lh-copy list mb0 mt0">
           {ReasonReact.string("Parental leave")}
         </li>
         <li className="lh-copy list mb0 mt0">
