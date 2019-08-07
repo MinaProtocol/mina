@@ -396,8 +396,6 @@ module Make
         Error (`Verifier_error e)
 
   let validate_delta_transition_chain_witness (t, validation) =
-    (* I didn't use the Transition_chain_witness.verify function because otherwise it
-       would include a cyclic dependencies *)
     let transition = With_hash.data t in
     match
       Transition_chain_verifier.verify ~target_hash:(parent_hash transition)
