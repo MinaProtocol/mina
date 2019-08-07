@@ -15,20 +15,19 @@ Follow the steps below to use [MiniUPnP](https://github.com/miniupnp/miniupnp) t
         $ ifconfig
         ...
         en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
-                ether 8c:85:90:c9:a2:01 
-                inet6 fe80::1458:bdd4:e7dc:518e%en0 prefixlen 64 secured scopeid 0x8 
+                ether 8c:85:90:c9:a2:01
+                inet6 fe80::1458:bdd4:e7dc:518e%en0 prefixlen 64 secured scopeid 0x8
                 inet 192.168.101.7 netmask 0xffffff00 broadcast 192.168.101.255
                 nd6 options=201<PERFORMNUD,DAD>
                 media: autoselect
                 status: active
         ...
 
-2. Run the following commands, with the IP address next to `inet` in the previous step. Note that you'll have to run it twice for the two ports below:
+2. Run the following command:
 
-        $ sudo upnpc -a <your-ip-address> 8302 8302 TCP
-        $ sudo upnpc -a <your-ip-address> 8303 8303 UDP
+        $ sudo upnpc -r 8302 TCP 8303 UDP
 
-If these commands succeed, you'll see responses indicating that the ports have been successfully redirected:
+If this command succeeds, you'll see a response indicating that the ports have been successfully redirected:
 
 ```
 ...
@@ -70,7 +69,7 @@ If you're running Coda on macOS and see the following time out error `monitor.ml
 - `$ hostname` to get your hostname
 - `$ vim /etc/hosts` to open your hostfile and add the mapping:
 
-```    
+```
 ##
 # Host Database
 #
