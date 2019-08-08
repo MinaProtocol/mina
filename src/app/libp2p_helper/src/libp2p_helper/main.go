@@ -227,7 +227,6 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			Seqno:  seq,
 			Upcall: "validate",
 			Idx:    s.Subscription,
-			Topic:  r.Topic,
 		})
 
 		select {
@@ -297,7 +296,6 @@ type validateUpcall struct {
 	Seqno  int    `json:"seqno"`
 	Upcall string `json:"upcall"`
 	Idx    int    `json:"subscription_idx"`
-	Topic  string `json:"topic"`
 }
 
 type validationCompleteMsg struct {

@@ -98,8 +98,8 @@ module Pubsub : sig
   (** Subscribe to a pubsub topic.
     *
     * Fails if already subscribed. If it succeeds, incoming messages for that
-    * topic will be written to the pipe. Returned deferred is resolved with [Ok
-    * sub] as soon as the subscription is enqueued.
+    * topic will be written to the [Subscription.message_pipe t]. Returned deferred
+    * is resolved with [Ok sub] as soon as the subscription is enqueued.
     *
     * [should_forward_message] will be called once per new message, and will
     * not be called again until the deferred it returns is resolved. The helper

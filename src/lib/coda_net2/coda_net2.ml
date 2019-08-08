@@ -49,11 +49,7 @@ module Helper = struct
     ; mutable seqno: int
     ; logger: Logger.t
     ; mutable me_keypair: keypair option
-    ; subscriptions:
-        ( int , subscription )
-        Hashtbl.t
-    ; validators:
-        (string, peerid:string -> data:string -> bool Deferred.t) Hashtbl.t
+    ; subscriptions: (int, subscription) Hashtbl.t
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
     ; mutable finished: bool }
@@ -63,6 +59,7 @@ module Helper = struct
     ; topic: string
     ; idx: int
     ; mutable closed: bool
+    ; validator: string -> string -> bool Deferred.t
     ; write_pipe:
         ( string Envelope.Incoming.t
         , Strict_pipe.crash Strict_pipe.buffered
@@ -147,7 +144,7 @@ module Helper = struct
 
       type output = string [@@deriving yojson]
 
-      let name = "unsubscribe"
+      let name = "subscribe"
     end
 
     module Unsubscribe = struct
@@ -156,14 +153,6 @@ module Helper = struct
       type output = string [@@deriving yojson]
 
       let name = "unsubscribe"
-    end
-
-    module Register_filter = struct
-      type input = {topic: string; idx: int} [@@deriving yojson]
-
-      type output = string [@@deriving yojson]
-
-      let name = "registerValidator"
     end
 
     module Configure = struct
@@ -214,7 +203,8 @@ module Helper = struct
     module Open_stream = struct
       type input = {peer: string; protocol: string} [@@deriving yojson]
 
-      type output = {stream_idx: int; remote_addr: string; remote_peerid: string}
+      type output =
+        {stream_idx: int; remote_addr: string; remote_peerid: string}
       [@@deriving yojson]
 
       let name = "openStream"
@@ -339,23 +329,25 @@ module Helper = struct
     | "validate" -> (
         let%bind peerid = v |> member "peer_id" |> to_string_res in
         let%bind data = v |> member "data" |> of_b58_data in
-        let%bind topic = v |> member "topic" |> to_string_res in
+        let%bind subscription_idx =
+          v |> member "subscription_idx" |> to_int_res
+        in
         let%bind seqno = v |> member "seqno" |> to_int_res in
-        match Hashtbl.find t.validators topic with
+        match Hashtbl.find t.subscriptions subscription_idx with
         | Some v ->
             (let open Deferred.Let_syntax in
-            let%map is_valid = v ~peerid ~data in
-            Writer.write
-              (Process.stdin t.subprocess)
-              (Yojson.Safe.to_string
-                 (`Assoc [("seqno", `Int seqno); ("is_valid", `Bool is_valid)])))
-            |> don't_wait_for ;
+            (let%map is_valid = v.validator peerid data in
+             Writer.write
+               (Process.stdin t.subprocess)
+               (Yojson.Safe.to_string
+                  (`Assoc
+                    [("seqno", `Int seqno); ("is_valid", `Bool is_valid)])))
+            |> don't_wait_for) ;
             Ok ()
         | None ->
             Or_error.errorf
-              "asked to validate message for topic we haven't registered a \
-               validator for %s"
-              topic )
+              "asked to validate message for unregistered subscription idx %d"
+              subscription_idx )
     | "incomingStream" -> (
         let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
         let%bind protocol = v |> member "protocol" |> to_string_res in
@@ -413,7 +405,9 @@ module Helper = struct
     | "streamLost" ->
         let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
         let%bind reason = v |> member "reason" |> to_string_res in
-        Logger.warn t.logger "Encountered error while reading stream: $error" ~module_:__MODULE__ ~location:__LOC__ ~metadata:["error", `String reason] ;
+        Logger.warn t.logger "Encountered error while reading stream: $error"
+          ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("error", `String reason)] ;
         let ret =
           if Hashtbl.mem t.streams stream_idx then Ok ()
           else
@@ -443,7 +437,6 @@ module Helper = struct
       ; me_keypair= None
       ; outstanding_requests= Hashtbl.create (module Int)
       ; subscriptions= Hashtbl.create (module Int)
-      ; validators= Hashtbl.create (module String)
       ; streams= Hashtbl.create (module Int)
       ; protocol_handlers= Hashtbl.create (module String)
       ; seqno= 1
@@ -544,6 +537,7 @@ module Pubsub = struct
       ; topic: string
       ; idx: int
       ; mutable closed: bool
+      ; validator: string -> string -> bool Deferred.t
       ; write_pipe:
           ( string Envelope.Incoming.t
           , Strict_pipe.crash Strict_pipe.buffered
@@ -572,24 +566,6 @@ module Pubsub = struct
     let message_pipe {read_pipe; _} = read_pipe
   end
 
-  let register_validator (net : net) topic ~f =
-    match Hashtbl.find net.validators topic with
-    | Some _ ->
-        Deferred.Or_error.error_string
-          "already have a validator for that topic"
-    | None -> (
-        let idx = Helper.genseq net in
-        Hashtbl.add_exn net.validators ~key:topic ~data:f ;
-        match%map
-          Helper.do_rpc net (module Helper.Rpcs.Register_filter) {topic; idx}
-          |> Deferred.Or_error.ok_exn
-        with
-        | "register validator success" ->
-            Ok ()
-        | v ->
-            failwithf "helper broke RPC protocol: registerValidator got %s" v
-              () )
-
   let subscribe (net : net) (topic : string) ~should_forward_message =
     let subscription_idx = Helper.genseq net in
     let read_pipe, write_pipe =
@@ -599,24 +575,31 @@ module Pubsub = struct
     in
     let sub =
       { Subscription.net
-      ; closed= false
       ; topic
       ; idx= subscription_idx
+      ; closed= false
+      ; validator=
+          (fun s d -> should_forward_message ~sender:(s :> PeerID.t) ~data:d)
       ; write_pipe
       ; read_pipe }
     in
     (* TODO: check if already subscribed to topic, fail. *)
-    Hashtbl.add_exn net.subscriptions ~key:subscription_idx
-      ~data:sub ;
+    let%bind _ =
+      match Hashtbl.add net.subscriptions ~key:subscription_idx ~data:sub with
+      | `Ok ->
+          return (Ok ())
+      | `Duplicate ->
+          Deferred.Or_error.errorf "already subscribed to topic %s" topic
+    in
     match%map
       Helper.do_rpc net (module Helper.Rpcs.Subscribe) {topic; subscription_idx}
-      |> Deferred.Or_error.ok_exn
     with
-    | "subscribe success" ->
+    | Ok "subscribe success" ->
         Ok sub
-    | v ->
-        failwithf "helper broke RPC protocol: unsubscribe got %s" v ()
-
+    | Ok j ->
+        failwithf "helper broke RPC protocol: subscribe got %s" j ()
+    | Error e ->
+        Error e
 end
 
 let me (net : Helper.t) = net.me_keypair
@@ -643,13 +626,15 @@ let peers _ = Deferred.return []
 
 let listen_on net iface =
   match%map Helper.do_rpc net (module Helper.Rpcs.Listen) {iface} with
-  | Ok maddrs -> Ok maddrs
+  | Ok maddrs ->
+      Ok maddrs
   | Error e ->
       Error e
 
 let listening_addrs net =
   match%map Helper.do_rpc net (module Helper.Rpcs.Listening_addrs) () with
-  | Ok maddrs -> Ok maddrs
+  | Ok maddrs ->
+      Ok maddrs
   | Error e ->
       Error e
 
@@ -691,16 +676,19 @@ module Protocol_handler = struct
   let is_closed ({closed; _} : t) = closed
 
   let close_connections (net : net) for_protocol =
-    Hashtbl.filter_inplace net.streams
-      ~f:(fun stream ->
+    Hashtbl.filter_inplace net.streams ~f:(fun stream ->
         if stream.protocol <> for_protocol then false
         else (
-          don't_wait_for (let%map _ = Stream.reset stream in ()) ;
+          don't_wait_for
+            (let%map _ = Stream.reset stream in
+             ()) ;
           true ) )
 
   let close ?(reset_existing_streams = false) ({net; protocol_name; _} : t) =
     Hashtbl.remove net.protocol_handlers protocol_name ;
-    let close_connections = if reset_existing_streams then close_connections else fun _ _ -> () in
+    let close_connections =
+      if reset_existing_streams then close_connections else fun _ _ -> ()
+    in
     match%map
       Helper.do_rpc net
         (module Helper.Rpcs.Remove_stream_handler)
@@ -875,16 +863,18 @@ let%test_module "coda network tests" =
        only a test."
 
     let setup_two_nodes network_id =
+      let%bind a_tmp = Unix.mkdtemp "p2p_helper_test_a" in
+      let%bind b_tmp = Async.Unix.mkdtemp "p2p_helper_test_b" in
       let%bind a =
         create
           ~logger:(Logger.extend logger [("name", `String "a")])
-          ~conf_dir:"/tmp/a"
+          ~conf_dir:a_tmp
         >>| Or_error.ok_exn
       in
       let%bind b =
         create
           ~logger:(Logger.extend logger [("name", `String "b")])
-          ~conf_dir:"/tmp/b"
+          ~conf_dir:b_tmp
         >>| Or_error.ok_exn
       in
       let%bind kp_a = Keypair.random a in
@@ -892,16 +882,21 @@ let%test_module "coda network tests" =
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
         configure a ~me:kp_a ~maddrs ~network_id >>| Or_error.ok_exn
-        and () = configure b ~me:kp_b ~maddrs ~network_id >>| Or_error.ok_exn
-      in
+      and () = configure b ~me:kp_b ~maddrs ~network_id >>| Or_error.ok_exn in
       (* Give the helpers time to announce and discover each other on localhost *)
       let%map () = after (Time.Span.of_sec 0.5) in
-      (a, b)
+      let shutdown () =
+        let%bind () = shutdown a in
+        let%bind () = shutdown b in
+        let%bind () = File_system.remove_dir a_tmp in
+        File_system.remove_dir b_tmp
+      in
+      (a, b, shutdown)
 
     let%test_unit "stream" =
       let test_def =
         let open Deferred.Let_syntax in
-        let%bind a, b = setup_two_nodes "test_stream" in
+        let%bind a, b, shutdown = setup_two_nodes "test_stream" in
         let a_peerid = Keypair.to_peerid (me a |> Option.value_exn) in
         let%bind () = after (sec 0.5) in
         let handler_finished = ref false in
@@ -911,7 +906,8 @@ let%test_module "coda network tests" =
               let r, w = Stream.pipes stream in
               let%map () = Pipe.transfer r w ~f:Fn.id in
               Pipe.close w ;
-              handler_finished := true ) |> Deferred.Or_error.ok_exn
+              handler_finished := true )
+          |> Deferred.Or_error.ok_exn
         in
         let%bind stream =
           open_stream b ~protocol:"echo" a_peerid >>| Or_error.ok_exn
@@ -924,9 +920,7 @@ let%test_module "coda network tests" =
         assert (msg = testmsg) ;
         assert !handler_finished ;
         let%bind () = Protocol_handler.close echo_handler in
-        let%bind () = shutdown a in
-        let%map () = shutdown b in
-        ()
+        shutdown ()
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
 
@@ -941,15 +935,17 @@ let%test_module "coda network tests" =
     let%test_unit "pubsub" =
       let test_def =
         let open Deferred.Let_syntax in
-        let%bind a, b = setup_two_nodes "test_pubsub" in
-        let should_forward_message ~sender ~data = return true in
+        let%bind a, b, shutdown = setup_two_nodes "test_pubsub" in
+        let should_forward_message ~sender:_ ~data:_ = return true in
         (* Give the libp2p helpers time to see each other. *)
         let%bind () = after (sec 0.5) in
         let%bind a_sub =
-          Pubsub.subscribe a "test" ~should_forward_message |> Deferred.Or_error.ok_exn
+          Pubsub.subscribe a "test" ~should_forward_message
+          |> Deferred.Or_error.ok_exn
         in
         let%bind b_sub =
-          Pubsub.subscribe b "test" ~should_forward_message |> Deferred.Or_error.ok_exn
+          Pubsub.subscribe b "test" ~should_forward_message
+          |> Deferred.Or_error.ok_exn
         in
         let a_r = Pubsub.Subscription.message_pipe a_sub in
         let b_r = Pubsub.Subscription.message_pipe b_sub in
@@ -967,9 +963,7 @@ let%test_module "coda network tests" =
         let%bind a_msg = Strict_pipe.Reader.read a_r in
         let%bind b_msg = Strict_pipe.Reader.read b_r in
         three_str_eq "msg from b" (unwrap_eof a_msg) (unwrap_eof b_msg) ;
-        let%bind () = shutdown a in
-        let%map () = shutdown b in
-        ()
+        shutdown ()
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
   end )
