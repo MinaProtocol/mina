@@ -1,3 +1,4 @@
+open Bitstring_lib
 open Core
 open Snarky
 open Snark
@@ -205,8 +206,10 @@ let%test_unit "instantiate" =
   let c () =
     let arg =
       Floating_point.of_quotient ~m
-        ~top:(Integer.of_bits ~m Boolean.[true_])
-        ~bottom:(Integer.of_bits ~m Boolean.[false_; true_])
+        ~top:(Integer.of_bits ~m (Bitstring.Lsb_first.of_list Boolean.[true_]))
+        ~bottom:
+          (Integer.of_bits ~m
+             (Bitstring.Lsb_first.of_list Boolean.[false_; true_]))
         ~top_is_less_than_bottom:() ~precision:2
     in
     Floating_point.to_bignum ~m (Exp.one_minus_exp ~m params arg)

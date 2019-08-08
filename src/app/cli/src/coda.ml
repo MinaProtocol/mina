@@ -23,9 +23,7 @@ let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
-    (let%map_open conf_dir =
-       flag "config-directory" ~doc:"DIR Configuration directory"
-         (optional string)
+    (let%map_open conf_dir = Cli_lib.Flag.conf_dir
      and unsafe_track_propose_key =
        flag "unsafe-track-propose-key"
          ~doc:
@@ -145,7 +143,7 @@ let daemon logger =
      fun () ->
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
-         Option.value ~default:(home ^/ ".coda-config") conf_dir
+         Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
        in
        let%bind log_level =
          match log_level with
