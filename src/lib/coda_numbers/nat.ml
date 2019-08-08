@@ -56,7 +56,15 @@ struct
 
     let to_field = Integer.to_field
 
-    let to_bits t = make_checked (fun () -> Integer.to_bits ~m t)
+    let pad bs =
+      let n = Bitstring.Lsb_first.length bs in
+      let padding_length = N.length_in_bits - n in
+      assert (Int.(padding_length >= 0)) ;
+      Bitstring.Lsb_first.pad ~zero:Boolean.false_ ~padding_length bs
+
+    let of_bits bs = Integer.of_bits ~m (pad bs)
+
+    let to_bits t = make_checked (fun () -> pad (Integer.to_bits ~m t))
 
     let to_triples t =
       Checked.map (to_bits t)
@@ -65,15 +73,6 @@ struct
             Fn.compose
               (pad_to_triple_list ~default:Boolean.false_)
               Lsb_first.to_list)
-
-    let of_bits bs =
-      let bs = Bitstring.Lsb_first.to_list bs in
-      let n = List.length bs in
-      let padding = N.length_in_bits - n in
-      assert (Int.(padding >= 0)) ;
-      Integer.of_bits ~m
-        (Bitstring.Lsb_first.of_list
-           (bs @ List.init padding ~f:(fun _ -> Boolean.false_)))
 
     let constant n = Integer.constant ~m (Bignum_bigint.of_int (N.to_int n))
 
@@ -88,13 +87,13 @@ struct
         typ.check (Bitstring.Lsb_first.to_list (Integer.to_bits_exn v))
       in
       let read v =
-        let of_bits_lsb =
-          List.foldi ~init:N.zero ~f:(fun i acc b ->
+        let of_field_elt x =
+          let bs = List.take (Field.unpack x) N.length_in_bits in
+          (* TODO: Make this efficient *)
+          List.foldi bs ~init:N.zero ~f:(fun i acc b ->
               if b then N.(logor (shift_left one i) acc) else acc )
         in
-        Typ.Read.map
-          (typ.read (Bitstring.Lsb_first.to_list (Integer.to_bits_exn v)))
-          ~f:of_bits_lsb
+        Typ.Read.map (Field.typ.read (Integer.to_field v)) ~f:of_field_elt
       in
       {alloc; store; check; read}
 
