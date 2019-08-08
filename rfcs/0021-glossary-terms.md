@@ -22,13 +22,13 @@ The proposal contains the suggested term with it's associated concept it encapsu
 The terms proposed are below:
 
 ### Block Producer
-**Concept:** A consensus node in the network that is selected for a slot, and generates a block.
+**Concept:** A node that participates in a process to determine what blocks it is allowed to produce, and then produces blocks that can be broadcast to the network. 
 
 **Rationale:** This term is used by other protocols, clearly describes the role duties, and is unambiguous.
 
 **Downsides:** EOS is the most popular chain that uses "block producers" and there is a chance of confusion if people think Coda also has only 21 block producers - but this is a tail risk.
 
-**Usage:** A block producer or block producing node stakes coda to participate in consensus.
+**Usage:** A block producer or block producing node stakes its coda and coda delegated to it in order to participate in consensus.
 
 **Alternatives:**
 - Validator - used by most other protocols, but not suitable for Coda, as every node can be a "verifier" or "validator" of SNARKs.
@@ -38,13 +38,13 @@ The terms proposed are below:
 - Miner, Baker, etc - not relevant to Coda's consensus mechanism.
 
 ### Block
-**Concept:** a set of transactions that represent a state transition.
+**Concept:** A set of transactions and consensus information that extend the state of the network. Includes a proof that the current state of the network is fully valid.
 
 **Rationale:** This term aligns with the rest of the industry, and it makes it easier to onboard other blockchain users.
 
 **Downsides:** Perhaps it is not as technically accurate as a transition.
 
-**Usage:** In the Coda network, transactions get added to blocks.
+**Usage:** Blocks enable the Coda network's state to be updated. Blocks include transactions to be applied to the ledger as well as various pieces of consensus information that allow the network to eventually agree on what blocks will stay in the blockchain.
 
 **Alternatives:**
 - External transition - maybe this is more precise, but has the heavy lifting of having to explain a new term for a mostly similar concept. Additionally, the word transition is very similar to transaction, causing confusion at times.
@@ -56,13 +56,13 @@ The terms proposed are below:
 
 **Downsides:** This is a subset of "Transactions", so it is a bit redundant.
 
-**Usage:** There are three types of transactions in the Coda network currently - user transactions, fee transfers, and coinbases.
+**Usage:** There are three types of transactions in the Coda network currently - user transactions, fee transfers, and coinbases. User transactions allow users to manage accounts and send money.
 
 **Alternatives:**
 - User command - this term is confusing, especially in  docs, as it can be conflated with a CLI command that a user issues.
 
 ### Snark worker / Snarker
-**Concept:** A Coda node that produces SNARKs to compress transactions (and in the future, blocks) in the network.
+**Concept:** A Coda node that produces SNARKs to compress data in the network.
 
 **Rationale:** The community likes SNARKs and it is a point of differentiation for Coda, so snarker is an engaging term.
 
@@ -87,6 +87,7 @@ The terms proposed are below:
 **Alternatives:**
 - Fully verifying nodes - more accurate, but a mouthful, and have to create a new term.
 - Trustless nodes - again, some lifting required.
+- Light node / light client - has a negative connotation of not being able to validate chain state.
 
 
 ### Coda vs coda vs CODA
