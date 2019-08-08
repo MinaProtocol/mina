@@ -12,6 +12,8 @@ module Stable = struct
       let to_yojson (x, y) =
         Tick.Field.(`List [`String (to_string x); `String (to_string y)])
 
+      let description = "Non zero curve point"
+
       let version_byte = Base58_check.Version_bytes.non_zero_curve_point
     end
 
@@ -107,6 +109,8 @@ module Compressed = struct
       module T = struct
         type t = (Field.t, bool) Poly.Stable.V1.t
         [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
+
+        let description = "Non zero curve point compressed"
 
         let version_byte =
           Base58_check.Version_bytes.non_zero_curve_point_compressed

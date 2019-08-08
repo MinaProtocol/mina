@@ -18,7 +18,9 @@ let run ~f port arg =
         let%bind has_daemon = does_daemon_exist port in
         if has_daemon then go Run_client else go No_daemon
     | No_daemon ->
-        Print.printf !"Error: daemon not running. See `coda daemon`\n" ;
+        Print.printf
+          !"Error: Daemon not running on port %d. See `coda daemon -help`\n"
+          port ;
         go Abort
     | Run_client ->
         f port arg
