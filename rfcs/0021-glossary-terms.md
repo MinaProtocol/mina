@@ -21,6 +21,18 @@ The proposal contains the suggested term with it's associated concept it encapsu
 
 The terms proposed are below:
 
+### Coda vs coda
+**Concept:** "Coda" is the network / protocol. "coda" is the token.
+
+**Rationale:** Aligns with other networks, and makes it easy to differentiate context based on casing.
+
+**Downsides:** More things to remember.
+
+**Usage:** The native token of the Coda network is coda.
+
+**Alternatives:**
+- Use "Coda" everywhere.
+
 ### Block Producer
 **Concept:** A node that participates in a process to determine what blocks it is allowed to produce, and then produces blocks that can be broadcast to the network. 
 
@@ -88,19 +100,6 @@ The terms proposed are below:
 - Fully verifying nodes - more accurate, but a mouthful, and have to create a new term.
 - Trustless nodes - again, some lifting required.
 - Light node / light client - has a negative connotation of not being able to validate chain state.
-
-
-### Coda vs coda vs CODA
-**Concept:** "Coda" is the network / protocol. "coda" is the token. "CODA" is the ticker symbol.
-
-**Rationale:** Aligns with other networks, and makes it easy to differentiate context based on casing.
-
-**Downsides:** More things to remember.
-
-**Usage:** The native token of the Coda network is coda.
-
-**Alternatives:**
-- Use "Coda" everywhere.
 
 
 ## Drawbacks
