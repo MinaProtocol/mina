@@ -430,20 +430,23 @@ let create (config : Config.t) =
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
           in
+          let handle_request ~f query_env =
+            let input = Envelope.Incoming.data query_env in
+            Deferred.return
+            @@
+            let open Option.Let_syntax in
+            let%bind frontier =
+              Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+            in
+            f ~frontier input
+          in
           let%bind net =
             Coda_networking.create config.net_config
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
-                (fun enveloped_hash ->
-                let hash = Envelope.Incoming.data enveloped_hash in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Sync_handler
-                .get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier
-                  hash )
+                (handle_request
+                   ~f:
+                     Sync_handler
+                     .get_staged_ledger_aux_and_pending_coinbases_at_hash)
               ~answer_sync_ledger_query:(fun query_env ->
                 let open Deferred.Or_error.Let_syntax in
                 let ledger_hash, _ = Envelope.Incoming.data query_env in
@@ -462,46 +465,18 @@ let create (config : Config.t) =
                                !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
                                Coda_networking.refused_answer_query_string
                                ledger_hash)) )
-              ~get_ancestry:(fun query_env ->
-                let consensus_state = Envelope.Incoming.data query_env in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Root_prover.prove ~logger:config.logger ~frontier
-                  consensus_state )
-              ~get_transition_chain_witness:(fun query ->
-                let state_hash = Envelope.Incoming.data query in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Transition_chain_witness.prove ~frontier state_hash )
-              ~get_transition_chain:(fun request ->
-                let hashes = Envelope.Incoming.data request in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Option.all
-                @@ List.map hashes ~f:(fun hash ->
-                       Option.merge
-                         (Transition_frontier.find frontier hash)
-                         (Transition_frontier.find_in_root_history frontier
-                            hash)
-                         ~f:Fn.const
-                       |> Option.map ~f:(fun breadcrumb ->
-                              Transition_frontier.Breadcrumb
-                              .transition_with_hash breadcrumb
-                              |> With_hash.data
-                              |> External_transition.Validated
-                                 .forget_validation ) ) )
+              ~get_ancestry:
+                (handle_request
+                   ~f:(Sync_handler.Root.prove ~logger:config.logger))
+              ~get_bootstrappable_best_tip:
+                (handle_request
+                   ~f:
+                     (Sync_handler.Bootstrappable_best_tip.prove
+                        ~logger:config.logger))
+              ~get_transition_chain_witness:
+                (handle_request ~f:Transition_chain_witness.prove)
+              ~get_transition_chain:
+                (handle_request ~f:Sync_handler.get_transition_chain)
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~logger:config.logger
