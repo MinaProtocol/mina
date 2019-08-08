@@ -1,11 +1,18 @@
 open Core_kernel
 open Fold_lib
+open Bitstring_lib
 
 (* Someday: Make more efficient by giving Field.unpack a length argument in
 camlsnark *)
 let unpack_field unpack ~bit_length x = List.take (unpack x) bit_length
 
 let bits_per_char = 8
+
+let pad (type a) ~length ~default (bs : a Bitstring.Lsb_first.t) =
+  let bs = (bs :> a list) in
+  let padding = length - List.length bs in
+  assert (padding >= 0) ;
+  bs @ List.init padding ~f:(fun _ -> default)
 
 module Vector = struct
   module type Basic = sig
@@ -227,7 +234,9 @@ module Snarkable = struct
           (Typ.list ~length:V.length Boolean.typ)
           ~there:(v_to_list V.length) ~back:v_of_list
 
-      let var_to_bits = Bitstring_lib.Bitstring.Lsb_first.of_list
+      let var_to_bits = Bitstring.Lsb_first.of_list
+
+      let var_of_bits = pad ~length:V.length ~default:Boolean.false_
 
       let var_to_triples (bs : var) =
         Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bs
@@ -312,6 +321,8 @@ module Snarkable = struct
           ~back:Field.project
 
       let var_to_bits = Bitstring_lib.Bitstring.Lsb_first.of_list
+
+      let var_of_bits = pad ~length:bit_length ~default:Boolean.false_
 
       let var_to_triples (bs : var) =
         Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bs
