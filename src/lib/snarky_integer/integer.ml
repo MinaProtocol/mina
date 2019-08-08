@@ -163,15 +163,17 @@ let div_mod (type f) ~m:((module M) as m : f m) a b =
     ; bits= Some q_bits }
   , {value= r; interval= b.interval; bits= Some r_bits} )
 
-let to_bits (type f) ~m:((module M) : f m) t =
+let to_bits ?length (type f) ~m:((module M) : f m) t =
   Bitstring.Lsb_first.of_list
     ( match t.bits with
     | Some bs ->
+        Option.iter length ~f:(fun n -> assert (Int.(n = List.length bs))) ;
         bs
     | None ->
         let bs =
           M.Field.choose_preimage_var t.value
-            ~length:(Interval.bits_needed t.interval)
+            ~length:
+              (Option.value length ~default:(Interval.bits_needed t.interval))
         in
         t.bits <- Some bs ;
         bs )

@@ -56,7 +56,8 @@ struct
 
     let to_field = Integer.to_field
 
-    let to_bits t = make_checked (fun () -> Integer.to_bits ~m t)
+    let to_bits t =
+      make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t)
 
     let to_triples t =
       Checked.map (to_bits t)
@@ -110,17 +111,9 @@ struct
     let if_ c ~then_ ~else_ =
       make_checked (fun () -> Integer.if_ ~m c ~then_ ~else_)
 
-    let succ_if t c =
-      make_checked (fun () ->
-          let t = Integer.succ_if ~m t c in
-          Integer.to_bits ~m t |> ignore ;
-          t )
+    let succ_if t c = make_checked (fun () -> Integer.succ_if ~m t c)
 
-    let succ t =
-      make_checked (fun () ->
-          let t = Integer.succ ~m t in
-          Integer.to_bits ~m t |> ignore ;
-          t )
+    let succ t = make_checked (fun () -> Integer.succ ~m t)
 
     let op op a b = make_checked (fun () -> op ~m a b)
 
