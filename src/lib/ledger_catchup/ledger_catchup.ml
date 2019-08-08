@@ -67,7 +67,7 @@ module Make (Inputs : Inputs.S) :
              `This_transition_was_not_received_via_gossip
         |> External_transition.validate_proof ~verifier
         >>= Fn.compose Deferred.return
-              External_transition.validate_delta_transition_chain_witness
+              External_transition.validate_delta_transition_chain
       in
       let enveloped_initially_validated_transition =
         Envelope.Incoming.map enveloped_transition
@@ -114,7 +114,7 @@ module Make (Inputs : Inputs.S) :
             , Some ("invalid proof", []) )
         in
         Error (Error.of_string "invalid proof")
-    | Error `Invalid_delta_transition_chain_witness ->
+    | Error `Invalid_delta_transition_chain_proof ->
         let%map () =
           Trust_system.record_envelope_sender trust_system logger sender
             ( Trust_system.Actions.Gossiped_invalid_transition
@@ -151,14 +151,14 @@ module Make (Inputs : Inputs.S) :
       "Doing a catchup job with target $target_hash" ;
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
         let open Deferred.Or_error.Let_syntax in
-        let%bind transition_chain_witness =
-          Network.get_transition_chain_witness network peer target_hash
+        let%bind transition_chain_proof =
+          Network.get_transition_chain_proof network peer target_hash
         in
         (* a list of state_hashes from new to old *)
         let%bind hashes =
           match
             Transition_chain_verifier.verify ~target_hash
-              ~transition_chain_witness
+              ~transition_chain_proof
           with
           | Some hashes ->
               Deferred.Or_error.return hashes
@@ -172,7 +172,7 @@ module Make (Inputs : Inputs.S) :
                 Trust_system.(
                   record trust_system logger peer.host
                     Actions.
-                      ( Sent_invalid_transition_chain_witness
+                      ( Sent_invalid_transition_chain_proof
                       , Some (error_msg, []) )) ;
               Deferred.Or_error.error_string error_msg
         in

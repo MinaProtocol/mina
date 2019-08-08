@@ -12,6 +12,6 @@ module Merkle_list_verifier = Merkle_list_verifier.Make (struct
       {previous_state_hash; body= state_body_hash}
 end)
 
-let verify ~target_hash ~transition_chain_witness:(init_state_hash, merkle_list)
+let verify ~target_hash ~transition_chain_proof:(init_state_hash, merkle_list)
     =
   Merkle_list_verifier.verify ~init:init_state_hash merkle_list target_hash

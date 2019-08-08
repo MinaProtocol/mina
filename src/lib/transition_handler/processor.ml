@@ -32,10 +32,9 @@ module Make (Inputs : Inputs.S) :
   type external_transition_with_initial_validation =
     ( [`Time_received] * unit Truth.true_t
     , [`Proof] * unit Truth.true_t
+    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
     , [`Frontier_dependencies] * unit Truth.false_t
-    , [`Staged_ledger_diff] * unit Truth.false_t
-    , [`Delta_transition_chain_witness]
-      * State_hash.t Non_empty_list.t Truth.true_t )
+    , [`Staged_ledger_diff] * unit Truth.false_t )
     External_transition.Validation.with_transition
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
@@ -117,10 +116,9 @@ module Make (Inputs : Inputs.S) :
             match validation with
             | ( _
               , _
+              , (`Delta_transition_chain, Truth.True delta_state_hashes)
               , _
-              , _
-              , (`Delta_transition_chain_witness, Truth.True delta_state_hashes)
-              ) ->
+              , _ ) ->
                 let timeout_duration =
                   Option.fold
                     (Transition_frontier.find frontier
@@ -134,8 +132,8 @@ module Make (Inputs : Inputs.S) :
             | _ ->
                 failwith
                   "This is impossible since the transition just passed \
-                   initial_validation so delta_transition_chain_witness must \
-                   be true" )
+                   initial_validation so delta_transition_chain_proof must be \
+                   true" )
       in
       (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
       let parent_hash =

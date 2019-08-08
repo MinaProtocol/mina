@@ -11,7 +11,7 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
   type validation_error =
     [ `Invalid_time_received of [`Too_early | `Too_late of int64]
     | `Invalid_proof
-    | `Invalid_delta_transition_chain_witness
+    | `Invalid_delta_transition_chain_proof
     | `Verifier_error of Error.t ]
 
   let handle_validation_error ~logger ~trust_system ~sender ~state_hash
@@ -40,8 +40,8 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
         punish Sent_invalid_proof (Some ("verifier error", error_metadata))
     | `Invalid_proof ->
         punish Sent_invalid_proof None
-    | `Invalid_delta_transition_chain_witness ->
-        punish Sent_invalid_transition_chain_witness None
+    | `Invalid_delta_transition_chain_proof ->
+        punish Sent_invalid_transition_chain_proof None
     | `Invalid_time_received `Too_early ->
         punish Gossiped_future_transition None
     | `Invalid_time_received (`Too_late slot_diff) ->
@@ -168,8 +168,7 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
             |> Fn.compose Deferred.return
                  (validate_time_received ~time_received)
             >>= validate_proof ~verifier
-            >>= Fn.compose Deferred.return
-                  validate_delta_transition_chain_witness)
+            >>= Fn.compose Deferred.return validate_delta_transition_chain)
         with
         | Ok verified_transition ->
             ( `Transition

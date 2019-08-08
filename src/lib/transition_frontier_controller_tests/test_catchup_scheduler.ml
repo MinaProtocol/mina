@@ -106,13 +106,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                    dangling_breadcrumb)
                 ( (`Time_received, Truth.True ())
                 , (`Proof, Truth.True ())
-                , (`Frontier_dependencies, Truth.False)
-                , (`Staged_ledger_diff, Truth.False)
-                , ( `Delta_transition_chain_witness
+                , ( `Delta_transition_chain
                   , Truth.True
                       ( Non_empty_list.singleton
                       @@ Transition_frontier.Breadcrumb.parent_hash
-                           dangling_breadcrumb ) ) )
+                           dangling_breadcrumb ) )
+                , (`Frontier_dependencies, Truth.False)
+                , (`Staged_ledger_diff, Truth.False) )
             in
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
@@ -179,13 +179,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                   External_transition.Validation.lower transition
                     ( (`Time_received, Truth.True ())
                     , (`Proof, Truth.True ())
-                    , (`Frontier_dependencies, Truth.False)
-                    , (`Staged_ledger_diff, Truth.False)
-                    , ( `Delta_transition_chain_witness
+                    , ( `Delta_transition_chain
                       , Truth.True
                           (Non_empty_list.singleton
                              (External_transition.Validated.parent_hash
-                                (With_hash.data transition))) ) )
+                                (With_hash.data transition))) )
+                    , (`Frontier_dependencies, Truth.False)
+                    , (`Staged_ledger_diff, Truth.False) )
                 in
                 Envelope.Incoming.wrap ~data:transition
                   ~sender:Envelope.Sender.Local
@@ -221,13 +221,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                             missing_breadcrumb)
                          ( (`Time_received, Truth.True ())
                          , (`Proof, Truth.True ())
-                         , (`Frontier_dependencies, Truth.False)
-                         , (`Staged_ledger_diff, Truth.False)
-                         , ( `Delta_transition_chain_witness
+                         , ( `Delta_transition_chain
                            , Truth.True
                                (Non_empty_list.singleton
                                   (Transition_frontier.Breadcrumb.parent_hash
-                                     missing_breadcrumb)) ) )
+                                     missing_breadcrumb)) )
+                         , (`Frontier_dependencies, Truth.False)
+                         , (`Staged_ledger_diff, Truth.False) )
                      in
                      Envelope.Incoming.wrap ~data:transition
                        ~sender:Envelope.Sender.Local)
@@ -291,13 +291,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                   External_transition.Validation.lower transition
                     ( (`Time_received, Truth.True ())
                     , (`Proof, Truth.True ())
-                    , (`Frontier_dependencies, Truth.False)
-                    , (`Staged_ledger_diff, Truth.False)
-                    , ( `Delta_transition_chain_witness
+                    , ( `Delta_transition_chain
                       , Truth.True
                           (Non_empty_list.singleton
                              (External_transition.Validated.parent_hash
-                                (With_hash.data transition))) ) )
+                                (With_hash.data transition))) )
+                    , (`Frontier_dependencies, Truth.False)
+                    , (`Staged_ledger_diff, Truth.False) )
                 in
                 Envelope.Incoming.wrap ~data:transition
                   ~sender:Envelope.Sender.Local
@@ -330,13 +330,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                             missing_breadcrumb)
                          ( (`Time_received, Truth.True ())
                          , (`Proof, Truth.True ())
-                         , (`Frontier_dependencies, Truth.False)
-                         , (`Staged_ledger_diff, Truth.False)
-                         , ( `Delta_transition_chain_witness
+                         , ( `Delta_transition_chain
                            , Truth.True
                                ( Non_empty_list.singleton
                                @@ Transition_frontier.Breadcrumb.parent_hash
-                                    missing_breadcrumb ) ) )
+                                    missing_breadcrumb ) )
+                         , (`Frontier_dependencies, Truth.False)
+                         , (`Staged_ledger_diff, Truth.False) )
                      in
                      Envelope.Incoming.wrap ~data:transition
                        ~sender:Envelope.Sender.Local)

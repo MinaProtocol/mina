@@ -13,10 +13,10 @@ module type Inputs_intf = sig
      and type mostly_validated_external_transition :=
                 ( [`Time_received] * unit Truth.true_t
                 , [`Proof] * unit Truth.true_t
+                , [`Delta_transition_chain]
+                  * State_hash.t Non_empty_list.t Truth.true_t
                 , [`Frontier_dependencies] * unit Truth.true_t
-                , [`Staged_ledger_diff] * unit Truth.false_t
-                , [`Delta_transition_chain_witness]
-                  * State_hash.t Non_empty_list.t Truth.true_t )
+                , [`Staged_ledger_diff] * unit Truth.false_t )
                 External_transition.Validation.with_transition
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -352,14 +352,14 @@ end = struct
       External_transition.Validation.lower initial_transition
         ( (`Time_received, Truth.True ())
         , (`Proof, Truth.True ())
-        , (`Frontier_dependencies, Truth.False)
-        , (`Staged_ledger_diff, Truth.False)
           (* This is a hack, but since we are bootstrapping. I am assuming this would be fine *)
-        , ( `Delta_transition_chain_witness
+        , ( `Delta_transition_chain
           , Truth.True
               (Non_empty_list.singleton
                  (Transition_frontier.Breadcrumb.parent_hash initial_breadcrumb))
-          ) )
+          )
+        , (`Frontier_dependencies, Truth.False)
+        , (`Staged_ledger_diff, Truth.False) )
     in
     let t =
       { network
@@ -515,13 +515,12 @@ end = struct
         External_transition.Validation.lower transition_with_hash
           ( (`Time_received, Truth.True ())
           , (`Proof, Truth.True ())
-          , (`Frontier_dependencies, Truth.False)
-          , (`Staged_ledger_diff, Truth.False)
-          , ( `Delta_transition_chain_witness
+          , ( `Delta_transition_chain
             , Truth.True
                 ( Non_empty_list.singleton
                 @@ External_transition.Validated.parent_hash genesis_root ) )
-          )
+          , (`Frontier_dependencies, Truth.False)
+          , (`Staged_ledger_diff, Truth.False) )
       in
       { logger
       ; trust_system

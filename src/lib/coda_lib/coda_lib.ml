@@ -350,7 +350,7 @@ let create_genesis_frontier (config : Config.t) ~verifier =
       (External_transition.create ~protocol_state:genesis_protocol_state
          ~protocol_state_proof:Precomputed_values.base_proof
          ~staged_ledger_diff:empty_diff
-         ~delta_transition_chain_witness:
+         ~delta_transition_chain_proof:
            (Protocol_state.previous_state_hash genesis_protocol_state, []))
   in
   let genesis_ledger = Lazy.force Genesis_ledger.t in
@@ -475,7 +475,7 @@ let create (config : Config.t) =
                    ~f:
                      (Sync_handler.Bootstrappable_best_tip.prove
                         ~logger:config.logger))
-              ~get_transition_chain_witness:
+              ~get_transition_chain_proof:
                 (handle_request ~f:(fun ~frontier hash ->
                      Transition_chain_prover.prove ~frontier hash ))
               ~get_transition_chain:

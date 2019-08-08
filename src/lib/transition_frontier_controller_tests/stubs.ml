@@ -235,7 +235,7 @@ struct
         External_transition.create ~protocol_state
           ~protocol_state_proof:Proof.dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
-          ~delta_transition_chain_witness:(previous_state_hash, [])
+          ~delta_transition_chain_proof:(previous_state_hash, [])
       in
       (* We manually created a verified an external_transition *)
       let (`I_swear_this_is_safe_see_my_comment
@@ -256,13 +256,13 @@ struct
                next_verified_external_transition_with_hash
                ( (`Time_received, Truth.True ())
                , (`Proof, Truth.True ())
-               , (`Frontier_dependencies, Truth.True ())
-               , (`Staged_ledger_diff, Truth.False)
-               , ( `Delta_transition_chain_witness
+               , ( `Delta_transition_chain
                  , Truth.True
                      (Non_empty_list.singleton
                         (Transition_frontier.Breadcrumb.state_hash
-                           parent_breadcrumb)) ) ))
+                           parent_breadcrumb)) )
+               , (`Frontier_dependencies, Truth.True ())
+               , (`Staged_ledger_diff, Truth.False) ))
           ~sender:None
       with
       | Ok new_breadcrumb ->
@@ -334,7 +334,7 @@ struct
         (External_transition.create ~protocol_state:genesis_protocol_state
            ~protocol_state_proof:Proof.dummy
            ~staged_ledger_diff:dummy_staged_ledger_diff
-           ~delta_transition_chain_witness:
+           ~delta_transition_chain_proof:
              (Protocol_state.previous_state_hash genesis_protocol_state, []))
     in
     let root_transition_with_data =
@@ -643,7 +643,7 @@ struct
         ~f:(Sync_handler.Bootstrappable_best_tip.prove ~logger)
         t
 
-    let get_transition_chain_witness =
+    let get_transition_chain_proof =
       handle_requests ~typ:"transition chain witness" ~f:(fun ~frontier hash ->
           Transition_chain_prover.prove ~frontier hash )
 
@@ -795,13 +795,13 @@ struct
         External_transition.Validation.lower transition_with_hash
           ( (`Time_received, Truth.True ())
           , (`Proof, Truth.True ())
-          , (`Frontier_dependencies, Truth.False)
-          , (`Staged_ledger_diff, Truth.False)
-          , ( `Delta_transition_chain_witness
+          , ( `Delta_transition_chain
             , Truth.True
                 (Non_empty_list.singleton
                    ( With_hash.data transition_with_hash
-                   |> External_transition.Validated.parent_hash )) ) )
+                   |> External_transition.Validated.parent_hash )) )
+          , (`Frontier_dependencies, Truth.False)
+          , (`Staged_ledger_diff, Truth.False) )
       in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:

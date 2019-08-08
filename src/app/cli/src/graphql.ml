@@ -187,7 +187,7 @@ module Types = struct
           List.rev
           @@ Rpc_timings.Fields.fold ~init:[] ~get_staged_ledger_aux:fd
                ~answer_sync_ledger_query:fd ~get_ancestry:fd
-               ~get_transition_chain_witness:fd ~get_transition_chain:fd )
+               ~get_transition_chain_proof:fd ~get_transition_chain:fd )
 
     module Histograms = Daemon_rpcs.Types.Status.Histograms
 

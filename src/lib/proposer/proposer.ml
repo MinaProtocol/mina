@@ -338,7 +338,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       let transition_hash =
                         Protocol_state.hash protocol_state
                       in
-                      let delta_transition_chain_witness =
+                      let delta_transition_chain_proof =
                         Transition_chain_prover.prove
                           ~length:(Consensus.Constants.delta - 1)
                           ~frontier
@@ -351,13 +351,13 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                           ; data=
                               External_transition.create ~protocol_state
                                 ~protocol_state_proof ~staged_ledger_diff
-                                ~delta_transition_chain_witness }
+                                ~delta_transition_chain_proof }
                         |> External_transition.skip_time_received_validation
                              `This_transition_was_not_received_via_gossip
                         |> External_transition.skip_proof_validation
                              `This_transition_was_generated_internally
                         |> External_transition
-                           .skip_delta_transition_chain_witness_validation
+                           .skip_delta_transition_chain_validation
                              `This_transition_was_not_received_via_gossip
                         |> Transition_frontier_validation
                            .validate_frontier_dependencies ~logger ~frontier

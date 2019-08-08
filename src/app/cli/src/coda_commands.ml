@@ -291,10 +291,10 @@ let get_status ~flag t =
           ; get_ancestry=
               { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_ancestry"
               ; impl= r ~name:"rpc_impl_get_ancestry" }
-          ; get_transition_chain_witness=
+          ; get_transition_chain_proof=
               { Rpc_pair.dispatch=
-                  r ~name:"rpc_dispatch_get_transition_chain_witness"
-              ; impl= r ~name:"rpc_impl_get_transition_chain_witness" }
+                  r ~name:"rpc_dispatch_get_transition_chain_proof"
+              ; impl= r ~name:"rpc_impl_get_transition_chain_proof" }
           ; get_transition_chain=
               { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_transition_chain"
               ; impl= r ~name:"rpc_impl_get_transition_chain" } }
