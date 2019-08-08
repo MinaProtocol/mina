@@ -4,8 +4,8 @@
 /dockerfiles/ @jkrauska
 /rfcs/ @imeckler @es92 @bkase
 /docs/ @rbkhmrcr @imeckler @bkase @nholland94 @cmr @o1pranay @schmavery @figitaki
-/scripts/ @nholland94 @jkrauska @cmr
-/Makefile @jkrauska
+/scripts/ @nholland94 @jkrauska @cmr @bkase
+/Makefile @jkrauska @bkase
 /src/config/ @imeckler @nholland94
 /CODE_OF_CONDUCT.md @imeckler @cmr
 /CONTRIBUTING.md @imeckler @cmr
