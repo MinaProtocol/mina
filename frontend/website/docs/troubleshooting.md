@@ -45,9 +45,11 @@ Depending on your router, you may see one of the following errors:
 
 If so, find your router model and search for `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Coda node. You'll need to open the TCP port 8302, and the UDP port 8303 by default.
 
-### `couldn't determine our IP from the internet, use -external-ip flag`
+### Issues determining IP address
 
-If you see this, the daemon failed to determine its own IP by making HTTP/S requests to [these](https://github.com/CodaProtocol/coda/blob/056d0203722ddfec1c7ad216846434648cd7af5e/src/app/cli/src/find_ip.ml#L7-L11) service providers. Your firewall may be blocking HTTP/S requests, or the network connection may not be working at all. If you know your external IP, use `-external-ip <your-ip>` to avoid these requests.
+If you see `couldn't determine our IP from the internet, use -external-ip flag`, then the daemon failed to determine its own IP from [these service providers](https://github.com/CodaProtocol/coda/blob/056d0203722ddfec1c7ad216846434648cd7af5e/src/app/cli/src/find_ip.ml#L7-L11). Your firewall may be blocking HTTP/S requests, or the network connection may not be working. 
+
+To bypass this, pass in the flag `-external-ip <your-ip-address>` when starting the Coda daemon. To get your external IP address, run `curl ifconfig.me`.
 
 ## macOS Hostname
 
