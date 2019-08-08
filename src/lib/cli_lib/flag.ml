@@ -22,6 +22,10 @@ let privkey_read_path =
   flag "privkey-path" ~doc:"FILE File to read private key from"
     (required string)
 
+let conf_dir =
+  let open Command.Param in
+  flag "config-directory" ~doc:"DIR Configuration directory" (optional string)
+
 let port =
   Command.Param.flag "daemon-port"
     ~doc:
