@@ -6,6 +6,8 @@ module type Inputs_intf = sig
 
   module Network : sig
     type t
+
+    val first_connection : t -> unit Async.Ivar.t
   end
 
   module Transition_frontier :

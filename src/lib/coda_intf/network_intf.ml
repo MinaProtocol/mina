@@ -41,6 +41,15 @@ module type Network_intf = sig
        Proof_carrying_data.t
        Deferred.Or_error.t
 
+  val get_bootstrappable_best_tip :
+       t
+    -> Network_peer.Peer.t
+    -> Consensus.Data.Consensus_state.Value.t
+    -> ( external_transition
+       , State_body_hash.t list * external_transition )
+       Proof_carrying_data.t
+       Deferred.Or_error.t
+
   val get_transition_chain_witness :
        t
     -> Network_peer.Peer.t
@@ -135,6 +144,13 @@ module type Network_intf = sig
                         , State_body_hash.t list * external_transition )
                         Proof_carrying_data.t
                         Deferred.Option.t)
+    -> get_bootstrappable_best_tip:(   Consensus.Data.Consensus_state.Value.t
+                                       Envelope.Incoming.t
+                                    -> ( external_transition
+                                       , State_body_hash.t list
+                                         * external_transition )
+                                       Proof_carrying_data.t
+                                       Deferred.Option.t)
     -> get_transition_chain_witness:(   State_hash.t Envelope.Incoming.t
                                      -> (State_hash.t * State_body_hash.t list)
                                         Deferred.Option.t)
