@@ -756,9 +756,7 @@ let unsafe_import =
           Deferred.unit
       | None ->
           (* Or we import it *)
-          let%map () =
-            Secrets.Wallets.import_keypair wallets keypair >>| ignore
-          in
+          let%map _ = Secrets.Wallets.import_keypair wallets keypair in
           printf
             !"Key imported successfully : %s\n"
             (Public_key.Compressed.to_base58_check
