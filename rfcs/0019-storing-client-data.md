@@ -342,7 +342,7 @@ let update_status sqlite finalized_transition deleted_transitions =
 
 #### Client Queries
 
-A query that a client makes will make use of both the daemon and the database. For the short term, the daemon will service all of the client's queries, namely through GraphQL. The daemon will make reads from the database asynchronously. In the future, we can offload the the client queries to another process, which we will call the API process if these queries become a bottleneck. The downside of this is that we will have to manually add communication channels between the daemon and the client process. We may use the existing RPC tools that we have or have the daemon answer queries through GraphQL. The following subsections will describe queries how to use the databases to make complicated queries:
+A query that a client makes will make use of both the daemon and the database. For the short term, the daemon will service all of the client's queries, namely through GraphQL. The daemon will make reads from the database asynchronously. In the future, we can offload the client queries to another process, which we will call the API process if these queries become a bottleneck. The downside of this is that we will have to manually add communication channels between the daemon and the client process. We may use the existing RPC tools that we have or have the daemon answer queries through GraphQL. The following subsections will describe queries how to use the databases to make complicated queries:
 
 #### Transaction_status
 
@@ -411,14 +411,14 @@ We can paginate `blocks` (sorting by `first_seen`) query using the following SQL
 
 SELECT state_hash, transaction_ids, time_seen, creator, ....FROM
 (
-SELECT state_hash, CONCAT(transition_to_transactions.transaction_id) as transaction_ids, MIN (transition_to_transactions.time_seen_transaction) as time_seen
-FROM transition_to_transactions
-GROUPBY transition_to_transactions.state_hash
-HAVING ((transition_to_transactions.sender IN $SENDERS) OR (transition_to_transactions.receiver IN $RECEIVERS))
+SELECT state_hash, CONCAT(block_to_transactions.transaction_id) as transaction_ids, MIN (block_to_transactions.time_seen_transaction) as time_seen
+FROM block_to_transactions
+GROUPBY block_to_transactions.state_hash
+HAVING ((block_to_transactions.sender IN $SENDERS) OR (block_to_transactions.receiver IN $RECEIVERS))
 ) as group_by
 INNER JOIN
-external_transitions
-ON group_by.state_hash = external_transitions.state_hash
+blocks
+ON group_by.state_hash = blocks.state_hash
 WHERE group_by.time_seen > $TIME_SEEN
 ORDER BY time_seen
 LIMIT 10
@@ -428,7 +428,7 @@ LIMIT 10
 #### Pooled_user_command
 
 `pooled_user_commands` should query the `user_commands` that is either sent or received by a certain public key.
-The current implementation of `pooled_user_commands` would query all the `user_commands` that a sender sent in the transaction pool. This was straightforward to implement as the `indexed_pool` had a look up from sender's public keys to their transactions in the pool. If we would like to query all `user_commands` for a receiver, we can look up all the `user_commands` received by a user in the database. Then, see if those transactions appear in the transaction id look up table.
+The current implementation of `pooled_user_commands` would query all the `user_commands` that a sender sent in the transaction pool. This was straightforward to implement as the `indexed_pool` have a look up from sender's public keys to their transactions in the pool. If we would like to query all `user_commands` for a receiver, we can look up all the `user_commands` received by a user in the `user_command` and `fee_transfer` table. Then, see if those transactions appear in the transaction id look up table.
 
 ### Deleting data
 
@@ -438,7 +438,7 @@ For this design, we are assuming that objects will never get deleted because the
 
 Since a node can go offline, it can miss gossipped objects. If this happens, a client would be interested in adding manually adding these objects into the client storage system. This storage system has the flexibility to do this.
 
-For adding arbitrary transactions, the client could simply add it to the `transactions` database with `is_manually_added=true`. We can add arbitrary `receipt_chain_hashes` along with its parents to the `receipt_chain` database. The user can arbitrary blocks along with their transactions into the `blockss_to_transactions` table, `external_transitions` and `transactions` database. When we add a transition whose block length is greater than root length, the `transition` will be added through the `transition_frontier_controller`. Namely, the `transition` will be added to the `network_transition_writer` pipe in `Coda_networking.ml`.
+For adding arbitrary transactions, the client could simply add it to the `transactions` database with `is_manually_added=true`. We can add arbitrary `receipt_chain_hashes` along with its parents to the `receipt_chain` database. The user can add arbitrary blocks along with their transactions into the `blocks_to_transactions` table, `block` and `transactions` database. When we add a block whose block length is greater than root length, the block will be added through the `transition_frontier_controller`. Namely, the block will be added to the `network_transition_writer` pipe in `Coda_networking.ml`.
 
 <a href="bootstrap"></a>
 
