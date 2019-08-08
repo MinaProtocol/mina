@@ -1628,7 +1628,7 @@ module Data = struct
       [ blockchain_length
       ; epoch_count
       ; min_window_length
-        ; curr_window_length
+      ; curr_window_length
       ; last_vrf_output
       ; total_currency
       ; curr_global_slot
@@ -1676,7 +1676,7 @@ module Data = struct
       { blockchain_length
       ; epoch_count
       ; min_window_length
-           ; curr_window_length
+      ; curr_window_length
       ; last_vrf_output
       ; total_currency
       ; curr_global_slot
@@ -1820,22 +1820,23 @@ module Data = struct
           Checkpoints.cons previous_protocol_state_hash
             previous_consensus_state.checkpoints
       in
-      let min_window_length, curr_window_length = 
+      let min_window_length, curr_window_length =
         (* Three cases:
            - same window
            - successor window
            - skipped a window *)
-        let prev = (prev_epoch, Window.of_slot prev_slot) in
-        let next = (next_epoch, Window.of_slot next_slot) in
-        if Epoch_and_window.equal prev next
-        then
+        let prev =
+          Global_window.of_global_slot
+            previous_consensus_state.curr_global_slot
+        in
+        let next = Global_window.of_global_slot consensus_transition in
+        (* Should use global window instead of this *)
+        if Global_window.equal prev next then
           ( previous_consensus_state.min_window_length
-          , Length.succ previous_consensus_state.curr_window_length)
-        else if Epoch_and_window.(equal (succ prev) next)
-        then 
-          ( Length.min
-            previous_consensus_state.min_window_length
-            previous_consensus_state.curr_window_length
+          , Length.succ previous_consensus_state.curr_window_length )
+        else if Global_window.(equal (succ prev) next) then
+          ( Length.min previous_consensus_state.min_window_length
+              previous_consensus_state.curr_window_length
           , Length.of_int 1 )
         else (Length.zero, Length.of_int 1)
       in
@@ -1879,20 +1880,21 @@ module Data = struct
       make_checked (fun () -> same_checkpoint_window ~prev ~next)
 
     let negative_one : Value.t Lazy.t =
-      lazy (
-      let max_window_length =Length.of_int (UInt32.to_int Constants.slots_per_window) in
-        { Poly.blockchain_length= Length.zero
-        ; epoch_count= Length.zero
-        ; min_window_length= max_window_length
-        ; curr_window_length= max_window_length
-        ; last_vrf_output= Vrf.Output.dummy
-        ; total_currency= Lazy.force genesis_ledger_total_currency
-        ; curr_global_slot= Global_slot.zero
-        ; staking_epoch_data= Lazy.force Epoch_data.Staking.genesis
-        ; next_epoch_data= Lazy.force Epoch_data.Next.genesis
-        ; has_ancestor_in_same_checkpoint_window= false
-        ; checkpoints= Checkpoints.empty }
-      )
+      lazy
+        (let max_window_length =
+           Length.of_int (UInt32.to_int Constants.slots_per_window)
+         in
+         { Poly.blockchain_length= Length.zero
+         ; epoch_count= Length.zero
+         ; min_window_length= max_window_length
+         ; curr_window_length= max_window_length
+         ; last_vrf_output= Vrf.Output.dummy
+         ; total_currency= Lazy.force genesis_ledger_total_currency
+         ; curr_global_slot= Global_slot.zero
+         ; staking_epoch_data= Lazy.force Epoch_data.Staking.genesis
+         ; next_epoch_data= Lazy.force Epoch_data.Next.genesis
+         ; has_ancestor_in_same_checkpoint_window= false
+         ; checkpoints= Checkpoints.empty })
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
         ~consensus_transition : Value.t =
@@ -1920,6 +1922,7 @@ module Data = struct
         ~(previous_blockchain_state_ledger_hash :
            Coda_base.Frozen_ledger_hash.var) =
       let open Snark_params.Tick in
+      let open Let_syntax in
       let {Poly.curr_global_slot= prev_global_slot; _} = previous_state in
       let next_global_slot = transition_data in
       let%bind () =
@@ -2020,28 +2023,41 @@ module Data = struct
         Amount.Checked.add previous_state.total_currency supply_increase
       and epoch_count =
         Length.Checked.succ_if previous_state.epoch_count epoch_increased
-      and min_window_length =
-        let if_ b ~then_ ~else_ =
-          let%bind b = b and then_ = then_ and else_ = else_ in
-          Length.Checked.if_ b ~then_ ~else_
+      and min_window_length, curr_window_length =
+        let%bind prev = Global_window.Checked.of_global_slot prev_global_slot
+        and next = Global_window.Checked.of_global_slot next_global_slot in
+        let%bind same_window = Global_window.Checked.equal prev next in
+        let open Length.Checked in
+        let%bind curr_window_length =
+          let%bind base =
+            if_ same_window ~then_:previous_state.curr_window_length
+              ~else_:zero
+          in
+          succ base
         in
-        let return = Checked.return in
-        if_
-          (return Boolean.(not epoch_increased))
-          ~then_:(return previous_state.min_window_length)
-          ~else_:
-            (if_
-               (Epoch.Checked.is_succ ~pred:prev_epoch ~succ:next_epoch)
-               ~then_:
-                 (Length.Checked.min previous_state.min_window_length
-                    previous_state.next_epoch_data.epoch_length)
-               ~else_:(return Length.Checked.zero))
+        let%bind min_window_length =
+          let if_ b ~then_ ~else_ =
+            let%bind b = b and then_ = then_ and else_ = else_ in
+            if_ b ~then_ ~else_
+          in
+          if_ (return same_window)
+            ~then_:(return previous_state.min_window_length)
+            ~else_:
+              (if_
+                 Global_window.Checked.(equal next (succ prev))
+                 ~then_:
+                   (min previous_state.curr_window_length
+                      previous_state.min_window_length)
+                 ~else_:(return zero))
+        in
+        return (min_window_length, curr_window_length)
       in
       Checked.return
         ( `Success threshold_satisfied
         , { Poly.blockchain_length
           ; epoch_count
           ; min_window_length
+          ; curr_window_length
           ; last_vrf_output= vrf_result
           ; curr_global_slot= next_global_slot
           ; total_currency= new_total_currency
@@ -2860,14 +2876,24 @@ module Hooks = struct
               prev.checkpoints
             else Checkpoints.cons previous_protocol_state.hash prev.checkpoints
           in
+          let min_window_length, curr_window_length =
+            (* Three cases:
+              - same window
+              - successor window
+              - skipped a window *)
+            let prev_ew = Global_window.of_global_slot prev.curr_global_slot in
+            let next_ew = Global_window.of_global_slot curr_global_slot in
+            if Global_window.equal prev_ew next_ew then
+              (prev.min_window_length, Length.succ prev.curr_window_length)
+            else if Global_window.(equal (succ prev_ew) next_ew) then
+              ( Length.min prev.min_window_length prev.curr_window_length
+              , Length.of_int 1 )
+            else (Length.zero, Length.of_int 1)
+          in
           { Poly.blockchain_length
           ; epoch_count
-          ; min_window_length=
-              ( if Epoch.equal prev_epoch curr_epoch then prev.min_window_length
-              else if Epoch.(equal curr_epoch (succ prev_epoch)) then
-                Length.min prev.min_window_length
-                  prev.next_epoch_data.epoch_length
-              else Length.zero )
+          ; min_window_length
+          ; curr_window_length
           ; last_vrf_output= proposer_vrf_result
           ; total_currency
           ; curr_global_slot
