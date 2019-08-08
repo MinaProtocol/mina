@@ -1,0 +1,45 @@
+digraph client_process {
+    
+    subgraph cluster_0 {
+		style=filled;
+		color=lightgrey;
+		node [style=filled,color=white];
+		transition_frontier [label="transition frontier"];
+        transaction_pool [label="transaction pool"];
+        daemon [color=yellow]
+		label = "daemon";
+	}
+
+    archive_process [label="archive process"]
+
+    API
+
+    subgraph cluster_2 {
+		style=filled;
+		color=lightgrey;
+		node [style=filled,color=white];
+        blocks [label="external transitions"];
+        user_commands [label="user commands"];
+        receipt_chain_table [label="receipt chain hashes"];
+        transition_to_transaction_table [label="transition to transaction"];
+        fee_transfers [label="Fee transfers"];
+        database [color=yellow]
+        label = "Database"
+    }
+
+    transition_frontier -> archive_process
+    transaction_pool -> archive_process
+
+    API -> daemon
+    API -> database
+
+    archive_process -> user_commands
+
+    archive_process -> receipt_chain_table
+    archive_process -> transition_to_transaction_table
+    archive_process -> fee_transfers
+    archive_process -> blocks
+
+
+
+}
