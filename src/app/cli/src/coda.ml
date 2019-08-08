@@ -23,9 +23,7 @@ let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
-    (let%map_open conf_dir =
-       flag "config-directory" ~doc:"DIR Configuration directory"
-         (optional string)
+    (let%map_open conf_dir = Cli_lib.Flag.conf_dir
      and unsafe_track_propose_key =
        flag "unsafe-track-propose-key"
          ~doc:
@@ -145,7 +143,7 @@ let daemon logger =
      fun () ->
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
-         Option.value ~default:(home ^/ ".coda-config") conf_dir
+         Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
        in
        let%bind log_level =
          match log_level with
@@ -215,6 +213,8 @@ let daemon logger =
          ~metadata:
            [ ("commit", `String Coda_version.commit_id)
            ; ("branch", `String Coda_version.branch) ] ;
+       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+         "Booting may take several seconds, please wait" ;
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
@@ -411,7 +411,7 @@ let daemon logger =
          let%bind external_ip =
            match external_ip_opt with
            | None ->
-               Find_ip.find ()
+               Find_ip.find ~logger
            | Some ip ->
                return @@ Unix.Inet_addr.of_string ip
          in

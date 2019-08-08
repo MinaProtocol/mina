@@ -77,8 +77,11 @@ module Footer = {
               <Link link="https://twitter.com/codaprotocol" name="twitter">
                 {ReasonReact.string("Twitter")}
               </Link>
-              <Link link="https://github.com/o1-labs" name="github">
+              <Link link="https://github.com/CodaProtocol/coda" name="github">
                 {ReasonReact.string("GitHub")}
+              </Link>
+              <Link link="https://forums.codaprotocol.com" name="discourse">
+                {ReasonReact.string("Discourse")}
               </Link>
               <Link link="https://reddit.com/r/coda" name="reddit">
                 {ReasonReact.string("Reddit")}

@@ -7,6 +7,12 @@ if [[ $# -ne 1 ]]; then
   exit 1
 fi
 
+if [ -f ".bsb.lock" ]; then
+  echo ".bsb.lock file exists, this usually means you're running 'yarn dev'."
+  echo "It's dangerous to deploy while running a dev server."
+  echo "If you're VERY sure, you can delete .bsb.lock and rerun the deploy."
+  exit 1
+fi
 
 rm -rf deploy
 mkdir -p deploy
