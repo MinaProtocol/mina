@@ -37,27 +37,7 @@ module Stable = struct
         , Public_key.Stable.V1.t
         , Signature.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving compare, sexp, hash, yojson, version]
-
-      include Binable.Of_binable (struct
-                  type t =
-                    ( Payload.Stable.V1.t
-                    , Public_key.Compressed.Stable.V1.t
-                    , Signature.Stable.V1.t )
-                    Poly.Stable.V1.t
-                  [@@deriving bin_io]
-                end)
-                (struct
-                  type nonrec t = t
-
-                  open Poly
-
-                  let of_binable t =
-                    {t with sender= Public_key.decompress_exn t.sender}
-
-                  let to_binable t =
-                    {t with sender= Public_key.compress t.sender}
-                end)
+      [@@deriving compare, bin_io, sexp, hash, yojson, version]
     end
 
     let description = "User command"
