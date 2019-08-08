@@ -1,5 +1,7 @@
 include Coda_numbers.Nat.S_unchecked
 
+val to_uint32 : t -> Unsigned.UInt32.t
+
 val ( + ) : t -> int -> t
 
 val create : epoch:Epoch.t -> slot:Slot.t -> t
