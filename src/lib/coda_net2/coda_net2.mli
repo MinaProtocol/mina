@@ -163,7 +163,7 @@ val peers : net -> PeerID.t list Deferred.t
 module Stream : sig
   type t
 
-  (** [pipes t] returns the same pipes that [open_stream] passes to the handler. *)
+  (** [pipes t] returns the reader/writer pipe for our half of the stream. *)
   val pipes : t -> string Pipe.Reader.t * string Pipe.Writer.t
 
   (** [reset t] informs the other process to close the stream.

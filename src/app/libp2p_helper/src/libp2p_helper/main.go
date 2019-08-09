@@ -221,16 +221,23 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		return nil, needsConfigure()
 	}
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
+		seqno := <-seqs
+		ch := make(chan bool)
+		app.Validators[seqno] = ch
 		app.writeMsg(validateUpcall{
 			PeerID: id.Pretty(),
 			Data:   b58.Encode(msg.Data),
-			Seqno:  seq,
+			Seqno:  seqno,
 			Upcall: "validate",
 			Idx:    s.Subscription,
 		})
 
 		select {
 		case <-ctx.Done():
+			// do NOT delete app.Validators[seqno] here! the ocaml side doesn't
+			// care about the timeout and will validate it anyway.
+			// validationComplete will remove app.Validators[seqno] once the
+			// coda process gets around to it.
 			return false
 		case res := <-ch:
 			return res
@@ -239,7 +246,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 	if err != nil {
 		return nil, badp2p(err)
-    }
+	}
 
 	sub, err := app.P2p.Pubsub.Subscribe(s.Topic)
 	if err != nil {
@@ -310,7 +317,7 @@ func (r *validationCompleteMsg) run(app *app) (interface{}, error) {
 	if ch, ok := app.Validators[r.Seqno]; ok {
 		ch <- r.Valid
 		delete(app.Validators, r.Seqno)
-		return "validation completed", nil
+		return "validationComplete success", nil
 	}
 	return nil, badRPC(errors.New("validation seqno unknown"))
 }
@@ -387,7 +394,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 				app.writeMsg(incomingMsgUpcall{
 					Upcall:    "incomingStreamMsg",
 					Data:      b58.Encode(buf[:len]),
-                    StreamIdx: idx,
+					StreamIdx: idx,
 				})
 			}
 
@@ -403,9 +410,9 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 }
 
 type openStreamResult struct {
-    StreamIdx int `json:"stream_idx"`
-    RemoteAddr string `json:"remote_addr"`
-    RemotePeerID string `json:"remote_peerid"`
+	StreamIdx    int    `json:"stream_idx"`
+	RemoteAddr   string `json:"remote_addr"`
+	RemotePeerID string `json:"remote_peerid"`
 }
 
 func (o *openStreamMsg) run(app *app) (interface{}, error) {
@@ -428,7 +435,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 
 	app.Streams[streamIdx] = stream
 	handleStreamReads(app, stream, streamIdx)
-	return openStreamResult { StreamIdx: streamIdx, RemoteAddr: stream.Conn().RemoteMultiaddr().String(), RemotePeerID: stream.Conn().RemotePeer().String() }, nil
+	return openStreamResult{StreamIdx: streamIdx, RemoteAddr: stream.Conn().RemoteMultiaddr().String(), RemotePeerID: stream.Conn().RemotePeer().String()}, nil
 }
 
 type closeStreamMsg struct {
@@ -496,11 +503,11 @@ type addStreamHandlerMsg struct {
 }
 
 type incomingStreamUpcall struct {
-	Upcall    string `json:"upcall"`
-    RemoteAddr    string `json:"remote_addr"`
-    RemotePeerID  string `json:"remote_peerid"`
-	StreamIdx int    `json:"stream_idx"`
-	Protocol  string `json:"protocol"`
+	Upcall       string `json:"upcall"`
+	RemoteAddr   string `json:"remote_addr"`
+	RemotePeerID string `json:"remote_peerid"`
+	StreamIdx    int    `json:"stream_idx"`
+	Protocol     string `json:"protocol"`
 }
 
 func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
@@ -511,11 +518,11 @@ func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
 		streamIdx := <-seqs
 		app.Streams[streamIdx] = stream
 		app.writeMsg(incomingStreamUpcall{
-			Upcall:    "incomingStream",
-            RemoteAddr:    stream.Conn().RemoteMultiaddr().String(),
-            RemotePeerID: stream.Conn().RemotePeer().String(),
-			StreamIdx: streamIdx,
-			Protocol:  as.Protocol,
+			Upcall:       "incomingStream",
+			RemoteAddr:   stream.Conn().RemoteMultiaddr().String(),
+			RemotePeerID: stream.Conn().RemotePeer().String(),
+			StreamIdx:    streamIdx,
+			Protocol:     as.Protocol,
 		})
 		handleStreamReads(app, stream, streamIdx)
 	})
@@ -564,7 +571,7 @@ type successResult struct {
 }
 
 func main() {
-	logwriter.Configure(logwriter.Output(os.Stderr))
+	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
 	log.SetOutput(os.Stderr)
 	logging.SetAllLoggers(logging2.INFO)
 
@@ -597,12 +604,12 @@ func main() {
 				Body: &raw,
 			}
 			if err := json.Unmarshal([]byte(line), &env); err != nil {
-                log.Print("when unmarshaling the envelope...")
+				log.Print("when unmarshaling the envelope...")
 				log.Fatal(err)
 			}
 			msg := msgHandlers[env.Method]()
 			if err := json.Unmarshal(raw, msg); err != nil {
-                log.Print("when unmarshaling the method invocation...")
+				log.Print("when unmarshaling the method invocation...")
 				log.Fatal(err)
 			}
 			res, err := msg.run(app)

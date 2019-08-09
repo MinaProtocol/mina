@@ -46,6 +46,18 @@ module Helper = struct
     ; lock_path: string
     ; conf_dir: string
     ; outstanding_requests: (int, Yojson.Safe.json Or_error.t Ivar.t) Hashtbl.t
+    (**
+      seqno is used to assign unique IDs to our outbound requests and index the
+      tables below.
+
+      The helper can also generate sequence numbers- but they are not the same space
+      of sequence numbers!
+
+      In general, if a message contains a seqno/idx, the response should contain the
+      same seqno/idx.
+
+      Some types would make it harder to misuse these integers.
+    *)
     ; mutable seqno: int
     ; logger: Logger.t
     ; mutable me_keypair: keypair option
@@ -209,13 +221,25 @@ module Helper = struct
 
       let name = "openStream"
     end
+
+    module Validation_complete = struct
+      type input = {seqno: int; is_valid: bool} [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "validationComplete"
+    end
   end
 
+  (** Generate the next sequence number for our side of the connection *)
   let genseq t =
     let v = t.seqno in
     t.seqno <- t.seqno + 1 ;
     v
 
+  (** [do_rpc net rpc body] will encode [body] as JSON according to [rpc],
+      send it to the helper, and return a deferred that resolves once the daemon
+      gets around to replying. *)
   let do_rpc (type a b) t (rpc : (a, b) rpc) (body : a) : b Deferred.Or_error.t
       =
     let module M = (val rpc) in
@@ -240,6 +264,14 @@ module Helper = struct
           (Fn.compose (Result.map_error ~f:Error.of_string) M.output_of_yojson) )
     else Deferred.Or_error.error_string "helper process already exited"
 
+  (** Track a new stream.
+
+    This is used for both newly created outbound streams and incomming streams, and
+    spawns the task that sends outbound messages to the helper.
+
+    The writing end of the stream will be automatically be closed once the
+    write pipe is closed.
+  *)
   let make_stream net idx protocol remote_addr remote_peerid =
     let incoming_r, incoming_w = Pipe.create () in
     let outgoing_r, outgoing_w = Pipe.create () in
@@ -275,6 +307,7 @@ module Helper = struct
     ; outgoing_r
     ; outgoing_w }
 
+  (** Parses a normal RPC response and resolves the deferred it answers. *)
   let handle_response t v =
     let open Yojson.Safe.Util in
     let open Or_error.Let_syntax in
@@ -298,10 +331,15 @@ module Helper = struct
         Or_error.errorf "spurious reply to RPC #%d: %s" seq
           (Yojson.Safe.to_string v)
 
+  (** Parses an "upcall" and performs it.
+
+    An upcall is like an RPC from the helper to us.*)
   let handle_upcall t v =
     let open Yojson.Safe.Util in
     let open Or_error.Let_syntax in
+    (* TODO: types here please *)
     match member "upcall" v |> to_string with
+    (* Message published on one of our subscriptions *)
     | "publish" -> (
         let%bind idx = v |> member "subscription_idx" |> to_int_res in
         let%bind data = v |> member "data" |> of_b58_data in
@@ -326,6 +364,7 @@ module Helper = struct
         | None ->
             Or_error.errorf
               "message published with inactive subsubscription %d" idx )
+    (* Validate a message received on a subscription *)
     | "validate" -> (
         let%bind peerid = v |> member "peer_id" |> to_string_res in
         let%bind data = v |> member "data" |> of_b58_data in
@@ -336,18 +375,20 @@ module Helper = struct
         match Hashtbl.find t.subscriptions subscription_idx with
         | Some v ->
             (let open Deferred.Let_syntax in
-            (let%map is_valid = v.validator peerid data in
-             Writer.write
-               (Process.stdin t.subprocess)
-               (Yojson.Safe.to_string
-                  (`Assoc
-                    [("seqno", `Int seqno); ("is_valid", `Bool is_valid)])))
-            |> don't_wait_for) ;
+            (let%bind is_valid = v.validator peerid data in
+             match%map do_rpc t (module Rpcs.Validation_complete) {seqno; is_valid} with
+             | Ok "validationComplete success" -> ()
+             | Ok v -> failwithf "helper broke RPC protocol: validationComplete got %s" v ()
+             | Error e ->
+               Logger.error t.logger "error during validationComplete, ignoring and continuing: $error"
+                ~module_:__MODULE__ ~location:__LOC__ ~metadata:["error", `String (Error.to_string_hum e)] ;
+             ) |> don't_wait_for) ;
             Ok ()
         | None ->
             Or_error.errorf
               "asked to validate message for unregistered subscription idx %d"
               subscription_idx )
+    (* A new inbound stream was opened *)
     | "incomingStream" -> (
         let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
         let%bind protocol = v |> member "protocol" |> to_string_res in
@@ -356,7 +397,7 @@ module Helper = struct
           v |> member "remote_peerid" |> to_string_res
         in
         let stream =
-          make_stream t stream_idx protocol remote_addr remote_peerid
+         make_stream t stream_idx protocol remote_addr remote_peerid
         in
         match Hashtbl.find t.protocol_handlers protocol with
         | Some ph ->
@@ -364,6 +405,10 @@ module Helper = struct
               Hashtbl.add_exn t.streams ~key:stream_idx ~data:stream ;
               don't_wait_for
                 (let open Deferred.Let_syntax in
+                (* Call the protocol handler. If it throws an exception,
+                   handle it according to [on_handler_error]. Mimics
+                  [Tcp.Server.create]. See [handle_protocol] doc comment.
+                *)
                 match%map
                   Monitor.try_with ~extract_exn:true (fun () -> ph.f stream)
                 with
@@ -392,6 +437,7 @@ module Helper = struct
         | None ->
             Or_error.errorf "incoming stream for protocol we don't know about?"
         )
+    (* Received a message on some stream *)
     | "incomingStreamMsg" -> (
         let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
         let%bind data = v |> member "data" |> of_b58_data in
@@ -402,6 +448,7 @@ module Helper = struct
         | None ->
             Or_error.errorf
               "incoming stream message for stream we don't know about?" )
+    (* Stream was reset, either by the remote peer or an error on our end. *)
     | "streamLost" ->
         let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
         let%bind reason = v |> member "reason" |> to_string_res in
@@ -415,6 +462,7 @@ module Helper = struct
         in
         Hashtbl.remove t.streams stream_idx ;
         ret
+    (* The remote peer closed its write end of one of our streams *)
     | "streamReadComplete" -> (
         let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
         match Hashtbl.find t.streams stream_idx with
@@ -446,7 +494,7 @@ module Helper = struct
     let errlines = Reader.lines err in
     let lines = Process.stdout subprocess |> Reader.lines in
     Pipe.iter errlines ~f:(fun line ->
-        (* TODO: the log messages from go are structured, we should copy the log level *)
+        (* TODO: the log messages are JSON, parse them and log at the appropriate level *)
         Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
           "log message from libp2p_helper: $line"
           ~metadata:[("line", `String line)] ;
