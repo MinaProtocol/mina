@@ -8,7 +8,7 @@
 
 (* custom consensus parameters for the testnet release *)
 [%%define consensus_mechanism "proof_of_stake"]
-[%%define k 5]
+[%%define k 10]
 [%%define c 8]
 [%%define delta 2]
 
