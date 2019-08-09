@@ -17,32 +17,45 @@ module type Group = sig
   val scale : t -> nat -> t
 end
 
+module type Field_intf = sig 
+  type t
+  type nat 
+  val ( * ) : t -> t -> t
+  val ( / ) : t -> t -> t
+  val ( + ) : t -> t -> t
+  val ( - ) : t -> t -> t
+  val zero : t
+  val one : t
+  val inv : t -> t
+  val negate : t -> t
+  val ( ** ) : t -> nat -> t
+  val to_bigint : t -> nat
+end
+
 module type Backend_intf = sig
-  module N : Nat_intf.S
+  module N : sig type t val of_int : int -> t end
 
-  module Fq : Fields.Fp_intf with type nat := N.t
+  module Fq : Field_intf with type nat := N.t
 
-  module Fr : Fields.Fp_intf with type nat := N.t
-
-  module Fqe : Fields.Extension_intf with type base = Fq.t
+  module Fr : Field_intf with type nat := N.t
 
   module G1 : Group with type nat := N.t
 
   module G2 : Group with type nat := N.t
 
   module Fq_target : sig
-    include Fields.Degree_2_extension_intf with type base = Fqe.t
-
+    include Fields.Degree_2_extension_intf
     val unitary_inverse : t -> t
   end
 
   module Pairing :
-    Pairing.S
+    Pairing.S_sonic
       with module G1 := G1
        and module G2 := G2
        and module Fq_target := Fq_target
 
-  module Fr_laurent : Laurent with type field := Fr.t and type nat := N.t
+  module Fr_laurent 
+  : Laurent with type field := Fr.t and type nat := N.t
 
   module Bivariate_fr_laurent :
     Laurent with type field := Fr_laurent.t and type nat := N.t

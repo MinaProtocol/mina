@@ -69,9 +69,9 @@ end
 module Make_laurent (N : sig
   type t
 
+  val num_bits : t -> int
+  val test_bit : t -> int -> bool
   val of_int : int -> t
-
-  val to_int_exn : t -> int
 end)
 (F : Field with type nat := N.t) :
   Laurent with type field := F.t and type nat := N.t = struct
@@ -200,11 +200,16 @@ end)
     in
     mul poly_a poly_b
 
-  let ( ** ) poly_a n =
-    let rec pow poly_a n =
-      if n = 1 then poly_a else poly_a * pow poly_a Int.(n - 1)
-    in
-    pow poly_a (N.to_int_exn n)
+    let ( ** ) x n =
+      let rec go acc i =
+        if i < 0
+        then acc 
+        else
+          let acc = acc * acc in 
+          let acc = if N.test_bit n i then acc * x else acc in
+          go acc Int.(i - 1)
+      in 
+      go one (Int.(-) (N.num_bits n) 1)
 
   (* let to_string poly =
     let starting_degree, coefficients = poly in

@@ -7,5 +7,5 @@
            test_permutation test_signatures test_protocol)
   (inline_tests)
   (preprocess (pps ppx_inline_test ppx_jane ppx_deriving.eq))
-  (libraries core snarkette snarky snarky_taylor snarky_verifier qcheck)
+  (libraries core snarkette snarky snarky_taylor qcheck)
 )

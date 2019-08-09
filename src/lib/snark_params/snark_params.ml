@@ -305,7 +305,6 @@ module Tock = struct
   end
 
   module Tock_run = Snarky.Snark.Run.Make (Tock_backend) (Unit)
-  module Tick_run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
 
   module Pairing_run = struct
     include Tock_run
@@ -394,7 +393,13 @@ module Tock = struct
       include Tock0_run
     end
 
+    let miller_loop a b = run_checked (Pairing.miller_loop a b)
+
     let final_exponentiation a = run_checked (Pairing.final_exponentiation a)
+
+    let unreduced_pairing a b = run_checked (Pairing.miller_loop (G1_precomputation.create a) (G2_precomputation.create b))
+
+    let reduced_pairing a b = run_checked (Pairing.(final_exponentiation (unreduced_pairing a b)))
 
     let batch_miller_loop a = run_checked (Pairing.batch_miller_loop a)
   end
@@ -745,6 +750,100 @@ module Tick = struct
 
   module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
 
+  module Tick_run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
+
+  module Pairing_run = struct
+    include Tick_run
+
+    module G1 = struct
+      type t = Pairing.G1.t
+
+      let add_unsafe a b = run_checked (Pairing.G1.add_unsafe a b)
+      
+      let add_exn a b =
+        match run_checked (Pairing.G1.add_unsafe a b) with
+        | `I_thought_about_this_very_carefully x -> x
+
+      let typ = Pairing.G1.typ
+
+      module Unchecked = Pairing.G1.Unchecked
+      
+      let scale a b ~init =
+        run_checked begin
+          let open Let_syntax in
+          let%bind (module Shifted) = Pairing.G1.Shifted.create () in
+          let%bind init = Shifted.(add zero init) in
+          Pairing.G1.scale (module Shifted) a b ~init >>= Shifted.unshift_nonzero
+        end
+    end
+
+    module G2 = struct
+      type t = Pairing.G2.t
+
+      let add_unsafe a b = run_checked (Pairing.G2.add_unsafe a b)
+
+      let add_exn a b =
+        match run_checked (Pairing.G2.add_unsafe a b) with
+        | `I_thought_about_this_very_carefully x -> x
+
+      let typ = Pairing.G2.typ
+
+      module Unchecked = Pairing.G2.Unchecked
+
+      let scale a b c ~init = run_checked (Pairing.G2.scale a b c ~init)
+    end
+
+    module Fqe = struct
+      type 'a t_ = 'a Pairing.Fqe.t_
+
+      let real_part = Pairing.Fqe.real_part
+
+      let to_list = Pairing.Fqe.to_list
+
+      let if_ b ~then_ ~else_ = run_checked (Pairing.Fqe.if_ b ~then_ ~else_)
+    end
+
+    module Fqk = struct
+      type t = Pairing.Fqk.t
+
+      let typ = Pairing.Fqk.typ
+
+      module Unchecked = Pairing.Fqk.Unchecked
+
+      let ( * ) a b = run_checked (Pairing.Fqk.( * ) a b)
+
+      let equal a b = run_checked (Pairing.Fqk.equal a b)
+
+      let one = Pairing.Fqk.one
+
+      let if_ b ~then_ ~else_ = run_checked (Pairing.Fqk.if_ b ~then_ ~else_)
+    end
+
+    module G1_precomputation = struct
+      type t = Pairing.G1_precomputation.t
+
+      let create = Pairing.G1_precomputation.create
+    end
+
+    module G2_precomputation = struct
+      type t = Pairing.G2_precomputation.t
+
+      let if_ b ~then_ ~else_ = run_checked (Pairing.G2_precomputation.if_ b ~then_ ~else_)
+
+      let create_constant = Pairing.G2_precomputation.create_constant
+
+      let create g = run_checked (Pairing.G2_precomputation.create g)
+    end
+
+    module Impl = struct
+      include Tock0_run
+    end
+
+    let final_exponentiation a = run_checked (Pairing.final_exponentiation a)
+
+    let batch_miller_loop a = run_checked (Pairing.batch_miller_loop a)
+  end
+
   module Verifier = struct
     include Snarky_verifier.Bowe_gabizon.Make (struct
       include Pairing
@@ -809,14 +908,20 @@ module Sonic_backend = struct
 
   (* module N = Snarkette.Mnt6_80.N *)
 
-  include Snarkette.Mnt6753
+  module N = struct
+    include Tock.Inner_curve.Scalar
 
-  module Fr = struct
-    include Tock.Field
+    let num_bits _ = length_in_bits
+
+    (* include Tock.Bigint
+    let num_bits _ = Tock.Field.size_in_bits
+    let of_int n = of_field (Tock.Field.of_int n) *)
+  end
+
+  module Fq = struct
+    include Tick.Field
 
     let length_in_bits = size_in_bits
-
-    let order = Snarkette.Mnt4753.Fq.order
 
     let ( ** ) x n =
       let rec go acc i =
@@ -827,7 +932,33 @@ module Sonic_backend = struct
           let acc = if N.test_bit n i then mul acc x else acc in
           go acc Int.(i - 1)
       in 
-      go one (Int.(-) (N.num_bits n) 1)
+      go one (Int.(-) length_in_bits 1)
+
+    let to_bits = unpack
+
+    let of_bits x = Some (project x)
+
+    (* major hack: Fq shouldn't require the to_bigint function *)
+    let to_bigint x = x
+  end
+  
+  module Fr = struct
+    include Tock.Field
+
+    let length_in_bits = size_in_bits
+
+    let order = Tock.Field.size
+
+    let ( ** ) x n =
+      let rec go acc i =
+        if i < 0
+        then acc 
+        else
+          let acc = square acc in 
+          let acc = if N.test_bit n i then mul acc x else acc in
+          go acc Int.(i - 1)
+      in 
+      go one (Int.(-) length_in_bits 1)
 
     open Fold_lib
 
@@ -838,62 +969,151 @@ module Sonic_backend = struct
     let of_bits x = Some (project x)
 
     (* TODO Fix *)
-    let to_bigint = Fn.compose N.of_string to_string
+    let to_bigint x = match (Fq.of_bits (to_bits x)) with
+      | Some y -> y
+      | None -> Fq.zero
 
     let to_yojson x = `String (to_string x)
 
     let fold x = Fold.group3 ~default:false (fold_bits x)
   end
 
-  (* module Fr = struct
-    include Tick.Pairing.Fq
+  module G1 = struct
+    include Tock.Pairing_run.G1.Unchecked
 
-    let ( / ) a b = ( * ) a (Tick0_run.run_checked (inv_exn b))
+    let ( * ) a b = scale_field b a
+  end
 
-    let ( ** ) x n =
-      let k = N.num_bits n in
-      let rec go acc i =
-        if Int.(i < 0) then acc
-        else
-          let acc = (Tick0_run.run_checked (acc * acc)) in
-          let acc = if N.test_bit n i then (Tick0_run.run_checked (acc * x)) else acc in
-          go acc Int.(i - 1)
-      in
-      go one Int.(k - 1)
+  module G2 = struct
+    include Tock.Pairing_run.G2.Unchecked
 
-    let equal a b = Tick0_run.As_prover.read Impl.Boolean.typ (Tick0_run.run_checked (equal a b))
+    let ( * ) a b = scale b a
+  end
 
-    let ( * ) a b = Tick0_run.run_checked (a * b)
+  module Fq_target = struct
+    type t = Fq.t * Fq.t [@@deriving eq, bin_io, sexp, compare]
 
-    let ( / ) a b = Tick0_run.run_checked (a / b)
+    type base = Fq.t
+
+    (* STUBS *)
+
+    let square x = x
+
+    let ( * ) x y = x
+
+    let ( + ) x y = x  
+
+    let equal x y = false
+
+    let inv x = x
+
+    let zero = (Fq.zero, Fq.zero)
+
+    let one = (Fq.zero, Fq.zero)
+
+    let project_to_base x = Fq.zero
+
+    let unitary_inverse x = x
+
+    let to_list x = []
+
+    let scale x y = x
+
+    let negate x = x
+    
+    let ( / ) x y = x
+
+    let of_base x = zero
+
+    let to_yojson x = `String "blah"
+
+    let ( - ) x y = x
+
+    let compare x y = 0
+
+    let gen = Quickcheck.Generator.(tuple2 Tick.Field.gen Tick.Field.gen)
+  end
+
+  module Fqe = Crypto_params.Tock_full.Fqe
+
+  (* module Pairing = struct
+    module G1_precomputation = struct
+      include Crypto_params.Tock_full.G1
+
+(* run_checked begin
+          let open Let_syntax in
+          let%bind (module Shifted) = Pairing.G1.Shifted.create () in
+          let%bind init = Shifted.(add zero init) in
+          Pairing.G1.scale (module Shifted) a b ~init >>= Shifted.unshift_nonzero
+        end *)
+      let create x =
+      run_checked begin
+      let open Let_syntax in
+      exists typ ~compute:x
+      end
+
+      let t_of_sexp _ = one
+
+      let sexp_of_t _ = Sexp.Atom "blah"
+    end
+
+    module G2_precomputation = struct
+      include Crypto_params.Tock_full.G2
+
+      let create x = x
+
+      let t_of_sexp _ = one
+
+      let sexp_of_t _ = Sexp.Atom "blah"
+    end
+
+    let reduced_pairing g1 g2 = Fq_target.zero
+
+    let unreduced_pairing g1 g2 = Fq_target.zero
+
+    let final_exponentiation a = a
+
+    let miller_loop a b = Fq_target.zero
+
   end *)
 
-  module Fqe = Fq3
-  
+  module Pairing = Tock.Pairing_run
+
   module Fr_laurent = Sonic_prototype.Laurent.Make_laurent (N) (Fr)
 
   module Bivariate_fr_laurent = Sonic_prototype.Laurent.Make_laurent (N) (Fr_laurent)
-  
-  module Fq_target = Fq6
+
+
 end
 
 module Srs = Sonic_prototype.Srs.Make (Sonic_backend)
-module Commitment_scheme = Sonic_prototype.Commitment_scheme.Make (Sonic_backend)
+module Commitment_scheme =
+  Sonic_prototype.Commitment_scheme.Make 
+    (Sonic_backend)
+
+module Sonic_commitment_scheme = Snarky_verifier.Sonic_commitment_scheme.Make (Tock.Pairing_run)
 
 let%test_unit "sonic test" =
   let module M = Snarky.Snark.Run.Make (Tock_backend) (Unit) in
-  Quickcheck.test ~trials:3 Quickcheck.Generator.(tuple3 Tock0.Field.gen Tock0.Field.gen Tock0.Field.gen) ~f:(fun (x, z, alpha) ->
+  Quickcheck.test ~trials:3 Quickcheck.Generator.(tuple3 Tock.Field.gen Tock.Field.gen Tock.Field.gen) ~f:(fun (x, z, alpha) ->
       let (), checked_output =
         M.run_and_check
           (fun () ->
             let open Sonic_backend in
             let open Commitment_scheme in
+            let open Sonic_commitment_scheme in
             let d = 15 in
             let srs = Srs.create d x alpha in
             let f = Fr_laurent.create 1 [Fr.of_int 10] in
             let commitment = commit_poly srs f in
             let opening = open_poly srs commitment z f in
-            fun () -> pc_v srs commitment z opening )
+            let g = exists typ ~compute:(List.hd_exn srs.gPositiveX) in
+            let h = List.hd_exn srs.hPositiveX in
+            let h_alpha = List.hd_exn srs.hPositiveAlphaX in
+            let h_alpha_x = List.nth_exn srs.hPositiveAlphaX 1 in
+            let (vk : (G1.t, G2.t) Verification_key.t_) = {g; h; h_alpha; h_alpha_x} in
+            let (vk_precomp : Verification_key.Precomputation.t) = Verification_key.Precomputation.create vk in
+            fun () -> pc_v vk vk_precomp commitment z opening )
           ()
         |> Or_error.ok_exn
       in

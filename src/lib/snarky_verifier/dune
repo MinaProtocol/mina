@@ -6,4 +6,5 @@
     sgn_type
     snarky
     snarkette
-    core_kernel ))
+    core_kernel
+    sonic_prototype ))

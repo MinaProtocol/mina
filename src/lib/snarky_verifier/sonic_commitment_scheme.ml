@@ -1,21 +1,3 @@
-
-
-(* open Snarkette
-
-module Backend = Sonic_prototype.Default_backend.Backend
-
-module Inputs (Impl : Snarky.Snark_intf.Run) : Inputs.S_run = struct
-  implements run
-
-  module G1 = struct
-    module Unchecked = Backend.G1
-
-    let add_exn a b =
-
-    
-  end
-end *)
-
 module Make (Inputs : Inputs.S_run) = struct
   open Inputs
   open Impl
@@ -57,28 +39,4 @@ module Make (Inputs : Inputs.S_run) = struct
         ; (Neg, G1_precomputation.create commitment, vk_precomp.h) ])
     |> Fqk.(equal one)
 end
-
-
-(* 
-let%test_unit "checked-unchecked equivalence" =
-(* let open Quickcheck in
-test ~trials:20 (Generator.tuple2 gen User_command_payload.gen)
-  ~f:(fun (base, payload) -> *)
-    let unchecked = cons payload base in
-    let checked =
-      let comp =
-        let open Snark_params.Tick.Checked.Let_syntax in
-        let%bind payload =
-          Schnorr.Message.var_of_payload
-            Transaction_union_payload.(
-              Checked.constant (of_user_command_payload payload))
-        in
-        let%map res = Checked.cons ~payload (var_of_t base) in
-        As_prover.read typ res
-      in
-      let (), x = Or_error.ok_exn (run_and_check comp ()) in
-      x
-    in
-    assert (equal unchecked checked)
- *)
 

@@ -52,6 +52,40 @@ module type S = sig
   val reduced_pairing : G1.t -> G2.t -> Fq_target.t
 end
 
+module type S_sonic = sig
+  module G1 : sig
+    type t
+  end
+
+  module G2 : sig
+    type t
+  end
+
+  module Fq_target : sig
+    type t
+  end
+
+  module G1_precomputation : sig
+    type t
+
+    val create : G1.t -> t
+  end
+
+  module G2_precomputation : sig
+    type t
+
+    val create : G2.t -> t
+  end
+
+  val final_exponentiation : Fq_target.t -> Fq_target.t
+
+  val miller_loop : G1_precomputation.t -> G2_precomputation.t -> Fq_target.t
+
+  val unreduced_pairing : G1.t -> G2.t -> Fq_target.t
+
+  val reduced_pairing : G1.t -> G2.t -> Fq_target.t
+end
+
 module Make
     (N : Nat_intf.S)
     (Fq : Fields.Fp_intf with type nat := N.t)
