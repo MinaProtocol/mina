@@ -403,7 +403,7 @@ let daemon logger =
                      ~metadata:[("host", `String host)] ;
                    None )
          in
-         (* flatten lists of lists of host-and-ports *)
+         (* flatten list of lists of host-and-ports *)
          let initial_peers_cleaned = List.concat initial_peers_cleaned_lists in
          let%bind () =
            if
