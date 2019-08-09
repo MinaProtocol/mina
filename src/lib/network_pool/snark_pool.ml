@@ -268,6 +268,7 @@ end
 include Make (Ledger_proof.Stable.V1) (Transaction_snark_work)
           (Transition_frontier)
 
+(*
 let%test_module "random set test" =
   ( module struct
     open Coda_base
@@ -442,4 +443,4 @@ let%test_module "random set test" =
         Deferred.unit
       in
       verify_unsolved_work |> Async.Thread_safe.block_on_async_exn
-  end )
+  end ) *)

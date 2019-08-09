@@ -300,6 +300,7 @@ module Node = struct
       implemented here.
   *)
   type 'e t = Two of int * 'e * 'e | Three of int * 'e * 'e * 'e
+  [@@deriving sexp]
 
   (** Extract the cached measurement *)
   let measure : 'e t -> int =
@@ -325,7 +326,9 @@ module Node = struct
       -> int
       -> 'e t
       -> 'e Digit.t_any_ar option * 'e * 'e Digit.t_any_ar option =
-   fun measure' target acc t -> to_digit t |> Digit.split measure' target acc
+    fun measure' target acc t -> 
+    Core.printf "split_to_digits target=%d acc=%d\n%!" target acc;
+    to_digit t |> Digit.split measure' target acc
 end
 
 (** Finally, the actual finger tree type! *)
@@ -343,6 +346,74 @@ type 'e t =
           parent. The top level has 'es, the next level has 'e Node.ts, the next
           has 'e Node.t Node.ts and so on. As you go deeper, the breadth
           increases exponentially. *)
+    module Untyped = struct
+      module Digit = struct
+        type 'e t =
+          | One of 'e
+          | Two of 'e * 'e
+          | Three of 'e * 'e * 'e
+          | Four of 'e * 'e * 'e * 'e
+        [@@deriving sexp]
+      end
+
+      type 'e t =
+        | Empty   (** Empty tree *)
+        | Single of 'e  (** Single element tree *)
+        | Deep of
+              int
+            * 'e Digit.t
+            * 'e Node.t t
+            * 'e Digit.t
+        [@@deriving sexp]
+
+        let digit_to_string f t= 
+          let s, xs = 
+            match t with
+            | Digit.One x -> "One", [ x]
+            | Two (x, y) -> "Two", [x; y]
+            | Three (x, y, z) -> "Three", [x; y; z]
+            | Four (x, y, z, w) -> "Four", [x; y; z; w]
+          in
+          let open Core in
+          sprintf "%s (%s)"
+            s (String.concat ~sep:"," (List.map ~f xs))
+
+
+        let node_to_string f t= 
+          let s, n, xs = 
+            match t with
+            | Node.Two (n, x, y) -> "Two", n, [x; y]
+            | Three (n, x, y, z) -> "Three", n, [x; y; z]
+          in
+          let open Core in
+          sprintf "%s (%s)"
+            s (String.concat ~sep:"," (Int.to_string n :: List.map ~f xs))
+
+      let rec to_string : type e. (e -> string) -> e t -> string = fun f -> function
+        | Empty -> "Empty"
+        | Single x -> sprintf "Single (%s)" (f x)
+        | Deep (n, l, t, r) ->
+          sprintf "Deep (%d, %s, %s, %s)"
+            n
+            (digit_to_string f l)
+            (sprintf "lazy (%s)" (to_string (node_to_string f) t))
+            (digit_to_string f r)
+    end
+
+    let untype_digit  (type a b) (d : (a, b, 'e) Digit.t) : 'e Untyped.Digit.t = 
+      match d with
+      | One x -> One x
+      | Two (x, y) -> Two (x, y)
+      | Three (x, y, z) -> Three (x, y, z)
+      | Four (x, y, z, w) -> Four (x, y, z, w)
+
+    let rec untype : type e. e t -> e Untyped.t =
+      function
+      | Empty -> Empty
+      | Single x -> Single x
+      | Deep (n, dl, nt_thunk, dr) ->
+        Deep (n, untype_digit dl, untype (Lazy.force nt_thunk) , untype_digit dr)
+
 
 (* About measurements: in the paper they define finger trees more generally than
    this implementation. Given a monoid m, a measurement function for elements
@@ -542,10 +613,48 @@ let to_list : 'e t -> 'e list = Fn.compose Sequence.to_list to_seq
 
 let of_list : 'e list -> 'e t = List.fold_left ~init:empty ~f:snoc
 
+    let digit_len : type l r e. (l, r, e) Digit.t -> (e -> int) -> int =
+      fun t len ->
+        let xs =
+          match t with
+          | One x -> [ x]
+          | Two (x, y) -> [x; y]
+          | Three (x, y, z) -> [x; y; z]
+          | Four (x, y, z, w) -> [x; y; z; w]
+        in
+        List.sum (module Int) ~f:len xs
+
+  let rec check_lengths : type e. e t -> (e -> int) -> int =
+    fun t len ->
+      let check_node_len : e Node.t -> int =
+        fun n ->
+          match n with
+          | Two (expected, x, y) ->
+            [%test_eq: int]
+              expected ( len x + len y);
+            expected
+          | Three (expected, x, y, z) ->
+            [%test_eq: int]
+              expected (len x + len y + len z);
+            expected
+      in
+      match t with
+      | Empty -> 0
+      | Single e -> len e
+      | Deep (expected_len, dl, tn_thunk, dr) ->
+        let len_l = digit_len dl len  in
+        let len_tn = check_lengths (Lazy.force tn_thunk) check_node_len in
+        let len_r = digit_len dr len  in
+        [%test_eq: int] expected_len (len_l + len_tn + len_r);
+        expected_len
+
+
 (* Split a tree into the elements before a given index, the element at that
    index and the elements after it. The index must exist in the tree. *)
 let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
  fun measure' t target acc ->
+  Core.printf "%d %d %s\n%!"
+    target acc (Untyped.to_string (fun _e -> Int.to_string 0) (untype t));
   match t with
   | Empty ->
       failwith "FSequence.split index out of bounds (1)"
@@ -554,9 +663,13 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
       else failwith "FSequence.split index out of bounds (2)"
   | Deep (_m, prefix, middle, suffix) ->
       let acc_p = acc + Digit.measure measure' prefix in
-      if acc_p > target then
+      Core.printf "  deep: acc=%d prefix=%d acc_p=%d\n%!"
+        acc (Digit.measure measure' prefix) acc_p;
+      if acc_p > target then (
         (* split point is in left finger *)
+        Core.printf "here\n%!";
         let dl, m, dr = Digit.split measure' target acc prefix in
+        Core.printf "through\n%!";
         ( Digit.opt_to_list dl |> of_list (* left part of digit split *)
         , m (* middle of digit split *)
         , match dr with
@@ -569,16 +682,22 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
                 deep measure' (Node.to_digit head) tail suffix )
           | Some (Mk_any_ar dig) ->
               deep measure' dig (force middle) suffix )
-      else
+      ) else (
         let acc_m = acc_p + measure Node.measure (force middle) in
-        if acc_m > target then
+        Core.printf " acc_m branch: acc=%d prefix=%d acc_p=%d acc_m=%d \n%!"
+          acc (Digit.measure measure' prefix) acc_p acc_m;
+        if acc_m > target then (
           (* split point is in subtree *)
+          Core.printf "YO!\n%!";
           let lhs, m, rhs = split Node.measure (force middle) target acc_p in
           (* The subtree is made of nodes, so the midpoint we got from the
              recursive call is a node, so split that. *)
           let m_lhs, m_m, m_rhs =
+            let arg  = measure Node.measure lhs + acc_p in
+            Core.printf "calling split to digits: target=%d arg=%d\n%!" 
+              target arg;
             Node.split_to_digits measure' target
-              (measure Node.measure lhs + acc_p)
+              arg
               m
           in
           ( (* prefix + lhs of the split of the subtree + lhs of the split of
@@ -605,7 +724,7 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
                   deep measure' (Node.to_digit head) tail suffix )
             | Some (Mk_any_ar dig) ->
                 deep measure' dig rhs suffix )
-        else
+        ) else
           let acc_s = acc_m + Digit.measure measure' suffix in
           if acc_s > target then
             (* split point is in right finger *)
@@ -629,6 +748,7 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
               | Some (Mk_any_ar dig) ->
                   tree_of_digit measure' dig )
           else failwith "FSequence.split index out of bounds (3)"
+      )
 
 (* Split a tree into the elements before some index and the elements >= that
    index. split_at works when the index is out of range and returns a pair while
@@ -678,7 +798,7 @@ let%test_unit "split properties" =
     let open Quickcheck.Generator in
     let open Quickcheck.Generator.Let_syntax in
     let%bind xs = list (Int.gen_incl 0 500) in
-    let%bind idx = Int.gen_incl 0 (max (List.length xs - 1) 0) in
+    let%bind idx = Int.gen_incl 0 (max (List.length xs ) 0) in
     return (xs, idx)
   in
   let shrinker =
@@ -692,13 +812,17 @@ let%test_unit "split properties" =
                  let res = idx - offset in
                  if res >= 0 then Some (xs, res) else None ) ) )
   in
-  Quickcheck.test gen ~shrink_attempts:`Exhaustive
+  Quickcheck.test gen
+    ~examples:[ ([0;1;2], 3) ]
+    ~shrink_attempts:`Exhaustive
     ~sexp_of:[%sexp_of: int list * int] ~shrinker ~f:(fun (xs, idx) ->
       let len = List.length xs in
       let split_l_list = List.take xs idx in
       let split_r_list = List.drop xs idx in
       let xs_fseq = of_list xs in
-      let split_l_fseq, split_r_fseq = split_at xs_fseq idx in
+      let split_l_fseq, split_r_fseq =
+        split_at xs_fseq idx
+      in
       let split_l_fseq', split_r_fseq' =
         (to_list split_l_fseq, to_list split_r_fseq)
       in
@@ -708,3 +832,126 @@ let%test_unit "split properties" =
       [%test_eq: int] (List.length split_l_fseq') (length split_l_fseq) ;
       [%test_eq: int] (List.length split_r_fseq') (length split_r_fseq) ;
       [%test_eq: int] (length split_l_fseq + length split_r_fseq) len )
+
+let%test_module "split test" =
+  (module (struct
+    type elt = int
+    [@@deriving sexp]
+
+    let elt_gen = Int.quickcheck_generator
+
+    module Op = struct
+      type t = 
+        | Cons of elt
+        | Snoc of elt
+        | Split of int
+      [@@deriving sexp]
+
+      let _t = Cons 3
+      let _t = Snoc 3
+      let _ = elt_gen
+
+      let gen n =
+        let open Quickcheck.Generator in 
+        let open Let_syntax in
+        let%map i = Int.gen_incl 0 (max 0 (n - 1)) in
+        Split i
+        (*
+        match%map variant3 elt_gen elt_gen 
+                    (Int.gen_incl 0 (max 0 (n - 1)))
+        with
+        | `A e -> Cons e
+        | `B e -> Snoc e
+        | `C i -> Split i *)
+
+      let apply op t =
+        match op with
+        | Cons e -> [ cons e t ]
+        | Snoc e -> [ snoc t e ]
+        | Split i -> let a, b = split_at t i in [a; b]
+    end
+
+    let%test_unit "foo" =
+      let _ = Op.gen in
+      let _ = Op.apply in
+      let ex =  Deep (75, Three (925,926,927), lazy (Deep (69, One (Three (3,928,929,930)), lazy (Deep (54, Three (Three (9,Three (3,931,932,933),Three (3,934,935,936),Three (3,937,938,939)),Three (9,Three (3,940,941,942),Three (3,943,944,945),Three (3,946,947,948)),Three (9,Three (3,949,950,951),Three (3,952,953,954),Three (3,955,956,957))), lazy (Empty), Three (Three (9,Three (3,958,959,960),Three (3,961,962,963),Three (3,964,965,966)),Three (9,Three (3,967,968,969),Three (3,970,971,972),Three (3,973,974,975)),Three (9,Three (3,976,977,978),Three (3,979,980,981),Three (3,982,983,984))))), Four (Three (3,985,986,987),Three (3,988,989,990),Three (3,991,992,993),Three (3,994,995,996)))), Three (997,998,999)) in
+      let _ex : _ Node.t Node.t Untyped.t = 
+        Deep
+          (54, 
+           Three
+             (Three (9,Three (3,931,932,933),Three (3,934,935,936),Three (3,937,938,939)),
+              Three (9,Three (3,940,941,942),Three (3,943,944,945),Three (3,946,947,948)),
+              Three (9,Three (3,949,950,951),Three (3,952,953,954),Three (3,955,956,957))),
+           (Empty),
+           Three
+             (Three (9,Three (3,958,959,960),Three (3,961,962,963),Three (3,964,965,966)),
+              Three (9,Three (3,967,968,969),Three (3,970,971,972),Three (3,973,974,975)),
+              Three (9,Three (3,976,977,978),Three (3,979,980,981),Three (3,982,983,984))))
+      in
+      check_lengths   
+        ex
+        (Fn.const 1) |> ignore;
+      Core.printf "\n--------------------------\n%!";
+      split_at ex 30 |> ignore
+
+    (*
+    let%test_unit "foo" =
+      let ex = Untyped.Deep (75, Three (925,926,927),  (Deep (69, One (Three (3,928,929,930)),  (Deep (54, Three (Three (9,Three (3,931,932,933),Three (3,934,935,936),Three (3,937,938,939)),Three (9,Three (3,940,941,942),Three (3,943,944,945),Three (3,946,947,948)),Three (9,Three (3,949,950,951),Three (3,952,953,954),Three (3,955,956,957))),  (Empty), Three (Three (9,Three (3,958,959,960),Three (3,961,962,963),Three (3,964,965,966)),Three (9,Three (3,967,968,969),Three (3,970,971,972),Three (3,973,974,975)),Three (9,Three (3,976,977,978),Three (3,979,980,981),Three (3,982,983,984))))), Four (Three (3,985,986,987),Three (3,988,989,990),Three (3,991,992,993),Three (3,994,995,996)))), Three (997,998,999))
+    let ex =
+      Untyped.Deep 
+        (75, Three (925,926,927),  (), Three (997,998,999))
+    let _ =
+      Deep (
+        69,
+        One (Three (3,928,929,930)),
+        (Deep (54, Three (Three (9,Three (3,931,932,933),Three (3,934,935,936),Three (3,937,938,939)),Three (9,Three (3,940,941,942),Three (3,943,944,945),Three (3,946,947,948)),Three (9,Three (3,949,950,951),Three (3,952,953,954),Three (3,955,956,957))),  (Empty), Three (Three (9,Three (3,958,959,960),Three (3,961,962,963),Three (3,964,965,966)),Three (9,Three (3,967,968,969),Three (3,970,971,972),Three (3,973,974,975)),Three (9,Three (3,976,977,978),Three (3,979,980,981),Three (3,982,983,984))))),
+        Four (Three (3,985,986,987),Three (3,988,989,990),Three (3,991,992,993),Three (3,994,995,996))
+      )
+    in
+      let shrinker =
+        Quickcheck.Shrinker.create (fun (t, i) ->
+            match t with
+            | Untyped.Empty -> (t, i)
+            | Single _ -> (t, i)
+            | Deep (_, l, m, r) ->
+          )
+      in
+      shrinker *)
+
+(*
+   let%test_unit "gen_iter" =
+      let open Quickcheck.Generator.Let_syntax in
+      let rec go count universe =
+        if count = 0
+        then return ()
+        else
+          let n= List.length universe in
+        let%bind i = Int.gen_incl 0 (n- 1) in
+          Core.printf "univ %d\n%!" n;
+        let t = List.nth_exn universe i in
+        let%bind op = Op.gen (length t) in
+        let universe =
+          let new_ts =
+            try
+            Op.apply op t
+            with _ ->
+              Core.printf
+              !"%s\n%!"
+                (Untyped.to_string Int.to_string (untype t));
+              failwithf !"bad op: %{sexp:Op.t} %{sexp:int list} %{sexp:int Untyped.t}"
+                op (to_list t) (untype t) ()
+          in
+          List.iter new_ts ~f:(fun t -> check_lengths t (Fn.const 1) |> ignore);
+          new_ts @ universe
+        in
+        let universe = 
+          List.dedup_and_sort ~compare:(fun x y -> if equal Int.equal x y then 0 else 1)
+            universe
+        in
+        go (count - 1) universe
+      in
+      Quickcheck.random_value
+        (go 500 [ empty; of_list (List.range 0 1000) ])
+
+*)
+  end))

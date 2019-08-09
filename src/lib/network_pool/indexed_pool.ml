@@ -629,6 +629,7 @@ let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
               )
       ; size= t.size + 1 }
 
+(*
 let%test_module _ =
   ( module struct
     open For_tests
@@ -894,4 +895,4 @@ let%test_module _ =
                 ()
             | _ ->
                 failwith "should've returned nsf" )
-  end )
+  end ) *)

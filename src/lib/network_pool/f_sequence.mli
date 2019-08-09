@@ -1,4 +1,4 @@
-(** A sequence type based on finger trees.
+  (** A sequence type based on finger trees.
 
       They are a purely functional data structure that provides amortized O(1)
       cons, snoc, uncons, and unsnoc; O(log (min (d1, d2))) splitting and

@@ -498,6 +498,7 @@ end)
 
 include Make (Staged_ledger) (Transition_frontier)
 
+(*
 let%test_module _ =
   ( module struct
     module Mock_base_ledger = struct
@@ -607,6 +608,50 @@ let%test_module _ =
         else Quickcheck.Generator.return @@ List.rev cmds
       in
       Quickcheck.random_value (go 0 [])
+
+    let dependent_cmds =
+      let init n ~f = 
+        Quickcheck.Generator.all (List.init n ~f)
+      in
+      init 1 ~f:(fun acct ->
+        let sender = test_keys.(acct) in
+        init 400 ~f:(fun i ->
+          User_command.Gen.payment 
+            ~nonce:(Account.Nonce.of_int i)
+            ~sign_type:`Real
+            ~key_gen:
+              Quickcheck.Generator.(tuple2
+                 (return sender)
+                  (Quickcheck_lib.of_array test_keys))
+            ~max_amount:1 ~max_fee:1 ()
+          ))
+      |> Quickcheck.random_value
+      |> List.concat
+
+    let%test_unit "adding things" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind assert_pool_txs, pool, _best_tip_diff_w, _frontier =
+            setup_test ()
+          in
+          assert_pool_txs [] ;
+          let cmds1, cmds2 = List.split_n dependent_cmds
+              Test.Resource_pool.pool_max_size
+          in
+          let%bind _apply_res =
+            Test.Resource_pool.Diff.apply pool
+              (Envelope.Incoming.local cmds1)
+          in
+          let%map _apply_res =
+            Test.Resource_pool.Diff.apply pool
+              (Envelope.Incoming.local cmds2)
+          in
+          ()
+          (*
+          [%test_eq: User_command.t list Or_error.t] apply_res
+            (Ok dependent_cmds) ;
+          assert_pool_txs 
+            dependent_cmds ; *)
+        )
 
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -872,4 +917,4 @@ let%test_module _ =
       in
       assert_pool_txs [List.nth_exn txs 1] ;
       Deferred.unit
-  end )
+  end ) *)
