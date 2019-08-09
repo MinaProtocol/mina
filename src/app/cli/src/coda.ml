@@ -23,9 +23,7 @@ let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
-    (let%map_open conf_dir =
-       flag "config-directory" ~doc:"DIR Configuration directory"
-         (optional string)
+    (let%map_open conf_dir = Cli_lib.Flag.conf_dir
      and unsafe_track_propose_key =
        flag "unsafe-track-propose-key"
          ~doc:
@@ -145,7 +143,7 @@ let daemon logger =
      fun () ->
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
-         Option.value ~default:(home ^/ ".coda-config") conf_dir
+         Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
        in
        let%bind log_level =
          match log_level with
@@ -378,29 +376,35 @@ let daemon logger =
          in
          let discovery_port = external_port + 1 in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-         let%bind initial_peers_cleaned =
+         let%bind initial_peers_cleaned_lists =
+           (* for each provided peer, lookup all its addresses *)
            Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
              initial_peers_raw ~f:(fun addr ->
                let host = Host_and_port.host addr in
-               match%bind
+               match%map
                  Monitor.try_with_or_error (fun () ->
-                     Unix.Inet_addr.of_string_or_getbyname host )
+                     Async.Unix.Host.getbyname_exn host )
                with
-               | Ok inet_addr ->
-                   return
-                   @@ Some
-                        (Host_and_port.create
-                           ~host:(Unix.Inet_addr.to_string inet_addr)
-                           ~port:(Host_and_port.port addr))
+               | Ok unix_host ->
+                   (* assume addresses is nonempty *)
+                   let addresses = Array.to_list unix_host.addresses in
+                   let port = Host_and_port.port addr in
+                   Some
+                     (List.map addresses ~f:(fun inet_addr ->
+                          Host_and_port.create
+                            ~host:(Unix.Inet_addr.to_string inet_addr)
+                            ~port ))
                | Error e ->
                    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                     "Error on getaddr: $error"
+                     "Error on getbyname: $error"
                      ~metadata:[("error", `String (Error.to_string_mach e))] ;
                    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                     "Failed to get address for host $host, skipping"
+                     "Failed to get addresses for host $host, skipping"
                      ~metadata:[("host", `String host)] ;
-                   return None )
+                   None )
          in
+         (* flatten list of lists of host-and-ports *)
+         let initial_peers_cleaned = List.concat initial_peers_cleaned_lists in
          let%bind () =
            if
              List.length initial_peers_raw <> 0

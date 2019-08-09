@@ -40,6 +40,8 @@ module Snarkable = struct
 
       val var_to_bits : var -> boolean_var Bitstring_lib.Bitstring.Lsb_first.t
 
+      val var_of_bits : boolean_var Bitstring_lib.Bitstring.Lsb_first.t -> var
+
       val var_to_triples : var -> boolean_var Triple.t list
 
       val var_of_value : value -> var
