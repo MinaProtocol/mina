@@ -78,18 +78,24 @@ let div_mod (type f) ~m:((module M) as m : f m) a b =
   ( {value= q; upper_bound= B.(one lsl q_bit_length); bits= Some q_bits}
   , {value= r; upper_bound= b.upper_bound; bits= Some r_bits} )
 
-let to_bits (type f) ~m:((module M) : f m) t =
-  Bitstring.Lsb_first.of_list
-    ( match t.bits with
-    | Some bs ->
-        bs
-    | None ->
-        let bs =
-          M.Field.choose_preimage_var t.value
-            ~length:(bits_needed t.upper_bound)
-        in
-        t.bits <- Some bs ;
-        bs )
+let to_bits ?length (type f) ~m:((module M) : f m) t =
+  match t.bits with
+  | Some bs -> (
+      let bs = Bitstring.Lsb_first.of_list bs in
+      match length with
+      | None ->
+          bs
+      | Some n ->
+          Bitstring.Lsb_first.pad bs
+            ~padding_length:(n - Bitstring.Lsb_first.length bs)
+            ~zero:M.Boolean.false_ )
+  | None ->
+      let bs =
+        M.Field.choose_preimage_var t.value
+          ~length:(Option.value ~default:(bits_needed t.upper_bound) length)
+      in
+      t.bits <- Some bs ;
+      Bitstring.Lsb_first.of_list bs
 
 let to_bits_exn t = Bitstring.Lsb_first.of_list (Option.value_exn t.bits)
 

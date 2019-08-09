@@ -30,7 +30,7 @@ struct
     module Latest = V1
 
     module Module_decl = struct
-      let name = "nat_make"
+      let name = sprintf "nat_make"
 
       type latest = Latest.t
     end
@@ -56,15 +56,12 @@ struct
 
     let to_field = Integer.to_field
 
-    let pad bs =
-      let n = Bitstring.Lsb_first.length bs in
-      let padding_length = N.length_in_bits - n in
-      assert (Int.(padding_length >= 0)) ;
-      Bitstring.Lsb_first.pad ~zero:Boolean.false_ ~padding_length bs
+    let of_bits bs = Integer.of_bits ~m bs
 
-    let of_bits bs = Integer.of_bits ~m (pad bs)
-
-    let to_bits t = make_checked (fun () -> pad (Integer.to_bits ~m t))
+    let to_bits t =
+      with_label
+        (sprintf "to_bits: %s" __LOC__)
+        (make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t))
 
     let to_triples t =
       Checked.map (to_bits t)
@@ -112,13 +109,11 @@ struct
     let succ_if t c =
       make_checked (fun () ->
           let t = Integer.succ_if ~m t c in
-          Integer.to_bits ~m t |> ignore ;
           t )
 
     let succ t =
       make_checked (fun () ->
           let t = Integer.succ ~m t in
-          Integer.to_bits ~m t |> ignore ;
           t )
 
     let op op a b = make_checked (fun () -> op ~m a b)

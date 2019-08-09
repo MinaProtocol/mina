@@ -10,7 +10,8 @@ val shift_left : m:'f m -> 'f t -> int -> 'f t
 
 val of_bits : m:'f m -> 'f Cvar.t Boolean.t Bitstring.Lsb_first.t -> 'f t
 
-val to_bits : m:'f m -> 'f t -> 'f Cvar.t Boolean.t Bitstring.Lsb_first.t
+val to_bits :
+  ?length:int -> m:'f m -> 'f t -> 'f Cvar.t Boolean.t Bitstring.Lsb_first.t
 
 val to_bits_exn : 'f t -> 'f Cvar.t Boolean.t Bitstring.Lsb_first.t
 
