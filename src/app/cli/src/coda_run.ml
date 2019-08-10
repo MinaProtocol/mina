@@ -90,8 +90,9 @@ let remove_prev_crash_reports ~conf_dir =
   Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*.tar.xz" conf_dir)
 
 let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
-  Logger.info top_logger ~module_:__MODULE__ ~location:__LOC__
-    "Generating crash report" ;
+  Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
+    "Unhandled top-level exception. Generating crash report"
+    ~metadata:[("exn", `String exn_str)] ;
   let _ = remove_prev_crash_reports ~conf_dir in
   let temp_config = Core.Unix.mkdtemp "coda_config_temp" in
   (*Transition frontier and ledger visualization*)
