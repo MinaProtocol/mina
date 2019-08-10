@@ -709,12 +709,19 @@ let internal_commands =
 
 let coda_commands logger =
   [ ("daemon", daemon logger)
-  ; ("accounts", Client.accounts)
   ; ("client", Client.command)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
+
+[%%if
+new_cli]
+
+let coda_commands logger =
+  ("accounts", Client.accounts) :: coda_commands logger
+
+[%%endif]
 
 [%%if
 integration_tests]
