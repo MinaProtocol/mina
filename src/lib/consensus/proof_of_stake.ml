@@ -793,7 +793,7 @@ module Data = struct
       open Bignum_bigint
 
       (* TEMPORARY HACK FOR TESTNETS: c should be 1 (or possibly 2) otherwise *)
-      let c = `Two_to_the 0
+      let c = `Two_to_the 1
 
       let base = Bignum.(one / of_int 2)
 
