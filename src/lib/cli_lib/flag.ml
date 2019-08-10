@@ -27,7 +27,7 @@ let conf_dir =
   flag "config-directory" ~doc:"DIR Configuration directory" (optional string)
 
 let port =
-  Command.Param.flag "--daemon-port"
+  Command.Param.flag "daemon-port"
     ~doc:
       (Printf.sprintf "PORT Client to daemon local communication (default: %d)"
          Port.default_client)
