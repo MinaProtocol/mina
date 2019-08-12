@@ -78,8 +78,9 @@ let daemon logger =
      and rest_server_port =
        flag "rest-port"
          ~doc:
-           "PORT local REST-server for daemon interaction (default no \
-            rest-server)"
+           (Printf.sprintf
+              "PORT local REST-server for daemon interaction (default: %d)"
+              Port.default_rest)
          (optional int16)
      and metrics_server_port =
        flag "metrics-port"
@@ -334,6 +335,10 @@ let daemon logger =
          let client_port =
            or_from_config YJ.Util.to_int_option "client-port"
              ~default:Port.default_client client_port
+         in
+         let rest_server_port =
+           or_from_config YJ.Util.to_int_option "rest-port"
+             ~default:Port.default_rest rest_server_port
          in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
@@ -594,7 +599,7 @@ let daemon logger =
        Coda_lib.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
-       Coda_run.setup_local_server ?client_whitelist ?rest_server_port
+       Coda_run.setup_local_server ?client_whitelist ~rest_server_port
          ~insecure_rest_server coda ;
        let%bind () =
          Option.map metrics_server_port ~f:(fun port ->
@@ -702,6 +707,14 @@ let coda_commands logger =
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
+
+[%%if
+new_cli]
+
+let coda_commands logger =
+  ("accounts", Client.accounts) :: coda_commands logger
+
+[%%endif]
 
 [%%if
 integration_tests]
