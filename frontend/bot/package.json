@@ -2,7 +2,7 @@
   "name": "coda-bot",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "MIT",
+  "license": "Apache 2.0",
   "scripts": {
     "build": "yarn run copy-schema && bsb -make-world",
     "clean": "bsb -clean-world",
