@@ -51,6 +51,8 @@ struct
 
   let get_values {pagination; _} = Pagination.get_values pagination
 
+  let get_all_values {pagination; _} = Pagination.get_all_values pagination
+
   let get_earlier_values {pagination; _} =
     Pagination.get_earlier_values pagination
 
