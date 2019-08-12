@@ -79,6 +79,10 @@ macos-portable:
 	@zip -r _build/coda-daemon-macos.zip _build/coda-daemon-macos/
 	@echo Find coda-daemon-macos.zip inside _build/
 
+update-graphql:
+	@echo Make sure that the daemon is running with -rest-port 8080
+	python scripts/introspection_query.py > graphql_schema.json
+
 ########################################
 ## Lint
 
@@ -191,6 +195,12 @@ codaslim:
 	@cp src/_build/coda.deb .
 	@./scripts/rebuild-docker.sh codaslim dockerfiles/Dockerfile-codaslim
 	@rm coda.deb
+
+##############################################
+## Genesis ledger in OCaml from running daemon
+
+genesis-ledger-ocaml:
+	@./scripts/generate-genesis-ledger.py .genesis-ledger.ml.jinja
 
 ########################################
 ## Tests
