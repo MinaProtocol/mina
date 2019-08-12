@@ -341,7 +341,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           let graphql_callback =
             Graphql_cohttp_async.make_callback
               (fun _req -> coda)
-              Graphql.schema
+              Coda_graphql.schema
           in
           Cohttp_async.(
             Server.create_expert

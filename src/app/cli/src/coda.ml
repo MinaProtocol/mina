@@ -6,6 +6,7 @@ open Async
 open Coda_base
 open Cli_lib
 open Signature_lib
+open Init
 module YJ = Yojson.Safe
 
 [%%if
@@ -726,6 +727,7 @@ module type Integration_test = sig
 end
 
 let coda_commands logger =
+  let open Tests in
   let group =
     List.map
       ~f:(fun (module T) -> (T.name, T.command))
@@ -772,7 +774,7 @@ let print_version_info () =
     (String.sub Coda_version.commit_id ~pos:0 ~len:7)
     Coda_version.branch
 
-let () =
+let start () =
   Random.self_init () ;
   let logger = Logger.create ~initialize_default_consumer:false () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;

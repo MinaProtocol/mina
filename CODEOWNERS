@@ -15,9 +15,9 @@
 
 /src/external/ @cmr @bkase @psteckler @imeckler
 
-/src/app/cli/tests @cmr @bkase @wu-s-john @ghost-not-in-the-shell @deepthiskumar
-/src/app/cli/graphql @bkase @wu-s-john @schmavery
-/src/app/cli/init @nholland94 @bkase @cmr @imeckler
+/src/app/cli/src/tests @cmr @bkase @wu-s-john @ghost-not-in-the-shell @deepthiskumar
+/src/app/cli/src/coda.ml @nholland94 @bkase @cmr @imeckler
+/src/app/cli/src/init @nholland94 @bkase @cmr @imeckler
 /src/app/kademlia-haskell/ @bkase @enolan @cmr @psteckler
 /src/app/reformat/ @bkase
 /src/app/trace-tool/ @cmr @mrmr1993
@@ -31,6 +31,8 @@
 /src/lib/chunked_triples/ @psteckler @rbkhmrcr @vanishreerao @imeckler @mrmr1993
 /src/lib/cli_lib/ @wu-s-john @bkase @schmavery
 /src/lib/coda_base/ @cmr @nholland94 @bkase @imeckler
+/src/lib/coda_commands @bkase @wu-s-john @schmavery
+/src/lib/coda_graphql @bkase @wu-s-john @schmavery
 /src/lib/coda_networking/ @cmr @enolan @nholland94
 /src/lib/coda_numbers/ @bkase @nholland94 @imeckler @mrmr1993
 /src/lib/coda_state/ @nholland94 @ghost-not-in-the-shell @wu-s-john
