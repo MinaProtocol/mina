@@ -522,8 +522,11 @@ jobs:
                   name: Running test -- test_postake_split_snarkless:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
             - run:
-                  name: Running test -- test_postake_split_snarkless:coda-change-snark-worker-testcoda-archive-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-change-snark-worker-testcoda-archive-node-test"'
+                  name: Running test -- test_postake_split_snarkless:coda-change-snark-worker-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-change-snark-worker-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-archive-node-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-archive-node-test"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_txns:
@@ -635,8 +638,11 @@ jobs:
                   name: Running test -- test_postake_split_snarkless_medium_curves:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-restart-node-test"'
             - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-change-snark-worker-testcoda-archive-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-change-snark-worker-testcoda-archive-node-test"'
+                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-change-snark-worker-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-change-snark-worker-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-archive-node-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-archive-node-test"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_txns_medium_curves:
