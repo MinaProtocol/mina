@@ -835,7 +835,7 @@ module Types = struct
         io_field query_name
           ~args:
             Arg.
-              [ arg "filter" ~typ:(non_null filter_argument)
+              [ arg "filter" ~typ:filter_argument
               ; arg "first" ~doc:"Returns the first _n_ elements from the list"
                   ~typ:int
               ; arg "after"
@@ -863,33 +863,44 @@ module Types = struct
                     let%map decoded = Cursor.deserialize data in
                     Some decoded
               in
-              let%map queried_nodes, has_earlier_page, has_later_page =
+              let%map ( (queried_nodes, has_earlier_page, has_later_page)
+                      , total_counts ) =
                 Deferred.return
                 @@
-                match (first, after, last, before) with
-                | Some _n_queries_before, _, Some _n_queries_after, _ ->
+                match (first, after, last, before, public_key) with
+                | _, _, _, _, None ->
+                    (* TODO: Return an actual pagination with a limited range of elements rather than returning all the elemens in the database *)
+                    let values = Pagination_database.get_all_values database in
+                    Result.return
+                      ( (values, `Has_earlier_page false, `Has_later_page false)
+                      , Some (List.length values) )
+                | Some _n_queries_before, _, Some _n_queries_after, _, _ ->
                     Error
                       "Illegal query: first and last must not be non-null \
                        value at the same time"
-                | num_to_query, cursor, None, _ ->
+                | num_to_query, cursor, None, _, Some public_key ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
-                    Pagination_database.get_earlier_values database public_key
-                      cursor num_to_query
-                | None, _, num_to_query, cursor ->
+                    ( Pagination_database.get_earlier_values database
+                        public_key cursor num_to_query
+                    , Pagination_database.get_total_values database public_key
+                    )
+                | None, _, num_to_query, cursor, Some public_key ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
-                    Pagination_database.get_later_values database public_key
-                      cursor num_to_query
+                    ( Pagination_database.get_later_values database public_key
+                        cursor num_to_query
+                    , Pagination_database.get_total_values database public_key
+                    )
               in
               ( ( List.map queried_nodes ~f:(fun node ->
                       {Edge.node; cursor= Cursor.serialize @@ to_cursor node}
                   )
                 , has_earlier_page
                 , has_later_page )
-              , Pagination_database.get_values database public_key )
+              , Option.value ~default:0 total_counts )
             in
-            build_connection result (List.length total_counts) )
+            build_connection result total_counts )
     end
 
     module User_command = struct
