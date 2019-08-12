@@ -49,8 +49,7 @@ val best_protocol_state : t -> Protocol_state.Value.t Participating_state.t
 
 val best_tip : t -> Transition_frontier.Breadcrumb.t Participating_state.t
 
-val sync_status :
-  t -> [`Offline | `Synced | `Bootstrap] Coda_incremental.Status.Observer.t
+val sync_status : t -> Sync_status.t Coda_incremental.Status.Observer.t
 
 val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
@@ -91,11 +90,14 @@ val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
 
 val get_ledger :
-  t -> Staged_ledger_hash.t -> Account.t list Deferred.Or_error.t
+  t -> Staged_ledger_hash.t option -> Account.t list Deferred.Or_error.t
 
 val receipt_chain_database : t -> Receipt_chain_database.t
 
 val wallets : t -> Secrets.Wallets.t
+
+val most_recent_valid_transition :
+  t -> External_transition.t Broadcast_pipe.Reader.t
 
 val top_level_logger : t -> Logger.t
 

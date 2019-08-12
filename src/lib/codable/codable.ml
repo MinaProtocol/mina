@@ -80,6 +80,8 @@ end)
 module Make_base58_check (T : sig
   type t [@@deriving bin_io]
 
+  val description : string
+
   val version_byte : char
 end) =
 struct
@@ -103,4 +105,29 @@ struct
   end
 
   include Make_of_string (String_ops)
+end
+
+module type Base58_check_base_intf = sig
+  type t
+
+  (** Base58Check decoding *)
+  val of_base58_check : string -> t Base.Or_error.t
+
+  (** Base58Check decoding *)
+  val of_base58_check_exn : string -> t
+end
+
+module type Base58_check_intf = sig
+  type t
+
+  (** string encoding (Base58Check) *)
+  val to_string : t -> string
+
+  (** string (Base58Check) decoding *)
+  val of_string : string -> t
+
+  (** explicit Base58Check encoding *)
+  val to_base58_check : t -> string
+
+  include Base58_check_base_intf with type t := t
 end

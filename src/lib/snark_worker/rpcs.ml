@@ -25,8 +25,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit
 
         type response =
-          ( ( Transaction_snark.Statement.t
-            , Transaction.t
+          ( ( Transaction.t
             , Transaction_witness.t
             , Ledger_proof.t )
             Work.Single.Spec.t
@@ -48,8 +47,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit [@@deriving bin_io, version {rpc}]
 
         type response =
-          ( ( Transaction_snark.Statement.Stable.V1.t
-            , Transaction.Stable.V1.t
+          ( ( Transaction.Stable.V1.t
             , Transaction_witness.Stable.V1.t
             , Ledger_proof.Stable.V1.t )
             Work.Single.Spec.Stable.V1.t
@@ -81,8 +79,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       module T = struct
         (* "master" types, do not change *)
         type query =
-          ( ( Transaction_snark.Statement.t
-            , Transaction.t
+          ( ( Transaction.t
             , Transaction_witness.t
             , Ledger_proof.t )
             Work.Single.Spec.t
@@ -103,8 +100,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     module V1 = struct
       module T = struct
         type query =
-          ( ( Transaction_snark.Statement.Stable.V1.t
-            , Transaction.Stable.V1.t
+          ( ( Transaction.Stable.V1.t
             , Transaction_witness.Stable.V1.t
             , Ledger_proof.Stable.V1.t )
             Work.Single.Spec.Stable.V1.t

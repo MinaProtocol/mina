@@ -20,6 +20,7 @@ type t =
   ; initial_propose_keypairs: Keypair.Set.t
   ; work_selection_method: (module Work_selector.Selection_method_intf)
   ; snark_worker_config: Snark_worker_config.t
+  ; work_reassignment_wait: int
   ; net_config: Coda_networking.Config.t
   ; snark_pool_disk_location: string
   ; wallets_disk_location: string
@@ -31,5 +32,6 @@ type t =
   ; transaction_database: Transaction_database.t
   ; external_transition_database: External_transition_database.t
   ; snark_work_fee: Currency.Fee.t
-  ; consensus_local_state: Consensus.Data.Local_state.t }
+  ; consensus_local_state: Consensus.Data.Local_state.t
+  ; is_archive_node: bool [@default false] }
 [@@deriving make]

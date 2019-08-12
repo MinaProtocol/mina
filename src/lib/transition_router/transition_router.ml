@@ -8,6 +8,8 @@ module type Inputs_intf = sig
 
   module Network : sig
     type t
+
+    val first_connection : t -> unit Ivar.t
   end
 
   module Transition_frontier :
@@ -105,7 +107,8 @@ module Make (Inputs : Inputs_intf) = struct
     Transition_frontier.close frontier ;
     Broadcast_pipe.Writer.write frontier_w None |> don't_wait_for ;
     upon
-      (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
+      (let%bind () = Ivar.read (Network.first_connection network) in
+       Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
          ~ledger_db ~frontier ~transition_reader:!transition_reader_ref)
       (fun (new_frontier, collected_transitions) ->
         Strict_pipe.Writer.kill !transition_writer_ref ;
@@ -117,7 +120,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   let run ~logger ~trust_system ~verifier ~network ~time_controller
       ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
-      ~network_transition_reader ~proposer_transition_reader frontier =
+      ~network_transition_reader ~proposer_transition_reader
+      ~most_recent_valid_block:( most_recent_valid_block_reader
+                               , most_recent_valid_block_writer ) frontier =
     let clear_reader, clear_writer =
       Strict_pipe.create ~name:"clear" Synchronous
     in
@@ -134,7 +139,40 @@ module Make (Inputs : Inputs_intf) = struct
        it didn't receive any transition from network for a while.
        Then it went to the second epoch and it could propose at
        the second epoch. *)
-    if Consensus.Hooks.is_genesis @@ Coda_base.Block_time.now time_controller
+    let now = Coda_base.Block_time.now time_controller in
+    if
+      try Consensus.Hooks.is_genesis now
+      with Invalid_argument _ ->
+        (* if "now" is before the genesis timestamp, the calculation
+           of the proof-of-stake epoch results in an exception
+        *)
+        let module Time = Coda_base.Block_time in
+        let time_till_genesis =
+          Time.diff Consensus.Constants.genesis_state_timestamp now
+        in
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "time_till_genesis"
+              , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )
+            ]
+          "Node started before genesis: waiting $time_till_genesis \
+           milliseconds before running transition router" ;
+        let seconds_to_wait = 30 in
+        let milliseconds_to_wait = Int64.of_int_exn (seconds_to_wait * 1000) in
+        let rec wait_loop tm =
+          if Int64.(tm <= zero) then ()
+          else (
+            Core.Unix.sleep seconds_to_wait ;
+            let tm_remaining = Int64.(tm - milliseconds_to_wait) in
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              "Still waiting $tm_remaining milliseconds before running \
+               transition router"
+              ~metadata:[("tm_remaining", `Int (Int64.to_int_exn tm_remaining))] ;
+            wait_loop tm_remaining )
+        in
+        wait_loop @@ Time.Span.to_ms time_till_genesis ;
+        (* after waiting, we're at least at the genesis time, maybe a bit past it *)
+        Consensus.Hooks.is_genesis @@ Coda_base.Block_time.now time_controller
     then
       start_transition_frontier_controller ~logger ~trust_system ~verifier
         ~network ~time_controller ~proposer_transition_reader
@@ -152,6 +190,28 @@ module Make (Inputs : Inputs_intf) = struct
     Initial_validator.run ~logger ~trust_system ~verifier
       ~transition_reader:network_transition_reader
       ~valid_transition_writer:valid_protocol_state_transition_writer ;
+    let valid_protocol_state_transition_reader, valid_transition_reader =
+      Strict_pipe.Reader.Fork.two valid_protocol_state_transition_reader
+    in
+    Strict_pipe.Reader.iter valid_transition_reader
+      ~f:(fun transition_with_time ->
+        let `Transition enveloped_transition, _ = transition_with_time in
+        let transition =
+          Envelope.Incoming.data enveloped_transition |> fst |> With_hash.data
+        in
+        let current_consensus_state =
+          External_transition.consensus_state
+            (Broadcast_pipe.Reader.peek most_recent_valid_block_reader)
+        in
+        if
+          Consensus.Hooks.select ~existing:current_consensus_state
+            ~candidate:External_transition.(consensus_state transition)
+            ~logger
+          = `Take
+        then
+          Broadcast_pipe.Writer.write most_recent_valid_block_writer transition
+        else Deferred.unit )
+    |> don't_wait_for ;
     Strict_pipe.Reader.iter_without_pushback
       valid_protocol_state_transition_reader ~f:(fun transition_with_time ->
         let `Transition enveloped_transition, _ = transition_with_time in

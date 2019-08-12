@@ -34,6 +34,31 @@ module type Transition_frontier_intf = sig
   val best_tip_diff_pipe : t -> Diff.Best_tip_diff.view Broadcast_pipe.Reader.t
 end
 
+module type S = sig
+  open Intf
+
+  type transition_frontier
+
+  type best_tip_diff
+
+  module Resource_pool : sig
+    include
+      Transaction_resource_pool_intf
+      with type best_tip_diff := best_tip_diff
+       and type transition_frontier := transition_frontier
+
+    module Diff : Transaction_pool_diff_intf
+  end
+
+  include
+    Network_pool_base_intf
+    with type resource_pool := Resource_pool.t
+     and type transition_frontier := transition_frontier
+     and type resource_pool_diff := Resource_pool.Diff.t
+
+  val add : t -> User_command.t -> unit Deferred.t
+end
+
 (* Functor over user command, base ledger and transaction validator for mocking. *)
 module Make0 (Base_ledger : sig
   type t
@@ -63,6 +88,8 @@ struct
       ; mutable diff_reader: unit Deferred.t sexp_opaque Option.t
       ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
     [@@deriving sexp_of]
+
+    let member t = Indexed_pool.member t.pool
 
     let transactions' p =
       Sequence.unfold ~init:p ~f:(fun pool ->
@@ -463,8 +490,12 @@ module Make (Staged_ledger : sig
   val ledger : t -> Coda_base.Ledger.t
 end)
 (Transition_frontier : Transition_frontier_intf
-                       with type staged_ledger := Staged_ledger.t) =
+                       with type staged_ledger := Staged_ledger.t) :
+  S
+  with type transition_frontier := Transition_frontier.t
+   and type best_tip_diff := Transition_frontier.Diff.Best_tip_diff.view =
   Make0 (Coda_base.Ledger) (Staged_ledger) (Transition_frontier)
+
 include Make (Staged_ledger) (Transition_frontier)
 
 let%test_module _ =
@@ -549,10 +580,9 @@ let%test_module _ =
       in
       let%map () = Async.Scheduler.yield () in
       ( (fun txs ->
-          let open Test.Resource_pool in
           Indexed_pool.For_tests.assert_invariants pool.pool ;
           [%test_eq: User_command.t List.t]
-            ( transactions pool
+            ( Test.Resource_pool.transactions pool
             |> Sequence.map ~f:User_command.forget_check
             |> Sequence.to_list
             |> List.sort ~compare:User_command.compare )

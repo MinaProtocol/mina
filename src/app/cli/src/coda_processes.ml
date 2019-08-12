@@ -7,10 +7,7 @@ open Async
 let init () = Parallel.init_master ()
 
 let net_configs n =
-  let ips =
-    List.init n ~f:(fun i ->
-        Unix.Inet_addr.of_string @@ sprintf "127.0.0.%i" (i + 10) )
-  in
+  let ips = List.init n ~f:(fun _i -> Unix.Inet_addr.of_string "127.0.0.1") in
   let addrs_and_ports_list =
     List.mapi ips ~f:(fun i ip ->
         let communication_port = 23000 + (i * 2) in
@@ -40,9 +37,10 @@ let offset =
         ( Consensus.Constants.genesis_state_timestamp
         |> Coda_base.Block_time.to_time ))
 
-let local_configs ?proposal_interval ?(proposers = Fn.const None) n
-    ~acceptable_delay ~program_dir ~snark_worker_public_keys
-    ~work_selection_method ~trace_dir ~max_concurrent_connections =
+let local_configs ?proposal_interval ?(proposers = Fn.const None)
+    ?(is_archive_node = Fn.const false) n ~acceptable_delay ~program_dir
+    ~snark_worker_public_keys ~work_selection_method ~trace_dir
+    ~max_concurrent_connections =
   let addrs_and_ports_list, peers = net_configs n in
   let peers = [] :: List.drop peers 1 in
   let args = List.zip_exn addrs_and_ports_list peers in
@@ -55,7 +53,8 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None) n
         Coda_process.local_config ?proposal_interval ~addrs_and_ports ~peers
           ~snark_worker_key:public_key ~program_dir ~acceptable_delay
           ~proposer:(proposers i) ~work_selection_method ~trace_dir
-          ~offset:(Lazy.force offset) ~max_concurrent_connections () )
+          ~is_archive_node:(is_archive_node i) ~offset:(Lazy.force offset)
+          ~max_concurrent_connections () )
   in
   configs
 

@@ -58,16 +58,15 @@ include
    and type attached_mask = Mask.Attached.t
    and type unattached_mask = Mask.t
 
+(* We override the type of unregister_mask_exn that comes from
+   Merkle_mask.Maskable_merkle_tree_intf.S because at this level callers aren't
+   doing reparenting and shouldn't be able to turn off the check parameter.
+*)
+val unregister_mask_exn : Mask.Attached.t -> Mask.Attached.t -> Mask.t
+
 (* The maskable ledger is t = Mask.Attached.t because register/unregister
  * work off of this type *)
 type maskable_ledger = t
-
-type serializable = int [@@deriving bin_io]
-
-(* TODO: Actually implement serializable properly #1206 *)
-val unattached_mask_of_serializable : serializable -> unattached_mask
-
-val serializable_of_t : t -> serializable
 
 val with_ledger : f:(t -> 'a) -> 'a
 
@@ -220,3 +219,19 @@ val merkle_root_after_user_command_exn :
 val create_empty : t -> Public_key.Compressed.t -> Path.t * Account.t
 
 val num_accounts : t -> int
+
+(** Generate an initial ledger state. There can't be a regular Quickcheck
+    generator for this type because you need to detach a mask from it's parent
+    when you're done with it - the GC doesn't take care of that. *)
+val gen_initial_ledger_state :
+  (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+  array
+  Quickcheck.Generator.t
+
+type init_state =
+  (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+  array
+[@@deriving sexp_of]
+
+(** Apply a generated state to a blank, concrete ledger. *)
+val apply_initial_ledger_state : t -> init_state -> unit

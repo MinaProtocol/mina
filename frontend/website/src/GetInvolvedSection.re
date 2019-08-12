@@ -383,7 +383,7 @@ let make = (~posts, _children) => {
             style([
               color(Style.Colors.denimTwo),
               marginTop(`rem(6.)),
-              marginBottom(`rem(2.5)),
+              marginBottom(`rem(1.5)),
               media(Style.MediaQuery.notMobile, [textAlign(`center)]),
             ]),
           ])
@@ -394,98 +394,30 @@ let make = (~posts, _children) => {
         className=Css.(
           style([
             display(`flex),
-            justifyContent(`spaceBetween),
+            justifyContent(`center),
             flexWrap(`wrap),
             alignItems(`flexStart),
             maxWidth(`rem(46.0)),
             media(
               Style.MediaQuery.notMobile,
-              [justifyContent(`spaceBetween), margin(`auto)],
+              [
+                justifyContent(`center),
+                margin3(~top=`zero, ~h=`auto, ~bottom=`rem(2.)),
+              ],
             ),
           ])
         )>
-        <p
-          className=Css.(
-            merge([
-              Style.Body.basic,
-              style([
-                maxWidth(`rem(22.5)),
-                marginTop(`zero),
-                marginBottom(`rem(0.5)),
-                width(`rem(22.)),
-                media(Style.MediaQuery.full, []),
-              ]),
-            ])
-          )>
-          <span>
-            {ReasonReact.string(
-               "Help us build a more accessible, inclusive cryptocurrency. Join our community on ",
-             )}
-          </span>
-          <A
-            name="copy-discord"
-            className=Style.Link.basic
-            href="https://discord.gg/wz7zQyc">
-            {ReasonReact.string("Discord")}
-          </A>
-          <span> {ReasonReact.string(", and follow our progress on ")} </span>
-          <A
-            name="copy-twitter"
-            className=Style.Link.basic
-            href="https://twitter.com/codaprotocol">
-            {ReasonReact.string("Twitter")}
-          </A>
-          <span> {ReasonReact.string(".")} </span>
-        </p>
-        <div className=Css.(style([marginRight(`rem(1.))]))>
-          <p
-            className=Css.(
-              merge([
-                Style.Body.basic,
-                style([marginTop(`zero), marginBottom(`rem(0.75))]),
-              ])
-            )>
-            {ReasonReact.string("Stay updated about:")}
-          </p>
-          <ul className=Css.(style([listStyle(`none, `inside, `none)]))>
-            <li className=marginBelow>
-              <Link
-                link=Links.Forms.mailingList
-                message="Join our mailing list"
-              />
-            </li>
-            <li className=marginBelow>
-              <Link
-                link=Links.Forms.developingWithCoda
-                message="Developing with Coda"
-              />
-            </li>
-            <li className=marginBelow>
-              <Link
-                link=Links.Forms.participateInConsensus
-                message="Participating in staking"
-              />
-            </li>
-            <li className=marginBelow>
-              <Link
-                link=Links.Forms.compressTheBlockchain
-                message="Compressing the blockchain"
-              />
-            </li>
-          </ul>
-        </div>
+        <NewsletterWidget />
       </div>
       <div
         className=Css.(
           style([
-            media(
-              Style.MediaQuery.notMobile,
-              [marginTop(`rem(1.0)), marginBottom(`rem(2.4))],
-            ),
+            media(Style.MediaQuery.notMobile, [marginBottom(`rem(2.4))]),
             display(`flex),
             flexWrap(`wrap),
             justifyContent(`spaceAround),
             alignItems(`center),
+            marginTop(`rem(1.0)),
             marginBottom(`rem(1.25)),
             maxWidth(`rem(63.)),
             marginLeft(`auto),
@@ -498,7 +430,7 @@ let make = (~posts, _children) => {
           svg={SocialLink.Svg.twitter("--svg-color-social")}
         />
         <SocialLink
-          link="https://discord.gg/wz7zQyc"
+          link="https://bit.ly/CodaDiscord"
           name="Discord"
           svg=SocialLink.Svg.discord
         />

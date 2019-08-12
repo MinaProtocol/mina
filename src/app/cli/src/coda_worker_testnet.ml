@@ -101,6 +101,11 @@ module Api = struct
         Coda_process.get_all_user_commands_exn worker public_key )
       t i
 
+  let get_all_transitions t i public_key =
+    run_online_worker
+      ~f:(fun worker -> Coda_process.get_all_transitions worker public_key)
+      t i
+
   let start t i =
     Linear_pipe.write t.start_writer
       ( i
@@ -246,7 +251,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
              >>| Array.to_list
            in
            Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-             "best paths diverged completely, network is forked"
+             "Best paths have diverged completely, network is forked"
              ~metadata:
                [ ("chains", chains_json ())
                ; ("tf_vizs", `List (List.map ~f:(fun s -> `String s) tfs)) ] ;
@@ -254,7 +259,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
           |> don't_wait_for
         else
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            "chains are ok, they have $hashes in common"
+            "Chains are OK, they have hashes $hashes in common"
             ~metadata:
               [ ( "hashes"
                 , `List
@@ -263,8 +268,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               ; ("chains", chains_json ()) ]
     | None ->
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-          "empty list of online chains, this is OK if we're still starting \
-           the network"
+          "Empty list of online chains, OK if we're still starting the network"
           ~metadata:[("chains", chains_json ())]
   in
   let last_time = ref (Time.now ()) in
@@ -284,7 +288,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
                 /. 1000. )
        then (
          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-           "no recent blocks" ;
+           "No recent blocks" ;
          ignore (exit 8) ) ;
        let%bind () = after (Time.Span.of_sec 1.0) in
        go ()
@@ -353,8 +357,9 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                       ~metadata:
                         [ ("worker_id", `Int worker_id)
                         ; ("user_cmd", User_command.to_yojson user_cmd) ]
-                      "transaction $user_cmd took too long to get into the \
-                       root of node $worker_id" ;
+                      "Transaction $user_cmd took too long to get into the \
+                       root of node $worker_id. Length expected: %d got: %d"
+                      expected_deadline length ;
                     exit 9 |> ignore ) ) ;
               List.iter user_commands ~f:(fun user_cmd ->
                   Hashtbl.change user_cmds_under_inspection user_cmd
@@ -367,7 +372,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                             [ ("user_cmd", User_command.to_yojson user_cmd)
                             ; ("worker_id", `Int worker_id)
                             ; ("length", `Int length) ]
-                          "transaction $user_cmd finally gets into the root \
+                          "Transaction $user_cmd finally gets into the root \
                            of node $worker_id, when root length is $length" ;
                         None
                     | None ->
@@ -420,8 +425,8 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test logger n proposers snark_work_public_keys work_selection_method
-    ~max_concurrent_connections =
+let test ?is_archive_node logger n proposers snark_work_public_keys
+    work_selection_method ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
   let acceptable_delay =
@@ -436,7 +441,7 @@ let test logger n proposers snark_work_public_keys work_selection_method
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
       ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections
+      ~max_concurrent_connections ?is_archive_node
   in
   let%map workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in
@@ -502,7 +507,7 @@ module Payments : sig
     -> User_command.t list Deferred.t
 
   val assert_retrievable_payments :
-    Api.t -> User_command.t sexp_list -> unit Deferred.t
+    Api.t -> User_command.t list -> unit Deferred.t
 end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
@@ -648,7 +653,8 @@ module Restarts : sig
 end = struct
   let restart_node testnet ~logger ~node ~duration =
     let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
+      node ;
     (* Send one payment *)
     let%bind () = Api.stop testnet node in
     let%bind () = after duration in
@@ -656,7 +662,8 @@ end = struct
 
   let trigger_catchup testnet ~logger ~node =
     let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
+      node ;
     let%bind () = Api.stop testnet node in
     let signal = Api.setup_catchup_signal testnet node in
     let%bind () = Ivar.read signal in
@@ -666,11 +673,12 @@ end = struct
 
   let trigger_bootstrap testnet ~logger ~node =
     let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
+      node ;
     let%bind () = Api.stop testnet node in
     let signal = Api.setup_bootstrap_signal testnet node in
     let%bind () = Ivar.read signal in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Triggering bootstrap on %d" node ;
+      "Triggering bootstrap on node %d" node ;
     Api.start testnet node
 end

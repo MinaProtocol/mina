@@ -215,6 +215,8 @@ module type Transition_frontier_extensions_intf = sig
 
     val most_recent : t -> breadcrumb option
 
+    val oldest : t -> breadcrumb option
+
     val mem : t -> State_hash.t -> bool
 
     val is_empty : t -> bool
@@ -377,13 +379,19 @@ module type Transition_frontier_intf = sig
 
   val all_breadcrumbs : t -> Breadcrumb.t list
 
+  val all_user_commands : t -> User_command.Set.t
+
   val root : t -> Breadcrumb.t
 
   val previous_root : t -> Breadcrumb.t option
 
+  val oldest_breadcrumb_in_history : t -> Breadcrumb.t option
+
   val root_length : t -> int
 
   val best_tip : t -> Breadcrumb.t
+
+  val best_tip_path : t -> Breadcrumb.t list
 
   val path_map : t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
 
@@ -445,6 +453,12 @@ module type Transition_frontier_intf = sig
 
   val persistence_diff_pipe :
     t -> Diff.Persistence_diff.view Broadcast_pipe.Reader.t
+
+  val catchup_signal : t -> [`Normal | `Catchup] Broadcast_pipe.Reader.t
+
+  val incr_num_catchup_jobs : t -> unit Deferred.t
+
+  val decr_num_catchup_jobs : t -> unit Deferred.t
 
   val new_transition :
     t -> external_transition_validated Coda_incremental.New_transition.t

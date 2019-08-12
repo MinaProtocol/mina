@@ -148,6 +148,9 @@ let benefits =
       </div>
       <ul className="mt0 mb0 ph0 w-70">
         <li className="lh-copy list mb0 mt0">
+          {ReasonReact.string("Relocation package")}
+        </li>
+        <li className="lh-copy list mb0 mt0">
           {ReasonReact.string("Parental leave")}
         </li>
         <li className="lh-copy list mb0 mt0">
@@ -244,7 +247,7 @@ let make = (~jobOpenings, _) => {
                  )}
                 <A
                   name="careers-code"
-                  href="/code.html"
+                  href="https://github.com/CodaProtocol/coda"
                   className={
                     "fw5 no-underline nowrap "
                     ++ Css.(
