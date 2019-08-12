@@ -82,6 +82,8 @@ module type Config_intf = sig
     ; logger: Logger.t
     ; trust_system: Trust_system.t
     ; max_concurrent_connections: int option
+    ; enable_libp2p: bool
+    ; disable_haskell: bool
     ; log_gossip_heard: log_gossip_heard }
   [@@deriving make]
 end
@@ -213,6 +215,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; logger: Logger.t
       ; trust_system: Trust_system.t
       ; max_concurrent_connections: int option
+      ; enable_libp2p: bool
+      ; disable_haskell: bool
       ; log_gossip_heard: log_gossip_heard }
     [@@deriving make]
   end

@@ -173,6 +173,14 @@ let daemon logger =
          [%%expires_after "20190907"]
        end in
        flag "no-bans" no_arg ~doc:"don't ban peers (**TEMPORARY FOR TESTNET**)"
+     and enable_libp2p =
+       flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
+     and libp2p_port =
+       flag "libp2p-port" (optional int)
+         ~doc:"Port to use for libp2p (default: 8304)"
+     and disable_haskell =
+       flag "disable-old-discovery" no_arg
+         ~doc:"Disable the old discovery mechanism"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -387,6 +395,10 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "rest-port"
              ~default:Port.default_rest rest_server_port
          in
+         let libp2p_port =
+           or_from_config YJ.Util.to_int_option "libp2p-port"
+             ~default:Port.default_libp2p libp2p_port
+         in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
@@ -496,7 +508,8 @@ let daemon logger =
            ; bind_ip
            ; discovery_port
            ; communication_port= external_port
-           ; client_port }
+           ; client_port
+           ; libp2p_port= libp2p_port }
          in
          let wallets_disk_location = conf_dir ^/ "wallets" in
          (* HACK: Until we can properly change propose keys at runtime we'll
@@ -602,8 +615,10 @@ let daemon logger =
                ; initial_peers= initial_peers_cleaned
                ; addrs_and_ports
                ; trust_system
-               ; max_concurrent_connections
-               ; log_gossip_heard } }
+               ; log_gossip_heard
+               ; enable_libp2p
+               ; disable_haskell
+               ; max_concurrent_connections } }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in

@@ -550,6 +550,8 @@ struct
           ; logger: Logger.t
           ; trust_system: Trust_system.t
           ; max_concurrent_connections: int option
+          ; enable_libp2p: bool
+          ; disable_haskell: bool
           ; log_gossip_heard: log_gossip_heard }
         [@@deriving make]
       end

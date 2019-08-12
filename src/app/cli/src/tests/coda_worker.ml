@@ -465,6 +465,8 @@ module T = struct
                 ; addrs_and_ports
                 ; logger
                 ; trust_system
+                ; enable_libp2p= false
+                ; disable_haskell= false
                 ; max_concurrent_connections
                 ; log_gossip_heard=
                     { snark_pool_diff= false
