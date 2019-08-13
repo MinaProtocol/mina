@@ -28,12 +28,28 @@ module type Field_intf = sig
   val to_bigint : t -> nat
 end
 
+module type Field_intf_str = sig 
+  type t
+  type nat 
+  val ( * ) : t -> t -> t
+  val ( / ) : t -> t -> t
+  val ( + ) : t -> t -> t
+  val ( - ) : t -> t -> t
+  val zero : t
+  val one : t
+  val inv : t -> t
+  val negate : t -> t
+  val ( ** ) : t -> nat -> t
+  val to_bigint : t -> nat
+  val to_string : t -> string
+end
+
 module type Backend_intf = sig
   module N : sig type t val of_int : int -> t end
 
   module Fq : Field_intf with type nat := N.t
 
-  module Fr : Field_intf with type nat := N.t
+  module Fr : Field_intf_str with type nat := N.t
 
   module G1 : Group with type nat := N.t
 

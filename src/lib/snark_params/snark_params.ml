@@ -308,7 +308,7 @@ module Tock = struct
     let final_exponentiation = FE.final_exponentiation4
   end
 
-  module Tock_run = Snarky.Snark.Run.Make (Tock_backend) (Unit)
+  module Tock_run = Crypto_params.Tock0_run
 
   module Pairing_run = struct
     include Tock_run
@@ -838,9 +838,7 @@ module Tick = struct
     let final_exponentiation = FE.final_exponentiation6
   end
 
-  module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
-
-  module Tick_run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
+  module Tick_run = Crypto_params.Tick0_run
 
   module Pairing_run = struct
     include Tick_run
@@ -945,7 +943,7 @@ module Tick = struct
       include Pairing
 
       module H =
-        Snarky_bowe_gabizon_hash.Make (Run) (Tick0)
+        Snarky_bowe_gabizon_hash.Make (Tick_run) (Tick0)
           (struct
             module Fqe = Pairing.Fqe
 
@@ -1174,17 +1172,29 @@ module Commitment_scheme =
 
 module Sonic_commitment_scheme = Snarky_verifier.Sonic_commitment_scheme.Make (Tock.Pairing_run) (Tock.Field)
 
+let gen_nonzero =
+  let open Quickcheck.Generator.Let_syntax in
+  let rec loop () =
+    let x = Tock.Field.random () in
+    if Tock.Field.(equal x zero) then loop () else x in
+  return (loop ())
+
 let%test_unit "sonic test" =
-  let module M = Snarky.Snark.Run.Make (Tock_backend) (Unit) in
-  Quickcheck.test ~trials:3 Quickcheck.Generator.(tuple3 Tock.Field.gen Tock.Field.gen Tock.Field.gen) ~f:(fun (x, z, alpha) ->
+  (* let module M = Snarky.Snark.Run.Make (Tock_backend) (Unit) in *)
+  Quickcheck.test ~trials:3 Quickcheck.Generator.(tuple3 gen_nonzero gen_nonzero gen_nonzero) ~f:(fun (x, z, alpha) ->
       let (), checked_output =
-        M.run_and_check
+        Tock.Tock_run.run_and_check
           (fun () ->
+            Printf.printf "x = %s\n" (Tock.Field.to_string x);
+            Printf.printf "z = %s\n" (Tock.Field.to_string z);
+            Printf.printf "alpha = %s\n" (Tock.Field.to_string alpha);
             let open Sonic_backend in
             let open Commitment_scheme in
             let open Sonic_commitment_scheme in
             let d = 15 in
+            Printf.printf "there!\n";
             let srs = Srs.create d x alpha in
+            Printf.printf "here here here!\n";
             let f = Fr_laurent.create 1 [Fr.of_int 10] in
             let commitment = commit_poly srs f in
             let opening = open_poly srs commitment z f in
