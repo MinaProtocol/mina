@@ -472,7 +472,7 @@ Coinbase also uses MongoDB to store all of the data in a blockchain.
 
 # Appendix
 
-The flexibility of this new design changed some parts of the schema of the GraphqQL database. Here is the schema:
+The flexibility of this new design changed some parts of the current schema of the GraphqQL database. Here is the schema:
 
 ```graphql
 enum ConsensusStatus {
@@ -513,6 +513,10 @@ type UserCommand {
 
   # Short arbitrary message provided by the sender
   memo: String!
+
+  firstTimeSeen: Date
+
+  is_manually_added: Bool!
 }
 
 type FeeTransfer {
@@ -521,6 +525,10 @@ type FeeTransfer {
 
   # Amount that the recipient is paid in this fee transfer
   fee: UInt64!
+
+  firstTimeSeen: Date
+
+  is_manually_added: Bool!
 }
 
 # Different types of transactions in a block
@@ -533,6 +541,10 @@ type Transactions {
 
   # Amount of coda granted to the producer of this block
   coinbase: UInt64!
+
+  firstTimeSeen: Date
+
+  is_manually_added: Bool!
 }
 
 type Block {
@@ -560,7 +572,7 @@ type TransactionUpdate {
 
 input BlockFilterInput {
   # A public key of a user who has their
-  #         transaction in the block, or produced the block
+  # transaction in the block, or produced the block
   senders: [PublicKey!]!
   receivers: [PublicKey!]!
 }
