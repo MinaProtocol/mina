@@ -17,8 +17,8 @@
 [%%define fake_hash false]
 
 [%%define genesis_ledger "testnet_medium_rare"]
-[%%define genesis_state_timestamp "2019-08-12 21:00:00-07:00"]
-[%%define block_window_duration 300000]
+[%%define genesis_state_timestamp "2019-08-13 13:00:00-07:00"]
+[%%define block_window_duration 360000]
 
 [%%define integration_tests false]
 [%%define force_updates false]

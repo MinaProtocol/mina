@@ -44,146 +44,187 @@ include Make (struct
             (Public_key.Compressed.of_base58_check_exn
                "tNcihXwbnb6Sv3MwW2rbhXDS4TNSn75tnDZjzUKsjgFSmVJUycLFftqnSZmikKBKEo7KHeLviRpsZw3XUh6zDZwtdH8zk9mhNG6ydL8pqrFM5FdkeV9fYdtvysVC29PSKyb97vK7jkJB5d")
       }
-      (* 
-        User Staking Keys 
+      (* User Staking Keys 
     *)
 
       (* LatentHero#5466 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNci2apfQDHNoaGXnBZ4TM6XDTTrcMGNe2BHK7XMWMCZ9KoXbW4MPw86dmmsgjRBNTv62AA7HvEhGH7CnjJYCxfj2KJ52nC3UZrfLW8qSzbCzuFNJThCc2fx6vbhpBSSoMKVnxTEwEvpbU"
-      ; balance= 30000
+            "tNciPrpmzWhLGyXGinWUoBNbRUT4na1m55Qc5sqz7BB2oNSWzkzj3MGFThNfFXvZvH3grZanj4smMvDmgS26Echn64BjLUqNDQRz7sseUr7VieBqmjCLQZRzTvNjP6UGTbLG94GhGBiEbZ"
+      ; balance= 20000
       ; delegate= None }
       (* Connor Di#2159 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNci9ViV7ieBUu73BSGmFp8z6QdqvF3jpAy6sGJ8eCkk9TCeFBKSgUvTxZbdjELuSH2jUWzWUyhr35u1sWQc3HuiY56tJGUdXXM8tqTw3ZiSrHBCfLsn6oXDvyTPEfP3tZuD7gDArb8Ytj"
-      ; balance= 30000
+            "tNciS3X51gg7BNCLwEd4K3LhN9BUQGbU34VHWznrLkaz2uQhQhScztzKvMuH9dhX5MX6PU9Grav4HsRtWKxjEBWq81PESgzGpxDcNQg5Kk6kij4TMbuZAnrgJtYrjkp2ExDKVtR4VrRWLW"
+      ; balance= 20000
       ; delegate= None }
       (* whataday2day#1271 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNcibAmoSQqiZYTEu52LPV3KadPQJKZUVpQe3ji3cdGMv8uB6ByyhMsfTnCYdKxUXUNjFGMdyW7dBVmDpFEFdjxVGpekAKfrsHc9Pbk8pXY2MCLQwNqgBbWHcWWyqhVjCdh7X6zVHSu87A"
-      ; balance= 30000
+            "tNciFDFuaseQWjeyfr7hFseqQch1XN47CffuzxakHdfTAvqMko9NPHksH1GD2HW1jR3ehTdfLXcbVxJ6xRmheze86c8z6aetkc7TwkA4Eu2nJ4fRnwsWe1qr1XEKvMreWHYzuFuo9mpTHa"
+      ; balance= 20000
       ; delegate= None }
       (* Ilya123#6248 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciBmRsk1JiErGuurp5bHUKhahh5Yaca5WEUnVh8HVGeExtSvSbB7rASzDDrAubB43CyUSQWhzy6sZgZeEhVWdTGsD2RYJBJpknztjDfXSBM1N5NHn57sTW4sdQwc8ZuB7LtzDTrLqYN9"
-      ; balance= 30000
+            "tNcicNArpuQKzfokRasB2Mz7nFaSxnF2zojB43GZcN6pK3oDXVGUvJ8bxTW5rcB3b6UwTorUdvo8dV5R7dd25SVvErwhuF8KtmFBsG8Zu6visqrNVN99Y1QdUjZByLLz1BZbnh1yGcvHXR"
+      ; balance= 20000
       ; delegate= None }
       (* Gs#7698 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNcie2fiCzTmpwYyP6MWttJcSza3wstdzouqteqjUG4QuhcaTUhHpjzE7Uv3vqSzXBMTDKaVXKSYzJRbAZX7GEJYJBMP4DNcXmJ8utLtDotaqXuvaG84EZNNT8jUzecRDMRkFVcNeFP6yM"
-      ; balance= 30000
+            "tNciYjrq2YuX6Msb5s1QxUHDMdJgXKrsSQybG9tPzf6efzfARe5C9QYtxaqShy8THYXNx5XYUwED9citmKe8dM13PCbkbtz6Ydn4NB9rcX3V8syw7vsGkcfBLdF7HQmuUacK5srpFr1Hsg"
+      ; balance= 20000
       ; delegate= None }
       (* garethtdavies#4963 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciEahw4NVYiKpEMQNbRZbwr9yM3M2pQNTTQL7CnERUF8y7dmP3vyf2dYuxaaM9ZP3zhuZPZe1NVa4ydMN6vybita3LnKLG7WVdMdGeMvaFNAH3q6CVCQpAwdFFqJLnY2wLUW4eNvz53D"
-      ; balance= 30000
+            "tNciEHZuC9SdpdKjG3cLw8dpdKUdXpbrqkhctcE422NyspG8G3ddArHJupGvV591mRKd6hEMBoPNPNRZMSjyN1S8Jp4jD8zMyHSzvsFhzKhqa7Q3F2a3uNmNUHp2rtVsj3HuLt9Zw3whHM"
+      ; balance= 20000
       ; delegate= None }
       (* boscro#0630 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciETC2KsFB4SwsPsV8cvVZYPgfioD3DFd5SFqXBKbp7thEkyZuurPGHn6k7SbLyfdb9CtzyYuWpzna5zERJBkzjMqgXDxn1W6QQP8zDMwGou5461RwJFCcCPemMEN483pwfq3bFRFX5F"
-      ; balance= 30000
+            "tNci7NvTGz8AVngwkhhiC4ES15Hgpx2yt1vehEQwuMfFAeXJ1Vy9bdhM4goQyAdHLrKmCxKf8QVPjY4cDm4QpZo8tsUJSqYRXU346wL2wm8pV6UhqRPgsErz1Y1S79w1xeyVQPuQRFmYGf"
+      ; balance= 20000
       ; delegate= None }
       (* arfrol#1015 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciHr7ozwggJExjEBtt2y1YUiyL6S9ifXQ34X8CTukmr4FSpu66Mo8TxNmeXhnkuibkkPL6cYDDJ8gznP6Tqq7usyJGRm53uuBpRdagYcKbNqkWJj1gB8yQBxy4SPX2EFvkygV5np4GiZ"
-      ; balance= 30000
+            "tNciFm9gAG2hMPj787P3RyJ4irvEk511Lw9TBMdFum1g7SSoXGuXwmcdTUF6Wt9qDe71U1PV9FeRQT3y6kuzzU2TEbM69XQqFnNHtMmLUU3L2A3auafFhXReHhoQpxtrU7Azea98MywgQS"
+      ; balance= 20000
       ; delegate= None }
       (* OranG3#1415 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciijuJGbjBr25StVtFXbJn1uim1nxw6fUzhhP5uYaFRVS15pLtyPRdjVjxLGGUQSrdPvDfp77kQWBTzVM8WuivVZDZvCaT2959pc3F8Dy6svUafgibzFgXA4ei1Ne2W9MpvLqE3uh2U9"
-      ; balance= 30000
+            "tNciBNjgL24UDGk6PfqB49S5sZmkPrmzxKjJchk9XAiFrd9TWxpyFSsxEVpXeVTfAkfYXndZU97512YpYbJXKVp5TTcXjKen3f1MZQrjW63MhrP4L3cGq9yYv9b7uEs2wDfPq7j83zmY2e"
+      ; balance= 20000
       ; delegate= None }
       (* y3v63n#0177 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNcikYgqmmqwFuvMpsaNxNppNLgGG9eNXHvxuwvMNWerJTk41hVPKsQa28mEyCqJkk8xjgddB9eCsF2YKmFLJG5p42bvnZYmjdqz2TPXXhRRWDbpfx8nTJnS5p6QDfy76MsWGnndZ8jAiw"
-      ; balance= 30000
+            "tNciXsQPVDeVq8Ss4ErRgw1fy1BRVaAihQho3i6L27DSXz32d5gigg5sT2nVrx1pVkZhKf7aZy5dBvm5miWETPhr7DNVcEGUetzD2H1kfpov6CXkuUbasDLPvNsHNRJC3WbSdUhyHFDr1d"
+      ; balance= 20000
       ; delegate= None }
       (* Alexander#4542 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNcimm3CnFATS2WUL9WJuGv8nXzsRTLCQCcuCbAAoixT5KeA8cUhTkddcyEBikG4baP3MMUMgTxm2R2L9C3HMcWA626qrRDZXgFVX5nvZeFPH7WcMdVmN9tSrvrLB6YPig3XHeKV7Hu9rP"
-      ; balance= 30000
+            "tNciQfhx9aXvE6VXAvZ7i84S8gwP5bqZuHam2b5dNacGGz95wVpxkQ5msDPSUvh5VCu7r1UMQ7Dq6oM1LADuzyYKaBV3J2ZQqoe2NF8rEujNm4ivkNhyhYZNf5f4TKaM3M2W2QLyNydGZz"
+      ; balance= 20000
       ; delegate= None }
       (* jspadave#2548 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciNCQRSPRxThUFwCyu1GTY1eVp1wpkGRfL4hLAmTdU7cqyYR3XtNfhMpkWcLTgu4CLQztQP5eSttRvF5TCHcGzHz59wzewPMCJheUwaLgYvyGka8sBhhKFHv4R3DZaM2tY6r7bAGezE5"
-      ; balance= 30000
+            "tNciCJB9Df2QdurcjSpKEJDuFU5sBphMCmjSr5xVPf77V7Pq3HyuKqheWiz6pekZjdhnBMTxYrfttMoiA4tzYPBmTwEN2bZKkhH9hcHa28eEJFZdiSryZ6mCKyniqXYhAxzKUfSXAKwQWN"
+      ; balance= 20000
       ; delegate= None }
       (* Dmitry D#9033 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciPt5taz5rze7dF6TZSMUYtWzwoLKRfQxgCi8tT35HGsama9dmGqAZXNonv8m8dnbRe56H9zT63kVBSxTHjbeU5egZcqTFMpsCbCvV6sbMq44X45eguHSWhPtFodqfR7fPWXSLqFFBku"
-      ; balance= 30000
+            "tNcierQsb9iynGCgJi7KVcot8nDtdrLKv5b87khjZmYBoENe3JXY8KXamVVetdLxUra4z75od4thbP5FHfY3YhiUdRpbbwpAJoBnmkjmesop1Ymm9Vfmkryr1cih4DDXtaGFGK9DDnkQ8J"
+      ; balance= 20000
       ; delegate= None }
       (* ttt#1591 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciUJbzpyufFsDxqyU6qnefMRYuem2dWXF4eEYaRW9UEnHzg4ekugrTcD4trgTkgiLj74bjbYGVgnEeqrsVrMLf3ePQ3Lp36bXYnoMKmZMk4y18HmoW5RLf4BXnobrPNmBSJgtFehSZc6"
-      ; balance= 30000
+            "tNci4YLE3EHdS87iPT9YKwddnpLranPxD1GTk72jXkcoFTv4EFi9x3Bsm9jyyzYRz2adTFDxQYgYciAYh3kUiCduaJ8HD1ZA7tDCax1JwCaqDnhD2N9QqCJwmNC9ziFidbJCFXoMnpLxHt"
+      ; balance= 20000
       ; delegate= None }
       (* dk808#9234 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciV3pfTJBvUPQNZ9FTwe9eiWFzE9G4mzES6xBTyRDqst1nEscfLpo9y3vjZeesXqNS8C3jVWNwD6y5XBcu2jGnxK4hcyMZYH7s4boJdVaDRr14TApTQvL6ssEkBxRheud7ffYEAdUE8X"
-      ; balance= 30000
+            "tNciDTHGE3FVLwsxapaMNw8V8bcE9JzsYxyMNhocphnbcPELPqztQxySfMxsQFuxgZQuqmCcziZvjugwPqe788hZNwwJ1aH7yPZRGZs7rrkZwafgExovep3KHbcpLFTxcuMd1njGd2YQti"
+      ; balance= 20000
       ; delegate= None }
       (* Bison Paul#5103 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNci5rMix2suHxxTjccwJATuimMm1Ynnf2kfY8m3HzGcv4nPzbREtUY2V9Gkus2711WManzgcCAFUB7cyz7Z7yuWvbncQm6CSpqsGxFDCHfxAJZ6Xo3Fihn8dMxZt8s41sXUhYo4u9aduM"
-      ; balance= 30000
+            "tNcich3ffNKczz46hLxizLibp1fwVQmiD7DsdrBvZi6v8fVDmthCrw61EYZMrqmwRQResszPfXgrgJ8bE5qzMkVxDxTq4Mu53naXmSoKimcL7S3WyDXSKECSVzmnrfd8LUNbmwRpf3aJ5j"
+      ; balance= 20000
       ; delegate= None }
       (* ansonlau3#9535 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciXsYTybpwd1Fx5Sz8hqDwoaGNPSP472U28LxW3kCKMazUz5LeZRMKDLeYUfvpkKPh6h9yGT8kxD8CSC2XY8u1JyDEnWqWAGfWB9xcZAshRmUzyygYsQbGAVrJesn4oKvdQD1JKqDeV4"
-      ; balance= 30000
+            "tNciAPwzid8C6CYV3MPvFBdwt3S3QE8566kFsQLgiUwhgMMymtUPdUQeaTcDnXnXXtfCKiT3R6Tnsc1cEL4eJn8vWjTYu8wHeSvusTmVnWJnAcqtxMw5WebmMNiwk6u4eidzStCUqT78zM"
+      ; balance= 20000
       ; delegate= None }
       (* turbotrainedbamboo#3788 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciEP8ZgZNUzcgi8VpMjMxKbg5yEpMEgpLFETgVSvVuaQ1x6m8imvHu13SodyUv6naiNGNcRsmDUFxQtqcQAYGCDR85wER6yqfS2PJ8Rdm7qyJmwxa4zDyWoYuM3hTiFcT8qzeMG71bzp"
-      ; balance= 30000
+            "tNciCpdJSg9REVvdSkUCmRASCniSgvgrrmr7rEutaxnVCciXbRzt8JPFRN1xJCrp15jwpyE8r8ypZ7ojAPyKXerfNywR2HgYpdNRJf6YSJRJyxh7MokAqkVDY1ggWeaYU7CVK8ecv7WxKL"
+      ; balance= 20000
       ; delegate= None }
       (* Hunterr84#7710 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciQFukA6prhQisFLk8Xyp3tsW5b78vZzAThNNTzeWdbiNUVMpxtmhXf38pxTQ37f3wS3a9Wzx2ComAGykicpXTFd5fZoz3iadnWB5kJZ2saDZ1PRMxVctdx52sJahksWAB9KtMU2ggTG"
-      ; balance= 30000
+            "tNciYm3GuF65WUwyySe2mo5KitMEiDuurGAqRHuKHfKXdTtqsutCg4M878raPGLnb8QaUAEYxJ9SeUJsDHZY3hN7eGmrdUKfoHsH5QELofe6JfWH3fJMqW8fuCa15DNYe9PYeLvUeUTH5W"
+      ; balance= 20000
       ; delegate= None }
       (* tarcieri | iqlusion.io#0590 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNcihEh77DbibdWrdGgTsrhSb3ccUm2cGGVDRitpxRKXjTP9f8KuxBoes9MBTxRH7rzoGA3Kzs27L2gmrBEppPTubX2AgN9GkBJ6fHGWBKyB39zhaemjWQFjdG4YZkGrESp7ZxNd9r2n3S"
-      ; balance= 30000
+            "tNciAD1jRkLg3V2826akbLpF6YCJehWtVE56Vd5DjbyFxrmxyrY7SaNnzAGhRiRxAzm73TyWDTtQdoBKmNvMRRoigNG2TKS6tZ3W5MUQGKHUKut9afPnFTd3UWRWyfDWma4YGcx5bRB8Eg"
+      ; balance= 20000
       ; delegate= None }
       (* Prague#9624 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNcicURZNZtRPB3Lv4pbifuBTLy1CPeiH8W5YPed2GKErk1HYTucRz5BBobocg9YwtQCW4dUBhQ4Pb7551TqnT2qeSPZGhzmhqFzfkycCS3bq3Faka28n54zugUKdgFYksy1LSxk9ybg1a"
-      ; balance= 30000
+            "tNciQ5nHMgNrzAWTkZx8Nc6fZVGTJ9xg9HEqGVE4SDoBXafsMAqbw5gU2Fx8Eq1ZNAD3YyxqqtsYdbrTm3kbMG3kGfX1D6WuQM4ZoeNDU6bHcMGF9MT9aM3d9HXWbFNf6XFtGAPBTJ8PHF"
+      ; balance= 20000
       ; delegate= None }
       (* Valardragon#2546 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNciJLLxyzdcixvWK4RKFxMt831ubHBVvMFLW8Q6umwnUsaf9zYpJ1CMDr1ussRnfEDwao7aMqPjsGsChtiLhZnJhL41xWh4pppb8aRit7E1dbX96Kkq6L8Nv2T5hCQMoDr2p3J9oCy48U"
-      ; balance= 30000
+            "tNciVsqTqnnbXb8SUBP2o684NYTK9B1sAA4QvwYXSaM1h8ytBXm4j4QAVeo4326H1Pck6zixWLvyVeomdzxGimZJTeKwu74CvpMPtJXKkP9DKb6FKwZhNgxwRUe33X9bQhrUJ8wJy6n6fZ"
+      ; balance= 20000
       ; delegate= None }
       (* novy#4976 *)
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tNcif2qEBiXuVqprvkQ22FmF6cTzRfPCXw4LWuejQ4u3SDshB4bdz3r4ZmmShQhZVbeN7x7JpqBtXjcUd6VzLQfxTjiZcvcTkEiCU3DUFCdEoLgK8JiVyWS2hbFCbRohpTSXLNMpdwKp3p"
-      ; balance= 30000
+            "tNciQtBECmmgu52BDF8ooyFTWBSWunCMzWrk7xepueUE2fCQXoM6JQn8qb4nBgPCgf9JEJtEZGkTVV4UCdN48PqJwtxcJnx93Fb3H7Tbjn5bsNGd6WAL7BVrnDAJWvbEpB3D2Vw7DLXDQR"
+      ; balance= 20000
+      ; delegate= None }
+      (* Matt Harrop / Figment Network#7027 *)
+    ; { pk=
+          Public_key.Compressed.of_base58_check_exn
+            "tNciVjQuDsSX2DtDC7Kwmf9zso2uBfSuKqgFCSYjVv2gEg5itVr8PYHoh6mF4x1vNJ7iB24iTJyT7AJ9UjhxiCGpx7JtJPsQQHaanhuFXDjHZyJbc9ajSfNuahYEH6GFA4sJqjoacrmx6f"
+      ; balance= 20000
+      ; delegate= None }
+      (* pk#9983 *)
+    ; { pk=
+          Public_key.Compressed.of_base58_check_exn
+            "tNcieYtciedQwxZ6Yp4MfGv7UT8opJtGyXfJR3SfUfd3KyNFaHcg8snLY8hKqM2iKRouqfnf6Zf1oUx5157FbwyEiHVsK3PzdNAqRNskLkmethEvzXmYuRjUnz4o1VWL7njLGzF79bRGju"
+      ; balance= 20000
+      ; delegate= None }
+      (* TylerTY#0202 *)
+    ; { pk=
+          Public_key.Compressed.of_base58_check_exn
+            "tNciho9dMeFQ3FkZJUgc6aMA6T3oVeaaHWAsY2aHMvezdpk3Rv6Y626HXrxjX4a6L95BceY2Ze4uwdtFXBhZKrHcff87CTyz7xWrw8EWTuSzazxMUfCsGqFN7SCgnhdxyFmfvd7aav4grh"
+      ; balance= 20000
+      ; delegate= None }
+      (* "Ionut S. | Chainode Capital#8971" *)
+    ; { pk=
+          Public_key.Compressed.of_base58_check_exn
+            "tNciQsSmjndcQuEt2SsbVkf6qg8wrjc4PahkD3J5ikFsp6pd3QgEB4HuNmoDRYxuJa3kNG8RDm99f5x5Nb1Zp8xRkGvfiEKsc4CaUw7V9vC1QajBWP2hhxWUwHERM9XaxLLgvRsuER7umy"
+      ; balance= 20000
+      ; delegate= None }
+      (* TipaZloy#4890 *)
+    ; { pk=
+          Public_key.Compressed.of_base58_check_exn
+            "tNciL4BcLDtz48FL7arqCw59z8Su5LQkNkkRZ2UCySPjym42Rba8pRS74rmE8jHQpdEFs1ppqvFaEZoYMUBGQsq7Kwawr6BdhKVoVKrFjDd4Ca4LPJ2hcgoTqvh7ZfTc57b4Qd2qto8QqX"
+      ; balance= 20000
+      ; delegate= None }
+      (* PetrG#3328 *)
+    ; { pk=
+          Public_key.Compressed.of_base58_check_exn
+            "tNciLrdx8uABxWye5VBEvh132bx6x4AZUcSUVjzn1j92MdgwW8VXoHABr43NyZkzTcfbw7aH9ahZ1gWaNc2dGEVsoasxBH7H2pcfD8tNbc4MgrmmV5RpggxBa756TJT1Myx5pFd1g2Gw2V"
+      ; balance= 20000
+      ; delegate= None }
+      (* Ilinca#5351 *)
+    ; { pk=
+          Public_key.Compressed.of_base58_check_exn
+            "tNciNBsVA4vhxBtZp4bQM3gZsWMr8be6UfmNRRvNqHjRrATsSBLe8XaUUnrT3bMY97kix97S4kBcpNsBiBZdLggsr7XcktkpziPdkFHfDNjALASU46n1Vq64x5rmgswroJ69B6N7Yei4Sz"
+      ; balance= 20000
       ; delegate= None } ]
 end)
