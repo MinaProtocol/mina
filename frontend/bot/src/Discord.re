@@ -13,12 +13,8 @@ module Channel = {
 module TextChannel = {
   type t;
   external fromChannelUnsafe: Channel.t => t = "%identity";
-  let fromChannel = (c: Channel.t): option(t) => {
-    switch (Channel.channelType(c)) {
-    | "text" => Some(fromChannelUnsafe(c))
-    | _ => None
-    };
-  };
+  let fromChannel = (c: Channel.t): option(t) =>
+    Channel.channelType(c) == "text" ? Some(fromChannelUnsafe(c)) : None;
   [@bs.get] external name: t => string = "name";
 };
 
@@ -45,7 +41,6 @@ module Message = {
   [@bs.get] external channel: t => Channel.t = "channel";
   [@bs.send] external reply: (t, string) => unit = "reply";
   [@bs.get] external author: t => User.t = "author";
-  /* [@bs.get] external member: t => Js.Nullable(GuildMember.t) = "member"; */
 };
 
 module Client = {

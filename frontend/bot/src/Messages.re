@@ -1,3 +1,5 @@
+let greeting = "You summoned me?";
+
 let help =
   {|
   Woof! I can help you get some coda on the testnet.
@@ -8,7 +10,8 @@ Once a mod approves, `|}
   ++ {| coda` will be sent to the requested address!|};
 
 let requestError = {|
-Grrrrr... Invalid Parameters!!
+Grrrrr... Invalid parameters!!
+Try again in this format:
 `$request <public-key>`|};
 
 let requestCooldown = (~userName, ~timeLeft) => {j|

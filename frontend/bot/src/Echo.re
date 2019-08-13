@@ -22,10 +22,10 @@ module ListenBlocks = [%graphql
    |}
 ];
 
-let sendEcho = (echoKey, {from, amount}) => {
+let sendEcho = (echoKey, {from: userKey, amount}) => {
   Coda.sendPayment(
     ~from=echoKey,
-    ~to_=from,
+    ~to_=userKey,
     ~amount,
     ~fee=Constants.feeAmount,
   )
@@ -38,7 +38,7 @@ let sendEcho = (echoKey, {from, amount}) => {
            "Echo failed (sending %s coda from %s to %s), error: %s\n",
            Int64.to_string(amount),
            echoKey,
-           from,
+           userKey,
            Js.String.make(e),
          )
        | NotFound => print_endline("Potential problem with echo.")
