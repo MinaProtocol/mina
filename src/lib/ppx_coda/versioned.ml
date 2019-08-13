@@ -296,16 +296,13 @@ let generate_version_lets_for_label_decls type_name label_decls =
     (List.map label_decls ~f:(fun lab_decl -> lab_decl.pld_type))
 
 let generate_constructor_decl_decls type_name ctor_decl =
-  match (ctor_decl.pcd_res, ctor_decl.pcd_args) with
-  | None, Pcstr_tuple core_types ->
+  match ctor_decl.pcd_args with
+  | Pcstr_tuple core_types ->
       (* C of T1 * ... * Tn *)
       generate_version_lets_for_core_types type_name core_types
-  | None, Pcstr_record label_decls ->
+  | Pcstr_record label_decls ->
       (* C of { ... } *)
       generate_version_lets_for_label_decls type_name label_decls
-  | _ ->
-      Ppx_deriving.raise_errorf ~loc:ctor_decl.pcd_loc
-        "Can't determine versioning for constructor declaration"
 
 let generate_contained_type_decls type_decl =
   let type_name = type_decl.ptype_name.txt in
