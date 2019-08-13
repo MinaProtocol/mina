@@ -705,7 +705,7 @@ let stop_tracing =
              print_rpc_error e ))
 
 let set_staking =
-  let privkey_path = Cli_lib.Flag.privkey_write_path in
+  let privkey_path = Cli_lib.Flag.privkey_read_path in
   Command.async ~summary:"Set new block proposer keys"
     (Cli_lib.Background_daemon.init privkey_path ~f:(fun port privkey_path ->
          let%bind ({Keypair.public_key; _} as keypair) =
@@ -719,6 +719,62 @@ let set_staking =
                !"New block proposer public key : %s\n"
                (Public_key.Compressed.to_base58_check
                   (Public_key.compress public_key)) ))
+
+(* A step towards `account import`, for now `unsafe-import` will suffice *)
+let unsafe_import =
+  Command.async
+    ~summary:
+      "Unsafely import a password protected private key to one with the \
+       password stripped, but tracked by this daemon and accessible via the \
+       GraphQL API"
+    (let open Command.Let_syntax in
+    (* We'll do this entirely without talking to the daemon for now, though in the future this may change *)
+    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path
+    and conf_dir = Cli_lib.Flag.conf_dir in
+    fun () ->
+      let open Deferred.Let_syntax in
+      let%bind home = Sys.home_directory () in
+      let conf_dir =
+        Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
+      in
+      let wallets_disk_location = conf_dir ^/ "wallets" in
+      let%bind ({Keypair.public_key; _} as keypair) =
+        Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+      in
+      let pk = Public_key.compress public_key in
+      let%bind wallets =
+        Secrets.Wallets.load ~logger:(Logger.create ())
+          ~disk_location:wallets_disk_location
+      in
+      (* Either we already are tracking it *)
+      match Secrets.Wallets.find wallets ~needle:pk with
+      | Some _ ->
+          printf
+            !"Key already present, no need to import : %s\n"
+            (Public_key.Compressed.to_base58_check
+               (Public_key.compress public_key)) ;
+          Deferred.unit
+      | None ->
+          (* Or we import it *)
+          let%map _ = Secrets.Wallets.import_keypair wallets keypair in
+          printf
+            !"Key imported successfully : %s\n"
+            (Public_key.Compressed.to_base58_check
+               (Public_key.compress public_key)))
+
+let list_accounts =
+  let open Command.Param in
+  Command.async ~summary:"List all owned accounts"
+    (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
+         Deferred.map
+           (Graphql_client.query (Graphql_client.Get_wallet.make ()) port)
+           ~f:(fun response ->
+             Array.iteri
+               ~f:(fun i w ->
+                 printf "Wallet #%d:\n  Public key: %s\n  Balance: %s\n" (i + 1)
+                   (Public_key.Compressed.to_base58_check w#public_key)
+                   (Unsigned.UInt64.to_string (w#balance)#total) )
+               response#ownedWallets ) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -764,6 +820,10 @@ module Visualization = struct
       ; (Registered_masks.name, Registered_masks.command) ]
 end
 
+let accounts =
+  Command.group ~summary:"Client commands concerning account management"
+    ~preserve_subcommand_order:() [("list", list_accounts)]
+
 let command =
   Command.group ~summary:"Lightweight client commands"
     ~preserve_subcommand_order:()
@@ -793,4 +853,5 @@ let advanced =
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
+    ; ("unsafe-import", unsafe_import)
     ; ("visualization", Visualization.command_group) ]

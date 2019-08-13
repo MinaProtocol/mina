@@ -23,9 +23,7 @@ let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
-    (let%map_open conf_dir =
-       flag "config-directory" ~doc:"DIR Configuration directory"
-         (optional string)
+    (let%map_open conf_dir = Cli_lib.Flag.conf_dir
      and unsafe_track_propose_key =
        flag "unsafe-track-propose-key"
          ~doc:
@@ -80,8 +78,9 @@ let daemon logger =
      and rest_server_port =
        flag "rest-port"
          ~doc:
-           "PORT local REST-server for daemon interaction (default no \
-            rest-server)"
+           (Printf.sprintf
+              "PORT local REST-server for daemon interaction (default: %d)"
+              Port.default_rest)
          (optional int16)
      and metrics_server_port =
        flag "metrics-port"
@@ -145,7 +144,7 @@ let daemon logger =
      fun () ->
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
-         Option.value ~default:(home ^/ ".coda-config") conf_dir
+         Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
        in
        let%bind log_level =
          match log_level with
@@ -341,6 +340,10 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "client-port"
              ~default:Port.default_client client_port
          in
+         let rest_server_port =
+           or_from_config YJ.Util.to_int_option "rest-port"
+             ~default:Port.default_rest rest_server_port
+         in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
@@ -378,29 +381,35 @@ let daemon logger =
          in
          let discovery_port = external_port + 1 in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-         let%bind initial_peers_cleaned =
+         let%bind initial_peers_cleaned_lists =
+           (* for each provided peer, lookup all its addresses *)
            Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
              initial_peers_raw ~f:(fun addr ->
                let host = Host_and_port.host addr in
-               match%bind
+               match%map
                  Monitor.try_with_or_error (fun () ->
-                     Unix.Inet_addr.of_string_or_getbyname host )
+                     Async.Unix.Host.getbyname_exn host )
                with
-               | Ok inet_addr ->
-                   return
-                   @@ Some
-                        (Host_and_port.create
-                           ~host:(Unix.Inet_addr.to_string inet_addr)
-                           ~port:(Host_and_port.port addr))
+               | Ok unix_host ->
+                   (* assume addresses is nonempty *)
+                   let addresses = Array.to_list unix_host.addresses in
+                   let port = Host_and_port.port addr in
+                   Some
+                     (List.map addresses ~f:(fun inet_addr ->
+                          Host_and_port.create
+                            ~host:(Unix.Inet_addr.to_string inet_addr)
+                            ~port ))
                | Error e ->
                    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                     "Error on getaddr: $error"
+                     "Error on getbyname: $error"
                      ~metadata:[("error", `String (Error.to_string_mach e))] ;
                    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                     "Failed to get address for host $host, skipping"
+                     "Failed to get addresses for host $host, skipping"
                      ~metadata:[("host", `String host)] ;
-                   return None )
+                   None )
          in
+         (* flatten list of lists of host-and-ports *)
+         let initial_peers_cleaned = List.concat initial_peers_cleaned_lists in
          let%bind () =
            if
              List.length initial_peers_raw <> 0
@@ -602,7 +611,7 @@ let daemon logger =
        Coda_lib.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
-       Coda_run.setup_local_server ?client_whitelist ?rest_server_port ~coda
+       Coda_run.setup_local_server ?client_whitelist ~rest_server_port ~coda
          ~insecure_rest_server ~client_port () ;
        Coda_run.run_snark_worker ~client_port run_snark_worker_action ;
        let%bind () =
@@ -711,6 +720,14 @@ let coda_commands logger =
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
+
+[%%if
+new_cli]
+
+let coda_commands logger =
+  ("accounts", Client.accounts) :: coda_commands logger
+
+[%%endif]
 
 [%%if
 integration_tests]

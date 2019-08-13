@@ -14,7 +14,7 @@
     "deploy-ci": "FIREBASE_TOKEN=\"$FIREBASE_TOKEN\" ./deploy-website.sh ci",
     "decrypt": "cd static/font && unzip PragmataPro.zip",
     "decrypt-ci": "([ -z \"$PRAGMATA_ZIP_PASSWORD\" ] && echo 'No font decryption key found') || (cd static/font && unzip -P \"$PRAGMATA_ZIP_PASSWORD\" PragmataPro.zip)",
-    "graphql-docs": "graphdoc -s ../wallet/schema.graphql -o ./graphql-docs --force"
+    "graphql-docs": "graphdoc -s ../../graphql_schema.json -o ./graphql-docs --force"
   },
   "dependencies": {
     "bs-css": "8.0.2",
@@ -35,6 +35,6 @@
     ],
     "ext": "js,md,markdown"
   },
-  "author": "",
-  "license": "ISC"
+  "author": "codaprotocol",
+  "license": "Apache-2.0"
 }

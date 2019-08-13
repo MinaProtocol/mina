@@ -185,46 +185,46 @@ module Types = struct
             in
             Printf.sprintf "%d%s" len list_str )
 
-      let num_accounts = int_option_entry "Global Number of Accounts"
+      let num_accounts = int_option_entry "Global number of accounts"
 
       let block_height = int_option_entry "Block Height"
 
       let max_block_height_observed = int_entry "Max Observed Block Height"
 
       let uptime_secs =
-        map_entry "Local Uptime" ~f:(fun secs ->
+        map_entry "Local uptime" ~f:(fun secs ->
             Time.Span.to_string (Time.Span.of_int_sec secs) )
 
-      let ledger_merkle_root = string_option_entry "Ledger Merkle Root"
+      let ledger_merkle_root = string_option_entry "Ledger Merkle root"
 
-      let staged_ledger_hash = string_option_entry "Staged-ledger Hash"
+      let staged_ledger_hash = string_option_entry "Staged-ledger hash"
 
-      let state_hash = string_option_entry "Staged Hash"
+      let state_hash = string_option_entry "Staged hash"
 
-      let commit_id = string_entry "GIT SHA-1"
+      let commit_id = string_entry "Git SHA-1"
 
-      let conf_dir = string_entry "Configuration Directory"
+      let conf_dir = string_entry "Configuration directory"
 
       let peers = list_entry "Peers" ~to_string:Fn.id
 
-      let user_commands_sent = int_entry "User_commands Sent"
+      let user_commands_sent = int_entry "User_commands sent"
 
-      let run_snark_worker = bool_entry "Snark Worker Running"
+      let run_snark_worker = bool_entry "SNARK worker running"
 
-      let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
+      let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
-        list_entry "Block Producers Running"
+        list_entry "Block producers running"
           ~to_string:Public_key.Compressed.to_string
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
       let consensus_time_best_tip =
-        string_option_entry "Best Tip Consensus Time"
+        string_option_entry "Best tip consensus time"
 
-      let consensus_time_now = string_entry "Consensus Time Now"
+      let consensus_time_now = string_entry "Consensus time now"
 
-      let consensus_mechanism = string_entry "Consensus Mechanism"
+      let consensus_mechanism = string_entry "Consensus mechanism"
 
       let consensus_configuration =
         let ms_to_string i =
@@ -245,7 +245,7 @@ module Types = struct
           |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
           |> digest_entries ~title:""
         in
-        map_entry "Consensus Configuration" ~f:render
+        map_entry "Consensus configuration" ~f:render
     end
 
     type t =
@@ -285,7 +285,7 @@ module Types = struct
 
     let to_text (t : t) =
       let title =
-        "Coda Daemon Status\n-----------------------------------\n"
+        "Coda daemon status\n-----------------------------------\n"
       in
       digest_entries ~title (entries t)
   end
