@@ -170,7 +170,7 @@ module type S_run = sig
   end
 
   module Fqk : sig
-    type t
+    type t  
 
     module Unchecked : sig
       type t [@@deriving sexp]
@@ -180,7 +180,8 @@ module type S_run = sig
 
     val ( * ) : t -> t -> t
 
-    val equal : t -> t -> Boolean.var
+    (* because Snarkette fields derive eq, so contain a val equal : t -> t -> bool *)
+    val equal_var : t -> t -> Boolean.var
 
     val one : t
 

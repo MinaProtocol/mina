@@ -47,7 +47,7 @@ module Make (Backend : Backend.Backend_intf) = struct
             G1.scale g1
               (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))))
     ; gPositiveAlphaX=
-        G1.zero
+        G1.one
         :: List.map
              (List.range 1 (d + 1))
              ~f:(fun i ->
@@ -80,25 +80,47 @@ module Make (Backend : Backend.Backend_intf) = struct
             else List.nth_exn positives current_deg
           in
           accum (current_deg + 1) tl
-            (plus (scale next (Fr.to_bigint hd)) so_far)
+            (plus (Some (scale next (Fr.to_bigint hd))) so_far)
     in
     let deg = Fr_laurent.deg poly in
     let coeffs = Fr_laurent.coeffs poly in
     accum deg coeffs init
 
+  let g1_plus_helper a b =
+    match a, b with
+    | None, None -> None
+    | None, Some y  -> Some y
+    | Some x, None -> Some x
+    | Some x, Some y -> Some (G1.( + ) x y)
+
+  let g2_plus_helper a b =
+    match a, b with
+    | None, None -> None
+    | None, Some y  -> Some y
+    | Some x, None -> Some x
+    | Some x, Some y -> Some (G2.( + ) x y)
+
   let select_g (srs : t) poly =
-    select_helper srs.gPositiveX srs.gNegativeX poly G1.zero G1.( + )
-      G1.scale
+    let result = select_helper srs.gPositiveX srs.gNegativeX poly None g1_plus_helper G1.scale in
+    match result with
+    | Some a -> a
+    | None -> G1.one
 
   let select_g_alpha (srs : t) poly =
-    select_helper srs.gPositiveAlphaX srs.gNegativeAlphaX poly G1.zero G1.( + )
-      G1.scale
+    let result = select_helper srs.gPositiveAlphaX srs.gNegativeAlphaX poly None g1_plus_helper G1.scale in
+    match result with
+    | Some a -> a
+    | None -> G1.one
 
   let select_h (srs : t) poly =
-    select_helper srs.hPositiveX srs.hNegativeX poly G2.zero G2.( + )
-      G2.scale
+    let result = select_helper srs.hPositiveX srs.hNegativeX poly None g2_plus_helper G2.scale in
+    match result with
+    | Some a -> a
+    | None -> G2.one
 
   let select_h_alpha (srs : t) poly =
-    select_helper srs.hPositiveAlphaX srs.hNegativeAlphaX poly G2.zero G2.( + )
-      G2.scale
+    let result = select_helper srs.hPositiveAlphaX srs.hNegativeAlphaX poly None g2_plus_helper G2.scale in
+    match result with
+    | Some a -> a
+    | None -> G2.one
 end

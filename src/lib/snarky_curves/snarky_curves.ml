@@ -82,6 +82,8 @@ module type Weierstrass_checked_intf = sig
     val create : unit -> ((module S), _) Checked.t
   end
 
+  val one_checked : t
+
   val negate : t -> t
 
   val constant : unchecked -> t
@@ -148,6 +150,8 @@ module Make_weierstrass_checked
   open F.Impl
 
   type t = F.t * F.t
+
+  let one_checked = (F.one, F.zero)
 
   let assert_on_curve (x, y) =
     let open F in

@@ -6,11 +6,7 @@ module type Group = sig
 
   type nat
 
-  val zero : t
-
   val one : t
-
-  val ( * ) : nat -> t -> t
 
   val ( + ) : t -> t -> t
 
@@ -43,10 +39,7 @@ module type Backend_intf = sig
 
   module G2 : Group with type nat := N.t
 
-  module Fq_target : sig
-    include Fields.Degree_2_extension_intf
-    val unitary_inverse : t -> t
-  end
+  module Fq_target : Fields.Degree_2_extension_intf
 
   module Pairing :
     Pairing.S_sonic

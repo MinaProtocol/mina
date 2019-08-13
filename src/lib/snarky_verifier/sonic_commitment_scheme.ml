@@ -1,4 +1,16 @@
-module Make (Inputs : Inputs.S_run) = struct
+open Core
+
+module Make (Inputs : Inputs.S_run) (Scalar_field : sig
+    type t
+
+    val unpack : t -> bool list
+
+    val sub : t -> t -> t
+
+    val zero : t
+
+    val one : t
+  end) = struct
   open Inputs
   open Impl
 
@@ -25,6 +37,9 @@ module Make (Inputs : Inputs.S_run) = struct
         {g; h; h_alpha; h_alpha_x}
     end
   end
+
+  let unpack_full a =
+    Bitstring_lib.Bitstring.Lsb_first.of_list (List.map ~f:Boolean.var_of_value (Scalar_field.unpack a))
   
   let pc_v (vk : _ Verification_key.t_)
       (vk_precomp : Verification_key.Precomputation.t) commitment z (v, w) : Boolean.var =
@@ -33,10 +48,10 @@ module Make (Inputs : Inputs.S_run) = struct
         [ (Pos, G1_precomputation.create w, vk_precomp.h_alpha_x)
         ; ( Pos
           , G1_precomputation.create (G1.add_exn
-              (G1.scale vk.g Field.(unpack_full (sub v one)) ~init:vk.g)
-              (G1.scale w Field.(unpack_full (sub (sub zero z) one)) ~init:w))
+              (G1.scale vk.g Scalar_field.(unpack_full (sub v one)) ~init:vk.g)
+              (G1.scale w Scalar_field.(unpack_full (sub (sub zero z) one)) ~init:w))
           , vk_precomp.h_alpha)
         ; (Neg, G1_precomputation.create commitment, vk_precomp.h) ])
-    |> Fqk.(equal one)
+    |> Fqk.(equal_var one)
 end
 

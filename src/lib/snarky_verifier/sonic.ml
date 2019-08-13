@@ -29,5 +29,5 @@ module Make (Inputs : Inputs.S_run) = struct
            , G1_precomputation.create G1.(add_exn a d)
            , G2_precomputation.create c )
          ; (Neg, G1_precomputation.create d, b_precomp) ])
-    |> Fqk.(equal one)
+    |> Fqk.(equal_var one)
 end
