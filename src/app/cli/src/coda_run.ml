@@ -189,11 +189,11 @@ let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
   Core.eprintf
     !{err|
 
-  ☠  Coda Daemon crashed. The Coda Protocol developers would like to know why!
+  ☠  Coda daemon crashed. The Coda Protocol developers would like to know why!
 
   Please:
     Open an issue:
-      https://github.com/CodaProtocol/coda/issues/new
+      <https://github.com/CodaProtocol/coda/issues/new>
 
     Briefly describe what you were doing and %s
 %!|err}
