@@ -89,7 +89,6 @@ type DaemonStatus {
   blockchainLength: Int
   uptimeSecs: Int!
   ledgerMerkleRoot: String
-  stagedLedgerHash: String
   stateHash: String
   commitId: String!
   confDir: String!
@@ -230,8 +229,8 @@ type query {
 
   # Get the status of a transaction
   transactionStatus(
-    # Serialized payment (base58-encoded janestreet/bin_prot serialization)
-    payment: String!
+    # Id of a UserCommand
+    payment: ID!
   ): TransactionStatus!
 }
 
@@ -248,6 +247,9 @@ type RpcTimings {
 }
 
 input SendDelegationInput {
+  # Desired nonce for delegating state
+  nonce: UInt32
+
   # Short arbitrary message provided by the sender
   memo: String
 
@@ -267,6 +269,9 @@ type SendDelegationPayload {
 }
 
 input SendPaymentInput {
+  # Desired nonce for sending a payment
+  nonce: UInt32
+
   # Short arbitrary message provided by the sender
   memo: String
 
@@ -323,6 +328,8 @@ enum SyncStatus {
   BOOTSTRAP
   SYNCED
   OFFLINE
+  CONNECTING
+  LISTENING
 }
 
 # Different types of transactions in a block
@@ -348,6 +355,9 @@ enum TransactionStatus {
   # The transaction has either been snarked, reached finality through consensus or has been dropped
   UNKNOWN
 }
+
+# String representing a uint32 number in base 10
+scalar UInt32
 
 # String representing a uint64 number in base 10
 scalar UInt64

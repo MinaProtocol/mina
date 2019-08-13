@@ -14,10 +14,10 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run"
     exit 0
 else
-    # master is 'stable'
-    if [[ "$CIRCLE_BRANCH" == "master" ]]; then
+    # release is 'stable'
+    if echo "$CIRCLE_BRANCH" | grep -qE "^release/"; then
         CODENAME='stable'
-    else
+    else # develop is 'unstable'
         CODENAME='unstable'
     fi
 

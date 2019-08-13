@@ -287,11 +287,14 @@ let verify_receipt =
          | Error e | Ok (Error e) ->
              eprintf "%s" (Error.to_string_hum e) ))
 
-let get_nonce addr port =
+let get_nonce :
+       rpc:(Public_key.Compressed.t, Account.Nonce.t option) Rpc.Rpc.t
+    -> Public_key.t
+    -> int
+    -> (Account.Nonce.t, string) Deferred.Result.t =
+ fun ~rpc addr port ->
   let open Deferred.Let_syntax in
-  match%map
-    dispatch Daemon_rpcs.Get_nonce.rpc (Public_key.compress addr) port
-  with
+  match%map dispatch rpc (Public_key.compress addr) port with
   | Ok (Some n) ->
       Ok n
   | Ok None ->
@@ -307,7 +310,7 @@ let get_nonce_cmd =
   in
   Command.async ~summary:"Get the current nonce for an account"
     (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
-         match%bind get_nonce address port with
+         match%bind get_nonce ~rpc:Daemon_rpcs.Get_nonce.rpc address port with
          | Error e ->
              eprintf "Failed to get nonce: %s\n" e ;
              exit 2
@@ -337,8 +340,8 @@ let status_clear_hist =
            (if performance then `Performance else `None)
            port ))
 
-let get_nonce_exn public_key port =
-  match%bind get_nonce public_key port with
+let get_nonce_exn ~rpc public_key port =
+  match%bind get_nonce ~rpc public_key port with
   | Error e ->
       eprintf "Failed to get nonce %s\n" e ;
       exit 3
@@ -390,7 +393,9 @@ let batch_send_payments =
     let open Deferred.Let_syntax in
     let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
     and infos = get_infos payments_path in
-    let%bind nonce0 = get_nonce_exn keypair.public_key port in
+    let%bind nonce0 =
+      get_nonce_exn ~rpc:Daemon_rpcs.Get_nonce.rpc keypair.public_key port
+    in
     let _, ts =
       List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
           ( Account.Nonce.succ nonce
@@ -429,30 +434,47 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            (Currency.Fee.to_int Cli_lib.Fee.default_transaction))
       (optional txn_fee)
   in
-  let flag = Args.zip3 body_args Cli_lib.Flag.privkey_read_path amount_flag in
+  let nonce_flag =
+    flag "nonce"
+      ~doc:
+        "NONCE Nonce that you would like to set for your transaction \
+         (default: nonce of your account on the best ledger or the successor \
+         of highest value nonce of your sent transactions from the \
+         transaction pool )"
+      (optional txn_nonce)
+  in
+  let flag =
+    Args.zip4 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
+  in
   Command.async ~summary
     (Cli_lib.Background_daemon.init flag
-       ~f:(fun port (body, from_account, fee) ->
+       ~f:(fun port (body, from_account, fee_opt, nonce_opt) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp =
            Secrets.Keypair.Terminal_stdin.read_exn from_account
          in
-         let%bind nonce = get_nonce_exn sender_kp.public_key port in
-         let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
-         let payload : User_command.Payload.t =
-           User_command.Payload.create ~fee ~nonce
-             ~memo:User_command_memo.dummy ~body
+         let%bind nonce =
+           match nonce_opt with
+           | Some nonce ->
+               return nonce
+           | None ->
+               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
+                 sender_kp.public_key port
          in
-         let payment =
-           (User_command.sign sender_kp payload :> User_command.t)
+         let fee =
+           Option.value ~default:Cli_lib.Fee.default_transaction fee_opt
          in
-         dispatch_with_message Daemon_rpcs.Send_user_command.rpc payment port
+         let command =
+           Coda_commands.setup_user_command ~fee ~nonce
+             ~memo:User_command_memo.dummy ~sender_kp body
+         in
+         dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
            ~success:
              (Or_error.map ~f:(fun receipt_chain_hash ->
                   sprintf
                     "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
                     label
-                    (User_command.to_base58_check payment)
+                    (User_command.to_base58_check command)
                     (Receipt.Chain_hash.to_string receipt_chain_hash) ))
            ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
 
@@ -690,7 +712,6 @@ let command =
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
-    ; ("get-txn-status", get_transaction_status)
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("set-staking", set_staking)

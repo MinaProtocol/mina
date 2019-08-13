@@ -1,20 +1,22 @@
 /src/ @imeckler
 /CODEOWNERS @imeckler @bkase
-/frontend/ @schmavery @bkase @figitaki
+/frontend/ @schmavery @bkase @figitaki @o1pranay
 /dockerfiles/ @jkrauska
 /rfcs/ @imeckler @es92 @bkase
-/docs/ @rbkhmrcr @imeckler @bkase @nholland94 @cmr @o1pranay
+/docs/ @rbkhmrcr @imeckler @bkase @nholland94 @cmr @o1pranay @schmavery @figitaki
 /scripts/ @nholland94 @jkrauska @cmr
 /Makefile @jkrauska
 /src/config/ @imeckler @nholland94
 /CODE_OF_CONDUCT.md @imeckler @cmr
 /CONTRIBUTING.md @imeckler @cmr
-/DIRECTORY_STRUCTURE.md @imeckler @jkrauska
 /LICENSE @imeckler
 /README.md @cmr @imeckler @o1pranay
 /README-dev.md @cmr @imeckler @o1pranay
 /azure-pipelines.yml @jkrauska
 /.circleci @jkrauska @bkase
+
+
+/src/external/ @cmr @bkase @psteckler
 
 /src/app/cli/ @cmr @nholland94 @bkase
 /src/app/kademlia-haskell/ @bkase @enolan
@@ -102,8 +104,8 @@
 /src/lib/rc_pool/ @nholland94 @cmr
 /src/lib/receipt_chain_database_lib/ @johnwu93
 /src/lib/rocksdb/ @psteckler @nholland94
-/src/lib/root_history/ @cmr
 /src/lib/root_prover/ @johnwu93 @bkase
+/src/lib/transition_chain_witness/ @ghost-not-in-the-shell
 /src/lib/rose_tree/ @bkase @nholland94
 /src/lib/secrets/ @cmr
 /src/lib/sgn/ @deepthiskumar @bkase
