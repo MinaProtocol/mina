@@ -50,6 +50,24 @@ Points will only be awarded for pull requests accepted [on Github](https://githu
 
 BONUS: 1st place +3000, 2nd place +2000, 3rd place +1000 pts respectively for most transactions sent over the week.
 
+**Challenge #9: ‘Block Party’**:
+
+This is one of our biggest points challenge yet, with up to 4000 points\* on the line for the winner. In order to complete this challenge, you'll need to stake coda to be an active block producer. Block producers who generate more than 14 blocks this week will successfully complete this challenge - 1000 pts*. 
+
+BONUS for those who produce the most blocks: 1st place - +3000 pts\*, 2nd place - +2000 pts\*, 3rd place - +1000 pts\*.
+
+**Challenge #10: ‘Bookworm’**
+
+Reach Trust Level 1 'Basic' on Coda Protocol's forum. We believe reading is the most fundamental and healthy action in any community. If you are willing to spend a little time reading, you will quickly be promoted to the first trust level. Sign up on our [forum](https://forums.codaprotocol.com/) , enter at least 5 topics, read at least 30 posts, and spend a total of 10 minutes reading posts to obtain Trust Level 1 'Basic' and 100 Testnet Points*.
+
+**Challenge #11: ‘Don't Break the Chain!’**
+
+Earn extra bonus points for every uninterrupted weeks that you participated in the testnet and earned points*.
+
+- If you earned points this week and last week - 100 pts\*
+- If you earned points this week and the previous 2 weeks - 200 pts\*
+- If you earned points this week and the previous 3 weeks  - 300 pts\*
+
 ## Leaderboard
 
 You can track the Testnet Points[\*](#disclaimer) and current leaders in [the public leaderboard](http://bit.ly/TestnetBetaLeaderboard).
