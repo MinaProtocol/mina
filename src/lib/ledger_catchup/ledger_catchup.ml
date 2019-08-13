@@ -172,7 +172,7 @@ module Make (Inputs : Inputs.S) :
                 Trust_system.(
                   record trust_system logger peer.host
                     Actions.
-                      ( Sent_invalid_transition_chain_proof
+                      ( Sent_invalid_transition_chain_merkle_proof
                       , Some (error_msg, []) )) ;
               Deferred.Or_error.error_string error_msg
         in
