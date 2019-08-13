@@ -99,6 +99,7 @@ module type S = sig
 
   type t
 
+  module Config : Config_intf
 
   val create :
     Config.t -> Host_and_port.t Rpc.Implementation.t list -> t Deferred.t
@@ -204,6 +205,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     ; ban_notification_reader: ban_notification Linear_pipe.Reader.t
     ; ban_notification_writer: ban_notification Linear_pipe.Writer.t
     ; mutable haskell_membership: Membership.t option
+    ; mutable libp2p_membership: Coda_net2.net option
     ; connections:
         ( Unix.Inet_addr.t
         , (Uuid.t, Connection_with_state.t) Hashtbl.t )
@@ -591,6 +593,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; ban_notification_writer
           ; chain_id= config.chain_id
           ; haskell_membership= membership
+          ; libp2p_membership= None
           ; connections= Hashtbl.create (module Unix.Inet_addr)
           ; first_connect }
         in
