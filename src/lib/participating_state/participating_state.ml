@@ -43,6 +43,12 @@ let active_exn = function
   | `Bootstrapping ->
       failwith "Node is still bootstrapping"
 
+let active_error = function
+  | `Active x ->
+      Ok x
+  | `Bootstrapping ->
+      Or_error.error_string "Node is still bootstrapping"
+
 let rec sequence (list : 'a T.t List.t) : 'a List.t T.t =
   match list with
   | [] ->

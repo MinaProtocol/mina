@@ -59,7 +59,7 @@ Delegating coda is an alternative option to staking it directly, with the benefi
 To delegate your stake, instead of running your own staking node, run this command:
 
     coda client delegate-stake \
-        -delegate <public-key> \
+        -delegate <delegate-public-key> \
         -privkey-path <file> \
         -fee <fee>
 
@@ -86,8 +86,8 @@ However, this isn't data encoding or compression in the traditional sense - rath
 When you [start the daemon](/docs/my-first-transaction/#start-up-a-node), set these extra arguments to also start a snark-worker:
 
     coda daemon \
-        -peer hello-coda.o1test.net:8303 \
-        -run-snark-worker <public-key> \
+        -peer medium-rare.o1test.net:8303 \
+        -run-snark-worker $CODA_PK \
         -snark-worker-fee <fee>
 
 As a snark-worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.
