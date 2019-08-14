@@ -285,12 +285,8 @@ let daemon logger =
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
-         type ('a, 'b, 'c, 'd, 'e) t =
-           { coda: 'a
-           ; client_whitelist: 'b
-           ; rest_server_port: 'c
-           ; client_port: 'd
-           ; run_snark_worker_action: 'e }
+         type ('a, 'b, 'c) t =
+           {coda: 'a; client_whitelist: 'b; rest_server_port: 'c}
        end in
        let coda_initialization_deferred () =
          let%bind config =
@@ -435,7 +431,8 @@ let daemon logger =
            { external_ip
            ; bind_ip
            ; discovery_port
-           ; communication_port= external_port }
+           ; communication_port= external_port
+           ; client_port }
          in
          let wallets_disk_location = conf_dir ^/ "wallets" in
          (* HACK: Until we can properly change propose keys at runtime we'll
@@ -497,17 +494,12 @@ let daemon logger =
            (Async.Scheduler.long_cycles
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
-             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-               "Long async cycle: $span milliseconds"
-               ~metadata:[("span", `String (Time_ns.Span.to_string span))] ) ;
-         let run_snark_worker_action =
-           Option.value_map run_snark_worker_flag ~default:`Don't_run
-             ~f:(fun k -> `With_public_key k)
-         in
-         let trace_database_initialization typ location directory =
-           Logger.trace logger ~module_:__MODULE__ ~location
-             "Creating database of type $typ in directory $directory"
-             ~metadata:[("typ", `String typ); ("directory", `String directory)]
+             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+               "long async cycle %s"
+               (Time_ns.Span.to_string span) ) ;
+         let trace_database_initialization typ location =
+           Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
+             ~location typ
          in
          let trust_dir = conf_dir ^/ "trust" in
          let () = Snark_params.set_chunked_hashing true in
@@ -579,7 +571,10 @@ let daemon logger =
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
-                ?snark_worker_key:run_snark_worker_flag
+                ~snark_worker_config:
+                  { Coda_lib.Config.Snark_worker_config.initial_snark_worker_key=
+                      run_snark_worker_flag
+                  ; shutdown_on_disconnect= true }
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~wallets_disk_location:(conf_dir ^/ "wallets")
                 ~ledger_db_location:(conf_dir ^/ "ledger_db")
@@ -589,22 +584,15 @@ let daemon logger =
                 ~transaction_database ~external_transition_database
                 ~is_archive_node ~work_reassignment_wait ())
          in
-         { Coda_initialization.coda
-         ; client_whitelist
-         ; rest_server_port
-         ; client_port
-         ; run_snark_worker_action }
+         {Coda_initialization.coda; client_whitelist; rest_server_port}
        in
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
        Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
-       let%bind { Coda_initialization.coda
-                ; client_whitelist
-                ; rest_server_port
-                ; client_port
-                ; run_snark_worker_action } =
+       let%bind {Coda_initialization.coda; client_whitelist; rest_server_port}
+           =
          coda_initialization_deferred ()
        in
        coda_ref := Some coda ;
@@ -612,9 +600,8 @@ let daemon logger =
        Coda_lib.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
-       Coda_run.setup_local_server ?client_whitelist ~rest_server_port ~coda
-         ~insecure_rest_server ~client_port () ;
-       Coda_run.run_snark_worker ~client_port run_snark_worker_action ;
+       Coda_run.setup_local_server ?client_whitelist ~rest_server_port
+         ~insecure_rest_server coda ;
        let%bind () =
          Option.map metrics_server_port ~f:(fun port ->
              Coda_metrics.server ~port ~logger >>| ignore )
@@ -758,6 +745,7 @@ let coda_commands logger =
         ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
         ; (module Coda_delegation_test)
+        ; (module Coda_change_snark_worker_test)
         ; (module Full_test)
         ; (module Transaction_snark_profiler)
         ; (module Coda_archive_node_test) ]
