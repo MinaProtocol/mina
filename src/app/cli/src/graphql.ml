@@ -221,12 +221,10 @@ module Types = struct
                ~ledger_merkle_root:string ~state_hash:string
                ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
-               ~user_commands_sent:nn_int ~run_snark_worker:nn_bool
+               ~user_commands_sent:nn_int ~snark_worker:string
                ~sync_status:(id ~typ:(non_null sync_status))
                ~propose_pubkeys:
-                 (Reflection.reflect
-                    ~typ:Schema.(non_null @@ list (non_null public_key))
-                    Fn.id)
+                 (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms) ~consensus_time_best_tip:string
                ~consensus_time_now:nn_string ~consensus_mechanism:nn_string
                ~consensus_configuration:
@@ -703,8 +701,8 @@ module Types = struct
         ~fields:
           [ arg "wallet" ~typ:public_key_arg
               ~doc:
-                "A public key you wish to get reward for doing snark work - \
-                 if omitted, then you will stop doing snark work" ]
+                "Public key you wish to start snark-working on; null to stop \
+                 doing any snark work" ]
 
     module AddPaymentReceipt = struct
       type t = {payment: string; added_time: string}
@@ -1272,7 +1270,7 @@ module Mutations = struct
 
   let set_snark_worker =
     field "setSnarkWorker"
-      ~doc:"Set key you wish to get rewarded for doing snark work"
+      ~doc:"Set key you wish to snark work with or disable snark working"
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_worker)]
       ~typ:(non_null Types.Payload.set_snark_worker)
       ~resolve:(fun {ctx= coda; _} () pk ->
