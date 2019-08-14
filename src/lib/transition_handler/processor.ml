@@ -30,16 +30,17 @@ module Make (Inputs : Inputs.S) :
     External_transition.Transition_frontier_validation (Transition_frontier)
 
   type external_transition_with_initial_validation =
-    ( [`Time_received] * Truth.true_t
-    , [`Proof] * Truth.true_t
-    , [`Frontier_dependencies] * Truth.false_t
-    , [`Staged_ledger_diff] * Truth.false_t )
+    ( [`Time_received] * unit Truth.true_t
+    , [`Proof] * unit Truth.true_t
+    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+    , [`Frontier_dependencies] * unit Truth.false_t
+    , [`Staged_ledger_diff] * unit Truth.false_t )
     External_transition.Validation.with_transition
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
   let catchup_timeout_duration =
     Block_time.Span.of_ms
-      (Consensus.Constants.block_window_duration_ms * 2 |> Int64.of_int)
+      (Consensus.Constants.(delta * block_window_duration_ms) |> Int64.of_int)
 
   let cached_transform_deferred_result ~transform_cached ~transform_result
       cached =
@@ -107,11 +108,32 @@ module Make (Inputs : Inputs.S) :
               "Refusing to process the transition with hash $state_hash \
                because is is already in the transition frontier" ;
             return (Error ())
-        | Error `Parent_missing_from_frontier ->
-            Catchup_scheduler.watch catchup_scheduler
-              ~timeout_duration:catchup_timeout_duration
-              ~cached_transition:cached_initially_validated_transition ;
-            return (Error ())
+        | Error `Parent_missing_from_frontier -> (
+            let _, validation =
+              Cached.peek cached_initially_validated_transition
+              |> Envelope.Incoming.data
+            in
+            match validation with
+            | ( _
+              , _
+              , (`Delta_transition_chain, Truth.True delta_state_hashes)
+              , _
+              , _ ) ->
+                let timeout_duration =
+                  Option.fold
+                    (Transition_frontier.find frontier
+                       (Non_empty_list.head delta_state_hashes))
+                    ~init:(Block_time.Span.of_ms 0L)
+                    ~f:(fun _ _ -> catchup_timeout_duration)
+                in
+                Catchup_scheduler.watch catchup_scheduler ~timeout_duration
+                  ~cached_transition:cached_initially_validated_transition ;
+                return (Error ())
+            | _ ->
+                failwith
+                  "This is impossible since the transition just passed \
+                   initial_validation so delta_transition_chain_proof must be \
+                   true" )
       in
       (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
       let parent_hash =
