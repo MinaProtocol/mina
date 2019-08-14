@@ -201,7 +201,7 @@ let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_whitelist = []) ?rest_server_port
-    ?(insecure_rest_server = false) coda =
+    ?(insecure_rest_server = false) ~coda ~client_port () =
   let client_whitelist =
     Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
   in
@@ -307,17 +307,15 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
-          Deferred.return
-            (let open Option.Let_syntax in
-            let%bind snark_worker_key = Coda_lib.snark_worker_key coda in
-            let%map r = Coda_lib.request_work coda in
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "work_spec"
-                  , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r) )
-                ]
-              "responding to a Get_work request with some new work" ;
-            (r, snark_worker_key)) )
+          let r = Coda_lib.request_work coda in
+          Option.iter r ~f:(fun r ->
+              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "work_spec"
+                    , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r)
+                    ) ]
+                "responding to a Get_work request with some new work" ) ;
+          return r )
     ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -343,7 +341,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           let graphql_callback =
             Graphql_cohttp_async.make_callback
               (fun _req -> coda)
-              Graphql.schema
+              Coda_graphql.schema
           in
           Cohttp_async.(
             Server.create_expert
@@ -383,8 +381,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                    rest_server_port ~module_:__MODULE__ ~location:__LOC__ ) )
       |> ignore ) ;
   let where_to_listen =
-    Tcp.Where_to_listen.bind_to All_addresses
-      (On_port (Coda_lib.client_port coda))
+    Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
   in
   trace_task "client RPC handling" (fun () ->
       Tcp.Server.create
@@ -427,21 +424,36 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                     Deferred.unit )) ) )
   |> ignore
 
-let handle_crash e =
-  Core.eprintf
-    !{err|
+let create_snark_worker ~public_key ~client_port ~shutdown_on_disconnect =
+  let%map p =
+    let our_binary = Sys.executable_name in
+    Process.create_exn () ~prog:our_binary
+      ~args:
+        ( "internal" :: Snark_worker.Intf.command_name
+        :: Snark_worker.arguments ~public_key
+             ~daemon_address:
+               (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
+             ~shutdown_on_disconnect )
+  in
+  (* We want these to be printfs so we don't double encode our logs here *)
+  Pipe.iter_without_pushback
+    (Reader.pipe (Process.stdout p))
+    ~f:(fun s -> printf "%s" s)
+  |> don't_wait_for ;
+  Pipe.iter_without_pushback
+    (Reader.pipe (Process.stderr p))
+    ~f:(fun s -> printf "%s" s)
+  |> don't_wait_for ;
+  Deferred.unit
 
-  💀 Coda's Daemon Crashed. The Coda Protocol developers would like to know why!
-
-  Please:
-    Open an issue:
-      https://github.com/CodaProtocol/coda/issues/new
-
-    Tell us what you were doing, and paste the last 20 lines of log messages.
-    And then paste the following:
-
-    %s%!|err}
-    (Exn.to_string e)
+let run_snark_worker ?shutdown_on_disconnect:(s = true) ~client_port
+    run_snark_worker =
+  match run_snark_worker with
+  | `Don't_run ->
+      ()
+  | `With_public_key public_key ->
+      create_snark_worker ~shutdown_on_disconnect:s ~public_key ~client_port
+      |> ignore
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->

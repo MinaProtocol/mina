@@ -1,22 +1,9 @@
 (executable
- (name coda)
- (public_name coda)
- (libraries base58_check core debug_assert daemon_rpcs pipe_lib coda_networking
-   proposer gossip_net kademlia coda_lib coda_numbers coda_intf lite_lib
-   lite_compat coda_base coda_state coda_transition test_util staged_ledger sparse_ledger_lib
-   syncable_ledger blockchain_snark transaction_snark snarky
-   snark_keys snark_params precomputed_values network_peer
-   network_pool snark_worker keys_lib storage logger transition_frontier transition_frontier_persistence
-   transition_frontier_controller sync_handler ledger_catchup
-   transition_handler bootstrap_controller transition_router async
-   async_extra rpc_parallel async_ssl cohttp o1trace cohttp-async parallel prover
-   file_system yojson web_client_pipe work_selector graphql-async graphql-cohttp
-   module_version incremental secrets auxiliary_database coda_version perf_histograms)
- (preprocessor_deps ../../../config.mlh)
- (preprocess
-  (pps ppx_deriving.eq ppx_deriving.make ppx_inline_test ppx_coda
-    ppx_base ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert
-    ppx_deriving_yojson graphql_ppx))
- ; the -w list here should be the same as in src/dune
- (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60)
- (modes native))
+  (package cli)
+  (name coda)
+  (public_name coda)
+  (modes native)
+  (libraries init tests)
+  (preprocessor_deps ../../../config.mlh)
+  (preprocess (pps ppx_coda ppx_jane))
+  (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60))
