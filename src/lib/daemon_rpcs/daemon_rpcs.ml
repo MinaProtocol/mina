@@ -187,9 +187,9 @@ module Types = struct
 
       let num_accounts = int_option_entry "Global number of accounts"
 
-      let block_height = int_option_entry "Block Height"
+      let block_height = int_option_entry "Block height"
 
-      let max_block_height_observed = int_entry "Max Observed Block Height"
+      let max_block_height_observed = int_entry "Max observed block height"
 
       let uptime_secs =
         map_entry "Local uptime" ~f:(fun secs ->
