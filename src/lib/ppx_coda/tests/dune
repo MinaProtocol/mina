@@ -101,3 +101,9 @@
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (libraries core_kernel)
   (modules versioned_bad_gadt))
+
+(library
+  (name versioned_bad_gadt_results)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
+  (modules versioned_bad_gadt_results))
