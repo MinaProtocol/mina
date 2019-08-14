@@ -27,7 +27,6 @@ module Ledger_catchup = Ledger_catchup.Make (struct
     Transition_handler.Unprocessed_transition_cache
   module Transition_handler_validator = Transition_handler.Validator
   module Breadcrumb_builder = Transition_handler.Breadcrumb_builder
-  module Transition_chain_witness = Transition_chain_witness
 end)
 
 let%test_module "Ledger catchup" =
@@ -115,8 +114,13 @@ let%test_module "Ledger catchup" =
               External_transition.Validation.lower
                 (Transition_frontier.Breadcrumb.transition_with_hash
                    best_breadcrumb)
-                ( (`Time_received, Truth.True)
-                , (`Proof, Truth.True)
+                ( (`Time_received, Truth.True ())
+                , (`Proof, Truth.True ())
+                , ( `Delta_transition_chain
+                  , Truth.True
+                      ( Non_empty_list.singleton
+                      @@ Transition_frontier.Breadcrumb.parent_hash
+                           best_breadcrumb ) )
                 , (`Frontier_dependencies, Truth.False)
                 , (`Staged_ledger_diff, Truth.False) )
             in
@@ -148,8 +152,13 @@ let%test_module "Ledger catchup" =
           let best_transition_enveloped =
             let transition =
               External_transition.Validation.lower best_transition
-                ( (`Time_received, Truth.True)
-                , (`Proof, Truth.True)
+                ( (`Time_received, Truth.True ())
+                , (`Proof, Truth.True ())
+                , ( `Delta_transition_chain
+                  , Truth.True
+                      ( Non_empty_list.singleton
+                      @@ Transition_frontier.Breadcrumb.parent_hash
+                           best_breadcrumb ) )
                 , (`Frontier_dependencies, Truth.False)
                 , (`Staged_ledger_diff, Truth.False) )
             in
@@ -188,8 +197,13 @@ let%test_module "Ledger catchup" =
           test_catchup ~logger ~trust_system ~network me
             (let transition =
                External_transition.Validation.lower best_transition
-                 ( (`Time_received, Truth.True)
-                 , (`Proof, Truth.True)
+                 ( (`Time_received, Truth.True ())
+                 , (`Proof, Truth.True ())
+                 , ( `Delta_transition_chain
+                   , Truth.True
+                       ( Non_empty_list.singleton
+                       @@ Transition_frontier.Breadcrumb.parent_hash
+                            best_breadcrumb ) )
                  , (`Frontier_dependencies, Truth.False)
                  , (`Staged_ledger_diff, Truth.False) )
              in
@@ -236,8 +250,13 @@ let%test_module "Ledger catchup" =
               unprocessed_transition_cache
               (let transition =
                  External_transition.Validation.lower best_transition
-                   ( (`Time_received, Truth.True)
-                   , (`Proof, Truth.True)
+                   ( (`Time_received, Truth.True ())
+                   , (`Proof, Truth.True ())
+                   , ( `Delta_transition_chain
+                     , Truth.True
+                         ( Non_empty_list.singleton
+                         @@ Transition_frontier.Breadcrumb.parent_hash
+                              best_breadcrumb ) )
                    , (`Frontier_dependencies, Truth.False)
                    , (`Staged_ledger_diff, Truth.False) )
                in
@@ -256,8 +275,13 @@ let%test_module "Ledger catchup" =
               unprocessed_transition_cache
               (let transition =
                  External_transition.Validation.lower failing_transition
-                   ( (`Time_received, Truth.True)
-                   , (`Proof, Truth.True)
+                   ( (`Time_received, Truth.True ())
+                   , (`Proof, Truth.True ())
+                   , ( `Delta_transition_chain
+                     , Truth.True
+                         (Non_empty_list.singleton
+                            ( With_hash.data failing_transition
+                            |> External_transition.Validated.parent_hash )) )
                    , (`Frontier_dependencies, Truth.False)
                    , (`Staged_ledger_diff, Truth.False) )
                in
@@ -323,8 +347,13 @@ let%test_module "Ledger catchup" =
             List.map missing_transitions ~f:(fun transition ->
                 let transition =
                   External_transition.Validation.lower transition
-                    ( (`Time_received, Truth.True)
-                    , (`Proof, Truth.True)
+                    ( (`Time_received, Truth.True ())
+                    , (`Proof, Truth.True ())
+                    , ( `Delta_transition_chain
+                      , Truth.True
+                          (Non_empty_list.singleton
+                             ( With_hash.data transition
+                             |> External_transition.Validated.parent_hash )) )
                     , (`Frontier_dependencies, Truth.False)
                     , (`Staged_ledger_diff, Truth.False) )
                 in
