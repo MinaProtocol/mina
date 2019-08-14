@@ -11,10 +11,12 @@ module type Inputs_intf = sig
     Coda_intf.Transition_frontier_intf
     with type external_transition_validated := External_transition.Validated.t
      and type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
+                ( [`Time_received] * unit Truth.true_t
+                , [`Proof] * unit Truth.true_t
+                , [`Delta_transition_chain]
+                  * State_hash.t Non_empty_list.t Truth.true_t
+                , [`Frontier_dependencies] * unit Truth.true_t
+                , [`Staged_ledger_diff] * unit Truth.false_t )
                 External_transition.Validation.with_transition
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -343,11 +345,19 @@ end = struct
     transfer_while_writer_alive transition_reader sync_ledger_writer ~f:Fn.id
     |> don't_wait_for ;
     let initial_breadcrumb = Transition_frontier.root frontier in
+    let initial_transition =
+      Transition_frontier.Breadcrumb.transition_with_hash initial_breadcrumb
+    in
     let initial_root_transition =
-      External_transition.Validation.lower
-        (Transition_frontier.Breadcrumb.transition_with_hash initial_breadcrumb)
-        ( (`Time_received, Truth.True)
-        , (`Proof, Truth.True)
+      External_transition.Validation.lower initial_transition
+        ( (`Time_received, Truth.True ())
+        , (`Proof, Truth.True ())
+          (* This is a hack, but since we are bootstrapping. I am assuming this would be fine *)
+        , ( `Delta_transition_chain
+          , Truth.True
+              (Non_empty_list.singleton
+                 (Transition_frontier.Breadcrumb.parent_hash initial_breadcrumb))
+          )
         , (`Frontier_dependencies, Truth.False)
         , (`Staged_ledger_diff, Truth.False) )
     in
@@ -503,8 +513,12 @@ end = struct
       in
       let transition =
         External_transition.Validation.lower transition_with_hash
-          ( (`Time_received, Truth.True)
-          , (`Proof, Truth.True)
+          ( (`Time_received, Truth.True ())
+          , (`Proof, Truth.True ())
+          , ( `Delta_transition_chain
+            , Truth.True
+                ( Non_empty_list.singleton
+                @@ External_transition.Validated.parent_hash genesis_root ) )
           , (`Frontier_dependencies, Truth.False)
           , (`Staged_ledger_diff, Truth.False) )
       in

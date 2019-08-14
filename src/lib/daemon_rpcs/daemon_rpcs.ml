@@ -58,7 +58,7 @@ module Types = struct
         { get_staged_ledger_aux: Perf_histograms.Report.t option Rpc_pair.t
         ; answer_sync_ledger_query: Perf_histograms.Report.t option Rpc_pair.t
         ; get_ancestry: Perf_histograms.Report.t option Rpc_pair.t
-        ; get_transition_chain_witness:
+        ; get_transition_chain_proof:
             Perf_histograms.Report.t option Rpc_pair.t
         ; get_transition_chain: Perf_histograms.Report.t option Rpc_pair.t }
       [@@deriving to_yojson, bin_io, fields]
@@ -87,8 +87,8 @@ module Types = struct
             ~answer_sync_ledger_query:(fun acc x ->
               add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc )
             ~get_ancestry:(fun acc x -> add_rpcs ~name:"Get Ancestry" (f x) acc)
-            ~get_transition_chain_witness:(fun acc x ->
-              add_rpcs ~name:"Get transition chain witness" (f x) acc )
+            ~get_transition_chain_proof:(fun acc x ->
+              add_rpcs ~name:"Get transition chain proof" (f x) acc )
             ~get_transition_chain:(fun acc x ->
               add_rpcs ~name:"Get transition chain" (f x) acc )
           |> List.rev

@@ -78,8 +78,13 @@ let%test_module "Bootstrap Controller" =
                 External_transition.Validation.lower
                   (Transition_frontier.Breadcrumb.transition_with_hash
                      breadcrumb)
-                  ( (`Time_received, Truth.True)
-                  , (`Proof, Truth.True)
+                  ( (`Time_received, Truth.True ())
+                  , (`Proof, Truth.True ())
+                  , ( `Delta_transition_chain
+                    , Truth.True
+                        ( Non_empty_list.singleton
+                        @@ Transition_frontier.Breadcrumb.parent_hash
+                             breadcrumb ) )
                   , (`Frontier_dependencies, Truth.False)
                   , (`Staged_ledger_diff, Truth.False) ) )
               breadcrumbs
