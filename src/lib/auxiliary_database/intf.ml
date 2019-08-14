@@ -15,6 +15,9 @@ module type Pagination = sig
       participant. *)
   val get_values : t -> Public_key.Compressed.t -> value list
 
+  (** [get_all_values t] queries all the values that are in the database  *)
+  val get_all_values : t -> value list
+
   (** [get_earlier_values t pk cursor n] queries [n] values (or all if n is
       None) involving peer, [pk], added before the value corresponding to
       [cursor] (exclusively) if [cursor] is non-null. Otherwise, it queries the
@@ -22,7 +25,6 @@ module type Pagination = sig
       before the earliest value in the query. It also indicates any values that
       occurred after [cursor]. It outputs an empty list of values if there are
       no values related to [pk] in the database *)
-
   val get_earlier_values :
        t
     -> Public_key.Compressed.t

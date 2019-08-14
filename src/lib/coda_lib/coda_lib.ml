@@ -349,7 +349,9 @@ let create_genesis_frontier (config : Config.t) ~verifier =
     External_transition.Validated.create_unsafe
       (External_transition.create ~protocol_state:genesis_protocol_state
          ~protocol_state_proof:Precomputed_values.base_proof
-         ~staged_ledger_diff:empty_diff)
+         ~staged_ledger_diff:empty_diff
+         ~delta_transition_chain_proof:
+           (Protocol_state.previous_state_hash genesis_protocol_state, []))
   in
   let genesis_ledger = Lazy.force Genesis_ledger.t in
   let load () =
@@ -473,8 +475,9 @@ let create (config : Config.t) =
                    ~f:
                      (Sync_handler.Bootstrappable_best_tip.prove
                         ~logger:config.logger))
-              ~get_transition_chain_witness:
-                (handle_request ~f:Transition_chain_witness.prove)
+              ~get_transition_chain_proof:
+                (handle_request ~f:(fun ~frontier hash ->
+                     Transition_chain_prover.prove ~frontier hash ))
               ~get_transition_chain:
                 (handle_request ~f:Sync_handler.get_transition_chain)
           in
