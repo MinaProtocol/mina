@@ -1,3 +1,4 @@
+// Needed to get urql working from nodejs
 %raw
 "global.fetch = require(\"node-fetch\");";
 
