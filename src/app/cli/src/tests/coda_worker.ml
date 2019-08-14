@@ -5,6 +5,7 @@ open Coda_state
 open Coda_transition
 open Signature_lib
 open Pipe_lib
+open Init
 
 module Input = struct
   type t =
@@ -649,7 +650,7 @@ module T = struct
                   ()
           in
           let coda_sync_status () =
-            let schema = Graphql.schema in
+            let schema = Coda_graphql.schema in
             match Graphql_parser.parse "subscription { newSyncUpdate }" with
             | Ok query -> (
                 match%map Graphql_async.Schema.execute schema coda query with
