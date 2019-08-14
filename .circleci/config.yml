@@ -157,10 +157,10 @@ jobs:
                     nix-build release2.nix
             - run:
                 name: Build ocaml
+                environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
                 command: bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h
-                environment:
-                DUNE_PROFILE: testnet_postake_medium_curves
             - run:
                 name: Collect PV Keys
                 command: |
@@ -522,6 +522,9 @@ jobs:
                   name: Running test -- test_postake_split_snarkless:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
             - run:
+                  name: Running test -- test_postake_split_snarkless:coda-change-snark-worker-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-change-snark-worker-test"'
+            - run:
                   name: Running test -- test_postake_split_snarkless:coda-archive-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-archive-node-test"'
             - store_artifacts:
@@ -634,6 +637,9 @@ jobs:
             - run:
                   name: Running test -- test_postake_split_snarkless_medium_curves:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-restart-node-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-change-snark-worker-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-change-snark-worker-test"'
             - run:
                   name: Running test -- test_postake_split_snarkless_medium_curves:coda-archive-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-archive-node-test"'

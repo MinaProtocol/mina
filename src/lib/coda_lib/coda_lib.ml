@@ -2,7 +2,7 @@
 "../../config.mlh"]
 
 open Core_kernel
-open Async_kernel
+open Async
 open Coda_base
 open Coda_transition
 open Pipe_lib
@@ -15,7 +15,18 @@ module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 module Config = Config
 module Subscriptions = Coda_subscriptions
 
-type processes = {prover: Prover.t; verifier: Verifier.t}
+exception Snark_worker_error of int
+
+exception Snark_worker_signal_interrupt of Signal.t
+
+(* A way to run a single snark worker for a daemon in a lazy manner. Evaluating
+   this lazy value will run the snark worker process. A snark work is
+   assigned to a public key. This public key can change throughout the entire time
+   the daemon is running *)
+type snark_worker = Public_key.Compressed.t option ref Lazy.t
+
+type processes =
+  {prover: Prover.t; verifier: Verifier.t; snark_worker: snark_worker}
 
 type components =
   { net: Coda_networking.t
@@ -56,7 +67,11 @@ let peek_frontier frontier_broadcast_pipe =
          (Error.of_string
             "Cannot retrieve transition frontier now. Bootstrapping right now.")
 
-let snark_worker_key t = t.config.snark_worker_key
+let client_port t =
+  let {Kademlia.Node_addrs_and_ports.client_port; _} =
+    t.config.net_config.gossip_net_params.addrs_and_ports
+  in
+  client_port
 
 (* Get the most recently set public keys  *)
 let propose_public_keys t : Public_key.Compressed.Set.t =
@@ -64,6 +79,59 @@ let propose_public_keys t : Public_key.Compressed.Set.t =
   Public_key.Compressed.Set.map public_keys ~f:snd
 
 let replace_propose_keypairs t kps = Agent.update t.propose_keypairs kps
+
+let create_snark_worker ~logger ?(shutdown_on_disconnect = true) client_port =
+  let%bind p =
+    let our_binary = Sys.executable_name in
+    Process.create_exn () ~prog:our_binary
+      ~args:
+        ( "internal" :: Snark_worker.Intf.command_name
+        :: Snark_worker.arguments
+             ~daemon_address:
+               (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
+             ~shutdown_on_disconnect )
+  in
+  don't_wait_for
+    ( match%bind Process.wait p with
+    | Ok () ->
+        Logger.info logger
+          "Snark worker process died normally, so the daemon will die as well"
+          ~module_:__MODULE__ ~location:__LOC__ ;
+        exit 0
+    | Error (`Exit_non_zero non_zero_error) ->
+        Logger.fatal logger
+          !"Snark worker process died with a nonzero error %i"
+          non_zero_error ~module_:__MODULE__ ~location:__LOC__ ;
+        raise (Snark_worker_error non_zero_error)
+    | Error (`Signal signal) ->
+        Logger.info logger
+          !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
+          signal ~module_:__MODULE__ ~location:__LOC__ ;
+        raise (Snark_worker_signal_interrupt signal) ) ;
+  Logger.trace logger
+    !"Created snark worker with pid: %i"
+    ~module_:__MODULE__ ~location:__LOC__
+    (Pid.to_int @@ Process.pid p) ;
+  (* We want these to be printfs so we don't double encode our logs here *)
+  Pipe.iter_without_pushback
+    (Async.Reader.pipe (Process.stdout p))
+    ~f:(fun s -> printf "%s" s)
+  |> don't_wait_for ;
+  Pipe.iter_without_pushback
+    (Async.Reader.pipe (Process.stderr p))
+    ~f:(fun s -> printf "%s" s)
+  |> don't_wait_for ;
+  Deferred.unit
+
+let snark_worker_key {processes; _} =
+  if Lazy.is_val processes.snark_worker then
+    !(Lazy.force processes.snark_worker)
+  else None
+
+let replace_snark_worker_key {processes; _} new_key =
+  if Option.is_some new_key || Lazy.is_val processes.snark_worker then
+    Lazy.force processes.snark_worker := new_key
+  else ()
 
 let best_tip_opt t =
   let open Option.Let_syntax in
@@ -352,11 +420,33 @@ let create_genesis_frontier (config : Config.t) ~verifier =
          ~staged_ledger_diff:empty_diff)
   in
   let genesis_ledger = Lazy.force Genesis_ledger.t in
-  let ledger_db =
-    Ledger.Db.create ?directory_name:config.ledger_db_location ()
+  let load () =
+    let ledger_db =
+      Ledger.Db.create ?directory_name:config.ledger_db_location ()
+    in
+    ( ledger_db
+    , Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db )
   in
-  let root_snarked_ledger =
-    Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db
+  let%bind root_snarked_ledger =
+    match load () with
+    | _, Ok l ->
+        return l
+    | ledger_db, Error _ ->
+        (* Persisted state was bogus. Give up on the ledger contents, we'll bootstrap. *)
+        Ledger.Db.close ledger_db ;
+        let%map () =
+          match config.ledger_db_location with
+          | Some ledger_db_location ->
+              Logger.error config.logger
+                "Failed to load genesis ledger, deleting $dir and trying again."
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("dir", `String ledger_db_location)] ;
+              File_system.remove_dir ledger_db_location
+          | None ->
+              Deferred.unit
+        in
+        snd (load ()) |> Or_error.ok_exn
+    (* If it fails again, something is very wrong. Die. *)
   in
   let snarked_ledger_hash =
     Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root genesis_ledger
@@ -390,6 +480,18 @@ let create (config : Config.t) =
       trace_task "coda" (fun () ->
           let%bind prover = Prover.create () in
           let%bind verifier = Verifier.create () in
+          let snark_worker =
+            Lazy.from_fun
+            @@ fun () ->
+            let {Kademlia.Node_addrs_and_ports.client_port; _} =
+              config.net_config.gossip_net_params.addrs_and_ports
+            in
+            create_snark_worker ~logger:config.logger client_port
+            |> don't_wait_for ;
+            ref config.snark_worker_config.initial_snark_worker_key
+          in
+          Option.iter config.snark_worker_config.initial_snark_worker_key
+            ~f:(fun _key -> ignore @@ Lazy.force snark_worker) ;
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
           in
@@ -407,20 +509,23 @@ let create (config : Config.t) =
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
           in
+          let handle_request ~f query_env =
+            let input = Envelope.Incoming.data query_env in
+            Deferred.return
+            @@
+            let open Option.Let_syntax in
+            let%bind frontier =
+              Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+            in
+            f ~frontier input
+          in
           let%bind net =
             Coda_networking.create config.net_config
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
-                (fun enveloped_hash ->
-                let hash = Envelope.Incoming.data enveloped_hash in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Sync_handler
-                .get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier
-                  hash )
+                (handle_request
+                   ~f:
+                     Sync_handler
+                     .get_staged_ledger_aux_and_pending_coinbases_at_hash)
               ~answer_sync_ledger_query:(fun query_env ->
                 let open Deferred.Or_error.Let_syntax in
                 let ledger_hash, _ = Envelope.Incoming.data query_env in
@@ -439,46 +544,18 @@ let create (config : Config.t) =
                                !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
                                Coda_networking.refused_answer_query_string
                                ledger_hash)) )
-              ~get_ancestry:(fun query_env ->
-                let consensus_state = Envelope.Incoming.data query_env in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Root_prover.prove ~logger:config.logger ~frontier
-                  consensus_state )
-              ~get_transition_chain_witness:(fun query ->
-                let state_hash = Envelope.Incoming.data query in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Transition_chain_witness.prove ~frontier state_hash )
-              ~get_transition_chain:(fun request ->
-                let hashes = Envelope.Incoming.data request in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                Option.all
-                @@ List.map hashes ~f:(fun hash ->
-                       Option.merge
-                         (Transition_frontier.find frontier hash)
-                         (Transition_frontier.find_in_root_history frontier
-                            hash)
-                         ~f:Fn.const
-                       |> Option.map ~f:(fun breadcrumb ->
-                              Transition_frontier.Breadcrumb
-                              .transition_with_hash breadcrumb
-                              |> With_hash.data
-                              |> External_transition.Validated
-                                 .forget_validation ) ) )
+              ~get_ancestry:
+                (handle_request
+                   ~f:(Sync_handler.Root.prove ~logger:config.logger))
+              ~get_bootstrappable_best_tip:
+                (handle_request
+                   ~f:
+                     (Sync_handler.Bootstrappable_best_tip.prove
+                        ~logger:config.logger))
+              ~get_transition_chain_witness:
+                (handle_request ~f:Transition_chain_witness.prove)
+              ~get_transition_chain:
+                (handle_request ~f:Sync_handler.get_transition_chain)
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~logger:config.logger
@@ -639,7 +716,7 @@ let create (config : Config.t) =
           in
           Deferred.return
             { config
-            ; processes= {prover; verifier}
+            ; processes= {prover; verifier; snark_worker}
             ; components=
                 { net
                 ; transaction_pool

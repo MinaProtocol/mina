@@ -16,3 +16,4 @@ app.js
 *.o
 *.log
 coda-daemon-macos.zip
+package-lock.json

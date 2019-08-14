@@ -27,7 +27,6 @@ Download and build the app:
 3. Update submodules: `git submodule update --init`
 4. `yarn install` to install dependencies
 5. `yarn pull-macos-binary` to grab the latest coda.exe (macOS only for now)
-6. `yarn run query-fake` to generate graphql_schema.json
 7. `yarn build` to build app
 
 Run locally with hot reloading:
