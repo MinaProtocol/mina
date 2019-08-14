@@ -80,7 +80,9 @@ val external_transition_database :
 
 val snark_pool : t -> Network_pool.Snark_pool.t
 
-val start : t -> unit
+val start_proposer : t -> unit
+
+val start_snark_worker : t -> unit
 
 val create : Config.t -> t Deferred.t
 

@@ -383,7 +383,7 @@ let request_work t =
   if List.is_empty instances then None
   else Some {Snark_work_lib.Work.Spec.instances; fee}
 
-let start t =
+let start_proposer t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
     ~prover:t.processes.prover ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
@@ -396,6 +396,19 @@ let start t =
     ~consensus_local_state:t.config.consensus_local_state
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.proposer_transition_writer
+
+let start_snark_worker t =
+  match t.config.snark_worker_config.initial_snark_worker_key with
+  | Some _ ->
+      Logger.debug t.config.logger
+        !"Starting snark worker process"
+        ~module_:__MODULE__ ~location:__LOC__ ;
+      ignore @@ Lazy.force t.processes.snark_worker
+  | None ->
+      Logger.debug t.config.logger
+        !"Not starting snark worker process since initial snark_worker_key is \
+          set to none"
+        ~module_:__MODULE__ ~location:__LOC__
 
 let create_genesis_frontier (config : Config.t) ~verifier =
   let consensus_local_state = config.consensus_local_state in

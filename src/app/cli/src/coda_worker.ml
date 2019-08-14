@@ -509,7 +509,11 @@ module T = struct
           Logger.info logger "Worker finish setting up coda"
             ~module_:__MODULE__ ~location:__LOC__ ;
           let coda_peers () = return (Coda_lib.peers coda) in
-          let coda_start () = return (Coda_lib.start coda) in
+          let coda_start () =
+            return
+              ( Coda_lib.start_proposer coda ;
+                Coda_lib.start_snark_worker coda )
+          in
           let coda_get_all_transitions pk =
             let external_transition_database =
               Coda_lib.external_transition_database coda
