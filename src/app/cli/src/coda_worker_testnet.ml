@@ -101,6 +101,11 @@ module Api = struct
         Coda_process.get_all_user_commands_exn worker public_key )
       t i
 
+  let get_all_transitions t i public_key =
+    run_online_worker
+      ~f:(fun worker -> Coda_process.get_all_transitions worker public_key)
+      t i
+
   let start t i =
     Linear_pipe.write t.start_writer
       ( i
@@ -170,6 +175,17 @@ module Api = struct
   let new_block t i key =
     run_online_worker
       ~f:(fun worker -> Coda_process.new_block_exn worker key)
+      t i
+
+  let replace_snark_worker_key t i key =
+    run_online_worker
+      ~f:(fun worker -> Coda_process.replace_snark_worker_key worker key)
+      t i
+
+  let validated_transitions_keyswaptest t i =
+    run_online_worker
+      ~f:(fun worker ->
+        Coda_process.validated_transitions_keyswaptest_exn worker )
       t i
 
   let new_user_command_and_subscribe t i key =
@@ -323,6 +339,8 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                       testnet.root_lengths.(i) + (Consensus.Constants.k / 2)
                       < length - 1
                     then (
+                      Logger.info logger !"Filled catchup ivar"
+                        ~module_:__MODULE__ ~location:__LOC__ ;
                       Ivar.fill signal () ;
                       testnet.restart_signals.(i) <- None )
                     else () ) ;
@@ -340,7 +358,8 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                         [ ("worker_id", `Int worker_id)
                         ; ("user_cmd", User_command.to_yojson user_cmd) ]
                       "Transaction $user_cmd took too long to get into the \
-                       root of node $worker_id" ;
+                       root of node $worker_id. Length expected: %d got: %d"
+                      expected_deadline length ;
                     exit 9 |> ignore ) ) ;
               List.iter user_commands ~f:(fun user_cmd ->
                   Hashtbl.change user_cmds_under_inspection user_cmd
@@ -406,8 +425,8 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test logger n proposers snark_work_public_keys work_selection_method
-    ~max_concurrent_connections =
+let test ?is_archive_node logger n proposers snark_work_public_keys
+    work_selection_method ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
   let acceptable_delay =
@@ -422,7 +441,7 @@ let test logger n proposers snark_work_public_keys work_selection_method
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
       ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections
+      ~max_concurrent_connections ?is_archive_node
   in
   let%map workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in
@@ -488,7 +507,7 @@ module Payments : sig
     -> User_command.t list Deferred.t
 
   val assert_retrievable_payments :
-    Api.t -> User_command.t sexp_list -> unit Deferred.t
+    Api.t -> User_command.t list -> unit Deferred.t
 end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =

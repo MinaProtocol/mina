@@ -19,8 +19,8 @@ let spawn_exn (config : Coda_worker.Input.t) =
   return (conn, process, config)
 
 let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
-    ~program_dir ~proposer ~snark_worker_config ~work_selection_method ~offset
-    ~trace_dir ~max_concurrent_connections () =
+    ~program_dir ~proposer ~snark_worker_key ~work_selection_method ~offset
+    ~trace_dir ~max_concurrent_connections ~is_archive_node () =
   let conf_dir =
     Filename.temp_dir_name
     ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
@@ -40,13 +40,14 @@ let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
                      (function [a; b] -> Some (a, b) | _ -> None)
                      (String.split ~on:'=')) )
     ; proposer
-    ; snark_worker_config
+    ; snark_worker_key
     ; work_selection_method
     ; peers
     ; conf_dir
     ; trace_dir
     ; program_dir
     ; acceptable_delay
+    ; is_archive_node
     ; max_concurrent_connections }
   in
   config
@@ -98,12 +99,24 @@ let verified_transitions_exn (conn, _proc, _) =
   in
   Linear_pipe.wrap_reader r
 
+(* TODO: 2836 delete once transition_frontier extensions refactoring gets in *)
+let validated_transitions_keyswaptest_exn (conn, _, _) =
+  let%map r =
+    Coda_worker.Connection.run_exn conn
+      ~f:Coda_worker.functions.validated_transitions_keyswaptest ~arg:()
+  in
+  Linear_pipe.wrap_reader r
+
 let new_block_exn (conn, _proc, __) key =
   let%map r =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.new_block
       ~arg:key
   in
   Linear_pipe.wrap_reader r
+
+let get_all_transitions (conn, _proc, __) key =
+  Coda_worker.Connection.run_exn conn
+    ~f:Coda_worker.functions.get_all_transitions ~arg:key
 
 let root_diff_exn (conn, _proc, _) =
   let%map r =
@@ -129,3 +142,7 @@ let dump_tf (conn, _proc, _) =
 let best_path (conn, _proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.best_path
     ~arg:()
+
+let replace_snark_worker_key (conn, _proc, _) key =
+  Coda_worker.Connection.run_exn conn
+    ~f:Coda_worker.functions.replace_snark_worker_key ~arg:key

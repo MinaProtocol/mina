@@ -1,7 +1,6 @@
 open Core
 open Async
 open Coda_base
-open Signature_lib
 
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S with type ledger_proof := Inputs.Ledger_proof.t = struct
@@ -77,15 +76,17 @@ module Make (Inputs : Intf.Inputs_intf) :
         match tag with
         | `Merge ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"Merge Proof Completed - %s%!"
-              (Time.Span.to_string total)
+              "Merge SNARK generated in $time"
+              ~metadata:[("time", `String (Time.Span.to_string_hum total))]
         | `Transition ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"Base Proof Completed - %s%!"
-              (Time.Span.to_string total) )
+              "Base SNARK generated in $time"
+              ~metadata:[("time", `String (Time.Span.to_string_hum total))] )
 
-  let main daemon_address public_key shutdown_on_disconnect =
-    let logger = Logger.create () in
+  let main daemon_address shutdown_on_disconnect =
+    let logger =
+      Logger.create () ~metadata:[("process", `String "Snark Worker")]
+    in
     let%bind state = Worker_state.create () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
@@ -111,10 +112,11 @@ module Make (Inputs : Intf.Inputs_intf) :
           (* No work to be done -- quietly take a brief nap *)
           let%bind () = wait ~sec:random_delay () in
           go ()
-      | Ok (Some work) -> (
+      | Ok (Some (work, public_key)) -> (
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            !"Received work from %s%!"
-            (Host_and_port.to_string daemon_address) ;
+            "SNARK work received from $address. Starting proof generation"
+            ~metadata:
+              [("address", `String (Host_and_port.to_string daemon_address))] ;
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
           match perform state public_key work with
@@ -124,8 +126,10 @@ module Make (Inputs : Intf.Inputs_intf) :
               match%bind
                 emit_proof_metrics result.metrics logger ;
                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Submitted work to %s%!"
-                  (Host_and_port.to_string daemon_address) ;
+                  "Submitted completed SNARK work to $address"
+                  ~metadata:
+                    [ ( "address"
+                      , `String (Host_and_port.to_string daemon_address) ) ] ;
                 dispatch Rpcs.Submit_work.Latest.rpc shutdown_on_disconnect
                   result daemon_address
               with
@@ -143,23 +147,16 @@ module Make (Inputs : Intf.Inputs_intf) :
         flag "daemon-address"
           (required (Arg_type.create Host_and_port.of_string))
           ~doc:"HOST-AND-PORT address daemon is listening on"
-      and public_key =
-        flag "public-key"
-          (required Cli_lib.Arg_type.public_key_compressed)
-          ~doc:"PUBLICKEY Public key to send SNARKing fees to"
       and shutdown_on_disconnect =
         flag "shutdown-on-disconnect" (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
       in
       fun () ->
-        main daemon_port public_key
-          (Option.value ~default:true shutdown_on_disconnect))
+        main daemon_port (Option.value ~default:true shutdown_on_disconnect))
 
-  let arguments ~public_key ~daemon_address ~shutdown_on_disconnect =
-    [ "-public-key"
-    ; Public_key.Compressed.to_base58_check public_key
-    ; "-daemon-address"
+  let arguments ~daemon_address ~shutdown_on_disconnect =
+    [ "-daemon-address"
     ; Host_and_port.to_string daemon_address
     ; "-shutdown-on-disconnect"
     ; Bool.to_string shutdown_on_disconnect ]

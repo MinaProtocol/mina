@@ -40,6 +40,10 @@ module Stable = struct
       [@@deriving bin_io, compare, sexp, hash, yojson, version]
     end
 
+    let description = "User command"
+
+    let version_byte = Base58_check.Version_bytes.user_command
+
     include T
     include Registration.Make_latest_version (T)
     include Comparable.Make (T)
@@ -83,10 +87,7 @@ let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
 module For_tests = struct
   (* Pretend to sign a command. Much faster than actually signing. *)
   let fake_sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
-    { payload
-    ; sender= kp.public_key
-    ; signature= (Snark_params.Tock.Field.zero, Snark_params.Tock.Field.zero)
-    }
+    {payload; sender= kp.public_key; signature= Signature.dummy}
 end
 
 module Gen = struct
@@ -270,6 +271,14 @@ module With_valid_signature = struct
   include Stable.Latest
   include Comparable.Make (Stable.Latest)
 end
+
+module Base58_check = Codable.Make_base58_check (Stable.Latest)
+
+[%%define_locally
+Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
+
+[%%define_locally
+Base58_check.String_ops.(to_string, of_string)]
 
 [%%if
 fake_hash]

@@ -18,9 +18,20 @@ proof_level = "full"]
 
 let with_snark = true
 
+let with_check = false
+
+[%%elif
+proof_level = "check"]
+
+let with_snark = false
+
+let with_check = true
+
 [%%else]
 
 let with_snark = false
+
+let with_check = false
 
 [%%endif]
 
@@ -41,11 +52,9 @@ let setup_time_offsets () = ()
 
 [%%endif]
 
-let logger = Logger.create ()
-
 let heartbeat_flag = ref true
 
-let print_heartbeat () =
+let print_heartbeat logger =
   let rec loop () =
     if !heartbeat_flag then (
       Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
@@ -57,8 +66,9 @@ let print_heartbeat () =
   loop ()
 
 let run_test () : unit Deferred.t =
+  let logger = Logger.create () in
   setup_time_offsets () ;
-  print_heartbeat () |> don't_wait_for ;
+  print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
   File_system.with_temp_dir "full_test_config" ~f:(fun temp_conf_dir ->
       let keypair = Genesis_ledger.largest_account_keypair_exn () in
@@ -110,6 +120,9 @@ let run_test () : unit Deferred.t =
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
+      let discovery_port = 8001 in
+      let communication_port = 8000 in
+      let client_port = 8123 in
       let net_config =
         Coda_networking.Config.
           { logger
@@ -125,8 +138,9 @@ let run_test () : unit Deferred.t =
               ; addrs_and_ports=
                   { external_ip= Unix.Inet_addr.localhost
                   ; bind_ip= Unix.Inet_addr.localhost
-                  ; discovery_port= 8001
-                  ; communication_port= 8000 }
+                  ; discovery_port
+                  ; communication_port
+                  ; client_port }
               ; trust_system
               ; max_concurrent_connections= Some 10 } }
       in
@@ -135,9 +149,9 @@ let run_test () : unit Deferred.t =
       let largest_account_keypair =
         Genesis_ledger.largest_account_keypair_exn ()
       in
-      let run_snark_worker =
-        `With_public_key
-          (Public_key.compress largest_account_keypair.public_key)
+      let fee = Currency.Fee.of_int in
+      let snark_work_fee, transaction_fee =
+        if with_snark then (fee 0, fee 0) else (fee 1, fee 2)
       in
       let%bind coda =
         Coda_lib.create
@@ -146,13 +160,17 @@ let run_test () : unit Deferred.t =
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_propose_keypairs:(Keypair.Set.singleton keypair)
-             ~snark_worker_key:
-               (Public_key.compress largest_account_keypair.public_key)
+             ~snark_worker_config:
+               Coda_lib.Config.Snark_worker_config.
+                 { initial_snark_worker_key=
+                     Some
+                       (Public_key.compress largest_account_keypair.public_key)
+                 ; shutdown_on_disconnect= true }
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
-             ~time_controller ~receipt_chain_database
-             ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state
-             ~transaction_database ~external_transition_database ())
+             ~time_controller ~receipt_chain_database ~snark_work_fee
+             ~consensus_local_state ~transaction_database
+             ~external_transition_database ~work_reassignment_wait:420000 ())
       in
       Coda_lib.start coda ;
       don't_wait_for
@@ -197,9 +215,7 @@ let run_test () : unit Deferred.t =
             failwith
               (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
       in
-      let client_port = 8123 in
-      Coda_run.setup_local_server ~client_port ~coda () ;
-      Coda_run.run_snark_worker ~client_port run_snark_worker ;
+      Coda_run.setup_local_server coda ;
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
       (* No proof emitted by the parallel scan at the begining *)
@@ -212,9 +228,9 @@ let run_test () : unit Deferred.t =
       let build_payment amount sender_sk receiver_pk fee =
         trace_recurring_task "build_payment" (fun () ->
             let nonce =
-              Coda_commands.get_nonce coda (pk_of_sk sender_sk)
-              |> Participating_state.active_exn
-              |> Option.value_exn ?here:None ?error:None ?message:None
+              Option.value_exn
+                ( Coda_commands.get_nonce coda (pk_of_sk sender_sk)
+                |> Participating_state.active_exn )
             in
             let payload : User_command.Payload.t =
               User_command.Payload.create ~fee ~nonce
@@ -226,13 +242,12 @@ let run_test () : unit Deferred.t =
       let assert_ok x = assert (Or_error.is_ok x) in
       let test_sending_payment sender_sk receiver_pk =
         let payment =
-          build_payment send_amount sender_sk receiver_pk
-            (Currency.Fee.of_int 0)
+          build_payment send_amount sender_sk receiver_pk transaction_fee
         in
         let prev_sender_balance =
-          Coda_commands.get_balance coda (pk_of_sk sender_sk)
-          |> Participating_state.active_exn
-          |> Option.value_exn ?here:None ?error:None ?message:None
+          Option.value_exn
+            ( Coda_commands.get_balance coda (pk_of_sk sender_sk)
+            |> Participating_state.active_exn )
         in
         let prev_receiver_balance =
           Coda_commands.get_balance coda receiver_pk
@@ -246,8 +261,7 @@ let run_test () : unit Deferred.t =
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
-          build_payment send_amount sender_sk receiver_pk
-            (Currency.Fee.of_int 0)
+          build_payment send_amount sender_sk receiver_pk transaction_fee
         in
         let%bind p2_res =
           Coda_commands.send_user_command coda (payment' :> User_command.t)
@@ -261,11 +275,13 @@ let run_test () : unit Deferred.t =
             ~initial_receiver_balance:prev_receiver_balance receiver_pk
         in
         assert_balance receiver_pk
-          ( Currency.Balance.( + ) prev_receiver_balance send_amount
-          |> Option.value_exn ?here:None ?error:None ?message:None ) ;
+          (Option.value_exn
+             (Currency.Balance.( + ) prev_receiver_balance send_amount)) ;
         assert_balance (pk_of_sk sender_sk)
-          ( Currency.Balance.( - ) prev_sender_balance send_amount
-          |> Option.value_exn ?here:None ?error:None ?message:None )
+          (Option.value_exn
+             (Currency.Balance.( - ) prev_sender_balance
+                (Option.value_exn
+                   (Currency.Amount.add_fee send_amount transaction_fee))))
       in
       let send_payment_update_balance_sheet sender_sk sender_pk receiver_pk
           amount balance_sheet fee =
@@ -376,7 +392,7 @@ let run_test () : unit Deferred.t =
         if with_snark then
           let accounts = List.take other_accounts 2 in
           let%bind blockchain_length' =
-            test_multiple_payments accounts ~txn_count:1 120.
+            test_multiple_payments accounts ~txn_count:2 120.
           in
           (*wait for a block after the ledger_proof is emitted*)
           let%map () =
@@ -389,6 +405,13 @@ let run_test () : unit Deferred.t =
                 |> Float.of_int )
           in
           assert (blockchain_length coda > blockchain_length')
+        else if with_check then
+          let%map _ =
+            test_multiple_payments other_accounts
+              ~txn_count:(List.length other_accounts / 2)
+              7.
+          in
+          ()
         else
           let%bind _ =
             test_multiple_payments other_accounts

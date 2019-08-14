@@ -67,7 +67,7 @@ module Code = {
                 marginBottom(`zero),
                 backgroundColor(Style.Colors.navy),
                 color(Style.Colors.white),
-                Style.Typeface.ibmplexmono,
+                Style.Typeface.pragmataPro,
                 fontWeight(`medium),
                 fontSize(`rem(0.8125)),
                 borderRadius(`px(12)),

@@ -93,7 +93,7 @@ struct
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
      user if they at least one coin*)
-  let gen_payments accounts_with_secret_keys :
+  let gen_payments staged_ledger accounts_with_secret_keys :
       User_command.With_valid_signature.t Sequence.t =
     let public_keys =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
@@ -105,14 +105,22 @@ struct
         let%bind sender_sk = sender_sk in
         let sender_keypair = Keypair.of_private_key_exn sender_sk in
         let%bind receiver_pk = List.random_element public_keys in
+        let nonce =
+          let ledger = Staged_ledger.ledger staged_ledger in
+          let status, account_location =
+            Ledger.get_or_create_account_exn ledger sender_account.public_key
+              sender_account
+          in
+          assert (status = `Existed) ;
+          (Option.value_exn (Ledger.get ledger account_location)).nonce
+        in
         let send_amount = Currency.Amount.of_int 1 in
         let sender_account_amount =
           sender_account.Account.Poly.balance |> Currency.Balance.to_amount
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let payload : User_command.Payload.t =
-          User_command.Payload.create ~fee:Fee.zero
-            ~nonce:sender_account.Account.Poly.nonce
+          User_command.Payload.create ~fee:Fee.zero ~nonce
             ~memo:User_command_memo.dummy
             ~body:(Payment {receiver= receiver_pk; amount= send_amount})
         in
@@ -156,7 +164,9 @@ struct
       let parent_staged_ledger =
         Transition_frontier.Breadcrumb.staged_ledger parent_breadcrumb
       in
-      let transactions = gen_payments accounts_with_secret_keys in
+      let transactions =
+        gen_payments parent_staged_ledger accounts_with_secret_keys
+      in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
           ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2)
@@ -353,6 +363,7 @@ struct
           Ledger_transfer.transfer_accounts
             ~src:(Lazy.force Genesis_ledger.t)
             ~dest:ledger_db
+          |> Or_error.ok_exn
         in
         let consensus_local_state =
           Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
@@ -440,15 +451,53 @@ struct
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
          (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
 
-  module Sync_handler = Sync_handler.Make (struct
+  module Best_tip_prover = Best_tip_prover.Make (struct
     include Transition_frontier_inputs
     module Transition_frontier = Transition_frontier
   end)
 
-  module Root_prover = Root_prover.Make (struct
+  module Sync_handler = struct
+    module T = Sync_handler.Make (struct
+      include Transition_frontier_inputs
+      module Transition_frontier = Transition_frontier
+      module Best_tip_prover = Best_tip_prover
+    end)
+
+    let answer_query = T.answer_query
+
+    let get_staged_ledger_aux_and_pending_coinbases_at_hash =
+      T.get_staged_ledger_aux_and_pending_coinbases_at_hash
+
+    let get_transition_chain = T.get_transition_chain
+
+    module Root = T.Root
+
+    (* HACK: This makes it unit tests involving eager bootstrap faster *)
+    module Bootstrappable_best_tip = struct
+      module For_tests = T.Bootstrappable_best_tip.For_tests
+
+      let should_select_tip ~existing ~candidate ~logger:_ =
+        let length =
+          Fn.compose Coda_numbers.Length.to_int
+            Consensus.Data.Consensus_state.blockchain_length
+        in
+        length candidate - length existing
+        > (2 * max_length) + Consensus.Constants.delta
+
+      let prove = T.Bootstrappable_best_tip.For_tests.prove ~should_select_tip
+
+      let verify =
+        T.Bootstrappable_best_tip.For_tests.verify ~should_select_tip
+    end
+  end
+
+  module Transition_chain_witness = Transition_chain_witness.Make (struct
     include Transition_frontier_inputs
     module Transition_frontier = Transition_frontier
   end)
+
+  module Transaction_pool =
+    Network_pool.Transaction_pool.Make (Staged_ledger) (Transition_frontier)
 
   module Breadcrumb_visualizations = struct
     module Graph =
@@ -517,6 +566,22 @@ struct
       end
     end
 
+    (* ban notification not implemented for these tests; satisfy interface *)
+    module Ban_notification = struct
+      type ban_notification = unit
+
+      let banned_until _ = failwith "banned_until: not implemented"
+
+      let banned_peer _ = failwith "banned_peer: not implemented"
+
+      let ban_notification_reader _ =
+        failwith "ban_notification_reader: not implemented"
+
+      let ban_notify _ = failwith "ban_notify: not implemented"
+    end
+
+    include Ban_notification
+
     module Config = struct
       type t =
         { logger: Logger.t
@@ -533,41 +598,50 @@ struct
     let peers_by_ip _ ip =
       [Network_peer.Peer.{host= ip; discovery_port= 0; communication_port= 0}]
 
+    let first_message _ = Ivar.create ()
+
+    let first_connection _ = Ivar.create ()
+
     let random_peers {peers; _} num_peers =
       let peer_list = Hash_set.to_list peers in
       List.take (List.permute peer_list) num_peers
 
-    let catchup_transition {ip_table; _} peer state_hash =
-      Deferred.Result.return
-      @@
-      let open Option.Let_syntax in
-      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
-      Sync_handler.transition_catchup ~frontier state_hash
-
-    let mplus ma mb = if Option.is_some ma then ma else mb
-
     let query_peer {ip_table= _; _} _peer _f _r = failwith "..."
 
-    let get_staged_ledger_aux_and_pending_coinbases_at_hash {ip_table; _}
-        inet_addr hash =
+    let handle_requests_with_inet_address ~f ~typ t inet_address input =
       Deferred.return
       @@ Result.of_option
-           ~error:
-             (Error.of_string
-                "Peer could not find the staged_ledger_aux and \
-                 pending_coinbase at hash")
-           (let open Option.Let_syntax in
-           let%bind frontier = Hashtbl.find ip_table inet_addr in
-           Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash
-             ~frontier hash)
+           ~error:(Error.createf !"Peer doesn't have the requested %s" typ)
+      @@
+      let open Option.Let_syntax in
+      let%bind frontier = Hashtbl.find t.ip_table inet_address in
+      f ~frontier input
 
-    let get_ancestry {ip_table; logger; _} inet_addr consensus_state =
-      Deferred.return
-      @@ Result.of_option
-           ~error:(Error.of_string "Peer could not produce an ancestor")
-           (let open Option.Let_syntax in
-           let%bind frontier = Hashtbl.find ip_table inet_addr in
-           Root_prover.prove ~logger ~frontier consensus_state)
+    let handle_requests t peer =
+      handle_requests_with_inet_address t peer.Network_peer.Peer.host
+
+    let get_staged_ledger_aux_and_pending_coinbases_at_hash =
+      handle_requests_with_inet_address
+        ~typ:"Staged ledger aux and pending coinbase"
+        ~f:Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash
+
+    let get_ancestry ({logger; _} as t) =
+      handle_requests_with_inet_address ~typ:"ancestor proof"
+        ~f:(Sync_handler.Root.prove ~logger)
+        t
+
+    let get_bootstrappable_best_tip ({logger; _} as t) =
+      handle_requests ~typ:"bootstrappable best tip"
+        ~f:(Sync_handler.Bootstrappable_best_tip.prove ~logger)
+        t
+
+    let get_transition_chain_witness =
+      handle_requests ~typ:"transition chain witness"
+        ~f:Transition_chain_witness.prove
+
+    let get_transition_chain =
+      handle_requests ~typ:"tranition_chain"
+        ~f:Sync_handler.get_transition_chain
 
     let glue_sync_ledger {ip_table; logger; _} query_reader response_writer :
         unit =

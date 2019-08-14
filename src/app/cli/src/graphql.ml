@@ -98,24 +98,23 @@ module Types = struct
       | Banned_until tm ->
           Some (date tm)
 
-    module State_hash = Codable.Make_base58_check (State_hash.Stable.V1)
-    module Ledger_hash = Codable.Make_base58_check (Ledger_hash.Stable.V1)
-    module Frozen_ledger_hash =
-      Codable.Make_base58_check (Frozen_ledger_hash.Stable.V1)
-  end
+    module State_hash = Codable.Make_base58_check (struct
+      include State_hash.Stable.V1
 
-  module Base58_check = Base58_check.Make (struct
-    let version_byte = Base58_check.Version_bytes.graphql
-  end)
+      let description = "State hash"
+    end)
 
-  module Id = struct
-    (* The id of a user_command is the Base58Check encoding of the serialized version of the user_command *)
-    let user_command user_command =
-      let bigstring =
-        Bin_prot.Utils.bin_dump Coda_base.User_command.Stable.V1.bin_t.writer
-          user_command
-      in
-      Base58_check.encode (Bigstring.to_string bigstring)
+    module Ledger_hash = Codable.Make_base58_check (struct
+      include Ledger_hash.Stable.V1
+
+      let description = "Ledger hash"
+    end)
+
+    module Frozen_ledger_hash = Codable.Make_base58_check (struct
+      include Frozen_ledger_hash.Stable.V1
+
+      let description = "Frozen ledger hash"
+    end)
   end
 
   let public_key =
@@ -126,12 +125,29 @@ module Types = struct
     scalar "UInt64" ~doc:"String representing a uint64 number in base 10"
       ~coerce:(fun num -> `String (Unsigned.UInt64.to_string num))
 
-  let sync_status : ('context, [`Offline | `Synced | `Bootstrap] option) typ =
+  let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
         [ enum_value "BOOTSTRAP" ~value:`Bootstrap
         ; enum_value "SYNCED" ~value:`Synced
-        ; enum_value "OFFLINE" ~value:`Offline ]
+        ; enum_value "OFFLINE" ~value:`Offline
+        ; enum_value "CONNECTING" ~value:`Connecting
+        ; enum_value "LISTENING" ~value:`Listening ]
+
+  let transaction_status : ('context, Transaction_status.State.t option) typ =
+    enum "TransactionStatus" ~doc:"Status of a transaction"
+      ~values:
+        Transaction_status.State.
+          [ enum_value "INCLUDED" ~value:Included
+              ~doc:"A transaction that is on the longest chain"
+          ; enum_value "PENDING" ~value:Pending
+              ~doc:
+                "A transaction either in the transition frontier or in \
+                 transaction pool but is not on the longest chain"
+          ; enum_value "UNKNOWN" ~value:Unknown
+              ~doc:
+                "The transaction has either been snarked, reached finality \
+                 through consensus or has been dropped" ]
 
   module DaemonStatus = struct
     type t = Daemon_rpcs.Types.Status.t
@@ -171,7 +187,7 @@ module Types = struct
           List.rev
           @@ Rpc_timings.Fields.fold ~init:[] ~get_staged_ledger_aux:fd
                ~answer_sync_ledger_query:fd ~get_ancestry:fd
-               ~transition_catchup:fd )
+               ~get_transition_chain_witness:fd ~get_transition_chain:fd )
 
     module Histograms = Daemon_rpcs.Types.Status.Histograms
 
@@ -202,8 +218,8 @@ module Types = struct
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
                ~blockchain_length:int ~uptime_secs:nn_int
-               ~ledger_merkle_root:string ~staged_ledger_hash:string
-               ~state_hash:string ~commit_id:nn_string ~conf_dir:nn_string
+               ~ledger_merkle_root:string ~state_hash:string
+               ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
                ~user_commands_sent:nn_int ~run_snark_worker:nn_bool
                ~sync_status:(id ~typ:(non_null sync_status))
@@ -214,14 +230,16 @@ module Types = struct
                ~histograms:(id ~typ:histograms) ~consensus_time_best_tip:string
                ~consensus_time_now:nn_string ~consensus_mechanism:nn_string
                ~consensus_configuration:
-                 (id ~typ:(non_null consensus_configuration)) )
+                 (id ~typ:(non_null consensus_configuration))
+               ~highest_block_length_received:nn_int )
   end
 
   let user_command : (Coda_lib.t, User_command.t option) typ =
     obj "UserCommand" ~fields:(fun _ ->
         [ field "id" ~typ:(non_null guid)
             ~args:Arg.[]
-            ~resolve:(fun _ user_command -> Id.user_command user_command)
+            ~resolve:(fun _ user_command ->
+              User_command.to_base58_check user_command )
         ; field "isDelegation" ~typ:(non_null bool)
             ~doc:
               "If true, this represents a delegation of stake, otherwise it \
@@ -453,7 +471,7 @@ module Types = struct
                  voting for"
               ~args:Arg.[]
               ~resolve:(fun _ {account; _} ->
-                Option.map ~f:Coda_base.State_hash.to_bytes
+                Option.map ~f:Coda_base.State_hash.to_base58_check
                   account.Account.Poly.voting_for )
           ; field "stakingActive" ~typ:(non_null bool)
               ~doc:
@@ -481,7 +499,7 @@ module Types = struct
               Currency.Fee.to_uint64 fee ) ] )
 
   module Payload = struct
-    let add_wallet : (Coda_lib.t, Account.key sexp_option) typ =
+    let add_wallet : (Coda_lib.t, Account.key option) typ =
       obj "AddWalletPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
               ~doc:"Public key of the newly-created wallet"
@@ -560,19 +578,40 @@ module Types = struct
           | _ ->
               Error "Invalid format for public key." )
 
-    let uint64_arg =
-      scalar "UInt64" ~doc:"String representing a uint64 number in base 10"
-        ~coerce:(fun key ->
+    module type Numeric_type = sig
+      type t
+
+      val of_string : string -> t
+
+      val of_int : int -> t
+    end
+
+    (** Converts a type into a graphql argument type. Expect name to start with uppercase    *)
+    let make_numeric_arg (type t) ~name
+        (module Numeric : Numeric_type with type t = t) =
+      let lower_name = String.lowercase name in
+      scalar name
+        ~doc:
+          (sprintf
+             "String or Integer representation of a %s number. If the input \
+              is String, the String must represent a the number in base 10"
+             lower_name) ~coerce:(fun key ->
           match key with
           | `String s ->
-              result_of_exn Unsigned.UInt64.of_string s
-                ~error:"Could not decode uint64."
+              result_of_exn Numeric.of_string s
+                ~error:(sprintf "Could not decode %s." lower_name)
           | `Int n ->
               if n < 0 then
-                Error "Could not convert negative number to uint64."
-              else Ok (Unsigned.UInt64.of_int n)
+                Error
+                  (sprintf "Could not convert negative number to %s."
+                     lower_name)
+              else Ok (Numeric.of_int n)
           | _ ->
-              Error "Invalid format for public key." )
+              Error (sprintf "Invalid format for %s type." lower_name) )
+
+    let uint64_arg = make_numeric_arg ~name:"UInt64" (module Unsigned.UInt64)
+
+    let uint32_arg = make_numeric_arg ~name:"UInt32" (module Unsigned.UInt32)
 
     module Fields = struct
       let from ~doc = arg "from" ~typ:(non_null public_key_arg) ~doc
@@ -582,29 +621,34 @@ module Types = struct
       let fee ~doc = arg "fee" ~typ:(non_null uint64_arg) ~doc
 
       let memo ~doc = arg "memo" ~typ:string ~doc
+
+      let nonce ~doc = arg "nonce" ~typ:uint32_arg ~doc
     end
 
     let send_payment =
       let open Fields in
       obj "SendPaymentInput"
-        ~coerce:(fun from to_ amount fee memo -> (from, to_, amount, fee, memo))
+        ~coerce:(fun from to_ amount fee memo nonce ->
+          (from, to_, amount, fee, memo, nonce) )
         ~fields:
           [ from ~doc:"Public key of recipient of payment"
           ; to_ ~doc:"Public key of sender of payment"
           ; arg "amount" ~doc:"Amount of coda to send to to receiver"
               ~typ:(non_null uint64_arg)
           ; fee ~doc:"Fee amount in order to send payment"
-          ; memo ~doc:"Short arbitrary message provided by the sender" ]
+          ; memo ~doc:"Short arbitrary message provided by the sender"
+          ; nonce ~doc:"Desired nonce for sending a payment" ]
 
     let send_delegation =
       let open Fields in
       obj "SendDelegationInput"
-        ~coerce:(fun from to_ fee memo -> (from, to_, fee, memo))
+        ~coerce:(fun from to_ fee memo nonce -> (from, to_, fee, memo, nonce))
         ~fields:
           [ from ~doc:"Public key of recipient of a stake delegation"
           ; to_ ~doc:"Public key of sender of a stake delegation"
           ; fee ~doc:"Fee amount in order to send a stake delegation"
-          ; memo ~doc:"Short arbitrary message provided by the sender" ]
+          ; memo ~doc:"Short arbitrary message provided by the sender"
+          ; nonce ~doc:"Desired nonce for delegating state" ]
 
     let delete_wallet =
       obj "DeleteWalletInput" ~coerce:Fn.id
@@ -736,7 +780,7 @@ module Types = struct
     module Make (Inputs : Inputs_intf) = struct
       open Inputs
 
-      let edge : (Coda_lib.t, Type.t Edge.t sexp_option) typ =
+      let edge : (Coda_lib.t, Type.t Edge.t option) typ =
         obj (Type.name ^ "Edge")
           ~doc:"Connection Edge as described by the Relay connections spec"
           ~fields:(fun _ ->
@@ -861,19 +905,12 @@ module Types = struct
         module Cursor = struct
           type t = User_command.t
 
-          let serialize = Id.user_command
+          let serialize = User_command.to_base58_check
 
           let deserialize ?error serialized_payment =
-            let open Result.Let_syntax in
-            let%bind serialized_transaction =
-              result_of_or_error
-                (Base58_check.decode serialized_payment)
-                ~error:(Option.value error ~default:"Invalid cursor")
-            in
-            Ok
-              (Coda_base.User_command.Stable.V1.bin_t.reader.read
-                 (Bigstring.of_string serialized_transaction)
-                 ~pos_ref:(ref 0))
+            result_of_or_error
+              (User_command.of_base58_check serialized_payment)
+              ~error:(Option.value error ~default:"Invalid cursor")
 
           let doc = Doc.bin_prot "Opaque pagination cursor for a user command"
         end
@@ -1086,13 +1123,11 @@ module Mutations = struct
         in
         (ip_address, Coda_commands.reset_trust_status coda ip_address) )
 
-  let build_user_command coda {Account.Poly.nonce; _} sender_kp memo
-      payment_body fee =
-    let payload =
-      User_command.Payload.create ~fee ~nonce ~memo ~body:payment_body
+  let build_user_command coda nonce sender_kp memo payment_body fee =
+    let command =
+      Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp
+        payment_body
     in
-    let payment = User_command.sign sender_kp payload in
-    let command = User_command.forget_check payment in
     match%map Coda_commands.send_user_command coda command with
     | `Active (Ok _) ->
         Ok command
@@ -1103,10 +1138,20 @@ module Mutations = struct
 
   let parse_user_command_input ~kind coda from to_ fee maybe_memo =
     let open Result.Let_syntax in
-    let%bind sender_account =
-      Result.of_option
-        Partial_account.(of_pk coda from |> to_full_account)
-        ~error:"Couldn't find the account for specified `sender`."
+    let%bind sender_nonce =
+      match
+        Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger coda
+          from
+      with
+      | `Active (Some nonce) ->
+          Ok nonce
+      | `Active None ->
+          Error
+            "Couldn't infer nonce for transaction from specified `sender` \
+             since `sender` is not in the ledger or sent a transaction in \
+             transaction pool."
+      | `Bootstrapping ->
+          Error "Node is still bootstrapping"
     in
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee
@@ -1127,16 +1172,17 @@ module Mutations = struct
           result_of_exn User_command_memo.create_by_digesting_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
-    (sender_account, sender_kp, memo, to_, fee)
+    (sender_nonce, sender_kp, memo, to_, fee)
 
   let send_delegation =
     io_field "sendDelegation"
       ~doc:"Change your delegate by sending a transaction"
       ~typ:(non_null Types.Payload.send_delegation)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.send_delegation)]
-      ~resolve:(fun {ctx= coda; _} () (from, to_, fee, maybe_memo) ->
+      ~resolve:
+        (fun {ctx= coda; _} () (from, to_, fee, maybe_memo, nonce_opt) ->
         let open Deferred.Result.Let_syntax in
-        let%bind sender_account, sender_kp, memo, new_delegate, fee =
+        let%bind sender_nonce, sender_kp, memo, new_delegate, fee =
           Deferred.return
           @@ parse_user_command_input ~kind:"stake delegation" coda from to_
                fee maybe_memo
@@ -1145,15 +1191,20 @@ module Mutations = struct
           User_command_payload.Body.Stake_delegation
             (Set_delegate {new_delegate})
         in
-        build_user_command coda sender_account sender_kp memo body fee )
+        let nonce =
+          Option.value_map nonce_opt ~f:Account.Nonce.of_uint32
+            ~default:sender_nonce
+        in
+        build_user_command coda nonce sender_kp memo body fee )
 
   let send_payment =
     io_field "sendPayment" ~doc:"Send a payment"
       ~typ:(non_null Types.Payload.send_payment)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.send_payment)]
-      ~resolve:(fun {ctx= coda; _} () (from, to_, amount, fee, maybe_memo) ->
+      ~resolve:
+        (fun {ctx= coda; _} () (from, to_, amount, fee, maybe_memo, nonce_opt) ->
         let open Deferred.Result.Let_syntax in
-        let%bind sender_account, sender_kp, memo, receiver, fee =
+        let%bind sender_nonce, sender_kp, memo, receiver, fee =
           Deferred.return
           @@ parse_user_command_input ~kind:"payment" coda from to_ fee
                maybe_memo
@@ -1162,7 +1213,11 @@ module Mutations = struct
           User_command_payload.Body.Payment
             {receiver; amount= Amount.of_uint64 amount}
         in
-        build_user_command coda sender_account sender_kp memo body fee )
+        let nonce =
+          Option.value_map nonce_opt ~f:Account.Nonce.of_uint32
+            ~default:sender_nonce
+        in
+        build_user_command coda nonce sender_kp memo body fee )
 
   let add_payment_receipt =
     result_field "addPaymentReceipt"
@@ -1293,6 +1348,23 @@ module Queries = struct
               Public_key.Compressed.Set.mem propose_public_keys pk
           ; path= Secrets.Wallets.get_path (Coda_lib.wallets coda) pk } )
 
+  let transaction_status =
+    result_field "transactionStatus" ~doc:"Get the status of a transaction"
+      ~typ:(non_null Types.transaction_status)
+      ~args:Arg.[arg "payment" ~typ:(non_null guid) ~doc:"Id of a UserCommand"]
+      ~resolve:(fun {ctx= coda; _} () serialized_payment ->
+        let open Result.Let_syntax in
+        let%bind payment =
+          Types.Pagination.User_command.Inputs.Cursor.deserialize
+            ~error:"Invalid payment provided" serialized_payment
+        in
+        let frontier_broadcast_pipe = Coda_lib.transition_frontier coda in
+        let transaction_pool = Coda_lib.transaction_pool coda in
+        Result.map_error
+          (Transaction_status.get_status ~frontier_broadcast_pipe
+             ~transaction_pool payment)
+          ~f:Error.to_string_hum )
+
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
       ~args:Arg.[]
@@ -1323,7 +1395,8 @@ module Queries = struct
     ; current_snark_worker
     ; blocks
     ; initial_peers
-    ; pooled_user_commands ]
+    ; pooled_user_commands
+    ; transaction_status ]
 end
 
 let schema =
