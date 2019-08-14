@@ -59,7 +59,7 @@ module type S = sig
       module V1 : sig
         type query = unit
 
-        type response = (Work.Spec.t * Public_key.Compressed.t) option
+        type response = Work.Spec.t option
 
         val rpc : (query, response) Rpc.Rpc.t
       end
@@ -83,7 +83,8 @@ module type S = sig
   val command : Command.t
 
   val arguments :
-       daemon_address:Host_and_port.t
+       public_key:Public_key.Compressed.t
+    -> daemon_address:Host_and_port.t
     -> shutdown_on_disconnect:bool
     -> string list
 end
