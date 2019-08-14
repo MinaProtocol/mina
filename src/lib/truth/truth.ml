@@ -1,8 +1,55 @@
-type true_
+module True = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = unit [@@deriving version {unnumbered}]
+      end
 
-type false_
+      include T
+    end
 
-type ('witness, _) t =
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t
+end
+
+module False = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = unit [@@deriving version {unnumbered}]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t
+end
+
+type true_ = True.t
+
+type false_ = False.t
+
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type ('witness, _) t =
+        | True : 'witness -> ('witness, True.Stable.Latest.t) t
+        | False : ('witness, False.Stable.Latest.t) t
+      [@@deriving version]
+    end
+
+    include T
+  end
+
+  module Latest = V1
+end
+
+type ('witness, 'b) t = ('witness, 'b) Stable.Latest.t =
   | True : 'witness -> ('witness, true_) t
   | False : ('witness, false_) t
 
