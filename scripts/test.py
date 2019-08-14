@@ -36,7 +36,6 @@ integration_tests = [
     'coda-shared-prefix-test -who-proposes 0',
     'coda-shared-prefix-test -who-proposes 1',
     'coda-restart-node-test',
-    'coda-change-snark-worker-test',
     'coda-archive-node-test'
 ]
 
