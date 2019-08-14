@@ -724,28 +724,34 @@ let set_snark_worker =
   let open Command.Param in
   let public_key_flag =
     flag "address"
-      ~doc:"PUBLICKEY Public-key address to receive snark work fees"
+      ~doc:
+        "PUBLICKEY Public-key address you wish to start snark-working on; \
+         null to stop doing any snark work"
       (optional Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async
-    ~summary:
-      "Set public key to do snark work and receive snark fees. (If omitted, \
-       then snark work will not be conducted anymore)"
-    (Cli_lib.Background_daemon.init public_key_flag
+    ~summary:"Set key you wish to snark work with or disable snark working"
+    (Cli_lib.Background_daemon.init ~rest:true public_key_flag
        ~f:(fun port optional_public_key ->
-         match%map
-           dispatch Daemon_rpcs.Set_snark_worker.rpc optional_public_key port
-         with
-         | Error e ->
-             print_rpc_error e
-         | Ok () -> (
-           match optional_public_key with
-           | Some public_key ->
-               printf
-                 !"New snark worker public key : %s\n"
-                 (Public_key.Compressed.to_base58_check public_key)
-           | None ->
-               printf "Will stop doing snark work\n" ) ))
+         let open Graphql_client in
+         let yojson_input =
+           [%to_yojson: Public_key.Compressed.t option] optional_public_key
+         in
+         let graphql =
+           Set_snark_worker.make ~wallet:(Yojson.Safe.to_basic yojson_input) ()
+         in
+         Deferred.map (query graphql port) ~f:(fun response ->
+             ( match optional_public_key with
+             | Some public_key ->
+                 printf
+                   !"New snark worker public key : %s\n"
+                   (Public_key.Compressed.to_base58_check public_key)
+             | None ->
+                 printf "Will stop doing snark work\n" ) ;
+             printf "Previous snark worker public key : %s\n"
+               (Option.value_map (response#setSnarkWorker)#lastSnarkWorker
+                  ~default:"None" ~f:Public_key.Compressed.to_base58_check) )
+     ))
 
 (* A step towards `account import`, for now `unsafe-import` will suffice *)
 let unsafe_import =
