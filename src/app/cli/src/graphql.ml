@@ -98,10 +98,23 @@ module Types = struct
       | Banned_until tm ->
           Some (date tm)
 
-    module State_hash = Codable.Make_base58_check (State_hash.Stable.V1)
-    module Ledger_hash = Codable.Make_base58_check (Ledger_hash.Stable.V1)
-    module Frozen_ledger_hash =
-      Codable.Make_base58_check (Frozen_ledger_hash.Stable.V1)
+    module State_hash = Codable.Make_base58_check (struct
+      include State_hash.Stable.V1
+
+      let description = "State hash"
+    end)
+
+    module Ledger_hash = Codable.Make_base58_check (struct
+      include Ledger_hash.Stable.V1
+
+      let description = "Ledger hash"
+    end)
+
+    module Frozen_ledger_hash = Codable.Make_base58_check (struct
+      include Frozen_ledger_hash.Stable.V1
+
+      let description = "Frozen ledger hash"
+    end)
   end
 
   let public_key =
@@ -486,7 +499,7 @@ module Types = struct
               Currency.Fee.to_uint64 fee ) ] )
 
   module Payload = struct
-    let add_wallet : (Coda_lib.t, Account.key sexp_option) typ =
+    let add_wallet : (Coda_lib.t, Account.key option) typ =
       obj "AddWalletPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
               ~doc:"Public key of the newly-created wallet"
@@ -767,7 +780,7 @@ module Types = struct
     module Make (Inputs : Inputs_intf) = struct
       open Inputs
 
-      let edge : (Coda_lib.t, Type.t Edge.t sexp_option) typ =
+      let edge : (Coda_lib.t, Type.t Edge.t option) typ =
         obj (Type.name ^ "Edge")
           ~doc:"Connection Edge as described by the Relay connections spec"
           ~fields:(fun _ ->
@@ -822,7 +835,7 @@ module Types = struct
         io_field query_name
           ~args:
             Arg.
-              [ arg "filter" ~typ:(non_null filter_argument)
+              [ arg "filter" ~typ:filter_argument
               ; arg "first" ~doc:"Returns the first _n_ elements from the list"
                   ~typ:int
               ; arg "after"
@@ -850,33 +863,44 @@ module Types = struct
                     let%map decoded = Cursor.deserialize data in
                     Some decoded
               in
-              let%map queried_nodes, has_earlier_page, has_later_page =
+              let%map ( (queried_nodes, has_earlier_page, has_later_page)
+                      , total_counts ) =
                 Deferred.return
                 @@
-                match (first, after, last, before) with
-                | Some _n_queries_before, _, Some _n_queries_after, _ ->
+                match (first, after, last, before, public_key) with
+                | _, _, _, _, None ->
+                    (* TODO: Return an actual pagination with a limited range of elements rather than returning all the elemens in the database *)
+                    let values = Pagination_database.get_all_values database in
+                    Result.return
+                      ( (values, `Has_earlier_page false, `Has_later_page false)
+                      , Some (List.length values) )
+                | Some _n_queries_before, _, Some _n_queries_after, _, _ ->
                     Error
                       "Illegal query: first and last must not be non-null \
                        value at the same time"
-                | num_to_query, cursor, None, _ ->
+                | num_to_query, cursor, None, _, Some public_key ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
-                    Pagination_database.get_earlier_values database public_key
-                      cursor num_to_query
-                | None, _, num_to_query, cursor ->
+                    ( Pagination_database.get_earlier_values database
+                        public_key cursor num_to_query
+                    , Pagination_database.get_total_values database public_key
+                    )
+                | None, _, num_to_query, cursor, Some public_key ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
-                    Pagination_database.get_later_values database public_key
-                      cursor num_to_query
+                    ( Pagination_database.get_later_values database public_key
+                        cursor num_to_query
+                    , Pagination_database.get_total_values database public_key
+                    )
               in
               ( ( List.map queried_nodes ~f:(fun node ->
                       {Edge.node; cursor= Cursor.serialize @@ to_cursor node}
                   )
                 , has_earlier_page
                 , has_later_page )
-              , Pagination_database.get_values database public_key )
+              , Option.value ~default:0 total_counts )
             in
-            build_connection result (List.length total_counts) )
+            build_connection result total_counts )
     end
 
     module User_command = struct
@@ -1126,13 +1150,19 @@ module Mutations = struct
   let parse_user_command_input ~kind coda from to_ fee maybe_memo =
     let open Result.Let_syntax in
     let%bind sender_nonce =
-      Result.of_option
-        (Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger coda
-           from)
-        ~error:
-          "Couldn't infer nonce for transaction from specified `sender` since \
-           `sender` is not in the ledger or sent a transaction in  \
-           transaction pool."
+      match
+        Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger coda
+          from
+      with
+      | `Active (Some nonce) ->
+          Ok nonce
+      | `Active None ->
+          Error
+            "Couldn't infer nonce for transaction from specified `sender` \
+             since `sender` is not in the ledger or sent a transaction in \
+             transaction pool."
+      | `Bootstrapping ->
+          Error "Node is still bootstrapping"
     in
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee

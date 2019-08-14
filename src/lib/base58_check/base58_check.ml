@@ -4,11 +4,13 @@
 
 open Core_kernel
 
-exception Invalid_base58_checksum
+exception Invalid_base58_checksum of string
 
-exception Invalid_base58_version_byte of char
+exception Invalid_base58_version_byte of (char * string)
 
-exception Invalid_base58_check_length
+exception Invalid_base58_check_length of string
+
+exception Invalid_base58_character of string
 
 (* same as Bitcoin alphabet *)
 let coda_alphabet =
@@ -20,6 +22,8 @@ let version_len = 1
 let checksum_len = 4
 
 module Make (M : sig
+  val description : string
+
   val version_byte : char
 end) =
 struct
@@ -45,10 +49,15 @@ struct
 
   let decode_exn s =
     let bytes = Bytes.of_string s in
-    let decoded = B58.decode coda_alphabet bytes |> Bytes.to_string in
+    let decoded =
+      try B58.decode coda_alphabet bytes |> Bytes.to_string
+      with B58.Invalid_base58_character ->
+        raise (Invalid_base58_character M.description)
+    in
     let len = String.length decoded in
     (* input must be at least as long as the version byte and checksum *)
-    if len < version_len + checksum_len then raise Invalid_base58_check_length ;
+    if len < version_len + checksum_len then
+      raise (Invalid_base58_check_length M.description) ;
     let checksum =
       String.sub decoded
         ~pos:(String.length decoded - checksum_len)
@@ -58,23 +67,26 @@ struct
       String.sub decoded ~pos:1 ~len:(len - version_len - checksum_len)
     in
     if not (String.equal checksum (compute_checksum payload)) then
-      raise Invalid_base58_checksum ;
+      raise (Invalid_base58_checksum M.description) ;
     if not (Char.equal decoded.[0] version_byte) then
-      raise (Invalid_base58_version_byte decoded.[0]) ;
+      raise (Invalid_base58_version_byte (decoded.[0], M.description)) ;
     payload
 
   let decode s =
+    let error_str e desc = sprintf "Invalid base58 %s in %s" e desc in
     try Ok (decode_exn s) with
-    | B58.Invalid_base58_character ->
-        Or_error.error_string "Invalid base58 character"
-    | Invalid_base58_check_length ->
-        Or_error.error_string "Invalid base58 check length"
-    | Invalid_base58_checksum ->
-        Or_error.error_string "Invalid base58 checksum"
-    | Invalid_base58_version_byte ch ->
+    | Invalid_base58_character str ->
+        Or_error.error_string (error_str "character" str)
+    | Invalid_base58_check_length str ->
+        Or_error.error_string (error_str "check length" str)
+    | Invalid_base58_checksum str ->
+        Or_error.error_string (error_str "checksum" str)
+    | Invalid_base58_version_byte (ch, str) ->
         Or_error.error_string
-          (sprintf "Invalid base58 version byte \\x%02X, expected \\x%02X"
-             (Char.to_int ch) (Char.to_int version_byte))
+          (error_str
+             (sprintf "version byte \\x%02X, expected \\x%02X" (Char.to_int ch)
+                (Char.to_int version_byte))
+             str)
 end
 
 module Version_bytes = Version_bytes
@@ -82,6 +94,8 @@ module Version_bytes = Version_bytes
 let%test_module "base58check tests" =
   ( module struct
     module Base58_check = Make (struct
+      let description = "Base58check tests"
+
       let version_byte = '\x53'
     end)
 
@@ -118,11 +132,11 @@ let%test_module "base58check tests" =
         let encoded_bad_checksum = Bytes.to_string bytes in
         let _payload = decode_exn encoded_bad_checksum in
         false
-      with Invalid_base58_checksum -> true
+      with Invalid_base58_checksum _ -> true
 
     let%test "invalid length" =
       try
         let _payload = decode_exn "abcd" in
         false
-      with Invalid_base58_check_length -> true
+      with Invalid_base58_check_length _ -> true
   end )

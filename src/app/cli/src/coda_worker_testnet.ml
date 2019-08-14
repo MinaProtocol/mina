@@ -345,7 +345,8 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                         [ ("worker_id", `Int worker_id)
                         ; ("user_cmd", User_command.to_yojson user_cmd) ]
                       "Transaction $user_cmd took too long to get into the \
-                       root of node $worker_id" ;
+                       root of node $worker_id. Length expected: %d got: %d"
+                      expected_deadline length ;
                     exit 9 |> ignore ) ) ;
               List.iter user_commands ~f:(fun user_cmd ->
                   Hashtbl.change user_cmds_under_inspection user_cmd
@@ -493,7 +494,7 @@ module Payments : sig
     -> User_command.t list Deferred.t
 
   val assert_retrievable_payments :
-    Api.t -> User_command.t sexp_list -> unit Deferred.t
+    Api.t -> User_command.t list -> unit Deferred.t
 end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =

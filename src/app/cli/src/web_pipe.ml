@@ -21,6 +21,8 @@ module type Intf = sig
 end
 
 module Base58_check = Base58_check.Make (struct
+  let description = "CODA_WEB_CLIENT_SERVICE"
+
   let version_byte = Base58_check.Version_bytes.web_pipe
 end)
 

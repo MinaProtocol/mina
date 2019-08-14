@@ -83,7 +83,6 @@ module type For_staged_ledger_intf = sig
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
      and type compressed_public_key := Public_key.Compressed.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
      and type transaction_snark_work := Transaction_snark_work.t
      and type transaction_snark_work_checked :=
                 Transaction_snark_work.Checked.t

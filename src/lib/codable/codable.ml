@@ -80,6 +80,8 @@ end)
 module Make_base58_check (T : sig
   type t [@@deriving bin_io]
 
+  val description : string
+
   val version_byte : char
 end) =
 struct

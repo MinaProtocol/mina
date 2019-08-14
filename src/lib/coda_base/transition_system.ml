@@ -46,6 +46,10 @@ module type Tock_keypair_intf = sig
   val keys : Tock.Keypair.t
 end
 
+let step_input () = Tick.Data_spec.[Tick.Field.typ]
+
+let step_input_size = Tick.Data_spec.size (step_input ())
+
 (* Someday:
    Tighten this up. Doing this with all these equalities is kind of a hack, but
    doing it right required an annoying change to the bits intf. *)
@@ -57,10 +61,6 @@ module Make (Digest : sig
 end)
 (System : S) =
 struct
-  let step_input () = Tick.Data_spec.[Tick.Field.typ]
-
-  let step_input_size = Tick.Data_spec.size (step_input ())
-
   module Step_base = struct
     open System
 
@@ -235,16 +235,8 @@ struct
     let step_vk_precomp =
       Verifier.Verification_key.Precomputation.create_constant step_vk
 
-    let step_vk_constant =
-      let open Verifier.Verification_key in
-      let {query_base; query; delta; alpha_beta} = step_vk in
-      { Verifier.Verification_key.query_base=
-          Inner_curve.Checked.constant query_base
-      ; query= List.map ~f:Inner_curve.Checked.constant query
-      ; delta= Pairing.G2.constant delta
-      ; alpha_beta= Pairing.Fqk.constant alpha_beta }
+    let step_vk_constant = Verifier.constant_vk step_vk
 
-    (* TODO: Use an online verifier here *)
     let%snarkydef main (input : Wrap_input.var) =
       let%bind result =
         (* The use of choose_preimage here is justified since we feed it to the verifier, which doesn't
