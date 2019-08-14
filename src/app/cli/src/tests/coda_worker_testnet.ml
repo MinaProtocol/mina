@@ -177,17 +177,6 @@ module Api = struct
       ~f:(fun worker -> Coda_process.new_block_exn worker key)
       t i
 
-  let replace_snark_worker_key t i key =
-    run_online_worker
-      ~f:(fun worker -> Coda_process.replace_snark_worker_key worker key)
-      t i
-
-  let validated_transitions_keyswaptest t i =
-    run_online_worker
-      ~f:(fun worker ->
-        Coda_process.validated_transitions_keyswaptest_exn worker )
-      t i
-
   let new_user_command_and_subscribe t i key =
     ignore @@ new_block t i key ;
     new_user_command t i key
@@ -339,8 +328,6 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                       testnet.root_lengths.(i) + (Consensus.Constants.k / 2)
                       < length - 1
                     then (
-                      Logger.info logger !"Filled catchup ivar"
-                        ~module_:__MODULE__ ~location:__LOC__ ;
                       Ivar.fill signal () ;
                       testnet.restart_signals.(i) <- None )
                     else () ) ;
