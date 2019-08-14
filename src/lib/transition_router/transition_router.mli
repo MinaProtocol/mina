@@ -69,8 +69,7 @@ module Make (Inputs : Inputs_intf) : sig
     -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
                                * External_transition.t Broadcast_pipe.Writer.t
     -> Transition_frontier.t
-    -> (External_transition.Validated.t, State_hash.t) With_hash.t
-       Strict_pipe.Reader.t
+    -> External_transition.Validated.t Strict_pipe.Reader.t
 end
 
 open Coda_transition
@@ -95,5 +94,4 @@ val run :
   -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
                              * External_transition.t Broadcast_pipe.Writer.t
   -> Transition_frontier.t
-  -> (External_transition.Validated.t, State_hash.t) With_hash.t
-     Strict_pipe.Reader.t
+  -> External_transition.Validated.t Strict_pipe.Reader.t

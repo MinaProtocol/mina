@@ -52,6 +52,9 @@ module Make
         let consensus_state {protocol_state; _} =
           Protocol_state.consensus_state protocol_state
 
+        let blockchain_state {protocol_state; _} =
+          Protocol_state.blockchain_state protocol_state
+
         let state_hash {protocol_state; _} = Protocol_state.hash protocol_state
 
         let parent_hash {protocol_state; _} =
@@ -101,6 +104,7 @@ module Make
   Stable.Latest.
     ( protocol_state
     , protocol_state_proof
+    , blockchain_state
     , staged_ledger_diff
     , consensus_state
     , state_hash
@@ -211,12 +215,6 @@ module Make
 
     let wrap t = (t, fully_invalid)
 
-    let lift (t, validation) =
-      With_hash.of_data (t, validation) ~hash_data:(fun _ -> With_hash.hash t)
-
-    let lower transition_with_hash v =
-      (With_hash.data transition_with_hash |> fst, v)
-
     let extract_delta_transition_chain_witness = function
       | ( _
         , _
@@ -224,6 +222,40 @@ module Make
         , _
         , _ ) ->
           delta_transition_chain_witness
+      | _ ->
+          failwith "why can't this be refuted?"
+
+    let reset_frontier_dependencies_validation
+        (transition_with_hash, validation) =
+      match validation with
+      | ( time_received
+        , proof
+        , delta_transition_chain
+        , (`Frontier_dependencies, Truth.True ())
+        , staged_ledger_diff ) ->
+          ( transition_with_hash
+          , ( time_received
+            , proof
+            , delta_transition_chain
+            , (`Frontier_dependencies, Truth.False)
+            , staged_ledger_diff ) )
+      | _ ->
+          failwith "why can't this be refuted?"
+
+    let reset_staged_ledger_diff_validation (transition_with_hash, validation)
+        =
+      match validation with
+      | ( time_received
+        , proof
+        , delta_transition_chain
+        , frontier_dependencies
+        , (`Staged_ledger_diff, Truth.True ()) ) ->
+          ( transition_with_hash
+          , ( time_received
+            , proof
+            , delta_transition_chain
+            , frontier_dependencies
+            , (`Staged_ledger_diff, Truth.False) ) )
       | _ ->
           failwith "why can't this be refuted?"
 
@@ -517,6 +549,8 @@ module Make
 
           let protocol_state_proof = lift protocol_state_proof
 
+          let blockchain_state = lift blockchain_state
+
           let staged_ledger_diff = lift staged_ledger_diff
 
           let consensus_state = lift consensus_state
@@ -574,6 +608,7 @@ module Make
       , forget_validation
       , protocol_state
       , protocol_state_proof
+      , blockchain_state
       , staged_ledger_diff
       , consensus_state
       , state_hash
@@ -592,7 +627,7 @@ module Make
     module Breadcrumb : sig
       type t
 
-      val transition_with_hash : t -> (Validated.t, State_hash.t) With_hash.t
+      val validated_transition : t -> Validated.t
     end
 
     val root : t -> Breadcrumb.t
@@ -607,8 +642,8 @@ module Make
       let parent_hash = Protocol_state.previous_state_hash protocol_state in
       let root_protocol_state =
         Transition_frontier.root frontier
-        |> Transition_frontier.Breadcrumb.transition_with_hash
-        |> With_hash.data |> Validated.protocol_state
+        |> Transition_frontier.Breadcrumb.validated_transition
+        |> Validated.protocol_state
       in
       let%bind () =
         Result.ok_if_true

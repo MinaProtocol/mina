@@ -209,18 +209,14 @@ module Make (Inputs : Intf.Main_inputs) = struct
       Transition_storage.get transition_storage ~logger (Transition state_hash)
     in
     let root_transition, root_successor_hashes =
-      let verified_transition, children_hashes =
-        get_verified_transition state_hash
-      in
-      ({With_hash.data= verified_transition; hash= state_hash}, children_hashes)
+      get_verified_transition state_hash
     in
     let%bind root_staged_ledger =
       Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
         ~verifier ~scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
         ~pending_coinbases
-        ~expected_merkle_root:
-          (staged_ledger_hash @@ With_hash.data root_transition)
+        ~expected_merkle_root:(staged_ledger_hash root_transition)
       |> Deferred.Or_error.ok_exn
     in
     let%bind transition_frontier =

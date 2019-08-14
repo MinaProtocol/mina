@@ -88,13 +88,11 @@ let%test_module "Ledger catchup" =
       assert_catchup_jobs_are_flushed me ;
       Rose_tree.equal expected_breadcrumbs catchup_breadcrumbs
         ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
-          let to_transition =
-            Transition_frontier.(
-              Fn.compose With_hash.data Breadcrumb.transition_with_hash)
-          in
           External_transition.Validated.equal
-            (to_transition breadcrumb_tree1)
-            (to_transition breadcrumb_tree2) )
+            (Transition_frontier.Breadcrumb.validated_transition
+               breadcrumb_tree1)
+            (Transition_frontier.Breadcrumb.validated_transition
+               breadcrumb_tree2) )
 
     let%test "catchup to a peer" =
       Core.Backtrace.elide := false ;
@@ -111,18 +109,12 @@ let%test_module "Ledger catchup" =
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
             let transition =
-              External_transition.Validation.lower
-                (Transition_frontier.Breadcrumb.transition_with_hash
-                   best_breadcrumb)
-                ( (`Time_received, Truth.True ())
-                , (`Proof, Truth.True ())
-                , ( `Delta_transition_chain
-                  , Truth.True
-                      ( Non_empty_list.singleton
-                      @@ Transition_frontier.Breadcrumb.parent_hash
-                           best_breadcrumb ) )
-                , (`Frontier_dependencies, Truth.False)
-                , (`Staged_ledger_diff, Truth.False) )
+              Transition_frontier.Breadcrumb.validated_transition
+                best_breadcrumb
+              |> External_transition.Validation
+                 .reset_frontier_dependencies_validation
+              |> External_transition.Validation
+                 .reset_staged_ledger_diff_validation
             in
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
@@ -147,20 +139,15 @@ let%test_module "Ledger catchup" =
           in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
+            Transition_frontier.Breadcrumb.validated_transition best_breadcrumb
           in
           let best_transition_enveloped =
             let transition =
-              External_transition.Validation.lower best_transition
-                ( (`Time_received, Truth.True ())
-                , (`Proof, Truth.True ())
-                , ( `Delta_transition_chain
-                  , Truth.True
-                      ( Non_empty_list.singleton
-                      @@ Transition_frontier.Breadcrumb.parent_hash
-                           best_breadcrumb ) )
-                , (`Frontier_dependencies, Truth.False)
-                , (`Staged_ledger_diff, Truth.False) )
+              best_transition
+              |> External_transition.Validation
+                 .reset_frontier_dependencies_validation
+              |> External_transition.Validation
+                 .reset_staged_ledger_diff_validation
             in
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
@@ -168,11 +155,13 @@ let%test_module "Ledger catchup" =
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ( "state_hash"
-                , State_hash.to_yojson (With_hash.hash best_transition) ) ]
+                , State_hash.to_yojson
+                    (External_transition.Validated.state_hash best_transition)
+                ) ]
             "Best transition of peer: $state_hash" ;
           let history =
             Transition_frontier.root_history_path_map peer.frontier
-              (With_hash.hash best_transition)
+              (External_transition.Validated.state_hash best_transition)
               ~f:Fn.id
             |> Option.value_exn
           in
@@ -192,20 +181,15 @@ let%test_module "Ledger catchup" =
           in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
+            Transition_frontier.Breadcrumb.validated_transition best_breadcrumb
           in
           test_catchup ~logger ~trust_system ~network me
             (let transition =
-               External_transition.Validation.lower best_transition
-                 ( (`Time_received, Truth.True ())
-                 , (`Proof, Truth.True ())
-                 , ( `Delta_transition_chain
-                   , Truth.True
-                       ( Non_empty_list.singleton
-                       @@ Transition_frontier.Breadcrumb.parent_hash
-                            best_breadcrumb ) )
-                 , (`Frontier_dependencies, Truth.False)
-                 , (`Staged_ledger_diff, Truth.False) )
+               best_transition
+               |> External_transition.Validation
+                  .reset_frontier_dependencies_validation
+               |> External_transition.Validation
+                  .reset_staged_ledger_diff_validation
              in
              Envelope.Incoming.wrap ~data:transition
                ~sender:Envelope.Sender.Local)
@@ -232,40 +216,34 @@ let%test_module "Ledger catchup" =
           in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
+            Transition_frontier.Breadcrumb.validated_transition best_breadcrumb
           in
           let history =
             Transition_frontier.root_history_path_map peer.frontier
-              (With_hash.hash best_transition)
+              (External_transition.Validated.state_hash best_transition)
               ~f:Fn.id
             |> Option.value_exn
           in
           let missing_breadcrumbs = Non_empty_list.tail history in
           let missing_transitions =
             List.map missing_breadcrumbs
-              ~f:Transition_frontier.Breadcrumb.transition_with_hash
+              ~f:Transition_frontier.Breadcrumb.validated_transition
           in
           let cached_best_transition =
             Transition_handler.Unprocessed_transition_cache.register_exn
               unprocessed_transition_cache
               (let transition =
-                 External_transition.Validation.lower best_transition
-                   ( (`Time_received, Truth.True ())
-                   , (`Proof, Truth.True ())
-                   , ( `Delta_transition_chain
-                     , Truth.True
-                         ( Non_empty_list.singleton
-                         @@ Transition_frontier.Breadcrumb.parent_hash
-                              best_breadcrumb ) )
-                   , (`Frontier_dependencies, Truth.False)
-                   , (`Staged_ledger_diff, Truth.False) )
+                 best_transition
+                 |> External_transition.Validation
+                    .reset_frontier_dependencies_validation
+                 |> External_transition.Validation
+                    .reset_staged_ledger_diff_validation
                in
                Envelope.Incoming.wrap ~data:transition
                  ~sender:Envelope.Sender.Local)
           in
           let parent_hash =
-            External_transition.Validated.parent_hash
-              (With_hash.data best_transition)
+            External_transition.Validated.parent_hash best_transition
           in
           Strict_pipe.Writer.write catchup_job_writer
             (parent_hash, [Rose_tree.T (cached_best_transition, [])]) ;
@@ -274,16 +252,11 @@ let%test_module "Ledger catchup" =
             Transition_handler.Unprocessed_transition_cache.register_exn
               unprocessed_transition_cache
               (let transition =
-                 External_transition.Validation.lower failing_transition
-                   ( (`Time_received, Truth.True ())
-                   , (`Proof, Truth.True ())
-                   , ( `Delta_transition_chain
-                     , Truth.True
-                         (Non_empty_list.singleton
-                            ( With_hash.data failing_transition
-                            |> External_transition.Validated.parent_hash )) )
-                   , (`Frontier_dependencies, Truth.False)
-                   , (`Staged_ledger_diff, Truth.False) )
+                 failing_transition
+                 |> External_transition.Validation
+                    .reset_frontier_dependencies_validation
+                 |> External_transition.Validation
+                    .reset_staged_ledger_diff_validation
                in
                Envelope.Incoming.wrap ~data:transition
                  ~sender:Envelope.Sender.Local)
@@ -322,40 +295,33 @@ let%test_module "Ledger catchup" =
           in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
+            Transition_frontier.Breadcrumb.validated_transition best_breadcrumb
           in
           let history =
             Transition_frontier.root_history_path_map peer.frontier
-              (With_hash.hash best_transition)
+              (External_transition.Validated.state_hash best_transition)
               ~f:Fn.id
             |> Option.value_exn
           in
           let missing_breadcrumbs = Non_empty_list.tail history in
           let missing_transitions =
             List.map missing_breadcrumbs
-              ~f:Transition_frontier.Breadcrumb.transition_with_hash
+              ~f:Transition_frontier.Breadcrumb.validated_transition
             |> List.rev
           in
           let last_breadcrumb = List.last_exn missing_breadcrumbs in
           let parent_hashes =
             List.map missing_transitions
-              ~f:
-                (Fn.compose External_transition.Validated.parent_hash
-                   With_hash.data)
+              ~f:External_transition.Validated.parent_hash
           in
           let cached_transitions =
             List.map missing_transitions ~f:(fun transition ->
                 let transition =
-                  External_transition.Validation.lower transition
-                    ( (`Time_received, Truth.True ())
-                    , (`Proof, Truth.True ())
-                    , ( `Delta_transition_chain
-                      , Truth.True
-                          (Non_empty_list.singleton
-                             ( With_hash.data transition
-                             |> External_transition.Validated.parent_hash )) )
-                    , (`Frontier_dependencies, Truth.False)
-                    , (`Staged_ledger_diff, Truth.False) )
+                  transition
+                  |> External_transition.Validation
+                     .reset_frontier_dependencies_validation
+                  |> External_transition.Validation
+                     .reset_staged_ledger_diff_validation
                 in
                 Envelope.Incoming.wrap ~data:transition
                   ~sender:Envelope.Sender.Local

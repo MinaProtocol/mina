@@ -56,7 +56,7 @@ module Make (Inputs : Inputs.S) :
       else Cached.invalidate_with_success cached_breadcrumb
     in
     let transition =
-      Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
+      Transition_frontier.Breadcrumb.validated_transition breadcrumb
     in
     let add_breadcrumb =
       if only_if_present then Transition_frontier.add_breadcrumb_if_present_exn
@@ -65,7 +65,7 @@ module Make (Inputs : Inputs.S) :
     let%map () = add_breadcrumb frontier breadcrumb in
     Writer.write processed_transition_writer transition ;
     Catchup_scheduler.notify catchup_scheduler
-      ~hash:(With_hash.hash transition)
+      ~hash:(External_transition.Validated.state_hash transition)
 
   let process_transition ~logger ~trust_system ~verifier ~frontier
       ~catchup_scheduler ~processed_transition_writer

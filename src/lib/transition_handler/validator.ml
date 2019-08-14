@@ -26,8 +26,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     let protocol_state = External_transition.protocol_state transition in
     let root_protocol_state =
       Transition_frontier.root frontier
-      |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
-      |> External_transition.Validated.protocol_state
+      |> Transition_frontier.Breadcrumb.protocol_state
     in
     let%bind () =
       Option.fold (Transition_frontier.find frontier transition_hash)

@@ -1,5 +1,4 @@
 open Coda_base
-open Coda_state
 open Core
 open Async
 open Cache_lib
@@ -80,13 +79,11 @@ module Make (Inputs : Inputs.S) :
                   let sender = Envelope.Incoming.sender enveloped_transition in
                   let parent = Cached.peek cached_parent in
                   let expected_parent_hash =
-                    Transition_frontier.Breadcrumb.transition_with_hash parent
-                    |> With_hash.hash
+                    Transition_frontier.Breadcrumb.state_hash parent
                   in
                   let actual_parent_hash =
                     transition_with_hash |> With_hash.data
-                    |> External_transition.protocol_state
-                    |> Protocol_state.previous_state_hash
+                    |> External_transition.parent_hash
                   in
                   let%bind () =
                     Deferred.return

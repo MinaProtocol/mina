@@ -104,9 +104,7 @@ end) :
       module New_frontier = struct
         (* TODO: version *)
         type t =
-          ( ( External_transition.Validated.Stable.V1.t
-            , State_hash.Stable.V1.t )
-            With_hash.Stable.V1.t
+          ( External_transition.Validated.Stable.V1.t
           , Staged_ledger.Scan_state.Stable.V1.t
           , Pending_coinbase.Stable.V1.t )
           Root.Poly.Stable.V1.t
@@ -115,11 +113,7 @@ end) :
 
       module Add_transition = struct
         (* TODO: version *)
-        type t =
-          ( External_transition.Validated.Stable.V1.t
-          , State_hash.Stable.V1.t )
-          With_hash.Stable.V1.t
-        [@@deriving bin_io]
+        type t = External_transition.Validated.Stable.V1.t [@@deriving bin_io]
       end
 
       module Update_root = struct
@@ -202,10 +196,12 @@ end) :
     let key_to_yojson (type a) (key : a t) =
       let json_key =
         match key with
-        | New_frontier {Root.Poly.root= With_hash.{hash; _}; _} ->
-            State_hash.to_yojson hash
-        | Add_transition With_hash.{hash; _} ->
-            State_hash.to_yojson hash
+        | New_frontier {Root.Poly.root= root_transition; _} ->
+            External_transition.Validated.state_hash root_transition
+            |> State_hash.to_yojson
+        | Add_transition validated_transition ->
+            External_transition.Validated.state_hash validated_transition
+            |> State_hash.to_yojson
         | Remove_transitions removed_transitions ->
             `List (List.map ~f:State_hash.to_yojson removed_transitions)
         | Update_root {Root.Poly.root= state_hash; scan_state; pending_coinbase}
@@ -231,11 +227,16 @@ end) :
     let hash_diff_contents (type mutant) (t : mutant t) acc =
       match t with
       | New_frontier
-          {Root.Poly.root= {With_hash.hash; _}; scan_state; pending_coinbase}
-        ->
-          hash_root_data (hash, scan_state, pending_coinbase) acc
-      | Add_transition {With_hash.hash; _} ->
-          Hash.merge acc (State_hash.raw_hash_bytes hash)
+          {Root.Poly.root= root_transition; scan_state; pending_coinbase} ->
+          hash_root_data
+            ( External_transition.Validated.state_hash root_transition
+            , scan_state
+            , pending_coinbase )
+            acc
+      | Add_transition validated_transition ->
+          Hash.merge acc
+            (State_hash.raw_hash_bytes
+               (External_transition.Validated.state_hash validated_transition))
       | Remove_transitions removed_transitions ->
           List.fold removed_transitions ~init:acc
             ~f:(fun acc_hash transition ->
@@ -400,9 +401,8 @@ end) :
       |> Staged_ledger.pending_coinbase_collection
 
     let consensus_state breadcrumb =
-      breadcrumb |> Breadcrumb.transition_with_hash |> With_hash.data
-      |> External_transition.Validated.protocol_state
-      |> Coda_state.Protocol_state.consensus_state
+      breadcrumb |> Breadcrumb.validated_transition
+      |> External_transition.Validated.consensus_state
 
     let get_root_data root =
       { Mutant.Root.Poly.root= Breadcrumb.state_hash root
@@ -414,20 +414,20 @@ end) :
           [ Mutant.E.With_value
               ( New_frontier
                   { Mutant.Root.Poly.root=
-                      Breadcrumb.transition_with_hash breadcrumb
+                      Breadcrumb.validated_transition breadcrumb
                   ; scan_state= scan_state breadcrumb
                   ; pending_coinbase= pending_coinbase breadcrumb }
               , () ) ]
       | New_breadcrumb {previous; added} ->
           [ With_value
-              ( Add_transition (Breadcrumb.transition_with_hash added)
+              ( Add_transition (Breadcrumb.validated_transition added)
               , consensus_state previous ) ]
       | New_best_tip
           {garbage; added_to_best_tip_path; new_root; old_root; parent; _} ->
           let added_transition =
             Mutant.E.With_value
               ( Add_transition
-                  ( Breadcrumb.transition_with_hash
+                  ( Breadcrumb.validated_transition
                   @@ Non_empty_list.last added_to_best_tip_path )
               , consensus_state parent )
           in
