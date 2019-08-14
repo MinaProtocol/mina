@@ -41,7 +41,7 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
     | `Invalid_proof ->
         punish Sent_invalid_proof None
     | `Invalid_delta_transition_chain_proof ->
-        punish Sent_invalid_transition_chain_proof None
+        punish Sent_invalid_transition_chain_merkle_proof None
     | `Invalid_time_received `Too_early ->
         punish Gossiped_future_transition None
     | `Invalid_time_received (`Too_late slot_diff) ->
