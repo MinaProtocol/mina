@@ -720,6 +720,33 @@ let set_staking =
                (Public_key.Compressed.to_base58_check
                   (Public_key.compress public_key)) ))
 
+let set_snark_worker =
+  let open Command.Param in
+  let public_key_flag =
+    flag "address"
+      ~doc:"PUBLICKEY Public-key address to receive snark work fees"
+      (optional Cli_lib.Arg_type.public_key_compressed)
+  in
+  Command.async
+    ~summary:
+      "Set public key to do snark work and receive snark fees. (If omitted, \
+       then snark work will not be conducted anymore)"
+    (Cli_lib.Background_daemon.init public_key_flag
+       ~f:(fun port optional_public_key ->
+         match%map
+           dispatch Daemon_rpcs.Set_snark_worker.rpc optional_public_key port
+         with
+         | Error e ->
+             print_rpc_error e
+         | Ok () -> (
+           match optional_public_key with
+           | Some public_key ->
+               printf
+                 !"New snark worker public key : %s\n"
+                 (Public_key.Compressed.to_base58_check public_key)
+           | None ->
+               printf "Will stop doing snark work\n" ) ))
+
 (* A step towards `account import`, for now `unsafe-import` will suffice *)
 let unsafe_import =
   Command.async
@@ -832,6 +859,7 @@ let command =
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("set-staking", set_staking)
+    ; ("set-snark-worker", set_snark_worker)
     ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
     ; ("stop-daemon", stop_daemon)

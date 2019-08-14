@@ -543,7 +543,7 @@ module Types = struct
               ~resolve:(fun _ -> Fn.id) ] )
 
     let add_payment_receipt =
-      obj "AddPaymentReceipt" ~fields:(fun _ ->
+      obj "AddPaymentReceiptPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
@@ -555,6 +555,15 @@ module Types = struct
                 "Returns the last wallet public keys that were staking before \
                  or empty if there were none"
               ~typ:(non_null (list (non_null public_key)))
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
+    let set_snark_worker =
+      obj "SetSnarkWorkerPayload" ~fields:(fun _ ->
+          [ field "lastSnarkWorker"
+              ~doc:
+                "Returns the last public key that was designated for snark work"
+              ~typ:public_key
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
   end
@@ -688,6 +697,14 @@ module Types = struct
               ~doc:
                 "Public keys of wallets you wish to stake - these must be \
                  wallets that are in ownedWallets" ]
+
+    let set_snark_worker =
+      obj "SetSnarkWorkerInput" ~coerce:Fn.id
+        ~fields:
+          [ arg "wallet" ~typ:public_key_arg
+              ~doc:
+                "A public key you wish to get reward for doing snark work - \
+                 if omitted, then you will stop doing snark work" ]
 
     module AddPaymentReceipt = struct
       type t = {payment: string; added_time: string}
@@ -1253,13 +1270,24 @@ module Mutations = struct
         ignore @@ Coda_commands.replace_proposers coda pks ;
         Public_key.Compressed.Set.to_list old_propose_keys )
 
+  let set_snark_worker =
+    field "setSnarkWorker"
+      ~doc:"Set key you wish to get rewarded for doing snark work"
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_worker)]
+      ~typ:(non_null Types.Payload.set_snark_worker)
+      ~resolve:(fun {ctx= coda; _} () pk ->
+        let old_snark_worker_key = Coda_lib.snark_worker_key coda in
+        Coda_lib.replace_snark_worker_key coda pk ;
+        old_snark_worker_key )
+
   let commands =
     [ add_wallet
     ; delete_wallet
     ; send_payment
     ; send_delegation
     ; add_payment_receipt
-    ; set_staking ]
+    ; set_staking
+    ; set_snark_worker ]
 end
 
 module Queries = struct
