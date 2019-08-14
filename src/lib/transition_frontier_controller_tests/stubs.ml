@@ -235,6 +235,7 @@ struct
         External_transition.create ~protocol_state
           ~protocol_state_proof:Proof.dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
+          ~delta_transition_chain_proof:(previous_state_hash, [])
       in
       (* We manually created a verified an external_transition *)
       let (`I_swear_this_is_safe_see_my_comment
@@ -253,9 +254,14 @@ struct
           ~transition:
             (External_transition.Validation.lower
                next_verified_external_transition_with_hash
-               ( (`Time_received, Truth.True)
-               , (`Proof, Truth.True)
-               , (`Frontier_dependencies, Truth.True)
+               ( (`Time_received, Truth.True ())
+               , (`Proof, Truth.True ())
+               , ( `Delta_transition_chain
+                 , Truth.True
+                     (Non_empty_list.singleton
+                        (Transition_frontier.Breadcrumb.state_hash
+                           parent_breadcrumb)) )
+               , (`Frontier_dependencies, Truth.True ())
                , (`Staged_ledger_diff, Truth.False) ))
           ~sender:None
       with
@@ -327,7 +333,9 @@ struct
       External_transition.Validated.create_unsafe
         (External_transition.create ~protocol_state:genesis_protocol_state
            ~protocol_state_proof:Proof.dummy
-           ~staged_ledger_diff:dummy_staged_ledger_diff)
+           ~staged_ledger_diff:dummy_staged_ledger_diff
+           ~delta_transition_chain_proof:
+             (Protocol_state.previous_state_hash genesis_protocol_state, []))
     in
     let root_transition_with_data =
       {With_hash.data= root_transition; hash= genesis_protocol_state_hash}
@@ -491,7 +499,7 @@ struct
     end
   end
 
-  module Transition_chain_witness = Transition_chain_witness.Make (struct
+  module Transition_chain_prover = Transition_chain_prover.Make (struct
     include Transition_frontier_inputs
     module Transition_frontier = Transition_frontier
   end)
@@ -636,9 +644,9 @@ struct
         ~f:(Sync_handler.Bootstrappable_best_tip.prove ~logger)
         t
 
-    let get_transition_chain_witness =
-      handle_requests ~typ:"transition chain witness"
-        ~f:Transition_chain_witness.prove
+    let get_transition_chain_proof =
+      handle_requests ~typ:"transition chain witness" ~f:(fun ~frontier hash ->
+          Transition_chain_prover.prove ~frontier hash )
 
     let get_transition_chain =
       handle_requests ~typ:"tranition_chain"
@@ -781,11 +789,18 @@ struct
     let send_transition ~logger ~transition_writer ~peer:{peer; frontier}
         state_hash =
       let transition =
-        External_transition.Validation.lower
-          ( Transition_frontier.find_exn frontier state_hash
-          |> Transition_frontier.Breadcrumb.transition_with_hash )
-          ( (`Time_received, Truth.True)
-          , (`Proof, Truth.True)
+        let transition_with_hash =
+          Transition_frontier.find_exn frontier state_hash
+          |> Transition_frontier.Breadcrumb.transition_with_hash
+        in
+        External_transition.Validation.lower transition_with_hash
+          ( (`Time_received, Truth.True ())
+          , (`Proof, Truth.True ())
+          , ( `Delta_transition_chain
+            , Truth.True
+                (Non_empty_list.singleton
+                   ( With_hash.data transition_with_hash
+                   |> External_transition.Validated.parent_hash )) )
           , (`Frontier_dependencies, Truth.False)
           , (`Staged_ledger_diff, Truth.False) )
       in
