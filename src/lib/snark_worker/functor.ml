@@ -66,8 +66,15 @@ module Make (Inputs : Intf.Inputs_intf) :
     match res with
     | Error exn ->
         if shutdown_on_disconnect then
-          failwithf !"Shutting down. Error: %s" (Exn.to_string_mach exn) ()
-        else Or_error.of_exn exn
+          failwithf
+            !"Shutting down. Error using the RPC call, %s,: %s"
+            (Rpc.Rpc.name rpc) (Exn.to_string_mach exn) ()
+        else
+          Error
+            ( Error.createf
+                !"Error using the RPC call, %s: %s"
+                (Rpc.Rpc.name rpc)
+            @@ Exn.to_string_mach exn )
     | Ok res ->
         res
 
