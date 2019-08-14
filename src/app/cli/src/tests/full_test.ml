@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"../../../../config.mlh"]
 
 open Core
 open Async
@@ -8,6 +8,7 @@ open Coda_state
 open Signature_lib
 open Pipe_lib
 open O1trace
+open Init
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
