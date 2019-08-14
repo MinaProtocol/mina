@@ -455,7 +455,7 @@ let handle_crash e =
     And then paste the following:
 
     %s%!|err}
-    (Exn.to_string e)
+        (Exn.to_string e)
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
