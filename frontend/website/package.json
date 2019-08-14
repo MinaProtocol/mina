@@ -35,6 +35,6 @@
     ],
     "ext": "js,md,markdown"
   },
-  "author": "",
-  "license": "ISC"
+  "author": "codaprotocol",
+  "license": "Apache-2.0"
 }
