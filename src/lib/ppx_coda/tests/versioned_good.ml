@@ -294,3 +294,17 @@ module M17 = struct
     end
   end
 end
+
+(* a GADT type with type parameters in result *)
+module M18 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('instantiated, 'unbound) t =
+          | Foo : int * 'unbound list -> (int, 'unbound) t
+          | Bar : string * 'unbound array -> (string, 'unbound) t
+        [@@deriving version]
+      end
+    end
+  end
+end
