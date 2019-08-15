@@ -215,8 +215,7 @@ let run_test () : unit Deferred.t =
               (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
       in
       Coda_run.setup_local_server coda ;
-      Coda_lib.start_proposer coda ;
-      Coda_lib.start_snark_worker coda ;
+      let%bind () = Coda_lib.start coda in
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
       (* No proof emitted by the parallel scan at the begining *)

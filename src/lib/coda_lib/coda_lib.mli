@@ -21,7 +21,8 @@ val propose_public_keys : t -> Public_key.Compressed.Set.t
 
 val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
 
-val replace_snark_worker_key : t -> Public_key.Compressed.t option -> unit
+val replace_snark_worker_key :
+  t -> Public_key.Compressed.t option -> unit Deferred.t
 
 val add_block_subscriber :
      t
@@ -80,9 +81,9 @@ val external_transition_database :
 
 val snark_pool : t -> Network_pool.Snark_pool.t
 
-val start_proposer : t -> unit
+val start : t -> unit Deferred.t
 
-val start_snark_worker : t -> unit
+val stop_snark_worker : t -> unit Deferred.t
 
 val create : Config.t -> t Deferred.t
 

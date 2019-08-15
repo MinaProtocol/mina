@@ -600,8 +600,7 @@ let daemon logger =
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_whitelist ~rest_server_port
          ~insecure_rest_server coda ;
-       Coda_lib.start_proposer coda ;
-       Coda_lib.start_snark_worker coda ;
+       let%bind () = Coda_lib.start coda in
        let%bind () =
          Option.map metrics_server_port ~f:(fun port ->
              Coda_metrics.server ~port ~logger >>| ignore )
