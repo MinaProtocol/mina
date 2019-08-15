@@ -94,3 +94,5 @@ val most_recent_valid_transition :
 val top_level_logger : t -> Logger.t
 
 val config : t -> Config.t
+
+val net : t -> Coda_networking.t
