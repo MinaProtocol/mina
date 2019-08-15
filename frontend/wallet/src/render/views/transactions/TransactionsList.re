@@ -34,7 +34,13 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~transactions, ~pending, ~onLoadMore: unit => Js.Promise.t('a)) => {
+let make =
+    (
+      ~transactions,
+      ~pending,
+      ~onLoadMore: unit => Js.Promise.t('a),
+      ~hasNextPage,
+    ) => {
   let (isFetchingMore, setFetchingMore) = React.useState(() => false);
 
   <div className=Styles.body>
@@ -56,22 +62,26 @@ let make = (~transactions, ~pending, ~onLoadMore: unit => Js.Promise.t('a)) => {
        transactions,
      )
      |> React.array}
-    {!isFetchingMore
-       ? <Waypoint
-           onEnter={_ => {
-             setFetchingMore(_ => true);
-             let _ =
-               onLoadMore()
-               |> Js.Promise.then_(() => {
-                    setFetchingMore(_ => false);
-                    Js.Promise.resolve();
-                  });
-             ();
-           }}
-           topOffset="100px"
-         />
-       : <div className=Css.(style([margin2(~v=`rem(1.5), ~h=`auto)]))>
-           <Loader />
-         </div>}
+    {hasNextPage
+       ? {
+         !isFetchingMore
+           ? <Waypoint
+               onEnter={_ => {
+                 setFetchingMore(_ => true);
+                 let _ =
+                   onLoadMore()
+                   |> Js.Promise.then_(() => {
+                        setFetchingMore(_ => false);
+                        Js.Promise.resolve();
+                      });
+                 ();
+               }}
+               topOffset="100px"
+             />
+           : <div className=Css.(style([margin2(~v=`rem(1.5), ~h=`auto)]))>
+               <Loader />
+             </div>;
+       }
+       : React.null}
   </div>;
 };
