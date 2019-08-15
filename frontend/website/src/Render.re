@@ -197,7 +197,8 @@ Router.(
         ),
         File(
           "testnet",
-          <Page page=`Testnet name="testnet" extraHeaders={Testnet.extraHeaders()}>
+          <Page
+            page=`Testnet name="testnet" extraHeaders={Testnet.extraHeaders()}>
             <Wrapped> <Testnet /> </Wrapped>
           </Page>,
         ),
