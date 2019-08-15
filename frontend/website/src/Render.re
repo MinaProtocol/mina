@@ -195,6 +195,13 @@ Router.(
             <Wrapped> <Careers jobOpenings /> </Wrapped>
           </Page>,
         ),
+        File(
+          "testnet",
+          <Page
+            page=`Testnet name="testnet" extraHeaders={Testnet.extraHeaders()}>
+            <Wrapped> <Testnet /> </Wrapped>
+          </Page>,
+        ),
         File("blog", blogPage("blog")),
         File(
           "privacy",
