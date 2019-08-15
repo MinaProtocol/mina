@@ -16,8 +16,9 @@ let dispatch rpc query port =
       | Error exn ->
           return
             (Or_error.errorf
-               !"Error connecting to the daemon on port %d: %s"
-               port (Exn.to_string exn))
+               !"Error connecting to the daemon on port %d using the RPC \
+                 call, %s,: %s"
+               port (Rpc.Rpc.name rpc) (Exn.to_string exn))
       | Ok conn ->
           Rpc.Rpc.dispatch rpc conn query )
 
