@@ -169,11 +169,10 @@ module TimeDisplay = {
   };
 
   [@react.component]
-  let make = (~date: Js.Date.t) => {
+  let make = (~date: Js.Date.t) =>
     <span className=Styles.time>
       {ReasonReact.string(Time.render(~date, ~now=Js.Date.make()))}
     </span>;
-  };
 };
 
 module Amount = {

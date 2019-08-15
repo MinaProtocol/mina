@@ -23,7 +23,6 @@ let thOfDate = x =>
   };
 
 let render = (~date, ~now) => {
-  Js.log(date);
   let int = (f, x) => f(x) |> Js.Math.unsafe_round;
 
   let militaryHours = int(Js.Date.getHours, date);
