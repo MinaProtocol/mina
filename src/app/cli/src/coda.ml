@@ -59,7 +59,7 @@ let daemon logger =
        flag "work-selection"
          ~doc:
            "seq|rand Choose work sequentially (seq) or randomly (rand) \
-            (default: seq)"
+            (default: rand)"
          (optional work_selection_method)
      and external_port =
        flag "external-port"
@@ -135,6 +135,13 @@ let daemon logger =
          ~doc:
            "true|false Limit the number of concurrent connections per IP \
             address (default:true)"
+         (optional bool)
+     (*TODO: This is being added to log all the snark works received for the 
+     beta-testnet challenge. We might want to remove this later?*)
+     and log_received_snark_pool_diff =
+       flag "log-snark-work-gossip"
+         ~doc:
+           "true|false Log snark-pool diff received from peers (default:false)"
          (optional bool)
      and no_bans =
        let module Expiration = struct
@@ -359,13 +366,17 @@ let daemon logger =
            or_from_config
              (Fn.compose Option.return
                 (Fn.compose work_selection_method_val YJ.Util.to_string))
-             "work-selection" ~default:Cli_lib.Arg_type.Sequence
+             "work-selection" ~default:Cli_lib.Arg_type.Random
              work_selection_method_flag
          in
          let work_reassignment_wait =
            or_from_config YJ.Util.to_int_option "work-reassignment-wait"
              ~default:Cli_lib.Default.work_reassignment_wait
              work_reassignment_wait
+         in
+         let log_received_snark_pool_diff =
+           or_from_config YJ.Util.to_bool_option "log-snark-work-gossip"
+             ~default:false log_received_snark_pool_diff
          in
          let initial_peers_raw =
            List.concat
@@ -537,7 +548,8 @@ let daemon logger =
                ; initial_peers= initial_peers_cleaned
                ; addrs_and_ports
                ; trust_system
-               ; max_concurrent_connections } }
+               ; max_concurrent_connections
+               ; log_received_snark_pool_diff } }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in

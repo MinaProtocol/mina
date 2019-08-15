@@ -32,7 +32,8 @@ module type Config_intf = sig
     ; conf_dir: string
     ; logger: Logger.t
     ; trust_system: Trust_system.t
-    ; max_concurrent_connections: int option }
+    ; max_concurrent_connections: int option
+    ; log_received_snark_pool_diff: bool }
   [@@deriving make]
 end
 
@@ -143,7 +144,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; conf_dir: string
       ; logger: Logger.t
       ; trust_system: Trust_system.t
-      ; max_concurrent_connections: int option }
+      ; max_concurrent_connections: int option
+      ; log_received_snark_pool_diff: bool }
     [@@deriving make]
   end
 

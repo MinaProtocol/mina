@@ -143,7 +143,8 @@ let run_test () : unit Deferred.t =
                   ; communication_port
                   ; client_port }
               ; trust_system
-              ; max_concurrent_connections= Some 10 } }
+              ; max_concurrent_connections= Some 10
+              ; log_received_snark_pool_diff= false } }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
