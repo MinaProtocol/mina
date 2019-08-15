@@ -2572,10 +2572,12 @@ module Hooks = struct
             epoch_data
         | Error () ->
             Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              "System time is out of sync with protocol state time" ;
-            failwith
-              "System time is out of sync with protocol state time; please \
-               setup NTP if you haven't)"
+              "An empty epoch is detected! This could be caused by bad \
+               internet connection; or the testnet has crashed. In our \
+               current version of testnet this is unrecoverable, but we will \
+               fix it in future versions once the planned change to consensus \
+               is finished." ;
+            exit 99
       in
       let total_stake = epoch_data.ledger.total_currency in
       let epoch_snapshot =
