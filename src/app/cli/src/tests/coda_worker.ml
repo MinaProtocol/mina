@@ -553,14 +553,13 @@ module T = struct
             don't_wait_for
               (Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
                  ~f:(fun t ->
-                   let p =
-                     External_transition.Validated.protocol_state
-                       (With_hash.data t)
-                   in
+                   let p = External_transition.Validated.protocol_state t in
                    let prev_state_hash =
                      Protocol_state.previous_state_hash p
                    in
-                   let state_hash = With_hash.hash t in
+                   let state_hash =
+                     External_transition.Validated.state_hash t
+                   in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in
                    if Pipe.is_closed w then
