@@ -93,6 +93,10 @@ Staking coda allows nodes on the network to increase their chances of being sele
 
 A pool of delegated funds that is run by a staking pool owner. Other nodes may choose to delegate funds to a staking pool to avoid the requirement of being online.
 
+####User Transaction
+
+A transaction issued by a user - either a payment or a delegation change
+
 ####Zero Knowledge Proof
 
 A proof by which one party (a prover) can prove to another party (verifiers) that they have knowledge of something - without giving away that specific knowledge. Coda uses zero knowledge proofs, and specifically, zk-SNARKs, to generate a proof attesting to the blockchain's validity and allowing any node on the network to verify this quickly.
