@@ -2572,11 +2572,14 @@ module Hooks = struct
             epoch_data
         | Error () ->
             Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              "An empty epoch is detected! This could be caused by bad \
-               internet connection; or the testnet has crashed. In our \
-               current version of testnet this is unrecoverable, but we will \
-               fix it in future versions once the planned change to consensus \
-               is finished." ;
+              "An empty epoch is detected! This could be caused by the \
+               following reasons: system time is out of sync with protocol \
+               state time; or internet connection is down or unstable; or the \
+               testnet has crashed. If it is the first case, please setup \
+               NIP. If it is the second case, please check the internet \
+               connection. If it is the last case, in our current version of \
+               testnet this is unrecoverable, but we will fix it in future \
+               versions once the planned change to consensus is finished." ;
             exit 99
       in
       let total_stake = epoch_data.ledger.total_currency in
