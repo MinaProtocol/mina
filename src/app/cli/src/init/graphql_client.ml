@@ -36,6 +36,10 @@ let query query_obj port =
         (Error.to_string_hum e) ;
       exit 17
 
+module Encoders = struct
+  let uint64 value = `String (Unsigned.UInt64.to_string value)
+end
+
 module Decoders = struct
   let public_key json =
     Yojson.Basic.Util.to_string json

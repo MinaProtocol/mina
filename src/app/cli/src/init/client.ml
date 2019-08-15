@@ -729,7 +729,7 @@ let set_snark_work_fee =
          let open Graphql_client in
          let graphql =
            Set_snark_work_fee.make
-             ~fee:(Yojson.Safe.to_basic @@ Currency.Fee.to_yojson fee)
+             ~fee:(Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
              ()
          in
          Deferred.map (query graphql port) ~f:(fun response ->
