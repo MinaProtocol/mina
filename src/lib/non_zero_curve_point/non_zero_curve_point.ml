@@ -138,7 +138,14 @@ module Compressed = struct
 
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
-  include Codable.Make_base58_check (Stable.Latest)
+
+  [%%define_locally
+  Stable.Latest.
+    ( of_yojson
+    , to_yojson
+    , to_base58_check
+    , of_base58_check
+    , of_base58_check_exn )]
 
   let compress (x, y) : t = {x; is_odd= parity y}
 
