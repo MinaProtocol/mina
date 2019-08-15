@@ -201,7 +201,7 @@ let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_whitelist = []) ?rest_server_port
-    ?(insecure_rest_server = false) ~coda ~client_port () =
+    ?(insecure_rest_server = false) coda =
   let client_whitelist =
     Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
   in
@@ -307,15 +307,17 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
-          let r = Coda_lib.request_work coda in
-          Option.iter r ~f:(fun r ->
-              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:
-                  [ ( "work_spec"
-                    , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r)
-                    ) ]
-                "responding to a Get_work request with some new work" ) ;
-          return r )
+          Deferred.return
+            (let open Option.Let_syntax in
+            let%bind snark_worker_key = Coda_lib.snark_worker_key coda in
+            let%map r = Coda_lib.request_work coda in
+            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ( "work_spec"
+                  , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r) )
+                ]
+              "responding to a Get_work request with some new work" ;
+            (r, snark_worker_key)) )
     ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -381,7 +383,8 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                    rest_server_port ~module_:__MODULE__ ~location:__LOC__ ) )
       |> ignore ) ;
   let where_to_listen =
-    Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
+    Tcp.Where_to_listen.bind_to All_addresses
+      (On_port (Coda_lib.client_port coda))
   in
   trace_task "client RPC handling" (fun () ->
       Tcp.Server.create
@@ -424,41 +427,37 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                     Deferred.unit )) ) )
   |> ignore
 
-let create_snark_worker ~public_key ~client_port ~shutdown_on_disconnect =
-  let%map p =
-    let our_binary = Sys.executable_name in
-    Process.create_exn () ~prog:our_binary
-      ~args:
-        ( "internal" :: Snark_worker.Intf.command_name
-        :: Snark_worker.arguments ~public_key
-             ~daemon_address:
-               (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
-             ~shutdown_on_disconnect )
-  in
-  (* We want these to be printfs so we don't double encode our logs here *)
-  Pipe.iter_without_pushback
-    (Reader.pipe (Process.stdout p))
-    ~f:(fun s -> printf "%s" s)
-  |> don't_wait_for ;
-  Pipe.iter_without_pushback
-    (Reader.pipe (Process.stderr p))
-    ~f:(fun s -> printf "%s" s)
-  |> don't_wait_for ;
-  Deferred.unit
+let handle_crash e =
+  Core.eprintf
+    !{err|
 
-let run_snark_worker ?shutdown_on_disconnect:(s = true) ~client_port
-    run_snark_worker =
-  match run_snark_worker with
-  | `Don't_run ->
-      ()
-  | `With_public_key public_key ->
-      create_snark_worker ~shutdown_on_disconnect:s ~public_key ~client_port
-      |> ignore
+  💀 Coda's Daemon Crashed. The Coda Protocol developers would like to know why!
+
+  Please:
+    Open an issue:
+      https://github.com/CodaProtocol/coda/issues/new
+
+    Tell us what you were doing, and paste the last 20 lines of log messages.
+    And then paste the following:
+
+    %s%!|err}
+    (Exn.to_string e)
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-      make_report_and_log_shutdown (Exn.to_string exn) ~conf_dir ~top_logger
-        coda_ref ;
+      ( match Monitor.extract_exn exn with
+      | Coda_networking.No_initial_peers ->
+          Core.eprintf
+            !{err|
+
+  ☠  Coda Daemon failed to connect to any initial peers.
+
+You might be trying to connect to a different network version, or need to troubleshoot your configuration. See https://codaprotocol.com/docs/troubleshooting/ for details.
+
+%!|err}
+      | exn ->
+          make_report_and_log_shutdown (Exn.to_string exn) ~conf_dir
+            ~top_logger coda_ref ) ;
       Stdlib.exit 1 ) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->
