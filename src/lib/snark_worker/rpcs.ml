@@ -1,7 +1,6 @@
 open Core_kernel
 open Async
 open Coda_base
-open Signature_lib
 
 (* for versioning of the types here, see
 
@@ -25,12 +24,11 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit
 
         type response =
-          ( ( Transaction.t
-            , Transaction_witness.t
-            , Ledger_proof.t )
-            Work.Single.Spec.t
-            Work.Spec.t
-          * Public_key.Compressed.t )
+          ( Transaction.t
+          , Transaction_witness.t
+          , Ledger_proof.t )
+          Work.Single.Spec.t
+          Work.Spec.t
           option
       end
 
@@ -47,12 +45,11 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit [@@deriving bin_io, version {rpc}]
 
         type response =
-          ( ( Transaction.Stable.V1.t
-            , Transaction_witness.Stable.V1.t
-            , Ledger_proof.Stable.V1.t )
-            Work.Single.Spec.Stable.V1.t
-            Work.Spec.Stable.V1.t
-          * Public_key.Compressed.Stable.V1.t )
+          ( Transaction.Stable.V1.t
+          , Transaction_witness.Stable.V1.t
+          , Ledger_proof.Stable.V1.t )
+          Work.Single.Spec.Stable.V1.t
+          Work.Spec.Stable.V1.t
           option
         [@@deriving bin_io, version {rpc}]
 

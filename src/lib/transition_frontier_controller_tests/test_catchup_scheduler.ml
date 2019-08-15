@@ -104,8 +104,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               External_transition.Validation.lower
                 (Transition_frontier.Breadcrumb.transition_with_hash
                    dangling_breadcrumb)
-                ( (`Time_received, Truth.True)
-                , (`Proof, Truth.True)
+                ( (`Time_received, Truth.True ())
+                , (`Proof, Truth.True ())
+                , ( `Delta_transition_chain
+                  , Truth.True
+                      ( Non_empty_list.singleton
+                      @@ Transition_frontier.Breadcrumb.parent_hash
+                           dangling_breadcrumb ) )
                 , (`Frontier_dependencies, Truth.False)
                 , (`Staged_ledger_diff, Truth.False) )
             in
@@ -172,8 +177,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             List.map dangling_transitions ~f:(fun transition ->
                 let transition =
                   External_transition.Validation.lower transition
-                    ( (`Time_received, Truth.True)
-                    , (`Proof, Truth.True)
+                    ( (`Time_received, Truth.True ())
+                    , (`Proof, Truth.True ())
+                    , ( `Delta_transition_chain
+                      , Truth.True
+                          (Non_empty_list.singleton
+                             (External_transition.Validated.parent_hash
+                                (With_hash.data transition))) )
                     , (`Frontier_dependencies, Truth.False)
                     , (`Staged_ledger_diff, Truth.False) )
                 in
@@ -209,8 +219,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                        External_transition.Validation.lower
                          (Transition_frontier.Breadcrumb.transition_with_hash
                             missing_breadcrumb)
-                         ( (`Time_received, Truth.True)
-                         , (`Proof, Truth.True)
+                         ( (`Time_received, Truth.True ())
+                         , (`Proof, Truth.True ())
+                         , ( `Delta_transition_chain
+                           , Truth.True
+                               (Non_empty_list.singleton
+                                  (Transition_frontier.Breadcrumb.parent_hash
+                                     missing_breadcrumb)) )
                          , (`Frontier_dependencies, Truth.False)
                          , (`Staged_ledger_diff, Truth.False) )
                      in
@@ -274,8 +289,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             List.map dangling_transitions ~f:(fun transition ->
                 let transition =
                   External_transition.Validation.lower transition
-                    ( (`Time_received, Truth.True)
-                    , (`Proof, Truth.True)
+                    ( (`Time_received, Truth.True ())
+                    , (`Proof, Truth.True ())
+                    , ( `Delta_transition_chain
+                      , Truth.True
+                          (Non_empty_list.singleton
+                             (External_transition.Validated.parent_hash
+                                (With_hash.data transition))) )
                     , (`Frontier_dependencies, Truth.False)
                     , (`Staged_ledger_diff, Truth.False) )
                 in
@@ -308,8 +328,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                        External_transition.Validation.lower
                          (Transition_frontier.Breadcrumb.transition_with_hash
                             missing_breadcrumb)
-                         ( (`Time_received, Truth.True)
-                         , (`Proof, Truth.True)
+                         ( (`Time_received, Truth.True ())
+                         , (`Proof, Truth.True ())
+                         , ( `Delta_transition_chain
+                           , Truth.True
+                               ( Non_empty_list.singleton
+                               @@ Transition_frontier.Breadcrumb.parent_hash
+                                    missing_breadcrumb ) )
                          , (`Frontier_dependencies, Truth.False)
                          , (`Staged_ledger_diff, Truth.False) )
                      in

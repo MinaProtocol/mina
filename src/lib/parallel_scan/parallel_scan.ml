@@ -1157,7 +1157,8 @@ let all_work : type merge base.
   let depth = Int.ceil_log2 t.max_base_jobs in
   let set1 = work_for_tree t ~data_tree:`Current in
   let _, other_sets =
-    List.fold ~init:(t, []) (List.init ~f:Fn.id t.delay)
+    List.fold ~init:(t, [])
+      (List.init ~f:Fn.id (t.delay + 1))
       ~f:(fun (t, work_list) _ ->
         let trees' = Non_empty_list.cons (create_tree ~depth) t.trees in
         let t' = {t with trees= trees'} in
@@ -1529,6 +1530,21 @@ let job_count t =
 let assert_job_count t t' ~completed_job_count ~base_job_count ~value_emitted =
   let todo_before, done_before = job_count t in
   let todo_after, done_after = job_count t' in
+  (*ordered list of jobs that is actually called when distributing work*)
+  let all_jobs = List.concat (all_jobs t') in
+  (*list of jobs*)
+  let all_jobs_expected =
+    List.fold ~init:[] (Non_empty_list.to_list t'.trees) ~f:(fun acc tree ->
+        Tree.jobs_records tree @ acc )
+    |> List.filter ~f:(fun job ->
+           match job with
+           | Job.Base {status= Job_status.Todo; _} | Job.Merge {status= Todo; _}
+             ->
+               true
+           | _ ->
+               false )
+  in
+  assert (List.length all_jobs = List.length all_jobs_expected) ;
   let expected_todo_after =
     let new_jobs =
       if value_emitted then (completed_job_count -. 1.) /. 2.
