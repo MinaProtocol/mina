@@ -511,7 +511,7 @@ module T = struct
           Logger.info logger "Worker finish setting up coda"
             ~module_:__MODULE__ ~location:__LOC__ ;
           let coda_peers () = return (Coda_lib.peers coda) in
-          let coda_start () = return (Coda_lib.start coda) in
+          let coda_start () = Coda_lib.start coda in
           let coda_get_all_transitions pk =
             let external_transition_database =
               Coda_lib.external_transition_database coda
@@ -579,7 +579,7 @@ module T = struct
                   e ()
           in
           let coda_replace_snark_worker_key =
-            Fn.compose Deferred.return (Coda_lib.replace_snark_worker_key coda)
+            Coda_lib.replace_snark_worker_key coda
           in
           let coda_new_block key =
             Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
