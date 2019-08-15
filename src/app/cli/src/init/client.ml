@@ -16,8 +16,9 @@ let dispatch rpc query port =
       | Error exn ->
           return
             (Or_error.errorf
-               !"Error connecting to the daemon on port %d: %s"
-               port (Exn.to_string exn))
+               !"Error connecting to the daemon on port %d using the RPC \
+                 call, %s,: %s"
+               port (Rpc.Rpc.name rpc) (Exn.to_string exn))
       | Ok conn ->
           Rpc.Rpc.dispatch rpc conn query )
 
@@ -705,7 +706,7 @@ let stop_tracing =
              print_rpc_error e ))
 
 let set_staking =
-  let privkey_path = Cli_lib.Flag.privkey_write_path in
+  let privkey_path = Cli_lib.Flag.privkey_read_path in
   Command.async ~summary:"Set new block proposer keys"
     (Cli_lib.Background_daemon.init privkey_path ~f:(fun port privkey_path ->
          let%bind ({Keypair.public_key; _} as keypair) =
@@ -762,6 +763,20 @@ let unsafe_import =
             (Public_key.Compressed.to_base58_check
                (Public_key.compress public_key)))
 
+let list_accounts =
+  let open Command.Param in
+  Command.async ~summary:"List all owned accounts"
+    (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
+         Deferred.map
+           (Graphql_client.query (Graphql_client.Get_wallet.make ()) port)
+           ~f:(fun response ->
+             Array.iteri
+               ~f:(fun i w ->
+                 printf "Wallet #%d:\n  Public key: %s\n  Balance: %s\n" (i + 1)
+                   (Public_key.Compressed.to_base58_check w#public_key)
+                   (Unsigned.UInt64.to_string (w#balance)#total) )
+               response#ownedWallets ) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -805,6 +820,10 @@ module Visualization = struct
       [ (Frontier.name, Frontier.command)
       ; (Registered_masks.name, Registered_masks.command) ]
 end
+
+let accounts =
+  Command.group ~summary:"Client commands concerning account management"
+    ~preserve_subcommand_order:() [("list", list_accounts)]
 
 let command =
   Command.group ~summary:"Lightweight client commands"

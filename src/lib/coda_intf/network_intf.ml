@@ -50,7 +50,7 @@ module type Network_intf = sig
        Proof_carrying_data.t
        Deferred.Or_error.t
 
-  val get_transition_chain_witness :
+  val get_transition_chain_proof :
        t
     -> Network_peer.Peer.t
     -> State_hash.t
@@ -151,9 +151,9 @@ module type Network_intf = sig
                                          * external_transition )
                                        Proof_carrying_data.t
                                        Deferred.Option.t)
-    -> get_transition_chain_witness:(   State_hash.t Envelope.Incoming.t
-                                     -> (State_hash.t * State_body_hash.t list)
-                                        Deferred.Option.t)
+    -> get_transition_chain_proof:(   State_hash.t Envelope.Incoming.t
+                                   -> (State_hash.t * State_body_hash.t list)
+                                      Deferred.Option.t)
     -> get_transition_chain:(   State_hash.t list Envelope.Incoming.t
                              -> external_transition list Deferred.Option.t)
     -> t Deferred.t
