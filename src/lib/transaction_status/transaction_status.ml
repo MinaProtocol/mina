@@ -91,7 +91,7 @@ module Make (Inputs : Inputs_intf) :
               Sequence.fold (Sequence.of_list best_tip_path)
                 ~init:User_command.Set.empty ~f:(fun acc_set breadcrumb ->
                   let user_commands =
-                    Transition_frontier.Breadcrumb.to_user_commands breadcrumb
+                    Transition_frontier.Breadcrumb.user_commands breadcrumb
                   in
                   List.fold user_commands ~init:acc_set ~f:Set.add )
             in

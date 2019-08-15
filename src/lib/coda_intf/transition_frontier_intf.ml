@@ -307,21 +307,25 @@ module type Transition_frontier_breadcrumb_intf = sig
 
   val hash : t -> int
 
-  val state_hash : t -> State_hash.t
-
   val protocol_state : t -> Coda_state.Protocol_state.Value.t
 
   val blockchain_state : t -> Coda_state.Blockchain_state.Value.t
 
   val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
+  val state_hash : t -> State_hash.t
+
   val parent_hash : t -> State_hash.t
+
+  val proposer : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+
+  val payments : t -> User_command.t list
 
   val display : t -> display
 
   val name : t -> string
-
-  val to_user_commands : t -> User_command.t list
 end
 
 module type Transition_frontier_base_intf = sig

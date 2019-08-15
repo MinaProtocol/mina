@@ -330,7 +330,7 @@ end) :
           None (* We only care about the best tip *)
       | New_frontier breadcrumb ->
           Some
-            { new_user_commands= Breadcrumb.to_user_commands breadcrumb
+            { new_user_commands= Breadcrumb.user_commands breadcrumb
             ; removed_user_commands= []
             ; reorg_best_tip= false }
       | New_best_tip {added_to_best_tip_path; removed_from_best_tip_path; _} ->
@@ -338,10 +338,10 @@ end) :
             { new_user_commands=
                 List.bind
                   (Non_empty_list.to_list added_to_best_tip_path)
-                  ~f:Breadcrumb.to_user_commands
+                  ~f:Breadcrumb.user_commands
             ; removed_user_commands=
                 List.bind removed_from_best_tip_path
-                  ~f:Breadcrumb.to_user_commands
+                  ~f:Breadcrumb.user_commands
                 (* Using `removed_user_commands` as a proxy for reorg_best_tip is not a good enough because we could be reorg-ing orphaning only coinbase blocks. However, `removed_from_best_tip_path` are all breadcrumbs including those with no user_commands *)
             ; reorg_best_tip= not @@ List.is_empty removed_from_best_tip_path
             }
@@ -366,8 +366,7 @@ end) :
           None
       | New_frontier root ->
           Some
-            { user_commands= Breadcrumb.to_user_commands root
-            ; root_length= Some 0 }
+            {user_commands= Breadcrumb.user_commands root; root_length= Some 0}
       | New_best_tip {old_root; new_root; old_root_length; _} ->
           if
             State_hash.equal
@@ -376,7 +375,7 @@ end) :
           then None
           else
             Some
-              { user_commands= Breadcrumb.to_user_commands new_root
+              { user_commands= Breadcrumb.user_commands new_root
               ; root_length= Some (1 + old_root_length) }
   end
 

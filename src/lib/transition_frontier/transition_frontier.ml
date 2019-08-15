@@ -154,7 +154,11 @@ module Make (Inputs : Inputs_intf) :
 
     let blockchain_state = lift External_transition.Validated.blockchain_state
 
-    let to_user_commands = lift External_transition.Validated.user_commands
+    let proposer = lift External_transition.Validated.proposer
+
+    let user_commands = lift External_transition.Validated.user_commands
+
+    let payments = lift External_transition.Validated.payments
 
     let mask = Fn.compose Staged_ledger.ledger staged_ledger
 
@@ -190,7 +194,7 @@ module Make (Inputs : Inputs_intf) :
     let all_user_commands breadcrumbs =
       Sequence.fold (Sequence.of_list breadcrumbs) ~init:User_command.Set.empty
         ~f:(fun acc_set breadcrumb ->
-          let user_commands = to_user_commands breadcrumb in
+          let user_commands = user_commands breadcrumb in
           Set.union acc_set (User_command.Set.of_list user_commands) )
   end
 
@@ -589,7 +593,7 @@ module Make (Inputs : Inputs_intf) :
     Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
     t.root <- new_root_hash ;
     let num_finalized_staged_txns =
-      Breadcrumb.to_user_commands new_root |> List.length |> Float.of_int
+      Breadcrumb.user_commands new_root |> List.length |> Float.of_int
     in
     (* TODO: these metrics are too expensive to compute in this way, but it should be ok for beta *)
     let root_snarked_ledger_accounts =

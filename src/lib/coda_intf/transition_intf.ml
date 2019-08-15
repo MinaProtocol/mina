@@ -54,13 +54,13 @@ module type External_transition_base_intf = sig
 
   val blockchain_state : t -> Blockchain_state.Value.t
 
+  val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
+
   val staged_ledger_diff : t -> staged_ledger_diff
 
   val state_hash : t -> State_hash.t
 
   val parent_hash : t -> State_hash.t
-
-  val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
   val proposer : t -> Public_key.Compressed.t
 
