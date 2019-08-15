@@ -940,7 +940,7 @@ let%test_module _ =
               assert (Result.is_ok apply_res1) ;
               [%test_eq: int] Test.Resource_pool.pool_max_size
                 (Indexed_pool.size pool.pool) ;
-              let%map apply_res2 =
+              let%map _apply_res2 =
                 Test.Resource_pool.Diff.apply pool
                   (Envelope.Incoming.local cmds2)
               in
