@@ -50,7 +50,7 @@ module Extend
     we assert versioning here, and use tests to assure the serialization
     doesn't change
   *)
-  let __versioned__ = true
+  let __versioned__ = ()
 
   include (Unsigned : Unsigned_intf with type t := t)
 

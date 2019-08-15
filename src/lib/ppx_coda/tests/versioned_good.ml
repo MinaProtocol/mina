@@ -308,3 +308,16 @@ module M18 = struct
     end
   end
 end
+
+(* versioned type mentions type with no inhabitants *)
+module M19 = struct
+  type empty [@@deriving bin_io, version {empty}]
+
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = empty list [@@deriving bin_io, version]
+      end
+    end
+  end
+end

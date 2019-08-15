@@ -40,11 +40,14 @@
   If "rpc" is true, again, the type must be named "query", "response", or "msg",
   and the type definition occurs in the hierarchy "Vn.T".
 
+  The option "empty" can be used with a type that has no right-hand side in its definition.
+  Such a type can be used in other versioned types.
+
   All these options are available for types within structures.
 
   Within signatures, the declaration
 
-    val __versioned__ : bool
+    val __versioned__ : unit
 
   is generated. If the "numbered" option is given, then
 
@@ -141,6 +144,19 @@ let validate_type_decl inner3_modules generation_kind type_decl =
           "Versioned type must be named \"%s\", got: \"%s\"" valid_name name ;
       validate_plain_type_decl inner3_modules type_decl
 
+let validate_empty_type_decl type_decl =
+  let invalid_name = "t" in
+  let name = type_decl.ptype_name.txt in
+  let loc = type_decl.ptype_name.loc in
+  if String.equal name invalid_name then
+    Location.raise_errorf ~loc "Empty versioned type must not be named \"%s\""
+      invalid_name
+  else if Option.is_some type_decl.ptype_manifest then
+    Location.raise_errorf ~loc
+      "Versioned type \"%s\" claimed to be empty has a manifest (right-hand \
+       side)"
+      name
+
 let module_name_from_plain_path inner3_modules =
   match inner3_modules with
   | ["T"; module_version; "Stable"] ->
@@ -226,6 +242,17 @@ let whitelisted_prefix prefix ~loc =
       Ppx_deriving.raise_errorf ~loc
         "Type name contains unexpected application"
 
+let empty_marker name = name ^ "__empty_versioned__"
+
+let generate_version_lets_for_empty_type ~loc type_name =
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = loc
+  end) in
+  let open E in
+  let _marker = empty_marker type_name in
+  (*  [%str let _ = [%e estring marker]] *)
+  [%str let _ = 42]
+
 let rec generate_core_type_version_decls type_name core_type =
   match core_type.ptyp_desc with
   | Ptyp_constr ({txt; _}, core_types) -> (
@@ -249,10 +276,7 @@ let rec generate_core_type_version_decls type_name core_type =
               Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
                 "Type constructor \"%s\" expects one type argument, got %d" id
                 (List.length core_types)
-        else
-          Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
-            "\"%s\" is neither an OCaml type constructor nor a versioned type"
-            id
+        else generate_version_lets_for_empty_type ~loc:core_type.ptyp_loc id
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
            if prefix not whitelisted, generate: let _ = A.B.__versioned__
@@ -350,7 +374,7 @@ let generate_versioned_decls ~asserted generation_kind type_decl =
     let loc = type_decl.ptype_loc
   end) in
   let open E in
-  let versioned_current = [%stri let __versioned__ = true] in
+  let versioned_current = [%stri let __versioned__ = ()] in
   if asserted then [versioned_current]
   else
     match generation_kind with
@@ -364,6 +388,15 @@ let generate_versioned_decls ~asserted generation_kind type_decl =
     | Plain ->
         (* check contained types, assert this type is versioned *)
         versioned_current :: generate_contained_type_decls type_decl
+
+let generate_empty_versioned_decls type_decl =
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = type_decl.ptype_loc
+  end) in
+  let open E in
+  let var = empty_marker type_decl.ptype_name.txt in
+  let patt = ppat_var {txt= var; loc} in
+  [%str let [%p patt] = ()]
 
 let get_type_decl_representative type_decls =
   let type_decl1 = List.hd_exn type_decls in
@@ -406,7 +439,7 @@ let validate_options valid options =
 let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
   ignore
     (validate_options
-       ["wrapped"; "unnumbered"; "rpc"; "asserted"; "for_test"]
+       ["wrapped"; "unnumbered"; "empty"; "rpc"; "asserted"; "for_test"]
        options) ;
   let type_decl = get_type_decl_representative type_decls in
   let wrapped = check_for_option "wrapped" options in
@@ -418,6 +451,7 @@ let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
     check_for_option "asserted" options || check_for_option "for_test" options
   in
   let rpc = check_for_option "rpc" options in
+  let empty = check_for_option "empty" options in
   if asserted && (wrapped || rpc) then
     Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
       "Options \"asserted\" or \"for_test\" cannot be combined with \
@@ -435,30 +469,38 @@ let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
           "RPC versioned type cannot also be wrapped"
   in
   let inner3_modules = List.take (List.rev path) 3 in
-  validate_type_decl inner3_modules generation_kind type_decl ;
-  let versioned_decls =
-    generate_versioned_decls ~asserted generation_kind type_decl
-  in
-  let type_name = type_decl.ptype_name.txt in
-  let has_type_params = not (List.is_empty type_decl.ptype_params) in
-  (* generate version number for Rpc response, but not for query, so we
-     don't get an unused value
-   *)
-  if
-    unnumbered || has_type_params
-    || (generation_kind = Rpc && String.equal type_name "query")
-  then versioned_decls
-  else
-    generate_version_number_decl inner3_modules type_decl.ptype_loc
-      generation_kind
-    :: versioned_decls
+  if empty then
+    if Int.(List.length options > 1) then
+      Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+        "Option \"empty\" cannot be used with other version options"
+    else (
+      validate_empty_type_decl type_decl ;
+      generate_empty_versioned_decls type_decl )
+  else (
+    validate_type_decl inner3_modules generation_kind type_decl ;
+    let versioned_decls =
+      generate_versioned_decls ~asserted generation_kind type_decl
+    in
+    let type_name = type_decl.ptype_name.txt in
+    let has_type_params = not (List.is_empty type_decl.ptype_params) in
+    (* generate version number for Rpc response, but not for query, so we
+       don't get an unused value
+    *)
+    if
+      unnumbered || has_type_params
+      || (generation_kind = Rpc && String.equal type_name "query")
+    then versioned_decls
+    else
+      generate_version_number_decl inner3_modules type_decl.ptype_loc
+        generation_kind
+      :: versioned_decls )
 
 let generate_val_decls_for_type_decl type_decl ~numbered =
   match type_decl.ptype_kind with
   (* the structure of the type doesn't affect what we generate for signatures *)
   | Ptype_abstract | Ptype_variant _ | Ptype_record _ ->
       let loc = type_decl.ptype_loc in
-      let versioned = [%sigi: val __versioned__ : bool] in
+      let versioned = [%sigi: val __versioned__ : unit] in
       if numbered then [[%sigi: val version : int]; versioned] else [versioned]
   | Ptype_open ->
       (* but the type can't be open, else it might vary over time *)

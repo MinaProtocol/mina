@@ -63,15 +63,18 @@ negative-tests :
 	@ echo -n "Versioned type with bad version name, should fail..."
 	@ ! dune build versioned_bad_version_name.cma ${REDIRECT}
 	@ echo "OK"
-	@ echo -n "Versioned types with bad contained types, should fail..."
+	@ echo -n "Versioned type with bad contained types, should fail..."
 	@ ! dune build versioned_bad_contained_types.cma ${REDIRECT}
 	@ echo "OK"
-	@ echo -n "Versioned types with unversioned type with type parameters, should fail..."
+	@ echo -n "Versioned type with unversioned type with type parameters, should fail..."
 	@ ! dune build versioned_bad_type_parameters.cma ${REDIRECT}
 	@ echo "OK"
-	@ echo -n "Versioned types with GADT type with unversioned inputs, should fail..."
+	@ echo -n "Versioned type with GADT type with unversioned inputs, should fail..."
 	@ ! dune build versioned_bad_gadt.cma ${REDIRECT}
 	@ echo "OK"
-	@ echo -n "Versioned types with GADT type with unversioned results, should fail..."
+	@ echo -n "Versioned type with GADT type with unversioned results, should fail..."
 	@ ! dune build versioned_bad_gadt_results.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Versioned type with invalid empty type, should fail..."
+	@ ! dune build versioned_bad_empty.cma ${REDIRECT}
 	@ echo "OK"
