@@ -66,7 +66,7 @@ let%test_module "Sync_handler" =
 
     let to_external_transition breadcrumb =
       Transition_frontier.Breadcrumb.validated_transition breadcrumb
-      |> External_transition.Validated.forget_validation
+      |> External_transition.Validation.forget_validation
 
     let%test "a node should be able to give a valid proof of their root" =
       let logger = Logger.null () in

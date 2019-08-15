@@ -585,7 +585,7 @@ let create (config : Config.t) =
           let genesis_transition =
             Transition_frontier.(
               root transition_frontier |> Breadcrumb.validated_transition
-              |> External_transition.Validated.forget_validation)
+              |> External_transition.Validation.forget_validation)
           in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
@@ -702,7 +702,7 @@ let create (config : Config.t) =
                        "Rebroadcasting $state_hash" ;
                      (* remove verified status for network broadcast *)
                      Coda_networking.broadcast_state net
-                       (External_transition.Validated.forget_validation
+                       (External_transition.Validation.forget_validation
                           transition)
                  | Error reason ->
                      let timing_error_json =

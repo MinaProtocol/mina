@@ -157,7 +157,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     in
     (* TMP HACK: our transition is already validated, so we "downgrade" it's validation #2486 *)
     let mostly_validated_external_transition =
-      ( With_hash.map ~f:External_transition.Validated.forget_validation
+      ( With_hash.map ~f:External_transition.Validation.forget_validation
           transition
       , ( (`Time_received, Truth.True ())
         , (`Proof, Truth.True ())

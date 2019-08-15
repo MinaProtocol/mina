@@ -75,7 +75,7 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.Breadcrumb.validated_transition best_tip_breadcrumb
     in
     let best_tip =
-      External_transition.Validated.forget_validation best_verified_tip
+      External_transition.Validation.forget_validation best_verified_tip
     in
     let root =
       Transition_frontier.root frontier
@@ -92,8 +92,8 @@ module Make (Inputs : Inputs_intf) :
     Proof_carrying_data.
       { data= best_tip
       ; proof=
-          (merkle_list, root |> External_transition.Validated.forget_validation)
-      }
+          ( merkle_list
+          , root |> External_transition.Validation.forget_validation ) }
 
   let validate_proof ~verifier transition_with_hash =
     let open Deferred.Result.Monad_infix in

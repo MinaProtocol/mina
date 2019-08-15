@@ -196,6 +196,15 @@ module type External_transition_intf = sig
          , 'frontier_dependencies
          , [`Staged_ledger_diff] * unit Truth.false_t )
          with_transition
+
+    val forget_validation :
+         ( 'time_received
+         , 'proof
+         , 'delta_transition_chain
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         with_transition
+      -> external_transition
   end
 
   type with_initial_validation =
@@ -212,8 +221,6 @@ module type External_transition_intf = sig
 
     val create_unsafe :
       external_transition -> [`I_swear_this_is_safe_see_my_comment of t]
-
-    val forget_validation : t -> external_transition
 
     include
       External_transition_base_intf

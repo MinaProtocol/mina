@@ -332,7 +332,7 @@ let%test_module "Bootstrap Controller" =
           let best_transition =
             Transition_frontier.best_tip peer_with_frontier.frontier
             |> Transition_frontier.Breadcrumb.validated_transition
-            |> External_transition.Validated.forget_validation
+            |> External_transition.Validation.forget_validation
           in
           let%bind should_sync =
             Bootstrap_controller.For_tests.on_transition bootstrap
@@ -343,7 +343,7 @@ let%test_module "Bootstrap Controller" =
           let outdated_transition =
             Transition_frontier.root peer_with_frontier.frontier
             |> Transition_frontier.Breadcrumb.validated_transition
-            |> External_transition.Validated.forget_validation
+            |> External_transition.Validation.forget_validation
           in
           let%map should_not_sync =
             Bootstrap_controller.For_tests.on_transition bootstrap

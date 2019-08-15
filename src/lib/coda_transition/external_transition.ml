@@ -259,6 +259,8 @@ module Make
       | _ ->
           failwith "why can't this be refuted?"
 
+    let forget_validation (t, _) = With_hash.data t
+
     module Unsafe = struct
       let set_valid_time_received :
              ( [`Time_received] * unit Truth.false_t
@@ -577,8 +579,6 @@ module Make
           let user_commands = lift user_commands
 
           let payments = lift payments
-
-          let forget_validation (t, _) = With_hash.data t
         end
 
         include T
@@ -605,7 +605,6 @@ module Make
       ( sexp_of_t
       , t_of_sexp
       , create_unsafe
-      , forget_validation
       , protocol_state
       , protocol_state_proof
       , blockchain_state

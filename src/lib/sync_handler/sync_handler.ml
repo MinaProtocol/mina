@@ -109,7 +109,7 @@ module Make (Inputs : Inputs_intf) :
            |> Option.map ~f:(fun breadcrumb ->
                   Transition_frontier.Breadcrumb.validated_transition
                     breadcrumb
-                  |> External_transition.Validated.forget_validation ) )
+                  |> External_transition.Validation.forget_validation ) )
 
   module Root = struct
     let prove ~logger ~frontier seen_consensus_state =

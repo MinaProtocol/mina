@@ -433,7 +433,9 @@ end = struct
                 , Some ("Received valid scan state from peer", []) ))
         in
         let new_root =
-          let root_transition = With_hash.data (fst t.current_root) in
+          let root_transition =
+            External_transition.Validation.forget_validation t.current_root
+          in
           (* TODO: review the correctness of this action #2480 *)
           let (`I_swear_this_is_safe_see_my_comment validated_root_transition)
               =
