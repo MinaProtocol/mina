@@ -269,6 +269,7 @@ let get_status ~flag t =
   in
   let user_commands_sent = !txn_count in
   let run_snark_worker = Option.is_some (Coda_lib.snark_worker_key t) in
+  let snark_work_fee = Currency.Fee.to_int @@ Coda_lib.snark_work_fee t in
   let propose_pubkeys = Coda_lib.propose_public_keys t in
   let consensus_mechanism = Consensus.name in
   let consensus_time_now =
@@ -390,6 +391,7 @@ let get_status ~flag t =
   ; peers
   ; user_commands_sent
   ; run_snark_worker
+  ; snark_work_fee
   ; propose_pubkeys= Public_key.Compressed.Set.to_list propose_pubkeys
   ; histograms
   ; consensus_time_now

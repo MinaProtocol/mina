@@ -57,3 +57,13 @@ query getWallet {
   }
 }
 |}]
+
+module Set_snark_work_fee =
+[%graphql
+{|
+mutation ($fee: UInt64!  ) {
+  setSnarkWorkFee(input: {fee: $fee}) {
+    lastFee @bsDecoder(fn: "Decoders.uint64")
+    }
+}
+|}]

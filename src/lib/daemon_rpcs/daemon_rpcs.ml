@@ -211,6 +211,8 @@ module Types = struct
 
       let run_snark_worker = bool_entry "SNARK worker running"
 
+      let snark_work_fee = int_entry "SNARK work fee"
+
       let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
@@ -248,6 +250,7 @@ module Types = struct
         map_entry "Consensus configuration" ~f:render
     end
 
+    (* TODO: put snark work fee *)
     type t =
       { num_accounts: int option
       ; blockchain_length: int option
@@ -260,6 +263,7 @@ module Types = struct
       ; peers: string list
       ; user_commands_sent: int
       ; run_snark_worker: bool
+      ; snark_work_fee: int
       ; sync_status: Sync_status.Stable.V1.t
       ; propose_pubkeys: Public_key.Compressed.Stable.V1.t list
       ; histograms: Histograms.t option
@@ -281,6 +285,7 @@ module Types = struct
         ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent
         ~run_snark_worker ~propose_pubkeys ~histograms ~consensus_time_best_tip
         ~consensus_time_now ~consensus_mechanism ~consensus_configuration
+        ~snark_work_fee
       |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =
