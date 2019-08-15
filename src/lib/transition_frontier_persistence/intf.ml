@@ -27,7 +27,7 @@ module type Frontier_diff = sig
 
   type scan_state
 
-  type add_transition = (external_transition_verified, state_hash) With_hash.t
+  type add_transition = external_transition_verified
 
   type move_root =
     { best_tip: add_transition

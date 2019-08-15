@@ -33,10 +33,10 @@ let main () =
   in
   let wait_for_snark_worker_proof new_block_pipe public_key =
     let found_snark_prover_ivar = Ivar.create () in
-    Pipe.iter new_block_pipe ~f:(fun {With_hash.hash= _; data= transition} ->
+    Pipe.iter new_block_pipe ~f:(fun transition ->
         let completed_works =
           Staged_ledger_diff.completed_works
-          @@ External_transition.staged_ledger_diff transition
+          @@ External_transition.Validated.staged_ledger_diff transition
         in
         if
           List.exists completed_works

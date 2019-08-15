@@ -533,6 +533,5 @@ module type Transition_router_intf = sig
                                  * [`Time_received of Block_time.t] )
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> (external_transition_verified, State_hash.t) With_hash.t
-       Strict_pipe.Reader.t
+    -> external_transition_verified Strict_pipe.Reader.t
 end
