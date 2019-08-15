@@ -165,7 +165,8 @@ module Haskell_process = struct
         { external_ip= ip1
         ; bind_ip= ip1
         ; discovery_port= 8000
-        ; communication_port= 8001 }
+        ; communication_port= 8001
+        ; client_port= 3000 }
     in
     let me_discovery = Host_and_port.create ~host:"1.1.1.1" ~port:8000 in
     let other = Host_and_port.create ~host:"1.1.1.2" ~port:8000 in
@@ -520,7 +521,8 @@ let%test_module "Tests" =
                 { external_ip= Unix.Inet_addr.localhost
                 ; bind_ip= Unix.Inet_addr.localhost
                 ; discovery_port= 3001
-                ; communication_port= 3000 }
+                ; communication_port= 3000
+                ; client_port= 2000 }
               ~logger:(Logger.null ())
               ~conf_dir:(Filename.temp_dir_name ^/ "membership-test")
           with
@@ -633,7 +635,8 @@ let%test_module "Tests" =
         { external_ip= Unix.Inet_addr.localhost
         ; bind_ip= Unix.Inet_addr.localhost
         ; discovery_port= 3006 + i
-        ; communication_port= 3005 + i }
+        ; communication_port= 3005 + i
+        ; client_port= 1000 + i }
 
     let conf_dir = Filename.temp_dir_name ^/ ".kademlia-test-"
 
