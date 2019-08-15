@@ -2,7 +2,7 @@
 "../../config.mlh"]
 
 open Core_kernel
-open Async_kernel
+open Async
 open Coda_base
 open Coda_transition
 open Pipe_lib
@@ -15,7 +15,18 @@ module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 module Config = Config
 module Subscriptions = Coda_subscriptions
 
-type processes = {prover: Prover.t; verifier: Verifier.t}
+exception Snark_worker_error of int
+
+exception Snark_worker_signal_interrupt of Signal.t
+
+(* A way to run a single snark worker for a daemon in a lazy manner. Evaluating
+   this lazy value will run the snark worker process. A snark work is
+   assigned to a public key. This public key can change throughout the entire time
+   the daemon is running *)
+type snark_worker = Public_key.Compressed.t option ref Lazy.t
+
+type processes =
+  {prover: Prover.t; verifier: Verifier.t; snark_worker: snark_worker}
 
 type components =
   { net: Coda_networking.t
@@ -56,7 +67,11 @@ let peek_frontier frontier_broadcast_pipe =
          (Error.of_string
             "Cannot retrieve transition frontier now. Bootstrapping right now.")
 
-let snark_worker_key t = t.config.snark_worker_key
+let client_port t =
+  let {Kademlia.Node_addrs_and_ports.client_port; _} =
+    t.config.net_config.gossip_net_params.addrs_and_ports
+  in
+  client_port
 
 (* Get the most recently set public keys  *)
 let propose_public_keys t : Public_key.Compressed.Set.t =
@@ -64,6 +79,59 @@ let propose_public_keys t : Public_key.Compressed.Set.t =
   Public_key.Compressed.Set.map public_keys ~f:snd
 
 let replace_propose_keypairs t kps = Agent.update t.propose_keypairs kps
+
+let create_snark_worker ~logger ?(shutdown_on_disconnect = true) client_port =
+  let%bind p =
+    let our_binary = Sys.executable_name in
+    Process.create_exn () ~prog:our_binary
+      ~args:
+        ( "internal" :: Snark_worker.Intf.command_name
+        :: Snark_worker.arguments
+             ~daemon_address:
+               (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
+             ~shutdown_on_disconnect )
+  in
+  don't_wait_for
+    ( match%bind Process.wait p with
+    | Ok () ->
+        Logger.info logger
+          "Snark worker process died normally, so the daemon will die as well"
+          ~module_:__MODULE__ ~location:__LOC__ ;
+        exit 0
+    | Error (`Exit_non_zero non_zero_error) ->
+        Logger.fatal logger
+          !"Snark worker process died with a nonzero error %i"
+          non_zero_error ~module_:__MODULE__ ~location:__LOC__ ;
+        raise (Snark_worker_error non_zero_error)
+    | Error (`Signal signal) ->
+        Logger.info logger
+          !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
+          signal ~module_:__MODULE__ ~location:__LOC__ ;
+        raise (Snark_worker_signal_interrupt signal) ) ;
+  Logger.trace logger
+    !"Created snark worker with pid: %i"
+    ~module_:__MODULE__ ~location:__LOC__
+    (Pid.to_int @@ Process.pid p) ;
+  (* We want these to be printfs so we don't double encode our logs here *)
+  Pipe.iter_without_pushback
+    (Async.Reader.pipe (Process.stdout p))
+    ~f:(fun s -> printf "%s" s)
+  |> don't_wait_for ;
+  Pipe.iter_without_pushback
+    (Async.Reader.pipe (Process.stderr p))
+    ~f:(fun s -> printf "%s" s)
+  |> don't_wait_for ;
+  Deferred.unit
+
+let snark_worker_key {processes; _} =
+  if Lazy.is_val processes.snark_worker then
+    !(Lazy.force processes.snark_worker)
+  else None
+
+let replace_snark_worker_key {processes; _} new_key =
+  if Option.is_some new_key || Lazy.is_val processes.snark_worker then
+    Lazy.force processes.snark_worker := new_key
+  else ()
 
 let best_tip_opt t =
   let open Option.Let_syntax in
@@ -414,6 +482,18 @@ let create (config : Config.t) =
       trace_task "coda" (fun () ->
           let%bind prover = Prover.create () in
           let%bind verifier = Verifier.create () in
+          let snark_worker =
+            Lazy.from_fun
+            @@ fun () ->
+            let {Kademlia.Node_addrs_and_ports.client_port; _} =
+              config.net_config.gossip_net_params.addrs_and_ports
+            in
+            create_snark_worker ~logger:config.logger client_port
+            |> don't_wait_for ;
+            ref config.snark_worker_config.initial_snark_worker_key
+          in
+          Option.iter config.snark_worker_config.initial_snark_worker_key
+            ~f:(fun _key -> ignore @@ Lazy.force snark_worker) ;
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
           in
@@ -639,7 +719,7 @@ let create (config : Config.t) =
           in
           Deferred.return
             { config
-            ; processes= {prover; verifier}
+            ; processes= {prover; verifier; snark_worker}
             ; components=
                 { net
                 ; transaction_pool
