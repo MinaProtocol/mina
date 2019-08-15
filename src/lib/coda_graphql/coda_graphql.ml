@@ -1280,14 +1280,14 @@ module Mutations = struct
         Public_key.Compressed.Set.to_list old_propose_keys )
 
   let set_snark_worker =
-    field "setSnarkWorker"
+    io_field "setSnarkWorker"
       ~doc:"Set key you wish to snark work with or disable snark working"
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_worker)]
       ~typ:(non_null Types.Payload.set_snark_worker)
       ~resolve:(fun {ctx= coda; _} () pk ->
         let old_snark_worker_key = Coda_lib.snark_worker_key coda in
-        Coda_lib.replace_snark_worker_key coda pk ;
-        old_snark_worker_key )
+        let%map () = Coda_lib.replace_snark_worker_key coda pk in
+        Ok old_snark_worker_key )
 
   let commands =
     [ add_wallet
