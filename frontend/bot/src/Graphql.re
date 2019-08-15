@@ -27,7 +27,7 @@ let client = {
   let subscriptionExchange =
     ReasonUrql.Exchanges.subscriptionExchange(subscriptionExchangeOpts);
 
-  print_endline("Connecting to " ++ endpoint);
+  Logger.log("Graphql", `Info, "Connecting to %s", endpoint);
 
   ReasonUrql.Client.make(
     ~url="http://" ++ endpoint,

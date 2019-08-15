@@ -24,7 +24,7 @@ let handleMessage = msg =>
 // Start echo service
 Echo.start(Constants.echoKey, Constants.feeAmount);
 
-Client.onReady(client, _ => print_endline("Bot is ready"));
+Client.onReady(client, _ => Logger.log("App", `Info, "Bot is ready"));
 
 Client.onMessage(client, handleMessage);
 

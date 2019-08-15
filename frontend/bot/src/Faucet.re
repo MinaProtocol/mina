@@ -1,3 +1,5 @@
+let log = (w, fmt) => Logger.log("Faucet", w, fmt);
+
 module StringMap = Belt.MutableMap.String;
 
 let lastRequestedMap: StringMap.t(float) = StringMap.make();
@@ -27,18 +29,14 @@ let sendFaucetCoda = (userId, msg, pk) => {
          switch (response) {
          | Graphql.Data(data) =>
            let id = data##sendPayment##payment##id;
-           Printf.printf("Faucet: sent (to %s): %s\n", pk, id);
+           log(`Info, "Sent (to %s): %s", pk, id);
            Messages.faucetSentNotification(~id);
          | Error(error) =>
-           Printf.printf(
-             "Faucet: send failed (to %s), error: %s\n",
-             pk,
-             error,
-           );
+           log(`Error, "Send failed (to %s), error: %s", pk, error);
            Messages.faucetFailNotification(~error);
          | NotFound =>
            // Shouldn't happen
-           print_endline("Faucet: Got 'NotFound' sending to " ++ pk);
+           log(`Error, "Got 'NotFound' sending to %s", pk);
            Messages.faucetFailNotification(~error="Not found...");
          };
        Discord.Message.reply(msg, replyText);
@@ -62,14 +60,17 @@ let msgIsFromAdmin = msg => {
 
 let handleMessage = (msg, pk) => {
   // Check if the user has requested recently
-  let userId = Discord.Message.author(msg) |> Discord.User.id;
+  let userId =
+    Discord.Message.author(msg)
+    |> Discord.User.id
+    |> Discord.Snowflake.toString;
   switch (StringMap.get(lastRequestedMap, userId)) {
   | None => sendFaucetCoda(userId, msg, pk)
   | Some(lastRequested) =>
     // if lastRequested was recent && user not a faucet_approver, error.
     let diff = Js.Date.now() -. lastRequested;
     if (diff < Constants.cooldownTimeMs && !msgIsFromAdmin(msg)) {
-      print_endline("Faucet: cooling down " ++ pk);
+      log(`Info, "Cooling down pubkey %s", pk);
       Discord.Message.reply(
         msg,
         Messages.requestCooldown(

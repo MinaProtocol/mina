@@ -1,3 +1,5 @@
+let log = (w, fmt) => Logger.log("Echo", w, fmt);
+
 type userCommands = {
   from: string,
   to_: string,
@@ -38,14 +40,11 @@ let sendEcho = (echoKey, fee, {from: userKey, amount}) =>
          switch (response) {
          | Graphql.Data(data) =>
            let payment = data##sendPayment##payment;
-           Printf.printf(
-             "Echo: sent (to %s): %s\n",
-             payment##to_,
-             payment##id,
-           );
+           log(`Info, "Sent (to %s): %s", payment##to_, payment##id);
          | Error(e) =>
-           Printf.printf(
-             "Echo: send failed (sending %s coda from %s to %s), error: %s\n",
+           log(
+             `Error,
+             "Send failed (sending %s coda from %s to %s), error: %s",
              Int64.to_string(amount),
              echoKey,
              userKey,
@@ -53,12 +52,13 @@ let sendEcho = (echoKey, fee, {from: userKey, amount}) =>
            )
          | NotFound =>
            // Shouldn't happen
-           print_endline("Echo: Got 'NotFound' sending to " ++ userKey)
+           log(`Error, "Gor 'NotFound' sending to %s", userKey)
          }
        );
   } else {
-    Printf.printf(
-      "Echo: Not enough coda to echo back to %s (only sent %s coda).\n",
+    log(
+      `Info,
+      "Not enough coda to echo back to %s (only sent %s coda).",
       userKey,
       Int64.to_string(amount),
     );
@@ -70,7 +70,7 @@ let checkAlreadyProcessed =
     | Graphql.Data(data) =>
       let stateHash = data##newBlock##stateHash;
       if (BlockSet.has(processedBlocks, stateHash)) {
-        print_endline("Echo: already processed block " ++ stateHash);
+        log(`Info, "Already processed block: %s", stateHash);
         false;
       } else {
         BlockSet.add(processedBlocks, stateHash);
@@ -82,7 +82,7 @@ let checkAlreadyProcessed =
   };
 
 let start = (echoKey, fee) => {
-  print_endline("Starting echo on " ++ echoKey);
+  log(`Info, "Starting echo on %s", echoKey);
   Graphql.executeSubscription(
     ListenBlocks.make(~publicKey=Graphql.Encoders.publicKey(echoKey), ()),
   )
@@ -96,11 +96,10 @@ let start = (echoKey, fee) => {
               to_ == echoKey && !isDelegation
             )
          |> List.iter(sendEcho(echoKey, fee))
-       | Error(e) =>
-         print_endline("Echo: error retrieving new block. Message: " ++ e)
+       | Error(e) => log(`Error, "Error retrieving new block. Message: %s", e)
        | NotFound =>
          // Shouldn't happen
-         print_endline("Echo: Got 'NotFound' while listening to blocks")
+         log(`Error, "Got 'NotFound' while listening to blocks")
        }
      );
 };
