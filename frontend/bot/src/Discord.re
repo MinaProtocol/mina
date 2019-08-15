@@ -1,13 +1,18 @@
+module Snowflake = {
+  type t;
+  external toString: t => string = "%identity";
+};
+
 module Collection = {
-  type t('a);
-  [@bs.send] external get: (t('a), string) => 'a = "get";
-  [@bs.send] external find: (t('a), 'a => bool) => option('a) = "find";
+  type t('k, 'v);
+  [@bs.send] external get: (t('k, 'v), 'k) => option('v) = "get";
+  [@bs.send] external find: (t('k, 'v), 'v => bool) => option('v) = "find";
 };
 
 module Channel = {
   type t;
   [@bs.get] external channelType: t => string = "type";
-  [@bs.get] external id: t => string = "id";
+  [@bs.get] external id: t => Snowflake.t = "id";
 };
 
 module TextChannel = {
@@ -20,19 +25,20 @@ module TextChannel = {
 
 module User = {
   type t;
-  [@bs.get] external id: t => string = "id";
+  [@bs.get] external id: t => Snowflake.t = "id";
   [@bs.get] external username: t => string = "username";
   [@bs.get] external bot: t => bool = "bot";
 };
 
 module Role = {
   type t;
+  [@bs.get] external name: t => string = "name";
 };
 
 module GuildMember = {
   type t;
   [@bs.get] external user: t => User.t = "user";
-  [@bs.get] external roles: t => Collection.t(Role.t) = "roles";
+  [@bs.get] external roles: t => Collection.t(Snowflake.t, Role.t) = "roles";
 };
 
 module Message = {
@@ -41,6 +47,7 @@ module Message = {
   [@bs.get] external channel: t => Channel.t = "channel";
   [@bs.send] external reply: (t, string) => unit = "reply";
   [@bs.get] external author: t => User.t = "author";
+  [@bs.get] external member: t => option(GuildMember.t) = "member";
 };
 
 module Client = {

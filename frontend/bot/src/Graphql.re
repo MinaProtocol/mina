@@ -2,7 +2,9 @@
 %raw
 "global.fetch = require(\"node-fetch\");";
 
-let endpoint = "localhost:8001/graphql";
+let endpoint =
+  "localhost:" ++ string_of_int(Constants.graphqlPort) ++ "/graphql";
+
 [@bs.module]
 external websocketImpl: SubscriptionsTransportWS.websocketImpl =
   "isomorphic-ws";
@@ -24,6 +26,8 @@ let client = {
 
   let subscriptionExchange =
     ReasonUrql.Exchanges.subscriptionExchange(subscriptionExchangeOpts);
+
+  print_endline("Connecting to " ++ endpoint);
 
   ReasonUrql.Client.make(
     ~url="http://" ++ endpoint,

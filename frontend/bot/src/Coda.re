@@ -3,7 +3,7 @@ module SendPayment = [%graphql
     sendPayment(input: {from: $from, to:$to_, amount:$amount, fee:$fee}) {
       payment {
         id
-        nonce
+        to_: to @bsDecoder(fn: "Graphql.Decoders.publicKey")
       }
   }} |}
 ];

@@ -3,7 +3,7 @@ open Discord;
 let client = Client.createClient();
 
 let handleMessageHelper = msg =>
-  switch (Array.to_list(Js.String.split(",", Message.content(msg)))) {
+  switch (Array.to_list(Js.String.split(" ", Message.content(msg)))) {
   | ["$tiny"] => Message.reply(msg, Messages.greeting)
   | ["$help"] => Message.reply(msg, Messages.help)
   | ["$request", pk] => Faucet.handleMessage(msg, pk)
@@ -22,7 +22,7 @@ let handleMessage = msg =>
   };
 
 // Start echo service
-Echo.start(Constants.echoKey);
+Echo.start(Constants.echoKey, Constants.feeAmount);
 
 Client.onReady(client, _ => print_endline("Bot is ready"));
 
