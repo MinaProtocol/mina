@@ -414,7 +414,6 @@ let create (config : Config.t) =
           let proposer_transition_reader, proposer_transition_writer =
             Strict_pipe.create Synchronous
           in
-          let net_ivar = Ivar.create () in
           let%bind ledger_db, transition_frontier =
             create_genesis_frontier config ~verifier
           in
@@ -509,7 +508,6 @@ let create (config : Config.t) =
                ~f:(fun x ->
                  Coda_networking.broadcast_transaction_pool_diff net x ;
                  Deferred.unit )) ;
-          Ivar.fill net_ivar net ;
           don't_wait_for
             (Strict_pipe.Reader.iter_without_pushback
                valid_transitions_for_network ~f:(fun transition ->
@@ -655,3 +653,5 @@ let create (config : Config.t) =
                   ~reassignment_wait:config.work_reassignment_wait
             ; subscriptions
             ; sync_status } ) )
+
+let net {components= {net; _}; _} = net
