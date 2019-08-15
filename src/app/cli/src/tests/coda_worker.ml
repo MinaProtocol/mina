@@ -470,7 +470,8 @@ module T = struct
                 ; addrs_and_ports
                 ; logger
                 ; trust_system
-                ; max_concurrent_connections } }
+                ; max_concurrent_connections
+                ; log_received_snark_pool_diff= false } }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =

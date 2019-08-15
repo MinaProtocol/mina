@@ -777,6 +777,15 @@ module Make (Inputs : Inputs_intf) = struct
                 ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
                 , Block_time.now config.time_controller )
           | Snark_pool_diff diff ->
+              if config.gossip_net_params.log_received_snark_pool_diff then
+                Logger.debug config.logger ~module_:__MODULE__
+                  ~location:__LOC__
+                  "Received Snark pool diff $diff from $sender"
+                  ~metadata:
+                    [ ("diff", Snark_pool_diff.to_yojson diff)
+                    ; ( "sender"
+                      , Envelope.(Sender.to_yojson (Incoming.sender envelope))
+                      ) ] ;
               `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff))
           | Transaction_pool_diff diff ->
               `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff)) )

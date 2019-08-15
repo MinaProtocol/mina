@@ -53,10 +53,12 @@ end)
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
   let summary = function
-    | Stable.V1.Add_solved_work (_, {proof= _; fee}) ->
+    | Stable.V1.Add_solved_work (_, {proof= _; fee= _}) as diff ->
         Printf.sprintf
-          !"Snark_pool_diff add with fee %{sexp: Coda_base.Fee_with_prover.t}"
-          fee
+          !"Snark_pool_diff add with fee %s"
+          (* "%{sexp: Coda_base.Fee_with_prover.t}"
+          fee *)
+          (Yojson.Safe.to_string (to_yojson diff))
 
   let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :
       t Or_error.t Deferred.t =
