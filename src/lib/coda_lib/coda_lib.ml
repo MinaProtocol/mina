@@ -84,7 +84,7 @@ let propose_public_keys t : Public_key.Compressed.Set.t =
 let replace_propose_keypairs t kps = Agent.update t.propose_keypairs kps
 
 module Snark_worker = struct
-  let run_process ~logger ?(shutdown_on_disconnect = true) client_port =
+  let run_process ~logger client_port =
     let%map snark_worker_process =
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
@@ -93,7 +93,7 @@ module Snark_worker = struct
           :: Snark_worker.arguments
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
-               ~shutdown_on_disconnect )
+               ~shutdown_on_disconnect:false )
     in
     don't_wait_for
       ( match%bind Process.wait snark_worker_process with
