@@ -20,6 +20,18 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
+let chain_id =
+  lazy
+    (let genesis_state_hash =
+       (Lazy.force Coda_state.Genesis_protocol_state.t).hash
+       |> State_hash.to_base58_check
+     in
+     let all_snark_keys =
+       List.fold_left ~f:( ^ ) ~init:"" Snark_keys.key_hashes
+     in
+     let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
+     Blake2.to_hex b2)
+
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -542,6 +554,7 @@ let daemon logger =
                ; logger
                ; target_peer_count= 8
                ; conf_dir
+               ; chain_id= Lazy.force chain_id
                ; initial_peers= initial_peers_cleaned
                ; addrs_and_ports
                ; trust_system

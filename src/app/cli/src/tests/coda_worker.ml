@@ -433,6 +433,7 @@ module T = struct
                 ; target_peer_count= 8
                 ; conf_dir
                 ; initial_peers= peers
+                ; chain_id= "bogus chain id for testing"
                 ; addrs_and_ports
                 ; logger
                 ; trust_system
