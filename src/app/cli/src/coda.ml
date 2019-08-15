@@ -788,7 +788,7 @@ let print_version_info () =
     (String.sub Coda_version.commit_id ~pos:0 ~len:7)
     Coda_version.branch
 
-let start () =
+let () =
   Random.self_init () ;
   let logger = Logger.create ~initialize_default_consumer:false () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
