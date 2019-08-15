@@ -16,80 +16,58 @@ module Make (Backend : Backend.Backend_intf) = struct
     ; srsPairing: Fq_target.t }
 
   let create d x alpha =
-    Printf.printf "starting!\n";
     let xInv = Fr.inv x in
-    Printf.printf "LOL!\n";
     let g1 = G1.one in
     let g2 = G2.one in
-    let a = List.map
+    { d
+    ; gNegativeX=
+        List.map
           (List.range 1 (d + 1))
           ~f:(fun i ->
-            Printf.printf "   x^%d = %s\n" i (Fr.to_string (Fr.( ** ) xInv (N.of_int i)));
-            G1.scale g1 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i)))) in
-    Printf.printf "A\n";
-    let b = List.map
+            G1.scale g1 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))))
+    ; gPositiveX=
+        List.map
           (List.range 0 (d + 1))
           ~f:(fun i ->
-            G1.scale g1 (Fr.to_bigint (Fr.( ** ) x (N.of_int i)))) in
-    Printf.printf "B\n";
-    let c = List.map
+            G1.scale g1 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))))
+    ; hNegativeX=
+        List.map
           (List.range 1 (d + 1))
           ~f:(fun i ->
-            G2.scale g2 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i)))) in
-    Printf.printf "C\n";
-    let dd = List.map
+            G2.scale g2 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))))
+    ; hPositiveX=
+        List.map
           (List.range 0 (d + 1))
           ~f:(fun i ->
-            G2.scale g2 (Fr.to_bigint (Fr.( ** ) x (N.of_int i)))) in
-    Printf.printf "D\n";
-    let e = List.map
+            G2.scale g2 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))))
+    ; gNegativeAlphaX=
+        List.map
           (List.range 1 (d + 1))
           ~f:(fun i ->
             G1.scale g1
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i))))) in
-    Printf.printf "E\n";
-    let f = G1.one
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))))
+    ; gPositiveAlphaX=
+        G1.one
         :: List.map
              (List.range 1 (d + 1))
              ~f:(fun i ->
                G1.scale g1
-                 (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i))))) in
-    Printf.printf "F\n";
-    let g = List.map
+                 (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i)))))
+    ; hNegativeAlphaX=
+        List.map
           (List.range 1 (d + 1))
           ~f:(fun i ->
             G2.scale g2
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i))))) in
-    Printf.printf "G\n";
-    let h = List.map
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))))
+    ; hPositiveAlphaX=
+        List.map
           (List.range 0 (d + 1))
           ~f:(fun i ->
             G2.scale g2
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i))))) in
-    Printf.printf "H\n";
-    let i = Pairing.reduced_pairing g1
-          (G2.scale g2 (Fr.to_bigint alpha)) in
-    Printf.printf "I\n";
-    let blah = { d
-    ; gNegativeX=
-        a
-    ; gPositiveX=
-        b
-    ; hNegativeX=
-        c
-    ; hPositiveX=
-        dd
-    ; gNegativeAlphaX=
-        e
-    ; gPositiveAlphaX=
-        f
-    ; hNegativeAlphaX=
-        g
-    ; hPositiveAlphaX=
-        h
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i)))))
     ; srsPairing=
-        i } in
-    Printf.printf "DONE!\n"; blah
+        Pairing.reduced_pairing g1
+          (G2.scale g2 (Fr.to_bigint alpha)) }
 
   let select_helper positives negatives poly init plus scale =
     let rec accum current_deg remaining_coeffs so_far =

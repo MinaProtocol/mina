@@ -7,7 +7,7 @@ module Make (Inputs : Inputs.S_run) (Scalar_field : sig
 
     val sub : t -> t -> t
 
-    val zero : t
+    (* val zero : t *)
 
     val one : t
   end) = struct
@@ -42,14 +42,14 @@ module Make (Inputs : Inputs.S_run) (Scalar_field : sig
     Bitstring_lib.Bitstring.Lsb_first.of_list (List.map ~f:Boolean.var_of_value (Scalar_field.unpack a))
   
   let pc_v (vk : _ Verification_key.t_)
-      (vk_precomp : Verification_key.Precomputation.t) commitment z (v, w) : Boolean.var =
+      (vk_precomp : Verification_key.Precomputation.t) commitment _z (v, w) : Boolean.var =
     final_exponentiation
       (batch_miller_loop
         [ (Pos, G1_precomputation.create w, vk_precomp.h_alpha_x)
         ; ( Pos
           , G1_precomputation.create (G1.add_exn
               (G1.scale vk.g Scalar_field.(unpack_full (sub v one)) ~init:vk.g)
-              (G1.scale w Scalar_field.(unpack_full (sub (sub zero z) one)) ~init:w))
+              vk.g)
           , vk_precomp.h_alpha)
         ; (Neg, G1_precomputation.create commitment, vk_precomp.h) ])
     |> Fqk.(equal_var one)
