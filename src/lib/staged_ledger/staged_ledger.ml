@@ -663,6 +663,9 @@ struct
     let%bind transactions, works, user_commands_count, coinbases =
       Deferred.return pre_diff_info
     in
+    Coda_metrics.(
+      Gauge.set Snark_work.snark_work_per_block
+        (Float.of_int (List.length works))) ;
     let%bind is_new_stack, data, stack_update =
       update_coinbase_stack_and_get_data t.scan_state new_ledger
         t.pending_coinbase_collection transactions
@@ -713,6 +716,9 @@ struct
             (Error.to_string_hum e) ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
+    Coda_metrics.(
+      Gauge.set Snark_work.scan_state_snark_jobs
+        (Float.of_int (List.length (Scan_state.all_work_pairs_exn scan_state')))) ;
     let%bind updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
         stack_update ~is_new_stack ~ledger_proof:res_opt
