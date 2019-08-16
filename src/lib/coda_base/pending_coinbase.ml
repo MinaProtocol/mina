@@ -319,18 +319,12 @@ module Hash_builder = struct
   include Data_hash_binable
 
   let merge ~height (h1 : t) (h2 : t) =
-    eprintf
-      !"UNCHECKED MERGE: height = %d h1 = %{sexp: t} h2 = %{sexp: t}\n%!"
-      height h1 h2 ;
     let open Tick.Pedersen in
     State.digest
       (hash_fold
          Hash_prefix.coinbase_merkle_tree.(height)
          Fold.(Digest.fold (h1 :> field) +> Digest.fold (h2 :> field)))
-    |> fun h ->
-    let result = of_hash h in
-    eprintf !"UNCHECKED RESULT: %{sexp: t}\n%!" result ;
-    result
+    |> of_hash
 
   let empty_hash =
     let open Tick.Pedersen in
@@ -489,9 +483,6 @@ struct
     let equal_data t1 t2 = Coinbase_stack_data.equal t1.Poly.data t2.Poly.data
 
     let push t (cb : Coinbase.t) =
-      eprintf
-        !"UNCHECKED PUSH SBH: %{sexp: State_body_hash.t}\n%!"
-        cb.state_body_hash ;
       let data = Coinbase_stack_data.push t.Poly.data cb in
       let state_hash = Coinbase_stack_state_hash.push t.Poly.state_hash cb in
       {Poly.data; state_hash}
@@ -517,13 +508,6 @@ struct
 
       let push (t : t) (coinbase : Coinbase_data.var) : (t, 'a) Tick0.Checked.t
           =
-        let%bind () =
-          as_prover
-            As_prover.(
-              let _, _, sbh = coinbase in
-              let%map sbh = read State_body_hash.typ sbh in
-              eprintf !"CHECKED PUSH SBH: %{sexp: State_body_hash.t}\n%!" sbh)
-        in
         let%bind data = Coinbase_stack_data.Checked.push t.data coinbase in
         let%map state_hash =
           Coinbase_stack_state_hash.Checked.push t.state_hash coinbase
@@ -638,17 +622,6 @@ struct
           let typ = Pedersen.Checked.Digest.typ
 
           let merge ~height h1 h2 =
-            let%bind () =
-              as_prover
-                As_prover.(
-                  let%bind h1 = read Field.typ h1 in
-                  let%map h2 = read Field.typ h2 in
-                  eprintf
-                    !"CHECKED MERGE: height = %d h1 = %{sexp: Field.t} h2 = \
-                      %{sexp: Field.t}\n\
-                      %!"
-                    height h1 h2)
-            in
             let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =
               Bitstring_lib.Bitstring.pad_to_triple_list
                 ~default:Boolean.false_
@@ -656,18 +629,9 @@ struct
             in
             let%bind h1 = Pedersen.Checked.Digest.choose_preimage h1
             and h2 = Pedersen.Checked.Digest.choose_preimage h2 in
-            let%bind result =
-              Pedersen.Checked.digest_triples
-                ~init:Hash_prefix.coinbase_merkle_tree.(height)
-                (to_triples h1 @ to_triples h2)
-            in
-            let%map () =
-              as_prover
-                As_prover.(
-                  let%map result = read Field.typ result in
-                  eprintf !"CHECKED RESULT: %{sexp: Field.t}\n%!" result)
-            in
-            result
+            Pedersen.Checked.digest_triples
+              ~init:Hash_prefix.coinbase_merkle_tree.(height)
+              (to_triples h1 @ to_triples h2)
 
           let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 
@@ -741,22 +705,6 @@ struct
              let%bind equal_prev =
                State_hash.equal_var previous_state_hash stack0.state_hash
              in
-             let%bind () =
-               as_prover
-                 As_prover.(
-                   let%bind is_new_stack = read Boolean.typ is_new_stack in
-                   let%bind previous_state_hash =
-                     read State_hash.typ previous_state_hash
-                   in
-                   let%map stack0_state_hash =
-                     read State_hash.typ stack0.state_hash
-                   in
-                   eprintf
-                     !"IS NEW STACK: %b PREV STATE HASH: %{sexp: \
-                       State_hash.t} STACK0 STATE HASH: %{sexp: State_hash.t}\n\
-                       %!"
-                     is_new_stack previous_state_hash stack0_state_hash)
-             in
              let%bind valid_stack_hash =
                Boolean.(if_ is_new_stack ~then_:true_ ~else_:equal_prev)
              in
@@ -773,17 +721,6 @@ struct
              let%bind rem_amount =
                Currency.Amount.Checked.sub total_coinbase_amount amount
              in
-             let%bind () =
-               as_prover
-                 As_prover.(
-                   let%bind amount = read Currency.Amount.typ amount in
-                   let%map rem_amount = read Currency.Amount.typ rem_amount in
-                   eprintf
-                     !"CHECKED AMOUNT: %{sexp: Currency.Amount.t} REM AMOUNT: \
-                       %{sexp: Currency.Amount.t}\n\
-                       %!"
-                     amount rem_amount)
-             in
              let%bind amount1_equal_to_zero = equal_to_zero amount in
              let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
              (* TODO: Optimize here since we are pushing twice to the same stack *)
@@ -794,26 +731,10 @@ struct
                Stack.Checked.push stack_with_amount1
                  (pk, rem_amount, state_body_hash)
              in
-             let%bind () =
-               as_prover
-                 As_prover.(
-                   let%bind zero1 = read Boolean.typ amount1_equal_to_zero in
-                   let%map zero2 = read Boolean.typ amount2_equal_to_zero in
-                   eprintf "ZERO1: %b  ZERO2: %b\n%!" zero1 zero2)
-             in
-             let%bind result_stack =
-               chain Stack.if_ amount1_equal_to_zero ~then_:(return stack0)
-                 ~else_:
-                   (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
-                      ~else_:stack_with_amount2)
-             in
-             let%map () =
-               as_prover
-                 As_prover.(
-                   let%map result_stack = read Stack.typ result_stack in
-                   eprintf !"CHAIN STACK: %{sexp: Stack.t}\n%!" result_stack)
-             in
-             result_stack ))
+             chain Stack.if_ amount1_equal_to_zero ~then_:(return stack0)
+               ~else_:
+                 (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
+                    ~else_:stack_with_amount2) ))
         reraise_merkle_requests
       >>| Hash.var_of_hash_packed
 
@@ -1003,7 +924,6 @@ struct
     get_stack t index
 
   let add_coinbase t ~coinbase ~is_new_stack =
-    eprintf !"UNCHECKED ADD CB\n%!" ;
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in
     let%bind stack_index = find_index t key in
@@ -1014,29 +934,21 @@ struct
         {Stack.Poly.data= stack_before0.data; state_hash= t.previous_state_hash}
       else stack_before0
     in
-    eprintf !"UNCHECKED STACK BEFORE: %{sexp: Stack.t}\n%!" stack_before ;
     let stack_after = Stack.push stack_before coinbase in
     let%bind t' = incr_index t ~is_new_stack in
     (* state hash in "after" stack becomes previous state hash at top level *)
-    eprintf !"UNCHECKED PENDING CB: %{sexp: t}\n%!" t ;
-    eprintf !"UNCHECKED STACK AFTER: %{sexp: Stack.t}\n%!" stack_after ;
     set_stack
       {t' with previous_state_hash= stack_after.state_hash}
       stack_index stack_after
 
   let update_coinbase_stack (t : t) stack ~is_new_stack =
     let open Or_error.Let_syntax in
-    eprintf "UNCHECKED UPDATE CB STACK\n%!" ;
-    eprintf !"BEFORE PCB: %{sexp: t}\n%!" t ;
-    eprintf !"STACK FOR UPDATE: %{sexp: Stack.t}\n%!" stack ;
-    eprintf "IS NEW STACK FOR UPDATE: %b\n%!" is_new_stack ;
     let%bind key = latest_stack_id t ~is_new_stack in
     let%bind stack_index = find_index t key in
     let%bind t' = incr_index t ~is_new_stack in
-    let t'' = {t' with previous_state_hash= stack.state_hash} in
-    let%map result = set_stack t'' stack_index stack in
-    eprintf !"AFTER PCB: %{sexp: t}\n%!" result ;
-    result
+    set_stack
+      {t' with previous_state_hash= stack.Stack.Poly.state_hash}
+      stack_index stack
 
   let remove_coinbase_stack (t : t) =
     let open Or_error.Let_syntax in
@@ -1098,16 +1010,8 @@ struct
             in
             respond (Provide (elt, path))
         | Checked.Set_coinbase_stack (idx, stack) ->
-            eprintf
-              !"CHECKED BEFORE PENDING CB: %{sexp: t}\n%!"
-              !pending_coinbase ;
-            eprintf !"CHECKED STACK: %{sexp: Stack.t}\n%!" stack ;
-            eprintf !"CHECKED IS NEW STACK: %b\n%!" is_new_stack ;
             pending_coinbase :=
               set_stack !pending_coinbase idx stack |> Or_error.ok_exn ;
-            eprintf
-              !"CHECKED AFTER PENDING CB: %{sexp: t}\n%!"
-              !pending_coinbase ;
             respond (Provide ())
         | _ ->
             unhandled )

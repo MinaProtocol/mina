@@ -586,7 +586,6 @@ struct
     let%bind pending_coinbase_collection_updated1 =
       match ledger_proof with
       | Some (proof, _) ->
-          eprintf "REMOVING OLDEST STACK\n%!" ;
           let%bind oldest_stack, pending_coinbase_collection_updated1 =
             Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
             |> to_staged_ledger_or_error
@@ -614,13 +613,11 @@ struct
       | `Update_none ->
           Ok pending_coinbase_collection_updated1
       | `Update_one stack1 ->
-          eprintf "UPDATING ONE STACK\n%!" ;
           Pending_coinbase.update_coinbase_stack
             pending_coinbase_collection_updated1 stack1 ~is_new_stack
           |> to_staged_ledger_or_error
       | `Update_two (stack1, stack2) ->
           (*The case when part of the transactions go in to the old tree and remaining on to the new tree*)
-          eprintf "UPDATING TWO STACKS\n%!" ;
           let%bind update1 =
             Pending_coinbase.update_coinbase_stack
               pending_coinbase_collection_updated1 stack1 ~is_new_stack:false
@@ -717,7 +714,6 @@ struct
       Deferred.return (to_staged_ledger_or_error r)
     in
     let%bind updated_pending_coinbase_collection' =
-      eprintf "UPDATE_PENDING_COINBASE_COLLECTION 1\n%!" ;
       update_pending_coinbase_collection t.pending_coinbase_collection
         stack_update ~is_new_stack ~ledger_proof:res_opt
       |> Deferred.return
@@ -797,7 +793,6 @@ struct
       |> Staged_ledger_error.to_or_error |> Deferred.return
     in
     let%map update_pending_coinbase_collection' =
-      eprintf "UPDATE_PENDING_COINBASE_COLLECTION 2\n%!" ;
       update_pending_coinbase_collection t.pending_coinbase_collection
         updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
       |> Staged_ledger_error.to_or_error |> Deferred.return
