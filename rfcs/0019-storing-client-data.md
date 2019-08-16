@@ -168,9 +168,9 @@ Below is a diagram of how the components in this RFC will depend on each other:
 
 The yellow nodes represent the entire component that the node is in.
 
-A persistent database that we would like to introduce into our codebase is `SQLite`. `SQLite` would be the best relational database for our use case because it has an Apache 2 license and its a very small binary (3.7MB on my Macbook). `SQLite` is a good choice if a client wants to run the lite version of `coda` (like an iOS version of our wallet app or an embedded device). `SQLite` has a considerably good amount of support for OCaml compared to the other databases that will be discussed and it would be relatively easy to get `SQLite` working off. There is even a nice OCaml library called [ocaml-sqlexpr](https://github.com/mfp/ocaml-sqlexpr) that enables us to embed type-safe `SQLite` queries onto our OCaml code.
+The relational databases that we should use should be agnostic. There are different use cases for using a light database, such as SQLite, and heavier data, such as Postgres. Postgres should be used when we have an archive node or a block explorer trying to make efficient writes to store everything that it hears from the network. We would use SQLite when a user is downloading a wallet for the first time and only stores information about their wallets and their friends. SQLite would also be good to use if we are running a light version of Coda and they would only want to store a small amount of data. If a client wants to upgrade the database from SQLite to Postgres, then use a migration tool to support this.
 
-We can also use `Postgres` as it is more performant than `SQLite` and is better than `SQLite` for performing complex queries. `Postgres` is a better choice than `SQLite` for a node that wants to track high amounts of data in the network.
+A client can also use AWS Appsync if they want to store their data ina distributed manner for multiple devices.
 
 For the objects discussed in the previous section, we can embed them as tables in one global SQL database. Below are the schemas of the tables:
 
@@ -283,8 +283,8 @@ Whenever the daemon produces a new `Transition_frontier_diff`, it will batch the
 Below is psuedocode for persisting a transaction when the archive process receives a `Transaction_pool_diff`:
 
 ```ocaml
-let write_transaction_with_no_commit sqlite txn ?time_first_seen ~is_manually_added external_transition_opt =
-  Sqlite.write sqlite['transaction'] txn;
+let write_transaction_with_no_commit sql txn ?time_first_seen ~is_manually_added external_transition_opt =
+  Sql.write sql['transaction'] txn;
   let state_hash = Option.map external_transition_opt ~f:With_hash.hash
   in
   let block_length = Option.map external_transition_opt ~f:External_transition.block_length
@@ -294,19 +294,19 @@ let write_transaction_with_no_commit sqlite txn ?time_first_seen ~is_manually_ad
   let epoch = Option.map external_transition_opt ~f:External_transition.epoch
   in
   get_time_first_seen sql['transaction'] Transaction.hash_id(txn)
-  Sqlite.write sqlite['block_to_transactions']
+  Sql.write sql['block_to_transactions']
     {transaction_id=Transaction.hash_id(txn); state_hash; sender= Some (txn.sender); receiver = txn.receiver; block_length = None; time_first_seen; block_length; slot; epoch; is_manually_added }
 
-let write_transaction sqlite txn account_before_sending_txn =
-  write_transaction_with_no_commit sqlite txn account_before_sending_txn None
-  Sqlite.commit sqlite
+let write_transaction sql txn account_before_sending_txn =
+  write_transaction_with_no_commit sql txn account_before_sending_txn None
+  Sql.commit sql
 ```
 
 The archive process will similarly persist a block along with its transactions whenever it receives the `Breadcrumb_added` diff. Additionally, we will compute the `receipt_chain_hash` of each `user_command` in the block using `Breadcrumb_added.sender_receipt_chains_from_parent_ledger`. This new computed `receipt_chain_hash` along with its parent `receipt_chain_hash` will be added to the `Receipt_chain_datbase` Below is psuedocode for persisting a block:
 
 ```ocaml
 (* filtered transition only contains transitions that we are interested in following *)
-let write_block (~sender_receipt_chains_from_parent_ledger: Receipt_chain_hash.t Public_key.Compressed.Map.t) ~sqlite ~receipt_chain_database filtered_transition_with_hash previous_ledger date =
+let write_block (~sender_receipt_chains_from_parent_ledger: Receipt_chain_hash.t Public_key.Compressed.Map.t) ~sql ~receipt_chain_database filtered_transition_with_hash previous_ledger date =
   let {With_hash.data=filtered_transition; hash=state_hash} = filtered_transition_with_hash in
   let transactions = Staged_ledger_diff.transactions @@  External_transition.staged_ledger_diff filtered_transition in
   let saved_block = {
@@ -315,7 +315,7 @@ let write_block (~sender_receipt_chains_from_parent_ledger: Receipt_chain_hash.t
     status=Pending
     ...
   } in
-  Sqlite.write sqlite['block'] saved_block;  
+  Sql.write sql['block'] saved_block;  
   List.iter transactions ~f:(fun transaction ->
     (* Add receipt chain hashes*)
     (match transaction with
@@ -324,20 +324,20 @@ let write_block (~sender_receipt_chains_from_parent_ledger: Receipt_chain_hash.t
       Receipt_chain_database.add ~previous receipt_chain_database transaction
     | _ -> ());
     let previous_sender_account = Option.value_exn (Ledger.get_account ledger location) in
-    write_transaction_with_no_commit ~time_first_seen:date sqlite ~is_manually_added:false transaction previous_sender_account transition_with_hash
+    write_transaction_with_no_commit ~time_first_seen:date sql ~is_manually_added:false transaction previous_sender_account transition_with_hash
   )
-  Sqlite.commit sqlite
+  Sql.commit sql
 ```
 
 When the archive process receives the `Root_transitioned` diff, it will mainly update the `consensus_status` of a block. Below is the psuedocode for it:
 
 ```ocaml
-let update_status sqlite finalized_transition deleted_transitions =
-  Sqlite.update sqlite['block'] finalized_transition.hash Confirmed;
+let update_status sql finalized_transition deleted_transitions =
+  Sql.update sql['block'] finalized_transition.hash Confirmed;
   List.iter deleted_transitions ~f:(fun deleted_transition ->
-    Sqlite.update sqlite['block'] deleted_transition.hash Failed;
+    Sql.update sql['block'] deleted_transition.hash Failed;
   );
-  Sqlite.commit sqlite
+  Sql.commit sql
 ```
 
 #### Client Queries
