@@ -189,7 +189,11 @@ let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
   Core.eprintf
     !{err|
 
-  ☠  Coda daemon crashed. The Coda Protocol developers would like to know why!
+  ☠  Coda daemon crashed with the following exception:
+  
+  %s
+  
+  The Coda Protocol developers would like to know why!
 
   Please:
     Open an issue:
@@ -197,7 +201,7 @@ let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
 
     Briefly describe what you were doing and %s
 %!|err}
-    action_string
+    exn_str action_string
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_whitelist = []) ?rest_server_port
