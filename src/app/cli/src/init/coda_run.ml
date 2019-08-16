@@ -87,7 +87,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
           (Visualization_message.bootstrap "transition frontier") )
 
 let remove_prev_crash_reports ~conf_dir =
-  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*.tar.xz" conf_dir)
+  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*.tar.gz" conf_dir)
 
 let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
   Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
@@ -101,7 +101,7 @@ let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
   let report_file =
     conf_dir ^/ "coda_crash_report_"
     ^ Time.to_filename_string ~zone:Time.Zone.utc crash_time
-    ^ ".tar.xz"
+    ^ ".tar.gz"
   in
   (*Coda status*)
   let status_file = temp_config ^/ "coda_status.json" in
@@ -168,7 +168,7 @@ let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
   in
   let files = tmp_files |> String.concat ~sep:" " in
   let tar_command =
-    sprintf "tar  -C %s -cJf %s %s" temp_config report_file files
+    sprintf "tar  -C %s -czf %s %s" temp_config report_file files
   in
   let exit = Core.Sys.command tar_command in
   let action_string =
