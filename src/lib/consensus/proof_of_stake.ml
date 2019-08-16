@@ -2571,7 +2571,7 @@ module Hooks = struct
         | Ok epoch_data ->
             epoch_data
         | Error () ->
-            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
               "An empty epoch is detected! This could be caused by the \
                following reasons: system time is out of sync with protocol \
                state time; or internet connection is down or unstable; or the \
