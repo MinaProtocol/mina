@@ -342,7 +342,7 @@ let update_status sql finalized_transition deleted_transitions =
 
 #### Client Queries
 
-A query that a client makes will make use of both the daemon and the database. For the short term, the daemon will service all of the client's queries, namely through GraphQL. The daemon will make reads from the database asynchronously. In the future, we can offload the client queries to another process, which we will call the API process if these queries become a bottleneck. The downside of this is that we will have to manually add communication channels between the daemon and the client process. We may use the existing RPC tools that we have or have the daemon answer queries through GraphQL. The following subsections will describe queries how to use the databases to make complicated queries:
+When a client wants to make a query, it will talk to an API process. The API process will invoke a server that makes calls to the daemon process and the database. The API process will talk to the daemon through Graphql. The API process will make direct SQL calls to the database and present it to the client. The following subsections will describe queries how to use the databases to make complicated queries:
 
 #### Transaction_status
 
