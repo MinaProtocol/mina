@@ -220,21 +220,28 @@ module Snark_work = struct
     let help = "# of snark work received from peers" in
     Counter.v "snark_work_received_gossip" ~help ~namespace ~subsystem
 
-  let snark_work_received_rpc : Counter.t =
+  let snark_work_completed_rpc : Counter.t =
     let help = "# of snark work received via rpc" in
-    Counter.v "snark_work_received_rpc" ~help ~namespace ~subsystem
+    Counter.v "snark_work_completed_rpc" ~help ~namespace ~subsystem
 
-  let snark_work_sent_rpc : Counter.t =
+  let snark_work_assigned_rpc : Counter.t =
     let help = "# of snark work sent via rpc" in
-    Counter.v "snark_work_sent_rpc" ~help ~namespace ~subsystem
+    Counter.v "snark_work_assigned_rpc" ~help ~namespace ~subsystem
+
+  let snark_work_timed_out : Counter.t =
+    let help =
+      "# of snark work sent via rpc that did not complete within \
+       work-reassignment-wait"
+    in
+    Counter.v "snark_work_timed_out" ~help ~namespace ~subsystem
 
   let snark_pool_size : Gauge.t =
     let help = "# of snark works in the snark pool" in
     Gauge.v "snark_pool_size" ~help ~namespace ~subsystem
 
-  let snark_work_per_block : Gauge.t =
+  let snark_work_last_block : Gauge.t =
     let help = "# of snark work purchased per block" in
-    Gauge.v "snark_work_per_block" ~help ~namespace ~subsystem
+    Gauge.v "snark_work_last_block" ~help ~namespace ~subsystem
 
   let scan_state_snark_jobs : Gauge.t =
     let help = "# of jobs in the scan state after every block" in

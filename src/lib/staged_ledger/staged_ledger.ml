@@ -664,7 +664,7 @@ struct
       Deferred.return pre_diff_info
     in
     Coda_metrics.(
-      Gauge.set Snark_work.snark_work_per_block
+      Gauge.set Snark_work.snark_work_last_block
         (Float.of_int (List.length works))) ;
     let%bind is_new_stack, data, stack_update =
       update_coinbase_stack_and_get_data t.scan_state new_ledger
