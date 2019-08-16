@@ -8,7 +8,8 @@
     "build-ci": "yarn build",
     "clean": "bsb -clean-world",
     "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei')",
-    "copy-schema": "cp ../../graphql_schema.json graphql_schema.json"
+    "copy-schema": "cp ../../graphql_schema.json graphql_schema.json",
+    "start": "node ./lib/js/src/App.js"
   },
   "dependencies": {
     "bs-platform": "^5.0.6",

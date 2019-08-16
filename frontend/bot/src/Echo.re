@@ -52,7 +52,7 @@ let sendEcho = (echoKey, fee, {from: userKey, amount}) =>
            )
          | NotFound =>
            // Shouldn't happen
-           log(`Error, "Gor 'NotFound' sending to %s", userKey)
+           log(`Error, "Got 'NotFound' sending to %s", userKey)
          }
        );
   } else {
