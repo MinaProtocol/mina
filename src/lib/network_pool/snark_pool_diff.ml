@@ -44,7 +44,11 @@ end)
               [ ("work", `Int (Work.hash work))
               ; ("fee", Currency.Fee.to_yojson fee)
               ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
-              ]
+                (*TODO: This should be 
+              Signature_lib.Public_key.Compressed.Stable.V1.to_yojson but for 
+              some reason both are returning two different strings and so using 
+              what mostly used in cli. Paul is looking into it*)
+               ]
     end
 
     module Latest = V1
