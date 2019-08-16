@@ -474,6 +474,8 @@ module type Inputs_intf = sig
         end
       end
       with type V1.t = t
+
+    val compact_json : t -> Yojson.Safe.json
   end
 
   module Transaction_pool_diff : sig
@@ -780,9 +782,9 @@ module Make (Inputs : Inputs_intf) = struct
               if config.gossip_net_params.log_received_snark_pool_diff then
                 Logger.debug config.logger ~module_:__MODULE__
                   ~location:__LOC__
-                  "Received Snark pool diff $diff from $sender"
+                  "Received Snark-pool-diff $work from $sender"
                   ~metadata:
-                    [ ("diff", Snark_pool_diff.to_yojson diff)
+                    [ ("work", Snark_pool_diff.compact_json diff)
                     ; ( "sender"
                       , Envelope.(Sender.to_yojson (Incoming.sender envelope))
                       ) ] ;
