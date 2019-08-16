@@ -6,7 +6,7 @@ Coda uses accounts to track each public key's state. This is distinct from Bitco
 
 ####Block
 
-A set of transactions to be added to the blockchain. It can also be thought of as a state transition - and represents an update to the current state of the network. In Coda, a block includes both information about transactions and proofs.
+A set of transactions and consensus information that extend the state of the network. Includes a proof that the current state of the network is fully valid.
 
 ####Blockchain
 
@@ -18,7 +18,7 @@ The number of blocks added after the reference block. As the number of confirmat
 
 ####Block Producer
 
-The node selected to add the next block to the Coda blockchain. The block producer is selected through the consensus mechanism.
+A node that participates in a process to determine what blocks it is allowed to produce, and then produces blocks that can be broadcast to the network.
 
 ####Coda
 
@@ -45,19 +45,23 @@ The Coda daemon is a background process that implements the Coda protocol and ru
 
 Because staking coda requires nodes to be online, some nodes may desire to delegate their coda to another node which runs a staking service. This process is called delegating a stake, and often the service provider or staking pool operator may charge a fee for running this service, which will be deducted any time the delegator gets selected to be a block producer.
 
+###Full Node
+
+A Coda node that is able to verify the state of the network trustlessly. In Coda, every node is a full node since all nodes can receive and verify zk-SNARKs.
+
 ####Kademlia
 
 A distributed hash table (DHT) for decentralized peer-to-peer networks. Coda uses Kademlia for peer discovery, so that nodes can find neighbor nodes to share information about the network state.
 
 ####Node
 
-A node is a machine running the coda daemon.
+A node is a machine running the coda daemon. 
 
 ####Peer-to-peer
 
 Networking systems that rely on peer nodes to distribute information amongst each other are called peer-to-peer networks. These networks are often distributed in nature, and unlike client-server networking models, do not rely on any centralized resource broker.
 
-####Private key
+####Private Key
 
 The other component in public-key cryptography - private keys are held private while public keys can be issued publicly. Only the holder of the a public key's corresponding private key can attest to ownership of the public key. This allows for signing transactions to prove that you are the honest holder of any funds associated with any given public key.
 
@@ -65,7 +69,7 @@ The other component in public-key cryptography - private keys are held private w
 
 The type of consensus algorithm Coda implements to allow nodes to agree upon the state of the network. Proof-of-Stake (PoS) allows nodes to [stake](#staking) coda on the network to increase their chance of being selected as the next block producer.
 
-####Public key
+####Public Key
 
 One component of public-key cryptography - public keys can be widely shared with the world, and can be thought of as "addresses" or identifiers for the person who holds the corresponding private key.
 
@@ -92,6 +96,10 @@ Staking coda allows nodes on the network to increase their chances of being sele
 ####Staking Pool
 
 A pool of delegated funds that is run by a staking pool owner. Other nodes may choose to delegate funds to a staking pool to avoid the requirement of being online.
+
+####User Transaction
+
+A transaction issued by a user - either a payment or a delegation change
 
 ####Zero Knowledge Proof
 
