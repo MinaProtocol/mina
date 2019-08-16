@@ -175,10 +175,10 @@ let () =
       [ `S Manpage.s_description
       ; `P
           "Logproc processes coda logs from stdin and is capable of filtering \
-           and reformating logs in a user friendly fashion. A simple \
-           javascript-like filter language is included for defining boolean \
-           predicates on log statements. Logproc will also attempt to \
-           interpolate logging strings."
+           and reformating logs in a user friendly fashion. A javascript-like \
+           filter language is included for defining boolean predicates on log \
+           statements. Logproc will also attempt to interpolate logging \
+           strings."
       ; `S Manpage.s_examples
       ; `I ("pretty print logs with default interpolation:", {|logproc|})
       ; `I ("pretty print logs and show all metadata:", {|logproc -i after|})
