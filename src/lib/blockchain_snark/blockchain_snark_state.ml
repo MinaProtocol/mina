@@ -77,10 +77,26 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         let%bind nothing_changed =
           Boolean.(ledger_hash_didn't_change && supply_increase_is_zero)
         in
+        let%bind () =
+          as_prover
+            As_prover.(
+              let%map b = read Boolean.typ nothing_changed in
+              eprintf "NOTHING CHANGED: %b\n%!" b)
+        in
         let%bind new_pending_coinbase_hash, deleted_stack =
           let%bind root_after_delete, deleted_stack =
             Pending_coinbase.Checked.pop_coinbases prev_pending_coinbase_root
               ~proof_emitted:(Boolean.not ledger_hash_didn't_change)
+          in
+          let%bind same =
+            Pending_coinbase.Hash.equal_var root_after_delete
+              prev_pending_coinbase_root
+          in
+          let%bind () =
+            as_prover
+              As_prover.(
+                let%map b = read Boolean.typ same in
+                eprintf "SAME VALUE: %b\n%!" b)
           in
           (*new stack or update one*)
           let%map new_root =
@@ -96,6 +112,19 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
             transition |> Snark_transition.blockchain_state
             |> Blockchain_state.staged_ledger_hash
             |> Staged_ledger_hash.pending_coinbase_hash_var
+          in
+          let%bind () =
+            as_prover
+              As_prover.(
+                let%bind new_root = read Pending_coinbase.Hash.typ new_root in
+                let%map new_pending_coinbase_hash =
+                  read Pending_coinbase.Hash.typ new_pending_coinbase_hash
+                in
+                eprintf
+                  !"NEW ROOT = %{sexp: Pending_coinbase.Hash.t} NEW PCB HASH: \
+                    %{sexp: Pending_coinbase.Hash.t}\n\
+                    %!"
+                  new_root new_pending_coinbase_hash)
           in
           Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
         in
@@ -113,6 +142,17 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         in
         let%bind correct_snark =
           Boolean.(correct_transaction_snark || nothing_changed)
+        in
+        let%bind () =
+          as_prover
+            As_prover.(
+              let%map snark_b = read Boolean.typ correct_snark
+              and cons_b = read Boolean.typ updated_consensus_state
+              and cb_b = read Boolean.typ correct_coinbase_status in
+              eprintf
+                "CORRECT SNARK: %b UPDATED CONS STATE: %b CORRECT CB STATUS: %b\n\
+                 %!"
+                snark_b cons_b cb_b)
         in
         Boolean.all
           [correct_snark; updated_consensus_state; correct_coinbase_status]

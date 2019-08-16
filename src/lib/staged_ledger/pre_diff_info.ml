@@ -46,9 +46,10 @@ end = struct
     ; user_commands_count: int
     ; coinbases: Coinbase.t list }
 
-  (*A Coinbase is a single transaction that accommodates the coinbase amount
-    and a fee transfer for the work required to add the coinbase. Unlike a
-    transaction, a coinbase (including the fee transfer) just requires one slot
+  (* A Coinbase is a single transaction that accommodates the coinbase amount
+    and a fee transfer for the work required to add the coinbase. It also 
+    contains the state body hash corresponding to a particular protocol state. 
+    Unlike a transaction, a coinbase (including the fee transfer) just requires one slot
     in the jobs queue.
 
     The minimum number of slots required to add a single transaction is three (at
@@ -59,13 +60,14 @@ end = struct
     adding transactions, the first prediff has two slots remaining which cannot
     not accommodate transactions, then those slots are filled by splitting the
     coinbase into two parts.
+
     If it has one slot, then we simply add one coinbase. It is also possible that
-    the first prediff may have no slots left after adding transactions (For
-    example, when there are three slots and
-    maximum number of provers), in which case, we simply add one coinbase as part
-    of the second prediff.
+    the first prediff may have no slots left after adding transactions (for
+    example, when there are three slots and maximum number of provers), in which case, 
+    we simply add one coinbase as part of the second prediff.
   *)
-  let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t) =
+  let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
+      (state_body_hash : State_body_hash.t) =
     let open Result.Let_syntax in
     let coinbase = Coda_compile_config.coinbase in
     let coinbase_or_error = function
@@ -80,14 +82,12 @@ end = struct
           (Error
              (Error.Coinbase_error
                 (sprintf
-                   !"overflow when splitting coinbase: Minuend: %{sexp: \
-                     Currency.Amount.t} Subtrahend: %{sexp: \
-                     Currency.Amount.t} \n"
+                   !"Overflow when splitting coinbase: Minuend: %{sexp: \
+                     Currency.Amount.t} Subtrahend: %{sexp: Currency.Amount.t}"
                    a1 a2)))
         (Currency.Amount.sub a1 a2)
         ~f:(fun x -> Ok x)
     in
-    let state_body_hash = State_body_hash.dummy in
     let two_parts amt (ft1 : Fee_transfer.Single.t option) ft2 =
       let%bind rem_coinbase = overflow_err coinbase amt in
       let%bind _ =
@@ -191,7 +191,7 @@ end = struct
     |> to_staged_ledger_or_error
 
   let get_individual_info coinbase_parts (proposer : Public_key.Compressed.t)
-      user_commands completed_works =
+      user_commands completed_works state_body_hash =
     let open Result.Let_syntax in
     let%map user_commands, coinbase, transactions =
       let open Result.Let_syntax in
@@ -208,7 +208,9 @@ end = struct
         in
         List.rev user_commands'
       in
-      let%bind coinbase = create_coinbase coinbase_parts proposer in
+      let%bind coinbase =
+        create_coinbase coinbase_parts proposer state_body_hash
+      in
       let coinbase_fts =
         List.concat_map coinbase ~f:(fun cb ->
             Option.value_map cb.fee_transfer ~default:[] ~f:(fun ft -> [ft]) )
@@ -255,7 +257,7 @@ end = struct
             `Two x
       in
       get_individual_info coinbase_parts t.creator t1.user_commands
-        t1.completed_works
+        t1.completed_works t.state_body_hash
     in
     let apply_pre_diff_with_at_most_one
         (t2 : Pre_diff_with_at_most_one_coinbase.t) =
@@ -263,7 +265,7 @@ end = struct
         match t2.coinbase with Zero -> `Zero | One x -> `One x
       in
       get_individual_info coinbase_added t.creator t2.user_commands
-        t2.completed_works
+        t2.completed_works t.state_body_hash
     in
     let open Result.Let_syntax in
     let%bind p1 = apply_pre_diff_with_at_most_two (fst t.diff) in
@@ -285,13 +287,13 @@ end = struct
     match t with Ok x -> x | Error e -> Core.Error.raise (Error.to_error e)
 
   let get_individual_diff_unchecked coinbase_parts proposer user_commands
-      completed_works =
+      completed_works state_body_hash =
     let txn_works =
       List.map ~f:Transaction_snark_work.forget completed_works
     in
     let coinbase_parts =
       O1trace.measure "create_coinbase" (fun () ->
-          ok_exn' (create_coinbase coinbase_parts proposer) )
+          ok_exn' (create_coinbase coinbase_parts proposer state_body_hash) )
     in
     let coinbase_fts =
       List.concat_map coinbase_parts ~f:(fun cb ->
@@ -333,7 +335,7 @@ end = struct
             `Two x
       in
       get_individual_diff_unchecked coinbase_parts t.creator
-        pre_diff1.user_commands pre_diff1.completed_works
+        pre_diff1.user_commands pre_diff1.completed_works t.state_body_hash
     in
     let apply_pre_diff_with_at_most_one
         (pre_diff2 :
@@ -343,7 +345,7 @@ end = struct
         match pre_diff2.coinbase with Zero -> `Zero | One x -> `One x
       in
       get_individual_diff_unchecked coinbase_added t.creator
-        pre_diff2.user_commands pre_diff2.completed_works
+        pre_diff2.user_commands pre_diff2.completed_works t.state_body_hash
     in
     let data1, work1, coinbases1 =
       apply_pre_diff_with_at_most_two (fst t.diff)

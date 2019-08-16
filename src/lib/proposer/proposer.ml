@@ -106,6 +106,9 @@ let generate_next_state ~previous_protocol_state ~time_controller
     ~(keypair : Keypair.t) ~proposal_data ~scheduled_time =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
+  let protocol_state_body_hash =
+    Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
+  in
   let%bind ( diff
            , next_staged_ledger_hash
            , ledger_proof_opt
@@ -116,7 +119,8 @@ let generate_next_state ~previous_protocol_state ~time_controller
       let diff =
         measure "create_diff" (fun () ->
             Staged_ledger.create_diff staged_ledger ~self ~logger
-              ~transactions_by_fee:transactions ~get_completed_work )
+              ~transactions_by_fee:transactions ~get_completed_work
+              ~state_body_hash:protocol_state_body_hash )
       in
       let%map ( `Hash_after_applying next_staged_ledger_hash
               , `Ledger_proof ledger_proof_opt
@@ -137,9 +141,6 @@ let generate_next_state ~previous_protocol_state ~time_controller
       , ledger_proof_opt
       , is_new_stack
       , coinbase_amount ))
-  in
-  let coinbase_state_body_hash =
-    Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
   in
   let%bind protocol_state, consensus_transition_data =
     lift_sync (fun () ->
@@ -204,7 +205,8 @@ let generate_next_state ~previous_protocol_state ~time_controller
               ~blockchain_state:
                 (Protocol_state.blockchain_state protocol_state)
               ~consensus_transition:consensus_transition_data ~proposer:self
-              ~coinbase_amount ~coinbase_state_body_hash ()
+              ~coinbase_amount
+              ~coinbase_state_body_hash:protocol_state_body_hash ()
           in
           let internal_transition =
             Internal_transition.create ~snark_transition

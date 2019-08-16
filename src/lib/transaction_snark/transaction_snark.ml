@@ -47,7 +47,7 @@ module Proof_type = struct
 end
 
 module Pending_coinbase_stack_state = struct
-  (*State of the coinbase stack for the current transaction snark*)
+  (* State of the coinbase stack for the current transaction snark *)
   module Stable = struct
     module V1 = struct
       module T = struct
@@ -590,6 +590,9 @@ module Merge = struct
 
   let wrap_input_typ = Typ.list ~length:Tock.Field.size_in_bits Boolean.typ
 
+  let wrap_pending_coinbase_typ =
+    Typ.list ~length:((Tock.Field.size_in_bits * 2) + 2) Boolean.typ
+
   (* TODO: When we switch to the weierstrass curve use the shifted
    add-many function *)
   let disjoint_union_sections = function
@@ -700,7 +703,7 @@ module Merge = struct
 
   let state3_offset = state2_offset + state_hash_size_in_triples
 
-  let state4_offset = state3_offset + state_hash_size_in_triples
+  let state4_offset = state3_offset + Pending_coinbase.Stack.length_in_triples
 
   (* spec for [main top_hash]:
      constraints pass iff
@@ -732,11 +735,11 @@ module Merge = struct
         ~f:
           (Fn.compose Transition_data.supply_increase Prover_state.transition23)
     and pending_coinbase1 =
-      exists' wrap_input_typ ~f:Prover_state.pending_coinbase_stack1
+      exists' wrap_pending_coinbase_typ ~f:Prover_state.pending_coinbase_stack1
     and pending_coinbase2 =
-      exists' wrap_input_typ ~f:Prover_state.pending_coinbase_stack2
+      exists' wrap_pending_coinbase_typ ~f:Prover_state.pending_coinbase_stack2
     and pending_coinbase3 =
-      exists' wrap_input_typ ~f:Prover_state.pending_coinbase_stack3
+      exists' wrap_pending_coinbase_typ ~f:Prover_state.pending_coinbase_stack3
     in
     let bits_to_triples bits =
       Fold.(to_list (group3 ~default:Boolean.false_ (of_list bits)))

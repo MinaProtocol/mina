@@ -132,13 +132,19 @@ module type Staged_ledger_diff_generalized_intf = sig
       with type V1.t = t
   end
 
-  type t = {diff: Diff.t; creator: compressed_public_key}
+  type t =
+    { diff: Diff.t
+    ; creator: compressed_public_key
+    ; state_body_hash: State_body_hash.Stable.V1.t }
   [@@deriving sexp, to_yojson, fields]
 
   module Stable :
     sig
       module V1 : sig
-        type t = {diff: Diff.t; creator: compressed_public_key}
+        type t =
+          { diff: Diff.t
+          ; creator: compressed_public_key
+          ; state_body_hash: State_body_hash.Stable.V1.t }
         [@@deriving sexp, to_yojson, bin_io, version]
       end
 
@@ -164,7 +170,11 @@ module type Staged_ledger_diff_generalized_intf = sig
       * pre_diff_with_at_most_one_coinbase option
     [@@deriving sexp]
 
-    type t = {diff: diff; creator: compressed_public_key} [@@deriving sexp]
+    type t =
+      { diff: diff
+      ; creator: compressed_public_key
+      ; state_body_hash: State_body_hash.t }
+    [@@deriving sexp]
 
     val user_commands : t -> user_command_with_valid_signature list
   end
@@ -506,6 +516,7 @@ module type Staged_ledger_generalized_intf = sig
     -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
     -> get_completed_work:(   transaction_snark_work_statement
                            -> transaction_snark_work_checked option)
+    -> state_body_hash:State_body_hash.t
     -> valid_diff
 
   val statement_exn : t -> [`Non_empty of transaction_snark_statement | `Empty]

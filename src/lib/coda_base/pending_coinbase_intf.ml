@@ -139,11 +139,22 @@ module type S = sig
       val typ : (var, value) Typ.t
     end
 
+    module Newest_stack_info : sig
+      (* address of stack; pending coinbase previous state hash; is new stack *)
+      type t = Address.value * State_hash.t * bool
+
+      type value = t
+
+      type var = Address.var * State_hash.var * Boolean.var
+
+      val typ : (var, value) Typ.t
+    end
+
     type _ Request.t +=
       | Coinbase_stack_path : Address.value -> path Request.t
       | Get_coinbase_stack : Address.value -> (Stack.t * path) Request.t
       | Set_coinbase_stack : Address.value * Stack.t -> unit Request.t
-      | Find_index_of_newest_stack : Address.value Request.t
+      | Find_index_of_newest_stack : Newest_stack_info.t Request.t
       | Find_index_of_oldest_stack : Address.value Request.t
 
     val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t

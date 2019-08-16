@@ -586,6 +586,7 @@ struct
     let%bind pending_coinbase_collection_updated1 =
       match ledger_proof with
       | Some (proof, _) ->
+          eprintf "REMOVING OLDEST STACK\n%!" ;
           let%bind oldest_stack, pending_coinbase_collection_updated1 =
             Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
             |> to_staged_ledger_or_error
@@ -613,11 +614,13 @@ struct
       | `Update_none ->
           Ok pending_coinbase_collection_updated1
       | `Update_one stack1 ->
+          eprintf "UPDATING ONE STACK\n%!" ;
           Pending_coinbase.update_coinbase_stack
             pending_coinbase_collection_updated1 stack1 ~is_new_stack
           |> to_staged_ledger_or_error
       | `Update_two (stack1, stack2) ->
           (*The case when part of the transactions go in to the old tree and remaining on to the new tree*)
+          eprintf "UPDATING TWO STACKS\n%!" ;
           let%bind update1 =
             Pending_coinbase.update_coinbase_stack
               pending_coinbase_collection_updated1 stack1 ~is_new_stack:false
@@ -714,6 +717,7 @@ struct
       Deferred.return (to_staged_ledger_or_error r)
     in
     let%bind updated_pending_coinbase_collection' =
+      eprintf "UPDATE_PENDING_COINBASE_COLLECTION 1\n%!" ;
       update_pending_coinbase_collection t.pending_coinbase_collection
         stack_update ~is_new_stack ~ledger_proof:res_opt
       |> Deferred.return
@@ -793,6 +797,7 @@ struct
       |> Staged_ledger_error.to_or_error |> Deferred.return
     in
     let%map update_pending_coinbase_collection' =
+      eprintf "UPDATE_PENDING_COINBASE_COLLECTION 2\n%!" ;
       update_pending_coinbase_collection t.pending_coinbase_collection
         updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
       |> Staged_ledger_error.to_or_error |> Deferred.return
@@ -1276,7 +1281,8 @@ struct
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
-         -> Transaction_snark_work.Checked.t option) =
+         -> Transaction_snark_work.Checked.t option)
+      ~(state_body_hash : State_body_hash.t) =
     O1trace.trace_event "curr_hash" ;
     let validating_ledger = Transaction_validator.create t.ledger in
     O1trace.trace_event "done mask" ;
@@ -1330,7 +1336,9 @@ struct
       "Number of proofs ready for purchase: $proof_count"
       ~metadata:[("proof_count", `Int proof_count)] ;
     trace_event "prediffs done" ;
-    {Staged_ledger_diff.With_valid_signatures_and_proofs.diff; creator= self}
+    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
+    ; creator= self
+    ; state_body_hash }
 
   module For_tests = struct
     let materialized_snarked_ledger_hash = materialized_snarked_ledger_hash
@@ -1574,6 +1582,9 @@ let%test_module "test" =
         type public_key = Public_key.Compressed.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
+        type state_body_hash = State_body_hash.Stable.V1.t
+        [@@deriving sexp, bin_io, compare, yojson]
+
         type staged_ledger_hash = Staged_ledger_hash.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
@@ -1715,7 +1726,10 @@ let%test_module "test" =
         module Stable = struct
           module V1 = struct
             module T = struct
-              type t = {diff: Diff.Stable.V1.t; creator: public_key}
+              type t =
+                { diff: Diff.Stable.V1.t
+                ; creator: public_key
+                ; state_body_hash: state_body_hash }
               [@@deriving sexp, to_yojson, bin_io, version {for_test}]
             end
 
@@ -1725,7 +1739,10 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = Stable.Latest.t = {diff: Diff.Stable.V1.t; creator: public_key}
+        type t = Stable.Latest.t =
+          { diff: Diff.Stable.V1.t
+          ; creator: public_key
+          ; state_body_hash: state_body_hash }
         [@@deriving sexp, yojson, fields]
 
         module With_valid_signatures_and_proofs = struct
@@ -1746,7 +1763,9 @@ let%test_module "test" =
             * pre_diff_with_at_most_one_coinbase option
           [@@deriving sexp, yojson]
 
-          type t = {diff: diff; creator: public_key} [@@deriving sexp, yojson]
+          type t =
+            {diff: diff; creator: public_key; state_body_hash: state_body_hash}
+          [@@deriving sexp, yojson]
 
           let user_commands t =
             (fst t.diff).user_commands
@@ -1779,7 +1798,8 @@ let%test_module "test" =
           { diff=
               ( forget_pre_diff_with_at_most_two (fst t.diff)
               , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one )
-          ; creator= t.creator }
+          ; creator= t.creator
+          ; state_body_hash= State_body_hash.dummy }
 
         let user_commands (t : t) =
           (fst t.diff).user_commands
@@ -1824,6 +1844,7 @@ let%test_module "test" =
         let diff =
           Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
             ~get_completed_work:stmt_to_work
+            ~state_body_hash:State_body_hash.dummy
         in
         let diff' = Staged_ledger_diff.forget diff in
         let%map ( `Hash_after_applying hash
@@ -2237,7 +2258,8 @@ let%test_module "test" =
                   ; user_commands= List.take txns slots
                   ; coinbase= Zero }
                 , None )
-            ; creator= self_pk }
+            ; creator= self_pk
+            ; state_body_hash= State_body_hash.dummy }
         | Some (_, _) ->
             let txns_in_second_diff = List.drop txns slots in
             let diff : Staged_ledger_diff.Diff.t =
@@ -2251,7 +2273,7 @@ let%test_module "test" =
                   ; user_commands= txns_in_second_diff
                   ; coinbase= Zero } )
             in
-            {diff; creator= self_pk}
+            {diff; creator= self_pk; state_body_hash= State_body_hash.dummy}
       in
       let empty_diff : Staged_ledger_diff.t =
         { diff=
@@ -2259,7 +2281,8 @@ let%test_module "test" =
               ; user_commands= []
               ; coinbase= Staged_ledger_diff.At_most_two.Zero }
             , None )
-        ; creator= self_pk }
+        ; creator= self_pk
+        ; state_body_hash= State_body_hash.dummy }
       in
       Quickcheck.test (gen_below_capacity ())
         ~sexp_of:
