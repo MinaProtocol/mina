@@ -590,8 +590,13 @@ module Merge = struct
 
   let wrap_input_typ = Typ.list ~length:Tock.Field.size_in_bits Boolean.typ
 
+  (* reflect the padding done in Pending_coinbase.Stack.to_bits *)
+  let pending_coinbase_padding = (3 - (Tock.Field.size_in_bits mod 3)) mod 3
+
   let wrap_pending_coinbase_typ =
-    Typ.list ~length:((Tock.Field.size_in_bits * 2) + 2) Boolean.typ
+    Typ.list
+      ~length:((Tock.Field.size_in_bits * 2) + pending_coinbase_padding)
+      Boolean.typ
 
   (* TODO: When we switch to the weierstrass curve use the shifted
    add-many function *)
@@ -620,18 +625,20 @@ module Merge = struct
         ~support:
           (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
     in
+    let start = Hash_prefix.length_in_triples in
     let%bind prefix_and_sok_digest =
       Pedersen.Checked.Section.extend prefix_section
         (Sok_message.Digest.Checked.to_triples sok_digest)
-        ~start:Hash_prefix.length_in_triples
+        ~start
+    in
+    let start =
+      start + Sok_message.Digest.length_in_triples
+      + (2 * state_hash_size_in_triples)
+      + (2 * Pending_coinbase.Stack.length_in_triples)
     in
     let%bind prefix_and_sok_digest_and_supply_increase_and_fee =
       let open Pedersen.Checked.Section in
-      extend prefix_and_sok_digest
-        ~start:
-          ( Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
-          + (2 * state_hash_size_in_triples)
-          + (2 * Pending_coinbase.Stack.length_in_triples) )
+      extend prefix_and_sok_digest ~start
         ( Amount.var_to_triples supply_increase
         @ Amount.Signed.Checked.to_triples fee_excess )
     in

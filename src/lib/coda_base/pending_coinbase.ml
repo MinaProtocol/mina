@@ -167,7 +167,7 @@ module Data_hash_binable = struct
 end
 
 (* a coinbase stack has two components, data and a state_hash
-   we create a module representing each component
+   we create modules for each component
 *)
 
 module Coinbase_stack_data = struct
@@ -440,9 +440,15 @@ struct
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
+    (* pad to match the triple representation *)
+    let pad_bits =
+      let len = List.length Coinbase_stack_data.(to_bits empty) in
+      let needed = (3 - (len mod 3)) mod 3 in
+      List.init needed ~f:(fun _ -> false)
+
     let to_bits t =
       Coinbase_stack_data.to_bits t.Poly.data
-      @ [false; false]
+      @ pad_bits
       @ Coinbase_stack_state_hash.to_bits t.Poly.state_hash
 
     let to_bytes t =
