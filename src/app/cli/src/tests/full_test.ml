@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"../../../../config.mlh"]
 
 open Core
 open Async
@@ -8,6 +8,7 @@ open Coda_state
 open Signature_lib
 open Pipe_lib
 open O1trace
+open Init
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
@@ -135,6 +136,7 @@ let run_test () : unit Deferred.t =
               ; target_peer_count= 8
               ; initial_peers= []
               ; conf_dir= temp_conf_dir
+              ; chain_id= "bogus chain id for testing"
               ; addrs_and_ports=
                   { external_ip= Unix.Inet_addr.localhost
                   ; bind_ip= Unix.Inet_addr.localhost
@@ -172,7 +174,6 @@ let run_test () : unit Deferred.t =
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000 ())
       in
-      Coda_lib.start coda ;
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
            (Coda_lib.validated_transitions coda)
@@ -216,6 +217,7 @@ let run_test () : unit Deferred.t =
               (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
       in
       Coda_run.setup_local_server coda ;
+      let%bind () = Coda_lib.start coda in
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
       (* No proof emitted by the parallel scan at the begining *)

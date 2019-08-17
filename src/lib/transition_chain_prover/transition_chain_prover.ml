@@ -9,10 +9,12 @@ module type Inputs_intf = sig
     Coda_intf.Transition_frontier_intf
     with type external_transition_validated := External_transition.Validated.t
      and type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
+                ( [`Time_received] * unit Truth.true_t
+                , [`Proof] * unit Truth.true_t
+                , [`Delta_transition_chain]
+                  * State_hash.t Non_empty_list.t Truth.true_t
+                , [`Frontier_dependencies] * unit Truth.true_t
+                , [`Staged_ledger_diff] * unit Truth.false_t )
                 External_transition.Validation.with_transition
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -21,19 +23,17 @@ module type Inputs_intf = sig
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_intf.Transition_chain_witness_intf
+  Coda_intf.Transition_chain_prover_intf
   with type transition_frontier := Inputs.Transition_frontier.t
    and type external_transition := Inputs.External_transition.t = struct
   open Inputs
 
-  module Merkle_list = Merkle_list.Make (struct
+  module Merkle_list = Merkle_list_prover.Make (struct
     type value = External_transition.t
 
     type context = Transition_frontier.t
 
     type proof_elem = State_body_hash.t
-
-    type hash = State_hash.t [@@deriving eq]
 
     let to_proof_elem transition =
       transition |> External_transition.protocol_state |> Protocol_state.body
@@ -53,13 +53,9 @@ module Make (Inputs : Inputs_intf) :
       in
       Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
       |> With_hash.data |> External_transition.Validated.forget_validation
-
-    let hash previous_state_hash state_body_hash =
-      Protocol_state.hash_abstract ~hash_body:Fn.id
-        {previous_state_hash; body= state_body_hash}
   end)
 
-  let prove ~frontier state_hash =
+  let prove ?length ~frontier state_hash =
     let open Option.Let_syntax in
     let%map requested_breadcrumb =
       Option.merge
@@ -71,22 +67,10 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.Breadcrumb.transition_with_hash requested_breadcrumb
       |> With_hash.data |> External_transition.Validated.forget_validation
     in
-    let merkle_list =
-      Merkle_list.prove ~context:frontier requested_transition
+    let first_transition, merkle_list =
+      Merkle_list.prove ?length ~context:frontier requested_transition
     in
-    let oldest_breadcrumb =
-      Option.value ~default:(Transition_frontier.root frontier)
-      @@ Transition_frontier.oldest_breadcrumb_in_history frontier
-    in
-    let oldest_state_hash =
-      Transition_frontier.Breadcrumb.transition_with_hash oldest_breadcrumb
-      |> With_hash.hash
-    in
-    (oldest_state_hash, merkle_list)
-
-  let verify ~target_hash
-      ~transition_chain_witness:(oldest_state_hash, merkle_list) =
-    Merkle_list.verify ~init:oldest_state_hash merkle_list target_hash
+    (External_transition.state_hash first_transition, merkle_list)
 end
 
 include Make (struct

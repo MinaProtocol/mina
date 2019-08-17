@@ -343,7 +343,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           let graphql_callback =
             Graphql_cohttp_async.make_callback
               (fun _req -> coda)
-              Graphql.schema
+              Coda_graphql.schema
           in
           Cohttp_async.(
             Server.create_expert
@@ -445,8 +445,19 @@ let handle_crash e =
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-      make_report_and_log_shutdown (Exn.to_string exn) ~conf_dir ~top_logger
-        coda_ref ;
+      ( match Monitor.extract_exn exn with
+      | Coda_networking.No_initial_peers ->
+          Core.eprintf
+            !{err|
+
+  ☠  Coda Daemon failed to connect to any initial peers.
+
+You might be trying to connect to a different network version, or need to troubleshoot your configuration. See https://codaprotocol.com/docs/troubleshooting/ for details.
+
+%!|err}
+      | exn ->
+          make_report_and_log_shutdown (Exn.to_string exn) ~conf_dir
+            ~top_logger coda_ref ) ;
       Stdlib.exit 1 ) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->

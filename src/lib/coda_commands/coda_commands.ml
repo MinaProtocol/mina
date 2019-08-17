@@ -268,7 +268,11 @@ let get_status ~flag t =
         |> Host_and_port.to_string )
   in
   let user_commands_sent = !txn_count in
-  let run_snark_worker = Option.is_some (Coda_lib.snark_worker_key t) in
+  let snark_worker =
+    Option.map
+      (Coda_lib.snark_worker_key t)
+      ~f:Public_key.Compressed.to_base58_check
+  in
   let propose_pubkeys = Coda_lib.propose_public_keys t in
   let consensus_mechanism = Consensus.name in
   let consensus_time_now =
@@ -291,10 +295,10 @@ let get_status ~flag t =
           ; get_ancestry=
               { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_ancestry"
               ; impl= r ~name:"rpc_impl_get_ancestry" }
-          ; get_transition_chain_witness=
+          ; get_transition_chain_proof=
               { Rpc_pair.dispatch=
-                  r ~name:"rpc_dispatch_get_transition_chain_witness"
-              ; impl= r ~name:"rpc_impl_get_transition_chain_witness" }
+                  r ~name:"rpc_dispatch_get_transition_chain_proof"
+              ; impl= r ~name:"rpc_impl_get_transition_chain_proof" }
           ; get_transition_chain=
               { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_transition_chain"
               ; impl= r ~name:"rpc_impl_get_transition_chain" } }
@@ -389,8 +393,10 @@ let get_status ~flag t =
   ; conf_dir
   ; peers
   ; user_commands_sent
-  ; run_snark_worker
-  ; propose_pubkeys= Public_key.Compressed.Set.to_list propose_pubkeys
+  ; snark_worker
+  ; propose_pubkeys=
+      Public_key.Compressed.Set.to_list propose_pubkeys
+      |> List.map ~f:Public_key.Compressed.to_base58_check
   ; histograms
   ; consensus_time_now
   ; consensus_mechanism

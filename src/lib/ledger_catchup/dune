@@ -15,5 +15,5 @@
     merkle_address 
     coda_base 
     kademlia
-    transition_chain_witness 
+    transition_chain_verifier
     coda_networking))

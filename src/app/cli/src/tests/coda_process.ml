@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"../../../../config.mlh"]
 
 open Core
 open Async
@@ -51,11 +51,6 @@ let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
     ; max_concurrent_connections }
   in
   config
-
-let disconnect (conn, proc, _) =
-  let%bind () = Coda_worker.Connection.close conn in
-  let%map (_ : Unix.Exit_or_signal.t) = Process.wait proc in
-  ()
 
 let peers_exn (conn, _proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()
@@ -146,3 +141,13 @@ let best_path (conn, _proc, _) =
 let replace_snark_worker_key (conn, _proc, _) key =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.replace_snark_worker_key ~arg:key
+
+let stop (conn, _proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.stop ~arg:()
+
+let disconnect ((conn, proc, _) as t) =
+  (* This kills any strangling snark worker process *)
+  let%bind () = stop t in
+  let%bind () = Coda_worker.Connection.close conn in
+  let%map (_ : Unix.Exit_or_signal.t) = Process.wait proc in
+  ()

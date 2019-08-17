@@ -73,6 +73,8 @@ module Time : sig
     val ( <= ) : t -> t -> bool
 
     val ( >= ) : t -> t -> bool
+
+    val min : t -> t -> t
   end
 
   val ( < ) : t -> t -> bool

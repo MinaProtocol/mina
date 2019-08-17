@@ -229,7 +229,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
     in
     let chains_json () =
       `List
-        ( Array.to_list chains
+        ( Array.to_list online_chains
         |> List.map ~f:(fun chain ->
                `List (List.map ~f:State_hash.Stable.Latest.to_yojson chain) )
         )

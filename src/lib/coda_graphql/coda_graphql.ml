@@ -187,7 +187,7 @@ module Types = struct
           List.rev
           @@ Rpc_timings.Fields.fold ~init:[] ~get_staged_ledger_aux:fd
                ~answer_sync_ledger_query:fd ~get_ancestry:fd
-               ~get_transition_chain_witness:fd ~get_transition_chain:fd )
+               ~get_transition_chain_proof:fd ~get_transition_chain:fd )
 
     module Histograms = Daemon_rpcs.Types.Status.Histograms
 
@@ -221,12 +221,10 @@ module Types = struct
                ~ledger_merkle_root:string ~state_hash:string
                ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
-               ~user_commands_sent:nn_int ~run_snark_worker:nn_bool
+               ~user_commands_sent:nn_int ~snark_worker:string
                ~sync_status:(id ~typ:(non_null sync_status))
                ~propose_pubkeys:
-                 (Reflection.reflect
-                    ~typ:Schema.(non_null @@ list (non_null public_key))
-                    Fn.id)
+                 (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms) ~consensus_time_best_tip:string
                ~consensus_time_now:nn_string ~consensus_mechanism:nn_string
                ~consensus_configuration:
@@ -543,7 +541,7 @@ module Types = struct
               ~resolve:(fun _ -> Fn.id) ] )
 
     let add_payment_receipt =
-      obj "AddPaymentReceipt" ~fields:(fun _ ->
+      obj "AddPaymentReceiptPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
@@ -555,6 +553,15 @@ module Types = struct
                 "Returns the last wallet public keys that were staking before \
                  or empty if there were none"
               ~typ:(non_null (list (non_null public_key)))
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
+    let set_snark_worker =
+      obj "SetSnarkWorkerPayload" ~fields:(fun _ ->
+          [ field "lastSnarkWorker"
+              ~doc:
+                "Returns the last public key that was designated for snark work"
+              ~typ:public_key
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
   end
@@ -688,6 +695,14 @@ module Types = struct
               ~doc:
                 "Public keys of wallets you wish to stake - these must be \
                  wallets that are in ownedWallets" ]
+
+    let set_snark_worker =
+      obj "SetSnarkWorkerInput" ~coerce:Fn.id
+        ~fields:
+          [ arg "wallet" ~typ:public_key_arg
+              ~doc:
+                "Public key you wish to start snark-working on; null to stop \
+                 doing any snark work" ]
 
     module AddPaymentReceipt = struct
       type t = {payment: string; added_time: string}
@@ -835,7 +850,7 @@ module Types = struct
         io_field query_name
           ~args:
             Arg.
-              [ arg "filter" ~typ:(non_null filter_argument)
+              [ arg "filter" ~typ:filter_argument
               ; arg "first" ~doc:"Returns the first _n_ elements from the list"
                   ~typ:int
               ; arg "after"
@@ -863,33 +878,44 @@ module Types = struct
                     let%map decoded = Cursor.deserialize data in
                     Some decoded
               in
-              let%map queried_nodes, has_earlier_page, has_later_page =
+              let%map ( (queried_nodes, has_earlier_page, has_later_page)
+                      , total_counts ) =
                 Deferred.return
                 @@
-                match (first, after, last, before) with
-                | Some _n_queries_before, _, Some _n_queries_after, _ ->
+                match (first, after, last, before, public_key) with
+                | _, _, _, _, None ->
+                    (* TODO: Return an actual pagination with a limited range of elements rather than returning all the elemens in the database *)
+                    let values = Pagination_database.get_all_values database in
+                    Result.return
+                      ( (values, `Has_earlier_page false, `Has_later_page false)
+                      , Some (List.length values) )
+                | Some _n_queries_before, _, Some _n_queries_after, _, _ ->
                     Error
                       "Illegal query: first and last must not be non-null \
                        value at the same time"
-                | num_to_query, cursor, None, _ ->
+                | num_to_query, cursor, None, _, Some public_key ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
-                    Pagination_database.get_earlier_values database public_key
-                      cursor num_to_query
-                | None, _, num_to_query, cursor ->
+                    ( Pagination_database.get_earlier_values database
+                        public_key cursor num_to_query
+                    , Pagination_database.get_total_values database public_key
+                    )
+                | None, _, num_to_query, cursor, Some public_key ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
-                    Pagination_database.get_later_values database public_key
-                      cursor num_to_query
+                    ( Pagination_database.get_later_values database public_key
+                        cursor num_to_query
+                    , Pagination_database.get_total_values database public_key
+                    )
               in
               ( ( List.map queried_nodes ~f:(fun node ->
                       {Edge.node; cursor= Cursor.serialize @@ to_cursor node}
                   )
                 , has_earlier_page
                 , has_later_page )
-              , Pagination_database.get_values database public_key )
+              , Option.value ~default:0 total_counts )
             in
-            build_connection result (List.length total_counts) )
+            build_connection result total_counts )
     end
 
     module User_command = struct
@@ -1253,13 +1279,24 @@ module Mutations = struct
         ignore @@ Coda_commands.replace_proposers coda pks ;
         Public_key.Compressed.Set.to_list old_propose_keys )
 
+  let set_snark_worker =
+    io_field "setSnarkWorker"
+      ~doc:"Set key you wish to snark work with or disable snark working"
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_worker)]
+      ~typ:(non_null Types.Payload.set_snark_worker)
+      ~resolve:(fun {ctx= coda; _} () pk ->
+        let old_snark_worker_key = Coda_lib.snark_worker_key coda in
+        let%map () = Coda_lib.replace_snark_worker_key coda pk in
+        Ok old_snark_worker_key )
+
   let commands =
     [ add_wallet
     ; delete_wallet
     ; send_payment
     ; send_delegation
     ; add_payment_receipt
-    ; set_staking ]
+    ; set_staking
+    ; set_snark_worker ]
 end
 
 module Queries = struct
