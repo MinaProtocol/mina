@@ -224,16 +224,16 @@ module Snark_work = struct
     let help = "# of snark work received via rpc" in
     Counter.v "snark_work_completed_rpc" ~help ~namespace ~subsystem
 
-  let snark_work_assigned_rpc : Counter.t =
+  let snark_job_assigned_rpc : Counter.t =
     let help = "# of snark work sent via rpc" in
-    Counter.v "snark_work_assigned_rpc" ~help ~namespace ~subsystem
+    Counter.v "snark_job_assigned_rpc" ~help ~namespace ~subsystem
 
-  let snark_work_timed_out : Counter.t =
+  let snark_work_timed_out_rpc : Counter.t =
     let help =
       "# of snark work sent via rpc that did not complete within \
        work-reassignment-wait"
     in
-    Counter.v "snark_work_timed_out" ~help ~namespace ~subsystem
+    Counter.v "snark_work_timed_out_rpc" ~help ~namespace ~subsystem
 
   let snark_pool_size : Gauge.t =
     let help = "# of snark works in the snark pool" in
