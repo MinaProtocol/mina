@@ -721,6 +721,38 @@ let set_staking =
                (Public_key.Compressed.to_base58_check
                   (Public_key.compress public_key)) ))
 
+let set_snark_worker =
+  let open Command.Param in
+  let public_key_flag =
+    flag "address"
+      ~doc:
+        "PUBLICKEY Public-key address you wish to start snark-working on; \
+         null to stop doing any snark work"
+      (optional Cli_lib.Arg_type.public_key_compressed)
+  in
+  Command.async
+    ~summary:"Set key you wish to snark work with or disable snark working"
+    (Cli_lib.Background_daemon.init ~rest:true public_key_flag
+       ~f:(fun port optional_public_key ->
+         let open Graphql_client in
+         let graphql =
+           Set_snark_worker.make
+             ~wallet:Encoders.(optional optional_public_key ~f:public_key)
+             ()
+         in
+         Deferred.map (query graphql port) ~f:(fun response ->
+             ( match optional_public_key with
+             | Some public_key ->
+                 printf
+                   !"New snark worker public key : %s\n"
+                   (Public_key.Compressed.to_base58_check public_key)
+             | None ->
+                 printf "Will stop doing snark work\n" ) ;
+             printf "Previous snark worker public key : %s\n"
+               (Option.value_map (response#setSnarkWorker)#lastSnarkWorker
+                  ~default:"None" ~f:Public_key.Compressed.to_base58_check) )
+     ))
+
 let set_snark_work_fee =
   Command.async ~summary:"Set fee reward for doing transaction snark work"
   @@ Cli_lib.Background_daemon.init ~rest:true
@@ -850,6 +882,7 @@ let command =
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("set-staking", set_staking)
+    ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)
     ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)

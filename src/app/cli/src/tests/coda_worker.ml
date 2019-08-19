@@ -116,7 +116,8 @@ module T = struct
         ( 'worker
         , unit
         , (External_transition.t, State_hash.t) With_hash.t Pipe.Reader.t )
-        Rpc_parallel.Function.t }
+        Rpc_parallel.Function.t
+    ; stop: ('worker, unit, unit) Rpc_parallel.Function.t }
 
   type coda_functions =
     { coda_peers: unit -> Network_peer.Peer.t list Deferred.t
@@ -171,7 +172,8 @@ module T = struct
            Pipe.Reader.t
            Deferred.t
     ; coda_dump_tf: unit -> string Deferred.t
-    ; coda_best_path: unit -> State_hash.Stable.Latest.t list Deferred.t }
+    ; coda_best_path: unit -> State_hash.Stable.Latest.t list Deferred.t
+    ; coda_stop: unit -> unit Deferred.t }
 
   module Worker_state = struct
     type init_arg = Input.t [@@deriving bin_io]
@@ -244,6 +246,8 @@ module T = struct
 
     let get_all_transitions_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_all_transitions pk
+
+    let stop_impl ~worker_state ~conn_state:() = worker_state.coda_stop
 
     let get_all_transitions =
       C.create_rpc ~f:get_all_transitions_impl
@@ -351,6 +355,9 @@ module T = struct
           [%bin_type_class: Public_key.Compressed.Stable.Latest.t option]
         ~bin_output:Unit.bin_t ()
 
+    let stop =
+      C.create_rpc ~f:stop_impl ~bin_input:Unit.bin_t ~bin_output:Unit.bin_t ()
+
     let functions =
       { peers
       ; start
@@ -370,7 +377,8 @@ module T = struct
       ; get_all_user_commands
       ; replace_snark_worker_key
       ; validated_transitions_keyswaptest
-      ; get_all_transitions }
+      ; get_all_transitions
+      ; stop }
 
     let init_worker_state
         { addrs_and_ports
@@ -581,6 +589,11 @@ module T = struct
           let coda_replace_snark_worker_key =
             Coda_lib.replace_snark_worker_key coda
           in
+          (* This should be used to kill any processes that is not killed when the daemon dies. *)
+          let coda_stop () =
+            don't_wait_for (Coda_lib.replace_snark_worker_key coda None) ;
+            Deferred.unit
+          in
           let coda_new_block key =
             Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
           in
@@ -698,8 +711,8 @@ module T = struct
               with_monitor coda_validated_transitions_keyswaptest
           ; coda_replace_snark_worker_key=
               with_monitor coda_replace_snark_worker_key
-          ; coda_get_all_transitions= with_monitor coda_get_all_transitions }
-      )
+          ; coda_get_all_transitions= with_monitor coda_get_all_transitions
+          ; coda_stop= with_monitor coda_stop } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end
