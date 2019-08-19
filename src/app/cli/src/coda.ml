@@ -35,7 +35,6 @@ let chain_id =
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
-  MemprofHelpers.start 1E-4 20 100 ;
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir = Cli_lib.Flag.conf_dir
      and unsafe_track_propose_key =
@@ -149,6 +148,8 @@ let daemon logger =
            "true|false Limit the number of concurrent connections per IP \
             address (default:true)"
          (optional bool)
+     and memprof =
+       flag "memprof" no_arg ~doc:"enable statistical memory profiling"
      and no_bans =
        let module Expiration = struct
          [%%expires_after "20190907"]
@@ -603,6 +604,8 @@ let daemon logger =
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
        Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
+       (* this has to be after `handle_shutdown` so that it can trap SIGUSR1 *)
+       if memprof then MemprofHelpers.start 1E-4 20 100 ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind {Coda_initialization.coda; client_whitelist; rest_server_port}

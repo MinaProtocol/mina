@@ -86,7 +86,7 @@ let rec sort_sampleTree (t : sampleTree) : sortedSampleTree =
 
 let print chan min_samples (SSTC (_, n, tl)) =
   let rec aux indent =
-    List.iter (fun (li, SSTC (sl, n, tl)) ->
+    List.iter (fun (li, SSTC (_sl, n, tl)) ->
         if min_samples <= n then (
           ( match Printexc.Slot.location (convert_raw_backtrace_slot li) with
           | Some {filename; line_number; start_char; end_char} ->
