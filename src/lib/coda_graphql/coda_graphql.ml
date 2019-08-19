@@ -221,12 +221,10 @@ module Types = struct
                ~ledger_merkle_root:string ~state_hash:string
                ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
-               ~user_commands_sent:nn_int ~run_snark_worker:nn_bool
+               ~user_commands_sent:nn_int ~snark_worker:string
                ~sync_status:(id ~typ:(non_null sync_status))
                ~propose_pubkeys:
-                 (Reflection.reflect
-                    ~typ:Schema.(non_null @@ list (non_null public_key))
-                    Fn.id)
+                 (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms) ~consensus_time_best_tip:string
                ~consensus_time_now:nn_string ~consensus_mechanism:nn_string
                ~consensus_configuration:
@@ -543,7 +541,7 @@ module Types = struct
               ~resolve:(fun _ -> Fn.id) ] )
 
     let add_payment_receipt =
-      obj "AddPaymentReceipt" ~fields:(fun _ ->
+      obj "AddPaymentReceiptPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
@@ -555,6 +553,15 @@ module Types = struct
                 "Returns the last wallet public keys that were staking before \
                  or empty if there were none"
               ~typ:(non_null (list (non_null public_key)))
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
+    let set_snark_worker =
+      obj "SetSnarkWorkerPayload" ~fields:(fun _ ->
+          [ field "lastSnarkWorker"
+              ~doc:
+                "Returns the last public key that was designated for snark work"
+              ~typ:public_key
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
   end
@@ -688,6 +695,14 @@ module Types = struct
               ~doc:
                 "Public keys of wallets you wish to stake - these must be \
                  wallets that are in ownedWallets" ]
+
+    let set_snark_worker =
+      obj "SetSnarkWorkerInput" ~coerce:Fn.id
+        ~fields:
+          [ arg "wallet" ~typ:public_key_arg
+              ~doc:
+                "Public key you wish to start snark-working on; null to stop \
+                 doing any snark work" ]
 
     module AddPaymentReceipt = struct
       type t = {payment: string; added_time: string}
@@ -1264,13 +1279,24 @@ module Mutations = struct
         ignore @@ Coda_commands.replace_proposers coda pks ;
         Public_key.Compressed.Set.to_list old_propose_keys )
 
+  let set_snark_worker =
+    io_field "setSnarkWorker"
+      ~doc:"Set key you wish to snark work with or disable snark working"
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_worker)]
+      ~typ:(non_null Types.Payload.set_snark_worker)
+      ~resolve:(fun {ctx= coda; _} () pk ->
+        let old_snark_worker_key = Coda_lib.snark_worker_key coda in
+        let%map () = Coda_lib.replace_snark_worker_key coda pk in
+        Ok old_snark_worker_key )
+
   let commands =
     [ add_wallet
     ; delete_wallet
     ; send_payment
     ; send_delegation
     ; add_payment_receipt
-    ; set_staking ]
+    ; set_staking
+    ; set_snark_worker ]
 end
 
 module Queries = struct
