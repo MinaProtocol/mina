@@ -397,6 +397,7 @@ let events workers start_reader =
     (Linear_pipe.iter start_reader ~f:(fun (i, config, started, synced) ->
          don't_wait_for
            (let%bind worker = Coda_process.spawn_exn config in
+            let%bind () = Coda_process.start_exn worker in
             workers.(i) <- worker ;
             started () ;
             don't_wait_for
