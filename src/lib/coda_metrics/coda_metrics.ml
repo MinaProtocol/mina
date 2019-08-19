@@ -213,6 +213,41 @@ module Network = struct
   (* TODO: track non gossip RPC messages as well *)
 end
 
+module Snark_work = struct
+  let subsystem = "Snark_work"
+
+  let snark_work_received_gossip : Counter.t =
+    let help = "# of snark work received from peers" in
+    Counter.v "snark_work_received_gossip" ~help ~namespace ~subsystem
+
+  let snark_work_completed_rpc : Counter.t =
+    let help = "# of snark work received via rpc" in
+    Counter.v "snark_work_completed_rpc" ~help ~namespace ~subsystem
+
+  let snark_job_assigned_rpc : Counter.t =
+    let help = "# of snark work sent via rpc" in
+    Counter.v "snark_job_assigned_rpc" ~help ~namespace ~subsystem
+
+  let snark_work_timed_out_rpc : Counter.t =
+    let help =
+      "# of snark work sent via rpc that did not complete within \
+       work-reassignment-wait"
+    in
+    Counter.v "snark_work_timed_out_rpc" ~help ~namespace ~subsystem
+
+  let snark_pool_size : Gauge.t =
+    let help = "# of snark works in the snark pool" in
+    Gauge.v "snark_pool_size" ~help ~namespace ~subsystem
+
+  let snark_work_last_block : Gauge.t =
+    let help = "# of snark work purchased per block" in
+    Gauge.v "snark_work_last_block" ~help ~namespace ~subsystem
+
+  let scan_state_snark_jobs : Gauge.t =
+    let help = "# of jobs in the scan state after every block" in
+    Gauge.v "scan_state_snark_jobs" ~help ~namespace ~subsystem
+end
+
 module Trust_system = struct
   let subsystem = "Trust_system"
 

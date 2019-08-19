@@ -788,6 +788,8 @@ module Make (Inputs : Inputs_intf) = struct
                     ; ( "sender"
                       , Envelope.(Sender.to_yojson (Incoming.sender envelope))
                       ) ] ;
+              Coda_metrics.(
+                Counter.inc_one Snark_work.snark_work_received_gossip) ;
               `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff))
           | Transaction_pool_diff diff ->
               `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff)) )
