@@ -87,9 +87,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
           (Visualization_message.bootstrap "transition frontier") )
 
 let remove_prev_crash_reports ~conf_dir =
-  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*.tar.xz" conf_dir)
-  |> ignore ;
-  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report_tmp*" conf_dir)
+  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*" conf_dir)
 
 let summary exn_str =
   let uname = Core.Unix.uname () in
@@ -111,13 +109,11 @@ let coda_status coda_ref =
 let make_report exn_str ~conf_dir ~top_logger coda_ref =
   let _ = remove_prev_crash_reports ~conf_dir in
   let crash_time = Time.to_filename_string ~zone:Time.Zone.utc (Time.now ()) in
-  let temp_config = conf_dir ^/ "coda_crash_report_tmp_" ^ crash_time in
+  let temp_config = conf_dir ^/ "coda_crash_report_" ^ crash_time in
   let () = Core.Unix.mkdir temp_config in
   (*Transition frontier and ledger visualization*)
   log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
-  let report_file =
-    conf_dir ^/ "coda_crash_report_" ^ crash_time ^ ".tar.xz"
-  in
+  let report_file = temp_config ^ ".tar.xz" in
   (*Coda status*)
   let status_file = temp_config ^/ "coda_status.json" in
   let status = coda_status !coda_ref in
@@ -426,6 +422,7 @@ let handle_crash e ~conf_dir ~top_logger coda_ref =
         let _ = Core.Sys.command (sprintf "rm -rf %s" temp_config) in
         sprintf "attach the crash report %s" report_file
     | Ok None ->
+        (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
         no_report ()
     | Error e ->
         Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
