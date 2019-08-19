@@ -250,7 +250,6 @@ module Types = struct
         map_entry "Consensus configuration" ~f:render
     end
 
-    (* TODO: put snark work fee *)
     type t =
       { num_accounts: int option
       ; blockchain_length: int option
