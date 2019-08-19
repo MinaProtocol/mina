@@ -278,14 +278,15 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
        let diff = Time.diff (Time.now ()) !last_time in
        let diff = Time.Span.to_sec diff in
        if
-         not
-           ( diff
-           < Time.Span.to_sec acceptable_delay
-             +. epsilon
-             +. Int.to_float
-                  ( (Consensus.Constants.c - 1)
-                  * Consensus.Constants.block_window_duration_ms )
-                /. 1000. )
+         (not (Array.for_all testnet.status ~f:(fun status -> status = `Off)))
+         && not
+              ( diff
+              < Time.Span.to_sec acceptable_delay
+                +. epsilon
+                +. Int.to_float
+                     ( (Consensus.Constants.c - 1)
+                     * Consensus.Constants.block_window_duration_ms )
+                   /. 1000. )
        then (
          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
            "No recent blocks" ;
