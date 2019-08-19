@@ -590,16 +590,10 @@ module Merge = struct
 
   let wrap_input_typ = Typ.list ~length:Tock.Field.size_in_bits Boolean.typ
 
-  (* reflect the padding done in Pending_coinbase.Stack.to_bits *)
-  let pending_coinbase_padding = (3 - (Tock.Field.size_in_bits mod 3)) mod 3
-
   let wrap_pending_coinbase_typ =
-    Typ.list
-      ~length:((Tock.Field.size_in_bits * 2) + pending_coinbase_padding)
-      Boolean.typ
+    Typ.list ~length:Pending_coinbase.Stack.length_in_bits Boolean.typ
 
-  (* TODO: When we switch to the weierstrass curve use the shifted
-   add-many function *)
+  (* TODO: When we switch to the Weierstrass curve use the shifted add-many function *)
   let disjoint_union_sections = function
     | [] ->
         failwith "empty list"

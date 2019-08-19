@@ -10,6 +10,22 @@ open Currency
 open Fold_lib
 open Module_version
 
+(* A pending coinbase is basically a Merkle tree of "stacks", each of which contains two hashes. The first hash
+   is computed from the components in the coinbase via a "push" operation. The second hash, a protocol
+   state hash, is computed from the state *body* hash in the coinbase, and a previous protocol state hash.
+   The "add_coinbase" operation takes a coinbase, retrieves the latest stack, or creates a new one, and does
+   a push.
+
+   A pending coinbase also contains a stack id, used to determine the chronology of stacks, so we can know
+   which is the oldest, and which is the newest stack.
+
+   Also, a pending coinbase contains a "previous protocol state hash", which is updated whenever we add a
+   coinbase. When we add a coinbase to a new stack, which contains a dummy state hash, we insert the previous state
+   hash to that stack before a push, so that the state hashes in stacks are always computed from an existing state hash.
+
+   The name "stack" here is a misnomer: see issue #3226
+ *)
+
 module Coinbase_data = struct
   type t =
     Public_key.Compressed.Stable.V1.t
@@ -182,6 +198,8 @@ module Coinbase_stack_data = struct
   let empty =
     of_hash (Pedersen.(State.salt "CoinbaseStack") |> Pedersen.State.digest)
 
+  let length_in_bits = List.length @@ to_bits empty
+
   module Checked = struct
     type t = var
 
@@ -193,16 +211,16 @@ module Coinbase_stack_data = struct
           ~support:
             (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
       in
+      let start = Hash_prefix.length_in_triples in
       let%bind coinbase_section =
         let%bind bs = Coinbase_data.var_to_triples coinbase in
-        Pedersen.Checked.Section.extend init bs
-          ~start:Hash_prefix.length_in_triples
+        Pedersen.Checked.Section.extend init bs ~start
       in
+      let start = start + Coinbase_data.length_in_triples in
       let%bind with_t =
         let%bind bs = var_to_triples t in
         Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
-          ~start:
-            (Hash_prefix.length_in_triples + Coinbase_data.length_in_triples)
+          ~start
       in
       let%map s =
         Pedersen.Checked.Section.disjoint_union_exn coinbase_section with_t
@@ -269,6 +287,8 @@ module Coinbase_stack_state_hash = struct
 
   let empty = State_hash.dummy
 
+  let length_in_bits = List.length @@ to_bits empty
+
   module Checked = struct
     type t = var
 
@@ -294,15 +314,16 @@ module Coinbase_stack_state_hash = struct
             (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
       in
       let%bind state_hash = update_state_hash ~state_hash:t ~state_body_hash in
+      let start = Hash_prefix.length_in_triples in
       let%bind state_hash_section =
         let%bind triples = var_to_triples state_hash in
-        Pedersen.Checked.Section.extend init triples
-          ~start:Hash_prefix.length_in_triples
+        Pedersen.Checked.Section.extend init triples ~start
       in
+      let start = start + length_in_triples in
       let%bind with_t =
         let%bind triples = var_to_triples t in
         Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty triples
-          ~start:(Hash_prefix.length_in_triples + length_in_triples)
+          ~start
       in
       let%map s =
         Pedersen.Checked.Section.disjoint_union_exn state_hash_section with_t
@@ -440,16 +461,21 @@ struct
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    (* pad to match the triple representation *)
-    let pad_bits =
+    let num_pad_bits =
       let len = List.length Coinbase_stack_data.(to_bits empty) in
-      let needed = (3 - (len mod 3)) mod 3 in
-      List.init needed ~f:(fun _ -> false)
+      (3 - (len mod 3)) mod 3
+
+    (* pad to match the triple representation *)
+    let pad_bits = List.init num_pad_bits ~f:(fun _ -> false)
 
     let to_bits t =
       Coinbase_stack_data.to_bits t.Poly.data
       @ pad_bits
       @ Coinbase_stack_state_hash.to_bits t.Poly.state_hash
+
+    let length_in_bits =
+      Coinbase_stack_data.length_in_bits + num_pad_bits
+      + Coinbase_stack_state_hash.length_in_bits
 
     let to_bytes t =
       Coinbase_stack_data.to_bytes t.Poly.data
@@ -947,6 +973,7 @@ struct
       {t' with previous_state_hash= stack_after.state_hash}
       stack_index stack_after
 
+  (* the stack here has a valid state hash already *)
   let update_coinbase_stack (t : t) stack ~is_new_stack =
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in

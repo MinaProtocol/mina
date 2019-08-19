@@ -99,6 +99,8 @@ module type S = sig
 
     val empty : t
 
+    val length_in_bits : int
+
     module Checked : sig
       type t = var
 
