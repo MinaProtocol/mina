@@ -92,7 +92,6 @@ let gen ~max_amount =
   let open Quickcheck.Generator.Let_syntax in
   let%map receiver = Public_key.Compressed.gen
   and amount = Amount.gen_incl Amount.zero max_amount in
-  (* always use dummy value *)
   Poly.{receiver; amount}
 
 let%test_unit "to_bits" =
