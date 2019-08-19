@@ -6,6 +6,7 @@ open Async
 open Coda_base
 open Cli_lib
 open Signature_lib
+open Init
 module YJ = Yojson.Safe
 
 [%%if
@@ -18,6 +19,18 @@ let maybe_sleep s = after (Time.Span.of_sec s)
 let maybe_sleep _ = Deferred.unit
 
 [%%endif]
+
+let chain_id =
+  lazy
+    (let genesis_state_hash =
+       (Lazy.force Coda_state.Genesis_protocol_state.t).hash
+       |> State_hash.to_base58_check
+     in
+     let all_snark_keys =
+       List.fold_left ~f:( ^ ) ~init:"" Snark_keys.key_hashes
+     in
+     let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
+     Blake2.to_hex b2)
 
 let daemon logger =
   let open Command.Let_syntax in
@@ -533,6 +546,7 @@ let daemon logger =
                ; logger
                ; target_peer_count= 8
                ; conf_dir
+               ; chain_id= Lazy.force chain_id
                ; initial_peers= initial_peers_cleaned
                ; addrs_and_ports
                ; trust_system
@@ -596,11 +610,11 @@ let daemon logger =
        in
        coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
-       Coda_lib.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_whitelist ~rest_server_port
          ~insecure_rest_server coda ;
+       let%bind () = Coda_lib.start coda in
        let%bind () =
          Option.map metrics_server_port ~f:(fun port ->
              Coda_metrics.server ~port ~logger >>| ignore )
@@ -726,6 +740,7 @@ module type Integration_test = sig
 end
 
 let coda_commands logger =
+  let open Tests in
   let group =
     List.map
       ~f:(fun (module T) -> (T.name, T.command))

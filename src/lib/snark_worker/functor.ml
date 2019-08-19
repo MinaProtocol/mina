@@ -66,8 +66,15 @@ module Make (Inputs : Intf.Inputs_intf) :
     match res with
     | Error exn ->
         if shutdown_on_disconnect then
-          failwithf !"Shutting down. Error: %s" (Exn.to_string_mach exn) ()
-        else Or_error.of_exn exn
+          failwithf
+            !"Shutting down. Error using the RPC call, %s,: %s"
+            (Rpc.Rpc.name rpc) (Exn.to_string_mach exn) ()
+        else
+          Error
+            ( Error.createf
+                !"Error using the RPC call, %s: %s"
+                (Rpc.Rpc.name rpc)
+            @@ Exn.to_string_mach exn )
     | Ok res ->
         res
 
@@ -83,10 +90,7 @@ module Make (Inputs : Intf.Inputs_intf) :
               "Base SNARK generated in $time"
               ~metadata:[("time", `String (Time.Span.to_string_hum total))] )
 
-  let main daemon_address shutdown_on_disconnect =
-    let logger =
-      Logger.create () ~metadata:[("process", `String "Snark Worker")]
-    in
+  let main ~logger daemon_address shutdown_on_disconnect =
     let%bind state = Worker_state.create () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
@@ -153,7 +157,16 @@ module Make (Inputs : Intf.Inputs_intf) :
             "true|false Shutdown when disconnected from daemon (default:true)"
       in
       fun () ->
-        main daemon_port (Option.value ~default:true shutdown_on_disconnect))
+        let logger =
+          Logger.create () ~metadata:[("process", `String "Snark Worker")]
+        in
+        Signal.handle [Signal.term] ~f:(fun _signal ->
+            Logger.info logger
+              !"Received signal to terminate. Aborting snark worker process"
+              ~module_:__MODULE__ ~location:__LOC__ ;
+            Core.exit 0 ) ;
+        main ~logger daemon_port
+          (Option.value ~default:true shutdown_on_disconnect))
 
   let arguments ~daemon_address ~shutdown_on_disconnect =
     [ "-daemon-address"
