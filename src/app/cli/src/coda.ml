@@ -35,6 +35,7 @@ let chain_id =
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
+  MemprofHelpers.start 1E-4 20 100 ;
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir = Cli_lib.Flag.conf_dir
      and unsafe_track_propose_key =
