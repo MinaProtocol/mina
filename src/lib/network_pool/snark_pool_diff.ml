@@ -41,7 +41,7 @@ end)
       let compact_json = function
         | Add_solved_work (work, {proof= _; fee= {fee; prover}}) ->
             `Assoc
-              [ ("work", `Int (Work.hash work))
+              [ ("work_id", `Int (Work.hash work))
               ; ("fee", Currency.Fee.to_yojson fee)
               ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
                 (*TODO: This should be 
