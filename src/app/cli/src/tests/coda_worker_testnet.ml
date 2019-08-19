@@ -278,7 +278,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
        let diff = Time.diff (Time.now ()) !last_time in
        let diff = Time.Span.to_sec diff in
        if
-         (not (Array.for_all testnet.status ~f:(fun status -> status = `Off)))
+         Array.existsi testnet.status ~f:(fun i _ -> Api.synced testnet i)
          && not
               ( diff
               < Time.Span.to_sec acceptable_delay
