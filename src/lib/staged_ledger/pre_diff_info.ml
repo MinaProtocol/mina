@@ -47,8 +47,8 @@ end = struct
     ; coinbases: Coinbase.t list }
 
   (* A Coinbase is a single transaction that accommodates the coinbase amount
-    and a fee transfer for the work required to add the coinbase. It also 
-    contains the state body hash corresponding to a particular protocol state. 
+    and a fee transfer for the work required to add the coinbase. It also
+    contains the state body hash corresponding to a particular protocol state.
     Unlike a transaction, a coinbase (including the fee transfer) just requires one slot
     in the jobs queue.
 
@@ -63,7 +63,7 @@ end = struct
 
     If it has one slot, then we simply add one coinbase. It is also possible that
     the first prediff may have no slots left after adding transactions (for
-    example, when there are three slots and maximum number of provers), in which case, 
+    example, when there are three slots and maximum number of provers), in which case,
     we simply add one coinbase as part of the second prediff.
   *)
   let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
