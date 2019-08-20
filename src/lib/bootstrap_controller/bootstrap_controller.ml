@@ -399,6 +399,13 @@ end = struct
           (Staged_ledger.Scan_state.hash scan_state)
           expected_merkle_root pending_coinbases
       in
+      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [ ( "expected_staged_ledger_hash"
+            , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
+          ; ( "received_staged_ledger_hash"
+            , Staged_ledger_hash.to_yojson received_staged_ledger_hash ) ]
+        "Comparing $expected_staged_ledger_hash to $received_staged_ledger_hash" ;
       let%bind () =
         Staged_ledger_hash.equal expected_staged_ledger_hash
           received_staged_ledger_hash
@@ -425,7 +432,9 @@ end = struct
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [ ("error", `String (Error.to_string_hum e))
-            ; ("state_hash", State_hash.to_yojson hash) ]
+            ; ("state_hash", State_hash.to_yojson hash)
+            ; ( "expected_staged_ledger_hash"
+              , Staged_ledger_hash.to_yojson expected_staged_ledger_hash ) ]
           "Failed to find scan state for the transition with hash $state_hash \
            from the peer or received faulty scan state: $error. Retry \
            bootstrap" ;
