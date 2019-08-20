@@ -35,6 +35,8 @@ module type Ledger_proof_generalized_intf = sig
     sig
       module V1 : sig
         type t [@@deriving sexp, bin_io, yojson, version]
+
+        val statement : t -> transaction_snark_statement
       end
 
       module Latest = V1
@@ -112,6 +114,29 @@ module type Transaction_snark_work_generalized_intf = sig
     val gen : t Quickcheck.Generator.t
   end
 
+  module Info : sig
+    type t =
+      { statements: Statement.Stable.V1.t
+      ; job_ids: int list
+      ; fee: Fee.Stable.V1.t
+      ; prover: Public_key.Compressed.Stable.V1.t }
+    [@@deriving to_yojson]
+
+    include Sexpable.S with type t := t
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving to_yojson, version]
+
+          include Sexpable.S with type t := t
+
+          include Binable.S with type t := t
+        end
+      end
+      with type V1.t = t
+  end
+
   (* TODO: The SOK message actually should bind the SNARK to
      be in this particular bundle. The easiest way would be to
      SOK with
@@ -119,17 +144,19 @@ module type Transaction_snark_work_generalized_intf = sig
   *)
 
   type t =
-    { fee: Fee.Stable.V1.t
-    ; proofs: ledger_proof list
-    ; prover: compressed_public_key }
+    {fee: Fee.t; proofs: ledger_proof list; prover: compressed_public_key}
   [@@deriving sexp, to_yojson]
 
-  val fee : t -> Fee.Stable.V1.t
+  val fee : t -> Fee.t
+
+  val info : t -> Info.t
 
   module Stable :
     sig
       module V1 : sig
         type t [@@deriving sexp, bin_io, to_yojson, version]
+
+        val info : t -> Info.Stable.V1.t
       end
     end
     with type V1.t = t

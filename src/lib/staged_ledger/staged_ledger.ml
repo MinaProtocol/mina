@@ -1395,7 +1395,12 @@ let%test_module "test" =
       module Ledger_proof = struct
         (*A proof here is a statement *)
         module Stable = struct
-          module V1 = Transaction_snark.Statement.Stable.V1
+          module V1 = struct
+            include Transaction_snark.Statement.Stable.V1
+
+            let statement = Fn.id
+          end
+
           module Latest = V1
         end
 
@@ -1492,25 +1497,6 @@ let%test_module "test" =
 
         let compressed_public_key_to_yojson = public_key_to_yojson
 
-        module Stable = struct
-          module V1 = struct
-            module T = struct
-              type t = {fee: fee; proofs: proof list; prover: public_key}
-              [@@deriving sexp, bin_io, compare, yojson, version {for_test}]
-            end
-
-            include T
-          end
-
-          module Latest = V1
-        end
-
-        type t = Stable.Latest.t =
-          {fee: fee; proofs: proof list; prover: public_key}
-        [@@deriving sexp, to_yojson, compare]
-
-        let fee {fee; _} = fee
-
         module Statement = struct
           module Stable = struct
             module V1 = struct
@@ -1535,6 +1521,64 @@ let%test_module "test" =
             Quickcheck.Generator.list_with_length proofs_length
               Transaction_snark.Statement.gen
         end
+
+        module Info = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t =
+                  { statements: Statement.Stable.V1.t
+                  ; job_ids: int list
+                  ; fee: Fee.Stable.V1.t
+                  ; prover: Public_key.Compressed.Stable.V1.t }
+                [@@deriving sexp, to_yojson, bin_io, version {for_test}]
+              end
+
+              include T
+            end
+
+            module Latest = V1
+          end
+
+          (* bin_io omitted *)
+          type t = Stable.Latest.t =
+            { statements: Statement.Stable.V1.t
+            ; job_ids: int list
+            ; fee: Fee.Stable.V1.t
+            ; prover: Public_key.Compressed.Stable.V1.t }
+          [@@deriving to_yojson, sexp]
+        end
+
+        module Stable = struct
+          module V1 = struct
+            module T = struct
+              type t = {fee: fee; proofs: proof list; prover: public_key}
+              [@@deriving sexp, bin_io, compare, yojson, version {for_test}]
+            end
+
+            include T
+
+            let info t =
+              let statements = List.map t.proofs ~f:Ledger_proof.statement in
+              { Info.Stable.V1.statements
+              ; job_ids=
+                  List.map statements
+                    ~f:Transaction_snark.Statement.Stable.V1.hash
+              ; fee= t.fee
+              ; prover= t.prover }
+          end
+
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t =
+          {fee: fee; proofs: proof list; prover: public_key}
+        [@@deriving sexp, to_yojson, compare]
+
+        let fee {fee; _} = fee
+
+        [%%define_locally
+        Stable.Latest.(info)]
 
         type unchecked = t
 
