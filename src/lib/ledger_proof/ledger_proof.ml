@@ -22,6 +22,9 @@ module Prod : S with type t = Transaction_snark.t = struct
       end
 
       include T
+
+      let statement (t : t) = Transaction_snark.Stable.V1.statement t
+
       include Registration.Make_latest_version (T)
     end
 
@@ -39,9 +42,10 @@ module Prod : S with type t = Transaction_snark.t = struct
 
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
-  let sok_digest = Transaction_snark.sok_digest
+  [%%define_locally
+  Stable.Latest.(statement)]
 
-  let statement = Transaction_snark.statement
+  let sok_digest = Transaction_snark.sok_digest
 
   let statement_target (t : Transaction_snark.Statement.t) = t.target
 
@@ -74,6 +78,9 @@ struct
       end
 
       include T
+
+      let statement ((t, _) : t) : Transaction_snark.Statement.t = t
+
       include Registration.Make_latest_version (T)
     end
 
@@ -91,9 +98,10 @@ struct
 
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
-  let underlying_proof (_ : t) = Proof.dummy
+  [%%define_locally
+  Stable.Latest.(statement)]
 
-  let statement ((t, _) : t) : Transaction_snark.Statement.t = t
+  let underlying_proof (_ : t) = Proof.dummy
 
   let statement_target (t : Transaction_snark.Statement.t) = t.target
 
