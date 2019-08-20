@@ -81,20 +81,12 @@ module Interval = struct
         Less_than B.(a + one)
     | Less_than a, Less_than _ ->
         Less_than a
-
-  let strict_upper_bound = function
-    | Constant a ->
-        B.(a + one)
-    | Less_than a ->
-        a
 end
 
 type 'f t =
   { value: 'f Cvar.t
   ; interval: Interval.t
   ; mutable bits: 'f Cvar.t Boolean.t list option }
-
-let strict_upper_bound t = Interval.strict_upper_bound t.interval
 
 let create ~value ~upper_bound =
   {value; interval= Less_than upper_bound; bits= None}
