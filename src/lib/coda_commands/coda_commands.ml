@@ -382,6 +382,21 @@ let get_status ~flag t =
           ; state_hash= None
           ; consensus_time_best_tip= None } )
   in
+  let next_proposal =
+    let str time =
+      let open Time in
+      let time = Int64.to_float time |> Span.of_ms |> of_span_since_epoch in
+      sprintf "%s (in %s)" (to_string time)
+        (Span.to_string_hum (diff time (now ())))
+    in
+    Option.map (Coda_lib.next_proposal t) ~f:(function
+      | `Propose_now _ ->
+          "Now"
+      | `Propose (time, _, _) ->
+          str time
+      | `Check_again time ->
+          sprintf "None this epoch… checking at %s" (str time) )
+  in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; blockchain_length
@@ -400,6 +415,7 @@ let get_status ~flag t =
       Public_key.Compressed.Set.to_list propose_pubkeys
       |> List.map ~f:Public_key.Compressed.to_base58_check
   ; histograms
+  ; next_proposal
   ; consensus_time_now
   ; consensus_mechanism
   ; consensus_configuration }
