@@ -41,6 +41,11 @@ function start() {
           const currentWeekElem = document.getElementById("leaderboard-current-week");
           currentWeekElem.textContent = headers[values[0].length - 1];
         }
+        // Sort values by latest week
+        values.sort((a, b) => {
+          const size = a.length;
+          return b[size - 1] - a[size - 1];
+        });
         // Add rows to leaderboard container
         const parentElem = document.getElementById("testnet-leaderboard");
         values.map((participant, index) => {

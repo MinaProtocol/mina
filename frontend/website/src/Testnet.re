@@ -15,6 +15,7 @@ module Styles = {
       color(Style.Colors.slate),
       textAlign(`center),
       margin2(~v=rem(3.5), ~h=`zero),
+      marginTop(rem(1.)),
     ]);
 
   let content =
@@ -41,6 +42,12 @@ module Styles = {
           display(`grid),
           gridColumnGap(rem(1.5)),
           gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(2.5)]),
+        ],
+      ),
+      selector(
+        "div span:last-child",
+        [
+          opacity(0.5),
         ],
       ),
       selector("div span:nth-child(odd)", [justifySelf(`flexEnd)]),
@@ -91,6 +98,7 @@ module Styles = {
       style([
         fontWeight(`semiBold),
         marginTop(rem(0.75)),
+        marginLeft(rem(1.75)),
       ]),
     ]);
 
@@ -99,6 +107,16 @@ module Styles = {
       Style.H4.wide,
       style([
         textAlign(`left),
+        fontSize(`rem(1.)),
+        fontWeight(`light),
+      ]),
+    ]);
+  
+  let weekHeader =
+    merge([
+      Style.H2.basic,
+      style([
+        padding2(~v=`rem(1.), ~h=`zero),
       ]),
     ]);
 };
@@ -140,62 +158,52 @@ let make = _children => {
                "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
              )}
           </p>
-          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #1")} </h4> </p>
+          
+          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Community")} </h4> </p>
           <p>
-            {ReasonReact.string(
-               "Connect to Testnet - 1000 pts for anyone who sends a transaction to the echo service"
-             )}
+            <a className=Style.Link.basic href="/docs"> {ReasonReact.string("Testnet Docs")} </a>
+            <br/>
+            <a className=Style.Link.basic href="https://bit.ly/CodaDiscord" target="_blank"> {ReasonReact.string("Discord")} </a>
+            <br/>
+            <a className=Style.Link.basic href="https://forums.codaprotocol.com" target="_blank"> {ReasonReact.string("Coda Forums")} </a>
           </p>
+
+          <p> <h2 className=Styles.weekHeader> {ReasonReact.string("Week 5")} </h2> </p>
+
+          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #12: 'CLI FYI'")} </h4> </p>
           <p>
             {ReasonReact.string(
-              " BONUS: An additional 2000 pts to the first person to complete the challenge, and an additional 1000 points to the second person to complete the challenge."
+              "Submit a product improvement or feature you'd like to see in the Coda command line interface (CLI). Post a new thread on the Discourse " 
+            )}
+            <a className=Style.Link.basic href="http://forums.codaprotocol.com" target="_blank">{ReasonReact.string("forums")}</a>
+            {ReasonReact.string(
+              " in the 'Product' category and add this to the title: '[CLI Feature]'. The community can vote on it by 'hearting' the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*."
             )}
           </p>
-          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #2")} </h4> </p>
           <p>
             {ReasonReact.string(
-               "Community Helper - 300 pts are awarded to anyone who helps another member of the community. This could include answering a question, helping them navigate the docs, and generally giving support and encouragement for those trying hard to get involved. We can only award points for what we see, so make sure you're doing it in one of the official testnet channels so everyone can learn!",
-             )}
+              "Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement -- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts*!"
+            )}
           </p>
-          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #3")} </h4> </p>
+
+          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #13: 'My two codas'")} </h4> </p>
           <p>
             {ReasonReact.string(
-               "Join Discord - 100 pts awarded for introducing yourself in the #testnet-general channel. Name, location and what you're excited about are all good things to share in order to get the points!",
-             )}
+              "Earn 400 pts* for giving your feedback by filling out this "
+            )}
+            <a className=Style.Link.basic href="http://bit.ly/CommunityRetro" target="_blank">{ReasonReact.string("survey")}</a>
+            {ReasonReact.string(".")}
           </p>
-          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #4 (on-going)")} </h4> </p>
+
+          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #14: 'Leonardo da Coda'")} </h4> </p>
           <p>
             {ReasonReact.string(
-               "Community MVP - Each week, we will recognize the winners of the previous week based on the point values below. We may give out all the awards in a week, or none, or several at each level. The more active the community is, the more points* we can award in this category.",
-             )}
-          </p>
-          <p>
-            <strong> {ReasonReact.string("Gold - 1000 pts")} </strong>
+              "Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the "
+            )}
+            <a className=Style.Link.basic href="https://forums.codaprotocol.com/t/community-art-contest-leonardo-da-coda/109" target="_blank">{ReasonReact.string("forums")}</a>
             {ReasonReact.string(
-               " - made a major, or on-going contribution to the community throughout the week. A major stand-out!",
-             )}
-          </p>
-          <p>
-            <strong> {ReasonReact.string("Silver - 500 pts")} </strong>
-            {ReasonReact.string(
-               " - always there, always helping, always positive!",
-             )}
-          </p>
-          <p>
-            <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #5 (on-going):")} </h4>
-          </p>
-          <p> {ReasonReact.string(" Major and Minor Bug Bounties")} </p>
-          <p>
-            <strong> {ReasonReact.string("Major - 2000 pts")} </strong>
-            {ReasonReact.string(
-               " - reported a new daemon crash that wasn't already on the known issues list.",
-             )}
-          </p>
-          <p>
-            <strong> {ReasonReact.string("Minor - 200 pts")} </strong>
-            {ReasonReact.string(
-               " - reported a new issue related to minor bugs in the daemon, documentation, or testnet.",
-             )}
+              ". You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by 'hearting' your post, so do not forget to 'heart' your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place."
+            )}
           </p>
           <p>
             <em>
