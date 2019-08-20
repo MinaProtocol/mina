@@ -71,6 +71,63 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "SetSnarkWorkerInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "wallet",
+              "description": "Public key you wish to start snark-working on; null to stop doing any snark work",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "wallet",
+              "description": "Public key you wish to start snark-working on; null to stop doing any snark work",
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "SetSnarkWorkerPayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "lastSnarkWorker",
+              "description": "Returns the last public key that was designated for snark work",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "SetStakingInput",
           "description": null,
           "fields": [
@@ -236,7 +293,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "AddPaymentReceipt",
+          "name": "AddPaymentReceiptPayload",
           "description": null,
           "fields": [
             {
@@ -878,7 +935,7 @@
               ],
               "type": {
                 "kind": "OBJECT",
-                "name": "AddPaymentReceipt",
+                "name": "AddPaymentReceiptPayload",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -909,6 +966,37 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "SetStakingPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setSnarkWorker",
+              "description": "Set key you wish to snark work with or disable snark working",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "SetSnarkWorkerInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SetSnarkWorkerPayload",
                   "ofType": null
                 }
               },
@@ -1682,6 +1770,16 @@
         },
         {
           "kind": "SCALAR",
+          "name": "Boolean",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "UInt64",
           "description": "String representing a uint64 number in base 10",
           "fields": null,
@@ -1730,6 +1828,16 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "PublicKey",
+          "description": "Base58Check-encoded public key string",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -2344,26 +2452,6 @@
         },
         {
           "kind": "SCALAR",
-          "name": "PublicKey",
-          "description": "Base58Check-encoded public key string",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "Boolean",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
           "name": "String",
           "description": null,
           "fields": null,
@@ -2540,17 +2628,13 @@
               "deprecationReason": null
             },
             {
-              "name": "runSnarkWorker",
+              "name": "snarkWorker",
               "description": null,
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -2586,7 +2670,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "SCALAR",
-                      "name": "PublicKey",
+                      "name": "String",
                       "ofType": null
                     }
                   }
