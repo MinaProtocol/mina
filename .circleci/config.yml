@@ -231,11 +231,9 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
-                  background: true
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
             - run:
                   name: Copy artifacts to cloud
-                  bsckground: true
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - persist_to_workspace:
                 root: /tmp/artifacts
@@ -274,11 +272,9 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
-                  background: true
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
             - run:
                   name: Copy artifacts to cloud
-                  bsckground: true
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - persist_to_workspace:
                 root: /tmp/artifacts

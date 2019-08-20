@@ -12,9 +12,13 @@ The Coda network is secured by [Proof-of-Stake consensus](/glossary/#proof-of-st
 
 ### Staking coda
 
-Since we have some funds in our wallet from [the previous step](/my-first-transaction), we can configure that wallet to stake its coda by issuing the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`):
+<!-- Since we have some funds in our wallet from [the previous step](/my-first-transaction), we can configure that wallet to stake its coda by issuing the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`): -->
 
-    coda client set-staking -privkey-path keys/my-wallet
+<!-- coda client set-staking -privkey-path keys/my-wallet -->
+
+Since we have some funds in our wallet from [the previous step](/my-first-transaction), we can now start the daemon with the `-propose-key` flag to begin staking coda. Let's stop our current daemon process, and restart it with the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`):
+
+    coda daemon -peer medium-rare.o1test.net:8303 -propose-key keys/my-wallet
 
 !!! note
     You can provide a list of key files to turn on staking for multiple wallets at the same time

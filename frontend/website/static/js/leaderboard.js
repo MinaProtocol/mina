@@ -1,18 +1,18 @@
 function renderParticipant(participant, rank) {
   const row = document.createElement("div");
   row.className = "leaderboard-row";
-  if (participant.length == 2) {
-    const rankCell = document.createElement("span");
-    rankCell.textContent = rank;
-    row.appendChild(rankCell);
 
-    const nameCell = document.createElement("span");
-    nameCell.textContent = participant[0];
-    row.appendChild(nameCell);
+  function appendColumn(value) {
+    const cell = document.createElement("span");
+    cell.textContent = value;
+    row.appendChild(cell);
+  }
 
-    const scoreCell = document.createElement("span");
-    scoreCell.textContent = participant[1];
-    row.appendChild(scoreCell);
+  if (participant.length > 2) {
+    appendColumn(rank); // rank
+    appendColumn(participant[0]); // name
+    appendColumn(participant[participant.length - 1]); // current week score
+    appendColumn(participant[1]); // total score
   }
   return row;
 }
@@ -25,13 +25,30 @@ function start() {
     .then(function() {
       return gapi.client.request({
         path:
-          "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/C4:D"
+          "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/C3:N"
       });
     })
     .then(
       function(response) {
+        const {
+          result: {
+            values,
+          }
+        } = response;
+        // Update the current week header dynamically
+        if (values.length) {
+          const headers = values.shift();
+          const currentWeekElem = document.getElementById("leaderboard-current-week");
+          currentWeekElem.textContent = headers[values[0].length - 1];
+        }
+        // Sort values by latest week
+        values.sort((a, b) => {
+          const size = a.length;
+          return b[size - 1] - a[size - 1];
+        });
+        // Add rows to leaderboard container
         const parentElem = document.getElementById("testnet-leaderboard");
-        response.result.values.map((participant, index) => {
+        values.map((participant, index) => {
           parentElem.appendChild(renderParticipant(participant, index + 1));
         });
         // Hide the loader
