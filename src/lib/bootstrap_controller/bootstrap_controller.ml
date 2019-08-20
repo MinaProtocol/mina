@@ -223,8 +223,10 @@ end = struct
               candidate_state peer_root_with_proof
           with
           | Ok (`Root root, `Best_tip best_tip) ->
-              start_sync_job_with_peer ~sender ~root_sync_ledger t best_tip
-                root
+              if done_syncing_root root_sync_ledger then return `Ignored
+              else
+                start_sync_job_with_peer ~sender ~root_sync_ledger t best_tip
+                  root
           | Error e ->
               return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
