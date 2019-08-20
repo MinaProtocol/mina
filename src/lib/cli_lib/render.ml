@@ -43,10 +43,9 @@ module Public_key_with_details = struct
     type t = string * int * string
 
     let to_yojson (public_key, balance, nonce) =
-      Yojson.Safe.from_string
-        (sprintf
-           !"\"%s\" : {\"balance\": %d, \"nonce\": %s }"
-           public_key balance nonce)
+      `Assoc
+        [ ( public_key
+          , `Assoc [("balance", `Int balance); ("nonce", `String nonce)] ) ]
   end
 
   type t = Pretty_account.t list [@@deriving to_yojson]
