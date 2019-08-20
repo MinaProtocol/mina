@@ -321,11 +321,9 @@ end = struct
            sync a snarked_ledger and we get rolling updates from the network on
            the snarked_ledger. The output of sync_status will implicitly
            surface when calling Root_sync_ledger.valid_tree *)
-        don't_wait_for
-          (Deferred.ignore
-             (sync_with_peer ~sender:queried_peer.host ~root_sync_ledger t
-                best_tip_with_validation root_with_validation)) ;
-        Deferred.unit
+        Deferred.ignore
+          (sync_with_peer ~sender:queried_peer.host ~root_sync_ledger t
+             best_tip_with_validation root_with_validation)
     | Error e ->
         Logger.info t.logger
           "A sample subset of peers could not give their valid best tip"
@@ -373,9 +371,11 @@ end = struct
     let root_sync_ledger =
       Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
     in
-    if should_ask_best_tip then
-      don't_wait_for
-      @@ request_and_sync_best_tip t root_sync_ledger initial_root_transition ;
+    let%bind () =
+      if should_ask_best_tip then
+        request_and_sync_best_tip t root_sync_ledger initial_root_transition
+      else Deferred.unit
+    in
     let%bind synced_db, (hash, sender, expected_staged_ledger_hash) =
       sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
       |> don't_wait_for ;
