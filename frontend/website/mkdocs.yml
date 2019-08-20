@@ -6,7 +6,7 @@ repo_url: https://github.com/codaprotocol/coda/
 edit_uri: edit/develop/frontend/website/docs/
 nav:
   - Overview: index.md
-  - Hello Coda: coda-testnet.md
+  - Coda Testnet: coda-testnet.md
   - Getting Started: getting-started.md
   - My First Transaction: my-first-transaction.md
   - Become a Node Operator: node-operator.md

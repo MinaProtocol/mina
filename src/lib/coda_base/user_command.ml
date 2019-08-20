@@ -40,6 +40,8 @@ module Stable = struct
       [@@deriving bin_io, compare, sexp, hash, yojson, version]
     end
 
+    let description = "User command"
+
     let version_byte = Base58_check.Version_bytes.user_command
 
     include T

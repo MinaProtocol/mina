@@ -19,6 +19,8 @@ let key_generation = false
 [%%endif]
 
 module Base58_check = Base58_check.Make (struct
+  let description = "Key generation"
+
   let version_byte = Base58_check.Version_bytes.lite_precomputed
 end)
 
@@ -107,6 +109,8 @@ let main () =
   let structure =
     [%str
       module Base58_check = Base58_check.Make (struct
+        let description = "Lite precomputed values"
+
         let version_byte = Base58_check.Version_bytes.lite_precomputed
       end)
 

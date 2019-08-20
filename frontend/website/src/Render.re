@@ -10,24 +10,6 @@ type critical = {
 [@bs.module "emotion-server"]
 external extractCritical: string => critical = "";
 
-module Fs = {
-  [@bs.val] [@bs.module "fs"]
-  external mkdirSync:
-    (
-      string,
-      {
-        .
-        "recursive": bool,
-        "mode": int,
-      }
-    ) =>
-    unit =
-    "";
-
-  [@bs.val] [@bs.module "fs"]
-  external symlinkSync: (string, string) => unit = "";
-};
-
 module Rimraf = {
   [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
 };
@@ -82,6 +64,31 @@ let posts = {
   );
 };
 
+module MoreFs = {
+  type stat;
+  [@bs.val] [@bs.module "fs"] external lstatSync: string => stat = "";
+  [@bs.send] external isDirectory: stat => bool = "";
+
+  [@bs.val] [@bs.module "fs"]
+  external copyFileSync: (string, string) => unit = "";
+
+  [@bs.val] [@bs.module "fs"]
+  external mkdirSync:
+    (
+      string,
+      {
+        .
+        "recursive": bool,
+        "mode": int,
+      }
+    ) =>
+    unit =
+    "";
+
+  [@bs.val] [@bs.module "fs"]
+  external symlinkSync: (string, string) => unit = "";
+};
+
 module Router = {
   type t =
     | File(string, ReasonReact.reactElement)
@@ -95,7 +102,7 @@ module Router = {
         }
       | Dir(name, routes) => {
           let path_ = path ++ "/" ++ name;
-          Fs.mkdirSync(path_, {"recursive": true, "mode": 0o755});
+          MoreFs.mkdirSync(path_, {"recursive": true, "mode": 0o755});
           routes |> Array.iter(helper(path_));
         };
 
@@ -112,6 +119,11 @@ let jobOpenings = [|
     "Senior Product Engineer (Frontend) (San Francisco).",
   ),
   ("frontend-engineer", "Product Engineer (Frontend) (San Francisco)."),
+  ("fullstack-engineer", "Product Engineer (Full-stack) (San Francisco)."),
+  (
+    "marketing-and-communications-manager",
+    "Marketing and Communications Manager (San Francisco).",
+  ),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
 |];
 
@@ -183,6 +195,13 @@ Router.(
             <Wrapped> <Careers jobOpenings /> </Wrapped>
           </Page>,
         ),
+        File(
+          "testnet",
+          <Page
+            page=`Testnet name="testnet" extraHeaders={Testnet.extraHeaders()}>
+            <Wrapped> <Testnet /> </Wrapped>
+          </Page>,
+        ),
         File("blog", blogPage("blog")),
         File(
           "privacy",
@@ -216,20 +235,9 @@ Router.(
   )
 );
 
-module MoreFs = {
-  type stat;
-  [@bs.val] [@bs.module "fs"] external lstatSync: string => stat = "";
-  [@bs.send] external isDirectory: stat => bool = "";
-
-  [@bs.val] [@bs.module "fs"]
-  external copyFileSync: (string, string) => unit = "";
-
-  [@bs.val] [@bs.module "fs"] external mkdirSync: string => unit = "";
-};
-
 let ignoreFiles = ["main.bc.js", "verifier_main.bc.js", ".DS_Store"];
 let rec copyFolder = path => {
-  MoreFs.mkdirSync("site/" ++ path);
+  MoreFs.mkdirSync("site/" ++ path, {"recursive": true, "mode": 0o755});
   Array.iter(
     s => {
       let path = Filename.concat(path, s);
@@ -265,4 +273,7 @@ Markdown.Child_process.execSync(
   Markdown.Child_process.option(),
 );
 
-Fs.symlinkSync(Node.Process.cwd() ++ "/graphql-docs", "./site/docs/graphql");
+MoreFs.symlinkSync(
+  Node.Process.cwd() ++ "/graphql-docs",
+  "./site/docs/graphql",
+);

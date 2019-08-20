@@ -276,7 +276,7 @@ module type Transaction_snark_scan_state_generalized_intf = sig
       -> verifier:Verifier.t
       -> error_prefix:string
       -> ledger_hash_end:frozen_ledger_hash
-      -> ledger_hash_begin:frozen_ledger_hash sexp_option
+      -> ledger_hash_begin:frozen_ledger_hash option
       -> (unit, Error.t) result M.t
   end
 

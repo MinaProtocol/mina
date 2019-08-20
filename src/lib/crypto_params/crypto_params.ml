@@ -202,4 +202,6 @@ module Wrap_input = struct
     else (module Tock_field_larger : S)
 
   include (val m)
+
+  let size = Tock0.Data_spec.size [typ]
 end

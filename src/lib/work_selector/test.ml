@@ -22,6 +22,7 @@ struct
     let p = 50 in
     let snark_pool = T.Snark_pool.create () in
     let fee = Currency.Fee.zero in
+    let logger = Logger.null () in
     Quickcheck.test gen_staged_ledger ~trials:100 ~f:(fun sl ->
         Async.Thread_safe.block_on_async_exn (fun () ->
             let open Deferred.Let_syntax in
@@ -30,7 +31,7 @@ struct
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
               let stuff, seen =
-                Selection_method.work ~snark_pool ~fee sl seen
+                Selection_method.work ~snark_pool ~fee sl seen ~logger
               in
               match stuff with [] -> return () | _ -> go (i + 1) seen
             in
@@ -40,9 +41,12 @@ struct
     Backtrace.elide := false ;
     let snark_pool = T.Snark_pool.create () in
     let fee = Currency.Fee.zero in
+    let logger = Logger.null () in
     let send_work sl seen =
       let rec go seen all_work =
-        let stuff, seen = Selection_method.work ~snark_pool ~fee sl seen in
+        let stuff, seen =
+          Selection_method.work ~snark_pool ~fee sl seen ~logger
+        in
         match stuff with
         | [] ->
             (all_work, seen)
@@ -91,6 +95,7 @@ struct
     Backtrace.elide := false ;
     let my_fee = Currency.Fee.of_int 2 in
     let p = 50 in
+    let logger = Logger.null () in
     let g =
       let open Quickcheck.Generator.Let_syntax in
       let%bind sl = gen_staged_ledger in
@@ -114,7 +119,7 @@ struct
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
               let work, seen =
-                Selection_method.work ~snark_pool ~fee:my_fee sl seen
+                Selection_method.work ~snark_pool ~fee:my_fee sl seen ~logger
               in
               match work with
               | [] ->

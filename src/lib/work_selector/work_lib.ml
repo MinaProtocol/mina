@@ -24,7 +24,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       module T = struct
         type t =
           Transaction_snark.Statement.t * Transaction_snark.Statement.t option
-        [@@deriving compare, sexp]
+        [@@deriving compare, sexp, to_yojson]
       end
 
       include T
@@ -36,10 +36,15 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     let init ~reassignment_wait =
       {jobs_seen= Seen_key.Map.empty; reassignment_wait}
 
-    let remove_old_assignments {jobs_seen; reassignment_wait} =
+    let remove_old_assignments {jobs_seen; reassignment_wait} ~logger =
       let now = Time.now () in
-      Map.filter jobs_seen ~f:(fun status ->
-          not (Job_status.is_old status ~now ~reassignment_wait) )
+      Map.filteri jobs_seen ~f:(fun ~key:work ~data:status ->
+          if Job_status.is_old status ~now ~reassignment_wait then (
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:[("work", Seen_key.to_yojson work)]
+              "Waited too long to get work for $work. Ready to be reassigned" ;
+            false )
+          else true )
 
     let set t x =
       { t with
@@ -80,8 +85,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       ~f:
         (Fn.compose (does_not_have_better_fee ~snark_pool ~fee) statement_pair)
 
-  let all_works (staged_ledger : Inputs.Staged_ledger.t) (state : State.t) =
-    let state = State.remove_old_assignments state in
+  let all_works ~logger (staged_ledger : Inputs.Staged_ledger.t)
+      (state : State.t) =
+    let state = State.remove_old_assignments state ~logger in
     let all_jobs = Inputs.Staged_ledger.all_work_pairs_exn staged_ledger in
     let unseen_jobs =
       List.filter all_jobs ~f:(fun js ->

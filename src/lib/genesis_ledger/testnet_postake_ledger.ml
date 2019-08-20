@@ -11,7 +11,7 @@ include Make (struct
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "tNciTDiJziUovrKA4KKs7wN1XNhV8BW1YUvcyoo33RdrtPa5fKSKJSqFTgo13aNscVYTBa2kRmPnNGCdsuAqsSw6YJSn1GKVuqfpTDxXkifm6PJoVmVN3Gd1vBPKzdpeyuTBULfwsjmFxB"
-      ; balance= 1600000
+      ; balance= 16000000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
@@ -25,7 +25,7 @@ include Make (struct
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "tNciGGG62uN18dV5YJrr2SyGWsGbQQhBn5fSEBJ5967KBikntN6hhnCw3Zc1aQCWi4FQDSZMS1d1aq18iKUVnJdDi87ZtBsvgvS1YRo9rWFyX3pUxeM7mntZmA387gztnXT4xfqYSwSh3v"
-      ; balance= 1600000
+      ; balance= 16000000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
@@ -39,7 +39,7 @@ include Make (struct
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "tNcij94DDKfuVRL2VrK9HQVeyJPwFK3Sz6bnpGWgme24Cqsgup1cpfb19XKEfkiUmRrUJ6CrJ8C7Bgz1w6mzeRvQ9BXuTsKaEc1yvuJUoDioGVXpuGowYVXw4KC1mG6RsqPYF4oH7iWcHY"
-      ; balance= 1600000
+      ; balance= 16000000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
@@ -53,7 +53,7 @@ include Make (struct
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "tNciMTgwisDWsms9pEiJvbRXWpCnp5vFQRJd417w1aN15ofzCEFQA37JC4yEoNLNw9MxP12uZVv4Wm5mcwCUryD6zr2DpZGiaBvrWikHTreYMbE4BViMB9d7BUGxLExtoC8cc1LjQFXPgG"
-      ; balance= 1600000
+      ; balance= 16000000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
@@ -67,7 +67,7 @@ include Make (struct
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "tNciUfrbXAYtEfcMhW8nYdh9DsFfGenEYNgqRq5vmzBnRgaQd4fDYVEt8VhfbZGQc7brDWCkvNrUdxbfbV9mc7pEN6GG6hEkqNAbXuz3YtKtQPLefz8YMcbLhdE1ninWdkym5ytaKNteCa"
-      ; balance= 1600000
+      ; balance= 16000000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
@@ -81,7 +81,7 @@ include Make (struct
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "tNciczxpMfZ4eW1ZPP9NVK2vxcm9cCHvTBWMe8Nskn2A25P1YqcdvFCD5LvgngraiCmAsnC8zWAiv5pwMYjrUwpMNYDePMQYiXX7HVMjrnB1JkEckyayvsAm2Bo4EQBWbHXD5Cxp65PZy5"
-      ; balance= 100000
+      ; balance= 1000000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn

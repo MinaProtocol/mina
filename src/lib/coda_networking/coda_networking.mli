@@ -3,6 +3,8 @@ open Coda_transition
 
 val refused_answer_query_string : string
 
+type exn += No_initial_peers
+
 module type Base_inputs_intf = Coda_intf.Inputs_intf
 
 module type Inputs_intf = sig

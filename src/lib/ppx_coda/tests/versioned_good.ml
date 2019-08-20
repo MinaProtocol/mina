@@ -59,7 +59,7 @@ module M4 = struct
 end
 
 module M5 (M : sig
-  type t [@@deriving version]
+  type t [@@deriving version {numbered}]
 end) =
 struct
   module Stable = struct
@@ -147,7 +147,7 @@ module M7 = struct
 end
 
 module type Intf = sig
-  type t = Int.t [@@deriving version {unnumbered}]
+  type t = Int.t [@@deriving version]
 end
 
 (* recursive type *)
@@ -277,6 +277,34 @@ module M16 = struct
       end
 
       include T
+    end
+  end
+end
+
+(* a GADT type *)
+module M17 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('a, 'b) t =
+          | Foo : int * string -> (int, string) t
+          | Bar : string * int -> (string, int) t
+        [@@deriving version]
+      end
+    end
+  end
+end
+
+(* a GADT type with type parameters in result *)
+module M18 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('instantiated, 'unbound) t =
+          | Foo : int * 'unbound list -> (int, 'unbound) t
+          | Bar : string * 'unbound array -> (string, 'unbound) t
+        [@@deriving version]
+      end
     end
   end
 end

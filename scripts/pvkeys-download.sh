@@ -31,10 +31,14 @@ set +e
 PR_NUMBER=`basename ${CIRCLE_PULL_REQUEST:-NOPR}`
 GH_API="https://api.github.com/repos/CodaProtocol/coda/pulls"
 MERGE_INTO_BRANCH=`curl -s ${GH_API}/${PR_NUMBER} | jq -r .base.ref`
+CIRCLE_BRANCH_NOSLASH=$( echo ${CIRCLE_BRANCH} |  sed 's!/!-!; s!!-!g' )
+MERGE_INTO_BRANCH_NOSLASH=$( echo ${MERGE_INTO_BRANCH} |  sed 's!/!-!; s!!-!g' )
 
 # Iterate over a few name variations until you a match?
 NAME_VARIATIONS="
+keys-${CIRCLE_BRANCH_NOSLASH:-NOBRANCH_NOSLASH}-${DUNE_PROFILE:-NOPROFILE}.tar.bz2
 keys-${CIRCLE_BRANCH:-NOBRANCH}-${DUNE_PROFILE:-NOPROFILE}.tar.bz2
+keys-${MERGE_INTO_BRANCH_NOSLASH:-NOBRANCH_NOSLASH}-${DUNE_PROFILE:-NOPROFILE}.tar.bz2
 keys-${MERGE_INTO_BRANCH:-NOBRANCH}-${DUNE_PROFILE:-NOPROFILE}.tar.bz2
 keys-temporary_hack-${DUNE_PROFILE:-NOPROFILE}.tar.bz2
 NOTFOUND

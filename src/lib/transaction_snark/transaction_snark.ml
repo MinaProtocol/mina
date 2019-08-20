@@ -265,9 +265,13 @@ module Verification_keys = struct
   [@@deriving bin_io]
 
   let dummy : t =
-    { merge= Dummy_values.Tick.Groth16.verification_key
-    ; base= Dummy_values.Tick.Groth16.verification_key
-    ; wrap= Dummy_values.Tock.Bowe_gabizon18.verification_key }
+    let groth16 =
+      Tick_backend.Verification_key.dummy
+        ~input_size:(Tick.Data_spec.size (tick_input ()))
+    in
+    { merge= groth16
+    ; base= groth16
+    ; wrap= Tock_backend.Verification_key.dummy ~input_size:Wrap_input.size }
 end
 
 module Keys0 = struct
@@ -1069,9 +1073,10 @@ struct
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
       ~brew_install_path:Cache_dir.brew_install_path
-      ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
-      ~input:(constraint_system ~exposing:wrap_input main)
-      ~create_env:Keypair.generate
+      ~digest_input:(fun x ->
+        Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
+      ~input:(lazy (constraint_system ~exposing:wrap_input main))
+      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
 end
 
 module type S = sig
@@ -1737,9 +1742,9 @@ let%test_module "transaction_snark" =
 
 let constraint_system_digests () =
   let module W = Wrap (struct
-    let merge = Dummy_values.Tick.Groth16.verification_key
+    let merge = Verification_keys.dummy.merge
 
-    let base = Dummy_values.Tick.Groth16.verification_key
+    let base = Verification_keys.dummy.base
   end) in
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in

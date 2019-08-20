@@ -11,10 +11,12 @@ module type Inputs_intf = Inputs.Inputs_intf
 module Make (Inputs : Inputs_intf) :
   Coda_intf.Transition_frontier_intf
   with type mostly_validated_external_transition :=
-              ( [`Time_received] * Truth.true_t
-              , [`Proof] * Truth.true_t
-              , [`Frontier_dependencies] * Truth.true_t
-              , [`Staged_ledger_diff] * Truth.false_t )
+              ( [`Time_received] * unit Truth.true_t
+              , [`Proof] * unit Truth.true_t
+              , [`Delta_transition_chain]
+                * State_hash.t Non_empty_list.t Truth.true_t
+              , [`Frontier_dependencies] * unit Truth.true_t
+              , [`Staged_ledger_diff] * unit Truth.false_t )
               Inputs.External_transition.Validation.with_transition
    and type external_transition_validated :=
               Inputs.External_transition.Validated.t
@@ -152,8 +154,7 @@ module Make (Inputs : Inputs_intf) :
 
     let parent_hash {transition_with_hash; _} =
       With_hash.data transition_with_hash
-      |> External_transition.Validated.protocol_state
-      |> Protocol_state.previous_state_hash
+      |> External_transition.Validated.parent_hash
 
     let mask = Fn.compose Staged_ledger.ledger staged_ledger
 
@@ -820,6 +821,12 @@ module Make (Inputs : Inputs_intf) :
                 ; ( "garbage_direct_descendants"
                   , `List
                       (List.map bad_children_hashes ~f:State_hash.to_yojson) )
+                ; ( "all_masks"
+                  , `List
+                      (List.map garbage_breadcrumbs ~f:(fun crumb ->
+                           `String
+                             ( Breadcrumb.mask crumb |> Ledger.get_uuid
+                             |> Uuid.to_string_hum ) )) )
                 ; ( "local_state"
                   , Consensus.Data.Local_state.to_yojson
                       t.consensus_local_state ) ]

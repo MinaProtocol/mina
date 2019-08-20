@@ -28,17 +28,23 @@ module Make
         type t =
           { protocol_state: Protocol_state.Value.Stable.V1.t
           ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-          ; staged_ledger_diff: Staged_ledger_diff.t }
+          ; staged_ledger_diff: Staged_ledger_diff.t
+          ; delta_transition_chain_proof:
+              State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list }
         [@@deriving sexp, fields, bin_io, version]
 
         type external_transition = t
 
         let to_yojson
-            {protocol_state; protocol_state_proof= _; staged_ledger_diff= _} =
+            { protocol_state
+            ; protocol_state_proof= _
+            ; staged_ledger_diff= _
+            ; delta_transition_chain_proof= _ } =
           `Assoc
             [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
             ; ("protocol_state_proof", `String "<opaque>")
-            ; ("staged_ledger_diff", `String "<opaque>") ]
+            ; ("staged_ledger_diff", `String "<opaque>")
+            ; ("delta_transition_chain_proof", `String "<opaque>") ]
 
         (* TODO: Important for bkase to review *)
         let compare t1 t2 =
@@ -87,7 +93,8 @@ module Make
   type t = Stable.Latest.t =
     { protocol_state: Protocol_state.Value.Stable.V1.t
     ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-    ; staged_ledger_diff: Staged_ledger_diff.t }
+    ; staged_ledger_diff: Staged_ledger_diff.t
+    ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list }
   [@@deriving sexp]
 
   type external_transition = t
@@ -107,8 +114,12 @@ module Make
 
   include Comparable.Make (Stable.Latest)
 
-  let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff =
-    {protocol_state; protocol_state_proof; staged_ledger_diff}
+  let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
+      ~delta_transition_chain_proof =
+    { protocol_state
+    ; protocol_state_proof
+    ; staged_ledger_diff
+    ; delta_transition_chain_proof }
 
   let timestamp {protocol_state; _} =
     Protocol_state.blockchain_state protocol_state
@@ -126,44 +137,63 @@ module Make
   module Validation = struct
     type ( 'time_received
          , 'proof
+         , 'delta_transition_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff )
          t =
-      'time_received * 'proof * 'frontier_dependencies * 'staged_ledger_diff
-      constraint 'time_received = [`Time_received] * _ Truth.t
-      constraint 'proof = [`Proof] * _ Truth.t
-      constraint 'frontier_dependencies = [`Frontier_dependencies] * _ Truth.t
-      constraint 'staged_ledger_diff = [`Staged_ledger_diff] * _ Truth.t
+      'time_received
+      * 'proof
+      * 'delta_transition_chain
+      * 'frontier_dependencies
+      * 'staged_ledger_diff
+      constraint 'time_received = [`Time_received] * (unit, _) Truth.t
+      constraint 'proof = [`Proof] * (unit, _) Truth.t
+      constraint
+        'delta_transition_chain =
+        [`Delta_transition_chain] * (State_hash.t Non_empty_list.t, _) Truth.t
+      constraint
+        'frontier_dependencies =
+        [`Frontier_dependencies] * (unit, _) Truth.t
+      constraint
+        'staged_ledger_diff =
+        [`Staged_ledger_diff] * (unit, _) Truth.t
 
-    type 'a all =
-      ( [`Time_received] * 'a
-      , [`Proof] * 'a
-      , [`Frontier_dependencies] * 'a
-      , [`Staged_ledger_diff] * 'a )
+    type fully_invalid =
+      ( [`Time_received] * unit Truth.false_t
+      , [`Proof] * unit Truth.false_t
+      , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.false_t
+      , [`Frontier_dependencies] * unit Truth.false_t
+      , [`Staged_ledger_diff] * unit Truth.false_t )
       t
-      constraint 'a = _ Truth.t
 
-    type fully_invalid = Truth.false_t all
-
-    type fully_valid = Truth.true_t all
+    type fully_valid =
+      ( [`Time_received] * unit Truth.true_t
+      , [`Proof] * unit Truth.true_t
+      , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+      , [`Frontier_dependencies] * unit Truth.true_t
+      , [`Staged_ledger_diff] * unit Truth.true_t )
+      t
 
     type ( 'time_received
          , 'proof
+         , 'delta_transition_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff )
          with_transition =
       (external_transition, State_hash.t) With_hash.t
-      * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
+      * ( 'time_received
+        , 'proof
+        , 'delta_transition_chain
+        , 'frontier_dependencies
+        , 'staged_ledger_diff )
+        t
 
-    let all t =
-      ( (`Time_received, t)
-      , (`Proof, t)
-      , (`Frontier_dependencies, t)
-      , (`Staged_ledger_diff, t) )
-
-    let fully_invalid = all Truth.False
-
-    let fully_valid = all Truth.True
+    let fully_invalid =
+      ( (`Time_received, Truth.False)
+      , (`Proof, Truth.False)
+      , (`Delta_transition_chain, Truth.False)
+      , (`Frontier_dependencies, Truth.False)
+      , (`Staged_ledger_diff, Truth.False) )
 
     let wrap t = (t, fully_invalid)
 
@@ -173,22 +203,26 @@ module Make
 
     module Unsafe = struct
       let set_valid_time_received :
-             ( [`Time_received] * Truth.false_t
+             ( [`Time_received] * unit Truth.false_t
              , 'proof
+             , 'delta_transition_chain
              , 'frontier_dependencies
              , 'staged_ledger_diff )
              t
-          -> ( [`Time_received] * Truth.true_t
+          -> ( [`Time_received] * unit Truth.true_t
              , 'proof
+             , 'delta_transition_chain
              , 'frontier_dependencies
              , 'staged_ledger_diff )
              t = function
         | ( (`Time_received, Truth.False)
           , proof
+          , delta_transition_chain
           , frontier_dependencies
           , staged_ledger_diff ) ->
-            ( (`Time_received, Truth.True)
+            ( (`Time_received, Truth.True ())
             , proof
+            , delta_transition_chain
             , frontier_dependencies
             , staged_ledger_diff )
         | _ ->
@@ -196,21 +230,56 @@ module Make
 
       let set_valid_proof :
              ( 'time_received
-             , [`Proof] * Truth.false_t
+             , [`Proof] * unit Truth.false_t
+             , 'delta_transition_chain
              , 'frontier_dependencies
              , 'staged_ledger_diff )
              t
           -> ( 'time_received
-             , [`Proof] * Truth.true_t
+             , [`Proof] * unit Truth.true_t
+             , 'delta_transition_chain
              , 'frontier_dependencies
              , 'staged_ledger_diff )
              t = function
         | ( time_received
           , (`Proof, Truth.False)
+          , delta_transition_chain
           , frontier_dependencies
           , staged_ledger_diff ) ->
             ( time_received
-            , (`Proof, Truth.True)
+            , (`Proof, Truth.True ())
+            , delta_transition_chain
+            , frontier_dependencies
+            , staged_ledger_diff )
+        | _ ->
+            failwith "why can't this be refuted?"
+
+      let set_valid_delta_transition_chain :
+             ( 'time_received
+             , 'proof
+             , [`Delta_transition_chain]
+               * State_hash.t Non_empty_list.t Truth.false_t
+             , 'frontier_dependencies
+             , 'staged_ledger_diff )
+             t
+          -> State_hash.t Non_empty_list.t
+          -> ( 'time_received
+             , 'proof
+             , [`Delta_transition_chain]
+               * State_hash.t Non_empty_list.t Truth.true_t
+             , 'frontier_dependencies
+             , 'staged_ledger_diff )
+             t =
+       fun validation hashes ->
+        match validation with
+        | ( time_received
+          , proof
+          , (`Delta_transition_chain, Truth.False)
+          , frontier_dependencies
+          , staged_ledger_diff ) ->
+            ( time_received
+            , proof
+            , (`Delta_transition_chain, Truth.True hashes)
             , frontier_dependencies
             , staged_ledger_diff )
         | _ ->
@@ -219,21 +288,25 @@ module Make
       let set_valid_frontier_dependencies :
              ( 'time_received
              , 'proof
-             , [`Frontier_dependencies] * Truth.false_t
+             , 'delta_transition_chain
+             , [`Frontier_dependencies] * unit Truth.false_t
              , 'staged_ledger_diff )
              t
           -> ( 'time_received
              , 'proof
-             , [`Frontier_dependencies] * Truth.true_t
+             , 'delta_transition_chain
+             , [`Frontier_dependencies] * unit Truth.true_t
              , 'staged_ledger_diff )
              t = function
         | ( time_received
           , proof
+          , delta_transition_chain
           , (`Frontier_dependencies, Truth.False)
           , staged_ledger_diff ) ->
             ( time_received
             , proof
-            , (`Frontier_dependencies, Truth.True)
+            , delta_transition_chain
+            , (`Frontier_dependencies, Truth.True ())
             , staged_ledger_diff )
         | _ ->
             failwith "why can't this be refuted?"
@@ -241,32 +314,37 @@ module Make
       let set_valid_staged_ledger_diff :
              ( 'time_received
              , 'proof
+             , 'delta_transition_chain
              , 'frontier_dependencies
-             , [`Staged_ledger_diff] * Truth.false_t )
+             , [`Staged_ledger_diff] * unit Truth.false_t )
              t
           -> ( 'time_received
              , 'proof
+             , 'delta_transition_chain
              , 'frontier_dependencies
-             , [`Staged_ledger_diff] * Truth.true_t )
+             , [`Staged_ledger_diff] * unit Truth.true_t )
              t = function
         | ( time_received
           , proof
+          , delta_transition_chain
           , frontier_dependencies
           , (`Staged_ledger_diff, Truth.False) ) ->
             ( time_received
             , proof
+            , delta_transition_chain
             , frontier_dependencies
-            , (`Staged_ledger_diff, Truth.True) )
+            , (`Staged_ledger_diff, Truth.True ()) )
         | _ ->
             failwith "why can't this be refuted?"
     end
   end
 
   type with_initial_validation =
-    ( [`Time_received] * Truth.true_t
-    , [`Proof] * Truth.true_t
-    , [`Frontier_dependencies] * Truth.false_t
-    , [`Staged_ledger_diff] * Truth.false_t )
+    ( [`Time_received] * unit Truth.true_t
+    , [`Proof] * unit Truth.true_t
+    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+    , [`Frontier_dependencies] * unit Truth.false_t
+    , [`Staged_ledger_diff] * unit Truth.false_t )
     Validation.with_transition
 
   let skip_time_received_validation
@@ -293,6 +371,13 @@ module Make
       (t, validation) =
     (t, Validation.Unsafe.set_valid_proof validation)
 
+  let skip_delta_transition_chain_validation
+      `This_transition_was_not_received_via_gossip (t, validation) =
+    let previous_protocol_state_hash = With_hash.data t |> parent_hash in
+    ( t
+    , Validation.Unsafe.set_valid_delta_transition_chain validation
+        (Non_empty_list.singleton previous_protocol_state_hash) )
+
   let validate_proof (t, validation) ~verifier =
     let open Blockchain_snark.Blockchain in
     let open Deferred.Let_syntax in
@@ -305,6 +390,20 @@ module Make
         else Error `Invalid_proof
     | Error e ->
         Error (`Verifier_error e)
+
+  let validate_delta_transition_chain (t, validation) =
+    let transition = With_hash.data t in
+    match
+      Transition_chain_verifier.verify ~target_hash:(parent_hash transition)
+        ~transition_chain_proof:transition.delta_transition_chain_proof
+    with
+    | Some hashes ->
+        Ok
+          ( t
+          , Validation.Unsafe.set_valid_delta_transition_chain validation
+              hashes )
+    | None ->
+        Error `Invalid_delta_transition_chain_proof
 
   let skip_frontier_dependencies_validation
       `This_transition_belongs_to_a_detached_subtree (t, validation) =
@@ -392,8 +491,9 @@ module Make
     let validate_staged_ledger_diff :
            ( 'time_received
            , 'proof
+           , 'delta_transition_chain
            , 'frontier_dependencies
-           , [`Staged_ledger_diff] * Truth.false_t )
+           , [`Staged_ledger_diff] * unit Truth.false_t )
            Validation.with_transition
         -> logger:Logger.t
         -> verifier:Verifier.t
@@ -402,8 +502,9 @@ module Make
              * [ `External_transition_with_validation of
                  ( 'time_received
                  , 'proof
+                 , 'delta_transition_chain
                  , 'frontier_dependencies
-                 , [`Staged_ledger_diff] * Truth.true_t )
+                 , [`Staged_ledger_diff] * unit Truth.true_t )
                  Validation.with_transition ]
              * [`Staged_ledger of Staged_ledger.t]
            , [ `Invalid_staged_ledger_diff of

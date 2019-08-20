@@ -31,3 +31,6 @@ let block_window_duration =
 "delta", delta]
 
 let inactivity_secs = block_window_duration_ms * delta
+
+(** Number of slots =24k in ouroboros praos *)
+let slots_per_epoch = Unsigned.UInt32.of_int (3 * c * k)
