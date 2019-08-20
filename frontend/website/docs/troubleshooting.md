@@ -90,3 +90,8 @@ If you restart the Coda daemon and it fails, then try deleting your config folde
 
 ### Daemon restart on computer sleep
 If the machine running your Coda node enters sleep mode or hibernates, you will need to restart the Coda daemon once the machine becomes active.
+
+### Failed to connect to any initial peers
+Look in the logs for messages about "Chain ID mismatch". These messages mean your daemon was compiled for a different chain than the peers it tried to connect to. This can happen normally, but during startup at least one peer needs to have a matching chain ID.
+
+Otherwise, if there are messages about "Retrieving chain ID failed", or other errors, you may need to [configure port forwarding for your router](/docs/getting-started/#port-forwarding).

@@ -19,7 +19,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
   return (conn, process, config)
 
 let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
-    ~program_dir ~proposer ~snark_worker_config ~work_selection_method ~offset
+    ~program_dir ~proposer ~snark_worker_key ~work_selection_method ~offset
     ~trace_dir ~max_concurrent_connections ~is_archive_node () =
   let conf_dir =
     Filename.temp_dir_name
@@ -40,7 +40,7 @@ let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
                      (function [a; b] -> Some (a, b) | _ -> None)
                      (String.split ~on:'=')) )
     ; proposer
-    ; snark_worker_config
+    ; snark_worker_key
     ; work_selection_method
     ; peers
     ; conf_dir
@@ -51,11 +51,6 @@ let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
     ; max_concurrent_connections }
   in
   config
-
-let disconnect (conn, proc, _) =
-  let%bind () = Coda_worker.Connection.close conn in
-  let%map (_ : Unix.Exit_or_signal.t) = Process.wait proc in
-  ()
 
 let peers_exn (conn, _proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()
@@ -99,6 +94,14 @@ let verified_transitions_exn (conn, _proc, _) =
   in
   Linear_pipe.wrap_reader r
 
+(* TODO: 2836 delete once transition_frontier extensions refactoring gets in *)
+let validated_transitions_keyswaptest_exn (conn, _, _) =
+  let%map r =
+    Coda_worker.Connection.run_exn conn
+      ~f:Coda_worker.functions.validated_transitions_keyswaptest ~arg:()
+  in
+  Linear_pipe.wrap_reader r
+
 let new_block_exn (conn, _proc, __) key =
   let%map r =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.new_block
@@ -134,3 +137,14 @@ let dump_tf (conn, _proc, _) =
 let best_path (conn, _proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.best_path
     ~arg:()
+
+let replace_snark_worker_key (conn, _proc, _) key =
+  Coda_worker.Connection.run_exn conn
+    ~f:Coda_worker.functions.replace_snark_worker_key ~arg:key
+
+let disconnect ((conn, proc, _) as t) =
+  (* This kills any strangling snark worker process *)
+  let%bind () = replace_snark_worker_key t None in
+  let%bind () = Coda_worker.Connection.close conn in
+  let%map (_ : Unix.Exit_or_signal.t) = Process.wait proc in
+  ()

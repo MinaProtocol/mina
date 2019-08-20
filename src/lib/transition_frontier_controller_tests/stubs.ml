@@ -567,6 +567,7 @@ struct
           ; initial_peers: Host_and_port.t list
           ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
           ; conf_dir: string
+          ; chain_id: string
           ; logger: Logger.t
           ; trust_system: Trust_system.t
           ; max_concurrent_connections: int option }

@@ -10,12 +10,19 @@ module Subscriptions = Coda_subscriptions
 
 type t
 
+exception Snark_worker_error of int
+
+exception Snark_worker_signal_interrupt of Signal.t
+
 val subscription : t -> Coda_subscriptions.t
 
 (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
 val propose_public_keys : t -> Public_key.Compressed.Set.t
 
 val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
+
+val replace_snark_worker_key :
+  t -> Public_key.Compressed.t option -> unit Deferred.t
 
 val add_block_subscriber :
      t
@@ -51,6 +58,8 @@ val peers : t -> Network_peer.Peer.t list
 
 val initial_peers : t -> Host_and_port.t list
 
+val client_port : t -> int
+
 val validated_transitions :
      t
   -> (External_transition.Validated.t, State_hash.t) With_hash.t
@@ -72,7 +81,9 @@ val external_transition_database :
 
 val snark_pool : t -> Network_pool.Snark_pool.t
 
-val start : t -> unit
+val start : t -> unit Deferred.t
+
+val stop_snark_worker : t -> unit Deferred.t
 
 val create : Config.t -> t Deferred.t
 
@@ -94,3 +105,5 @@ val most_recent_valid_transition :
 val top_level_logger : t -> Logger.t
 
 val config : t -> Config.t
+
+val net : t -> Coda_networking.t

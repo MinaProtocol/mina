@@ -177,6 +177,17 @@ module Api = struct
       ~f:(fun worker -> Coda_process.new_block_exn worker key)
       t i
 
+  let replace_snark_worker_key t i key =
+    run_online_worker
+      ~f:(fun worker -> Coda_process.replace_snark_worker_key worker key)
+      t i
+
+  let validated_transitions_keyswaptest t i =
+    run_online_worker
+      ~f:(fun worker ->
+        Coda_process.validated_transitions_keyswaptest_exn worker )
+      t i
+
   let new_user_command_and_subscribe t i key =
     ignore @@ new_block t i key ;
     new_user_command t i key
@@ -267,14 +278,15 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
        let diff = Time.diff (Time.now ()) !last_time in
        let diff = Time.Span.to_sec diff in
        if
-         not
-           ( diff
-           < Time.Span.to_sec acceptable_delay
-             +. epsilon
-             +. Int.to_float
-                  ( (Consensus.Constants.c - 1)
-                  * Consensus.Constants.block_window_duration_ms )
-                /. 1000. )
+         Array.existsi testnet.status ~f:(fun i _ -> Api.synced testnet i)
+         && not
+              ( diff
+              < Time.Span.to_sec acceptable_delay
+                +. epsilon
+                +. Int.to_float
+                     ( (Consensus.Constants.c - 1)
+                     * Consensus.Constants.block_window_duration_ms )
+                   /. 1000. )
        then (
          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
            "No recent blocks" ;
@@ -328,6 +340,8 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                       testnet.root_lengths.(i) + (Consensus.Constants.k / 2)
                       < length - 1
                     then (
+                      Logger.info logger !"Filled catchup ivar"
+                        ~module_:__MODULE__ ~location:__LOC__ ;
                       Ivar.fill signal () ;
                       testnet.restart_signals.(i) <- None )
                     else () ) ;
@@ -383,6 +397,7 @@ let events workers start_reader =
     (Linear_pipe.iter start_reader ~f:(fun (i, config, started, synced) ->
          don't_wait_for
            (let%bind worker = Coda_process.spawn_exn config in
+            let%bind () = Coda_process.start_exn worker in
             workers.(i) <- worker ;
             started () ;
             don't_wait_for

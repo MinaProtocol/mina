@@ -7,18 +7,12 @@ open Signature_lib
 open Pipe_lib
 open Init
 
-module Snark_worker_config = struct
-  (* TODO : version *)
-  type t = {port: int; public_key: Public_key.Compressed.Stable.V1.t}
-  [@@deriving bin_io]
-end
-
 module Input = struct
   type t =
     { addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+    ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
     ; proposer: int option
-    ; snark_worker_config: Snark_worker_config.t option
     ; work_selection_method: Cli_lib.Arg_type.work_selection_method
     ; conf_dir: string
     ; trace_dir: string option
@@ -115,6 +109,13 @@ module T = struct
         ( 'worker
         , unit
         , State_hash.Stable.Latest.t list )
+        Rpc_parallel.Function.t
+    ; replace_snark_worker_key:
+        ('worker, Public_key.Compressed.t option, unit) Rpc_parallel.Function.t
+    ; validated_transitions_keyswaptest:
+        ( 'worker
+        , unit
+        , (External_transition.t, State_hash.t) With_hash.t Pipe.Reader.t )
         Rpc_parallel.Function.t }
 
   type coda_functions =
@@ -140,6 +141,15 @@ module T = struct
     ; coda_get_all_user_commands:
            Public_key.Compressed.Stable.V1.t
         -> User_command.Stable.V1.t list Deferred.t
+    ; coda_replace_snark_worker_key:
+        Public_key.Compressed.Stable.V1.t option -> unit Deferred.t
+    ; coda_validated_transitions_keyswaptest:
+           unit
+        -> ( External_transition.Stable.V1.t
+           , State_hash.Stable.V1.t )
+           With_hash.t
+           Pipe.Reader.t
+           Deferred.t
     ; coda_root_diff:
            unit
         -> Transition_frontier.Diff.Root_diff.view Pipe.Reader.t Deferred.t
@@ -225,6 +235,12 @@ module T = struct
 
     let best_path_impl ~worker_state ~conn_state:() () =
       worker_state.coda_best_path ()
+
+    let replace_snark_worker_key_impl ~worker_state ~conn_state:() key =
+      worker_state.coda_replace_snark_worker_key key
+
+    let validated_transitions_keyswaptest_impl ~worker_state ~conn_state:() =
+      worker_state.coda_validated_transitions_keyswaptest
 
     let get_all_transitions_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_all_transitions pk
@@ -320,6 +336,21 @@ module T = struct
       C.create_rpc ~f:best_path_impl ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: State_hash.Stable.Latest.t list] ()
 
+    let validated_transitions_keyswaptest =
+      C.create_pipe ~f:validated_transitions_keyswaptest_impl
+        ~bin_input:Unit.bin_t
+        ~bin_output:
+          [%bin_type_class:
+            ( External_transition.Stable.Latest.t
+            , State_hash.Stable.Latest.t )
+            With_hash.Stable.Latest.t] ()
+
+    let replace_snark_worker_key =
+      C.create_rpc ~f:replace_snark_worker_key_impl
+        ~bin_input:
+          [%bin_type_class: Public_key.Compressed.Stable.Latest.t option]
+        ~bin_output:Unit.bin_t ()
+
     let functions =
       { peers
       ; start
@@ -337,12 +368,14 @@ module T = struct
       ; sync_status
       ; new_user_command
       ; get_all_user_commands
+      ; replace_snark_worker_key
+      ; validated_transitions_keyswaptest
       ; get_all_transitions }
 
     let init_worker_state
         { addrs_and_ports
         ; proposer
-        ; snark_worker_config
+        ; snark_worker_key
         ; work_selection_method
         ; conf_dir
         ; trace_dir
@@ -433,6 +466,7 @@ module T = struct
                 ; target_peer_count= 8
                 ; conf_dir
                 ; initial_peers= peers
+                ; chain_id= "bogus chain id for testing"
                 ; addrs_and_ports
                 ; logger
                 ; trust_system
@@ -448,8 +482,10 @@ module T = struct
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
-                 ?snark_worker_key:
-                   (Option.map snark_worker_config ~f:(fun c -> c.public_key))
+                 ~snark_worker_config:
+                   Coda_lib.Config.Snark_worker_config.
+                     { initial_snark_worker_key= snark_worker_key
+                     ; shutdown_on_disconnect= true }
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
@@ -466,19 +502,16 @@ module T = struct
               (fun () ->
                 let%map coda = coda_deferred () in
                 coda_ref := Some coda ;
-                Option.iter snark_worker_config ~f:(fun config ->
-                    let run_snark_worker =
-                      `With_public_key config.public_key
-                    in
-                    Coda_run.setup_local_server ~client_port:config.port ~coda
-                      () ;
-                    Coda_run.run_snark_worker ~client_port:config.port
-                      run_snark_worker ) ;
+                Logger.info logger "Setting up snark worker "
+                  ~module_:__MODULE__ ~location:__LOC__ ;
+                Coda_run.setup_local_server coda ;
                 coda )
               ()
           in
+          Logger.info logger "Worker finish setting up coda"
+            ~module_:__MODULE__ ~location:__LOC__ ;
           let coda_peers () = return (Coda_lib.peers coda) in
-          let coda_start () = return (Coda_lib.start coda) in
+          let coda_start () = Coda_lib.start coda in
           let coda_get_all_transitions pk =
             let external_transition_database =
               Coda_lib.external_transition_database coda
@@ -545,14 +578,26 @@ module T = struct
                   !"Failed to construct payment proof: %{sexp:Error.t}"
                   e ()
           in
+          let coda_replace_snark_worker_key =
+            Coda_lib.replace_snark_worker_key coda
+          in
           let coda_new_block key =
             Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
+          in
+          (* TODO: #2836 Remove validated_transitions_keyswaptest once the refactoring of broadcast pipe enters the code base *)
+          let ( validated_transitions_keyswaptest_reader
+              , validated_transitions_keyswaptest_writer ) =
+            Pipe.create ()
           in
           let coda_verified_transitions () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
               (Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
                  ~f:(fun t ->
+                   Pipe.write_without_pushback_if_open
+                     validated_transitions_keyswaptest_writer
+                     (With_hash.map t
+                        ~f:External_transition.Validated.forget_validation) ;
                    let p =
                      External_transition.Validated.protocol_state
                        (With_hash.data t)
@@ -571,6 +616,9 @@ module T = struct
                      (prev_state_hash, state_hash) ;
                    Deferred.unit )) ;
             return r.pipe
+          in
+          let coda_validated_transitions_keyswaptest () =
+            Deferred.return validated_transitions_keyswaptest_reader
           in
           let coda_root_diff () =
             let r, w = Linear_pipe.create () in
@@ -646,6 +694,10 @@ module T = struct
           ; coda_sync_status= with_monitor coda_sync_status
           ; coda_new_user_command= with_monitor coda_new_user_command
           ; coda_get_all_user_commands= with_monitor coda_get_all_user_commands
+          ; coda_validated_transitions_keyswaptest=
+              with_monitor coda_validated_transitions_keyswaptest
+          ; coda_replace_snark_worker_key=
+              with_monitor coda_replace_snark_worker_key
           ; coda_get_all_transitions= with_monitor coda_get_all_transitions }
       )
 

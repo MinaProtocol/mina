@@ -32,9 +32,9 @@ let main () =
     peers ;
   let config =
     Coda_process.local_config ~peers ~addrs_and_ports ~acceptable_delay
-      ~snark_worker_config:None ~proposer:None ~program_dir
-      ~work_selection_method ~trace_dir ~offset:Time.Span.zero ()
-      ~max_concurrent_connections ~is_archive_node:false
+      ~snark_worker_key:None ~proposer:None ~program_dir ~work_selection_method
+      ~trace_dir ~offset:Time.Span.zero () ~max_concurrent_connections
+      ~is_archive_node:false
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in
