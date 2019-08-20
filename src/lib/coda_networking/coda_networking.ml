@@ -8,6 +8,8 @@ open Network_peer
 
 let refused_answer_query_string = "Refused to answer_query"
 
+type exn += No_initial_peers
+
 module type Base_inputs_intf = Coda_intf.Inputs_intf
 
 (* assumption: the Rpcs functor is applied only once in the codebase, so that
@@ -174,9 +176,9 @@ module Make_rpcs (Inputs : Base_inputs_intf) = struct
     end
   end
 
-  module Get_transition_chain_witness = struct
+  module Get_transition_chain_proof = struct
     module Master = struct
-      let name = "get_transition_chain_witness"
+      let name = "get_transition_chain_proof"
 
       module T = struct
         type query = State_hash.Stable.V1.t [@@deriving sexp, to_yojson]
@@ -309,6 +311,63 @@ module Make_rpcs (Inputs : Base_inputs_intf) = struct
         [@@deriving bin_io, sexp, version {rpc}]
 
         type response = unit [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      include T
+      include Register (T)
+    end
+  end
+
+  module Get_bootstrappable_best_tip = struct
+    module Master = struct
+      let name = "get_bootstrappable_best_tip"
+
+      module T = struct
+        (* "master" types, do not change *)
+        type query = Consensus.Data.Consensus_state.Value.t
+        [@@deriving sexp, to_yojson]
+
+        type response =
+          ( External_transition.Stable.V1.t
+          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
+          )
+          Proof_carrying_data.Stable.V1.t
+          option
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include Master
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = Consensus.Data.Consensus_state.Value.Stable.V1.t
+        [@@deriving bin_io, sexp, version {rpc}]
+
+        type response =
+          ( External_transition.Stable.V1.t
+          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
+          )
+          Proof_carrying_data.Stable.V1.t
+          option
+        [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
 
@@ -525,7 +584,13 @@ module Make (Inputs : Inputs_intf) = struct
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
             Deferred.Option.t)
-      ~(get_transition_chain_witness :
+      ~(get_bootstrappable_best_tip :
+            Consensus.Data.Consensus_state.Value.t Envelope.Incoming.t
+         -> ( External_transition.t
+            , State_body_hash.t list * External_transition.t )
+            Proof_carrying_data.t
+            Deferred.Option.t)
+      ~(get_transition_chain_proof :
             State_hash.t Envelope.Incoming.t
          -> (State_hash.t * State_body_hash.t list) Deferred.Option.t)
       ~(get_transition_chain :
@@ -607,17 +672,30 @@ module Make (Inputs : Inputs_intf) = struct
       in
       record_unknown_item result sender action_msg msg_args
     in
-    let get_transition_chain_witness_rpc conn ~version:_ query =
-      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
-        "Sending transition_chain_witness to peer with IP %s"
-        conn.Host_and_port.host ;
-      let action_msg = "Get_transition_chain_witness query: $query" in
+    let get_bootstrappable_best_tip_rpc conn ~version:_ query =
+      Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
+        "Sending best_tip to peer with IP %s" conn.Host_and_port.host ;
+      let action_msg = "Get_bootstrappable_best_tip query: $query" in
       let msg_args =
-        [("query", Rpcs.Get_transition_chain_witness.query_to_yojson query)]
+        [("query", Rpcs.Get_bootstrappable_best_tip.query_to_yojson query)]
       in
       let%bind result, sender =
-        run_for_rpc_result conn query ~f:get_transition_chain_witness
-          action_msg msg_args
+        run_for_rpc_result conn query ~f:get_bootstrappable_best_tip action_msg
+          msg_args
+      in
+      record_unknown_item result sender action_msg msg_args
+    in
+    let get_transition_chain_proof_rpc conn ~version:_ query =
+      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+        "Sending transition_chain_proof to peer with IP %s"
+        conn.Host_and_port.host ;
+      let action_msg = "Get_transition_chain_proof query: $query" in
+      let msg_args =
+        [("query", Rpcs.Get_transition_chain_proof.query_to_yojson query)]
+      in
+      let%bind result, sender =
+        run_for_rpc_result conn query ~f:get_transition_chain_proof action_msg
+          msg_args
       in
       record_unknown_item result sender action_msg msg_args
     in
@@ -652,9 +730,11 @@ module Make (Inputs : Inputs_intf) = struct
             get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc
         ; Rpcs.Answer_sync_ledger_query.implement_multi
             answer_sync_ledger_query_rpc
+        ; Rpcs.Get_bootstrappable_best_tip.implement_multi
+            get_bootstrappable_best_tip_rpc
         ; Rpcs.Get_ancestry.implement_multi get_ancestry_rpc
-        ; Rpcs.Get_transition_chain_witness.implement_multi
-            get_transition_chain_witness_rpc
+        ; Rpcs.Get_transition_chain_proof.implement_multi
+            get_transition_chain_proof_rpc
         ; Rpcs.Get_transition_chain.implement_multi get_transition_chain_rpc
         ; Rpcs.Ban_notify.implement_multi ban_notify_rpc
         ; Consensus.Hooks.Rpcs.implementations ~logger:config.logger
@@ -663,6 +743,14 @@ module Make (Inputs : Inputs_intf) = struct
     let%map gossip_net =
       Gossip_net.create config.gossip_net_params implementations
     in
+    don't_wait_for
+      (let%map () = Ivar.read gossip_net.first_connect in
+       (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
+       let initial_peers = Gossip_net.peers gossip_net in
+       if List.is_empty initial_peers then (
+         Logger.fatal config.logger "Failed to connect to any initial peers"
+           ~module_:__MODULE__ ~location:__LOC__ ;
+         raise No_initial_peers )) ;
     (* TODO: Think about buffering:
        I.e., what do we do when too many messages are coming in, or going out.
        For example, some things you really want to not drop (like your outgoing
@@ -767,37 +855,31 @@ module Make (Inputs : Inputs_intf) = struct
   let random_peers_except {gossip_net; _} n ~(except : Peer.Hash_set.t) =
     Gossip_net.random_peers_except gossip_net n ~except
 
-  let get_transition_chain_witness t peer state_hash =
+  let make_rpc_request ~rpc_dispatch ~label t peer input =
     let open Deferred.Let_syntax in
-    match%map
-      Gossip_net.query_peer t.gossip_net peer
-        Rpcs.Get_transition_chain_witness.dispatch_multi state_hash
-    with
+    match%map Gossip_net.query_peer t.gossip_net peer rpc_dispatch input with
     | Ok (Some response) ->
         Ok response
     | Ok None ->
         Or_error.errorf
-          !"Peer %{sexp:Network_peer.Peer.t} doesn't have the requested \
-            transition"
-          peer
+          !"Peer %{sexp:Network_peer.Peer.t} doesn't have the requested %s"
+          peer label
     | Error e ->
         Error e
 
-  let get_transition_chain t peer request =
-    let open Deferred.Let_syntax in
-    match%map
-      Gossip_net.query_peer t.gossip_net peer
-        Rpcs.Get_transition_chain.dispatch_multi request
-    with
-    | Ok (Some response) ->
-        Ok response
-    | Ok None ->
-        Or_error.errorf
-          !"Peer %{sexp:Network_peer.Peer.t} doesn't have the requested chain \
-            of transitions"
-          peer
-    | Error e ->
-        Error e
+  let get_transition_chain_proof =
+    make_rpc_request
+      ~rpc_dispatch:Rpcs.Get_transition_chain_proof.dispatch_multi
+      ~label:"transition"
+
+  let get_transition_chain =
+    make_rpc_request ~rpc_dispatch:Rpcs.Get_transition_chain.dispatch_multi
+      ~label:"chain of transitions"
+
+  let get_bootstrappable_best_tip =
+    make_rpc_request
+      ~rpc_dispatch:Rpcs.Get_bootstrappable_best_tip.dispatch_multi
+      ~label:"best tip"
 
   let ban_notify t peer banned_until =
     Gossip_net.query_peer t.gossip_net peer Rpcs.Ban_notify.dispatch_multi

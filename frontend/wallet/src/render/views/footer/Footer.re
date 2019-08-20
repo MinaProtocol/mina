@@ -30,13 +30,16 @@ module Styles = {
 module StakingSwitch = {
   [@react.component]
   let make = () => {
-    let (staking, setStaking) = React.useState(() => true);
+    let (staking, setStaking) = React.useState(() => false);
     <div
       className=Css.(
         style([
           color(Theme.Colors.serpentine),
           display(`flex),
           alignItems(`center),
+          // Disable the switch until it's functional
+          opacity(0.5),
+          pointerEvents(`none),
         ])
       )>
       <Toggle value=staking onChange=setStaking />

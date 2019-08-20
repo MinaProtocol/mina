@@ -202,7 +202,9 @@ module Make (Inputs : Inputs.S) = struct
         Hashtbl.add t.parent_root_timeouts ~key:parent_hash
           ~data:
             (make_timeout
-               (Option.value remaining_time ~default:timeout_duration))
+               (Option.fold remaining_time ~init:timeout_duration
+                  ~f:(fun _ remaining_time ->
+                    Block_time.Span.min remaining_time timeout_duration )))
         |> ignore
     | Some cached_sibling_transitions ->
         if

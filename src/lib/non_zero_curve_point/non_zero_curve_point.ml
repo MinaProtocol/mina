@@ -12,6 +12,8 @@ module Stable = struct
       let to_yojson (x, y) =
         Tick.Field.(`List [`String (to_string x); `String (to_string y)])
 
+      let description = "Non zero curve point"
+
       let version_byte = Base58_check.Version_bytes.non_zero_curve_point
     end
 
@@ -107,14 +109,30 @@ module Compressed = struct
       module T = struct
         type t = (Field.t, bool) Poly.Stable.V1.t
         [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
-
-        let version_byte =
-          Base58_check.Version_bytes.non_zero_curve_point_compressed
       end
 
       include T
-      include Registration.Make_latest_version (T)
-      include Codable.Make_base58_check (T)
+      module Registered = Registration.Make_latest_version (T)
+      include Registered
+
+      let description = "Non zero curve point compressed"
+
+      let version_byte =
+        Base58_check.Version_bytes.non_zero_curve_point_compressed
+
+      (* Registered contains shadowed versions of bin_io functions in T;
+	 we call the same functor below with Stable.Latest, which also has
+	 the shadowed versions
+       *)
+      include Codable.Make_base58_check (struct
+        type nonrec t = t
+
+        include Registered
+
+        let description = description
+
+        let version_byte = version_byte
+      end)
     end
 
     module Latest = V1

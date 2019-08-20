@@ -13,6 +13,8 @@ module Digest = struct
       include T
 
       module Base58_check = Base58_check.Make (struct
+        let description = "Random oracle digest"
+
         let version_byte = Base58_check.Version_bytes.random_oracle_base
       end)
 
@@ -20,12 +22,15 @@ module Digest = struct
 
       let of_yojson = function
         | `String s -> (
-          try Ok (Base58_check.decode_exn s)
-          with exn ->
-            Error
-              (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn)) )
+          match Base58_check.decode s with
+          | Error e ->
+              Error
+                (sprintf "Random_oracle_base.of_yojson, bad Base58Check: %s"
+                   (Error.to_string_hum e))
+          | Ok x ->
+              Ok x )
         | _ ->
-            Error "expected `String"
+            Error "Random_oracle_base.of_yojson expected `String"
 
       include Comparable.Make (T)
       include Registration.Make_latest_version (T)

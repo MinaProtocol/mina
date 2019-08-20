@@ -1,6 +1,10 @@
 include Data_hash.Make_full_size ()
 
-module Base58_check = Codable.Make_base58_check (Stable.Latest)
+module Base58_check = Codable.Make_base58_check (struct
+  include Stable.Latest
+
+  let description = "State hash"
+end)
 
 [%%define_locally
 Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]

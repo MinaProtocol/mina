@@ -101,15 +101,24 @@ let create ~value ~upper_bound =
 
 let to_field t = t.value
 
-let constant (type f) ~m:((module M) as m : f m) x =
+let constant (type f) ?length ~m:((module M) as m : f m) x =
   let open M in
   assert (x < Field.size) ;
   let upper_bound = B.(one + x) in
+  let length =
+    let b = bits_needed upper_bound in
+    match length with
+    | Some n ->
+        assert (Int.(n >= b)) ;
+        n
+    | None ->
+        b
+  in
   { value= Field.(constant (bigint_to_field ~m x))
   ; interval= Constant x
   ; bits=
       Some
-        (List.init (bits_needed upper_bound) ~f:(fun i ->
+        (List.init length ~f:(fun i ->
              Boolean.var_of_value B.(shift_right x i land one = one) )) }
 
 let shift_left (type f) ~m:((module M) as m : f m) t k =
@@ -124,7 +133,7 @@ let shift_left (type f) ~m:((module M) as m : f m) t k =
 let of_bits (type f) ~m:((module M) : f m) bs =
   let bs = Bitstring.Lsb_first.to_list bs in
   { value= M.Field.project bs
-  ; interval= Constant B.(one lsl List.length bs)
+  ; interval= Less_than B.(one lsl List.length bs)
   ; bits= Some bs }
 
 (* Given a and b returns (q, r) such that
@@ -164,19 +173,24 @@ let div_mod (type f) ~m:((module M) as m : f m) a b =
   , {value= r; interval= b.interval; bits= Some r_bits} )
 
 let to_bits ?length (type f) ~m:((module M) : f m) t =
-  Bitstring.Lsb_first.of_list
-    ( match t.bits with
-    | Some bs ->
-        Option.iter length ~f:(fun n -> assert (Int.(n = List.length bs))) ;
-        bs
-    | None ->
-        let bs =
-          M.Field.choose_preimage_var t.value
-            ~length:
-              (Option.value length ~default:(Interval.bits_needed t.interval))
-        in
-        t.bits <- Some bs ;
-        bs )
+  match t.bits with
+  | Some bs -> (
+      let bs = Bitstring.Lsb_first.of_list bs in
+      match length with
+      | None ->
+          bs
+      | Some n ->
+          Bitstring.Lsb_first.pad bs
+            ~padding_length:(n - Bitstring.Lsb_first.length bs)
+            ~zero:M.Boolean.false_ )
+  | None ->
+      let bs =
+        M.Field.choose_preimage_var t.value
+          ~length:
+            (Option.value ~default:(Interval.bits_needed t.interval) length)
+      in
+      t.bits <- Some bs ;
+      Bitstring.Lsb_first.of_list bs
 
 let to_bits_exn t = Bitstring.Lsb_first.of_list (Option.value_exn t.bits)
 

@@ -30,7 +30,7 @@ struct
     module Latest = V1
 
     module Module_decl = struct
-      let name = "nat_make"
+      let name = sprintf "nat_make"
 
       type latest = Latest.t
     end
@@ -56,8 +56,12 @@ struct
 
     let to_field = Integer.to_field
 
+    let of_bits bs = Integer.of_bits ~m bs
+
     let to_bits t =
-      make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t)
+      with_label
+        (sprintf "to_bits: %s" __LOC__)
+        (make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t))
 
     let to_triples t =
       Checked.map (to_bits t)
@@ -67,16 +71,9 @@ struct
               (pad_to_triple_list ~default:Boolean.false_)
               Lsb_first.to_list)
 
-    let of_bits bs =
-      let bs = Bitstring.Lsb_first.to_list bs in
-      let n = List.length bs in
-      let padding = N.length_in_bits - n in
-      assert (Int.(padding >= 0)) ;
-      Integer.of_bits ~m
-        (Bitstring.Lsb_first.of_list
-           (bs @ List.init padding ~f:(fun _ -> Boolean.false_)))
-
-    let constant n = Integer.constant ~m (Bignum_bigint.of_int (N.to_int n))
+    let constant n =
+      Integer.constant ~length:N.length_in_bits ~m
+        (Bignum_bigint.of_int (N.to_int n))
 
     let typ : (field Integer.t, t) Typ.t =
       let typ = Typ.list ~length:N.length_in_bits Boolean.typ in
@@ -89,13 +86,13 @@ struct
         typ.check (Bitstring.Lsb_first.to_list (Integer.to_bits_exn v))
       in
       let read v =
-        let of_bits_lsb =
-          List.foldi ~init:N.zero ~f:(fun i acc b ->
+        let of_field_elt x =
+          let bs = List.take (Field.unpack x) N.length_in_bits in
+          (* TODO: Make this efficient *)
+          List.foldi bs ~init:N.zero ~f:(fun i acc b ->
               if b then N.(logor (shift_left one i) acc) else acc )
         in
-        Typ.Read.map
-          (typ.read (Bitstring.Lsb_first.to_list (Integer.to_bits_exn v)))
-          ~f:of_bits_lsb
+        Typ.Read.map (Field.typ.read (Integer.to_field v)) ~f:of_field_elt
       in
       {alloc; store; check; read}
 

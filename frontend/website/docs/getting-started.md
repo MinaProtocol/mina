@@ -3,7 +3,7 @@
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
 !!! note
-    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for `v0.0.1-beta.1`.
+    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.3-beta`.
 
 ## Requirements
 
@@ -22,30 +22,39 @@ GPUs aren't currently required, but may be required for node operators when the 
 
 The newest binary releases can be found below. Instructions are provided for macOS and Linux below:
 
-!!! note
-    This is a large download, around 1GB, so the install might take some time.
+This is a large download, around 1GB, so the install might take some time.
+
+!!! warning
+    If you installed `coda` from a previous release, you'll need to upgrade it so that you won't get banned by the network for using an older client. See instructions below for upgrading both macOS and Linux builds.
 
 ### macOS
 
-Install using [brew](https://brew.sh).
+Install using [Homebrew](https://brew.sh).
 ```
 brew install codaprotocol/coda/coda
 ```
+
+If you already have `coda` installed from a previous release, run:
+```
+brew upgrade coda
+```
+
 You can run `coda -help` to check if the installation succeeded.
 
 ### Ubuntu 18.04 / Debian 9
 
-Add the Coda Debian repo and install.
+Add the Coda Debian repo and install:
 
 ```
-echo "deb [trusted=yes] http://packages.o1test.net unstable main" | sudo tee /etc/apt/sources.list.d/coda.list
+sudo apt-get remove coda-testnet-postake-medium-curves
+echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
-sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-43cb0790
-sudo apt-mark hold coda-testnet-postake-medium-curves
+sudo apt-get install -t release coda-testnet-postake-medium-curves
 ```
+
+If you already have `coda` installed from a previous release, running the above commands should automatically uninstall and reinstall the newest version. If you're installing Coda from scratch, you may see this error when you run the first command: `E: Unable to locate package coda-testnet-postake-medium-curves`. You can ignore this - it just means there wasn't a prior release installed.
 
 You can run `coda -help` to check if the installation succeeded.
-
 
 ### Windows
 

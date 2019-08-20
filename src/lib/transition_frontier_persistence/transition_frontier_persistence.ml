@@ -152,13 +152,18 @@ module Make (Inputs : Intf.Main_inputs) = struct
         ~metadata:[("hash", State_hash.to_yojson (With_hash.hash transition))]
         "Failed to add breadcrumb to transition $hash"
     in
+    let previous_state_hash =
+      With_hash.data transition |> External_transition.Validated.parent_hash
+    in
     (* TMP HACK: our transition is already validated, so we "downgrade" it's validation #2486 *)
     let mostly_validated_external_transition =
       ( With_hash.map ~f:External_transition.Validated.forget_validation
           transition
-      , ( (`Time_received, Truth.True)
-        , (`Proof, Truth.True)
-        , (`Frontier_dependencies, Truth.True)
+      , ( (`Time_received, Truth.True ())
+        , (`Proof, Truth.True ())
+        , ( `Delta_transition_chain
+          , Truth.True (Non_empty_list.singleton previous_state_hash) )
+        , (`Frontier_dependencies, Truth.True ())
         , (`Staged_ledger_diff, Truth.False) ) )
     in
     let%bind child_breadcrumb =

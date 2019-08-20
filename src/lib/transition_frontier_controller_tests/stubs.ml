@@ -235,6 +235,7 @@ struct
         External_transition.create ~protocol_state
           ~protocol_state_proof:Proof.dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
+          ~delta_transition_chain_proof:(previous_state_hash, [])
       in
       (* We manually created a verified an external_transition *)
       let (`I_swear_this_is_safe_see_my_comment
@@ -253,9 +254,14 @@ struct
           ~transition:
             (External_transition.Validation.lower
                next_verified_external_transition_with_hash
-               ( (`Time_received, Truth.True)
-               , (`Proof, Truth.True)
-               , (`Frontier_dependencies, Truth.True)
+               ( (`Time_received, Truth.True ())
+               , (`Proof, Truth.True ())
+               , ( `Delta_transition_chain
+                 , Truth.True
+                     (Non_empty_list.singleton
+                        (Transition_frontier.Breadcrumb.state_hash
+                           parent_breadcrumb)) )
+               , (`Frontier_dependencies, Truth.True ())
                , (`Staged_ledger_diff, Truth.False) ))
           ~sender:None
       with
@@ -327,7 +333,9 @@ struct
       External_transition.Validated.create_unsafe
         (External_transition.create ~protocol_state:genesis_protocol_state
            ~protocol_state_proof:Proof.dummy
-           ~staged_ledger_diff:dummy_staged_ledger_diff)
+           ~staged_ledger_diff:dummy_staged_ledger_diff
+           ~delta_transition_chain_proof:
+             (Protocol_state.previous_state_hash genesis_protocol_state, []))
     in
     let root_transition_with_data =
       {With_hash.data= root_transition; hash= genesis_protocol_state_hash}
@@ -451,17 +459,47 @@ struct
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
          (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
 
-  module Sync_handler = Sync_handler.Make (struct
+  module Best_tip_prover = Best_tip_prover.Make (struct
     include Transition_frontier_inputs
     module Transition_frontier = Transition_frontier
   end)
 
-  module Root_prover = Root_prover.Make (struct
-    include Transition_frontier_inputs
-    module Transition_frontier = Transition_frontier
-  end)
+  module Sync_handler = struct
+    module T = Sync_handler.Make (struct
+      include Transition_frontier_inputs
+      module Transition_frontier = Transition_frontier
+      module Best_tip_prover = Best_tip_prover
+    end)
 
-  module Transition_chain_witness = Transition_chain_witness.Make (struct
+    let answer_query = T.answer_query
+
+    let get_staged_ledger_aux_and_pending_coinbases_at_hash =
+      T.get_staged_ledger_aux_and_pending_coinbases_at_hash
+
+    let get_transition_chain = T.get_transition_chain
+
+    module Root = T.Root
+
+    (* HACK: This makes it unit tests involving eager bootstrap faster *)
+    module Bootstrappable_best_tip = struct
+      module For_tests = T.Bootstrappable_best_tip.For_tests
+
+      let should_select_tip ~existing ~candidate ~logger:_ =
+        let length =
+          Fn.compose Coda_numbers.Length.to_int
+            Consensus.Data.Consensus_state.blockchain_length
+        in
+        length candidate - length existing
+        > (2 * max_length) + Consensus.Constants.delta
+
+      let prove = T.Bootstrappable_best_tip.For_tests.prove ~should_select_tip
+
+      let verify =
+        T.Bootstrappable_best_tip.For_tests.verify ~should_select_tip
+    end
+  end
+
+  module Transition_chain_prover = Transition_chain_prover.Make (struct
     include Transition_frontier_inputs
     module Transition_frontier = Transition_frontier
   end)
@@ -529,6 +567,7 @@ struct
           ; initial_peers: Host_and_port.t list
           ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
           ; conf_dir: string
+          ; chain_id: string
           ; logger: Logger.t
           ; trust_system: Trust_system.t
           ; max_concurrent_connections: int option }
@@ -578,57 +617,40 @@ struct
 
     let query_peer {ip_table= _; _} _peer _f _r = failwith "..."
 
-    let get_staged_ledger_aux_and_pending_coinbases_at_hash {ip_table; _}
-        inet_addr hash =
+    let handle_requests_with_inet_address ~f ~typ t inet_address input =
       Deferred.return
       @@ Result.of_option
-           ~error:
-             (Error.of_string
-                "Peer could not find the staged_ledger_aux and \
-                 pending_coinbase at hash")
-           (let open Option.Let_syntax in
-           let%bind frontier = Hashtbl.find ip_table inet_addr in
-           Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash
-             ~frontier hash)
-
-    let get_ancestry {ip_table; logger; _} inet_addr consensus_state =
-      Deferred.return
-      @@ Result.of_option
-           ~error:(Error.of_string "Peer could not produce an ancestor")
-           (let open Option.Let_syntax in
-           let%bind frontier = Hashtbl.find ip_table inet_addr in
-           Root_prover.prove ~logger ~frontier consensus_state)
-
-    let get_transition_chain_witness {ip_table; _} peer requested_state_hash =
-      return
-      @@ Result.of_option
-           ~error:
-             (Error.of_string "Peer doesn't have the requested transition")
+           ~error:(Error.createf !"Peer doesn't have the requested %s" typ)
       @@
       let open Option.Let_syntax in
-      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
-      Transition_chain_witness.prove ~frontier requested_state_hash
+      let%bind frontier = Hashtbl.find t.ip_table inet_address in
+      f ~frontier input
 
-    let get_transition_chain {ip_table; _} peer hashes =
-      return
-      @@ Result.of_option
-           ~error:
-             (Error.of_string
-                "Peer doesn't have the requested chain of transitions")
-      @@
-      let open Option.Let_syntax in
-      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
-      Option.all
-      @@ List.map hashes ~f:(fun hash ->
-             Option.merge
-               (Transition_frontier.find frontier hash)
-               (Transition_frontier.find_in_root_history frontier hash)
-               ~f:Fn.const
-             |> Option.map ~f:(fun breadcrumb ->
-                    Transition_frontier.Breadcrumb.transition_with_hash
-                      breadcrumb
-                    |> With_hash.data
-                    |> External_transition.Validated.forget_validation ) )
+    let handle_requests t peer =
+      handle_requests_with_inet_address t peer.Network_peer.Peer.host
+
+    let get_staged_ledger_aux_and_pending_coinbases_at_hash =
+      handle_requests_with_inet_address
+        ~typ:"Staged ledger aux and pending coinbase"
+        ~f:Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash
+
+    let get_ancestry ({logger; _} as t) =
+      handle_requests_with_inet_address ~typ:"ancestor proof"
+        ~f:(Sync_handler.Root.prove ~logger)
+        t
+
+    let get_bootstrappable_best_tip ({logger; _} as t) =
+      handle_requests ~typ:"bootstrappable best tip"
+        ~f:(Sync_handler.Bootstrappable_best_tip.prove ~logger)
+        t
+
+    let get_transition_chain_proof =
+      handle_requests ~typ:"transition chain witness" ~f:(fun ~frontier hash ->
+          Transition_chain_prover.prove ~frontier hash )
+
+    let get_transition_chain =
+      handle_requests ~typ:"tranition_chain"
+        ~f:Sync_handler.get_transition_chain
 
     let glue_sync_ledger {ip_table; logger; _} query_reader response_writer :
         unit =
@@ -767,11 +789,18 @@ struct
     let send_transition ~logger ~transition_writer ~peer:{peer; frontier}
         state_hash =
       let transition =
-        External_transition.Validation.lower
-          ( Transition_frontier.find_exn frontier state_hash
-          |> Transition_frontier.Breadcrumb.transition_with_hash )
-          ( (`Time_received, Truth.True)
-          , (`Proof, Truth.True)
+        let transition_with_hash =
+          Transition_frontier.find_exn frontier state_hash
+          |> Transition_frontier.Breadcrumb.transition_with_hash
+        in
+        External_transition.Validation.lower transition_with_hash
+          ( (`Time_received, Truth.True ())
+          , (`Proof, Truth.True ())
+          , ( `Delta_transition_chain
+            , Truth.True
+                (Non_empty_list.singleton
+                   ( With_hash.data transition_with_hash
+                   |> External_transition.Validated.parent_hash )) )
           , (`Frontier_dependencies, Truth.False)
           , (`Staged_ledger_diff, Truth.False) )
       in

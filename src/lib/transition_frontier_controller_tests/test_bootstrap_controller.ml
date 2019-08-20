@@ -26,7 +26,6 @@ module Bootstrap_controller = Bootstrap_controller.Make (struct
   module Network = Network
   module Time = Time
   module Sync_handler = Sync_handler
-  module Root_prover = Root_prover
 end)
 
 let%test_module "Bootstrap Controller" =
@@ -79,8 +78,13 @@ let%test_module "Bootstrap Controller" =
                 External_transition.Validation.lower
                   (Transition_frontier.Breadcrumb.transition_with_hash
                      breadcrumb)
-                  ( (`Time_received, Truth.True)
-                  , (`Proof, Truth.True)
+                  ( (`Time_received, Truth.True ())
+                  , (`Proof, Truth.True ())
+                  , ( `Delta_transition_chain
+                    , Truth.True
+                        ( Non_empty_list.singleton
+                        @@ Transition_frontier.Breadcrumb.parent_hash
+                             breadcrumb ) )
                   , (`Frontier_dependencies, Truth.False)
                   , (`Staged_ledger_diff, Truth.False) ) )
               breadcrumbs
@@ -190,7 +194,7 @@ let%test_module "Bootstrap Controller" =
                   (Staged_ledger.hash staged_ledger)
                   (Staged_ledger.hash actual_staged_ledger) ) ) )
 
-    let%test "sync with one node correctly" =
+    let%test "sync with one node after receiving a transition" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       let logger = Logger.null () in
@@ -215,8 +219,38 @@ let%test_module "Bootstrap Controller" =
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
-            Bootstrap_controller.run ~logger ~trust_system ~verifier:()
-              ~network ~frontier:syncing_frontier ~ledger_db ~transition_reader
+            Bootstrap_controller.For_tests.run ~logger ~trust_system
+              ~verifier:() ~network ~frontier:syncing_frontier ~ledger_db
+              ~transition_reader ~should_ask_best_tip:false
+          in
+          Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
+      )
+
+    let%test "sync with one node eagerly" =
+      Backtrace.elide := false ;
+      Printexc.record_backtrace true ;
+      let logger = Logger.create () in
+      let trust_system = Trust_system.null () in
+      let num_breadcrumbs = (2 * max_length) + Consensus.Constants.delta + 2 in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind syncing_frontier, peer, network =
+            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+              ~num_breadcrumbs
+              ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
+              ~target_accounts:Genesis_ledger.accounts
+          in
+          let transition_reader, _ = make_transition_pipe () in
+          let ledger_db =
+            Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
+          in
+          let%map ( new_frontier
+                  , (_ :
+                      External_transition.with_initial_validation
+                      Envelope.Incoming.t
+                      list) ) =
+            Bootstrap_controller.For_tests.run ~logger ~trust_system
+              ~verifier:() ~network ~frontier:syncing_frontier ~ledger_db
+              ~transition_reader ~should_ask_best_tip:true
           in
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
       )
@@ -266,8 +300,9 @@ let%test_module "Bootstrap Controller" =
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
-            Bootstrap_controller.run ~logger ~trust_system ~verifier:()
-              ~network ~frontier:me ~ledger_db ~transition_reader
+            Bootstrap_controller.For_tests.run ~logger ~trust_system
+              ~verifier:() ~network ~frontier:me ~ledger_db ~transition_reader
+              ~should_ask_best_tip:false
           in
           Ledger_hash.equal (root_hash new_frontier)
             (root_hash large_peer.frontier) )

@@ -6,6 +6,8 @@ module Chain_hash = struct
   include Data_hash.Make_full_size ()
 
   module Base58_check = Base58_check.Make (struct
+    let description = "Receipt chain hash"
+
     let version_byte = Base58_check.Version_bytes.receipt_chain_hash
   end)
 

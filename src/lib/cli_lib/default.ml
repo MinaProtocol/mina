@@ -6,3 +6,5 @@ let transaction_fee = Currency.Fee.of_int 5
 let snark_worker_fee = Currency.Fee.of_int 1
 
 let work_reassignment_wait = 420000
+
+let conf_dir_name = ".coda-config"

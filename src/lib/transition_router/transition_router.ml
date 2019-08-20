@@ -8,16 +8,20 @@ module type Inputs_intf = sig
 
   module Network : sig
     type t
+
+    val first_connection : t -> unit Ivar.t
   end
 
   module Transition_frontier :
     Coda_intf.Transition_frontier_intf
     with type external_transition_validated := External_transition.Validated.t
      and type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
+                ( [`Time_received] * unit Truth.true_t
+                , [`Proof] * unit Truth.true_t
+                , [`Delta_transition_chain]
+                  * Coda_base.State_hash.t Non_empty_list.t Truth.true_t
+                , [`Frontier_dependencies] * unit Truth.true_t
+                , [`Staged_ledger_diff] * unit Truth.false_t )
                 External_transition.Validation.with_transition
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -105,7 +109,8 @@ module Make (Inputs : Inputs_intf) = struct
     Transition_frontier.close frontier ;
     Broadcast_pipe.Writer.write frontier_w None |> don't_wait_for ;
     upon
-      (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
+      (let%bind () = Ivar.read (Network.first_connection network) in
+       Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
          ~ledger_db ~frontier ~transition_reader:!transition_reader_ref)
       (fun (new_frontier, collected_transitions) ->
         Strict_pipe.Writer.kill !transition_writer_ref ;

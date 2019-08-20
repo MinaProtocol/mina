@@ -8,6 +8,8 @@ module Stable = struct
       type t = Field.t * Inner_curve.Scalar.t
       [@@deriving sexp, eq, compare, hash, bin_io, version {asserted}]
 
+      let description = "Signature"
+
       let version_byte = Base58_check.Version_bytes.signature
 
       (* TODO : version Field in snarky *)
