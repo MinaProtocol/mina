@@ -101,7 +101,7 @@ let get_keys_with_details t =
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
       , account.Account.Poly.balance |> Currency.Balance.to_int
-      , account.Account.Poly.nonce |> Account.Nonce.to_string ) )
+      , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
 
 let get_inferred_nonce_from_transaction_pool_and_ledger t
     (addr : Public_key.Compressed.t) =

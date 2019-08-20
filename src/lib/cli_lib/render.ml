@@ -40,12 +40,12 @@ end
 
 module Public_key_with_details = struct
   module Pretty_account = struct
-    type t = string * int * string
+    type t = string * int * int
 
     let to_yojson (public_key, balance, nonce) =
       `Assoc
         [ ( public_key
-          , `Assoc [("balance", `Int balance); ("nonce", `String nonce)] ) ]
+          , `Assoc [("balance", `Int balance); ("nonce", `Int nonce)] ) ]
   end
 
   type t = Pretty_account.t list [@@deriving to_yojson]
@@ -56,6 +56,6 @@ module Public_key_with_details = struct
 
   let to_text account =
     List.map account ~f:(fun (public_key, balance, nonce) ->
-        sprintf !"%s, %d, %s" public_key balance nonce )
+        sprintf !"%s, %d, %d" public_key balance nonce )
     |> String.concat ~sep:"\n"
 end

@@ -469,7 +469,7 @@ end
 module Get_public_keys_with_details = struct
   type query = unit [@@deriving bin_io]
 
-  type response = (string * int * string) list Or_error.t
+  type response = (string * int * int) list Or_error.t
   [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
