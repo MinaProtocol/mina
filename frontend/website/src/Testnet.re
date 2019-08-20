@@ -39,8 +39,8 @@ module Styles = {
         ".leaderboard-row",
         [
           display(`grid),
-          gridColumnGap(rem(1.)),
-          gridTemplateColumns([rem(2.5), `auto, rem(6.)]),
+          gridColumnGap(rem(1.5)),
+          gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(2.5)]),
         ],
       ),
       selector("div span:nth-child(odd)", [justifySelf(`flexEnd)]),
@@ -71,8 +71,8 @@ module Styles = {
       style([
         display(`grid),
         color(Style.Colors.midnight),
-        gridColumnGap(rem(1.)),
-        gridTemplateColumns([rem(2.5), `auto, rem(6.)]),
+        gridColumnGap(rem(1.5)),
+        gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(2.5)]),
       ]),
     ]);
 
@@ -91,6 +91,14 @@ module Styles = {
       style([
         fontWeight(`semiBold),
         marginTop(rem(0.75)),
+      ]),
+    ]);
+
+  let sidebarHeader = 
+    merge([
+      Style.H4.wide,
+      style([
+        textAlign(`left),
       ]),
     ]);
 };
@@ -117,6 +125,7 @@ let make = _children => {
           <div className=Styles.headerRow>
             <span> {ReasonReact.string("Rank")} </span>
             <span> {ReasonReact.string("Username")} </span>
+            <span id="leaderboard-current-week"></span>
             <span> {ReasonReact.string("Total")} </span>
           </div>
           <hr />
@@ -125,32 +134,36 @@ let make = _children => {
           </div>
         </div>
         <div className=Styles.copy>
+          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Testnet Points")} </h4> </p>
           <p>
             {ReasonReact.string(
                "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
              )}
           </p>
-          <p> <h4> {ReasonReact.string("Challenge #1")} </h4> </p>
+          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #1")} </h4> </p>
           <p>
             {ReasonReact.string(
-               "Connect to Testnet - 1000 pts for anyone who sends a transaction to the echo service BONUS: An additional 2000 pts to the first person to complete the challenge, and an additional 1000 points to the second person to complete the challenge.",
+               "Connect to Testnet - 1000 pts for anyone who sends a transaction to the echo service"
              )}
           </p>
-          <p> <strong> {ReasonReact.string("Challenge #2")} </strong> </p>
+          <p>
+            {ReasonReact.string(
+              " BONUS: An additional 2000 pts to the first person to complete the challenge, and an additional 1000 points to the second person to complete the challenge."
+            )}
+          </p>
+          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #2")} </h4> </p>
           <p>
             {ReasonReact.string(
                "Community Helper - 300 pts are awarded to anyone who helps another member of the community. This could include answering a question, helping them navigate the docs, and generally giving support and encouragement for those trying hard to get involved. We can only award points for what we see, so make sure you're doing it in one of the official testnet channels so everyone can learn!",
              )}
           </p>
-          <p> <strong> {ReasonReact.string("Challenge #3")} </strong> </p>
+          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #3")} </h4> </p>
           <p>
             {ReasonReact.string(
                "Join Discord - 100 pts awarded for introducing yourself in the #testnet-general channel. Name, location and what you're excited about are all good things to share in order to get the points!",
              )}
           </p>
-          <p>
-            <strong> {ReasonReact.string("Challenge #4 (on-going)")} </strong>
-          </p>
+          <p> <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #4 (on-going)")} </h4> </p>
           <p>
             {ReasonReact.string(
                "Community MVP - Each week, we will recognize the winners of the previous week based on the point values below. We may give out all the awards in a week, or none, or several at each level. The more active the community is, the more points* we can award in this category.",
@@ -169,11 +182,9 @@ let make = _children => {
              )}
           </p>
           <p>
-            <strong>
-              {ReasonReact.string("Challenge #5 (on-going):")}
-            </strong>
-            {ReasonReact.string(" Major and Minor Bug Bounties")}
+            <h4 className=Styles.sidebarHeader> {ReasonReact.string("Challenge #5 (on-going):")} </h4>
           </p>
+          <p> {ReasonReact.string(" Major and Minor Bug Bounties")} </p>
           <p>
             <strong> {ReasonReact.string("Major - 2000 pts")} </strong>
             {ReasonReact.string(

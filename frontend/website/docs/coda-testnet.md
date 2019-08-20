@@ -10,7 +10,7 @@ The goal of Testnet Points[\*](#disclaimer) is to recognize Coda community membe
 
 The current challenges are:
 
-**Challenge #1: Connect to Testnet** - 1000 pts for anyone who sends a transaction to the [echo service](/docs/my-first-transaction/#make-a-payment).
+**Challenge #1 (on-going): Connect to Testnet** - 1000 pts for anyone who sends a transaction to the [echo service](/docs/my-first-transaction/#make-a-payment).
 
 BONUS: An additional 2000 pts to the first person to complete the challenge, and an additional 1000 points to the second person to complete the challenge.
   
@@ -44,23 +44,23 @@ Points will only be awarded for new issues [reported on Github](https://github.c
 
 Points will only be awarded for pull requests accepted [on Github](https://github.com/codaprotocol/coda/pulls).
 
-**Challenge #8: 'Bonanza'** - Send as many transactions as you can! We’ll link the public key to a discord account by seeing what you use to ask the faucet for funds (we’ll only use the first public key that you requested tokens with).
+**Challenge #8 (expired): 'Bonanza'** - Send as many transactions as you can! We’ll link the public key to a discord account by seeing what you use to ask the faucet for funds (we’ll only use the first public key that you requested tokens with).
 
 1000 pts - sent at least 20 transactions
 
 BONUS: 1st place +3000, 2nd place +2000, 3rd place +1000 pts respectively for most transactions sent over the week.
 
-**Challenge #9: ‘Block Party’**:
+**Challenge #9 (expired): ‘Block Party’**:
 
 This is one of our biggest points challenge yet, with up to 4000 points\* on the line for the winner. In order to complete this challenge, you'll need to stake coda to be an active block producer. Block producers who generate more than 14 blocks this week will successfully complete this challenge - 1000 pts*. 
 
 BONUS for those who produce the most blocks: 1st place - +3000 pts\*, 2nd place - +2000 pts\*, 3rd place - +1000 pts\*.
 
-**Challenge #10: ‘Bookworm’**
+**Challenge #10 (on-going): ‘Bookworm’**
 
 Reach Trust Level 1 'Basic' on Coda Protocol's forum. We believe reading is the most fundamental and healthy action in any community. If you are willing to spend a little time reading, you will quickly be promoted to the first trust level. Sign up on our [forum](https://forums.codaprotocol.com/) , enter at least 5 topics, read at least 30 posts, and spend a total of 10 minutes reading posts to obtain Trust Level 1 'Basic' and 100 Testnet Points*.
 
-**Challenge #11: ‘Don't Break the Chain!’**
+**Challenge #11 (on-going): ‘Don't Break the Chain!’**
 
 Earn extra bonus points for every uninterrupted weeks that you participated in the testnet and earned points*.
 
