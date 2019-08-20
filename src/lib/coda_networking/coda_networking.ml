@@ -775,14 +775,22 @@ module Make (Inputs : Inputs_intf) = struct
                    ( External_transition.protocol_state state
                    |> Protocol_state.blockchain_state
                    |> Blockchain_state.timestamp |> Block_time.to_time )) ;
+              if config.gossip_net_params.log_gossip_heard.new_state then
+                Logger.debug config.logger ~module_:__MODULE__
+                  ~location:__LOC__ "Received a block $block from $sender"
+                  ~metadata:
+                    [ ("block", External_transition.to_yojson state)
+                    ; ( "sender"
+                      , Envelope.(Sender.to_yojson (Incoming.sender envelope))
+                      ) ] ;
               `Fst
                 ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
                 , Block_time.now config.time_controller )
           | Snark_pool_diff diff ->
-              if config.gossip_net_params.log_received_snark_pool_diff then
+              if config.gossip_net_params.log_gossip_heard.snark_pool_diff then
                 Logger.debug config.logger ~module_:__MODULE__
                   ~location:__LOC__
-                  "Received Snark-pool-diff $work from $sender"
+                  "Received Snark-pool diff $work from $sender"
                   ~metadata:
                     [ ("work", Snark_pool_diff.compact_json diff)
                     ; ( "sender"
@@ -792,6 +800,17 @@ module Make (Inputs : Inputs_intf) = struct
                 Counter.inc_one Snark_work.snark_work_received_gossip) ;
               `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff))
           | Transaction_pool_diff diff ->
+              if
+                config.gossip_net_params.log_gossip_heard.transaction_pool_diff
+              then
+                Logger.debug config.logger ~module_:__MODULE__
+                  ~location:__LOC__
+                  "Received transaction-pool diff $txns from $sender"
+                  ~metadata:
+                    [ ("txns", Transaction_pool_diff.to_yojson diff)
+                    ; ( "sender"
+                      , Envelope.(Sender.to_yojson (Incoming.sender envelope))
+                      ) ] ;
               `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff)) )
     in
     { gossip_net
