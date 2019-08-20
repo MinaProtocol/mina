@@ -170,6 +170,11 @@ module Snark_worker = struct
           run_process ~logger:t.config.logger
             t.config.net_config.gossip_net_params.addrs_and_ports.client_port
         in
+        Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "snark_worker_pid"
+              , `Int (Pid.to_int (Process.pid snark_worker_process)) ) ]
+          "Started snark worker process with pid: $snark_worker_pid" ;
         Ivar.fill process_ivar snark_worker_process
     | None ->
         Logger.info t.config.logger
@@ -181,9 +186,12 @@ module Snark_worker = struct
   let stop t =
     match t.processes.snark_worker with
     | Some {public_key= _; process} ->
-        Logger.info t.config.logger "Killing snark worker" ~module_:__MODULE__
-          ~location:__LOC__ ;
         let%map process = Ivar.read process in
+        Logger.info t.config.logger
+          "Killing snark worker process with pid: $snark_worker_pid"
+          ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [("snark_worker_pid", `Int (Pid.to_int (Process.pid process)))] ;
         Signal.send_exn Signal.term (`Pid (Process.pid process))
     | None ->
         Logger.warn t.config.logger
