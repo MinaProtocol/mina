@@ -11,6 +11,8 @@ let samples = ref (Array.make min_buf_size empty_ephe)
 
 let n_samples = ref 0
 
+let default_sampling_rate = 1E-4
+
 (* Data structure managment functions. They are not reentrant, so they should
    not be called when the sampling is active. *)
 
@@ -122,7 +124,7 @@ let dump () =
   in
   sort_sampleTree (aux (STC ([], 0, Hashtbl.create 3)) 0)
 
-let start sampling_rate callstack_size min_samples_print =
+let start ~sampling_rate ~callstack_size ~min_samples_print =
   Memprof.start {sampling_rate; callstack_size; callback} ;
   Sys.set_signal Sys.sigusr1
     (Sys.Signal_handle
