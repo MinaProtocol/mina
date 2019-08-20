@@ -37,9 +37,13 @@ let query query_obj port =
       exit 17
 
 module Decoders = struct
+  let optional ~f = function `Null -> None | json -> Some (f json)
+
   let public_key json =
     Yojson.Basic.Util.to_string json
     |> Public_key.Compressed.of_base58_check_exn
+
+  let optional_public_key = Option.map ~f:public_key
 
   let uint64 json =
     Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
@@ -56,4 +60,14 @@ query getWallet {
     }
   }
 }
+|}]
+
+module Set_snark_worker =
+[%graphql
+{|
+mutation ($wallet: PublicKey) {
+  setSnarkWorker (input : {wallet: $wallet}) {
+      lastSnarkWorker @bsDecoder(fn: "Decoders.optional_public_key")
+    }
+  }
 |}]
