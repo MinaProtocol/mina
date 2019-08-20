@@ -278,14 +278,15 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
        let diff = Time.diff (Time.now ()) !last_time in
        let diff = Time.Span.to_sec diff in
        if
-         not
-           ( diff
-           < Time.Span.to_sec acceptable_delay
-             +. epsilon
-             +. Int.to_float
-                  ( (Consensus.Constants.c - 1)
-                  * Consensus.Constants.block_window_duration_ms )
-                /. 1000. )
+         Array.existsi testnet.status ~f:(fun i _ -> Api.synced testnet i)
+         && not
+              ( diff
+              < Time.Span.to_sec acceptable_delay
+                +. epsilon
+                +. Int.to_float
+                     ( (Consensus.Constants.c - 1)
+                     * Consensus.Constants.block_window_duration_ms )
+                   /. 1000. )
        then (
          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
            "No recent blocks" ;
@@ -396,6 +397,7 @@ let events workers start_reader =
     (Linear_pipe.iter start_reader ~f:(fun (i, config, started, synced) ->
          don't_wait_for
            (let%bind worker = Coda_process.spawn_exn config in
+            let%bind () = Coda_process.start_exn worker in
             workers.(i) <- worker ;
             started () ;
             don't_wait_for
