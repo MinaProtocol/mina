@@ -1,4 +1,4 @@
-include Coda_numbers.Nat.S
+include Coda_numbers.Nat.S_unchecked
 
 val ( + ) : t -> int -> t
 
@@ -13,11 +13,9 @@ val slot : t -> Slot.t
 val to_epoch_and_slot : t -> Epoch.t * Slot.t
 
 module Checked : sig
-  val create : epoch:Epoch.Unpacked.var -> slot:Slot.Unpacked.var -> Packed.var
+  include Coda_numbers.Nat.S_checked with type unchecked := t
 
-  val to_integer :
-    Packed.var -> Snark_params.Tick.field Snarky_taylor.Integer.t
+  open Snark_params.Tick
 
-  val to_epoch_and_slot :
-    Unpacked.var -> Epoch.Unpacked.var * Slot.Unpacked.var
+  val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
 end
