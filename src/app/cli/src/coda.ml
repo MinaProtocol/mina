@@ -155,6 +155,16 @@ let daemon logger =
          ~doc:
            "true|false Log snark-pool diff received from peers (default:false)"
          (optional bool)
+     and log_received_blocks =
+       flag "log-received-blocks"
+         ~doc:"true|false Log blocks received from peers (default:false)"
+         (optional bool)
+     and log_transaction_pool_diff =
+       flag "log-txn-pool-gossip"
+         ~doc:
+           "true|false Log transaction-pool diff received from peers \
+            (default:false)"
+         (optional bool)
      and no_bans =
        let module Expiration = struct
          [%%expires_after "20190907"]
@@ -388,6 +398,20 @@ let daemon logger =
            or_from_config YJ.Util.to_bool_option "log-snark-work-gossip"
              ~default:false log_received_snark_pool_diff
          in
+         let log_received_blocks =
+           or_from_config YJ.Util.to_bool_option "log-received-blocks"
+             ~default:false log_received_blocks
+         in
+         let log_transaction_pool_diff =
+           or_from_config YJ.Util.to_bool_option "log-txn-pool-gossip"
+             ~default:false log_transaction_pool_diff
+         in
+         let log_gossip_heard =
+           { Coda_networking.Gossip_net.Config.snark_pool_diff=
+               log_received_snark_pool_diff
+           ; transaction_pool_diff= log_transaction_pool_diff
+           ; new_state= log_received_blocks }
+         in
          let initial_peers_raw =
            List.concat
              [ initial_peers_raw
@@ -560,7 +584,7 @@ let daemon logger =
                ; addrs_and_ports
                ; trust_system
                ; max_concurrent_connections
-               ; log_received_snark_pool_diff } }
+               ; log_gossip_heard } }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
