@@ -105,6 +105,8 @@ module type Transaction_snark_work_generalized_intf = sig
           include Binable.S with type t := t
 
           include Hashable.S_binable with type t := t
+
+          val compact_json : t -> Yojson.Safe.json
         end
       end
       with type V1.t = t

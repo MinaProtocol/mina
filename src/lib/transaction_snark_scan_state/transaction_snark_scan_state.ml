@@ -127,7 +127,8 @@ module Make
       let hash_string h = Sexp.to_string (Frozen_ledger_hash.sexp_of_t h) in
       let statement_to_yojson (s : Transaction_snark.Statement.t) =
         `Assoc
-          [ ("Source", `String (hash_string s.source))
+          [ ("job_id", `Int (Transaction_snark.Statement.hash s))
+          ; ("Source", `String (hash_string s.source))
           ; ("Target", `String (hash_string s.target))
           ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
           ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase) ]
