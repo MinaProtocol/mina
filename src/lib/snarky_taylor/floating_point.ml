@@ -1,6 +1,7 @@
 open Core
 open Snarky
 open Snark
+open Snarky_integer
 open Util
 module B = Bigint
 

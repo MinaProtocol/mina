@@ -1,5 +1,6 @@
 open Snarky
 open Snark
+open Snarky_integer
 
 type 'f t
 
