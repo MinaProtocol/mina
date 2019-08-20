@@ -9,6 +9,8 @@ module Styles = {
 
   let header =
     style([
+      display(`flex),
+      flexDirection(`column),
       width(`percent(100.)),
       color(Style.Colors.slate),
       textAlign(`center),
@@ -29,7 +31,7 @@ module Styles = {
       width(`percent(100.)),
       maxWidth(rem(41.)),
       borderRadius(px(3)),
-      padding(rem(1.)),
+      padding2(~v=`rem(1.), ~h=`zero),
       Style.Typeface.pragmataPro,
       lineHeight(rem(1.5)),
       color(Style.Colors.midnight),
@@ -59,6 +61,8 @@ module Styles = {
           color(Style.Colors.slateAlpha(0.7)),
         ],
       ),
+      selector("div", [padding2(~v=`zero, ~h=`rem(1.))]),
+      selector("div:nth-child(even)", [backgroundColor(`rgba(71, 130, 130, 0.1))]),
     ]);
 
   let headerRow =
@@ -79,6 +83,16 @@ module Styles = {
       media(Style.MediaQuery.somewhatLarge, [marginLeft(rem(5.))]),
       ...Style.Body.basicStyles,
     ]);
+
+  let leaderboardLink =
+    merge([
+      Style.Link.basic,
+      Style.H3.basic,
+      style([
+        fontWeight(`semiBold),
+        marginTop(rem(0.75)),
+      ]),
+    ]);
 };
 
 let component = ReasonReact.statelessComponent("Testnet");
@@ -90,13 +104,20 @@ let make = _children => {
         <h1 className=Style.H1.hero>
           {ReasonReact.string("Testnet Leaderboard")}
         </h1>
+        <a
+          href="https://docs.google.com/spreadsheets/d/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/edit#gid=0"
+          target="_blank"
+          className=Styles.leaderboardLink
+        >
+          {ReasonReact.string({j|View Full Leaderboard\u00A0→|j})}
+        </a>
       </div>
       <div className=Styles.content>
         <div id="testnet-leaderboard" className=Styles.leaderboard>
           <div className=Styles.headerRow>
             <span> {ReasonReact.string("Rank")} </span>
             <span> {ReasonReact.string("Username")} </span>
-            <span> {ReasonReact.string("Total Points")} </span>
+            <span> {ReasonReact.string("Total")} </span>
           </div>
           <hr />
           <div id="leaderboard-loading">
@@ -109,7 +130,7 @@ let make = _children => {
                "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
              )}
           </p>
-          <p> <strong> {ReasonReact.string("Challenge #1")} </strong> </p>
+          <p> <h4> {ReasonReact.string("Challenge #1")} </h4> </p>
           <p>
             {ReasonReact.string(
                "Connect to Testnet - 1000 pts for anyone who sends a transaction to the echo service BONUS: An additional 2000 pts to the first person to complete the challenge, and an additional 1000 points to the second person to complete the challenge.",

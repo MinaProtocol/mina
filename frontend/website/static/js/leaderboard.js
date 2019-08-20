@@ -20,7 +20,8 @@ function renderParticipant(participant, rank) {
 function start() {
   gapi.client
     .init({
-      apiKey: "AIzaSyDIFwMr7SPGCLl_o6e4UZKi1q9l8snkUZs"
+      // apiKey: "AIzaSyDIFwMr7SPGCLl_o6e4UZKi1q9l8snkUZs"
+      apiKey: "AIzaSyB_AJlZmkWNwDHaznJStaHINij7pu0nNA8"
     })
     .then(function() {
       return gapi.client.request({
