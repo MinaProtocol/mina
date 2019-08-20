@@ -1,3 +1,4 @@
+open Async_kernel
 open Coda_base
 open Pipe_lib
 
@@ -7,7 +8,9 @@ module type Inputs_intf = sig
   module Network : sig
     type t
 
-    val first_connection : t -> unit Async.Ivar.t
+    val high_connectivity : t -> unit Ivar.t
+
+    val peers : t -> Network_peer.Peer.t list
   end
 
   module Transition_frontier :
