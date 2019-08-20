@@ -136,7 +136,7 @@ type key = Stable.Latest.key [@@deriving sexp, eq, hash, compare, yojson]
 type var =
   ( Public_key.Compressed.var
   , Balance.var
-  , Nonce.Unpacked.var
+  , Nonce.Checked.t
   , Receipt.Chain_hash.var
   , State_hash.var )
   Poly.t
@@ -165,7 +165,7 @@ let typ : (var, value) Typ.t =
     let open Data_spec in
     [ Public_key.Compressed.typ
     ; Balance.typ
-    ; Nonce.Unpacked.typ
+    ; Nonce.typ
     ; Receipt.Chain_hash.typ
     ; Public_key.Compressed.typ
     ; State_hash.typ ]
@@ -193,7 +193,7 @@ let var_of_t
       value) =
   { Poly.public_key= Public_key.Compressed.var_of_t public_key
   ; balance= Balance.var_of_t balance
-  ; nonce= Nonce.Unpacked.var_of_value nonce
+  ; nonce= Nonce.Checked.constant nonce
   ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash
   ; delegate= Public_key.Compressed.var_of_t delegate
   ; voting_for= State_hash.var_of_t voting_for }
@@ -204,9 +204,9 @@ let var_to_triples
   let%map public_key = Public_key.Compressed.var_to_triples public_key
   and voting_for = State_hash.var_to_triples voting_for
   and receipt_chain_hash = Receipt.Chain_hash.var_to_triples receipt_chain_hash
-  and delegate = Public_key.Compressed.var_to_triples delegate in
+  and delegate = Public_key.Compressed.var_to_triples delegate
+  and nonce = Nonce.Checked.to_triples nonce in
   let balance = Balance.var_to_triples balance in
-  let nonce = Nonce.Unpacked.var_to_triples nonce in
   public_key @ balance @ nonce @ receipt_chain_hash @ delegate @ voting_for
 
 let fold

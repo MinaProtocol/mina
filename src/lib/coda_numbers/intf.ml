@@ -4,7 +4,7 @@ open Fold_lib
 open Tuple_lib
 open Unsigned
 
-module type S = sig
+module type S_unchecked = sig
   type t [@@deriving sexp, compare, hash, yojson]
 
   include Comparable.S with type t := t
@@ -45,19 +45,66 @@ module type S = sig
 
   module Bits : Bits_intf.S with type t := t
 
-  include
-    Snark_params.Tick.Snarkable.Bits.Small
-    with type Unpacked.value = t
-     and type Packed.value = t
+  val fold : t -> bool Triple.t Fold.t
+end
+
+module type S_checked = sig
+  type unchecked
 
   open Snark_params.Tick
+  open Bitstring_lib
 
-  val is_succ_var :
-    pred:Unpacked.var -> succ:Unpacked.var -> (Boolean.var, _) Checked.t
+  type var
 
-  val min_var : Unpacked.var -> Unpacked.var -> (Unpacked.var, _) Checked.t
+  val constant : unchecked -> var
 
-  val fold : t -> bool Triple.t Fold.t
+  type t = var
+
+  val zero : t
+
+  val succ : t -> (t, _) Checked.t
+
+  val is_succ : pred:t -> succ:t -> (Boolean.var, _) Checked.t
+
+  val min : t -> t -> (t, _) Checked.t
+
+  val of_bits : Boolean.var Bitstring.Lsb_first.t -> t
+
+  val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
+
+  val to_triples : t -> (Boolean.var Triple.t list, _) Checked.t
+
+  val to_integer : t -> field Snarky_integer.Integer.t
+
+  val succ_if : t -> Boolean.var -> (t, _) Checked.t
+
+  val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
+
+  val typ : (t, unchecked) Snark_params.Tick.Typ.t
+
+  val equal : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( = ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( < ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( > ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( <= ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
+
+  module Unsafe : sig
+    val of_integer : field Snarky_integer.Integer.t -> t
+  end
+end
+
+module type S = sig
+  include S_unchecked
+
+  module Checked : S_checked with type unchecked := t
+
+  val typ : (Checked.t, t) Snark_params.Tick.Typ.t
 end
 
 module type UInt32 = sig
@@ -86,8 +133,4 @@ module type F = functor
       val random : unit -> t
     end)
   (Bits : Bits_intf.S with type t := N.t)
-  (Bits_snarkable :
-     Snark_params.Tick.Snarkable.Bits.Small
-     with type Packed.value = N.t
-      and type Unpacked.value = N.t)
   -> S with type t := N.t and module Bits := Bits

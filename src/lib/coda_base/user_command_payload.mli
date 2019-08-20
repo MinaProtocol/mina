@@ -55,7 +55,7 @@ module Common : sig
 
   type var =
     ( Currency.Fee.var
-    , Coda_numbers.Account_nonce.Unpacked.var
+    , Coda_numbers.Account_nonce.Checked.t
     , User_command_memo.Checked.t )
     Poly.t
 
@@ -64,7 +64,7 @@ module Common : sig
   val fold : t -> bool Triple.t Fold.t
 
   module Checked : sig
-    val to_triples : var -> Boolean.var Triple.t list
+    val to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
     val constant : t -> var
   end
