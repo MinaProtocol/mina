@@ -157,7 +157,7 @@ let daemon logger =
          (optional bool)
      and log_received_blocks =
        flag "log-received-blocks"
-         ~doc:"true|false Log blocks received from peers (default:true)"
+         ~doc:"true|false Log blocks received from peers (default:false)"
          (optional bool)
      and log_transaction_pool_diff =
        flag "log-txn-pool-gossip"
@@ -402,7 +402,7 @@ let daemon logger =
          in
          let log_received_blocks =
            or_from_config YJ.Util.to_bool_option "log-received-blocks"
-             ~default:true log_received_blocks
+             ~default:false log_received_blocks
          in
          let log_transaction_pool_diff =
            or_from_config YJ.Util.to_bool_option "log-txn-pool-gossip"
