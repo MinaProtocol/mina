@@ -200,7 +200,7 @@ let make = _children => {
             {ReasonReact.string(
               "Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the "
             )}
-            <a className=Style.Link.basic href="https://forums.codaprotocol.com/t/community-art-contest-leonardo-da-coda/109" target="_blank">{ReasonReact.string("forums")}</a>
+            <a className=Style.Link.basic href="https://forums.codaprotocol.com/t/community-art-contest-gifs/109" target="_blank">{ReasonReact.string("forums")}</a>
             {ReasonReact.string(
               ". You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by 'hearting' your post, so do not forget to 'heart' your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place."
             )}

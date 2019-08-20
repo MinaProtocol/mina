@@ -84,7 +84,7 @@ Every feasible feature suggested will get 500 pts*. Top 5 features will win a bo
 
 **Challenge #14: "Leonardo da Coda"**
 
-Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the [forum](https://forums.codaprotocol.com/t/community-art-contest-leonardo-da-coda/109?u=codacommunity). You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by “hearting” your post, so do not forget to "heart" your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.
+Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the [forum](https://forums.codaprotocol.com/t/community-art-contest-gifs/109). You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by “hearting” your post, so do not forget to "heart" your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.
 
 ### Disclaimer
 
