@@ -25,7 +25,7 @@ let main n waiting_time () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger ~node:1
       ~duration:(Time.Span.of_ms (2 * epoch_duration |> Float.of_int))
   in
-  let%bind () = after (Time.Span.of_min (waiting_time |> Float.of_int)) in
+  let%bind () = after (Time.Span.of_sec (waiting_time |> Float.of_int)) in
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
@@ -37,6 +37,6 @@ let command =
      and waiting_time =
        flag "waiting-time"
          ~doc:"the waiting time after the nodes coming back alive"
-         (optional_with_default 2 int)
+         (optional_with_default 30 int)
      in
      main num_proposers waiting_time)
