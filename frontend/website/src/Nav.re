@@ -156,15 +156,14 @@ module DropdownMenu = {
   };
 };
 
-// TODO Fix styles
+// TODO Please fix these styles so we don't need to mapi...
 module NavWrapper = {
   [@react.component]
   let make = (~keepAnnouncementBar, ~children) => {
     let items =
       children
-      |> Array.mapi((idx, elem)
-           /* if (idx == Array.length(children) - 1) { */
-           =>
+      |> Array.mapi((idx, elem) =>
+           if (idx == Array.length(children) - 1) {
              <li
                key={string_of_int(idx)}
                className={Css.style([
@@ -176,47 +175,47 @@ module NavWrapper = {
                  ),
                ])}>
                elem
-             </li>
-           )
-      /* } else { */
-      /*   <> */
-      /*     <li */
-      /*       key={string_of_int(idx) ++ "-li"} */
-      /*       className={Css.style( */
-      /*         Style.paddingX(`rem(0.75)) */
-      /*         @ Style.paddingY(`rem(0.5)) */
-      /*         @ [ */
-      /*           Css.listStyle(`none, `inside, `none), */
-      /*           Css.media( */
-      /*             NavStyle.MediaQuery.menuMax, */
-      /*             [Css.width(`percent(100.)), Css.padding(`zero)], */
-      /*           ), */
-      /*         ], */
-      /*       )}> */
-      /*       elem */
-      /*     </li> */
-      /*     <hr */
-      /*       key={string_of_int(idx) ++ "-hr"} */
-      /*       ariaHidden=true */
-      /*       className=Css.( */
-      /*         style([ */
-      /*           borderTop( */
-      /*             `rem(0.0625), */
-      /*             `solid, */
-      /*             Style.Colors.hyperlinkAlpha(0.15), */
-      /*           ), */
-      /*           marginTop(`zero), */
-      /*           marginBottom(`zero), */
-      /*           borderBottomWidth(`zero), */
-      /*           borderLeftWidth(`zero), */
-      /*           borderRightWidth(`zero), */
-      /*           width(`percent(85.)), */
-      /*           media(NavStyle.MediaQuery.menu, [display(`none)]), */
-      /*         ]) */
-      /*       ) */
-      /*     /> */
-      /*   </>; */
-      /* } */
+             </li>;
+           } else {
+             <>
+               <li
+                 key={string_of_int(idx) ++ "-li"}
+                 className={Css.style(
+                   Style.paddingX(`rem(0.75))
+                   @ Style.paddingY(`rem(0.5))
+                   @ [
+                     Css.listStyle(`none, `inside, `none),
+                     Css.media(
+                       NavStyle.MediaQuery.menuMax,
+                       [Css.width(`percent(100.)), Css.padding(`zero)],
+                     ),
+                   ],
+                 )}>
+                 elem
+               </li>
+               <hr
+                 key={string_of_int(idx) ++ "-hr"}
+                 ariaHidden=true
+                 className=Css.(
+                   style([
+                     borderTop(
+                       `rem(0.0625),
+                       `solid,
+                       Style.Colors.hyperlinkAlpha(0.15),
+                     ),
+                     marginTop(`zero),
+                     marginBottom(`zero),
+                     borderBottomWidth(`zero),
+                     borderLeftWidth(`zero),
+                     borderRightWidth(`zero),
+                     width(`percent(85.)),
+                     media(NavStyle.MediaQuery.menu, [display(`none)]),
+                   ])
+                 )
+               />
+             </>;
+           }
+         )
       |> React.array;
 
     <nav
