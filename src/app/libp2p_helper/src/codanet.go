@@ -146,11 +146,13 @@ func MakeHelper(ctx context.Context, listenOn []multiaddr.Multiaddr, statedir st
 	foundPeer := func(info peerstore.PeerInfo, source string) {
 		if info.ID != "" {
 			ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-			defer cancel()
+            defer cancel()
+            // TODO: do a GetCodaInfo request to learn communication port?
 			if err := host.Connect(ctx, info); err != nil {
 				log.Printf("Warn: couldn't connect to %s peer %v (different chain?): %v", source, info.Loggable(), err)
 			} else {
-				log.Printf("Found a %s peer: %s", source, info.Loggable())
+                log.Printf("Found a %s peer: %s", source, info.Loggable())
+                // TODO: additionally have a callback here
 				host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
 			}
 		}

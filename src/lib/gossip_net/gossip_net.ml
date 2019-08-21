@@ -552,7 +552,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               failwithf "Unhandled Membership.connect exception: %s"
                 (Exn.to_string e) ()
         in
-        let%bind membership =
+        let%bind haskell_membership =
           if not config.disable_haskell then
           (match%map
             Monitor.try_with
@@ -566,6 +566,25 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           with
           | Ok (Ok membership) ->
               Some membership
+          | Ok (Error e) ->
+              fail (Error.to_string_hum e)
+          | Error e ->
+              fail (Exn.to_string e)) else Deferred.return None
+        in
+        let%bind libp2p_membership =
+          if config.enable_libp2p then
+          (match%bind
+            Monitor.try_with
+              (fun () ->
+                trace_task "coda_net2" (fun () ->
+                  Coda_net2.create ~logger:config.logger ~conf_dir:(config.conf_dir ^/ "coda_net2")))
+          with
+          | Ok (Ok net2) ->
+            (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
+            let%bind me = Coda_net2.Keypair.random net2 in
+            (match%map Coda_net2.configure net2 ~me ~maddrs:[Coda_net2.Multiaddr.of_string (sprintf "/ip4/%s/tcp/%d" (config.addrs_and_ports.bind_ip |> Unix.Inet_addr.to_string) config.addrs_and_ports.libp2p_port)] ~network_id:"libp2p phase2 test network" with
+            |  Ok () -> Some net2
+            | Error e -> fail (Error.to_string_hum e))
           | Ok (Error e) ->
               fail (Error.to_string_hum e)
           | Error e ->
@@ -592,8 +611,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; ban_notification_reader
           ; ban_notification_writer
           ; chain_id= config.chain_id
-          ; haskell_membership= membership
-          ; libp2p_membership= None
+          ; haskell_membership
+          ; libp2p_membership
           ; connections= Hashtbl.create (module Unix.Inet_addr)
           ; first_connect }
         in

@@ -177,7 +177,7 @@ let daemon logger =
        flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
      and libp2p_port =
        flag "libp2p-port" (optional int)
-         ~doc:"Port to use for libp2p (default: 8304)"
+         ~doc:"Port to use for libp2p (default: 28675)"
      and disable_haskell =
        flag "disable-old-discovery" no_arg
          ~doc:"Disable the old discovery mechanism"
@@ -395,9 +395,12 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "rest-port"
              ~default:Port.default_rest rest_server_port
          in
+         ignore libp2p_port ; (* FIXME HACK: make this configurable when we can pass the port in the CLI *)
          let libp2p_port =
+          (*
            or_from_config YJ.Util.to_int_option "libp2p-port"
-             ~default:Port.default_libp2p libp2p_port
+             ~default:Port.default_libp2p libp2p_port *)
+            Port.default_libp2p
          in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =

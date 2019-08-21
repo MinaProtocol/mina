@@ -137,7 +137,8 @@ val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
   *
   * Listens on each address in [maddrs].
   *
-  * This will only connect to peers that share the same [network_id].
+  * This will only connect to peers that share the same [network_id]. [on_new_peer], if present,
+  * will be called for each peer we discover.
   *
   * This fails if initializing libp2p fails for any reason.
 *)
@@ -146,6 +147,7 @@ val configure :
   -> me:Keypair.t
   -> maddrs:Multiaddr.t list
   -> network_id:string
+  -> ?on_new_peer:(Network_peer.Peer.t -> unit)
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.
