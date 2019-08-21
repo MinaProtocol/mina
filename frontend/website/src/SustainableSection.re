@@ -133,10 +133,6 @@ let make = () => {
               "Help compress Coda by participating in snarking. Just like mining, with snarking anyone can contribute their compute to the network to help compress the blockchain.",
             ),
           |]
-          cta={
-            SideText.Cta.copy: {j|Learn more about helping compress Coda's\u00A0blockchain|j},
-            link: Links.Forms.compressTheBlockchain,
-          }
         />
       </div>
     </div>

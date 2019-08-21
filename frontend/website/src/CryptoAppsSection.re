@@ -278,10 +278,6 @@ let make = () => {
               "Your users will have a seamless, secure experience without having to download any extensions or trust additional 3rd parties.",
             ),
           |]
-          cta={
-            SideText.Cta.copy: {j|Stay informed about early access to developing with\u00A0Coda|j},
-            link: Links.Forms.developingWithCoda,
-          }
         />
       </div>
       <ImageCollage

@@ -1,13 +1,5 @@
-module Cta = {
-  type t = {
-    copy: string,
-    link: Links.Named.t(string),
-  };
-};
-
 [@react.component]
-let make = (~className="", ~paragraphs, ~cta) => {
-  let {Cta.link} = cta;
+let make = (~className="", ~paragraphs) => {
   let ps =
     paragraphs
     |> Array.mapi((i, entry) => {

@@ -211,10 +211,6 @@ let make = () => {
                 "With just a small stake you'll be able to participate directly in consensus.",
               ),
             |]
-            cta={
-              SideText.Cta.copy: {j|Sign up to learn more about about staking with\u00A0Coda|j},
-              link: Links.Forms.participateInConsensus,
-            }
           />
         </div>
         <Legend
