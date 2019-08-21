@@ -163,7 +163,8 @@ end = struct
     (not @@ done_syncing_root root_sync_ledger)
     && worth_getting_root t candidate_state
 
-  let sync_with_peer ~sender ~root_sync_ledger t peer_best_tip peer_root =
+  let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip
+      peer_root =
     let%bind () =
       Trust_system.(
         record t.trust_system t.logger sender
@@ -223,7 +224,10 @@ end = struct
               candidate_state peer_root_with_proof
           with
           | Ok (`Root root, `Best_tip best_tip) ->
-              sync_with_peer ~sender ~root_sync_ledger t best_tip root
+              if done_syncing_root root_sync_ledger then return `Ignored
+              else
+                start_sync_job_with_peer ~sender ~root_sync_ledger t best_tip
+                  root
           | Error e ->
               return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
@@ -322,8 +326,9 @@ end = struct
                     ~module_:__MODULE__ ~location:__LOC__ ;
                   (* TODO: Efficiently limiting the number of green threads in #1337 *)
                   Deferred.ignore
-                    (sync_with_peer ~sender:peer.host ~root_sync_ledger t
-                       best_tip_with_validation root_with_validation) )
+                    (start_sync_job_with_peer ~sender:peer.host
+                       ~root_sync_ledger t best_tip_with_validation
+                       root_with_validation) )
                 else (
                   Logger.debug logger
                     !"Will not sync with peer's bootstrappable best tip "
@@ -414,6 +419,13 @@ end = struct
           (Staged_ledger.Scan_state.hash scan_state)
           expected_merkle_root pending_coinbases
       in
+      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [ ( "expected_staged_ledger_hash"
+            , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
+          ; ( "received_staged_ledger_hash"
+            , Staged_ledger_hash.to_yojson received_staged_ledger_hash ) ]
+        "Comparing $expected_staged_ledger_hash to $received_staged_ledger_hash" ;
       let%bind () =
         Staged_ledger_hash.equal expected_staged_ledger_hash
           received_staged_ledger_hash
@@ -440,7 +452,9 @@ end = struct
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [ ("error", `String (Error.to_string_hum e))
-            ; ("state_hash", State_hash.to_yojson hash) ]
+            ; ("state_hash", State_hash.to_yojson hash)
+            ; ( "expected_staged_ledger_hash"
+              , Staged_ledger_hash.to_yojson expected_staged_ledger_hash ) ]
           "Failed to find scan state for the transition with hash $state_hash \
            from the peer or received faulty scan state: $error. Retry \
            bootstrap" ;
