@@ -7,7 +7,7 @@ let make = (~path) => {
   // HACK: In an attempt to make the job post page passable for a quick deploy, I forced some extra CSS in a style tag on the top.
   <>
     <style>
-      {ReasonReact.string(
+      {React.string(
          {css|
 main h2 {
   margin-top: 1.5rem;
@@ -36,7 +36,7 @@ ul li {
                          ])
                        )
                   }>
-                  {ReasonReact.string(title)}
+                  {React.string(title)}
                 </h1>
               </div>
               <div className="db dn-ns">
@@ -50,7 +50,7 @@ ul li {
                          ])
                        )
                   }>
-                  {ReasonReact.string(title)}
+                  {React.string(title)}
                 </h1>
               </div>
             </div>

@@ -86,7 +86,7 @@ module Code = {
             ],
           )
         )>
-        {ReasonReact.string(src)}
+        {React.string(src)}
       </pre>
     </div>;
   };

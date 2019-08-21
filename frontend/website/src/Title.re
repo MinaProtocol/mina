@@ -30,7 +30,7 @@ let make = (~noBottomMargin=false, ~fontColor, ~text) => {
           ]),
         ])
       )>
-      {ReasonReact.string(text)}
+      {React.string(text)}
     </h1>
   </div>;
 };

@@ -26,7 +26,7 @@ module Footer = {
         {last
            ? ReasonReact.null
            : <span className=footerStyle ariaHidden=true>
-               {ReasonReact.string({js| · |js})}
+               {React.string({js| · |js})}
              </span>}
       </li>;
     };
@@ -65,40 +65,40 @@ module Footer = {
               style([listStyleType(`none), ...Style.paddingX(`zero)])
             )>
             <Link link="mailto:contact@o1labs.org" name="mail">
-              {ReasonReact.string("contact@o1labs.org")}
+              {React.string("contact@o1labs.org")}
             </Link>
             <Link link="https://o1labs.org" name="o1www">
-              {ReasonReact.string("o1labs.org")}
+              {React.string("o1labs.org")}
             </Link>
             <Link link="https://twitter.com/codaprotocol" name="twitter">
-              {ReasonReact.string("Twitter")}
+              {React.string("Twitter")}
             </Link>
             <Link link="https://github.com/CodaProtocol/coda" name="github">
-              {ReasonReact.string("GitHub")}
+              {React.string("GitHub")}
             </Link>
             <Link link="https://forums.codaprotocol.com" name="discourse">
-              {ReasonReact.string("Discourse")}
+              {React.string("Discourse")}
             </Link>
             <Link link="https://reddit.com/r/coda" name="reddit">
-              {ReasonReact.string("Reddit")}
+              {React.string("Reddit")}
             </Link>
             <Link link="https://t.me/codaprotocol" name="telegram">
-              {ReasonReact.string("Telegram")}
+              {React.string("Telegram")}
             </Link>
             <Link link="/tos.html" name="tos">
-              {ReasonReact.string("Terms of service")}
+              {React.string("Terms of service")}
             </Link>
             <Link link="/privacy.html" name="privacy">
-              {ReasonReact.string("Privacy Policy")}
+              {React.string("Privacy Policy")}
             </Link>
             <Link link="/jobs.html" name="hiring">
-              {ReasonReact.string("We're Hiring")}
+              {React.string("We're Hiring")}
             </Link>
             <Link
               link={Links.Cdn.url("/static/presskit.zip")}
               name="presskit"
               last=true>
-              {ReasonReact.string("Press Kit")}
+              {React.string("Press Kit")}
             </Link>
           </ul>
         </div>
@@ -109,7 +109,7 @@ module Footer = {
               style([textAlign(`center), color(Style.Colors.saville)]),
             ])
           )>
-          {ReasonReact.string({j|© 2019 O(1) Labs|j})}
+          {React.string({j|© 2019 O(1) Labs|j})}
         </p>
       </section>
     </footer>;

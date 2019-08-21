@@ -61,9 +61,9 @@ var disqus_config = function () {
          )}
       </RunScript>
       <noscript>
-        {ReasonReact.string("Please enable JavaScript to view the ")}
+        {React.string("Please enable JavaScript to view the ")}
         <a href="https://disqus.com/?ref_noscript">
-          {ReasonReact.string("comments powered by Disqus.")}
+          {React.string("comments powered by Disqus.")}
         </a>
       </noscript>
     </div>;
@@ -71,24 +71,24 @@ var disqus_config = function () {
 };
 
 let dot = {
-  ReasonReact.string({js|•|js});
+  React.string({js|•|js});
 };
 
 let shareItems =
   <>
     <span className="f7 ttu fw4 tracked-mega blueshare">
-      {ReasonReact.string("share:")}
+      {React.string("share:")}
     </span>
     <A name="share-blog-twitter" href="https://twitter.com/codaprotocol">
-      {ReasonReact.string("Twitter")}
+      {React.string("Twitter")}
     </A>
     dot
     <A name="share-blog-discord" href="https://bit.ly/CodaDiscord">
-      {ReasonReact.string("Discord")}
+      {React.string("Discord")}
     </A>
     dot
     <A name="share-blog-telegram" href="https://t.me/codaprotocol">
-      {ReasonReact.string("Telegram")}
+      {React.string("Telegram")}
     </A>
   </>;
 
@@ -115,7 +115,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
               {switch (metadata.authorWebsite) {
                | None =>
                  <span className="mr2">
-                   {ReasonReact.string("by " ++ metadata.author ++ " ")}
+                   {React.string("by " ++ metadata.author ++ " ")}
                  </span>
                | Some(website) =>
                  <A
@@ -127,7 +127,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
                    className="blueblack no-underline"
                    target="_blank">
                    <span className="mr2">
-                     {ReasonReact.string("by " ++ metadata.author ++ " ")}
+                     {React.string("by " ++ metadata.author ++ " ")}
                    </span>
                    <i
                      className="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"
@@ -137,7 +137,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
             </h4>
             <h4
               className="f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45">
-              {ReasonReact.string(metadata.date)}
+              {React.string(metadata.date)}
             </h4>
             <div className="blog-content lh-copy">
               <div dangerouslySetInnerHTML={"__html": html} /> // TODO: replace this with some react markdown component
@@ -167,7 +167,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
                 {switch (metadata.authorWebsite) {
                  | None =>
                    <span className="mr2">
-                     {ReasonReact.string("by " ++ metadata.author ++ " ")}
+                     {React.string("by " ++ metadata.author ++ " ")}
                    </span>
                  | Some(website) =>
                    <A
@@ -179,7 +179,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
                      className="blueblack no-underline"
                      target="_blank">
                      <span className="mr2">
-                       {ReasonReact.string("by " ++ metadata.author ++ " ")}
+                       {React.string("by " ++ metadata.author ++ " ")}
                      </span>
                      <i
                        className="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"
@@ -189,7 +189,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
               </h4>
               <h4
                 className="f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45">
-                {ReasonReact.string(metadata.date)}
+                {React.string(metadata.date)}
               </h4>
               <div className="blog-content lh-copy">
                 <div dangerouslySetInnerHTML={"__html": html} /> // TODO: replace this with some react markdown component

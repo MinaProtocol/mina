@@ -6,7 +6,7 @@ module Link = {
       target="_blank"
       href={link.Links.Named.link}
       className=Css.(merge([Style.Link.basic, style([cursor(`pointer)])]))>
-      {ReasonReact.string(message ++ {js|\u00A0→|js})}
+      {React.string(message ++ {js|\u00A0→|js})}
     </A>;
   };
 };
@@ -67,7 +67,7 @@ module KnowledgeBase = {
               ]),
             ])
           )>
-          {ReasonReact.string(title)}
+          {React.string(title)}
         </h5>
         <ul
           className=Css.(
@@ -134,7 +134,7 @@ module KnowledgeBase = {
                  color(Style.Colors.midnight),
                ])
              )>
-             {ReasonReact.string("Knowledge base")}
+             {React.string("Knowledge base")}
            </h4>,
          |],
        )}
@@ -213,7 +213,7 @@ module KnowledgeBase = {
           ])
         )
         htmlFor="expand-knowledge-base">
-        {ReasonReact.string({js|View all ↓|js})}
+        {React.string({js|View all ↓|js})}
       </label>
       <RunScript>
         {|document.getElementById("expand-knowledge-base").checked = false;|}
@@ -353,7 +353,7 @@ module SocialLink = {
         ])
       )>
       <div className=Css.(style([marginRight(`rem(1.))]))> svg </div>
-      <h3 className=Style.H3.wideNoColor> {ReasonReact.string(name)} </h3>
+      <h3 className=Style.H3.wideNoColor> {React.string(name)} </h3>
     </A>;
   };
 };
@@ -375,7 +375,7 @@ let make = (~posts) => {
           ]),
         ])
       )>
-      {ReasonReact.string("Get involved")}
+      {React.string("Get involved")}
     </h1>
     <div
       className=Css.(

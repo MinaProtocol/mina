@@ -123,7 +123,7 @@ module DropdownMenu = {
           ])
         )
         id="nav-menu-btn">
-        {ReasonReact.string("Menu")}
+        {React.string("Menu")}
       </button>
       <div className=Css.(style([zIndex(1), position(`relative)]))>
         <ul id="nav-menu" className=NavStyle.collapsedMenuItems> children </ul>
@@ -178,45 +178,45 @@ module NavWrapper = {
                elem
              </li>
            )
-           /* } else { */
-           /*   <> */
-           /*     <li */
-           /*       key={string_of_int(idx) ++ "-li"} */
-           /*       className={Css.style( */
-           /*         Style.paddingX(`rem(0.75)) */
-           /*         @ Style.paddingY(`rem(0.5)) */
-           /*         @ [ */
-           /*           Css.listStyle(`none, `inside, `none), */
-           /*           Css.media( */
-           /*             NavStyle.MediaQuery.menuMax, */
-           /*             [Css.width(`percent(100.)), Css.padding(`zero)], */
-           /*           ), */
-           /*         ], */
-           /*       )}> */
-           /*       elem */
-           /*     </li> */
-           /*     <hr */
-           /*       key={string_of_int(idx) ++ "-hr"} */
-           /*       ariaHidden=true */
-           /*       className=Css.( */
-           /*         style([ */
-           /*           borderTop( */
-           /*             `rem(0.0625), */
-           /*             `solid, */
-           /*             Style.Colors.hyperlinkAlpha(0.15), */
-           /*           ), */
-           /*           marginTop(`zero), */
-           /*           marginBottom(`zero), */
-           /*           borderBottomWidth(`zero), */
-           /*           borderLeftWidth(`zero), */
-           /*           borderRightWidth(`zero), */
-           /*           width(`percent(85.)), */
-           /*           media(NavStyle.MediaQuery.menu, [display(`none)]), */
-           /*         ]) */
-           /*       ) */
-           /*     /> */
-           /*   </>; */
-           /* } */
+      /* } else { */
+      /*   <> */
+      /*     <li */
+      /*       key={string_of_int(idx) ++ "-li"} */
+      /*       className={Css.style( */
+      /*         Style.paddingX(`rem(0.75)) */
+      /*         @ Style.paddingY(`rem(0.5)) */
+      /*         @ [ */
+      /*           Css.listStyle(`none, `inside, `none), */
+      /*           Css.media( */
+      /*             NavStyle.MediaQuery.menuMax, */
+      /*             [Css.width(`percent(100.)), Css.padding(`zero)], */
+      /*           ), */
+      /*         ], */
+      /*       )}> */
+      /*       elem */
+      /*     </li> */
+      /*     <hr */
+      /*       key={string_of_int(idx) ++ "-hr"} */
+      /*       ariaHidden=true */
+      /*       className=Css.( */
+      /*         style([ */
+      /*           borderTop( */
+      /*             `rem(0.0625), */
+      /*             `solid, */
+      /*             Style.Colors.hyperlinkAlpha(0.15), */
+      /*           ), */
+      /*           marginTop(`zero), */
+      /*           marginBottom(`zero), */
+      /*           borderBottomWidth(`zero), */
+      /*           borderLeftWidth(`zero), */
+      /*           borderRightWidth(`zero), */
+      /*           width(`percent(85.)), */
+      /*           media(NavStyle.MediaQuery.menu, [display(`none)]), */
+      /*         ]) */
+      /*       ) */
+      /*     /> */
+      /*   </>; */
+      /* } */
       |> React.array;
 
     <nav
@@ -357,7 +357,7 @@ module SimpleButton = {
           ),
         ])
       )>
-      {ReasonReact.string(name)}
+      {React.string(name)}
     </A>;
   };
 };

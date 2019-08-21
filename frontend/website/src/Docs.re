@@ -268,10 +268,10 @@ let make = () => {
           />
         </svg>
         <span className=Css.(style([marginLeft(`rem(0.25))]))>
-          {ReasonReact.string("Edit")}
+          {React.string("Edit")}
         </span>
       </A>
-      {ReasonReact.string("{{ page.content }}")}
+      {React.string("{{ page.content }}")}
       <hr
         className=Css.(
           style([
@@ -284,20 +284,20 @@ let make = () => {
         className=Css.(
           style([display(`flex), justifyContent(`spaceBetween)])
         )>
-        {ReasonReact.string("{% if page.previous_page %}")}
+        {React.string("{% if page.previous_page %}")}
         <A name="next_page" href="{{ page.previous_page.url|url }}">
-          {ReasonReact.string({js|← {{ page.previous_page.title }}|js})}
+          {React.string({js|← {{ page.previous_page.title }}|js})}
         </A>
-        {ReasonReact.string("{% else %}")}
+        {React.string("{% else %}")}
         <span />
-        {ReasonReact.string("{% endif %}")}
-        {ReasonReact.string("{% if page.next_page %}")}
+        {React.string("{% endif %}")}
+        {React.string("{% if page.next_page %}")}
         <A name="next_page" href="{{ page.next_page.url|url }}">
-          {ReasonReact.string({js|{{ page.next_page.title }} →|js})}
+          {React.string({js|{{ page.next_page.title }} →|js})}
         </A>
-        {ReasonReact.string("{% else %}")}
+        {React.string("{% else %}")}
         <span />
-        {ReasonReact.string("{% endif %}")}
+        {React.string("{% endif %}")}
       </div>
     </article>
     <script src={Links.Cdn.url("/static/js/clipboard.js")} />

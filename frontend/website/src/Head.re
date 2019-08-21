@@ -44,7 +44,7 @@ let make = (~extra, ~filename) => {
       content="Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means anyone can use Coda directly from any device, in less data than a few tweets."
     />
     extra
-    <title> {ReasonReact.string("Coda Cryptocurrency Protocol")} </title>
+    <title> {React.string("Coda Cryptocurrency Protocol")} </title>
     <link
       rel="stylesheet"
       type_="text/css"
@@ -78,7 +78,7 @@ let make = (~extra, ~filename) => {
     // unstyled content" for images by displaying the alt text(!) before the
     // image loads. Of course, we must disable this.
     <style>
-      {ReasonReact.string(
+      {React.string(
          {|
       img:-moz-loading {
         visibility: hidden;

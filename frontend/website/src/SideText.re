@@ -14,7 +14,7 @@ let make = (~className="", ~paragraphs, ~cta) => {
          let key = string_of_int(i);
          let content =
            switch (entry) {
-           | `str(s) => [|<span key> {ReasonReact.string(s)} </span>|]
+           | `str(s) => [|<span key> {React.string(s)} </span>|]
            | `styled(xs) =>
              List.mapi(
                (i, x) => {
@@ -22,10 +22,9 @@ let make = (~className="", ~paragraphs, ~cta) => {
                  switch (x) {
                  | `emph(s) =>
                    <span key=styleKey className=Style.Body.basic_semibold>
-                     {ReasonReact.string(s)}
+                     {React.string(s)}
                    </span>
-                 | `str(s) =>
-                   <span key=styleKey> {ReasonReact.string(s)} </span>
+                 | `str(s) => <span key=styleKey> {React.string(s)} </span>
                  };
                },
                xs,

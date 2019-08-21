@@ -34,7 +34,7 @@ module Copy = {
               ]),
             ])
           )>
-          {ReasonReact.string(
+          {React.string(
              {j|A cryptocurrency with a tiny portable blockchain.|j},
            )}
         </h1>
@@ -54,17 +54,17 @@ module Copy = {
             ])
           )>
           <span>
-            {ReasonReact.string(
+            {React.string(
                "Coda swaps the traditional blockchain for a tiny cryptographic proof, enabling a cryptocurrency as accessible as any other app or website. This makes it ",
              )}
           </span>
           <span className=Style.Body.big_semibold>
-            {ReasonReact.string(
+            {React.string(
                "dramatically easier to develop user friendly crypto apps",
              )}
           </span>
           <span>
-            {ReasonReact.string(
+            {React.string(
                {j| that run natively in the browser, and enables more inclusive, sustainable\u00A0consensus.|j},
              )}
           </span>
@@ -125,7 +125,7 @@ module Graphic = {
                 ]),
               ])
             )>
-            {ReasonReact.string(name)}
+            {React.string(name)}
           </h3>
           <h3
             className=Css.(
@@ -139,7 +139,7 @@ module Graphic = {
                 ]),
               ])
             )>
-            {ReasonReact.string(size)}
+            {React.string(size)}
           </h3>
         </div>
         <h5
@@ -149,7 +149,7 @@ module Graphic = {
               style([marginTop(`rem(1.125)), marginBottom(`rem(0.375))]),
             ])
           )>
-          {ReasonReact.string(label)}
+          {React.string(label)}
         </h5>
       </div>;
     };

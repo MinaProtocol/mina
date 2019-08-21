@@ -51,7 +51,7 @@ module Legend = {
               ]),
             ])
           )>
-          {ReasonReact.string(copy)}
+          {React.string(copy)}
         </h3>
       </div>;
     };
@@ -98,7 +98,7 @@ module Legend = {
               ]),
             ])
           )>
-          {ReasonReact.string("Consensus Participants")}
+          {React.string("Consensus Participants")}
         </h5>
       </div>
       <div ariaHidden=true>
@@ -153,7 +153,7 @@ module Figure = {
             ]),
           ])
         )>
-        {ReasonReact.string(caption)}
+        {React.string(caption)}
       </figcaption>
     </figure>;
   };

@@ -97,7 +97,7 @@ module Member = {
                   ]),
                 ])
               )>
-              {ReasonReact.string(name)}
+              {React.string(name)}
             </h3>
           </div>
           <h5
@@ -111,7 +111,7 @@ module Member = {
                 ]),
               ])
             )>
-            {ReasonReact.string(title)}
+            {React.string(title)}
           </h5>
         </div>
       </div>
@@ -126,7 +126,7 @@ module Member = {
             Style.Body.Technical.basic,
           ])
         )>
-        {ReasonReact.string(description)}
+        {React.string(description)}
       </p>
     </div>;
   };
@@ -138,7 +138,7 @@ module Section = {
     let checkboxName = name ++ "-checkbox";
     let labelName = name ++ "-label";
     <div className=Css.(style([display(`flex), flexDirection(`column)]))>
-      <h3 className=Style.H3.Technical.boxed> {ReasonReact.string(name)} </h3>
+      <h3 className=Style.H3.Technical.boxed> {React.string(name)} </h3>
       <input
         type_="checkbox"
         id=checkboxName
@@ -207,7 +207,7 @@ module Section = {
           ])
         )
         htmlFor=checkboxName>
-        {ReasonReact.string({js|View all ↓|js})}
+        {React.string({js|View all ↓|js})}
       </label>
       <RunScript>
         {Printf.sprintf(
@@ -262,11 +262,11 @@ let make = () => {
             style([fontWeight(`light), marginRight(`rem(1.))]),
           ])
         )>
-        {ReasonReact.string("Built by ")}
+        {React.string("Built by ")}
       </span>
       <span
         className=Css.(merge([headerStyle, style([fontWeight(`medium)])]))>
-        {ReasonReact.string(" O(1) Labs")}
+        {React.string(" O(1) Labs")}
       </span>
     </div>
     <Section name="Team">

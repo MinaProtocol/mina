@@ -85,7 +85,7 @@ let make = () => {
             ]),
           ])
         )>
-        {ReasonReact.string("Testnet Beta is live")}
+        {React.string("Testnet Beta is live")}
       </p>
     </div>
     <p
@@ -100,7 +100,7 @@ let make = () => {
           ]),
         ])
       )>
-      {ReasonReact.string({j|Read Here\u00A0→|j})}
+      {React.string({j|Read Here\u00A0→|j})}
     </p>
   </A>;
 };

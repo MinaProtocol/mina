@@ -35,7 +35,7 @@ let make = () => {
             ]),
           ])
         )>
-        {ReasonReact.string("Sustainable scalability")}
+        {React.string("Sustainable scalability")}
         <div
           className=Css.(
             style([

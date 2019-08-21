@@ -14,7 +14,7 @@ module ApplyItem = {
                ])
              )
         }>
-        {ReasonReact.string(name)}
+        {React.string(name)}
       </A>
     </li>;
   };
@@ -27,7 +27,7 @@ module HeadingItem = {
       <div className="dn db-ns">
         <div className="flex justify-between mt45">
           <h2 className="pr2 fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
-            {ReasonReact.string(title)}
+            {React.string(title)}
           </h2>
           <p className="w-65 mt0 mb0 lh-copy"> children </p>
         </div>
@@ -35,7 +35,7 @@ module HeadingItem = {
       <div className="db dn-ns">
         <div className="mt45">
           <h2 className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
-            {ReasonReact.string(title)}
+            {React.string(title)}
           </h2>
           <p className="mt3 mb0 ml15 lh-copy"> children </p>
         </div>
@@ -48,13 +48,11 @@ let benefits =
   <>
     <div className="flex justify-between ">
       <div className="flex justify-end w-30">
-        <h3 className="fw6 f5 ph4 mt0 mb0">
-          {ReasonReact.string("Healthcare")}
-        </h3>
+        <h3 className="fw6 f5 ph4 mt0 mb0"> {React.string("Healthcare")} </h3>
       </div>
       <ul className="mt0 mb0 ph0 w-70">
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string(
+          {React.string(
              {js|We cover 100% of employee premiums for platinum healthcare plans with zero deductible, and 99% of vision and dental\u00A0premiums|js},
            )}
         </li>
@@ -62,43 +60,39 @@ let benefits =
     </div>
     <div className="flex justify-between mt4">
       <div className="flex justify-end w-30">
-        <h3 className="fw6 f5 ph4 mt0 mb0"> {ReasonReact.string("401k")} </h3>
+        <h3 className="fw6 f5 ph4 mt0 mb0"> {React.string("401k")} </h3>
       </div>
       <ul className="mt0 mb0 ph0 w-70">
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string("401k contribution matching up to 3% of salary")}
+          {React.string("401k contribution matching up to 3% of salary")}
         </li>
       </ul>
     </div>
     <div className="flex justify-between mt4">
       <div className="flex justify-end w-30">
-        <h3 className="fw6 f5 ph4 mt0 mb0">
-          {ReasonReact.string("Education")}
-        </h3>
+        <h3 className="fw6 f5 ph4 mt0 mb0"> {React.string("Education")} </h3>
       </div>
       <ul className="mt0 mb0 ph0 w-70">
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string(
+          {React.string(
              {js|$750 annual budget for conferences of your choice (we cover company-related\u00A0conferences)|js},
            )}
         </li>
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string("Office library")}
+          {React.string("Office library")}
         </li>
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string("Twice-a-week learning lunches")}
+          {React.string("Twice-a-week learning lunches")}
         </li>
       </ul>
     </div>
     <div className="flex justify-between mt4">
       <div className="flex justify-end w-30">
-        <h3 className="fw6 f5 ph4 mt0 mb0">
-          {ReasonReact.string("Equipment")}
-        </h3>
+        <h3 className="fw6 f5 ph4 mt0 mb0"> {React.string("Equipment")} </h3>
       </div>
       <ul className="mt0 mb0 ph0 w-70">
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string(
+          {React.string(
              {js|Top-of-the-line laptop, $500 monitor budget and $500 peripheral\u00A0budget|js},
            )}
         </li>
@@ -107,68 +101,60 @@ let benefits =
     <div className="flex justify-between mt4">
       <div className="flex justify-end w-30">
         <h3 className="fw6 f5 ph4 mt0 mb0">
-          {ReasonReact.string({js|Time\u00A0off|js})}
+          {React.string({js|Time\u00A0off|js})}
         </h3>
       </div>
       <ul className="mt0 mb0 ph0 w-70">
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string(
+          {React.string(
              {js|Unlimited vacation, with encouragement for employees to take off|js},
            )}
-          <span className="i"> {ReasonReact.string(" at least ")} </span>
-          {ReasonReact.string({js|14 days\u00A0annually|js})}
+          <span className="i"> {React.string(" at least ")} </span>
+          {React.string({js|14 days\u00A0annually|js})}
         </li>
       </ul>
     </div>
     <div className="flex justify-between mt4">
       <div className="flex justify-end w-30">
-        <h3 className="fw6 f5 ph4 mt0 mb0">
-          {ReasonReact.string("Meals")}
-        </h3>
+        <h3 className="fw6 f5 ph4 mt0 mb0"> {React.string("Meals")} </h3>
       </div>
       <ul className="mt0 mb0 ph0 w-70">
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string(
-             "Healthy snacks and provided lunch twice a week",
-           )}
+          {React.string("Healthy snacks and provided lunch twice a week")}
         </li>
       </ul>
     </div>
     <div className="flex justify-between mt4">
       <div className="flex justify-end w-30">
-        <h3 className="fw6 f5 ph4 mt0 mb0">
-          {ReasonReact.string("Other")}
-        </h3>
+        <h3 className="fw6 f5 ph4 mt0 mb0"> {React.string("Other")} </h3>
       </div>
       <ul className="mt0 mb0 ph0 w-70">
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string("Relocation package")}
+          {React.string("Relocation package")}
         </li>
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string("Parental leave")}
+          {React.string("Parental leave")}
         </li>
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string("Commuting benefits")}
+          {React.string("Commuting benefits")}
         </li>
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string("Bike-friendly culture")}
+          {React.string("Bike-friendly culture")}
         </li>
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string("Take up to 1 day of PTO per year to volunteer")}
+          {React.string("Take up to 1 day of PTO per year to volunteer")}
         </li>
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string(
-             "We match nonprofit donations up to $500 per year",
-           )}
+          {React.string("We match nonprofit donations up to $500 per year")}
         </li>
         <li className="lh-copy list mb0 mt0">
-          {ReasonReact.string("...and many others!")}
+          {React.string("...and many others!")}
         </li>
       </ul>
     </div>
   </>;
 
-let str = ReasonReact.string;
+let str = React.string;
 
 let dot = {
   str({js|·|js});
@@ -202,7 +188,7 @@ let make = (~jobOpenings) => {
           "fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4 nowrap "
           ++ Css.(style([marginTop(`rem(1.25))]))
         }>
-        {ReasonReact.string("Work with us!")}
+        {React.string("Work with us!")}
       </h1>
       <div className=Css.(style([marginBottom(`rem(1.5))]))>
         <div className="dn db-ns">
@@ -227,7 +213,7 @@ let make = (~jobOpenings) => {
       </div>
       <div className="mw800 center">
         <p className="lh-copy f3 ocean f2-ns tracked-tightly">
-          {ReasonReact.string(
+          {React.string(
              {js|We're using cryptography and cryptocurrency to build computing systems that put people back in control of their digital\u00A0lives.|js},
            )}
         </p>
@@ -235,7 +221,7 @@ let make = (~jobOpenings) => {
           <hr className="mt45 ml0 mr0 mt0 mb0 b0 h2px bg-extradarksnow" />
           <div className="mt45">
             <HeadingItem title="Open Source">
-              {ReasonReact.string(
+              {React.string(
                  {js|We passionately believe in the open-source philosophy, and make our software free for the entire world to\u00A0use. |js},
                )}
               <A
@@ -250,16 +236,16 @@ let make = (~jobOpenings) => {
                        ])
                      )
                 }>
-                {ReasonReact.string({js|Take a look →|js})}
+                {React.string({js|Take a look →|js})}
               </A>
             </HeadingItem>
             <HeadingItem title="Collaboration">
-              {ReasonReact.string(
+              {React.string(
                  {js|The problems we face are novel and challenging and we take them on as a\u00A0team.|js},
                )}
             </HeadingItem>
             <HeadingItem title="Inclusion">
-              {ReasonReact.string(
+              {React.string(
                  {js|We're working on technologies with the potential to reimagine social structures. We believe it's important to incorporate diverse perspectives from conception through\u00A0realization.|js},
                )}
             </HeadingItem>
@@ -272,7 +258,7 @@ let make = (~jobOpenings) => {
               <div className="flex justify-between mt45">
                 <h2
                   className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
-                  {ReasonReact.string("Benefits")}
+                  {React.string("Benefits")}
                 </h2>
                 <div className="w-70 mt3"> benefits </div>
               </div>
@@ -281,7 +267,7 @@ let make = (~jobOpenings) => {
               <div className="mt45">
                 <h2
                   className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
-                  {ReasonReact.string("Benefits")}
+                  {React.string("Benefits")}
                 </h2>
                 <div className="mt4 ml15 mt3"> benefits </div>
               </div>
@@ -296,7 +282,7 @@ let make = (~jobOpenings) => {
                 <div className="w-50">
                   <h2
                     className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
-                    {ReasonReact.string("Apply")}
+                    {React.string("Apply")}
                   </h2>
                 </div>
                 <div className="w-50">
@@ -308,7 +294,7 @@ let make = (~jobOpenings) => {
               <div className="mt45">
                 <h2
                   className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
-                  {ReasonReact.string("Apply")}
+                  {React.string("Apply")}
                 </h2>
                 <ul className="mt4 ml15 mb0 ph0"> jobItems </ul>
               </div>

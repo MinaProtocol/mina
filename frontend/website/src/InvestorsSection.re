@@ -21,7 +21,7 @@ module Investor = {
             style(Style.paddingX(`rem(0.1875))),
           ])
         )>
-        {ReasonReact.string(name)}
+        {React.string(name)}
       </h4>
     </div>;
   };
@@ -31,7 +31,7 @@ module Investor = {
 let make = () => {
   <div className=Css.(style([display(`flex), flexDirection(`column)]))>
     <h3 className=Style.H3.Technical.boxed>
-      {ReasonReact.string("O(1) Investors")}
+      {React.string("O(1) Investors")}
     </h3>
     <div
       className=Css.(

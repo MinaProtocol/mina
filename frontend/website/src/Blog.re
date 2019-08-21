@@ -69,7 +69,7 @@ let createPostHeader = metadata =>
           textTransform(`uppercase),
         ])
       )>
-      {ReasonReact.string("by " ++ metadata.author ++ " ")}
+      {React.string("by " ++ metadata.author ++ " ")}
     </h3>
     <h3
       className=Css.(
@@ -81,7 +81,7 @@ let createPostHeader = metadata =>
           color(Style.Colors.slateAlpha(0.5)),
         ])
       )>
-      {ReasonReact.string(metadata.date)}
+      {React.string(metadata.date)}
     </h3>
   </div>;
 
@@ -189,7 +189,7 @@ let createPostSummary = ((name, html, metadata)) => {
             unsafe("color", "var(--read-more-color)"),
           ])
         )>
-        {ReasonReact.string({js|Read more →|js})}
+        {React.string({js|Read more →|js})}
       </div>
     </div>
   </div>;

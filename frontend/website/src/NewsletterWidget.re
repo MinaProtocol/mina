@@ -87,10 +87,10 @@ let make = () => {
   let formId = uniqueId();
   <form id={"subscribe-form-" ++ formId} className=Styles.container>
     <div className=Css.(style([marginBottom(px(8))]))>
-      {ReasonReact.string("Subscribe to our newsletter for updates")}
+      {React.string("Subscribe to our newsletter for updates")}
     </div>
     <div id={"success-message-" ++ formId} className=Styles.successMessage>
-      {ReasonReact.string({js|✓ Check your email|js})}
+      {React.string({js|✓ Check your email|js})}
     </div>
     <input
       type_="email"
