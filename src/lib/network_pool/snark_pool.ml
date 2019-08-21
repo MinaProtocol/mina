@@ -102,6 +102,8 @@ end) (Transaction_snark_work : sig
           type t [@@deriving sexp, bin_io, yojson, version]
 
           include Hashable.S_binable with type t := t
+
+          val compact_json : t -> Yojson.Safe.json
         end
       end
       with type V1.t = t
@@ -149,6 +151,21 @@ end)
         Bin_prot.Type_class.{size= bin_size_t; write= bin_write_t}
 
       let removed_breadcrumb_wait = 10
+
+      let snark_pool_json t : Yojson.Safe.json =
+        `List
+          (Statement_table.fold ~init:[] t.snark_table
+             ~f:(fun ~key ~data:{proof= _; fee= {fee; prover}} acc ->
+               let work_ids =
+                 Transaction_snark_work.Statement.Stable.V1.compact_json key
+               in
+               `Assoc
+                 [ ("work_ids", work_ids)
+                 ; ("fee", Currency.Fee.Stable.V1.to_yojson fee)
+                 ; ( "prover"
+                   , Signature_lib.Public_key.Compressed.Stable.V1.to_yojson
+                       prover ) ]
+               :: acc ))
 
       let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t) =
         (* start with empty ref table *)

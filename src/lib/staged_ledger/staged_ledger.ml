@@ -1537,6 +1537,14 @@ let%test_module "test" =
 
               include T
               include Hashable.Make_binable (T)
+
+              let compact_json : t -> Yojson.Safe.json =
+               fun t ->
+                `List
+                  (List.map
+                     ~f:(fun s ->
+                       `Int (Transaction_snark.Statement.Stable.V1.hash s) )
+                     t)
             end
 
             module Latest = V1
