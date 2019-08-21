@@ -45,7 +45,7 @@ let createPostHeader = metadata =>
       dangerouslySetInnerHTML={"__html": metadata.BlogPost.title}
     />
     {switch (metadata.subtitle) {
-     | None => ReasonReact.null
+     | None => React.null
      | Some(subtitle) =>
        <h2
          className=Css.(

@@ -91,7 +91,7 @@ module MoreFs = {
 
 module Router = {
   type t =
-    | File(string, ReasonReact.reactElement)
+    | File(string, React.element)
     | Dir(string, array(t));
 
   let generateStatic = {

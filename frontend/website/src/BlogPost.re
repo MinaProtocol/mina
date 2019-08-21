@@ -201,7 +201,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
             </div>
           </div>
         </div>
-        {showComments ? <Comments name /> : ReasonReact.null}
+        {showComments ? <Comments name /> : React.null}
       </div>
     </div>
     renderKatex

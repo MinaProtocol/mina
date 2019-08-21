@@ -24,7 +24,7 @@ module Footer = {
           children
         </A>
         {last
-           ? ReasonReact.null
+           ? React.null
            : <span className=footerStyle ariaHidden=true>
                {React.string({js| · |js})}
              </span>}
@@ -120,7 +120,7 @@ module Footer = {
 let make =
     (
       ~name,
-      ~extraHeaders=ReasonReact.null,
+      ~extraHeaders=React.null,
       ~footerColor=Style.Colors.white,
       ~page,
       ~children,
