@@ -1397,8 +1397,6 @@ let%test_module "test" =
         module Stable = struct
           module V1 = struct
             include Transaction_snark.Statement.Stable.V1
-
-            let statement = Fn.id
           end
 
           module Latest = V1
@@ -1557,15 +1555,6 @@ let%test_module "test" =
             end
 
             include T
-
-            let info t =
-              let statements = List.map t.proofs ~f:Ledger_proof.statement in
-              { Info.Stable.V1.statements
-              ; job_ids=
-                  List.map statements
-                    ~f:Transaction_snark.Statement.Stable.V1.hash
-              ; fee= t.fee
-              ; prover= t.prover }
           end
 
           module Latest = V1
@@ -1577,8 +1566,12 @@ let%test_module "test" =
 
         let fee {fee; _} = fee
 
-        [%%define_locally
-        Stable.Latest.(info)]
+        let info t =
+          let statements = List.map t.proofs ~f:Ledger_proof.statement in
+          { Info.statements
+          ; job_ids= List.map statements ~f:Transaction_snark.Statement.hash
+          ; fee= t.fee
+          ; prover= t.prover }
 
         type unchecked = t
 

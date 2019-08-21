@@ -74,8 +74,6 @@ module Stable :
   sig
     module V1 : sig
       type t [@@deriving bin_io, sexp, yojson, version]
-
-      val statement : t -> Statement.t
     end
 
     module Latest = V1

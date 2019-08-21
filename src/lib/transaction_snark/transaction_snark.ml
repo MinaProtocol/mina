@@ -184,27 +184,6 @@ module Stable = struct
     end
 
     include T
-
-    let statement
-        ({ source
-         ; target
-         ; proof_type
-         ; fee_excess
-         ; supply_increase
-         ; pending_coinbase_stack_state
-         ; sok_digest= _
-         ; proof= _ } :
-          t) =
-      { Statement.Stable.V1.source
-      ; target
-      ; proof_type
-      ; supply_increase
-      ; pending_coinbase_stack_state
-      ; fee_excess=
-          Currency.Fee.Signed.create
-            ~magnitude:Currency.Amount.(to_fee (Signed.magnitude fee_excess))
-            ~sgn:(Currency.Amount.Signed.sgn fee_excess) }
-
     include Registration.Make_latest_version (T)
   end
 
@@ -232,8 +211,25 @@ type t = Stable.Latest.t =
   ; proof: Proof.Stable.V1.t }
 [@@deriving fields, sexp, yojson]
 
-[%%define_locally
-Stable.Latest.(statement)]
+let statement
+    ({ source
+     ; target
+     ; proof_type
+     ; fee_excess
+     ; supply_increase
+     ; pending_coinbase_stack_state
+     ; sok_digest= _
+     ; proof= _ } :
+      t) =
+  { Statement.Stable.V1.source
+  ; target
+  ; proof_type
+  ; supply_increase
+  ; pending_coinbase_stack_state
+  ; fee_excess=
+      Currency.Fee.Signed.create
+        ~magnitude:Currency.Amount.(to_fee (Signed.magnitude fee_excess))
+        ~sgn:(Currency.Amount.Signed.sgn fee_excess) }
 
 let create = Fields.create
 

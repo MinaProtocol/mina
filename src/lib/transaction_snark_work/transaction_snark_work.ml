@@ -10,12 +10,14 @@ module Make (Ledger_proof : sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, to_yojson]
-
-        val statement : t -> Transaction_snark.Statement.Stable.V1.t
+        type t [@@deriving sexp, bin_io, to_yojson, version]
       end
+
+      module Latest = V1
     end
     with type V1.t = t
+
+  val statement : t -> Transaction_snark.Statement.t
 end) :
   Coda_intf.Transaction_snark_work_intf
   with type ledger_proof := Ledger_proof.t = struct
@@ -69,7 +71,7 @@ end) :
             ; job_ids: int list
             ; fee: Fee.Stable.V1.t
             ; prover: Public_key.Compressed.Stable.V1.t }
-          [@@deriving sexp, to_yojson, bin_io, version {asserted}]
+          [@@deriving sexp, to_yojson, bin_io, version]
         end
 
         include T
@@ -105,18 +107,7 @@ end) :
             { fee: Fee.Stable.V1.t
             ; proofs: Ledger_proof.Stable.V1.t list
             ; prover: Public_key.Compressed.Stable.V1.t }
-          [@@deriving sexp, to_yojson, bin_io, version {asserted}]
-
-          let info t =
-            let statements =
-              List.map t.proofs ~f:Ledger_proof.Stable.V1.statement
-            in
-            { Info.Stable.V1.statements
-            ; job_ids=
-                List.map statements
-                  ~f:Transaction_snark.Statement.Stable.V1.hash
-            ; fee= t.fee
-            ; prover= t.prover }
+          [@@deriving sexp, to_yojson, bin_io, version]
         end
 
         include T
@@ -140,8 +131,12 @@ end) :
       {fee: Fee.t; proofs: Ledger_proof.t list; prover: Public_key.Compressed.t}
     [@@deriving to_yojson, sexp]
 
-    [%%define_locally
-    Stable.Latest.(info)]
+    let info t =
+      let statements = List.map t.proofs ~f:Ledger_proof.statement in
+      { Info.statements
+      ; job_ids= List.map statements ~f:Transaction_snark.Statement.hash
+      ; fee= t.fee
+      ; prover= t.prover }
   end
 
   include T

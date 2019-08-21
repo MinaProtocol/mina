@@ -35,8 +35,6 @@ module type Ledger_proof_generalized_intf = sig
     sig
       module V1 : sig
         type t [@@deriving sexp, bin_io, yojson, version]
-
-        val statement : t -> transaction_snark_statement
       end
 
       module Latest = V1
@@ -91,20 +89,14 @@ module type Transaction_snark_work_generalized_intf = sig
   type ledger_proof [@@deriving to_yojson]
 
   module Statement : sig
-    type t = transaction_snark_statement list [@@deriving yojson]
-
-    include Sexpable.S with type t := t
+    type t = transaction_snark_statement list [@@deriving yojson, sexp]
 
     include Hashable.S with type t := t
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving yojson, version]
-
-          include Sexpable.S with type t := t
-
-          include Binable.S with type t := t
+          type t [@@deriving yojson, version, sexp, bin_io]
 
           include Hashable.S_binable with type t := t
         end
@@ -120,18 +112,12 @@ module type Transaction_snark_work_generalized_intf = sig
       ; job_ids: int list
       ; fee: Fee.Stable.V1.t
       ; prover: Public_key.Compressed.Stable.V1.t }
-    [@@deriving to_yojson]
-
-    include Sexpable.S with type t := t
+    [@@deriving to_yojson, sexp]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving to_yojson, version]
-
-          include Sexpable.S with type t := t
-
-          include Binable.S with type t := t
+          type t [@@deriving to_yojson, version, sexp, bin_io]
         end
       end
       with type V1.t = t
@@ -155,8 +141,6 @@ module type Transaction_snark_work_generalized_intf = sig
     sig
       module V1 : sig
         type t [@@deriving sexp, bin_io, to_yojson, version]
-
-        val info : t -> Info.Stable.V1.t
       end
     end
     with type V1.t = t
