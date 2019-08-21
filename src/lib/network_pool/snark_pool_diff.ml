@@ -11,6 +11,8 @@ end) (Work : sig
     sig
       module V1 : sig
         type t [@@deriving sexp, bin_io, yojson, version, hash]
+
+        val compact_json : t -> Yojson.Safe.json
       end
     end
     with type V1.t = t
@@ -41,7 +43,7 @@ end)
       let compact_json = function
         | Add_solved_work (work, {proof= _; fee= {fee; prover}}) ->
             `Assoc
-              [ ("work_id", `Int (Work.hash work))
+              [ ("work_ids", Work.Stable.V1.compact_json work)
               ; ("fee", Currency.Fee.Stable.V1.to_yojson fee)
               ; ( "prover"
                 , Signature_lib.Public_key.Compressed.Stable.V1.to_yojson
