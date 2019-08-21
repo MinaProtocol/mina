@@ -1375,10 +1375,9 @@ readable-stream@~1.0.17, readable-stream@~1.0.27-1:
     isarray "0.0.1"
     string_decoder "~0.10.x"
 
-reason-react@^0.7.0:
+"reason-react@github:Schmavery/reason-react#b59143e45a0cdfc696e6bf3ff8bd88bc1a11f0f4":
   version "0.7.0"
-  resolved "https://registry.yarnpkg.com/reason-react/-/reason-react-0.7.0.tgz#46a975c321e81cd51310d7b1a02418ca7667b0d6"
-  integrity sha512-czR/f0lY5iyLCki9gwftOFF5Zs40l7ZSFmpGK/Z6hx2jBVeFDmIiXB8bAQW/cO6IvtuEt97OmsYueiuOYG9XjQ==
+  resolved "https://codeload.github.com/Schmavery/reason-react/tar.gz/b59143e45a0cdfc696e6bf3ff8bd88bc1a11f0f4"
   dependencies:
     react ">=16.8.1"
     react-dom ">=16.8.1"
