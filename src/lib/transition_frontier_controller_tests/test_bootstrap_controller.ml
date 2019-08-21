@@ -49,8 +49,7 @@ let%test_module "Bootstrap Controller" =
           in
           let genesis_root =
             Transition_frontier.root frontier
-            |> Transition_frontier.Breadcrumb.transition_with_hash
-            |> With_hash.data
+            |> Transition_frontier.Breadcrumb.validated_transition
           in
           let bootstrap =
             Bootstrap_controller.For_tests.make_bootstrap ~logger ~trust_system
@@ -75,18 +74,11 @@ let%test_module "Bootstrap Controller" =
           let input_transitions =
             List.map
               ~f:(fun breadcrumb ->
-                External_transition.Validation.lower
-                  (Transition_frontier.Breadcrumb.transition_with_hash
-                     breadcrumb)
-                  ( (`Time_received, Truth.True ())
-                  , (`Proof, Truth.True ())
-                  , ( `Delta_transition_chain
-                    , Truth.True
-                        ( Non_empty_list.singleton
-                        @@ Transition_frontier.Breadcrumb.parent_hash
-                             breadcrumb ) )
-                  , (`Frontier_dependencies, Truth.False)
-                  , (`Staged_ledger_diff, Truth.False) ) )
+                Transition_frontier.Breadcrumb.validated_transition breadcrumb
+                |> External_transition.Validation
+                   .reset_frontier_dependencies_validation
+                |> External_transition.Validation
+                   .reset_staged_ledger_diff_validation )
               breadcrumbs
           in
           let envelopes =
@@ -147,7 +139,7 @@ let%test_module "Bootstrap Controller" =
 
     let get_best_tip_hash (peer : Network_builder.peer_with_frontier) =
       Transition_frontier.best_tip peer.frontier
-      |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.hash
+      |> Transition_frontier.Breadcrumb.state_hash
 
     let root_hash =
       Fn.compose Ledger.Db.merkle_root
@@ -366,8 +358,7 @@ let%test_module "Bootstrap Controller" =
           Network.glue_sync_ledger network query_reader response_writer ;
           let genesis_root =
             Transition_frontier.root syncing_frontier
-            |> Transition_frontier.Breadcrumb.transition_with_hash
-            |> With_hash.data
+            |> Transition_frontier.Breadcrumb.validated_transition
           in
           let open Bootstrap_controller.For_tests in
           let bootstrap =
@@ -376,9 +367,8 @@ let%test_module "Bootstrap Controller" =
           in
           let best_transition =
             Transition_frontier.best_tip peer_with_frontier.frontier
-            |> Transition_frontier.Breadcrumb.transition_with_hash
-            |> With_hash.data
-            |> External_transition.Validated.forget_validation
+            |> Transition_frontier.Breadcrumb.validated_transition
+            |> External_transition.Validation.forget_validation
           in
           let%bind should_sync =
             Bootstrap_controller.For_tests.on_transition bootstrap
@@ -388,9 +378,8 @@ let%test_module "Bootstrap Controller" =
           assert (is_syncing should_sync) ;
           let outdated_transition =
             Transition_frontier.root peer_with_frontier.frontier
-            |> Transition_frontier.Breadcrumb.transition_with_hash
-            |> With_hash.data
-            |> External_transition.Validated.forget_validation
+            |> Transition_frontier.Breadcrumb.validated_transition
+            |> External_transition.Validation.forget_validation
           in
           let%map should_not_sync =
             Bootstrap_controller.For_tests.on_transition bootstrap

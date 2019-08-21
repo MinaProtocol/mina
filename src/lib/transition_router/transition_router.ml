@@ -69,8 +69,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let get_root_state frontier =
     Transition_frontier.root frontier
-    |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
-    |> External_transition.Validated.protocol_state
+    |> Transition_frontier.Breadcrumb.protocol_state
 
   let start_transition_frontier_controller ~logger ~trust_system ~verifier
       ~network ~time_controller ~proposer_transition_reader

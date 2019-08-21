@@ -237,7 +237,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               !"Producing new block with parent $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
               let transition : External_transition.Validated.t =
-                (Breadcrumb.transition_with_hash crumb).data
+                Breadcrumb.validated_transition crumb
               in
               ( External_transition.Validated.protocol_state transition
               , External_transition.Validated.protocol_state_proof transition
@@ -279,9 +279,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                          over their parent" ;
                     let root_consensus_state =
                       Transition_frontier.root frontier
-                      |> (fun x -> (Breadcrumb.transition_with_hash x).data)
-                      |> External_transition.Validated.protocol_state
-                      |> Protocol_state.consensus_state
+                      |> Breadcrumb.consensus_state
                     in
                     [%test_result: [`Take | `Keep]]
                       (Consensus.Hooks.select ~existing:root_consensus_state
@@ -484,17 +482,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                    in
                    check_for_proposal ())
             | Some transition_frontier -> (
-                let breadcrumb =
-                  Transition_frontier.best_tip transition_frontier
-                in
-                let transition =
-                  (Breadcrumb.transition_with_hash breadcrumb).data
-                in
-                let protocol_state =
-                  External_transition.Validated.protocol_state transition
-                in
                 let consensus_state =
-                  Protocol_state.consensus_state protocol_state
+                  Transition_frontier.best_tip transition_frontier
+                  |> Breadcrumb.consensus_state
                 in
                 assert (
                   Consensus.Hooks.required_local_state_sync ~consensus_state
