@@ -537,6 +537,10 @@ struct
 
     module Gossip_net = struct
       module Config = struct
+        type log_gossip_heard =
+          {snark_pool_diff: bool; transaction_pool_diff: bool; new_state: bool}
+        [@@deriving make]
+
         type t =
           { timeout: Time.Span.t
           ; target_peer_count: int
@@ -546,7 +550,8 @@ struct
           ; chain_id: string
           ; logger: Logger.t
           ; trust_system: Trust_system.t
-          ; max_concurrent_connections: int option }
+          ; max_concurrent_connections: int option
+          ; log_gossip_heard: log_gossip_heard }
         [@@deriving make]
       end
     end

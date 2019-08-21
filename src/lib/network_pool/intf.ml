@@ -134,6 +134,8 @@ module type Snark_pool_diff_intf = sig
 
   val summary : t -> string
 
+  val compact_json : t -> Yojson.Safe.json
+
   val apply : resource_pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
 end
 

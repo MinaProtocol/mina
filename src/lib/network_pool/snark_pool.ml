@@ -185,11 +185,15 @@ end)
                         return ()
                       else (
                         removedCounter := 0 ;
+                        Statement_table.filter_keys_inplace t.snark_table
+                          ~f:(fun work ->
+                            Option.is_some
+                              (Statement_table.find refcount_table work) ) ;
                         return
-                          (Statement_table.filter_keys_inplace t.snark_table
-                             ~f:(fun work ->
-                               Option.is_some
-                                 (Statement_table.find refcount_table work) )) )
+                          (*when snark works removed from the pool*)
+                          Coda_metrics.(
+                            Gauge.set Snark_work.snark_pool_size
+                              (Float.of_int @@ Hashtbl.length t.snark_table)) )
                   )
                 in
                 deferred
@@ -223,6 +227,10 @@ end)
         if work_is_referenced t work then
           let update_and_rebroadcast () =
             Hashtbl.set t.snark_table ~key:work ~data:{proof; fee} ;
+            (*when snark work added to the pool*)
+            Coda_metrics.(
+              Gauge.set Snark_work.snark_pool_size
+                (Float.of_int @@ Hashtbl.length t.snark_table)) ;
             `Rebroadcast
           in
           match Statement_table.find t.snark_table work with
