@@ -42,14 +42,14 @@ let daemon logger =
          ~doc:
            "Your private key will be copied to the internal wallets folder \
             stripped of its password if it is given using the `propose-key` \
-            flag. (default:don't copy the private key)"
+            flag. (default: don't copy the private key)"
          no_arg
      and propose_key =
        flag "propose-key"
          ~doc:
            "KEYFILE Private key file for the block producer. You cannot \
-            provide both `propose-key` and `propose-public-key`. \
-            (default:don't produce blocks)"
+            provide both `propose-key` and `propose-public-key`. (default: \
+            don't produce blocks)"
          (optional string)
      and propose_public_key =
        flag "propose-public-key"
@@ -132,7 +132,8 @@ let daemon logger =
        flag "work-reassignment-wait" (optional int)
          ~doc:
            (Printf.sprintf
-              "WAIT-TIME in ms before a snark-work is reassigned (default:%dms)"
+              "WAIT-TIME in ms before a snark-work is reassigned (default: \
+               %dms)"
               Cli_lib.Default.work_reassignment_wait)
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
@@ -146,24 +147,24 @@ let daemon logger =
        flag "limit-concurrent-connections"
          ~doc:
            "true|false Limit the number of concurrent connections per IP \
-            address (default:true)"
+            address (default: true)"
          (optional bool)
      (*TODO: This is being added to log all the snark works received for the 
      beta-testnet challenge. We might want to remove this later?*)
      and log_received_snark_pool_diff =
        flag "log-snark-work-gossip"
          ~doc:
-           "true|false Log snark-pool diff received from peers (default:false)"
+           "true|false Log snark-pool diff received from peers (default: false)"
          (optional bool)
      and log_received_blocks =
        flag "log-received-blocks"
-         ~doc:"true|false Log blocks received from peers (default:false)"
+         ~doc:"true|false Log blocks received from peers (default: false)"
          (optional bool)
      and log_transaction_pool_diff =
        flag "log-txn-pool-gossip"
          ~doc:
            "true|false Log transaction-pool diff received from peers \
-            (default:false)"
+            (default: false)"
          (optional bool)
      and no_bans =
        let module Expiration = struct
