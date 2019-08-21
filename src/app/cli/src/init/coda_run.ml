@@ -321,11 +321,12 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                   , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r) )
                 ]
               "responding to a Get_work request with some new work" ;
-            Coda_metrics.(Counter.inc_one Snark_work.snark_job_assigned_rpc) ;
+            Coda_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (r, snark_worker_key)) )
     ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
-          Coda_metrics.(Counter.inc_one Snark_work.snark_work_completed_rpc) ;
+          Coda_metrics.(
+            Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
             "received completed work from a snark worker"
             ~metadata:

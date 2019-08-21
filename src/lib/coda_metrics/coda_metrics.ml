@@ -216,36 +216,40 @@ end
 module Snark_work = struct
   let subsystem = "Snark_work"
 
-  let snark_work_received_gossip : Counter.t =
-    let help = "# of snark work received from peers" in
-    Counter.v "snark_work_received_gossip" ~help ~namespace ~subsystem
+  let completed_snark_work_received_gossip : Counter.t =
+    let help = "# of completed snark work bundles received from peers" in
+    Counter.v "completed_snark_work_received_gossip" ~help ~namespace
+      ~subsystem
 
-  let snark_work_completed_rpc : Counter.t =
-    let help = "# of snark work received via rpc" in
-    Counter.v "snark_work_completed_rpc" ~help ~namespace ~subsystem
+  let completed_snark_work_received_rpc : Counter.t =
+    let help = "# of completed snark work bundles received via rpc" in
+    Counter.v "completed_snark_work_received_rpc" ~help ~namespace ~subsystem
 
-  let snark_job_assigned_rpc : Counter.t =
-    let help = "# of snark work sent via rpc" in
-    Counter.v "snark_job_assigned_rpc" ~help ~namespace ~subsystem
+  let snark_work_assigned_rpc : Counter.t =
+    let help = "# of snark work bundles assigned via rpc" in
+    Counter.v "snark_work_assigned_rpc" ~help ~namespace ~subsystem
 
   let snark_work_timed_out_rpc : Counter.t =
     let help =
-      "# of snark work sent via rpc that did not complete within \
-       work-reassignment-wait"
+      "# of snark work bundles sent via rpc that did not complete within the \
+       value of the daemon flag work-reassignment-wait"
     in
     Counter.v "snark_work_timed_out_rpc" ~help ~namespace ~subsystem
 
   let snark_pool_size : Gauge.t =
-    let help = "# of snark works in the snark pool" in
+    let help = "# of completed snark work bundles in the snark pool" in
     Gauge.v "snark_pool_size" ~help ~namespace ~subsystem
 
-  let snark_work_last_block : Gauge.t =
-    let help = "# of snark work purchased per block" in
-    Gauge.v "snark_work_last_block" ~help ~namespace ~subsystem
+  let completed_snark_work_last_block : Gauge.t =
+    let help = "# of snark work bundles purchased per block" in
+    Gauge.v "completed_snark_work_last_block" ~help ~namespace ~subsystem
 
-  let scan_state_snark_jobs : Gauge.t =
-    let help = "# of jobs in the scan state after every block" in
-    Gauge.v "scan_state_snark_jobs" ~help ~namespace ~subsystem
+  let scan_state_snark_work : Gauge.t =
+    let help =
+      "# of snark work in the scan state that are yet to be done/purchased \
+       after every block"
+    in
+    Gauge.v "scan_state_snark_work" ~help ~namespace ~subsystem
 end
 
 module Trust_system = struct
