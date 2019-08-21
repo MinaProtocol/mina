@@ -246,7 +246,7 @@ module T = struct
       worker_state.coda_get_all_transitions pk
 
     let get_all_transitions =
-      C.create_rpc ~f:get_all_transitions_impl
+      C.create_rpc ~f:get_all_transitions_impl ~name:"get_all_transitions"
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
         ~bin_output:
           [%bin_type_class:
@@ -256,37 +256,37 @@ module T = struct
             list] ()
 
     let peers =
-      C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t
+      C.create_rpc ~f:peers_impl ~name:"peers" ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: Network_peer.Peer.Stable.V1.t list] ()
 
     let start =
-      C.create_rpc ~f:start_impl ~bin_input:Unit.bin_t ~bin_output:Unit.bin_t
-        ()
+      C.create_rpc ~name:"start" ~f:start_impl ~bin_input:Unit.bin_t
+        ~bin_output:Unit.bin_t ()
 
     let get_balance =
-      C.create_rpc ~f:get_balance_impl
+      C.create_rpc ~f:get_balance_impl ~name:"get_balance"
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
         ~bin_output:[%bin_type_class: Currency.Balance.Stable.V1.t option] ()
 
     let get_nonce =
-      C.create_rpc ~f:get_nonce_impl
+      C.create_rpc ~f:get_nonce_impl ~name:"get_nonce"
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
         ~bin_output:
           [%bin_type_class: Coda_numbers.Account_nonce.Stable.V1.t option] ()
 
     let root_length =
-      C.create_rpc ~f:root_length_impl ~bin_input:Unit.bin_t
-        ~bin_output:Int.bin_t ()
+      C.create_rpc ~name:"root_length" ~f:root_length_impl
+        ~bin_input:Unit.bin_t ~bin_output:Int.bin_t ()
 
     let prove_receipt =
-      C.create_rpc ~f:prove_receipt_impl
+      C.create_rpc ~f:prove_receipt_impl ~name:"prove_receipt"
         ~bin_input:
           [%bin_type_class:
             Receipt.Chain_hash.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t]
         ~bin_output:Payment_proof.bin_t ()
 
     let new_block =
-      C.create_pipe ~f:new_block_impl
+      C.create_pipe ~f:new_block_impl ~name:"new_block"
         ~bin_input:[%bin_type_class: Account.Stable.V1.key]
         ~bin_output:
           [%bin_type_class:
@@ -295,50 +295,52 @@ module T = struct
             With_hash.Stable.V1.t] ()
 
     let send_user_command =
-      C.create_rpc ~f:send_payment_impl ~bin_input:Send_payment_input.bin_t
+      C.create_rpc ~name:"send_user_command" ~f:send_payment_impl
+        ~bin_input:Send_payment_input.bin_t
         ~bin_output:
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
     let process_user_command =
-      C.create_rpc ~f:process_user_command_impl
+      C.create_rpc ~name:"process_user_command" ~f:process_user_command_impl
         ~bin_input:User_command.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
     let verified_transitions =
-      C.create_pipe ~f:verified_transitions_impl ~bin_input:Unit.bin_t
+      C.create_pipe ~name:"verified_transitions" ~f:verified_transitions_impl
+        ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: bool list * bool list] ()
 
     let root_diff =
-      C.create_pipe ~f:root_diff_impl ~bin_input:Unit.bin_t
+      C.create_pipe ~name:"root_diff" ~f:root_diff_impl ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: Transition_frontier.Diff.Root_diff.view]
         ()
 
     let sync_status =
-      C.create_pipe ~f:sync_status_impl ~bin_input:Unit.bin_t
-        ~bin_output:Sync_status.Stable.V1.bin_t ()
+      C.create_pipe ~name:"sync_status" ~f:sync_status_impl
+        ~bin_input:Unit.bin_t ~bin_output:Sync_status.Stable.V1.bin_t ()
 
     let new_user_command =
-      C.create_pipe ~f:new_user_command_impl
+      C.create_pipe ~name:"new_user_command" ~f:new_user_command_impl
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
         ~bin_output:User_command.Stable.V1.bin_t ()
 
     let get_all_user_commands =
-      C.create_rpc ~f:get_all_user_commands_impl
+      C.create_rpc ~name:"get_all_user_commands" ~f:get_all_user_commands_impl
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
         ~bin_output:[%bin_type_class: User_command.Stable.V1.t list] ()
 
     let dump_tf =
-      C.create_rpc ~f:dump_tf_impl ~bin_input:Unit.bin_t
+      C.create_rpc ~name:"dump_tf" ~f:dump_tf_impl ~bin_input:Unit.bin_t
         ~bin_output:String.bin_t ()
 
     let best_path =
-      C.create_rpc ~f:best_path_impl ~bin_input:Unit.bin_t
+      C.create_rpc ~name:"best_path" ~f:best_path_impl ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: State_hash.Stable.Latest.t list] ()
 
     let validated_transitions_keyswaptest =
-      C.create_pipe ~f:validated_transitions_keyswaptest_impl
-        ~bin_input:Unit.bin_t
+      C.create_pipe ~name:"validated_transitions_keyswaptest"
+        ~f:validated_transitions_keyswaptest_impl ~bin_input:Unit.bin_t
         ~bin_output:
           [%bin_type_class:
             ( External_transition.Stable.Latest.t
@@ -346,7 +348,8 @@ module T = struct
             With_hash.Stable.Latest.t] ()
 
     let replace_snark_worker_key =
-      C.create_rpc ~f:replace_snark_worker_key_impl
+      C.create_rpc ~name:"replace_snark_worker_key"
+        ~f:replace_snark_worker_key_impl
         ~bin_input:
           [%bin_type_class: Public_key.Compressed.Stable.Latest.t option]
         ~bin_output:Unit.bin_t ()
