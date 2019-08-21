@@ -1,7 +1,6 @@
 open Core
 open Async
 open Coda_base
-open Coda_state
 open Coda_transition
 open Signature_lib
 open Pipe_lib
@@ -115,7 +114,7 @@ module T = struct
     ; validated_transitions_keyswaptest:
         ( 'worker
         , unit
-        , (External_transition.t, State_hash.t) With_hash.t Pipe.Reader.t )
+        , External_transition.Validated.t Pipe.Reader.t )
         Rpc_parallel.Function.t }
 
   type coda_functions =
@@ -145,11 +144,7 @@ module T = struct
         Public_key.Compressed.Stable.V1.t option -> unit Deferred.t
     ; coda_validated_transitions_keyswaptest:
            unit
-        -> ( External_transition.Stable.V1.t
-           , State_hash.Stable.V1.t )
-           With_hash.t
-           Pipe.Reader.t
-           Deferred.t
+        -> External_transition.Validated.Stable.V1.t Pipe.Reader.t Deferred.t
     ; coda_root_diff:
            unit
         -> Transition_frontier.Diff.Root_diff.view Pipe.Reader.t Deferred.t
@@ -342,10 +337,7 @@ module T = struct
       C.create_pipe ~name:"validated_transitions_keyswaptest"
         ~f:validated_transitions_keyswaptest_impl ~bin_input:Unit.bin_t
         ~bin_output:
-          [%bin_type_class:
-            ( External_transition.Stable.Latest.t
-            , State_hash.Stable.Latest.t )
-            With_hash.Stable.Latest.t] ()
+          [%bin_type_class: External_transition.Validated.Stable.Latest.t] ()
 
     let replace_snark_worker_key =
       C.create_rpc ~name:"replace_snark_worker_key"
@@ -598,17 +590,13 @@ module T = struct
               (Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
                  ~f:(fun t ->
                    Pipe.write_without_pushback_if_open
-                     validated_transitions_keyswaptest_writer
-                     (With_hash.map t
-                        ~f:External_transition.Validated.forget_validation) ;
-                   let p =
-                     External_transition.Validated.protocol_state
-                       (With_hash.data t)
-                   in
+                     validated_transitions_keyswaptest_writer t ;
                    let prev_state_hash =
-                     Protocol_state.previous_state_hash p
+                     External_transition.Validated.parent_hash t
                    in
-                   let state_hash = With_hash.hash t in
+                   let state_hash =
+                     External_transition.Validated.state_hash t
+                   in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in
                    if Pipe.is_closed w then

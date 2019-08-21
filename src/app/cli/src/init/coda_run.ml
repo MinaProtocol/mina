@@ -26,9 +26,8 @@ let get_lite_chain :
     ~f:(fun consensus_state_to_lite t pks ->
       let ledger = Coda_lib.best_ledger t |> Participating_state.active_exn in
       let transition =
-        With_hash.data
-          (Transition_frontier.Breadcrumb.transition_with_hash
-             (Coda_lib.best_tip t |> Participating_state.active_exn))
+        Transition_frontier.Breadcrumb.validated_transition
+          (Coda_lib.best_tip t |> Participating_state.active_exn)
       in
       let state = External_transition.Validated.protocol_state transition in
       let proof =
