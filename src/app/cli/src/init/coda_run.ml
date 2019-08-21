@@ -419,7 +419,8 @@ let handle_crash e ~conf_dir ~top_logger coda_ref =
       with exn -> Error (Error.of_exn exn)
     with
     | Ok (Some (report_file, temp_config)) ->
-        let _ = Core.Sys.command (sprintf "rm -rf %s" temp_config) in
+        ( try Core.Sys.command (sprintf "rm -rf %s" temp_config) |> ignore
+          with _ -> () ) ;
         sprintf "attach the crash report %s" report_file
     | Ok None ->
         (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
