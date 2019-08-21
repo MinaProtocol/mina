@@ -10,10 +10,12 @@ end) (Work : sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, yojson, version]
+        type t [@@deriving sexp, bin_io, yojson, version, hash]
       end
     end
     with type V1.t = t
+
+  include Hashable.S with type t := t
 end)
 (Transition_frontier : T)
 (Pool : Intf.Snark_resource_pool_intf
@@ -35,6 +37,15 @@ end)
 
       include T
       include Registration.Make_latest_version (T)
+
+      let compact_json = function
+        | Add_solved_work (work, {proof= _; fee= {fee; prover}}) ->
+            `Assoc
+              [ ("work_id", `Int (Work.hash work))
+              ; ("fee", Currency.Fee.Stable.V1.to_yojson fee)
+              ; ( "prover"
+                , Signature_lib.Public_key.Compressed.Stable.V1.to_yojson
+                    prover ) ]
     end
 
     module Latest = V1
@@ -51,6 +62,9 @@ end)
 
   (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, yojson]
+
+  [%%define_locally
+  Stable.Latest.(compact_json)]
 
   let summary = function
     | Stable.V1.Add_solved_work (_, {proof= _; fee}) ->

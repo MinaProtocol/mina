@@ -68,6 +68,10 @@ module type Message_intf = sig
 end
 
 module type Config_intf = sig
+  type log_gossip_heard =
+    {snark_pool_diff: bool; transaction_pool_diff: bool; new_state: bool}
+  [@@deriving make]
+
   type t =
     { timeout: Time.Span.t
     ; target_peer_count: int
@@ -77,7 +81,8 @@ module type Config_intf = sig
     ; chain_id: string
     ; logger: Logger.t
     ; trust_system: Trust_system.t
-    ; max_concurrent_connections: int option }
+    ; max_concurrent_connections: int option
+    ; log_gossip_heard: log_gossip_heard }
   [@@deriving make]
 end
 
@@ -194,6 +199,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     }
 
   module Config = struct
+    type log_gossip_heard =
+      {snark_pool_diff: bool; transaction_pool_diff: bool; new_state: bool}
+    [@@deriving make]
+
     type t =
       { timeout: Time.Span.t
       ; target_peer_count: int
@@ -203,7 +212,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; chain_id: string
       ; logger: Logger.t
       ; trust_system: Trust_system.t
-      ; max_concurrent_connections: int option }
+      ; max_concurrent_connections: int option
+      ; log_gossip_heard: log_gossip_heard }
     [@@deriving make]
   end
 
@@ -245,8 +255,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let mark_peer_disconnected t peer =
     remove_peer t peer ;
     Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Moving peer to disconnected peer set : %{sexp: Peer.t}"
-      peer ;
+      ~metadata:[("peer", Peer.to_yojson peer)]
+      !"Moving peer $peer to disconnected peer set" ;
     Hash_set.add t.disconnected_peers peer
 
   let is_unix_errno errno unix_errno =
@@ -267,9 +277,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             if Hash_set.mem t.disconnected_peers peer then (
               (* optimistically, mark all disconnected peers as peers *)
               Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                !"On RPC call, reconnected to a disconnected peer: %{sexp: \
-                  Peer.t}"
-                peer ;
+                ~metadata:[("peer", Peer.to_yojson peer)]
+                !"On RPC call, reconnected to a disconnected peer: $peer" ;
               unmark_all_disconnected_peers t )
             else return ()
           in
@@ -634,7 +643,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
                  ~f:(fun m ->
                    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-                     "broadcasting message" ;
+                     ~metadata:[("message", `String (Message.summary m))]
+                     "broadcasting message: $message" ;
                    broadcast_random t t.target_peer_count m )) ) ;
         let implementations =
           let implementations =
