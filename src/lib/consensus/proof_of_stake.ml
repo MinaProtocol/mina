@@ -43,13 +43,13 @@ let compute_delegatee_table keys ~iter_accounts =
   let outer_table = Public_key.Compressed.Table.create () in
   iter_accounts (fun i (acct : Account.t) ->
       if Public_key.Compressed.Set.mem keys acct.delegate then
-        Public_key.Compressed.Table.change outer_table acct.delegate
-          ~f:(fun maybe_table ->
-            let table =
-              Option.value maybe_table ~default:(Account.Index.Table.create ())
-            in
-            Account.Index.Table.add_exn table ~key:i ~data:acct.balance ;
-            Some table ) ) ;
+        Public_key.Compressed.Table.update outer_table acct.delegate
+          ~f:(function
+          | None ->
+              Account.Index.Table.of_alist_exn [(i, acct.balance)]
+          | Some table ->
+              Account.Index.Table.add_exn table ~key:i ~data:acct.balance ;
+              table ) ) ;
   (* TODO: this metric tracking currently assumes that the
    * result of compute_delegatee_table is called with the
    * full set of proposer keypairs every time the set
