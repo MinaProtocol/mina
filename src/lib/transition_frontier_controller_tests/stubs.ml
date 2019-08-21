@@ -611,6 +611,8 @@ struct
 
     let first_connection _ = Ivar.create ()
 
+    let high_connectivity _ = Ivar.create ()
+
     let random_peers {peers; _} num_peers =
       let peer_list = Hash_set.to_list peers in
       List.take (List.permute peer_list) num_peers

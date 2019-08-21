@@ -159,6 +159,10 @@ end = struct
   let done_syncing_root root_sync_ledger =
     Option.is_some (Root_sync_ledger.peek_valid_tree root_sync_ledger)
 
+  let should_sync ~root_sync_ledger t candidate_state =
+    (not @@ done_syncing_root root_sync_ledger)
+    && worth_getting_root t candidate_state
+
   let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip
       peer_root =
     let%bind () =
@@ -201,13 +205,10 @@ end = struct
   let on_transition t ~sender ~root_sync_ledger
       (candidate_transition : External_transition.t) =
     let candidate_state =
-      External_transition.protocol_state candidate_transition
-      |> Protocol_state.consensus_state
+      External_transition.consensus_state candidate_transition
     in
-    if
-      done_syncing_root root_sync_ledger
-      || (not @@ worth_getting_root t candidate_state)
-    then Deferred.return `Ignored
+    if not @@ should_sync ~root_sync_ledger t candidate_state then
+      Deferred.return `Ignored
     else
       match%bind Network.get_ancestry t.network sender candidate_state with
       | Error e ->
@@ -236,9 +237,13 @@ end = struct
     Network.glue_sync_ledger t.network query_reader response_writer ;
     Reader.iter sync_ledger_reader
       ~f:(fun (`Transition incoming_transition, `Time_received _) ->
-        let ({With_hash.data= transition; hash= _}, _)
+        let ({With_hash.data= transition; hash}, _)
               : External_transition.with_initial_validation =
           Envelope.Incoming.data incoming_transition
+        in
+        let protocol_state = External_transition.protocol_state transition in
+        let previous_state_hash =
+          Protocol_state.previous_state_hash protocol_state
         in
         let sender =
           match Envelope.Incoming.sender incoming_transition with
@@ -249,87 +254,101 @@ end = struct
           | Envelope.Sender.Remote inet_addr ->
               inet_addr
         in
-        let protocol_state = External_transition.protocol_state transition in
-        let previous_state_hash =
-          Protocol_state.previous_state_hash protocol_state
-        in
         Transition_cache.add transition_graph ~parent:previous_state_hash
           incoming_transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
-        if worth_getting_root t (Protocol_state.consensus_state protocol_state)
-        then
+        if
+          worth_getting_root t (External_transition.consensus_state transition)
+        then (
+          Logger.trace t.logger
+            !"Added the transition from sync_ledger_reader into cache"
+            ~location:__LOC__ ~module_:__MODULE__
+            ~metadata:
+              [ ("state_hash", State_hash.to_yojson hash)
+              ; ( "external_transition"
+                , External_transition.to_yojson transition ) ] ;
           Deferred.ignore
-          @@ on_transition t ~sender ~root_sync_ledger transition
+          @@ on_transition t ~sender ~root_sync_ledger transition )
         else Deferred.unit )
 
-  let download_best_tip ~network ~logger ~trust_system ~verifier
+  let download_best_tip ~root_sync_ledger ~transition_graph t
       ({With_hash.data= initial_root_transition; _}, _) =
     let num_peers = 8 in
-    let peers = Network.random_peers network num_peers in
-    Logger.info logger
-      !"Number of peers that we are sampling: %i"
-      (List.length peers) ~module_:__MODULE__ ~location:__LOC__ ;
-    Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
-        let open Deferred.Or_error.Let_syntax in
-        let initial_consensus_state =
-          External_transition.consensus_state initial_root_transition
-        in
-        let%bind peer_best_tip =
-          Network.get_bootstrappable_best_tip network peer
-            initial_consensus_state
-        in
-        let open Deferred.Let_syntax in
-        match%bind
-          Sync_handler.Bootstrappable_best_tip.verify ~logger ~verifier
-            initial_consensus_state peer_best_tip
-        with
-        | Ok verified_witness ->
-            Deferred.Or_error.return
-              (`Verified_witness verified_witness, `Queried_peer peer)
-        | Error e ->
-            let error_msg =
-              sprintf
-                !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof for \
-                  their best tip"
-                peer
-            in
-            Logger.warn logger !"%s" error_msg ~module_:__MODULE__
-              ~location:__LOC__ ;
-            ignore
-              Trust_system.(
-                record trust_system logger peer.host
-                  Actions.(Violated_protocol, Some (error_msg, []))) ;
-            Deferred.return (Error e) )
-
-  let request_and_sync_best_tip t root_sync_ledger initial_root_transition =
+    let peers = Network.random_peers t.network num_peers in
     Logger.info t.logger
       "Requesting peers for their best tip to eagerly start bootstrap"
       ~module_:__MODULE__ ~location:__LOC__ ;
-    match%bind
-      download_best_tip ~network:t.network ~logger:t.logger
-        ~trust_system:t.trust_system ~verifier:t.verifier
-        initial_root_transition
-    with
-    | Ok
-        ( `Verified_witness
-            ( `Root root_with_validation
-            , `Best_tip ((best_tip, _) as best_tip_with_validation) )
-        , `Queried_peer queried_peer ) ->
-        Logger.info t.logger
-          "Syncing with peer's best tip after asking other peers"
-          ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:
-            [ ("peer", Network_peer.Peer.to_yojson queried_peer)
-            ; ("best tip", External_transition.to_yojson best_tip.data) ] ;
-        Deferred.ignore
-          (start_sync_job_with_peer ~sender:queried_peer.host ~root_sync_ledger
-             t best_tip_with_validation root_with_validation)
-    | Error e ->
-        Logger.info t.logger
-          "A sample subset of peers could not give their valid best tip"
-          ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("error", `String (Error.to_string_hum e))] ;
-        Deferred.unit
+    Logger.info t.logger
+      !"Number of peers that we are sampling: %i"
+      (List.length peers) ~module_:__MODULE__ ~location:__LOC__ ;
+    Deferred.List.iter peers ~f:(fun peer ->
+        let initial_consensus_state =
+          External_transition.consensus_state initial_root_transition
+        in
+        match%bind
+          Network.get_bootstrappable_best_tip t.network peer
+            initial_consensus_state
+        with
+        | Error e ->
+            Logger.debug t.logger
+              !"Could not get bootstrappable best tip from peer: \
+                %{sexp:Error.t}"
+              ~metadata:[("peer", Network_peer.Peer.to_yojson peer)]
+              e ~location:__LOC__ ~module_:__MODULE__ ;
+            Deferred.unit
+        | Ok peer_best_tip -> (
+            match%bind
+              Sync_handler.Bootstrappable_best_tip.verify ~logger:t.logger
+                ~verifier:t.verifier initial_consensus_state peer_best_tip
+            with
+            | Ok
+                ( `Root root_with_validation
+                , `Best_tip
+                    ((best_tip_with_hash, _) as best_tip_with_validation) ) ->
+                let best_tip = With_hash.data best_tip_with_hash in
+                let logger =
+                  Logger.extend t.logger
+                    [ ("peer", Network_peer.Peer.to_yojson peer)
+                    ; ("best tip", External_transition.to_yojson @@ best_tip)
+                    ; ( "hash"
+                      , State_hash.to_yojson
+                        @@ With_hash.hash best_tip_with_hash ) ]
+                in
+                Transition_cache.add transition_graph
+                  ~parent:(External_transition.parent_hash best_tip)
+                  {data= best_tip_with_validation; sender= Remote peer.host} ;
+                if
+                  should_sync ~root_sync_ledger t
+                  @@ External_transition.consensus_state best_tip
+                then (
+                  Logger.debug logger
+                    "Syncing with peer's bootstrappable best tip"
+                    ~module_:__MODULE__ ~location:__LOC__ ;
+                  (* TODO: Efficiently limiting the number of green threads in #1337 *)
+                  Deferred.ignore
+                    (start_sync_job_with_peer ~sender:peer.host
+                       ~root_sync_ledger t best_tip_with_validation
+                       root_with_validation) )
+                else (
+                  Logger.debug logger
+                    !"Will not sync with peer's bootstrappable best tip "
+                    ~location:__LOC__ ~module_:__MODULE__ ;
+                  Deferred.unit )
+            | Error e ->
+                let error_msg =
+                  sprintf
+                    !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof for \
+                      their best tip"
+                    peer
+                in
+                Logger.warn t.logger !"%s" error_msg ~module_:__MODULE__
+                  ~location:__LOC__
+                  ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                ignore
+                  Trust_system.(
+                    record t.trust_system t.logger peer.host
+                      Actions.(Violated_protocol, Some (error_msg, []))) ;
+                Deferred.unit ) )
 
   (* We conditionally ask other peers for their best tip. This is for testing
      eager bootstrapping and the regular functionalities of bootstrapping in
@@ -373,7 +392,8 @@ end = struct
     in
     let%bind () =
       if should_ask_best_tip then
-        request_and_sync_best_tip t root_sync_ledger initial_root_transition
+        download_best_tip ~root_sync_ledger ~transition_graph t
+          initial_root_transition
       else Deferred.unit
     in
     let%bind synced_db, (hash, sender, expected_staged_ledger_hash) =
@@ -508,7 +528,31 @@ end = struct
             in
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               "Bootstrap state: complete." ;
-            (new_frontier, Transition_cache.data transition_graph) )
+            let collected_transitions =
+              Transition_cache.data transition_graph
+            in
+            let logger =
+              Logger.extend logger
+                [ ( "context"
+                  , `String "Filter collected transitions in bootstrap" ) ]
+            in
+            let root_consensus_state =
+              Transition_frontier.(
+                External_transition.Validated.consensus_state
+                @@ Breadcrumb.external_transition @@ root new_frontier)
+            in
+            let filtered_collected_transitions =
+              List.filter collected_transitions ~f:(fun incoming_transition ->
+                  let With_hash.{data= transition; _}, _ =
+                    Envelope.Incoming.data incoming_transition
+                  in
+                  `Take
+                  = Consensus.Hooks.select ~existing:root_consensus_state
+                      ~candidate:
+                        (External_transition.consensus_state transition)
+                      ~logger )
+            in
+            (new_frontier, filtered_collected_transitions) )
 
   module For_tests = struct
     type nonrec t = t
