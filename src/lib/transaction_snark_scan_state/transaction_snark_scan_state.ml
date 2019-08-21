@@ -148,8 +148,10 @@ module Make
                     [ statement_to_yojson x
                     ; statement_to_yojson y
                     ; `Int seq_no
-                    ; `String (Parallel_scan.Job_status.to_string status) ] )
-              ]
+                    ; `Assoc
+                        [ ( "status"
+                          , `String (Parallel_scan.Job_status.to_string status)
+                          ) ] ] ) ]
         | BFull (x, {seq_no; status}) ->
             `Assoc
               [ ( "B"
