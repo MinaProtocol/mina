@@ -32,22 +32,20 @@ let writeStatic = (path, rootComponent) => {
 
 let asset_regex = [%re {|/\/static\/blog\/.*{png,jpg,svg}/|}];
 
-let posts = {
-  let unsorted =
-    Node.Fs.readdirSync("posts")
-    |> Array.to_list
-    |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
-    |> List.map(fileName => {
-         let length =
-           String.length(fileName) - String.length(Markdown.suffix);
-         let name = String.sub(fileName, 0, length);
-         let path = "posts/" ++ fileName;
-         let (html, content) = Markdown.load(path);
-         let metadata = BlogPost.parseMetadata(content, path);
-         (name, html, metadata);
-       });
-
-  List.sort(
+let posts =
+  Node.Fs.readdirSync("posts")
+  |> Array.to_list
+  |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
+  |> List.map(fileName => {
+        let length =
+          String.length(fileName) - String.length(Markdown.suffix);
+        let name = String.sub(fileName, 0, length);
+        let path = "posts/" ++ fileName;
+        let (html, content) = Markdown.load(path);
+        let metadata = BlogPost.parseMetadata(content, path);
+        (name, html, metadata);
+      })
+  |> List.sort(
     ((_, _, metadata1), (_, _, metadata2)) => {
       let date1 = Js.Date.fromString(metadata1.BlogPost.date);
       let date2 = Js.Date.fromString(metadata2.date);
@@ -59,10 +57,8 @@ let posts = {
       } else {
         0;
       };
-    },
-    unsorted,
+    }
   );
-};
 
 module MoreFs = {
   type stat;
@@ -111,31 +107,50 @@ module Router = {
 };
 
 let jobOpenings = [|
-  ("engineering-manager", "Engineering Manager (San Francisco)."),
-  ("product-manager", "Product Manager (San Francisco)."),
-  ("senior-designer", "Senior Designer (San Francisco)."),
+  ("engineering-manager", "Engineering Manager (San Francisco)"),
+  ("product-manager", "Product Manager (San Francisco)"),
+  ("senior-designer", "Senior Designer (San Francisco)"),
   (
     "senior-frontend-engineer",
-    "Senior Product Engineer (Frontend) (San Francisco).",
+    "Senior Product Engineer (Frontend) (San Francisco)",
   ),
-  ("frontend-engineer", "Product Engineer (Frontend) (San Francisco)."),
-  ("fullstack-engineer", "Product Engineer (Full-stack) (San Francisco)."),
+  ("frontend-engineer", "Product Engineer (Frontend) (San Francisco)"),
+  ("fullstack-engineer", "Product Engineer (Full-stack) (San Francisco)"),
   (
     "marketing-and-communications-manager",
-    "Marketing and Communications Manager (San Francisco).",
+    "Marketing and Communications Manager (San Francisco)",
   ),
-  ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
+  ("protocol-engineer", "Senior Protocol Engineer (San Francisco)"),
   ("cryptography-engineer", "Cryptography Engineer (San Francisco)"),
 |];
 
 // GENERATE
 
 Rimraf.sync("site");
+Rimraf.sync("docs-theme");
 
 let blogPage = name =>
   <Page page=`Blog name extraHeaders={Blog.extraHeaders()}>
     <Wrapped> <Blog posts /> </Wrapped>
   </Page>;
+
+let privacyPage = name =>
+  <Page page=`Privacy name>
+    <RawHtml path="html/Privacy.html" />
+  </Page>;
+
+let jobsPage = name =>
+  <Page page=`Jobs name extraHeaders={Careers.extraHeaders()}>
+    <Wrapped> <Careers jobOpenings /> </Wrapped>
+  </Page>;
+
+let testnetPage = name =>
+  <Page page=`Testnet name extraHeaders={Testnet.extraHeaders()}>
+    <Wrapped> <Testnet /> </Wrapped>
+  </Page>;
+
+let tosPage = name =>
+  <Page page=`Tos name> <RawHtml path="html/TOS.html" /> </Page>;
 
 Router.(
   generateStatic(
@@ -188,38 +203,22 @@ Router.(
                    </Wrapped>
                  </Page>,
                )
-             ),
+             )
+          |> Array.append([|File("index", jobsPage("index"))|]),
         ),
-        File(
-          "jobs",
-          <Page page=`Jobs name="jobs" extraHeaders={Careers.extraHeaders()}>
-            <Wrapped> <Careers jobOpenings /> </Wrapped>
-          </Page>,
-        ),
-        File(
-          "testnet",
-          <Page
-            page=`Testnet name="testnet" extraHeaders={Testnet.extraHeaders()}>
-            <Wrapped> <Testnet /> </Wrapped>
-          </Page>,
-        ),
+        Dir("privacy", [|File("index", privacyPage("index"))|]),
+        Dir("testnet", [|File("index", testnetPage("index"))|]),
+        Dir("tos", [|File("index", tosPage("index"))|]),
         File("blog", blogPage("blog")),
-        File(
-          "privacy",
-          <Page page=`Privacy name="privacy">
-            <RawHtml path="html/Privacy.html" />
-          </Page>,
-        ),
-        File(
-          "tos",
-          <Page page=`Tos name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
-        ),
+        File("privacy", privacyPage("privacy")),
+        File("jobs", jobsPage("jobs")),
+        File("testnet", testnetPage("testnet")),
+        File("tos", tosPage("tos")),
       |],
     ),
-  )
+  ),
 );
 
-Rimraf.sync("docs-theme");
 Router.(
   generateStatic(
     Dir(

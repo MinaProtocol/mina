@@ -8,7 +8,7 @@
     "clean": "bsb -clean-world",
     "watch": "bsb -make-world -w",
     "start": "serve -l 8000 site",
-    "dev": "npx concurrently 'bsb -make-world -w' 'npx nodemon ./lib/js/src/Render.js mkdocs.yml' 'serve -l 8000 site'",
+    "dev": "npx concurrently 'bsb -make-world -w' 'npx nodemon ./lib/js/src/Render.js mkdocs.yml' 'serve -l 8000 -c ../serve.json site'",
     "reformat": "bsrefmt --in-place src/*.re",
     "deploy": "./deploy-website.sh",
     "deploy-ci": "FIREBASE_TOKEN=\"$FIREBASE_TOKEN\" ./deploy-website.sh ci",
