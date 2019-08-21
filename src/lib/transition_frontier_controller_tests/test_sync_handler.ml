@@ -65,8 +65,8 @@ let%test_module "Sync_handler" =
                   failwith "target of sync_ledger should not change" ) )
 
     let to_external_transition breadcrumb =
-      Transition_frontier.Breadcrumb.external_transition breadcrumb
-      |> External_transition.Validated.forget_validation
+      Transition_frontier.Breadcrumb.validated_transition breadcrumb
+      |> External_transition.Validation.forget_validation
 
     let%test "a node should be able to give a valid proof of their root" =
       let logger = Logger.null () in
@@ -88,7 +88,7 @@ let%test_module "Sync_handler" =
           let seen_transition =
             Transition_frontier.(
               all_breadcrumbs frontier |> List.permute |> List.hd_exn
-              |> Breadcrumb.transition_with_hash |> With_hash.data)
+              |> Breadcrumb.validated_transition)
           in
           let observed_state =
             External_transition.Validated.protocol_state seen_transition
@@ -123,8 +123,8 @@ let%test_module "Sync_handler" =
             create_root_frontier ~logger Genesis_ledger.accounts
           in
           let root_breadcrumb = Transition_frontier.root frontier in
-          let {With_hash.data= root_transition; _} =
-            Transition_frontier.Breadcrumb.transition_with_hash root_breadcrumb
+          let root_transition =
+            Transition_frontier.Breadcrumb.validated_transition root_breadcrumb
           in
           let%bind () =
             build_frontier_randomly frontier

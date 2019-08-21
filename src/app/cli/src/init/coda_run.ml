@@ -14,6 +14,11 @@ let snark_job_list_json t =
   let%map sl = Coda_lib.best_staged_ledger t in
   Staged_ledger.Scan_state.snark_job_list_json (Staged_ledger.scan_state sl)
 
+let snark_pool_list t =
+  Coda_lib.snark_pool t |> Network_pool.Snark_pool.resource_pool
+  |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
+  |> Yojson.Safe.to_string
+
 let get_lite_chain :
     (Coda_lib.t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
     option =
@@ -21,9 +26,8 @@ let get_lite_chain :
     ~f:(fun consensus_state_to_lite t pks ->
       let ledger = Coda_lib.best_ledger t |> Participating_state.active_exn in
       let transition =
-        With_hash.data
-          (Transition_frontier.Breadcrumb.transition_with_hash
-             (Coda_lib.best_tip t |> Participating_state.active_exn))
+        Transition_frontier.Breadcrumb.validated_transition
+          (Coda_lib.best_tip t |> Participating_state.active_exn)
       in
       let state = External_transition.Validated.protocol_state transition in
       let proof =
@@ -255,6 +259,8 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
     ; implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
           return (snark_job_list_json coda |> Participating_state.active_error)
       )
+    ; implement Daemon_rpcs.Snark_pool_list.rpc (fun () () ->
+          return (snark_pool_list coda) )
     ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
           let open Coda_lib.Config in
           Coda_tracing.start (Coda_lib.config coda).conf_dir )

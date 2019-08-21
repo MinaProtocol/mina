@@ -196,12 +196,11 @@ struct
           staged_ledger_diff
         |> Deferred.Or_error.ok_exn
       in
-      let previous_transition_with_hash =
-        Transition_frontier.Breadcrumb.transition_with_hash parent_breadcrumb
+      let previous_transition =
+        Transition_frontier.Breadcrumb.validated_transition parent_breadcrumb
       in
       let previous_protocol_state =
-        With_hash.data previous_transition_with_hash
-        |> External_transition.Validated.protocol_state
+        previous_transition |> External_transition.Validated.protocol_state
       in
       let previous_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
@@ -241,36 +240,20 @@ struct
             next_verified_external_transition) =
         External_transition.Validated.create_unsafe next_external_transition
       in
-      let next_verified_external_transition_with_hash =
-        With_hash.of_data next_verified_external_transition
-          ~hash_data:
-            (Fn.compose Protocol_state.hash
-               External_transition.Validated.protocol_state)
-      in
       match%map
         Transition_frontier.Breadcrumb.build ~logger ~trust_system ~verifier:()
           ~parent:parent_breadcrumb
           ~transition:
-            (External_transition.Validation.lower
-               next_verified_external_transition_with_hash
-               ( (`Time_received, Truth.True ())
-               , (`Proof, Truth.True ())
-               , ( `Delta_transition_chain
-                 , Truth.True
-                     (Non_empty_list.singleton
-                        (Transition_frontier.Breadcrumb.state_hash
-                           parent_breadcrumb)) )
-               , (`Frontier_dependencies, Truth.True ())
-               , (`Staged_ledger_diff, Truth.False) ))
+            (External_transition.Validation.reset_staged_ledger_diff_validation
+               next_verified_external_transition)
           ~sender:None
       with
       | Ok new_breadcrumb ->
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ( "state_hash"
-                , Transition_frontier.Breadcrumb.transition_with_hash
-                    new_breadcrumb
-                  |> With_hash.hash |> State_hash.to_yojson ) ]
+                , Transition_frontier.Breadcrumb.state_hash new_breadcrumb
+                  |> State_hash.to_yojson ) ]
             "Producing a breadcrumb with hash: $state_hash" ;
           new_breadcrumb
       | Error (`Fatal_error exn) ->
@@ -305,9 +288,6 @@ struct
     let genesis_protocol_state =
       With_hash.data genesis_protocol_state_with_hash
     in
-    let genesis_protocol_state_hash =
-      With_hash.hash genesis_protocol_state_with_hash
-    in
     let root_ledger_hash =
       genesis_protocol_state |> Protocol_state.blockchain_state
       |> Blockchain_state.snarked_ledger_hash
@@ -336,9 +316,6 @@ struct
            ~delta_transition_chain_proof:
              (Protocol_state.previous_state_hash genesis_protocol_state, []))
     in
-    let root_transition_with_data =
-      {With_hash.data= root_transition; hash= genesis_protocol_state_hash}
-    in
     let open Deferred.Let_syntax in
     let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
     match%bind
@@ -349,9 +326,8 @@ struct
     with
     | Ok root_staged_ledger ->
         let%map frontier =
-          Transition_frontier.create ~logger
-            ~root_transition:root_transition_with_data ~root_snarked_ledger
-            ~root_staged_ledger ~consensus_local_state
+          Transition_frontier.create ~logger ~root_transition
+            ~root_snarked_ledger ~root_staged_ledger ~consensus_local_state
         in
         frontier
     | Error err ->
@@ -790,20 +766,14 @@ struct
     let send_transition ~logger ~transition_writer ~peer:{peer; frontier}
         state_hash =
       let transition =
-        let transition_with_hash =
+        let validated_transition =
           Transition_frontier.find_exn frontier state_hash
-          |> Transition_frontier.Breadcrumb.transition_with_hash
+          |> Transition_frontier.Breadcrumb.validated_transition
         in
-        External_transition.Validation.lower transition_with_hash
-          ( (`Time_received, Truth.True ())
-          , (`Proof, Truth.True ())
-          , ( `Delta_transition_chain
-            , Truth.True
-                (Non_empty_list.singleton
-                   ( With_hash.data transition_with_hash
-                   |> External_transition.Validated.parent_hash )) )
-          , (`Frontier_dependencies, Truth.False)
-          , (`Staged_ledger_diff, Truth.False) )
+        validated_transition
+        |> External_transition.Validation
+           .reset_frontier_dependencies_validation
+        |> External_transition.Validation.reset_staged_ledger_diff_validation
       in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:

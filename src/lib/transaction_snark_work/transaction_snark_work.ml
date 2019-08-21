@@ -38,6 +38,12 @@ end) :
         include T
         include Registration.Make_latest_version (T)
         include Hashable.Make_binable (T)
+
+        let compact_json t =
+          `List
+            (List.map
+               ~f:(fun s -> `Int (Transaction_snark.Statement.Stable.V1.hash s))
+               t)
       end
 
       module Latest = V1

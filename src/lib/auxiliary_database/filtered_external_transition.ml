@@ -85,8 +85,7 @@ let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
 let user_commands {transactions= {Transactions.user_commands; _}; _} =
   user_commands
 
-let of_transition tracked_participants {With_hash.data= external_transition; _}
-    =
+let of_transition tracked_participants external_transition =
   let open External_transition.Validated in
   let creator = proposer external_transition in
   let protocol_state =

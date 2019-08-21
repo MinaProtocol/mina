@@ -363,20 +363,12 @@ end = struct
     |> don't_wait_for ;
     let initial_breadcrumb = Transition_frontier.root frontier in
     let initial_transition =
-      Transition_frontier.Breadcrumb.transition_with_hash initial_breadcrumb
+      Transition_frontier.Breadcrumb.validated_transition initial_breadcrumb
     in
     let initial_root_transition =
-      External_transition.Validation.lower initial_transition
-        ( (`Time_received, Truth.True ())
-        , (`Proof, Truth.True ())
-          (* This is a hack, but since we are bootstrapping. I am assuming this would be fine *)
-        , ( `Delta_transition_chain
-          , Truth.True
-              (Non_empty_list.singleton
-                 (Transition_frontier.Breadcrumb.parent_hash initial_breadcrumb))
-          )
-        , (`Frontier_dependencies, Truth.False)
-        , (`Staged_ledger_diff, Truth.False) )
+      initial_transition
+      |> External_transition.Validation.reset_frontier_dependencies_validation
+      |> External_transition.Validation.reset_staged_ledger_diff_validation
     in
     let t =
       { network
@@ -470,17 +462,18 @@ end = struct
                 , Some ("Received valid scan state from peer", []) ))
         in
         let new_root =
-          With_hash.map (fst t.current_root) ~f:(fun root ->
-              (* TODO: review the correctness of this action #2480 *)
-              let (`I_swear_this_is_safe_see_my_comment root') =
-                External_transition.Validated.create_unsafe root
-              in
-              root' )
+          let root_transition =
+            External_transition.Validation.forget_validation t.current_root
+          in
+          (* TODO: review the correctness of this action #2480 *)
+          let (`I_swear_this_is_safe_see_my_comment validated_root_transition)
+              =
+            External_transition.Validated.create_unsafe root_transition
+          in
+          validated_root_transition
         in
         let consensus_state =
-          With_hash.data new_root
-          |> External_transition.Validated.protocol_state
-          |> Protocol_state.consensus_state
+          new_root |> External_transition.Validated.consensus_state
         in
         let local_state = Transition_frontier.consensus_local_state frontier in
         match%bind
@@ -558,22 +551,11 @@ end = struct
     type nonrec t = t
 
     let make_bootstrap ~logger ~trust_system ~verifier ~genesis_root ~network =
-      let transition_with_hash =
-        With_hash.of_data genesis_root
-          ~hash_data:
-            (Fn.compose Protocol_state.hash
-               External_transition.Validated.protocol_state)
-      in
       let transition =
-        External_transition.Validation.lower transition_with_hash
-          ( (`Time_received, Truth.True ())
-          , (`Proof, Truth.True ())
-          , ( `Delta_transition_chain
-            , Truth.True
-                ( Non_empty_list.singleton
-                @@ External_transition.Validated.parent_hash genesis_root ) )
-          , (`Frontier_dependencies, Truth.False)
-          , (`Staged_ledger_diff, Truth.False) )
+        genesis_root
+        |> External_transition.Validation
+           .reset_frontier_dependencies_validation
+        |> External_transition.Validation.reset_staged_ledger_diff_validation
       in
       { logger
       ; trust_system
