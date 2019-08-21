@@ -222,6 +222,7 @@ module Types = struct
                ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
                ~user_commands_sent:nn_int ~snark_worker:string
+               ~snark_work_fee:nn_int
                ~sync_status:(id ~typ:(non_null sync_status))
                ~propose_pubkeys:
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
@@ -556,6 +557,13 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
+    let set_snark_work_fee =
+      obj "SetSnarkWorkFeePayload" ~fields:(fun _ ->
+          [ field "lastFee" ~doc:"Returns the last fee set to do snark work"
+              ~typ:(non_null uint64)
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
     let set_snark_worker =
       obj "SetSnarkWorkerPayload" ~fields:(fun _ ->
           [ field "lastSnarkWorker"
@@ -695,6 +703,11 @@ module Types = struct
               ~doc:
                 "Public keys of wallets you wish to stake - these must be \
                  wallets that are in ownedWallets" ]
+
+    let set_snark_work_fee =
+      obj "SetSnarkWorkFee"
+        ~fields:[Fields.fee ~doc:"Fee to get rewarded for producing snark work"]
+        ~coerce:Fn.id
 
     let set_snark_worker =
       obj "SetSnarkWorkerInput" ~coerce:Fn.id
@@ -1289,6 +1302,21 @@ module Mutations = struct
         let%map () = Coda_lib.replace_snark_worker_key coda pk in
         Ok old_snark_worker_key )
 
+  let set_snark_work_fee =
+    result_field "setSnarkWorkFee"
+      ~doc:"Set fee that you will like to receive for doing snark work"
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_work_fee)]
+      ~typ:(non_null Types.Payload.set_snark_work_fee)
+      ~resolve:(fun {ctx= coda; _} () raw_fee ->
+        let open Result.Let_syntax in
+        let%map fee =
+          result_of_exn Currency.Fee.of_uint64 raw_fee
+            ~error:"Invalid snark work `fee` provided."
+        in
+        let last_fee = Coda_lib.snark_work_fee coda in
+        Coda_lib.set_snark_work_fee coda fee ;
+        Currency.Fee.to_uint64 last_fee )
+
   let commands =
     [ add_wallet
     ; delete_wallet
@@ -1296,7 +1324,8 @@ module Mutations = struct
     ; send_delegation
     ; add_payment_receipt
     ; set_staking
-    ; set_snark_worker ]
+    ; set_snark_worker
+    ; set_snark_work_fee ]
 end
 
 module Queries = struct
