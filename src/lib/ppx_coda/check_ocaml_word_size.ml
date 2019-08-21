@@ -12,7 +12,7 @@ open Asttypes
 let name = "check_ocaml_word_size"
 
 let expand ~loc ~path:_ expected_word_size =
-  if Int.(not @@ equal Sys.word_size expected_word_size) then
+  if not (Int.equal Sys.word_size expected_word_size) then
     Location.raise_errorf ~loc "OCaml word size must be %d, got %d"
       expected_word_size Sys.word_size ;
   [%stri let () = ()]
