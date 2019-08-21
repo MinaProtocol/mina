@@ -233,9 +233,13 @@ end = struct
     Network.glue_sync_ledger t.network query_reader response_writer ;
     Reader.iter sync_ledger_reader
       ~f:(fun (`Transition incoming_transition, `Time_received _) ->
-        let ({With_hash.data= transition; hash= _}, _)
+        let ({With_hash.data= transition; hash}, _)
               : External_transition.with_initial_validation =
           Envelope.Incoming.data incoming_transition
+        in
+        let protocol_state = External_transition.protocol_state transition in
+        let previous_state_hash =
+          Protocol_state.previous_state_hash protocol_state
         in
         let sender =
           match Envelope.Incoming.sender incoming_transition with
@@ -246,18 +250,24 @@ end = struct
           | Envelope.Sender.Remote inet_addr ->
               inet_addr
         in
-        Transition_cache.add transition_graph
-          ~parent:(External_transition.parent_hash transition)
-          incoming_transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
         if
           worth_getting_root t (External_transition.consensus_state transition)
-        then
+        then (
+          Logger.trace t.logger
+            !"Added the transition from sync_ledger_reader into cache"
+            ~location:__LOC__ ~module_:__MODULE__
+            ~metadata:
+              [ ("state_hash", State_hash.to_yojson hash)
+              ; ( "external_transition"
+                , External_transition.to_yojson transition ) ] ;
+          Transition_cache.add transition_graph ~parent:previous_state_hash
+            incoming_transition ;
           Deferred.ignore
-          @@ on_transition t ~sender ~root_sync_ledger transition
+          @@ on_transition t ~sender ~root_sync_ledger transition )
         else Deferred.unit )
 
-  let download_best_tip ~root_sync_ledger t
+  let download_best_tip ~root_sync_ledger ~transition_graph t
       ({With_hash.data= initial_root_transition; _}, _) =
     let num_peers = 8 in
     let peers = Network.random_peers t.network num_peers in
@@ -296,12 +306,17 @@ end = struct
                   Logger.extend t.logger
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("best tip", External_transition.to_yojson @@ best_tip)
-                    ]
+                    ; ( "hash"
+                      , State_hash.to_yojson
+                        @@ With_hash.hash best_tip_with_hash ) ]
                 in
                 if
                   should_sync ~root_sync_ledger t
                   @@ External_transition.consensus_state best_tip
                 then (
+                  Transition_cache.add transition_graph
+                    ~parent:(External_transition.parent_hash best_tip)
+                    {data= best_tip_with_validation; sender= Remote peer.host} ;
                   Logger.debug logger
                     "Syncing with peer's bootstrappable best tip"
                     ~module_:__MODULE__ ~location:__LOC__ ;
@@ -372,7 +387,8 @@ end = struct
     in
     let%bind () =
       if should_ask_best_tip then
-        download_best_tip ~root_sync_ledger t initial_root_transition
+        download_best_tip ~root_sync_ledger ~transition_graph t
+          initial_root_transition
       else Deferred.unit
     in
     let%bind synced_db, (hash, sender, expected_staged_ledger_hash) =
