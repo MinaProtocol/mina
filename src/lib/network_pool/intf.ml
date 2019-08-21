@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Coda_base
 open Pipe_lib
+open Signature_lib
 
 (** A [Resource_pool_base_intf] is a mutable pool of resources that supports
  *  mutation via some [Resource_pool_diff_intf]. A [Resource_pool_base_intf]
@@ -106,6 +107,8 @@ module type Snark_resource_pool_intf = sig
     -> [`Rebroadcast | `Don't_rebroadcast]
 
   val request_proof : t -> work -> ledger_proof list Priced_proof.t option
+
+  val snark_pool_json : t -> Yojson.Safe.json
 end
 
 (** A [Snark_pool_diff_intf] is the resource pool diff for
@@ -131,5 +134,40 @@ module type Snark_pool_diff_intf = sig
 
   val summary : t -> string
 
+  val compact_json : t -> Yojson.Safe.json
+
   val apply : resource_pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
+end
+
+module type Transaction_pool_diff_intf = sig
+  module Stable : sig
+    module V1 : sig
+      type t = User_command.Stable.V1.t list
+      [@@deriving sexp, to_yojson, bin_io, version]
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+end
+
+module type Transaction_resource_pool_intf = sig
+  type t
+
+  type best_tip_diff
+
+  type transition_frontier
+
+  include
+    Resource_pool_base_intf
+    with type transition_frontier := transition_frontier
+     and type t := t
+
+  val member : t -> User_command.With_valid_signature.t -> bool
+
+  val transactions : t -> User_command.With_valid_signature.t Sequence.t
+
+  val all_from_user :
+    t -> Public_key.Compressed.t -> User_command.With_valid_signature.t list
 end

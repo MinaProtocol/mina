@@ -2,9 +2,10 @@
  (name kademlia)
  (public_name kademlia)
  (library_flags -linkall)
+ (c_names caml_syslimits)
  (inline_tests)
  (libraries core logger pipe_lib async async_extra file_system
-   network_peer trust_system)
+   network_peer trust_system ctypes ctypes.foreign)
  (preprocess
   (pps ppx_jane bisect_ppx -- -conditional))
  (synopsis "Kademlia DHT -- only being used for its membership"))

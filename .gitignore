@@ -14,3 +14,4 @@ test_logs
 .firebase/
 node_modules/
 .DS_Store
+.graphql_ppx_cache

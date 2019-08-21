@@ -5,7 +5,7 @@ open Tuple_lib
 let ( = ) = `Don't_use_polymorphic_equality
 
 module type Intf = sig
-  type t [@@deriving eq, bin_io, sexp, compare]
+  type t [@@deriving eq, bin_io, sexp, to_yojson, compare]
 
   val gen : t Quickcheck.Generator.t
 
@@ -79,7 +79,7 @@ module Make_fp
   include Info
 
   (* TODO version *)
-  type t = N.t [@@deriving eq, bin_io, sexp, compare]
+  type t = N.t [@@deriving eq, bin_io, sexp, to_yojson, compare]
 
   let to_bigint = Fn.id
 
@@ -325,7 +325,7 @@ end = struct
 
   type base = Fp.t
 
-  type t = Fp.t * Fp.t * Fp.t [@@deriving eq, bin_io, sexp, compare]
+  type t = Fp.t * Fp.t * Fp.t [@@deriving eq, bin_io, sexp, to_yojson, compare]
 
   let gen = Quickcheck.Generator.tuple3 Fp.gen Fp.gen Fp.gen
 
@@ -400,7 +400,7 @@ module Make_fp2
 end = struct
   type base = Fp.t
 
-  type t = Fp.t * Fp.t [@@deriving eq, bin_io, sexp, compare]
+  type t = Fp.t * Fp.t [@@deriving eq, to_yojson, bin_io, sexp, compare]
 
   let gen = Quickcheck.Generator.tuple2 Fp.gen Fp.gen
 
@@ -472,7 +472,7 @@ module Make_fp6
 
   val unitary_inverse : t -> t
 end = struct
-  type t = Fp3.t * Fp3.t [@@deriving eq, bin_io, sexp, compare]
+  type t = Fp3.t * Fp3.t [@@deriving eq, to_yojson, bin_io, sexp, compare]
 
   type base = Fp3.t
 

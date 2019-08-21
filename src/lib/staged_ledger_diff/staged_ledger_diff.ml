@@ -6,14 +6,14 @@ open Module_version
 module Make (Transaction_snark_work : sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, version]
+      type t [@@deriving bin_io, sexp, to_yojson, version]
     end
   end
 
   type t = Stable.V1.t
 
   module Checked : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, to_yojson]
   end
 
   val forget : Checked.t -> t
@@ -30,7 +30,7 @@ struct
             | Zero
             | One of 'a option
             | Two of ('a * 'a option) option
-          [@@deriving sexp, bin_io, version]
+          [@@deriving sexp, to_yojson, bin_io, version]
         end
 
         include T
@@ -43,7 +43,7 @@ struct
       | Zero
       | One of 'a option
       | Two of ('a * 'a option) option
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     let increase t ws =
       match (t, ws) with
@@ -66,7 +66,7 @@ struct
       module V1 = struct
         module T = struct
           type 'a t = Zero | One of 'a option
-          [@@deriving sexp, bin_io, version]
+          [@@deriving sexp, to_yojson, bin_io, version]
         end
 
         include T
@@ -76,7 +76,7 @@ struct
     end
 
     type 'a t = 'a Stable.Latest.t = Zero | One of 'a option
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     let increase t ws =
       match (t, ws) with
@@ -93,7 +93,7 @@ struct
       module V1 = struct
         module T = struct
           type t = Fee_transfer.Single.Stable.V1.t
-          [@@deriving sexp, bin_io, version {unnumbered}]
+          [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
         end
 
         include T
@@ -102,7 +102,7 @@ struct
       module Latest = V1
     end
 
-    type t = Stable.Latest.t [@@deriving sexp]
+    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
   end
 
   module Pre_diff_with_at_most_two_coinbase = struct
@@ -113,7 +113,7 @@ struct
             { completed_works: Transaction_snark_work.Stable.V1.t list
             ; user_commands: User_command.Stable.V1.t list
             ; coinbase: Ft.Stable.V1.t At_most_two.Stable.V1.t }
-          [@@deriving sexp, bin_io, version {unnumbered}]
+          [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
         end
 
         include T
@@ -126,7 +126,7 @@ struct
       { completed_works: Transaction_snark_work.Stable.V1.t list
       ; user_commands: User_command.Stable.V1.t list
       ; coinbase: Ft.Stable.V1.t At_most_two.Stable.V1.t }
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
   end
 
   module Pre_diff_with_at_most_one_coinbase = struct
@@ -137,7 +137,7 @@ struct
             { completed_works: Transaction_snark_work.Stable.V1.t list
             ; user_commands: User_command.Stable.V1.t list
             ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t }
-          [@@deriving sexp, bin_io, version {unnumbered}]
+          [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
         end
 
         include T
@@ -150,7 +150,7 @@ struct
       { completed_works: Transaction_snark_work.Stable.V1.t list
       ; user_commands: User_command.Stable.V1.t list
       ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t }
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
   end
 
   module Diff = struct
@@ -160,7 +160,7 @@ struct
           type t =
             Pre_diff_with_at_most_two_coinbase.Stable.V1.t
             * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
-          [@@deriving sexp, bin_io, version {unnumbered}]
+          [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
         end
 
         include T
@@ -169,7 +169,7 @@ struct
       module Latest = V1
     end
 
-    type t = Stable.Latest.t [@@deriving sexp]
+    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
   end
 
   module Stable = struct
@@ -177,7 +177,7 @@ struct
       module T = struct
         type t =
           {diff: Diff.Stable.V1.t; creator: Public_key.Compressed.Stable.V1.t}
-        [@@deriving sexp, bin_io, version]
+        [@@deriving sexp, to_yojson, bin_io, version]
       end
 
       include T
@@ -198,27 +198,28 @@ struct
 
   type t = Stable.Latest.t =
     {diff: Diff.Stable.V1.t; creator: Public_key.Compressed.Stable.V1.t}
-  [@@deriving sexp, fields]
+  [@@deriving sexp, to_yojson, fields]
 
   module With_valid_signatures_and_proofs = struct
     type pre_diff_with_at_most_two_coinbase =
       { completed_works: Transaction_snark_work.Checked.t list
       ; user_commands: User_command.With_valid_signature.t list
       ; coinbase: Ft.t At_most_two.t }
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     type pre_diff_with_at_most_one_coinbase =
       { completed_works: Transaction_snark_work.Checked.t list
       ; user_commands: User_command.With_valid_signature.t list
       ; coinbase: Ft.t At_most_one.t }
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     type diff =
       pre_diff_with_at_most_two_coinbase
       * pre_diff_with_at_most_one_coinbase option
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
-    type t = {diff: diff; creator: Public_key.Compressed.t} [@@deriving sexp]
+    type t = {diff: diff; creator: Public_key.Compressed.t}
+    [@@deriving sexp, to_yojson]
 
     let user_commands t =
       (fst t.diff).user_commands

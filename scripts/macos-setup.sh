@@ -38,10 +38,6 @@ if [[ $DOWNLOAD_THINGS == "YES" ]]; then
   else
     echo 'All brew packages have already been installed.'
   fi
-
-  # ocaml downloading
-  OPAMYES=1 opam init
-  eval $(opam config env)
 else
   echo 'Not running download step'
 fi
@@ -49,12 +45,26 @@ fi
 
 # Compile things
 if [[ $COMPILE_THINGS == "YES" ]]; then
+
+  # Keep compile dirs to avoid recompiles
+  export OPAMKEEPBUILDDIR='true'
+  export OPAMREUSEBUILDDIR='true'
+  export OPAMYES=1
+
+  # Set term to xterm if not set
+  export TERM=${TERM:-xterm}
+
+  # ocaml downloading
+  opam init
+  eval $(opam config env)
+
   opam update
   # This is dirty, keep the OCaml project version up to date!
-  opam switch create 4.07.1 || true 
-  opam switch 4.07.1
+  opam switch create 4.07.1+statistical-memprof || true
+  opam switch 4.07.1+statistical-memprof
+
   # All our ocaml packages
-  env TERM=xterm opam switch -y import src/opam.export
+  opam switch -y import src/opam.export
   eval $(opam config env)
 
   # Extlib gets automatically installed, but we want our pin, so we should
@@ -62,41 +72,20 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   opam uninstall -y extlib
 
   # Our pins
-  env TERM=xterm opam pin -y add src/external/ocaml-sodium
-  env TERM=xterm opam pin -y add src/external/rpc_parallel
-  env TERM=xterm opam pin -y add src/external/ocaml-extlib
-  env TERM=xterm opam pin -y add src/external/digestif
-  env TERM=xterm opam pin -y add src/external/async_kernel
-  env TERM=xterm opam pin -y add src/external/coda_base58
+  opam pin -y add src/external/ocaml-sodium
+  opam pin -y add src/external/rpc_parallel
+  opam pin -y add src/external/ocaml-extlib
+  opam pin -y add src/external/digestif
+
+  # workaround a permissions problem
+  sudo chown -R distiller /Users/distiller/.opam
+  sudo chmod -R u+rw /Users/distiller/.opam
+
+  opam pin -y add src/external/async_kernel
+  opam pin -y add src/external/coda_base58
+  opam pin -y add src/external/graphql_ppx
   eval $(opam config env)
 
-  # Kademlia
-  curl https://nixos.org/nix/install | sh
-  touch ~/.profile
-  set +u
-  . ~/.nix-profile/etc/profile.d/nix.sh
-  if [[ "$CIRCLE_BUILD_NUM" ]]; then
-      mkdir -p ~/.config/nix
-      cat > ~/.config/nix/nix.conf <<EOF
-substituters = https://cache.nixos.org s3://o1-nix-cache
-# Checking signatures is broken with S3 based Nix caches, see
-# https://github.com/NixOS/nix/issues/2024
-require-sigs = false
-EOF
-  fi
-  set +e
-  nix-build --dry-run src/app/kademlia-haskell/release2.nix 2>&1 | grep -q 'these derivations will be built'
-  building_kad=$?
-  set -e
-  make kademlia
-  if [[ "$CIRCLE_BUILD_NUM" && "$building_kad" = 0 ]]; then
-      nix copy --to s3://o1-nix-cache src/app/kademlia-haskell/result/
-      # Incantation to copy build dependencies. We instantiate the nix
-      # expression to a derivation, get a list of the derivations it references,
-      # and copy the outputs of those derivations to our cache.
-      nix copy --to s3://o1-nix-cache $(nix-store -r $(nix-store -q --references $(nix-instantiate src/app/kademlia-haskell/release2.nix)))
-  fi
-  set -u
 else
   echo 'Not running compile step.'
 fi

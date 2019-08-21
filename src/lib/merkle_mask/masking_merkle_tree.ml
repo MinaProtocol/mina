@@ -101,6 +101,7 @@ module Make (Inputs : Inputs_intf.S) = struct
          Mask.create and Mask.set_parent"
 
     let unset_parent t =
+      assert (Option.is_some t.parent) ;
       t.parent <- None ;
       t
 
@@ -632,6 +633,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   end
 
   let set_parent t parent =
+    assert (Option.is_none t.parent) ;
     t.parent <- Some parent ;
     t.current_location <- Attached.last_filled t ;
     t

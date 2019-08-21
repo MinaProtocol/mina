@@ -35,15 +35,17 @@ struct
           (* This is an option to allow using a fake trust system in tests. This is
        ugly, but the alternative is functoring half of Coda over the trust
        system. *)
-    ; bans_reader: Peer_id.t Strict_pipe.Reader.t
+    ; bans_reader: (Peer_id.t * Time.t) Strict_pipe.Reader.t
     ; bans_writer:
-        ( Peer_id.t
+        ( Peer_id.t * Time.t
         , Strict_pipe.synchronous
         , unit Deferred.t )
         Strict_pipe.Writer.t
     ; mutable actions_writers: (Action.t * Peer_id.t) Pipe.Writer.t list }
 
   module Record_inst = Record.Make (Now)
+
+  let disable_bans = Record_inst.disable_bans
 
   let create ~db_dir =
     let reader, writer = Strict_pipe.create Strict_pipe.Synchronous in
@@ -118,7 +120,15 @@ struct
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:([("peer", Peer_id.to_yojson peer)] @ action_metadata)
         "%s trust for peer $peer due to action %s. New trust is %f." verb
-        action_fmt simple_new.trust
+        action_fmt simple_new.trust ;
+      if
+        Record_inst.get_bans_disabled ()
+        && simple_old.trust >. -1. && simple_new.trust <=. -1.
+      then
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Bans are disabled; otherwise, peer $peer would be banned (maybe \
+           already banned)"
+          ~metadata:[("peer", Peer_id.to_yojson peer)]
     in
     let%map () =
       match (simple_old.banned, simple_new.banned) with
@@ -134,7 +144,7 @@ struct
             "Banning peer $peer until $expiration because it %s" action_fmt ;
           if Option.is_some db then (
             Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
-            Strict_pipe.Writer.write bans_writer peer )
+            Strict_pipe.Writer.write bans_writer (peer, expiration) )
           else Deferred.unit
       | Banned_until _, Unbanned ->
           Coda_metrics.Gauge.dec_one Coda_metrics.Trust_system.banned_peers ;
@@ -198,7 +208,8 @@ let%test_module "peer_trust" =
     let ban_pipe_out = ref []
 
     let assert_ban_pipe expected =
-      [%test_eq: int list] expected !ban_pipe_out ;
+      [%test_eq: int list] expected
+        (List.map !ban_pipe_out ~f:(fun (peer, _banned_until) -> peer)) ;
       ban_pipe_out := []
 
     let setup_mock_db () =

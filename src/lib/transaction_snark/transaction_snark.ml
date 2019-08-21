@@ -21,7 +21,7 @@ module Proof_type = struct
     module V1 = struct
       module T = struct
         type t = [`Base | `Merge]
-        [@@deriving bin_io, sexp, hash, compare, yojson, version]
+        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end
 
       include T
@@ -94,7 +94,7 @@ module Statement = struct
               Pending_coinbase_stack_state.Stable.V1.t
           ; fee_excess: Currency.Fee.Signed.Stable.V1.t
           ; proof_type: Proof_type.Stable.V1.t }
-        [@@deriving sexp, bin_io, hash, compare, yojson, version]
+        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end
 
       include T
@@ -212,15 +212,16 @@ type t = Stable.Latest.t =
 [@@deriving fields, sexp, yojson]
 
 let statement
-    { source
-    ; target
-    ; proof_type
-    ; fee_excess
-    ; supply_increase
-    ; pending_coinbase_stack_state
-    ; sok_digest= _
-    ; proof= _ } =
-  { Statement.source
+    ({ source
+     ; target
+     ; proof_type
+     ; fee_excess
+     ; supply_increase
+     ; pending_coinbase_stack_state
+     ; sok_digest= _
+     ; proof= _ } :
+      t) =
+  { Statement.Stable.V1.source
   ; target
   ; proof_type
   ; supply_increase
@@ -265,9 +266,13 @@ module Verification_keys = struct
   [@@deriving bin_io]
 
   let dummy : t =
-    { merge= Dummy_values.Tick.Groth16.verification_key
-    ; base= Dummy_values.Tick.Groth16.verification_key
-    ; wrap= Dummy_values.Tock.Bowe_gabizon18.verification_key }
+    let groth16 =
+      Tick_backend.Verification_key.dummy
+        ~input_size:(Tick.Data_spec.size (tick_input ()))
+    in
+    { merge= groth16
+    ; base= groth16
+    ; wrap= Tock_backend.Verification_key.dummy ~input_size:Wrap_input.size }
 end
 
 module Keys0 = struct
@@ -373,12 +378,12 @@ module Base = struct
         sender_compressed ~f:(fun ~is_empty_and_writeable account ->
           with_label __LOC__
             (let%bind next_nonce =
-               Account.Nonce.increment_if_var account.nonce is_user_command
+               Account.Nonce.Checked.succ_if account.nonce is_user_command
              in
              let%bind () =
                with_label __LOC__
                  (let%bind nonce_matches =
-                    Account.Nonce.equal_var nonce account.nonce
+                    Account.Nonce.Checked.equal nonce account.nonce
                   in
                   Boolean.Assert.any
                     [Boolean.not is_user_command; nonce_matches])
@@ -535,6 +540,7 @@ module Base = struct
     Cached.Spec.create ~load ~name:"transaction-snark base keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
+      ~brew_install_path:Cache_dir.brew_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(tick_input ()) main))
@@ -819,6 +825,7 @@ module Merge = struct
     Cached.Spec.create ~load ~name:"transaction-snark merge keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
+      ~brew_install_path:Cache_dir.brew_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(input ()) main))
@@ -1066,9 +1073,11 @@ struct
     Cached.Spec.create ~load ~name:"transaction-snark wrap keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
-      ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
-      ~input:(constraint_system ~exposing:wrap_input main)
-      ~create_env:Keypair.generate
+      ~brew_install_path:Cache_dir.brew_install_path
+      ~digest_input:(fun x ->
+        Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
+      ~input:(lazy (constraint_system ~exposing:wrap_input main))
+      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
 end
 
 module type S = sig
@@ -1734,9 +1743,9 @@ let%test_module "transaction_snark" =
 
 let constraint_system_digests () =
   let module W = Wrap (struct
-    let merge = Dummy_values.Tick.Groth16.verification_key
+    let merge = Verification_keys.dummy.merge
 
-    let base = Dummy_values.Tick.Groth16.verification_key
+    let base = Verification_keys.dummy.base
   end) in
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in

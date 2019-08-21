@@ -15,12 +15,12 @@ module type S = sig
       with type V1.t = t
   end
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, to_yojson]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io]
+        type t [@@deriving sexp, to_yojson, bin_io]
       end
 
       module Latest = V1
@@ -41,12 +41,12 @@ module type S = sig
 end
 
 module Make (Staged_ledger_diff : sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, to_yojson]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving bin_io, sexp, version]
+        type t [@@deriving bin_io, sexp, to_yojson, version]
       end
     end
     with type V1.t = t
@@ -60,7 +60,7 @@ end) : S with module Staged_ledger_diff = Staged_ledger_diff = struct
           { snark_transition: Snark_transition.Value.Stable.V1.t
           ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
           ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
-        [@@deriving sexp, fields, bin_io, version]
+        [@@deriving sexp, to_yojson, fields, bin_io, version]
       end
 
       include T
@@ -84,7 +84,7 @@ end) : S with module Staged_ledger_diff = Staged_ledger_diff = struct
     { snark_transition: Snark_transition.Value.Stable.V1.t
     ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
     ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
-  [@@deriving sexp, fields]
+  [@@deriving sexp, fields, to_yojson]
 
   let create ~snark_transition ~prover_state ~staged_ledger_diff =
     {Stable.Latest.snark_transition; staged_ledger_diff; prover_state}

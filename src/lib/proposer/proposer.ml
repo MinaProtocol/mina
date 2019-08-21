@@ -120,7 +120,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
       in
       let%map ( `Hash_after_applying next_staged_ledger_hash
               , `Ledger_proof ledger_proof_opt
-              , `Staged_ledger _transitioned_staged_ledger
+              , `Staged_ledger transitioned_staged_ledger
               , `Pending_coinbase_data (is_new_stack, coinbase_amount) ) =
         let%map or_error =
           Staged_ledger.apply_diff_unchecked staged_ledger diff
@@ -128,6 +128,10 @@ let generate_next_state ~previous_protocol_state ~time_controller
         Or_error.ok_exn or_error
       in
       (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
+      ignore
+      @@ Ledger.unregister_mask_exn
+           (Staged_ledger.ledger staged_ledger)
+           (Staged_ledger.ledger transitioned_staged_ledger) ;
       ( diff
       , next_staged_ledger_hash
       , ledger_proof_opt
@@ -215,11 +219,10 @@ let generate_next_state ~previous_protocol_state ~time_controller
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs
     ~consensus_local_state ~frontier_reader ~transition_writer =
-  trace_task "proposer" (fun () ->
+  trace_task "block_producer" (fun () ->
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Bootstrapping right now. Cannot generate new blockchains or \
-           schedule event"
+          "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let propose ivar (keypair, scheduled_time, proposal_data) =
@@ -231,10 +234,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             let crumb = Transition_frontier.best_tip frontier in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
-              !"Begining to propose off of crumb $breadcrumb%!" ;
+              !"Producing new block with parent $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
               let transition : External_transition.Validated.t =
-                (Breadcrumb.transition_with_hash crumb).data
+                Breadcrumb.validated_transition crumb
               in
               ( External_transition.Validated.protocol_state transition
               , External_transition.Validated.protocol_state_proof transition
@@ -276,9 +279,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                          over their parent" ;
                     let root_consensus_state =
                       Transition_frontier.root frontier
-                      |> (fun x -> (Breadcrumb.transition_with_hash x).data)
-                      |> External_transition.Validated.protocol_state
-                      |> Protocol_state.consensus_state
+                      |> Breadcrumb.consensus_state
                     in
                     [%test_result: [`Take | `Keep]]
                       (Consensus.Hooks.select ~existing:root_consensus_state
@@ -301,8 +302,23 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   with
                   | Error err ->
                       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                        "failed to prove generated protocol state: %s"
-                        (Error.to_string_hum err) ;
+                        "Prover failed to prove freshly generated transition: \
+                         $error"
+                        ~metadata:
+                          [ ("error", `String (Error.to_string_hum err))
+                          ; ( "prev_state"
+                            , Protocol_state.value_to_yojson
+                                previous_protocol_state )
+                          ; ( "prev_state_proof"
+                            , Proof.to_yojson previous_protocol_state_proof )
+                          ; ( "next_state"
+                            , Protocol_state.value_to_yojson protocol_state )
+                          ; ( "internal_transition"
+                            , Internal_transition.to_yojson internal_transition
+                            )
+                          ; ( "pending_coinbase_witness"
+                            , Pending_coinbase_witness.to_yojson
+                                pending_coinbase_witness ) ] ;
                       return ()
                   | Ok protocol_state_proof -> (
                       let span = Time.diff (Time.now time_controller) t0 in
@@ -320,16 +336,27 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       let transition_hash =
                         Protocol_state.hash protocol_state
                       in
+                      let delta_transition_chain_proof =
+                        Transition_chain_prover.prove
+                          ~length:(Consensus.Constants.delta - 1)
+                          ~frontier
+                          (Protocol_state.hash previous_protocol_state)
+                        |> Option.value_exn
+                      in
                       let transition =
                         External_transition.Validation.wrap
                           { With_hash.hash= transition_hash
                           ; data=
                               External_transition.create ~protocol_state
-                                ~protocol_state_proof ~staged_ledger_diff }
+                                ~protocol_state_proof ~staged_ledger_diff
+                                ~delta_transition_chain_proof }
                         |> External_transition.skip_time_received_validation
                              `This_transition_was_not_received_via_gossip
                         |> External_transition.skip_proof_validation
                              `This_transition_was_generated_internally
+                        |> External_transition
+                           .skip_delta_transition_chain_validation
+                             `This_transition_was_not_received_via_gossip
                         |> Transition_frontier_validation
                            .validate_frontier_dependencies ~logger ~frontier
                         |> Result.map_error ~f:(fun err ->
@@ -383,14 +410,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         [("state_hash", State_hash.to_yojson transition_hash)]
                       in
                       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                        !"Submitting transition $state_hash to the transition \
-                          frontier controller"
+                        !"Submitting newly produced block $state_hash to the \
+                          transition frontier controller"
                         ~metadata ;
                       Coda_metrics.(Counter.inc_one Proposer.blocks_proposed) ;
                       let%bind () =
                         Strict_pipe.Writer.write transition_writer breadcrumb
                       in
-                      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                         ~metadata
                         "Waiting for transition $state_hash to be inserted \
                          into frontier" ;
@@ -404,7 +431,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 (* We allow up to 15 seconds for the transition to make its way from the transition_writer to the frontier.
                                   This value is chosen to be reasonably generous. In theory, this should not take terribly long. But long
                                   cycles do happen in our system, and with medium curves those long cycles can be substantial. *)
-                                (Time.Span.of_ms 15000L)
+                                (Time.Span.of_ms 20000L)
                                 ~f:(Fn.const ())
                             |> Time.Timeout.to_deferred )
                             (Fn.const `Timed_out) ]
@@ -416,12 +443,15 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                              into transition frontier"
                       | `Timed_out ->
                           let str =
-                            "Generated transition $state_hash was never \
-                             accepted into transition frontier"
+                            "Timed out waiting for generated transition \
+                             $state_hash to enter transition frontier. \
+                             Continuing to produce new blocks anyway. This \
+                             may mean your CPU is overloaded. Consider \
+                             disabling `-run-snark-worker` if it's configured."
                           in
-                          Logger.fatal logger ~module_:__MODULE__
-                            ~location:__LOC__ ~metadata "%s" str ;
-                          Error.raise (Error.of_string str) )) )
+                          (* FIXME #3167: this should be fatal, and more importantly, shouldn't happen. *)
+                          Logger.error logger ~module_:__MODULE__
+                            ~location:__LOC__ ~metadata "%s" str )) )
       in
       let proposal_supervisor = Singleton_supervisor.create ~task:propose in
       let scheduler = Singleton_scheduler.create time_controller in
@@ -452,17 +482,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                    in
                    check_for_proposal ())
             | Some transition_frontier -> (
-                let breadcrumb =
-                  Transition_frontier.best_tip transition_frontier
-                in
-                let transition =
-                  (Breadcrumb.transition_with_hash breadcrumb).data
-                in
-                let protocol_state =
-                  External_transition.Validated.protocol_state transition
-                in
                 let consensus_state =
-                  Protocol_state.consensus_state protocol_state
+                  Transition_frontier.best_tip transition_frontier
+                  |> Breadcrumb.consensus_state
                 in
                 assert (
                   Consensus.Hooks.required_local_state_sync ~consensus_state
@@ -523,8 +545,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             [ ( "time_till_genesis"
               , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )
             ]
-          "node started before genesis: waiting $time_till_genesis ms before \
-           proposing any blocks" ;
+          "Node started before genesis: waiting $time_till_genesis \
+           milliseconds before starting block producer" ;
         ignore
           (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
                start () )) )

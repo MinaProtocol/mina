@@ -58,7 +58,9 @@ module Types = struct
         { get_staged_ledger_aux: Perf_histograms.Report.t option Rpc_pair.t
         ; answer_sync_ledger_query: Perf_histograms.Report.t option Rpc_pair.t
         ; get_ancestry: Perf_histograms.Report.t option Rpc_pair.t
-        ; transition_catchup: Perf_histograms.Report.t option Rpc_pair.t }
+        ; get_transition_chain_proof:
+            Perf_histograms.Report.t option Rpc_pair.t
+        ; get_transition_chain: Perf_histograms.Report.t option Rpc_pair.t }
       [@@deriving to_yojson, bin_io, fields]
 
       let to_text s =
@@ -85,8 +87,10 @@ module Types = struct
             ~answer_sync_ledger_query:(fun acc x ->
               add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc )
             ~get_ancestry:(fun acc x -> add_rpcs ~name:"Get Ancestry" (f x) acc)
-            ~transition_catchup:(fun acc x ->
-              add_rpcs ~name:"Transition Catchup" (f x) acc )
+            ~get_transition_chain_proof:(fun acc x ->
+              add_rpcs ~name:"Get transition chain proof" (f x) acc )
+            ~get_transition_chain:(fun acc x ->
+              add_rpcs ~name:"Get transition chain" (f x) acc )
           |> List.rev
         in
         digest_entries ~title:"RPCs" entries
@@ -173,75 +177,94 @@ module Types = struct
 
       let int_option_entry = option_entry ~f:Int.to_string
 
-      let num_accounts = int_option_entry "Global Number of Accounts"
+      let list_entry name ~to_string =
+        map_entry name ~f:(fun keys ->
+            let len = List.length keys in
+            let list_str =
+              if len > 0 then " " ^ List.to_string ~f:to_string keys else ""
+            in
+            Printf.sprintf "%d%s" len list_str )
 
-      let blockchain_length =
-        int_option_entry "The Total Number of Blocks in the Blockchain"
+      let num_accounts = int_option_entry "Global number of accounts"
 
-      let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
+      let blockchain_length = int_option_entry "Block height"
 
-      let ledger_merkle_root = string_option_entry "Ledger Merkle Root"
+      let highest_block_length_received = int_entry "Max observed block length"
 
-      let staged_ledger_hash = string_option_entry "Staged-ledger Hash"
+      let uptime_secs =
+        map_entry "Local uptime" ~f:(fun secs ->
+            Time.Span.to_string (Time.Span.of_int_sec secs) )
 
-      let state_hash = string_option_entry "Staged Hash"
+      let ledger_merkle_root = string_option_entry "Ledger Merkle root"
 
-      let commit_id = string_entry "GIT SHA1"
+      let staged_ledger_hash = string_option_entry "Staged-ledger hash"
 
-      let conf_dir = string_entry "Configuration Directory"
+      let state_hash = string_option_entry "Staged hash"
 
-      let peers =
-        map_entry "Peers" ~f:(fun peers ->
-            Printf.sprintf "Total: %d " (List.length peers)
-            ^ List.to_string ~f:Fn.id peers )
+      let commit_id = string_entry "Git SHA-1"
 
-      let user_commands_sent = int_entry "User_commands Sent"
+      let conf_dir = string_entry "Configuration directory"
 
-      let run_snark_worker = bool_entry "Snark Worker Running"
+      let peers = list_entry "Peers" ~to_string:Fn.id
 
-      let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
+      let user_commands_sent = int_entry "User_commands sent"
+
+      let snark_worker =
+        map_entry "SNARK worker" ~f:(Option.value ~default:"None")
+
+      let snark_work_fee = int_entry "SNARK work fee"
+
+      let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
-        map_entry "Proposers Running" ~f:(fun keys ->
-            Printf.sprintf "Total: %d " (List.length keys)
-            ^ List.to_string ~f:Public_key.Compressed.to_string keys )
+        list_entry "Block producers running" ~to_string:Fn.id
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
       let consensus_time_best_tip =
-        string_option_entry "Best Tip Consensus Time"
+        string_option_entry "Best tip consensus time"
 
-      let consensus_time_now = string_entry "Consensus Time Now"
+      let consensus_time_now = string_entry "Consensus time now"
 
-      let consensus_mechanism = string_entry "Consensus Mechanism"
+      let consensus_mechanism = string_entry "Consensus mechanism"
 
       let consensus_configuration =
-        let render conf =
-          match Consensus.Configuration.to_yojson conf with
-          | `Assoc ls ->
-              List.fold_left ls ~init:"" ~f:(fun acc (k, v) ->
-                  acc ^ sprintf "\n    %s = %s" k (Yojson.Safe.to_string v) )
-              ^ "\n"
-          | _ ->
-              failwith "unexpected consensus configuration json format"
+        let ms_to_string i =
+          float_of_int i |> Time.Span.of_ms |> Time.Span.to_string
         in
-        map_entry "Consensus Configuration" ~f:render
+        let render conf =
+          let fmt_field name op field = (name, op (Field.get field conf)) in
+          Consensus.Configuration.Fields.to_list
+            ~delta:(fmt_field "Delta" string_of_int)
+            ~k:(fmt_field "k" string_of_int)
+            ~c:(fmt_field "c" string_of_int)
+            ~c_times_k:(fmt_field "c * k" string_of_int)
+            ~slots_per_epoch:(fmt_field "Slots per epoch" string_of_int)
+            ~slot_duration:(fmt_field "Slot duration" ms_to_string)
+            ~epoch_duration:(fmt_field "Epoch duration" ms_to_string)
+            ~acceptable_network_delay:
+              (fmt_field "Acceptable network delay" ms_to_string)
+          |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
+          |> digest_entries ~title:""
+        in
+        map_entry "Consensus configuration" ~f:render
     end
 
     type t =
       { num_accounts: int option
       ; blockchain_length: int option
+      ; highest_block_length_received: int
       ; uptime_secs: int
       ; ledger_merkle_root: string option
-      ; staged_ledger_hash: string option
       ; state_hash: string option
       ; commit_id: Git_sha.t
       ; conf_dir: string
       ; peers: string list
       ; user_commands_sent: int
-      ; run_snark_worker: bool
+      ; snark_worker: string option
+      ; snark_work_fee: int
       ; sync_status: Sync_status.Stable.V1.t
-      ; propose_pubkeys: Public_key.Compressed.Stable.V1.t list
+      ; propose_pubkeys: string list
       ; histograms: Histograms.t option
       ; consensus_time_best_tip: string option
       ; consensus_time_now: string
@@ -256,16 +279,17 @@ module Types = struct
         let get field = Field.get field s
       end) in
       let open M in
-      Fields.to_list ~sync_status ~num_accounts ~blockchain_length ~uptime_secs
-        ~ledger_merkle_root ~staged_ledger_hash ~state_hash ~commit_id
-        ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkeys
-        ~histograms ~consensus_time_best_tip ~consensus_time_now
-        ~consensus_mechanism ~consensus_configuration
+      Fields.to_list ~sync_status ~num_accounts ~blockchain_length
+        ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
+        ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent
+        ~snark_worker ~propose_pubkeys ~histograms ~consensus_time_best_tip
+        ~consensus_time_now ~consensus_mechanism ~consensus_configuration
+        ~snark_work_fee
       |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =
       let title =
-        "Coda Daemon Status\n-----------------------------------\n"
+        "Coda daemon status\n-----------------------------------\n"
       in
       digest_entries ~title (entries t)
   end
@@ -284,10 +308,23 @@ module Send_user_command = struct
       ~bin_response
 end
 
+module Get_transaction_status = struct
+  type query = User_command.Stable.Latest.t [@@deriving bin_io]
+
+  type response = Transaction_status.State.Stable.Latest.t Or_error.t
+  [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_transaction_status" ~version:0 ~bin_query
+      ~bin_response
+end
+
 module Send_user_commands = struct
   type query = User_command.Stable.Latest.t list [@@deriving bin_io]
 
-  type response = unit [@@deriving bin_io]
+  type response = unit Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -297,7 +334,7 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = Staged_ledger_hash.Stable.Latest.t [@@deriving bin_io]
+  type query = Staged_ledger_hash.Stable.Latest.t option [@@deriving bin_io]
 
   type response = Account.Stable.Latest.t list Or_error.t [@@deriving bin_io]
 
@@ -310,9 +347,10 @@ end
 module Get_balance = struct
   type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Currency.Balance.Stable.Latest.t option [@@deriving bin_io]
+  type error = string [@@deriving bin_io]
 
-  type error = unit [@@deriving bin_io]
+  type response = Currency.Balance.Stable.Latest.t option Or_error.t
+  [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_balance" ~version:0 ~bin_query ~bin_response
@@ -384,10 +422,24 @@ module Prove_receipt = struct
     Rpc.Rpc.create ~name:"Prove_receipt" ~version:0 ~bin_query ~bin_response
 end
 
+module Get_inferred_nonce = struct
+  type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
+
+  type response = Account.Nonce.Stable.Latest.t option Or_error.t
+  [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_inferred_nonce" ~version:0 ~bin_query
+      ~bin_response
+end
+
 module Get_nonce = struct
   type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.Nonce.Stable.Latest.t option [@@deriving bin_io]
+  type response = Account.Nonce.Stable.Latest.t option Or_error.t
+  [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -418,22 +470,23 @@ module Clear_hist_status = struct
       ~bin_response
 end
 
-module Get_public_keys_with_balances = struct
+module Get_public_keys_with_details = struct
   type query = unit [@@deriving bin_io]
 
-  type response = (string * int) list [@@deriving bin_io, sexp]
+  type response = (string * int * int) list Or_error.t
+  [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_public_keys_with_balances" ~version:0 ~bin_query
+    Rpc.Rpc.create ~name:"Get_public_keys_with_details" ~version:0 ~bin_query
       ~bin_response
 end
 
 module Get_public_keys = struct
   type query = unit [@@deriving bin_io]
 
-  type response = string list [@@deriving bin_io, sexp]
+  type response = string list Or_error.t [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
 
@@ -455,12 +508,23 @@ end
 module Snark_job_list = struct
   type query = unit [@@deriving bin_io]
 
-  type response = string [@@deriving bin_io]
+  type response = string Or_error.t [@@deriving bin_io]
 
   type error = unit
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Snark_job_list" ~version:0 ~bin_query ~bin_response
+end
+
+module Snark_pool_list = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = string [@@deriving bin_io]
+
+  type error = unit
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Snark_pool_list" ~version:0 ~bin_query ~bin_response
 end
 
 module Start_tracing = struct

@@ -79,6 +79,10 @@ macos-portable:
 	@zip -r _build/coda-daemon-macos.zip _build/coda-daemon-macos/
 	@echo Find coda-daemon-macos.zip inside _build/
 
+update-graphql:
+	@echo Make sure that the daemon is running with -rest-port 8080
+	python scripts/introspection_query.py > graphql_schema.json
+
 ########################################
 ## Lint
 
@@ -173,17 +177,13 @@ publish-macos:
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
-	@cp src/_build/coda.deb /tmp/artifacts/.
+	@cp src/_build/coda*.deb /tmp/artifacts/.
+	@cp src/_build/coda_pvkeys_* /tmp/artifacts/.
 
 publish_deb:
 	@./scripts/publish-deb.sh
 
 publish_debs: publish_deb
-
-provingkeys:
-	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH)_$(CODA_CONSENSUS).tar.bz2  /tmp/coda_cache_dir ; \
-	mkdir -p /tmp/artifacts ; \
-	cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
@@ -195,6 +195,12 @@ codaslim:
 	@cp src/_build/coda.deb .
 	@./scripts/rebuild-docker.sh codaslim dockerfiles/Dockerfile-codaslim
 	@rm coda.deb
+
+##############################################
+## Genesis ledger in OCaml from running daemon
+
+genesis-ledger-ocaml:
+	@./scripts/generate-genesis-ledger.py .genesis-ledger.ml.jinja
 
 ########################################
 ## Tests

@@ -1,5 +1,5 @@
 [%%import "config/ledger_depth/tiny.mlh"]
-[%%import "config/curve_size/small.mlh"]
+[%%import "config/curve/small.mlh"]
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/postake_nano.mlh"]
 [%%import "config/scan_state/small.mlh"]
@@ -16,6 +16,7 @@
 
 [%%define integration_tests true]
 [%%define force_updates false]
-[%%define fixup_localhost_ips_for_testing true]
 
 [%%define mock_frontend_data false]
+
+[%%define new_cli false]

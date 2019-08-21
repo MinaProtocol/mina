@@ -10,6 +10,7 @@ let digest = field
 
 let twist_field x : LTock.Fq3.t =
   let module V = Snark_params.Tick_backend.Field.Vector in
+  let x = Snark_params.Tock_backend.Full.Fqe.to_vector x in
   let c i = field (V.get x i) in
   (c 0, c 1, c 2)
 

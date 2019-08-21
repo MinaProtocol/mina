@@ -9,7 +9,7 @@ module Stable = struct
         ; ledger: Sparse_ledger.Stable.V1.t
         ; private_key: Signature_lib.Private_key.Stable.V1.t
         ; public_key: Signature_lib.Public_key.Stable.V1.t }
-      [@@deriving bin_io, sexp, version]
+      [@@deriving bin_io, sexp, to_yojson, version]
     end
 
     include T
@@ -28,4 +28,4 @@ type t = Stable.Latest.t =
   ; ledger: Sparse_ledger.Stable.V1.t
   ; private_key: Signature_lib.Private_key.t
   ; public_key: Signature_lib.Public_key.t }
-[@@deriving sexp]
+[@@deriving to_yojson, sexp]

@@ -32,6 +32,7 @@ module Spec : sig
     -> name:string
     -> autogen_path:string
     -> manual_install_path:string
+    -> brew_install_path:string
     -> digest_input:('input -> string)
     -> create_env:('input -> 'env)
     -> input:'input

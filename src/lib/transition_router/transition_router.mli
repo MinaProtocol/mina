@@ -1,3 +1,4 @@
+open Async_kernel
 open Coda_base
 open Pipe_lib
 
@@ -6,16 +7,22 @@ module type Inputs_intf = sig
 
   module Network : sig
     type t
+
+    val high_connectivity : t -> unit Ivar.t
+
+    val peers : t -> Network_peer.Peer.t list
   end
 
   module Transition_frontier :
     Coda_intf.Transition_frontier_intf
     with type external_transition_validated := External_transition.Validated.t
      and type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
+                ( [`Time_received] * unit Truth.true_t
+                , [`Proof] * unit Truth.true_t
+                , [`Delta_transition_chain]
+                  * State_hash.t Non_empty_list.t Truth.true_t
+                , [`Frontier_dependencies] * unit Truth.true_t
+                , [`Staged_ledger_diff] * unit Truth.false_t )
                 External_transition.Validation.with_transition
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -62,9 +69,10 @@ module Make (Inputs : Inputs_intf) : sig
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:Transition_frontier.Breadcrumb.t
                                   Strict_pipe.Reader.t
+    -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
+                               * External_transition.t Broadcast_pipe.Writer.t
     -> Transition_frontier.t
-    -> (External_transition.Validated.t, State_hash.t) With_hash.t
-       Strict_pipe.Reader.t
+    -> External_transition.Validated.t Strict_pipe.Reader.t
 end
 
 open Coda_transition
@@ -86,6 +94,7 @@ val run :
                                Strict_pipe.Reader.t
   -> proposer_transition_reader:Transition_frontier.Breadcrumb.t
                                 Strict_pipe.Reader.t
+  -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
+                             * External_transition.t Broadcast_pipe.Writer.t
   -> Transition_frontier.t
-  -> (External_transition.Validated.t, State_hash.t) With_hash.t
-     Strict_pipe.Reader.t
+  -> External_transition.Validated.t Strict_pipe.Reader.t

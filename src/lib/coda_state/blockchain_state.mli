@@ -90,14 +90,14 @@ module Message :
    and type t = Value.t
    and type var = var
 
+open Tick
+
 module Signature :
   Signature_lib.Checked.S
-  with type ('a, 'b) typ := ('a, 'b) Tick.Typ.t
-   and type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
-   and type boolean_var := Tick.Boolean.var
-   and type curve := Snark_params.Tick.Inner_curve.t
-   and type curve_var := Snark_params.Tick.Inner_curve.var
-   and type curve_scalar := Snark_params.Tick.Inner_curve.Scalar.t
-   and type curve_scalar_var := Snark_params.Tick.Inner_curve.Scalar.var
+  with module Impl := Tick
+   and type curve := Inner_curve.t
+   and type curve_var := Inner_curve.var
+   and type curve_scalar := Inner_curve.Scalar.t
+   and type curve_scalar_var := Inner_curve.Scalar.var
    and module Message := Message
    and module Shifted := Snark_params.Tick.Inner_curve.Checked.Shifted

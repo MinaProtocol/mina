@@ -4,7 +4,7 @@ type t = char
 
 (* each of the following values should be distinct *)
 
-let graphql : t = '\x17'
+let user_command : t = '\x17'
 
 let web_pipe : t = '\x41'
 

@@ -17,10 +17,6 @@ module Ledger_proof = struct
   include Stable.V1.T
 end
 
-module Transaction_snark = struct
-  module Statement = Int
-end
-
 module Transaction_snark_work = struct
   type t =
     { fee: Currency.Fee.t
@@ -28,20 +24,28 @@ module Transaction_snark_work = struct
     ; prover: Public_key.Compressed.t }
 
   module Statement = struct
-    type t = int list [@@deriving sexp, hash, compare, bin_io, yojson]
+    type t = Transaction_snark.Statement.Stable.Latest.t list
+    [@@deriving sexp, hash, compare, bin_io, yojson]
 
-    let gen = List.quickcheck_generator Int.quickcheck_generator
+    let gen = List.quickcheck_generator Transaction_snark.Statement.gen
 
     module Stable = struct
       module V1 = struct
         module T = struct
-          type t = int list
+          type t = Transaction_snark.Statement.Stable.V1.t list
           [@@deriving
             sexp, hash, compare, bin_io, yojson, version {unnumbered}]
         end
 
         include T
         include Hashable.Make_binable (T)
+
+        let compact_json : t -> Yojson.Safe.json =
+         fun t ->
+          `List
+            (List.map
+               ~f:(fun s -> `Int (Transaction_snark.Statement.Stable.V1.hash s))
+               t)
       end
     end
 

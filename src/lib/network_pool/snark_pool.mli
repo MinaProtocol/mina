@@ -53,11 +53,7 @@ module type S = sig
 
   val add_completed_work :
        t
-    -> ( ( transaction_snark_statement
-         , 'b
-         , 'c
-         , 'd )
-         Snark_work_lib.Work.Single.Spec.t
+    -> ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
          Snark_work_lib.Work.Spec.t
        , ledger_proof )
        Snark_work_lib.Work.Result.t
@@ -91,10 +87,6 @@ end
 
 module Make (Ledger_proof : sig
   type t [@@deriving bin_io, sexp, yojson, version]
-end) (Transaction_snark : sig
-  module Statement : sig
-    type t
-  end
 end) (Transaction_snark_work : sig
   type t =
     { fee: Currency.Fee.t
@@ -110,6 +102,8 @@ end) (Transaction_snark_work : sig
           type t [@@deriving sexp, bin_io, yojson, version]
 
           include Hashable.S_binable with type t := t
+
+          val compact_json : t -> Yojson.Safe.json
         end
       end
       with type V1.t = t

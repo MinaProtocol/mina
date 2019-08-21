@@ -126,6 +126,8 @@ module Time = struct
     let ( <= ) = UInt64.( <= )
 
     let ( >= ) = UInt64.( >= )
+
+    let min = UInt64.min
   end
 
   let ( < ) = UInt64.( < )

@@ -41,7 +41,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
     with
     | Error e ->
         Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-          "Could not connect to worker" ;
+          "Could not connect to worker to handle mutant diff: $error"
+          ~metadata:[("error", `String (Error.to_string_hum e))] ;
         Error.raise e
     | Ok new_hash ->
         if Transition_frontier.Diff.Hash.equal new_hash ground_truth_hash then
@@ -149,15 +150,20 @@ module Make (Inputs : Intf.Main_inputs) = struct
     let log_error () =
       Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("hash", State_hash.to_yojson (With_hash.hash transition))]
-        "Failed to add breadcrumb into $hash"
+        "Failed to add breadcrumb to transition $hash"
+    in
+    let previous_state_hash =
+      With_hash.data transition |> External_transition.Validated.parent_hash
     in
     (* TMP HACK: our transition is already validated, so we "downgrade" it's validation #2486 *)
     let mostly_validated_external_transition =
-      ( With_hash.map ~f:External_transition.Validated.forget_validation
+      ( With_hash.map ~f:External_transition.Validation.forget_validation
           transition
-      , ( (`Time_received, Truth.True)
-        , (`Proof, Truth.True)
-        , (`Frontier_dependencies, Truth.True)
+      , ( (`Time_received, Truth.True ())
+        , (`Proof, Truth.True ())
+        , ( `Delta_transition_chain
+          , Truth.True (Non_empty_list.singleton previous_state_hash) )
+        , (`Frontier_dependencies, Truth.True ())
         , (`Staged_ledger_diff, Truth.False) ) )
     in
     let%bind child_breadcrumb =
@@ -203,18 +209,14 @@ module Make (Inputs : Intf.Main_inputs) = struct
       Transition_storage.get transition_storage ~logger (Transition state_hash)
     in
     let root_transition, root_successor_hashes =
-      let verified_transition, children_hashes =
-        get_verified_transition state_hash
-      in
-      ({With_hash.data= verified_transition; hash= state_hash}, children_hashes)
+      get_verified_transition state_hash
     in
     let%bind root_staged_ledger =
       Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
         ~verifier ~scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
         ~pending_coinbases
-        ~expected_merkle_root:
-          (staged_ledger_hash @@ With_hash.data root_transition)
+        ~expected_merkle_root:(staged_ledger_hash root_transition)
       |> Deferred.Or_error.ok_exn
     in
     let%bind transition_frontier =

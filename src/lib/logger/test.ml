@@ -13,11 +13,11 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
   in
   let rec run_test ~last_size ~rotations ~rotation_expected =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "test" ;
-    let curr_size = get_size "coda.log.0" in
+    let curr_size = get_size "coda.log" in
     if curr_size < last_size then (
       assert rotation_expected ;
-      assert (exists "coda.log.1") ;
-      assert (get_size "coda.log.1" = last_size) ;
+      assert (exists "coda.log.0") ;
+      assert (get_size "coda.log.0" = last_size) ;
       if rotations <= 2 then
         run_test ~last_size:curr_size ~rotations:(rotations + 1)
           ~rotation_expected:false )

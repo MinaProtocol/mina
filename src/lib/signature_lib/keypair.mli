@@ -21,6 +21,8 @@ val of_private_key_exn : Private_key.t -> t
 
 val create : unit -> t
 
+val gen : t Quickcheck.Generator.t
+
 module And_compressed_pk : sig
   type nonrec t = t * Public_key.Compressed.t [@@deriving sexp, compare]
 

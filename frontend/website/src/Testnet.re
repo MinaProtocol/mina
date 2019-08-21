@@ -1,247 +1,237 @@
-let extraHeaders = () => <> {Head.legacyStylesheets()} </>;
+let extraHeaders = () =>
+  <>
+    <script src="https://apis.google.com/js/api.js" />
+    <script src={Links.Cdn.url("/static/js/leaderboard.js")} />
+  </>;
 
-{
+module Styles = {
   open Css;
-  // Hide social links
-  global("#block-explorer div div a.no-underline", [display(`none)]);
-  // Hide header text
-  global("#block-explorer div h2", [display(`none)]);
-  // Make everything IBM plex sans
-  global(
-    ".roboto",
-    [
-      Style.Typeface.ibmplexsans,
-      color(Style.Colors.saville),
-      fontSize(`px(16)),
-    ],
-  );
-  global(
-    "#block-explorer .bg-lemoncurry",
-    [Style.Typeface.ibmplexsans, fontWeight(`medium), fontSize(`px(16))],
-  );
 
-  // Remove the "status down" lemon curry popup as it's inaccurate
-  global(".darksnow.tc.bg-lemoncurry", [display(`none)]);
-
-  // Remove fade in of explanations
-  global(".animate-opacity", [opacity(1.)]);
-
-  // Remove explanations on mobile
-  global(".o-90", [display(`none)]);
-
-  // Remove box shadows
-  global(".shadow-subtle", [opacity(1.), boxShadow(transparent)]);
-
-  // Set explaination (and container contents) colors to white
-  global(".bg-darksnow", [backgroundColor(white)]);
-
-  // Remove borders around explanations
-  global(".b-sky", [border(`zero, `none, transparent)]);
-
-  // Remove border around merkle path previous state hash column
-  global(
-    "svg ~ div.b-silver",
-    [
-      margin(`zero),
-      marginTop(`rem(-0.3)),
-      padding(`zero),
-      border(`zero, `none, transparent),
-    ],
-  );
-
-  // Container contents
-  global(
-    ".bg-darksnow .ocean",
-    [
-      backgroundColor(`hex("eff2f7")),
-      padding(`rem(0.75)),
-      fontSize(`rem(0.875)),
-      Style.Typeface.ibmplexsans,
-      color(Style.Colors.saville),
-    ],
-  );
-
-  // zk-Snark container
-  global(
-    ".shadow-subtle .grass-gradient",
-    [Style.Typeface.ibmplexsans, color(Style.Colors.saville)],
-  );
-
-  // Disable red state since the demo is broken
-  global(
-    ".bg-brightred div",
-    [
-      backgroundColor(Style.Colors.teal),
-      Style.Typeface.ibmplexsans,
-      color(Style.Colors.saville),
-    ],
-  );
-
-  global(
-    ".shadow-small1.bg-brightred",
-    [backgroundColor(`hex("bcbcbc")), boxShadow(transparent)],
-  );
-
-  global(
-    ".state-with-proof div:nth-child(2) div .mw5 > div:nth-child(2)",
-    [display(`none)],
-  );
-
-  // Header on other containers
-  global(
-    "div.silver-gradient div",
-    [
-      backgroundColor(Style.Colors.teal),
-      Style.Typeface.ibmplexsans,
-      color(Style.Colors.saville),
-    ],
-  );
-  // Dot on other containers
-  global(
-    "div.silver-gradient div div div",
-    [backgroundColor(`hex("bcbcbc")), boxShadow(transparent)],
-  );
-
-  // Style carets
-  global(
-    ".f1",
-    [
-      fontSize(`rem(5.)),
-      color(Style.Colors.tealAlpha(0.2)),
-      marginLeft(`zero),
-      marginRight(`zero),
-    ],
-  );
-
-  // Make things wider
-  global(".mw5", [maxWidth(`rem(20.))]);
-
-  // Smaller border radius
-  global(".br3", [borderRadius(`px(5))]);
-  global(
-    ".br--top",
-    [borderBottomLeftRadius(`px(0)), borderBottomRightRadius(`px(0))],
-  );
-  global(
-    ".br--bottom",
-    [borderTopLeftRadius(`px(0)), borderTopRightRadius(`px(0))],
-  );
-
-  // Style titles
-  global(
-    ".record-title-padding",
-    [
-      fontSize(`px(20)),
-      color(Style.Colors.midnight),
-      lineHeight(`rem(1.2)),
-      marginBottom(`rem(1.5)),
-    ],
-  );
-};
-let component = ReasonReact.statelessComponent("Testnet");
-
-let rightSideText =
-  Css.(
+  let header =
     style([
-      margin(`zero),
-      Style.Typeface.ibmplexsans,
-      color(Style.Colors.saville),
-      fontWeight(`medium),
-      lineHeight(`rem(1.5)),
-      marginTop(`rem(1.)),
-    ])
-  );
-let rightSideLink =
-  Css.(
+      display(`flex),
+      flexDirection(`column),
+      width(`percent(100.)),
+      color(Style.Colors.slate),
+      textAlign(`center),
+      margin2(~v=rem(3.5), ~h=`zero),
+      marginTop(rem(1.)),
+    ]);
+
+  let content =
+    style([
+      display(`flex),
+      flexDirection(`columnReverse),
+      justifyContent(`center),
+      media(Style.MediaQuery.somewhatLarge, [flexDirection(`row)]),
+    ]);
+
+  let leaderboard =
+    style([
+      background(Style.Colors.hyperlinkAlpha(0.15)),
+      width(`percent(100.)),
+      maxWidth(rem(41.)),
+      borderRadius(px(3)),
+      padding2(~v=`rem(1.), ~h=`zero),
+      Style.Typeface.pragmataPro,
+      lineHeight(rem(1.5)),
+      color(Style.Colors.midnight),
+      selector(
+        ".leaderboard-row",
+        [
+          display(`grid),
+          gridColumnGap(rem(1.5)),
+          gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(2.5)]),
+        ],
+      ),
+      selector("div span:last-child", [opacity(0.5)]),
+      selector("div span:nth-child(odd)", [justifySelf(`flexEnd)]),
+      selector(
+        "hr",
+        [
+          height(px(4)),
+          borderTop(px(1), `dashed, Style.Colors.marine),
+          borderLeft(`zero, solid, transparent),
+          borderBottom(px(1), `dashed, Style.Colors.marine),
+        ],
+      ),
+      selector(
+        "#leaderboard-loading",
+        [
+          textAlign(`center),
+          marginTop(rem(2.)),
+          color(Style.Colors.slateAlpha(0.7)),
+        ],
+      ),
+      selector("div", [padding2(~v=`zero, ~h=`rem(1.))]),
+      selector(
+        "div:nth-child(even)",
+        [backgroundColor(`rgba((71, 130, 130, 0.1)))],
+      ),
+    ]);
+
+  let headerRow =
+    merge([
+      Style.Body.basic_semibold,
+      style([
+        display(`grid),
+        color(Style.Colors.midnight),
+        gridColumnGap(rem(1.5)),
+        gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(2.5)]),
+      ]),
+    ]);
+
+  let copy =
+    style([
+      width(rem(28.)),
+      margin3(~top=`zero, ~h=`auto, ~bottom=rem(2.)),
+      media(Style.MediaQuery.somewhatLarge, [marginLeft(rem(5.))]),
+      ...Style.Body.basicStyles,
+    ]);
+
+  let leaderboardLink =
     merge([
       Style.Link.basic,
-      rightSideText,
+      Style.H3.basic,
       style([
-        marginTop(`rem(0.75)),
-        display(`block),
-        cursor(`pointer),
-        color(Style.Colors.hyperlink),
-        hover([color(Style.Colors.hyperlinkHover)]),
+        fontWeight(`semiBold),
+        marginTop(rem(0.75)),
+        marginLeft(rem(1.75)),
       ]),
-    ])
-  );
+    ]);
 
-let make = _ => {
-  ...component,
-  render: _self =>
-    <section>
-      <h3
-        className=Css.(
-          merge([
-            Style.H3.wings,
-            style([marginTop(`rem(1.25)), marginBottom(`rem(3.0))]),
-          ])
-        )>
-        {ReasonReact.string("Testnet")}
-      </h3>
-      <div
-        className=Css.(
-          style([
-            display(`flex),
-            flexWrap(`wrap),
-            flexDirection(`column),
-            justifyContent(`spaceBetween),
-            maxWidth(`rem(32.)),
-            marginLeft(`auto),
-            marginRight(`auto),
-            media(
-              Style.MediaQuery.notMobile,
-              [justifyContent(`spaceAround)],
-            ),
-          ])
-        )>
-        <div
-          className=Css.(
-            merge([
-              Style.Body.basic,
-              style([
-                marginLeft(`rem(1.)),
-                marginRight(`rem(1.)),
-                marginTop(`rem(1.)),
-                marginBottom(`zero),
-              ]),
-            ])
-          )>
-          {ReasonReact.string(
-             "Public Testnet Beta is launching soon. See below \
-              for an explanation of how the protocol state and \
-              account balance are verified.",
-           )}
+  let sidebarHeader =
+    merge([
+      Style.H4.wide,
+      style([textAlign(`left), fontSize(`rem(1.)), fontWeight(`light)]),
+    ]);
+
+  let weekHeader =
+    merge([Style.H2.basic, style([padding2(~v=`rem(1.), ~h=`zero)])]);
+};
+
+[@react.component]
+let make = () => {
+  <div>
+    <div className=Styles.header>
+      <h1 className=Style.H1.hero> {React.string("Testnet Leaderboard")} </h1>
+      <a
+        href="https://docs.google.com/spreadsheets/d/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/edit#gid=0"
+        target="_blank"
+        className=Styles.leaderboardLink>
+        {React.string({j|View Full Leaderboard\u00A0→|j})}
+      </a>
+    </div>
+    <div className=Styles.content>
+      <div id="testnet-leaderboard" className=Styles.leaderboard>
+        <div className=Styles.headerRow>
+          <span> {React.string("Rank")} </span>
+          <span> {React.string("Username")} </span>
+          <span id="leaderboard-current-week" />
+          <span> {React.string("Total")} </span>
         </div>
-        <div
-          className=Css.(
-            style([
-              maxWidth(`rem(25.)),
-              marginLeft(`rem(1.)),
-              marginRight(`rem(1.)),
-            ])
-          )>
-          <A
-            name={"testnet-" ++ Links.Forms.participateInConsensus.name}
-            target="_blank"
-            href={Links.Forms.participateInConsensus.link}
-            className=rightSideLink>
-            {ReasonReact.string({js|Participate in the testnet\u00A0→|js})}
-          </A>
-        </div>
+        <hr />
+        <div id="leaderboard-loading"> {React.string("Loading...")} </div>
       </div>
-      <div
-        className=Css.(
-          style([
-            marginLeft(`auto),
-            marginRight(`auto),
-            marginTop(`rem(4.0)),
-            display(`flex),
-            justifyContent(`center),
-          ])
-        )
-        id="block-explorer"
-      />
-      <script defer=true src="/static/main.bc.js" />
-    </section>,
+      <div className=Styles.copy>
+        <p>
+          <h4 className=Styles.sidebarHeader>
+            {React.string("Testnet Points")}
+          </h4>
+        </p>
+        <p>
+          {React.string(
+             "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
+           )}
+        </p>
+        <p>
+          <h4 className=Styles.sidebarHeader>
+            {React.string("Community")}
+          </h4>
+        </p>
+        <p>
+          <a className=Style.Link.basic href="/docs">
+            {React.string("Testnet Docs")}
+          </a>
+          <br />
+          <a
+            className=Style.Link.basic
+            href="https://bit.ly/CodaDiscord"
+            target="_blank">
+            {React.string("Discord")}
+          </a>
+          <br />
+          <a
+            className=Style.Link.basic
+            href="https://forums.codaprotocol.com"
+            target="_blank">
+            {React.string("Coda Forums")}
+          </a>
+        </p>
+        <p>
+          <h2 className=Styles.weekHeader> {React.string("Week 5")} </h2>
+        </p>
+        <p>
+          <h4 className=Styles.sidebarHeader>
+            {React.string("Challenge #12: 'CLI FYI'")}
+          </h4>
+        </p>
+        <p>
+          {React.string(
+             "Submit a product improvement or feature you'd like to see in the Coda command line interface (CLI). Post a new thread on the Discourse ",
+           )}
+          <a
+            className=Style.Link.basic
+            href="http://forums.codaprotocol.com"
+            target="_blank">
+            {React.string("forums")}
+          </a>
+          {React.string(
+             " in the 'Product' category and add this to the title: '[CLI Feature]'. The community can vote on it by 'hearting' the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*.",
+           )}
+        </p>
+        <p>
+          {React.string(
+             "Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement -- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts*!",
+           )}
+        </p>
+        <p>
+          <h4 className=Styles.sidebarHeader>
+            {React.string("Challenge #13: 'My two codas'")}
+          </h4>
+        </p>
+        <p>
+          {React.string(
+             "Earn 400 pts* for giving your feedback by filling out this ",
+           )}
+          <a
+            className=Style.Link.basic
+            href="http://bit.ly/CommunityRetro"
+            target="_blank">
+            {React.string("survey")}
+          </a>
+          {React.string(".")}
+        </p>
+        <p>
+          <h4 className=Styles.sidebarHeader>
+            {React.string("Challenge #14: 'Leonardo da Coda'")}
+          </h4>
+        </p>
+        <p>
+          {React.string(
+             "Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the ",
+           )}
+          <a
+            className=Style.Link.basic
+            href="https://forums.codaprotocol.com/t/community-art-contest-gifs/109"
+            target="_blank">
+            {React.string("forums")}
+          </a>
+          {React.string(
+             ". You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by 'hearting' your post, so do not forget to 'heart' your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.",
+           )}
+        </p>
+      </div>
+    </div>
+  </div>;
 };

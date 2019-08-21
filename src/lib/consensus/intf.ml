@@ -32,7 +32,10 @@ module type Constants_intf = sig
    * block. In sig, it's exactly 1 as blocks should be produced every slot. *)
   val c : int
 
-  val inactivity_secs : int
+  val inactivity_ms : int
+
+  (** Number of slots in one epoch *)
+  val slots_per_epoch : Unsigned.UInt32.t
 end
 
 module type Blockchain_state_intf = sig
@@ -306,12 +309,12 @@ module type S = sig
     end
 
     module Prover_state : sig
-      type t [@@deriving sexp]
+      type t [@@deriving to_yojson, sexp]
 
       module Stable :
         sig
           module V1 : sig
-            type t [@@deriving bin_io, sexp, version]
+            type t [@@deriving bin_io, sexp, to_yojson, version]
           end
 
           module Latest = V1
@@ -330,11 +333,11 @@ module type S = sig
       module Value : sig
         module Stable : sig
           module V1 : sig
-            type t [@@deriving sexp, bin_io, version]
+            type t [@@deriving sexp, bin_io, to_yojson, version]
           end
         end
 
-        type t = Stable.V1.t [@@deriving sexp]
+        type t = Stable.V1.t [@@deriving to_yojson, sexp]
       end
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
@@ -391,9 +394,9 @@ module type S = sig
 
       val network_delay : Configuration.t -> int
 
-      val curr_epoch : Value.t -> int
+      val curr_epoch : Value.t -> Epoch.t
 
-      val curr_slot : Value.t -> int
+      val curr_slot : Value.t -> Slot.t
     end
 
     module Proposal_data : sig

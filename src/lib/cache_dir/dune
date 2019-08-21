@@ -1,5 +1,5 @@
 (library
  (name cache_dir)
  (public_name cache_dir)
- (libraries core)
+ (libraries core async)
  (preprocess no_preprocessing))
