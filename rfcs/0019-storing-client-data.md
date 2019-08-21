@@ -20,7 +20,7 @@ The first section will talk about the requirements and basic primitives that a c
 
 __NOTE: The types presented in OCaml code are disk representations of the types__
 
-In the Coda blockchain, there would be many different transactions sent and received from various people in the network. We would only be interested in hearing about several transactions involving certain people (i.e. friends). Therefore, a client should only keep a persistent record of transactions involving a white-list of people and they should be able to look up the contents of these transactions from a container. Here are the records for a transaction. Note that transactions could be either `user_commands` or `fee_transfers` for this design:
+In the Coda blockchain, there would be many different transactions sent and received from various people in the network. A client would only be interested in hearing about several transactions involving certain people (i.e. friends). Therefore, the client should only keep a persistent record of transactions involving a white-list of people and they should be able to look up the contents of these transactions from a container. Also, some applications would be interested in hearing everything that comes through the network (i.e. archive nodes, block explorers). Thus, a client should have the ability to record every object that they hear throughout the network. Here are the records for a transaction. Note that transactions could be either `user_commands` or `fee_transfers` for this design:
 
 ```ocaml
 module User_commands = struct
@@ -252,7 +252,7 @@ Here is a link of an interactive version of the schema: https://dbdiagram.io/d/5
 
 Notice that all the possible joins that we have to run through the `block_to_transactions` table. The `transaction_id` and `state_hash` columns are indexed to make it fast to compute which transactions are in an block and which blocks have a certain transaction for the `transactionStatus` query. We have multicolumn indexes for `(receiver, block_length, epoch, slot)` and `(sender, block_length, epoch, slot)` to boost the performance of pagination queries where are sorting based on `block_compare`.
 
-We also have multicolumn indexes for `(receiver, time_seen_transaction)` and `(sender, time_seen_transaction)` to boost the performance of pagination queries where we are sorting based on the time we first see a transaction. The join table has quite a bit of indexes, which will impact the performance of the table when performing write updates. If the writes are too slow, then the join table should have only one type of pagination comparison. We should prefer `block_compare` over `time_seen_transaction` since `time_seen_transaction` is a mutable field and the change to this field would cause more index updates to `time_seen_transaction`.
+We also have multicolumn indexes for `(receiver, time_seen_transaction)` and `(sender, time_seen_transaction)` to boost the performance of pagination queries where we are sorting based on the time we first see a transaction. The join table has quite a bit of indexes, which will impact the performance of the table when performing write updates. If the writes are too slow, then the join table should have only one type of pagination comparison. It is hard to predict the performance of these writes with these indexes. We should write benchmark performance tests to see how fast writes are with these indices. If the writes are too slow, we should prefer `block_compare` over `time_seen_transaction` since `time_seen_transaction` is a mutable field and the change to this field would cause more index updates to `time_seen_transaction`.
 
 ### Archive Process
 
@@ -340,9 +340,13 @@ let update_status sql finalized_transition deleted_transitions =
   Sql.commit sql
 ```
 
+We can also use `RPC_parallel` to ensure that the daemon will die if the archive process will die and vice versa using RPC parallel. 
+
 #### Client Queries
 
-When a client wants to make a query, it will talk to an API process. The API process will invoke a server that makes calls to the daemon process and the database. The API process will talk to the daemon through Graphql. The API process will make direct SQL calls to the database and present it to the client. The following subsections will describe queries how to use the databases to make complicated queries:
+When a client wants to make a query, it will talk to the daemon's GraphQL server. The server will service any commands involving in-memory data structures of the daemon (i.e. `transition_frontier`, `transaction_pool`). It will also send SQL calls to the database. There shouldn't be much of a performance issue if the API calls are being sent to the daemon since most of the queries involving the in-memory data structures are O(1) and we asynchronously wait for databases to perform SQL calls.
+
+In the future, we can offload these API queries on another process if the queries significantly slow down the performance of the daemon. This API process will run its own server taking client calls. It will talk to the daemon through Graphql. The API process will make direct SQL calls to the database and present it to the client. The following subsections will describe queries how to use the databases to make complicated queries:
 
 #### Transaction_status
 
@@ -475,20 +479,31 @@ Coinbase also uses MongoDB to store all of the data in a blockchain.
 The flexibility of this new design changed some parts of the current schema of the GraphqQL database. Here is the schema:
 
 ```graphql
-enum ConsensusStatus {
+enum FinalizedStatusEnum {
   FAILED
   CONFIRMED
-  PENDING of int
-  UNKNOWN
+  UNKONWN
 }
 
-enum TransactionConsensusStatus {
-  SCHEDULED
-  FAILED
-  CONFIRMED
-  PENDING of int
-  UNKNOWN
+type FinalizedStatus {
+  status: FinalizedStatusEnum!
 }
+
+type PendingStatus {
+  blockConfirmationNumber: Int!
+}
+
+enum ScheduledEnum {
+  SCHEDULED
+}
+
+type Scheduled {
+  status: ScheduledEnum!
+}
+
+union ConsensusStatus = FinalizedStatus | PendingStatus
+
+union TransactionConsensusStatus = FinalizedStatus  | PendingStatus | Scheduled
 
 type UserCommand {
   id: ID!
