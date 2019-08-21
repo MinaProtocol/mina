@@ -542,7 +542,7 @@ module Make (Inputs : Inputs_intf) = struct
   [@@deriving fields]
 
   let offline_time =
-    Block_time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_secs
+    Block_time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_ms
 
   let setup_timer time_controller sync_state_broadcaster =
     Block_time.Timeout.create time_controller offline_time ~f:(fun _ ->
