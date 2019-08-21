@@ -114,9 +114,7 @@ module Styles = {
 let make = () => {
   <div>
     <div className=Styles.header>
-      <h1 className=Style.H1.hero>
-        {React.string("Testnet Leaderboard")}
-      </h1>
+      <h1 className=Style.H1.hero> {React.string("Testnet Leaderboard")} </h1>
       <a
         href="https://docs.google.com/spreadsheets/d/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/edit#gid=0"
         target="_blank"
@@ -133,9 +131,7 @@ let make = () => {
           <span> {React.string("Total")} </span>
         </div>
         <hr />
-        <div id="leaderboard-loading">
-          {React.string("Loading...")}
-        </div>
+        <div id="leaderboard-loading"> {React.string("Loading...")} </div>
       </div>
       <div className=Styles.copy>
         <p>
@@ -173,9 +169,7 @@ let make = () => {
           </a>
         </p>
         <p>
-          <h2 className=Styles.weekHeader>
-            {React.string("Week 5")}
-          </h2>
+          <h2 className=Styles.weekHeader> {React.string("Week 5")} </h2>
         </p>
         <p>
           <h4 className=Styles.sidebarHeader>
