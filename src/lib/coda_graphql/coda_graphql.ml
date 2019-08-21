@@ -343,11 +343,11 @@ module Types = struct
             ~doc:"Amount the prover is paid for the snark work"
             ~resolve:(fun _ {Transaction_snark_work.Info.fee; _} ->
               Currency.Fee.to_uint64 fee )
-        ; field "jobIds" ~doc:"Unique identifier for the snark work purchased"
+        ; field "workIds" ~doc:"Unique identifier for the snark work purchased"
             ~typ:(non_null @@ list @@ non_null int)
             ~args:Arg.[]
-            ~resolve:(fun _ {Transaction_snark_work.Info.job_ids; _} -> job_ids)
-        ] )
+            ~resolve:(fun _ {Transaction_snark_work.Info.work_ids; _} ->
+              work_ids ) ] )
 
   let blockchain_state =
     obj "BlockchainState" ~fields:(fun _ ->

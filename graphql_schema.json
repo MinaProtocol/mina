@@ -1285,7 +1285,7 @@
               "deprecationReason": null
             },
             {
-              "name": "jobIds",
+              "name": "workIds",
               "description": "Unique identifier for the snark work purchased",
               "args": [],
               "type": {

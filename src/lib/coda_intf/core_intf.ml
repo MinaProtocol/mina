@@ -109,7 +109,7 @@ module type Transaction_snark_work_generalized_intf = sig
   module Info : sig
     type t =
       { statements: Statement.Stable.V1.t
-      ; job_ids: int list
+      ; work_ids: int list
       ; fee: Fee.Stable.V1.t
       ; prover: Public_key.Compressed.Stable.V1.t }
     [@@deriving to_yojson, sexp]
