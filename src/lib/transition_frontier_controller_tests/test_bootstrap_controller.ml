@@ -255,6 +255,42 @@ let%test_module "Bootstrap Controller" =
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
       )
 
+    let%test "when eagerly syncing to multiple nodes, you should sync to the \
+              node with the highest transition_frontier" =
+      let logger = Logger.create () in
+      let trust_system = Trust_system.null () in
+      let unsynced_peer_num_breadcrumbs = 6 in
+      let unsynced_peers_accounts =
+        List.take Genesis_ledger.accounts
+          (List.length Genesis_ledger.accounts / 2)
+      in
+      let synced_peer_num_breadcrumbs = unsynced_peer_num_breadcrumbs * 2 in
+      let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind {me; peers; network} =
+            Network_builder.setup ~source_accounts ~logger ~trust_system
+              [ { num_breadcrumbs= unsynced_peer_num_breadcrumbs
+                ; accounts= unsynced_peers_accounts }
+              ; { num_breadcrumbs= synced_peer_num_breadcrumbs
+                ; accounts= Genesis_ledger.accounts } ]
+          in
+          let transition_reader, _ = make_transition_pipe () in
+          let ledger_db =
+            Transition_frontier.For_tests.root_snarked_ledger me
+          in
+          let synced_peer = List.nth_exn peers 1 in
+          let%map ( new_frontier
+                  , (_ :
+                      External_transition.with_initial_validation
+                      Envelope.Incoming.t
+                      list) ) =
+            Bootstrap_controller.For_tests.run ~logger ~trust_system
+              ~verifier:() ~network ~frontier:me ~ledger_db ~transition_reader
+              ~should_ask_best_tip:true
+          in
+          Ledger_hash.equal (root_hash new_frontier)
+            (root_hash synced_peer.frontier) )
+
     let%test "if we see a new transition that is better than the transition \
               that we are syncing from, than we should retarget our root" =
       Backtrace.elide := false ;
