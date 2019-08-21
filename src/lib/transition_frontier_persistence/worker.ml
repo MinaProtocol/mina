@@ -27,17 +27,18 @@ module Make (Inputs : Intf.Worker_inputs) :
     Transition_storage.close transition_storage
 
   let apply_add_transition ({transition_storage; logger}, batch)
-      With_hash.{hash; data= external_transition} =
+      validated_transition =
     let open Transition_storage.Schema in
+    let hash = External_transition.Validated.state_hash validated_transition in
     let parent_hash =
-      External_transition.Validated.parent_hash external_transition
+      External_transition.Validated.parent_hash validated_transition
     in
     let parent_transition, children_hashes =
       Transition_storage.get transition_storage ~logger
         (Transition parent_hash) ~location:__LOC__
     in
     Transition_storage.Batch.set batch ~key:(Transition hash)
-      ~data:(external_transition, []) ;
+      ~data:(validated_transition, []) ;
     Transition_storage.Batch.set batch ~key:(Transition parent_hash)
       ~data:(parent_transition, hash :: children_hashes) ;
     Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -53,9 +54,10 @@ module Make (Inputs : Intf.Worker_inputs) :
     match diff with
     | New_frontier
         Transition_frontier.Diff.Mutant.Root.Poly.
-          { root= {With_hash.hash= first_root_hash; data= first_root}
-          ; scan_state
-          ; pending_coinbase } ->
+          {root= first_root; scan_state; pending_coinbase} ->
+        let first_root_hash =
+          External_transition.Validated.state_hash first_root
+        in
         Transition_storage.Batch.with_batch t.transition_storage
           ~f:(fun batch ->
             Transition_storage.Batch.set batch ~key:Root
@@ -63,11 +65,11 @@ module Make (Inputs : Intf.Worker_inputs) :
             Transition_storage.Batch.set batch
               ~key:(Transition first_root_hash) ~data:(first_root, []) ;
             Transition_frontier.Diff.Mutant.hash acc_hash diff () )
-    | Add_transition transition_with_hash ->
+    | Add_transition validated_transition ->
         Transition_storage.Batch.with_batch t.transition_storage
           ~f:(fun batch ->
             let mutant =
-              apply_add_transition (t, batch) transition_with_hash
+              apply_add_transition (t, batch) validated_transition
             in
             Transition_frontier.Diff.Mutant.hash acc_hash diff mutant )
     | Remove_transitions removed_transitions ->

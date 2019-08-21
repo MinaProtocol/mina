@@ -90,13 +90,8 @@ module Make (Inputs : Inputs_intf) :
             let best_tip_user_commands =
               Sequence.fold (Sequence.of_list best_tip_path)
                 ~init:User_command.Set.empty ~f:(fun acc_set breadcrumb ->
-                  let external_transition =
-                    Transition_frontier.Breadcrumb.external_transition
-                      breadcrumb
-                  in
                   let user_commands =
-                    External_transition.Validated.user_commands
-                      external_transition
+                    Transition_frontier.Breadcrumb.user_commands breadcrumb
                   in
                   List.fold user_commands ~init:acc_set ~f:Set.add )
             in
