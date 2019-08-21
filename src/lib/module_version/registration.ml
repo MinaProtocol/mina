@@ -91,13 +91,16 @@ module Make (Module_decl : Module_decl_intf) = struct
   end
 end
 
-(* functor to generate With_version and bin_io boilerplate *)
+(* functor to generate With_version, __registered__, and bin_io boilerplate *)
 module Make_version (Version : Version_intf) = struct
   module With_version = struct
     type t = {version: int; t: Version.t} [@@deriving bin_io]
 
     let create t = {version= Version.version; t}
   end
+
+  (* mark as registered, used by version ppx *)
+  let __registered__ = ()
 
   (* shadow derived bin_io code for Version.t
 

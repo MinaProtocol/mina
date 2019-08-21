@@ -226,7 +226,7 @@ let whitelisted_prefix prefix ~loc =
       Ppx_deriving.raise_errorf ~loc
         "Type name contains unexpected application"
 
-let rec generate_core_type_version_decls type_name core_type =
+let rec generate_core_type_version_decls type_name core_type has_type_params =
   match core_type.ptyp_desc with
   | Ptyp_constr ({txt; _}, core_types) -> (
     match txt with
@@ -255,7 +255,9 @@ let rec generate_core_type_version_decls type_name core_type =
             id
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
-           if prefix not whitelisted, generate: let _ = A.B.__versioned__
+           if prefix not whitelisted, generate:
+               let _ = A.B.__versioned__
+               let _ = A.B.__registered__
         *)
         let core_type_decls =
           generate_version_lets_for_core_types type_name core_types
@@ -265,12 +267,22 @@ let rec generate_core_type_version_decls type_name core_type =
         else
           let loc = core_type.ptyp_loc in
           let pexp_loc = loc in
-          let versioned_ident =
-            { pexp_desc= Pexp_ident {txt= Ldot (prefix, "__versioned__"); loc}
+          let prefixed id =
+            { pexp_desc= Pexp_ident {txt= Ldot (prefix, id); loc}
             ; pexp_loc
             ; pexp_attributes= [] }
           in
-          [%str let _ = [%e versioned_ident]] @ core_type_decls
+          let versioned_ident = prefixed "__versioned__" in
+          (* types with parameters aren't registered *)
+          let decls =
+            if has_type_params then [%str let _ = [%e versioned_ident]]
+            else
+              let registered_ident = prefixed "__registered__" in
+              [%str let _ = [%e versioned_ident]
+
+                    let _ = [%e registered_ident]]
+          in
+          decls @ core_type_decls
     | _ ->
         Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
           "Unrecognized type constructor for versioned type" )
