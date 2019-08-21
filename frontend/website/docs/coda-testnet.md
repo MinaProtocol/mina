@@ -10,7 +10,7 @@ The goal of Testnet Points[\*](#disclaimer) is to recognize Coda community membe
 
 ### Leaderboard
 
-You can track the Testnet Points[\*](#disclaimer) and current leaders in [the public leaderboard](/testnet).
+You can track the Testnet Points[\*](#disclaimer) and current leaders in [the public leaderboard](/testnet.html).
 
 ### Challenges
 
