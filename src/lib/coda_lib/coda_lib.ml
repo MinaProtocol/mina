@@ -629,10 +629,31 @@ let create (config : Config.t) =
           let%bind net =
             Coda_networking.create config.net_config
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
-                (handle_request
-                   ~f:
-                     Sync_handler
-                     .get_staged_ledger_aux_and_pending_coinbases_at_hash)
+                (fun query_env ->
+                let input = Envelope.Incoming.data query_env in
+                Deferred.return
+                @@
+                let open Option.Let_syntax in
+                let%bind frontier =
+                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                in
+                let%map scan_state, expected_merkle_root, pending_coinbases =
+                  Sync_handler
+                  .get_staged_ledger_aux_and_pending_coinbases_at_hash
+                    ~frontier input
+                in
+                let staged_ledger_hash =
+                  Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+                    (Staged_ledger.Scan_state.hash scan_state)
+                    expected_merkle_root pending_coinbases
+                in
+                Logger.debug config.logger ~module_:__MODULE__
+                  ~location:__LOC__
+                  ~metadata:
+                    [ ( "staged_ledger_hash"
+                      , Staged_ledger_hash.to_yojson staged_ledger_hash ) ]
+                  "sending scan state and pending coinbase" ;
+                (scan_state, expected_merkle_root, pending_coinbases) )
               ~answer_sync_ledger_query:(fun query_env ->
                 let open Deferred.Or_error.Let_syntax in
                 let ledger_hash, _ = Envelope.Incoming.data query_env in
