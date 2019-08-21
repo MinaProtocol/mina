@@ -125,6 +125,7 @@ let jobOpenings = [|
     "Marketing and Communications Manager (San Francisco).",
   ),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
+  ("cryptography-engineer", "Cryptography Engineer (San Francisco)"),
 |];
 
 // GENERATE
