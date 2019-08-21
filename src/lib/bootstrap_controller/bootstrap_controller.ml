@@ -250,6 +250,8 @@ end = struct
           | Envelope.Sender.Remote inet_addr ->
               inet_addr
         in
+        Transition_cache.add transition_graph ~parent:previous_state_hash
+          incoming_transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
         if
           worth_getting_root t (External_transition.consensus_state transition)
@@ -261,8 +263,6 @@ end = struct
               [ ("state_hash", State_hash.to_yojson hash)
               ; ( "external_transition"
                 , External_transition.to_yojson transition ) ] ;
-          Transition_cache.add transition_graph ~parent:previous_state_hash
-            incoming_transition ;
           Deferred.ignore
           @@ on_transition t ~sender ~root_sync_ledger transition )
         else Deferred.unit )
@@ -310,13 +310,13 @@ end = struct
                       , State_hash.to_yojson
                         @@ With_hash.hash best_tip_with_hash ) ]
                 in
+                Transition_cache.add transition_graph
+                  ~parent:(External_transition.parent_hash best_tip)
+                  {data= best_tip_with_validation; sender= Remote peer.host} ;
                 if
                   should_sync ~root_sync_ledger t
                   @@ External_transition.consensus_state best_tip
                 then (
-                  Transition_cache.add transition_graph
-                    ~parent:(External_transition.parent_hash best_tip)
-                    {data= best_tip_with_validation; sender= Remote peer.host} ;
                   Logger.debug logger
                     "Syncing with peer's bootstrappable best tip"
                     ~module_:__MODULE__ ~location:__LOC__ ;
@@ -514,7 +514,31 @@ end = struct
             in
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               "Bootstrap state: complete." ;
-            (new_frontier, Transition_cache.data transition_graph) )
+            let collected_transitions =
+              Transition_cache.data transition_graph
+            in
+            let logger =
+              Logger.extend logger
+                [ ( "context"
+                  , `String "Filter collected transitions in bootstrap" ) ]
+            in
+            let root_consensus_state =
+              Transition_frontier.(
+                External_transition.Validated.consensus_state
+                @@ Breadcrumb.external_transition @@ root new_frontier)
+            in
+            let filtered_collected_transitions =
+              List.filter collected_transitions ~f:(fun incoming_transition ->
+                  let With_hash.{data= transition; _}, _ =
+                    Envelope.Incoming.data incoming_transition
+                  in
+                  `Take
+                  = Consensus.Hooks.select ~existing:root_consensus_state
+                      ~candidate:
+                        (External_transition.consensus_state transition)
+                      ~logger )
+            in
+            (new_frontier, filtered_collected_transitions) )
 
   module For_tests = struct
     type nonrec t = t
