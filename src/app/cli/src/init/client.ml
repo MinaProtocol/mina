@@ -735,11 +735,10 @@ let set_snark_worker =
     (Cli_lib.Background_daemon.init ~rest:true public_key_flag
        ~f:(fun port optional_public_key ->
          let open Graphql_client in
-         let yojson_input =
-           [%to_yojson: Public_key.Compressed.t option] optional_public_key
-         in
          let graphql =
-           Set_snark_worker.make ~wallet:(Yojson.Safe.to_basic yojson_input) ()
+           Set_snark_worker.make
+             ~wallet:Encoders.(optional optional_public_key ~f:public_key)
+             ()
          in
          Deferred.map (query graphql port) ~f:(fun response ->
              ( match optional_public_key with
@@ -753,6 +752,23 @@ let set_snark_worker =
                (Option.value_map (response#setSnarkWorker)#lastSnarkWorker
                   ~default:"None" ~f:Public_key.Compressed.to_base58_check) )
      ))
+
+let set_snark_work_fee =
+  Command.async ~summary:"Set fee reward for doing transaction snark work"
+  @@ Cli_lib.Background_daemon.init ~rest:true
+       Command.Param.(anon @@ ("fee" %: Cli_lib.Arg_type.txn_fee))
+       ~f:(fun port fee ->
+         let open Graphql_client in
+         let graphql =
+           Set_snark_work_fee.make
+             ~fee:(Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
+             ()
+         in
+         Deferred.map (query graphql port) ~f:(fun response ->
+             printf
+               !"Updated snark work fee: %i\nOld snark work fee: %i\n"
+               (Currency.Fee.to_int fee)
+               (Unsigned.UInt64.to_int (response#setSnarkWorkFee)#lastFee) ) )
 
 (* A step towards `account import`, for now `unsafe-import` will suffice *)
 let unsafe_import =
@@ -867,6 +883,7 @@ let command =
     ; ("delegate-stake", delegate_stake)
     ; ("set-staking", set_staking)
     ; ("set-snark-worker", set_snark_worker)
+    ; ("set-snark-work-fee", set_snark_work_fee)
     ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
     ; ("stop-daemon", stop_daemon)

@@ -9,6 +9,9 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
+[%%check_ocaml_word_size
+64]
+
 [%%if
 fake_hash]
 
@@ -196,10 +199,8 @@ let daemon logger =
          if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
              conf_dir ;
-           Daemon.daemonize
-             ~redirect_stdout:(`File_append (conf_dir ^/ "coda.log"))
-             ~redirect_stderr:(`File_append (conf_dir ^/ "coda.log"))
-             () )
+           Daemon.daemonize ~redirect_stdout:`Dev_null
+             ~redirect_stderr:`Dev_null () )
          else ()
        in
        let stdout_log_processor =

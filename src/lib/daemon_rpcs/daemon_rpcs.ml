@@ -212,6 +212,8 @@ module Types = struct
       let snark_worker =
         map_entry "SNARK worker" ~f:(Option.value ~default:"None")
 
+      let snark_work_fee = int_entry "SNARK work fee"
+
       let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
@@ -260,6 +262,7 @@ module Types = struct
       ; peers: string list
       ; user_commands_sent: int
       ; snark_worker: string option
+      ; snark_work_fee: int
       ; sync_status: Sync_status.Stable.V1.t
       ; propose_pubkeys: string list
       ; histograms: Histograms.t option
@@ -281,6 +284,7 @@ module Types = struct
         ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent
         ~snark_worker ~propose_pubkeys ~histograms ~consensus_time_best_tip
         ~consensus_time_now ~consensus_mechanism ~consensus_configuration
+        ~snark_work_fee
       |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =
@@ -469,7 +473,7 @@ end
 module Get_public_keys_with_details = struct
   type query = unit [@@deriving bin_io]
 
-  type response = (string * int * string) list Or_error.t
+  type response = (string * int * int) list Or_error.t
   [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
