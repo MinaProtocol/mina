@@ -63,9 +63,7 @@ val initial_peers : t -> Host_and_port.t list
 val client_port : t -> int
 
 val validated_transitions :
-     t
-  -> (External_transition.Validated.t, State_hash.t) With_hash.t
-     Strict_pipe.Reader.t
+  t -> External_transition.Validated.t Strict_pipe.Reader.t
 
 val root_diff :
   t -> Transition_frontier.Diff.Root_diff.view Strict_pipe.Reader.t

@@ -544,7 +544,7 @@ module Make (Inputs : Inputs_intf) = struct
   [@@deriving fields]
 
   let offline_time =
-    Block_time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_secs
+    Block_time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_ms
 
   let setup_timer time_controller sync_state_broadcaster =
     Block_time.Timeout.create time_controller offline_time ~f:(fun _ ->
@@ -746,7 +746,7 @@ module Make (Inputs : Inputs_intf) = struct
       Gossip_net.create config.gossip_net_params implementations
     in
     don't_wait_for
-      (let%map () = Ivar.read gossip_net.first_connect in
+      (let%map () = Ivar.read @@ Gossip_net.first_connect gossip_net in
        (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
        let initial_peers = Gossip_net.peers gossip_net in
        if List.is_empty initial_peers then (
@@ -825,7 +825,10 @@ module Make (Inputs : Inputs_intf) = struct
 
   let first_message {first_received_message; _} = first_received_message
 
-  let first_connection {gossip_net; _} = gossip_net.first_connect
+  let first_connection {gossip_net; _} = Gossip_net.first_connect gossip_net
+
+  let high_connectivity {gossip_net; _} =
+    Gossip_net.high_connectivity_signal gossip_net
 
   (* TODO: Have better pushback behavior *)
   let broadcast t msg =
@@ -957,8 +960,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     loop peers 1
 
-  let peers_by_ip t inet_addr =
-    Hashtbl.find_multi t.gossip_net.peers_by_ip inet_addr
+  let peers_by_ip t = Gossip_net.peers_by_ip t.gossip_net
 
   let try_preferred_peer t inet_addr input ~rpc =
     let peers_at_addr = peers_by_ip t inet_addr in
