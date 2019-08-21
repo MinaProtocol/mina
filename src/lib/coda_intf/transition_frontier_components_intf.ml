@@ -165,9 +165,7 @@ module type Transition_handler_processor_intf = sig
                                   , Strict_pipe.crash Strict_pipe.buffered
                                   , unit )
                                   Strict_pipe.Writer.t
-    -> processed_transition_writer:( ( external_transition_validated
-                                     , State_hash.t )
-                                     With_hash.t
+    -> processed_transition_writer:( external_transition_validated
                                    , Strict_pipe.crash Strict_pipe.buffered
                                    , unit )
                                    Strict_pipe.Writer.t
@@ -481,8 +479,7 @@ module type Transition_frontier_controller_intf = sig
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> clear_reader:[`Clear] Strict_pipe.Reader.t
-    -> (external_transition_validated, State_hash.t) With_hash.t
-       Strict_pipe.Reader.t
+    -> external_transition_validated Strict_pipe.Reader.t
 end
 
 module type Initial_validator_intf = sig
@@ -536,6 +533,5 @@ module type Transition_router_intf = sig
                                  * [`Time_received of Block_time.t] )
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> (external_transition_verified, State_hash.t) With_hash.t
-       Strict_pipe.Reader.t
+    -> external_transition_verified Strict_pipe.Reader.t
 end
