@@ -531,8 +531,7 @@ end = struct
             in
             let root_consensus_state =
               Transition_frontier.(
-                External_transition.Validated.consensus_state
-                @@ Breadcrumb.external_transition @@ root new_frontier)
+                Breadcrumb.consensus_state (root new_frontier))
             in
             let filtered_collected_transitions =
               List.filter collected_transitions ~f:(fun incoming_transition ->
