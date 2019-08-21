@@ -1395,10 +1395,7 @@ let%test_module "test" =
       module Ledger_proof = struct
         (*A proof here is a statement *)
         module Stable = struct
-          module V1 = struct
-            include Transaction_snark.Statement.Stable.V1
-          end
-
+          module V1 = Transaction_snark.Statement.Stable.V1
           module Latest = V1
         end
 
