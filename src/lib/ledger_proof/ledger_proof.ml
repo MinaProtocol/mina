@@ -39,9 +39,9 @@ module Prod : S with type t = Transaction_snark.t = struct
 
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
-  let sok_digest = Transaction_snark.sok_digest
+  let statement (t : t) = Transaction_snark.statement t
 
-  let statement = Transaction_snark.statement
+  let sok_digest = Transaction_snark.sok_digest
 
   let statement_target (t : Transaction_snark.Statement.t) = t.target
 
@@ -91,9 +91,9 @@ struct
 
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
-  let underlying_proof (_ : t) = Proof.dummy
-
   let statement ((t, _) : t) : Transaction_snark.Statement.t = t
+
+  let underlying_proof (_ : t) = Proof.dummy
 
   let statement_target (t : Transaction_snark.Statement.t) = t.target
 

@@ -41,8 +41,7 @@ type components =
 
 type pipes =
   { validated_transitions_reader:
-      (External_transition.Validated.t, State_hash.t) With_hash.t
-      Strict_pipe.Reader.t
+      External_transition.Validated.t Strict_pipe.Reader.t
   ; proposer_transition_writer:
       (Transition_frontier.Breadcrumb.t, synchronous, unit Deferred.t) Writer.t
   ; external_transitions_writer:
@@ -262,8 +261,7 @@ let best_staged_ledger_opt t =
 let best_protocol_state_opt t =
   let open Option.Let_syntax in
   let%map tip = best_tip_opt t in
-  Transition_frontier.Breadcrumb.transition_with_hash tip
-  |> With_hash.data |> External_transition.Validated.protocol_state
+  Transition_frontier.Breadcrumb.protocol_state tip
 
 let best_ledger_opt t =
   let open Option.Let_syntax in
@@ -582,12 +580,8 @@ let create_genesis_frontier (config : Config.t) ~verifier =
   in
   let%map frontier =
     Transition_frontier.create ~logger:config.logger
-      ~root_transition:
-        (With_hash.of_data first_transition
-           ~hash_data:
-             (Fn.compose Protocol_state.hash
-                External_transition.Validated.protocol_state))
-      ~root_staged_ledger ~root_snarked_ledger ~consensus_local_state
+      ~root_transition:first_transition ~root_staged_ledger
+      ~root_snarked_ledger ~consensus_local_state
   in
   (root_snarked_ledger, frontier)
 
@@ -616,8 +610,8 @@ let create (config : Config.t) =
           in
           let genesis_transition =
             Transition_frontier.(
-              root transition_frontier |> Breadcrumb.external_transition
-              |> External_transition.Validated.forget_validation)
+              root transition_frontier |> Breadcrumb.validated_transition
+              |> External_transition.Validation.forget_validation)
           in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
@@ -728,12 +722,12 @@ let create (config : Config.t) =
                  Deferred.unit )) ;
           don't_wait_for
             (Strict_pipe.Reader.iter_without_pushback
-               valid_transitions_for_network ~f:(fun transition_with_hash ->
-                 let hash = With_hash.hash transition_with_hash in
+               valid_transitions_for_network ~f:(fun transition ->
+                 let hash =
+                   External_transition.Validated.state_hash transition
+                 in
                  let consensus_state =
-                   With_hash.data transition_with_hash
-                   |> External_transition.Validated.protocol_state
-                   |> Protocol_state.consensus_state
+                   transition |> External_transition.Validated.consensus_state
                  in
                  let now =
                    let open Block_time in
@@ -750,13 +744,13 @@ let create (config : Config.t) =
                        ~metadata:
                          [ ("state_hash", State_hash.to_yojson hash)
                          ; ( "external_transition"
-                           , External_transition.Validated.to_yojson
-                               (With_hash.data transition_with_hash) ) ]
+                           , External_transition.Validated.to_yojson transition
+                           ) ]
                        "Rebroadcasting $state_hash" ;
                      (* remove verified status for network broadcast *)
                      Coda_networking.broadcast_state net
-                       (External_transition.Validated.forget_validation
-                          (With_hash.data transition_with_hash))
+                       (External_transition.Validation.forget_validation
+                          transition)
                  | Error reason ->
                      let timing_error_json =
                        match reason with
@@ -770,8 +764,8 @@ let create (config : Config.t) =
                        ~metadata:
                          [ ("state_hash", State_hash.to_yojson hash)
                          ; ( "external_transition"
-                           , External_transition.Validated.to_yojson
-                               (With_hash.data transition_with_hash) )
+                           , External_transition.Validated.to_yojson transition
+                           )
                          ; ("timing", timing_error_json) ]
                        "Not rebroadcasting block $state_hash because it was \
                         received $timing" )) ;

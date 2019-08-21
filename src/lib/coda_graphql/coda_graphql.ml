@@ -332,6 +332,23 @@ module Types = struct
             ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
         ] )
 
+  let snark_jobs =
+    obj "SnarkJobs" ~doc:"Snark works purchased" ~fields:(fun _ ->
+        [ field "prover"
+            ~args:Arg.[]
+            ~doc:"Public key of the prover" ~typ:(non_null public_key)
+            ~resolve:(fun _ {Transaction_snark_work.Info.prover; _} -> prover)
+        ; field "fee" ~typ:(non_null uint64)
+            ~args:Arg.[]
+            ~doc:"Amount the prover is paid for the snark work"
+            ~resolve:(fun _ {Transaction_snark_work.Info.fee; _} ->
+              Currency.Fee.to_uint64 fee )
+        ; field "workIds" ~doc:"Unique identifier for the snark work purchased"
+            ~typ:(non_null @@ list @@ non_null int)
+            ~args:Arg.[]
+            ~resolve:(fun _ {Transaction_snark_work.Info.work_ids; _} ->
+              work_ids ) ] )
+
   let blockchain_state =
     obj "BlockchainState" ~fields:(fun _ ->
         [ field "date" ~typ:(non_null string) ~doc:(Doc.date "date")
@@ -387,7 +404,11 @@ module Types = struct
             ~resolve:(fun _ {With_hash.data; _} -> data.protocol_state)
         ; field "transactions" ~typ:(non_null transactions)
             ~args:Arg.[]
-            ~resolve:(fun _ {With_hash.data; _} -> data.transactions) ] )
+            ~resolve:(fun _ {With_hash.data; _} -> data.transactions)
+        ; field "snarkJobs"
+            ~typ:(non_null @@ list @@ non_null snark_jobs)
+            ~args:Arg.[]
+            ~resolve:(fun _ {With_hash.data; _} -> data.snark_jobs) ] )
 
   let chain_reorganization_status : ('context, [`Changed] option) typ =
     enum "ChainReorganizationStatus"

@@ -14,6 +14,11 @@ let snark_job_list_json t =
   let%map sl = Coda_lib.best_staged_ledger t in
   Staged_ledger.Scan_state.snark_job_list_json (Staged_ledger.scan_state sl)
 
+let snark_pool_list t =
+  Coda_lib.snark_pool t |> Network_pool.Snark_pool.resource_pool
+  |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
+  |> Yojson.Safe.to_string
+
 let get_lite_chain :
     (Coda_lib.t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
     option =
@@ -21,9 +26,8 @@ let get_lite_chain :
     ~f:(fun consensus_state_to_lite t pks ->
       let ledger = Coda_lib.best_ledger t |> Participating_state.active_exn in
       let transition =
-        With_hash.data
-          (Transition_frontier.Breadcrumb.transition_with_hash
-             (Coda_lib.best_tip t |> Participating_state.active_exn))
+        Transition_frontier.Breadcrumb.validated_transition
+          (Coda_lib.best_tip t |> Participating_state.active_exn)
       in
       let state = External_transition.Validated.protocol_state transition in
       let proof =
@@ -113,7 +117,7 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   let () = Core.Unix.mkdir temp_config in
   (*Transition frontier and ledger visualization*)
   log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
-  let report_file = temp_config ^ ".tar.xz" in
+  let report_file = temp_config ^ ".tar.gz" in
   (*Coda status*)
   let status_file = temp_config ^/ "coda_status.json" in
   let status = coda_status !coda_ref in
@@ -160,7 +164,7 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   in
   let files = tmp_files |> String.concat ~sep:" " in
   let tar_command =
-    sprintf "tar  -C %s -cJf %s %s" temp_config report_file files
+    sprintf "tar  -C %s -czf %s %s" temp_config report_file files
   in
   let exit = Core.Sys.command tar_command in
   if exit = 2 then (
@@ -255,6 +259,8 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
     ; implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
           return (snark_job_list_json coda |> Participating_state.active_error)
       )
+    ; implement Daemon_rpcs.Snark_pool_list.rpc (fun () () ->
+          return (snark_pool_list coda) )
     ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
           let open Coda_lib.Config in
           Coda_tracing.start (Coda_lib.config coda).conf_dir )
@@ -287,9 +293,12 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                   , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r) )
                 ]
               "responding to a Get_work request with some new work" ;
+            Coda_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (r, snark_worker_key)) )
     ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
+          Coda_metrics.(
+            Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
             "received completed work from a snark worker"
             ~metadata:
