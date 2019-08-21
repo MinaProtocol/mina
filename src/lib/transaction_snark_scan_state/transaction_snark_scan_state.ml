@@ -127,7 +127,7 @@ module Make
       let hash_string h = Sexp.to_string (Frozen_ledger_hash.sexp_of_t h) in
       let statement_to_yojson (s : Transaction_snark.Statement.t) =
         `Assoc
-          [ ("job_id", `Int (Transaction_snark.Statement.hash s))
+          [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
           ; ("Source", `String (hash_string s.source))
           ; ("Target", `String (hash_string s.target))
           ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
@@ -149,7 +149,7 @@ module Make
                     ; statement_to_yojson y
                     ; `Int seq_no
                     ; `Assoc
-                        [ ( "status"
+                        [ ( "Status"
                           , `String (Parallel_scan.Job_status.to_string status)
                           ) ] ] ) ]
         | BFull (x, {seq_no; status}) ->
@@ -158,8 +158,10 @@ module Make
                 , `List
                     [ statement_to_yojson x
                     ; `Int seq_no
-                    ; `String (Parallel_scan.Job_status.to_string status) ] )
-              ]
+                    ; `Assoc
+                        [ ( "Status"
+                          , `String (Parallel_scan.Job_status.to_string status)
+                          ) ] ] ) ]
       in
       `List [`Int position; job_to_yojson]
   end

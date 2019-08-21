@@ -156,11 +156,11 @@ end)
         `List
           (Statement_table.fold ~init:[] t.snark_table
              ~f:(fun ~key ~data:{proof= _; fee= {fee; prover}} acc ->
-               let job_ids =
+               let work_ids =
                  Transaction_snark_work.Statement.Stable.V1.compact_json key
                in
                `Assoc
-                 [ ("job_ids", job_ids)
+                 [ ("work_ids", work_ids)
                  ; ("fee", Currency.Fee.Stable.V1.to_yojson fee)
                  ; ( "prover"
                    , Signature_lib.Public_key.Compressed.Stable.V1.to_yojson
