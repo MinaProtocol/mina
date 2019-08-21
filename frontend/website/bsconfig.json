@@ -1,6 +1,6 @@
 {
   "name": "website",
-  "reason" : {"react-jsx" : 2},
+  "reason" : {"react-jsx" : 3},
   "sources": {
       "dir": "src",
       "subdirs": true

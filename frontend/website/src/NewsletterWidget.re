@@ -82,33 +82,30 @@ let uniqueId = () => {
   string_of_int(widgetCounter^);
 };
 
-let component =
-  ReasonReact.statelessComponent("HeroSection.NewsletterWidget");
-let make = _ => {
-  ...component,
-  render: _self => {
-    let formId = uniqueId();
-    <form id={"subscribe-form-" ++ formId} className=Styles.container>
-      <div className=Css.(style([marginBottom(px(8))]))>
-        {ReasonReact.string("Subscribe to our newsletter for updates")}
-      </div>
-      <div id={"success-message-" ++ formId} className=Styles.successMessage>
-        {ReasonReact.string({js|✓ Check your email|js})}
-      </div>
-      <input
-        type_="email"
-        name="email"
-        placeholder="janedoe@example.com"
-        className=Styles.textField
-      />
-      <input
-        type_="submit"
-        value="Subscribe"
-        id={"subscribe-button-" ++ formId}
-        className=Styles.submit
-      />
-      <RunScript>
-        {j|
+[@react.component]
+let make = () => {
+  let formId = uniqueId();
+  <form id={"subscribe-form-" ++ formId} className=Styles.container>
+    <div className=Css.(style([marginBottom(px(8))]))>
+      {ReasonReact.string("Subscribe to our newsletter for updates")}
+    </div>
+    <div id={"success-message-" ++ formId} className=Styles.successMessage>
+      {ReasonReact.string({js|✓ Check your email|js})}
+    </div>
+    <input
+      type_="email"
+      name="email"
+      placeholder="janedoe@example.com"
+      className=Styles.textField
+    />
+    <input
+      type_="submit"
+      value="Subscribe"
+      id={"subscribe-button-" ++ formId}
+      className=Styles.submit
+    />
+    <RunScript>
+      {j|
             document.getElementById('subscribe-form-$formId '.trim()).onsubmit = function (e) {
               e.preventDefault();
               const formElement = document.getElementById('subscribe-form-$formId '.trim());
@@ -130,7 +127,6 @@ let make = _ => {
               return false;
             }
           |j}
-      </RunScript>
-    </form>;
-  },
+    </RunScript>
+  </form>;
 };

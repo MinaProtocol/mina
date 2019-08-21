@@ -1,52 +1,46 @@
 module ApplyItem = {
-  let component = ReasonReact.statelessComponent("Careers.ApplyItem");
-  let make = (~filename, ~name, _) => {
-    ...component,
-    render: _self =>
-      <li className="list lh-copy">
-        <A
-          name={"job-" ++ filename}
-          href={"/jobs/" ++ filename ++ ".html"}
-          className={
-            "f5 fw5 no-underline "
-            ++ Css.(
-                 style([
-                   color(Style.Colors.hyperlink),
-                   hover([color(Style.Colors.hyperlinkHover)]),
-                 ])
-               )
-          }>
-          {ReasonReact.string(name)}
-        </A>
-      </li>,
+  [@react.component]
+  let make = (~filename, ~name) => {
+    <li className="list lh-copy">
+      <A
+        name={"job-" ++ filename}
+        href={"/jobs/" ++ filename ++ ".html"}
+        className={
+          "f5 fw5 no-underline "
+          ++ Css.(
+               style([
+                 color(Style.Colors.hyperlink),
+                 hover([color(Style.Colors.hyperlinkHover)]),
+               ])
+             )
+        }>
+        {ReasonReact.string(name)}
+      </A>
+    </li>;
   };
 };
 
 module HeadingItem = {
-  let component = ReasonReact.statelessComponent("Careers.HeadingItem");
-
-  let make = (~title, children) => {
-    ...component,
-    render: _self =>
-      <div>
-        <div className="dn db-ns">
-          <div className="flex justify-between mt45">
-            <h2
-              className="pr2 fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
-              {ReasonReact.string(title)}
-            </h2>
-            <p className="w-65 mt0 mb0 lh-copy"> ...children </p>
-          </div>
+  [@react.component]
+  let make = (~title, ~children) => {
+    <div>
+      <div className="dn db-ns">
+        <div className="flex justify-between mt45">
+          <h2 className="pr2 fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
+            {ReasonReact.string(title)}
+          </h2>
+          <p className="w-65 mt0 mb0 lh-copy"> children </p>
         </div>
-        <div className="db dn-ns">
-          <div className="mt45">
-            <h2 className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
-              {ReasonReact.string(title)}
-            </h2>
-            <p className="mt3 mb0 ml15 lh-copy"> ...children </p>
-          </div>
+      </div>
+      <div className="db dn-ns">
+        <div className="mt45">
+          <h2 className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
+            {ReasonReact.string(title)}
+          </h2>
+          <p className="mt3 mb0 ml15 lh-copy"> children </p>
         </div>
-      </div>,
+      </div>
+    </div>;
   };
 };
 
@@ -190,140 +184,138 @@ let extraHeaders = () =>
     {Head.legacyStylesheets()}
   </>;
 
-let component = ReasonReact.statelessComponent("Career");
-let make = (~jobOpenings, _) => {
-  ...component,
-  render: _self => {
-    let jobItems =
-      Array.map(
-        ((filename, name)) => <ApplyItem filename name />,
-        jobOpenings,
-      );
+[@react.component]
+let make = (~jobOpenings) => {
+  let jobItems =
+    Array.map(
+      ((filename, name)) => <ApplyItem key=name filename name />,
+      jobOpenings,
+    )
+    |> React.array;
 
-    let f = Links.Cdn.url;
+  let f = Links.Cdn.url;
 
-    <div>
-      <div className="mw960 center ph3 ibmplex oceanblack">
-        <h1
-          className={
-            "fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4 nowrap "
-            ++ Css.(style([marginTop(`rem(1.25))]))
-          }>
-          {ReasonReact.string("Work with us!")}
-        </h1>
-        <div className=Css.(style([marginBottom(`rem(1.5))]))>
-          <div className="dn db-ns">
-            <div>
-              <div className="careers-gallery-row1">
-                <img src={f("/static/img/careers/group-outside.jpg")} />
-                <img src={f("/static/img/careers/group-in-house.jpg")} />
-              </div>
-              <div className="careers-gallery-row2">
-                <img src={f("/static/img/careers/nacera-outside.jpg")} />
-                <img src={f("/static/img/careers/john-cooking.jpg")} />
-                <img src={f("/static/img/careers/vanishree-talking.jpg")} />
-              </div>
+  <div>
+    <div className="mw960 center ph3 ibmplex oceanblack">
+      <h1
+        className={
+          "fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4 nowrap "
+          ++ Css.(style([marginTop(`rem(1.25))]))
+        }>
+        {ReasonReact.string("Work with us!")}
+      </h1>
+      <div className=Css.(style([marginBottom(`rem(1.5))]))>
+        <div className="dn db-ns">
+          <div>
+            <div className="careers-gallery-row1">
+              <img src={f("/static/img/careers/group-outside.jpg")} />
+              <img src={f("/static/img/careers/group-in-house.jpg")} />
             </div>
-          </div>
-          <div className="db dn-ns">
-            <img
-              className=""
-              src={f("/static/img/careers/group-outside.jpg")}
-            />
+            <div className="careers-gallery-row2">
+              <img src={f("/static/img/careers/nacera-outside.jpg")} />
+              <img src={f("/static/img/careers/john-cooking.jpg")} />
+              <img src={f("/static/img/careers/vanishree-talking.jpg")} />
+            </div>
           </div>
         </div>
-        <div className="mw800 center">
-          <p className="lh-copy f3 ocean f2-ns tracked-tightly">
-            {ReasonReact.string(
-               {js|We're using cryptography and cryptocurrency to build computing systems that put people back in control of their digital\u00A0lives.|js},
-             )}
-          </p>
+        <div className="db dn-ns">
+          <img
+            className=""
+            src={f("/static/img/careers/group-outside.jpg")}
+          />
+        </div>
+      </div>
+      <div className="mw800 center">
+        <p className="lh-copy f3 ocean f2-ns tracked-tightly">
+          {ReasonReact.string(
+             {js|We're using cryptography and cryptocurrency to build computing systems that put people back in control of their digital\u00A0lives.|js},
+           )}
+        </p>
+        <div className="mt45">
+          <hr className="mt45 ml0 mr0 mt0 mb0 b0 h2px bg-extradarksnow" />
           <div className="mt45">
-            <hr className="mt45 ml0 mr0 mt0 mb0 b0 h2px bg-extradarksnow" />
-            <div className="mt45">
-              <HeadingItem title="Open Source">
-                {ReasonReact.string(
-                   {js|We passionately believe in the open-source philosophy, and make our software free for the entire world to\u00A0use. |js},
-                 )}
-                <A
-                  name="careers-code"
-                  href="https://github.com/CodaProtocol/coda"
-                  className={
-                    "fw5 no-underline nowrap "
-                    ++ Css.(
-                         style([
-                           color(Style.Colors.hyperlink),
-                           hover([color(Style.Colors.hyperlinkHover)]),
-                         ])
-                       )
-                  }>
-                  {ReasonReact.string({js|Take a look →|js})}
-                </A>
-              </HeadingItem>
-              <HeadingItem title="Collaboration">
-                {ReasonReact.string(
-                   {js|The problems we face are novel and challenging and we take them on as a\u00A0team.|js},
-                 )}
-              </HeadingItem>
-              <HeadingItem title="Inclusion">
-                {ReasonReact.string(
-                   {js|We're working on technologies with the potential to reimagine social structures. We believe it's important to incorporate diverse perspectives from conception through\u00A0realization.|js},
-                 )}
-              </HeadingItem>
-            </div>
+            <HeadingItem title="Open Source">
+              {ReasonReact.string(
+                 {js|We passionately believe in the open-source philosophy, and make our software free for the entire world to\u00A0use. |js},
+               )}
+              <A
+                name="careers-code"
+                href="https://github.com/CodaProtocol/coda"
+                className={
+                  "fw5 no-underline nowrap "
+                  ++ Css.(
+                       style([
+                         color(Style.Colors.hyperlink),
+                         hover([color(Style.Colors.hyperlinkHover)]),
+                       ])
+                     )
+                }>
+                {ReasonReact.string({js|Take a look →|js})}
+              </A>
+            </HeadingItem>
+            <HeadingItem title="Collaboration">
+              {ReasonReact.string(
+                 {js|The problems we face are novel and challenging and we take them on as a\u00A0team.|js},
+               )}
+            </HeadingItem>
+            <HeadingItem title="Inclusion">
+              {ReasonReact.string(
+                 {js|We're working on technologies with the potential to reimagine social structures. We believe it's important to incorporate diverse perspectives from conception through\u00A0realization.|js},
+               )}
+            </HeadingItem>
           </div>
+        </div>
+        <div>
+          <hr className="mt45 ml0 mr0 mt0 mb0 b0 h2px bg-extradarksnow" />
           <div>
-            <hr className="mt45 ml0 mr0 mt0 mb0 b0 h2px bg-extradarksnow" />
-            <div>
-              <div className="dn db-ns">
-                <div className="flex justify-between mt45">
-                  <h2
-                    className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
-                    {ReasonReact.string("Benefits")}
-                  </h2>
-                  <div className="w-70 mt3"> benefits </div>
-                </div>
+            <div className="dn db-ns">
+              <div className="flex justify-between mt45">
+                <h2
+                  className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
+                  {ReasonReact.string("Benefits")}
+                </h2>
+                <div className="w-70 mt3"> benefits </div>
               </div>
-              <div className="db dn-ns">
-                <div className="mt45">
-                  <h2
-                    className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
-                    {ReasonReact.string("Benefits")}
-                  </h2>
-                  <div className="mt4 ml15 mt3"> benefits </div>
-                </div>
+            </div>
+            <div className="db dn-ns">
+              <div className="mt45">
+                <h2
+                  className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
+                  {ReasonReact.string("Benefits")}
+                </h2>
+                <div className="mt4 ml15 mt3"> benefits </div>
               </div>
             </div>
           </div>
+        </div>
+        <div>
+          <hr className="mt45 ml0 mr0 mt0 mb0 b0 h2px bg-extradarksnow" />
           <div>
-            <hr className="mt45 ml0 mr0 mt0 mb0 b0 h2px bg-extradarksnow" />
-            <div>
-              <div className="dn db-ns">
-                <div className="flex justify-between mt45">
-                  <div className="w-50">
-                    <h2
-                      className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
-                      {ReasonReact.string("Apply")}
-                    </h2>
-                  </div>
-                  <div className="w-50">
-                    <ul className="mt0 mb0 ph0"> ...jobItems </ul>
-                  </div>
-                </div>
-              </div>
-              <div className="db dn-ns">
-                <div className="mt45">
+            <div className="dn db-ns">
+              <div className="flex justify-between mt45">
+                <div className="w-50">
                   <h2
                     className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
                     {ReasonReact.string("Apply")}
                   </h2>
-                  <ul className="mt4 ml15 mb0 ph0"> ...jobItems </ul>
                 </div>
+                <div className="w-50">
+                  <ul className="mt0 mb0 ph0"> jobItems </ul>
+                </div>
+              </div>
+            </div>
+            <div className="db dn-ns">
+              <div className="mt45">
+                <h2
+                  className="fw5 mt0 mb0 ml15 f2 ocean f2-ns tracked-tightly">
+                  {ReasonReact.string("Apply")}
+                </h2>
+                <ul className="mt4 ml15 mb0 ph0"> jobItems </ul>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>;
-  },
+    </div>
+  </div>;
 };

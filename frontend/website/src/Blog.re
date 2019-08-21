@@ -26,8 +26,6 @@ let titleColor = c => Css.unsafe("--title-color", Style.Colors.string(c));
 let readMoreColor = c =>
   Css.unsafe("--read-more-color", Style.Colors.string(c));
 
-let component = ReasonReact.statelessComponent("Blog");
-
 // Need to dangerouslySetInnerHTML to handle html entities in the markdown
 let createPostHeader = metadata =>
   <div className={Css.style([Css.width(`percent(100.))])}>
@@ -141,7 +139,7 @@ let createPostFadedContents = html =>
 
 // Uses an overlay link to avoid nesting anchor tags
 let createPostSummary = ((name, html, metadata)) => {
-  <div className=Css.(style([position(`relative)]))>
+  <div key=name className=Css.(style([position(`relative)]))>
     <A
       name={"blog-" ++ name}
       href={"/blog/" ++ name ++ ".html"}
@@ -197,22 +195,23 @@ let createPostSummary = ((name, html, metadata)) => {
   </div>;
 };
 
-let make = (~posts, _children) => {
-  ...component,
-  render: _self =>
-    <div
-      className=Css.(
-        style([
-          display(`flex),
-          flexDirection(`column),
-          alignItems(`stretch),
-          maxWidth(`rem(43.)),
-          marginLeft(`auto),
-          marginRight(`auto),
-          media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
-        ])
-      )>
-      <div> ...{Array.of_list(List.map(createPostSummary, posts))} </div>
-      BlogPost.renderKatex
-    </div>,
+[@react.component]
+let make = (~posts) => {
+  <div
+    className=Css.(
+      style([
+        display(`flex),
+        flexDirection(`column),
+        alignItems(`stretch),
+        maxWidth(`rem(43.)),
+        marginLeft(`auto),
+        marginRight(`auto),
+        media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
+      ])
+    )>
+    <div>
+      {React.array(Array.of_list(List.map(createPostSummary, posts)))}
+    </div>
+    BlogPost.renderKatex
+  </div>;
 };
