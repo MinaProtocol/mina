@@ -113,7 +113,7 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   let () = Core.Unix.mkdir temp_config in
   (*Transition frontier and ledger visualization*)
   log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
-  let report_file = temp_config ^ ".tar.xz" in
+  let report_file = temp_config ^ ".tar.gz" in
   (*Coda status*)
   let status_file = temp_config ^/ "coda_status.json" in
   let status = coda_status !coda_ref in
@@ -160,7 +160,7 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   in
   let files = tmp_files |> String.concat ~sep:" " in
   let tar_command =
-    sprintf "tar  -C %s -cJf %s %s" temp_config report_file files
+    sprintf "tar  -C %s -czf %s %s" temp_config report_file files
   in
   let exit = Core.Sys.command tar_command in
   if exit = 2 then (
