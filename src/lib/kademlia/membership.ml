@@ -373,7 +373,7 @@ end = struct
       )
     in
     List.iter unbanned_lives ~f:(fun (peer, kkey) ->
-        Peer.Table.add_exn ~key:peer ~data:kkey t.peers ) ;
+        Peer.Table.set ~key:peer ~data:kkey t.peers ) ;
     if List.length unbanned_lives > 0 then
       Linear_pipe.write t.changes_writer
         (Peer.Event.Connect (List.map unbanned_lives ~f:fst))
