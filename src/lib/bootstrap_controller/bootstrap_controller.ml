@@ -257,7 +257,7 @@ end = struct
           @@ on_transition t ~sender ~root_sync_ledger transition
         else Deferred.unit )
 
-  let download_best_tip ~transition_graph ~root_sync_ledger t
+  let download_best_tip ~root_sync_ledger t
       ({With_hash.data= initial_root_transition; _}, _) =
     let num_peers = 8 in
     let peers = Network.random_peers t.network num_peers in
@@ -298,9 +298,6 @@ end = struct
                     ; ("best tip", External_transition.to_yojson @@ best_tip)
                     ]
                 in
-                Transition_cache.add transition_graph
-                  ~parent:(External_transition.parent_hash best_tip)
-                  {data= best_tip_with_validation; sender= Remote peer.host} ;
                 if
                   should_sync ~root_sync_ledger t
                   @@ External_transition.consensus_state best_tip
@@ -375,8 +372,7 @@ end = struct
     in
     let%bind () =
       if should_ask_best_tip then
-        download_best_tip ~transition_graph ~root_sync_ledger t
-          initial_root_transition
+        download_best_tip ~root_sync_ledger t initial_root_transition
       else Deferred.unit
     in
     let%bind synced_db, (hash, sender, expected_staged_ledger_hash) =
