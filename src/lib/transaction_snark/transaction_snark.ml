@@ -212,15 +212,16 @@ type t = Stable.Latest.t =
 [@@deriving fields, sexp, yojson]
 
 let statement
-    { source
-    ; target
-    ; proof_type
-    ; fee_excess
-    ; supply_increase
-    ; pending_coinbase_stack_state
-    ; sok_digest= _
-    ; proof= _ } =
-  { Statement.source
+    ({ source
+     ; target
+     ; proof_type
+     ; fee_excess
+     ; supply_increase
+     ; pending_coinbase_stack_state
+     ; sok_digest= _
+     ; proof= _ } :
+      t) =
+  { Statement.Stable.V1.source
   ; target
   ; proof_type
   ; supply_increase

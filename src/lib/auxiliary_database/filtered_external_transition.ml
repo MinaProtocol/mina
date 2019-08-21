@@ -53,7 +53,8 @@ module Stable = struct
       type t =
         { creator: Public_key.Compressed.Stable.V1.t
         ; protocol_state: Protocol_state.Stable.V1.t
-        ; transactions: Transactions.Stable.V1.t }
+        ; transactions: Transactions.Stable.V1.t
+        ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list }
       [@@deriving bin_io, version {unnumbered}]
     end
 
@@ -66,7 +67,8 @@ end
 type t = Stable.Latest.t =
   { creator: Public_key.Compressed.t
   ; protocol_state: Protocol_state.t
-  ; transactions: Transactions.t }
+  ; transactions: Transactions.t
+  ; snark_jobs: Transaction_snark_work.Info.t list }
 
 let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
     =
@@ -94,9 +96,9 @@ let of_transition tracked_participants {With_hash.data= external_transition; _}
         @@ protocol_state external_transition }
   in
   let open Result.Let_syntax in
+  let staged_ledger_diff = staged_ledger_diff external_transition in
   let%map calculated_transactions =
-    Staged_ledger.Pre_diff_info.get_transactions
-    @@ staged_ledger_diff external_transition
+    Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
   in
   let transactions =
     List.fold calculated_transactions
@@ -147,4 +149,9 @@ let of_transition tracked_participants {With_hash.data= external_transition; _}
               Currency.Amount.(
                 Option.value_exn (add amount acc_transactions.coinbase)) } )
   in
-  {creator; protocol_state; transactions}
+  let snark_jobs =
+    List.map
+      (Staged_ledger_diff.completed_works staged_ledger_diff)
+      ~f:Transaction_snark_work.info
+  in
+  {creator; protocol_state; transactions; snark_jobs}

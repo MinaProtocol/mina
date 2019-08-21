@@ -34,8 +34,7 @@ struct
   module Ledger_proof_statement = Transaction_snark.Statement
   module Pending_coinbase_stack_state =
     Transaction_snark.Pending_coinbase_stack_state
-  module Transaction_snark_work =
-    Transaction_snark_work.Make (Ledger_proof.Stable.V1)
+  module Transaction_snark_work = Transaction_snark_work.Make (Ledger_proof)
   module Staged_ledger_diff = Staged_ledger_diff.Make (Transaction_snark_work)
 
   module External_transition =
