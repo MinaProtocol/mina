@@ -70,6 +70,8 @@ module Make0 (Base_ledger : sig
   val location_of_key : t -> Public_key.Compressed.t -> Location.t option
 
   val get : t -> Location.t -> Account.t option
+end) (Max_size : sig
+  val pool_max_size : int
 end) (Staged_ledger : sig
   type t
 
@@ -81,6 +83,8 @@ struct
   module Breadcrumb = Transition_frontier.Breadcrumb
 
   module Resource_pool = struct
+    include Max_size
+
     type t =
       { mutable pool: Indexed_pool.t
       ; logger: Logger.t sexp_opaque
@@ -120,17 +124,6 @@ struct
       in
       t.best_tip_ledger <- Some best_tip_ledger ;
       best_tip_ledger
-
-    (* note this value needs to be mostly the same across gossipping nodes, so
-       nodes with larger pools don't send nodes with smaller pools lots of
-       low fee transactions the smaller-pooled nodes consider useless and get
-       themselves banned.
-    *)
-    [%%import
-    "../../config.mlh"]
-
-    [%%inject
-    "pool_max_size", pool_max_size]
 
     let drop_until_below_max_size :
            Indexed_pool.t
@@ -494,7 +487,22 @@ end)
   S
   with type transition_frontier := Transition_frontier.t
    and type best_tip_diff := Transition_frontier.Diff.Best_tip_diff.view =
-  Make0 (Coda_base.Ledger) (Staged_ledger) (Transition_frontier)
+  Make0
+    (Coda_base.Ledger)
+    (struct
+      (* note this value needs to be mostly the same across gossipping nodes, so
+       nodes with larger pools don't send nodes with smaller pools lots of
+       low fee transactions the smaller-pooled nodes consider useless and get
+       themselves banned.
+    *)
+      [%%import
+      "../../config.mlh"]
+
+      [%%inject
+      "pool_max_size", pool_max_size]
+    end)
+    (Staged_ledger)
+    (Transition_frontier)
 
 include Make (Staged_ledger) (Transition_frontier)
 
@@ -564,7 +572,13 @@ let%test_module _ =
     end
 
     module Test =
-      Make0 (Mock_base_ledger) (Mock_staged_ledger) (Mock_transition_frontier)
+      Make0
+        (Mock_base_ledger)
+        (struct
+          let pool_max_size = 25
+        end)
+        (Mock_staged_ledger)
+        (Mock_transition_frontier)
 
     let _ =
       Core.Backtrace.elide := false ;
@@ -656,7 +670,9 @@ let%test_module _ =
           ; nonce= Account.Nonce.of_int nonce
           ; receipt_chain_hash= Receipt.Chain_hash.empty
           ; delegate= Public_key.Compressed.empty
-          ; voting_for= Quickcheck.random_value State_hash.gen } )
+          ; voting_for=
+              Quickcheck.random_value ~seed:(`Deterministic "constant")
+                State_hash.gen } )
 
     let%test_unit "Transactions are removed and added back in fork changes" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -872,4 +888,69 @@ let%test_module _ =
       in
       assert_pool_txs [List.nth_exn txs 1] ;
       Deferred.unit
+
+    let%test_unit "max size is maintained" =
+      Quickcheck.test ~trials:500
+        (let open Quickcheck.Generator.Let_syntax in
+        let%bind init_ledger_state = Ledger.gen_initial_ledger_state in
+        let%bind cmds_count =
+          Int.gen_incl Test.Resource_pool.pool_max_size
+            (Test.Resource_pool.pool_max_size * 2)
+        in
+        let%bind cmds =
+          User_command.Gen.sequence ~sign_type:`Real ~length:cmds_count
+            init_ledger_state
+        in
+        return (init_ledger_state, cmds))
+        ~f:(fun (init_ledger_state, cmds) ->
+          Thread_safe.block_on_async_exn (fun () ->
+              let%bind ( _assert_pool_txs
+                       , pool
+                       , best_tip_diff_w
+                       , (_, best_tip_ref) ) =
+                setup_test ()
+              in
+              let mock_ledger =
+                Public_key.Compressed.Map.of_alist_exn
+                  ( init_ledger_state |> Array.to_sequence
+                  |> Sequence.map ~f:(fun (kp, bal, nonce) ->
+                         let public_key = Public_key.compress kp.public_key in
+                         ( public_key
+                         , { (Account.initialize public_key) with
+                             balance=
+                               Currency.Balance.of_int
+                                 (Currency.Amount.to_int bal)
+                           ; nonce } ) )
+                  |> Sequence.to_list )
+              in
+              best_tip_ref := mock_ledger ;
+              let%bind () =
+                Broadcast_pipe.Writer.write best_tip_diff_w
+                  { new_user_commands= []
+                  ; removed_user_commands= []
+                  ; reorg_best_tip= true }
+              in
+              let cmds1, cmds2 =
+                List.split_n cmds Test.Resource_pool.pool_max_size
+              in
+              let%bind apply_res1 =
+                Test.Resource_pool.Diff.apply pool
+                  (Envelope.Incoming.local cmds1)
+              in
+              assert (Result.is_ok apply_res1) ;
+              [%test_eq: int] Test.Resource_pool.pool_max_size
+                (Indexed_pool.size pool.pool) ;
+              let%map _apply_res2 =
+                Test.Resource_pool.Diff.apply pool
+                  (Envelope.Incoming.local cmds2)
+              in
+              (* N.B. Adding a transaction when the pool is full may drop > 1
+                 command, so the size now is not necessarily the maximum.
+                 Applying the diff may also return an error if none of the new
+                 commands have higher fee than the lowest one already in the
+                 pool.
+              *)
+              assert (
+                Indexed_pool.size pool.pool <= Test.Resource_pool.pool_max_size
+              ) ) )
   end )
