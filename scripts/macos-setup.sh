@@ -71,6 +71,10 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   # uninstall here
   opam uninstall -y extlib
 
+  # TEMP
+  ls -lR /Users/distiller/.opam/4.07.1+statistical-memprof/.opam-switch/build/
+  chmod -R a+r /Users/distiller/.opam/4.07.1+statistical-memprof/.opam-switch/build/
+
   # Our pins
   opam pin -y add src/external/ocaml-sodium
   opam pin -y add src/external/rpc_parallel
