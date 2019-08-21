@@ -71,6 +71,75 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "SetSnarkWorkFee",
+          "description": null,
+          "fields": [
+            {
+              "name": "fee",
+              "description": "Fee to get rewarded for producing snark work",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "fee",
+              "description": "Fee to get rewarded for producing snark work",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "SetSnarkWorkFeePayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "lastFee",
+              "description": "Returns the last fee set to do snark work",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "SetSnarkWorkerInput",
           "description": null,
           "fields": [
@@ -997,6 +1066,37 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "SetSnarkWorkerPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setSnarkWorkFee",
+              "description": "Set fee that you will like to receive for doing snark work",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "SetSnarkWorkFee",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SetSnarkWorkFeePayload",
                   "ofType": null
                 }
               },
@@ -2326,7 +2426,7 @@
               "deprecationReason": null
             },
             {
-              "name": "getTransitionChainWitness",
+              "name": "getTransitionChainProof",
               "description": null,
               "args": [],
               "type": {
@@ -2635,6 +2735,22 @@
                 "kind": "SCALAR",
                 "name": "String",
                 "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snarkWorkFee",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -2958,13 +3074,9 @@
                   "name": "filter",
                   "description": null,
                   "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "BlockFilterInput",
-                      "ofType": null
-                    }
+                    "kind": "INPUT_OBJECT",
+                    "name": "BlockFilterInput",
+                    "ofType": null
                   },
                   "defaultValue": null
                 }

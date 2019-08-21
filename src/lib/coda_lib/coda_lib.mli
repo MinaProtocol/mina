@@ -38,6 +38,8 @@ val snark_worker_key : t -> Public_key.Compressed.Stable.V1.t option
 
 val snark_work_fee : t -> Currency.Fee.t
 
+val set_snark_work_fee : t -> Currency.Fee.t -> unit
+
 val request_work : t -> Snark_worker.Work.Spec.t option
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
