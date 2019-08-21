@@ -35,7 +35,7 @@ module Child_process = {
   [@bs.obj] external option: (~env: env=?, unit) => option = "";
 
   [@bs.module "child_process"]
-  external execSync: (string, option) => string = "";
+  external execSync: (string, option) => string = "execSync";
 };
 
 let load = path => {
