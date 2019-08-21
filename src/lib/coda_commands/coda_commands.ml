@@ -101,7 +101,7 @@ let get_keys_with_details t =
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
       , account.Account.Poly.balance |> Currency.Balance.to_int
-      , account.Account.Poly.nonce |> Account.Nonce.to_string ) )
+      , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
 
 let get_inferred_nonce_from_transaction_pool_and_ledger t
     (addr : Public_key.Compressed.t) =
@@ -273,6 +273,7 @@ let get_status ~flag t =
       (Coda_lib.snark_worker_key t)
       ~f:Public_key.Compressed.to_base58_check
   in
+  let snark_work_fee = Currency.Fee.to_int @@ Coda_lib.snark_work_fee t in
   let propose_pubkeys = Coda_lib.propose_public_keys t in
   let consensus_mechanism = Consensus.name in
   let consensus_time_now =
@@ -394,6 +395,7 @@ let get_status ~flag t =
   ; peers
   ; user_commands_sent
   ; snark_worker
+  ; snark_work_fee
   ; propose_pubkeys=
       Public_key.Compressed.Set.to_list propose_pubkeys
       |> List.map ~f:Public_key.Compressed.to_base58_check

@@ -60,8 +60,8 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
 
   opam update
   # This is dirty, keep the OCaml project version up to date!
-  opam switch create 4.07.1 || true
-  opam switch 4.07.1
+  opam switch create 4.07.1+statistical-memprof || true
+  opam switch 4.07.1+statistical-memprof
 
   # All our ocaml packages
   opam switch -y import src/opam.export
@@ -76,6 +76,11 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   opam pin -y add src/external/rpc_parallel
   opam pin -y add src/external/ocaml-extlib
   opam pin -y add src/external/digestif
+
+  # workaround a permissions problem
+  sudo chown -R distiller /Users/distiller/.opam
+  sudo chmod -R u+rw /Users/distiller/.opam
+
   opam pin -y add src/external/async_kernel
   opam pin -y add src/external/coda_base58
   opam pin -y add src/external/graphql_ppx

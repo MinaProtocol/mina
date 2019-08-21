@@ -9,6 +9,9 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
+[%%check_ocaml_word_size
+64]
+
 [%%if
 fake_hash]
 
@@ -123,7 +126,7 @@ let daemon logger =
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
-           (Printf.sprintf
+           (sprintf
               "FEE Amount a worker wants to get compensated for generating a \
                snark proof (default: %d)"
               (Currency.Fee.to_int Cli_lib.Default.snark_worker_fee))
@@ -131,7 +134,7 @@ let daemon logger =
      and work_reassignment_wait =
        flag "work-reassignment-wait" (optional int)
          ~doc:
-           (Printf.sprintf
+           (sprintf
               "WAIT-TIME in ms before a snark-work is reassigned (default:%dms)"
               Cli_lib.Default.work_reassignment_wait)
      and enable_tracing =
@@ -148,6 +151,14 @@ let daemon logger =
            "true|false Limit the number of concurrent connections per IP \
             address (default:true)"
          (optional bool)
+     and memory_profiling =
+       flag "memory-profiling" no_arg ~doc:"enable memory profiling"
+     and sampling_rate =
+       flag "sampling-rate"
+         ~doc:
+           (sprintf "FLOAT Sampling rate for memory profiling (default: %F)"
+              Memprof_helpers.default_sampling_rate)
+         (optional sampling_rate)
      and no_bans =
        let module Expiration = struct
          [%%expires_after "20190907"]
@@ -600,6 +611,15 @@ let daemon logger =
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
        Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
+       (* we don't check if sampling rate was given without enabling memory profiling *)
+       let sampling_rate =
+         Option.value sampling_rate
+           ~default:Memprof_helpers.default_sampling_rate
+       in
+       (* this has to be after `handle_shutdown` so that it can trap SIGUSR1 *)
+       if memory_profiling then
+         Memprof_helpers.start ~sampling_rate ~callstack_size:20
+           ~min_samples_print:100 ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind {Coda_initialization.coda; client_whitelist; rest_server_port}

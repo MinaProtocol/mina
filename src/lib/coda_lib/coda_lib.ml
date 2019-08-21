@@ -29,7 +29,8 @@ type snark_worker =
 type processes =
   { prover: Prover.t
   ; verifier: Verifier.t
-  ; mutable snark_worker: snark_worker option }
+  ; mutable snark_worker:
+      [`On of snark_worker * Currency.Fee.t | `Off of Currency.Fee.t] }
 
 type components =
   { net: Coda_networking.t
@@ -163,7 +164,7 @@ module Snark_worker = struct
 
   let start t =
     match t.processes.snark_worker with
-    | Some {process= process_ivar; _} ->
+    | `On ({process= process_ivar; _}, _) ->
         Logger.debug t.config.logger
           !"Starting snark worker process"
           ~module_:__MODULE__ ~location:__LOC__ ;
@@ -177,7 +178,7 @@ module Snark_worker = struct
               , `Int (Pid.to_int (Process.pid snark_worker_process)) ) ]
           "Started snark worker process with pid: $snark_worker_pid" ;
         Ivar.fill process_ivar snark_worker_process
-    | None ->
+    | `Off _ ->
         Logger.info t.config.logger
           !"Attempted to turn on snark worker, but snark worker key is set to \
             none"
@@ -186,7 +187,7 @@ module Snark_worker = struct
 
   let stop t =
     match t.processes.snark_worker with
-    | Some {public_key= _; process} ->
+    | `On ({public_key= _; process}, _) ->
         let%map process = Ivar.read process in
         Logger.info t.config.logger
           "Killing snark worker process with pid: $snark_worker_pid"
@@ -194,37 +195,41 @@ module Snark_worker = struct
           ~metadata:
             [("snark_worker_pid", `Int (Pid.to_int (Process.pid process)))] ;
         Signal.send_exn Signal.term (`Pid (Process.pid process))
-    | None ->
+    | `Off _ ->
         Logger.warn t.config.logger
           "Attempted to turn off snark worker, but no snark worker was running"
           ~module_:__MODULE__ ~location:__LOC__ ;
         Deferred.unit
 
   let get_key {processes= {snark_worker; _}; _} =
-    Option.map snark_worker ~f:(fun {public_key; _} -> public_key)
+    match snark_worker with
+    | `On ({public_key; _}, _) ->
+        Some public_key
+    | `Off _ ->
+        None
 
   let replace_key ({processes= {snark_worker; _}; config= {logger; _}; _} as t)
       new_key =
     match (snark_worker, new_key) with
-    | None, None ->
+    | `Off _, None ->
         Logger.info logger
           "Snark work is still not happening since keys snark worker keys are \
            still set to None"
           ~module_:__MODULE__ ~location:__LOC__ ;
         Deferred.unit
-    | None, Some new_key ->
+    | `Off fee, Some new_key ->
         let process = Ivar.create () in
-        t.processes.snark_worker <- Some {public_key= new_key; process} ;
+        t.processes.snark_worker <- `On ({public_key= new_key; process}, fee) ;
         start t
-    | Some {public_key= _; process}, Some new_key ->
+    | `On ({public_key= _; process}, fee), Some new_key ->
         Logger.debug logger
           !"Changing snark worker key from $old to $new"
           ~module_:__MODULE__ ~location:__LOC__ ;
-        t.processes.snark_worker <- Some {public_key= new_key; process} ;
+        t.processes.snark_worker <- `On ({public_key= new_key; process}, fee) ;
         Deferred.unit
-    | Some _, None ->
+    | `On (_, fee), None ->
         let%map () = stop t in
-        t.processes.snark_worker <- None
+        t.processes.snark_worker <- `Off fee
 end
 
 let replace_snark_worker_key = Snark_worker.replace_key
@@ -417,7 +422,16 @@ let peers t = Coda_networking.peers t.components.net
 
 let initial_peers t = Coda_networking.initial_peers t.components.net
 
-let snark_work_fee t = t.config.snark_work_fee
+let snark_work_fee t =
+  match t.processes.snark_worker with `On (_, fee) -> fee | `Off fee -> fee
+
+let set_snark_work_fee t new_fee =
+  t.processes.snark_worker
+  <- ( match t.processes.snark_worker with
+     | `On (config, _) ->
+         `On (config, new_fee)
+     | `Off _ ->
+         `Off new_fee )
 
 let receipt_chain_database t = t.config.receipt_chain_database
 
@@ -584,8 +598,12 @@ let create (config : Config.t) =
           let%bind prover = Prover.create () in
           let%bind verifier = Verifier.create () in
           let snark_worker =
-            Option.map config.snark_worker_config.initial_snark_worker_key
-              ~f:(fun public_key -> {public_key; process= Ivar.create ()})
+            Option.value_map
+              config.snark_worker_config.initial_snark_worker_key
+              ~default:(`Off config.snark_work_fee) ~f:(fun public_key ->
+                `On
+                  ({public_key; process= Ivar.create ()}, config.snark_work_fee)
+            )
           in
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
@@ -617,10 +635,31 @@ let create (config : Config.t) =
           let%bind net =
             Coda_networking.create config.net_config
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
-                (handle_request
-                   ~f:
-                     Sync_handler
-                     .get_staged_ledger_aux_and_pending_coinbases_at_hash)
+                (fun query_env ->
+                let input = Envelope.Incoming.data query_env in
+                Deferred.return
+                @@
+                let open Option.Let_syntax in
+                let%bind frontier =
+                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                in
+                let%map scan_state, expected_merkle_root, pending_coinbases =
+                  Sync_handler
+                  .get_staged_ledger_aux_and_pending_coinbases_at_hash
+                    ~frontier input
+                in
+                let staged_ledger_hash =
+                  Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+                    (Staged_ledger.Scan_state.hash scan_state)
+                    expected_merkle_root pending_coinbases
+                in
+                Logger.debug config.logger ~module_:__MODULE__
+                  ~location:__LOC__
+                  ~metadata:
+                    [ ( "staged_ledger_hash"
+                      , Staged_ledger_hash.to_yojson staged_ledger_hash ) ]
+                  "sending scan state and pending coinbase" ;
+                (scan_state, expected_merkle_root, pending_coinbases) )
               ~answer_sync_ledger_query:(fun query_env ->
                 let open Deferred.Or_error.Let_syntax in
                 let ledger_hash, _ = Envelope.Incoming.data query_env in
