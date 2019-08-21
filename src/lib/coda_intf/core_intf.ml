@@ -89,20 +89,14 @@ module type Transaction_snark_work_generalized_intf = sig
   type ledger_proof [@@deriving to_yojson]
 
   module Statement : sig
-    type t = transaction_snark_statement list [@@deriving yojson]
-
-    include Sexpable.S with type t := t
+    type t = transaction_snark_statement list [@@deriving yojson, sexp]
 
     include Hashable.S with type t := t
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving yojson, version]
-
-          include Sexpable.S with type t := t
-
-          include Binable.S with type t := t
+          type t [@@deriving yojson, version, sexp, bin_io]
 
           include Hashable.S_binable with type t := t
 
@@ -114,6 +108,23 @@ module type Transaction_snark_work_generalized_intf = sig
     val gen : t Quickcheck.Generator.t
   end
 
+  module Info : sig
+    type t =
+      { statements: Statement.Stable.V1.t
+      ; work_ids: int list
+      ; fee: Fee.Stable.V1.t
+      ; prover: Public_key.Compressed.Stable.V1.t }
+    [@@deriving to_yojson, sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving to_yojson, version, sexp, bin_io]
+        end
+      end
+      with type V1.t = t
+  end
+
   (* TODO: The SOK message actually should bind the SNARK to
      be in this particular bundle. The easiest way would be to
      SOK with
@@ -121,12 +132,12 @@ module type Transaction_snark_work_generalized_intf = sig
   *)
 
   type t =
-    { fee: Fee.Stable.V1.t
-    ; proofs: ledger_proof list
-    ; prover: compressed_public_key }
+    {fee: Fee.t; proofs: ledger_proof list; prover: compressed_public_key}
   [@@deriving sexp, to_yojson]
 
-  val fee : t -> Fee.Stable.V1.t
+  val fee : t -> Fee.t
+
+  val info : t -> Info.t
 
   module Stable :
     sig
