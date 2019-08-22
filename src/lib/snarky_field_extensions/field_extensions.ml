@@ -1,6 +1,8 @@
 open Core_kernel
 
 module Make_test (F : Intf.Basic) = struct
+  (* This checks that the snarky (i.e., checked) implementation agrees with the
+     CPU (i.e., unchecked) implementation. *)
   let test arg_typ gen_arg sexp_of_arg label unchecked checked =
     let open F.Impl in
     let converted x =
@@ -54,10 +56,7 @@ module Make (F : Intf.Basic) = struct
     >>= Boolean.all
 
   let assert_equal x y =
-    assert_all
-      (List.map2_exn
-         ~f:(fun x y -> Constraint.equal x y)
-         (F.to_list x) (F.to_list y))
+    assert_all (List.map2_exn ~f:Constraint.equal (F.to_list x) (F.to_list y))
 
   let ( + ) = F.( + )
 
@@ -73,18 +72,53 @@ module Make (F : Intf.Basic) = struct
 
   let one = constant Unchecked.one
 
+  let constant_optimize to_constant unchecked checked x =
+    match to_constant x with
+    | Some c ->
+        return (constant (unchecked c))
+    | None ->
+        checked x
+
+  let constant_optimize2 unchecked checked =
+    let unc = Tuple2.uncurry in
+    constant_optimize
+      (fun (x, y) -> Option.both (to_constant x) (to_constant y))
+      (unc unchecked) (unc checked)
+    |> Tuple2.curry
+
+  let mk_checked inp out unchecked check x =
+    let%bind res =
+      exists out ~compute:As_prover.(map (read inp x) ~f:unchecked)
+    in
+    let%map () = check x ~res in
+    res
+
+  let checked2 unchecked check =
+    constant_optimize2 unchecked
+      (Tuple2.curry
+         (mk_checked
+            Typ.(typ * typ)
+            typ (Tuple2.uncurry unchecked) (Tuple2.uncurry check)))
+
+  let checked1 unchecked check =
+    constant_optimize to_constant unchecked
+      (mk_checked typ typ unchecked check)
+
+  (* 
+  `div_unsafe x y = z` iff `y * z = x`
+
+   So,
+   - if `y != 0`, then we can divide by `y` and get `div_unsafe x y = z = x / y`.
+   - if `y = 0` and `x != 0`, then the equation says `0 * z = x` which means `0 * z != 0`
+     and so we will have an unsatisfiable constraint system.
+   - if `y = 0` and `x = 0`, then `y` can be anything since the equation just says `0 * z = 0`
+     which is satisfied by all `z`.
+
+   Thus this division function should only be called if we know statically that `y != 0` (at least
+   with all-but-negligible probability).
+*)
   let div_unsafe x y =
-    match (to_constant x, to_constant y) with
-    | Some x, Some y ->
-        return (constant Unchecked.(x / y))
-    | _, _ ->
-        let%bind x_over_y =
-          exists typ
-            ~compute:
-              As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( / ))
-        in
-        let%map () = assert_r1cs y x_over_y x in
-        x_over_y
+    checked2 Unchecked.( / ) (fun x y ~res -> assert_r1cs y res x) x y
 
   let assert_square =
     match assert_square with
@@ -93,24 +127,14 @@ module Make (F : Intf.Basic) = struct
     | `Define ->
         fun a a2 -> assert_r1cs a a a2
 
+  (* It would be nice to write a HOF for this but the value restriction gets in the way... *)
   let ( * ) =
     match ( * ) with
     | `Custom f ->
         f
-    | `Define -> (
+    | `Define ->
         fun x y ->
-          match (to_constant x, to_constant y) with
-          | Some x, Some y ->
-              return (constant Unchecked.(x * y))
-          | _, _ ->
-              let%bind res =
-                exists typ
-                  ~compute:
-                    As_prover.(
-                      map2 (read typ x) (read typ y) ~f:Unchecked.( * ))
-              in
-              let%map () = assert_r1cs x y res in
-              res )
+          checked2 Unchecked.( * ) (fun x y ~res -> assert_r1cs x y res) x y
 
   let%test_unit "mul" =
     let module M = Make_test (F) in
@@ -120,18 +144,9 @@ module Make (F : Intf.Basic) = struct
     match square with
     | `Custom f ->
         f
-    | `Define -> (
+    | `Define ->
         fun x ->
-          match to_constant x with
-          | Some x ->
-              return (constant (Unchecked.square x))
-          | None ->
-              let%bind res =
-                exists typ
-                  ~compute:As_prover.(map (read typ x) ~f:Unchecked.square)
-              in
-              let%map () = assert_square x res in
-              res )
+          checked1 Unchecked.square (fun x ~res -> assert_square x res) x
 
   let%test_unit "square" =
     let module M = Make_test (F) in
@@ -141,18 +156,8 @@ module Make (F : Intf.Basic) = struct
     match inv_exn with
     | `Custom f ->
         f
-    | `Define -> (
-        fun t ->
-          match to_constant t with
-          | Some x ->
-              return (constant (Unchecked.inv x))
-          | None ->
-              let%bind res =
-                exists typ
-                  ~compute:As_prover.(map (read typ t) ~f:Unchecked.inv)
-              in
-              let%map () = assert_r1cs t res one in
-              res )
+    | `Define ->
+        fun x -> checked1 Unchecked.inv (fun x ~res -> assert_r1cs x res one) x
 end
 
 module Make_applicative
@@ -184,6 +189,8 @@ struct
   let scale t x = A.map t ~f:(fun a -> F.scale a x)
 
   let scale' t x = A.map t ~f:(fun a -> F.scale x a)
+
+  let _ = scale' (* potato *)
 
   let negate t = A.map t ~f:F.negate
 
@@ -288,6 +295,19 @@ module E2
     with module Impl = F.Impl
      and module Base = F
      and type 'a A.t = 'a * 'a
+
+  val checked1 :
+       (Unchecked.t -> Unchecked.t)
+    -> (t -> res:t -> (unit, 'a) Impl.Checked.t)
+    -> t
+    -> (t, 'a) Impl.Checked.t
+
+  val checked2 :
+       (Unchecked.t -> Unchecked.t -> Unchecked.t)
+    -> (t -> t -> res:t -> (unit, 'a) Impl.Checked.t)
+    -> t
+    -> t
+    -> (t, 'a) Impl.Checked.t
 
   val unitary_inverse : t -> t
 end = struct
@@ -615,32 +635,33 @@ module F3
       let%bind v0 = a0 * b0 and v4 = a2 * b2 in
       let beta = Params.non_residue in
       let beta_inv = F.Unchecked.inv beta in
+      let ( * ) = Fn.flip scale in
       let%map () =
         assert_r1cs
           (a0 + a1 + a2)
           (b0 + b1 + b2)
-          ( c1 + c2 + F.scale c0 beta_inv
-          + F.(scale v0 Unchecked.(one - beta_inv))
-          + F.(scale v4 Unchecked.(one - beta)) )
+          ( c1 + c2 + (beta_inv * c0)
+          + (Unchecked.(one - beta_inv) * v0)
+          + (Unchecked.(one - beta) * v4) )
       and () =
         assert_r1cs
           (a0 - a1 + a2)
           (b0 - b1 + b2)
           ( c2 - c1
-          + F.(scale v0 Unchecked.(one + beta_inv))
-          - F.scale c0 beta_inv
-          + F.(scale v4 Unchecked.(one + beta)) )
+          + (Unchecked.(one + beta_inv) * v0)
+          - (beta_inv * c0)
+          + (Unchecked.(one + beta) * v4) )
       and () =
         let two = Impl.Field.of_int 2 in
         let four = Impl.Field.of_int 4 in
         let sixteen = Impl.Field.of_int 16 in
         let eight_beta_inv = Impl.Field.(mul (of_int 8) beta_inv) in
         assert_r1cs
-          (a0 + F.scale a1 two + F.scale a2 four)
-          (b0 + F.scale b1 two + F.scale b2 four)
-          ( F.scale c1 two + F.scale c2 four + F.scale c0 eight_beta_inv
-          + F.(scale v0 Unchecked.(one - eight_beta_inv))
-          + F.(scale v4 Unchecked.(sixteen - (beta + beta))) )
+          (a0 + (two * a1) + (four * a2))
+          (b0 + (two * b1) + (four * b2))
+          ( (two * c1) + (four * c2) + (eight_beta_inv * c0)
+          + (Unchecked.(one - eight_beta_inv) * v0)
+          + (Unchecked.(sixteen - (beta + beta)) * v4) )
       in
       ()
 
@@ -720,16 +741,19 @@ module F6
         end
     end) (Params : sig
       val frobenius_coeffs_c1 : Fq.Unchecked.t array
-    end) =
-struct
-  include E2
-            (Fq3)
-            (struct
-              let non_residue : Fq3.Unchecked.t =
-                Fq.Unchecked.(zero, one, zero)
+    end)  = struct
+  module Base = Fq3
 
-              let mul_by_non_residue = Fq3.mul_by_primitive_element
-            end)
+  module T =
+    E2
+      (Fq3)
+      (struct
+        let non_residue : Fq3.Unchecked.t = Fq.Unchecked.(zero, one, zero)
+
+        let mul_by_non_residue = Fq3.mul_by_primitive_element
+      end)
+
+  include (T : module type of T with module Base := Base)
 
   let fq_mul_by_non_residue x = Fq.scale x Fq3.Params.non_residue
 
@@ -775,14 +799,7 @@ struct
     ()
 
   let special_div_unsafe a b =
-    let open Impl in
-    let%bind result =
-      exists typ
-        ~compute:As_prover.(map2 ~f:Unchecked.( / ) (read typ a) (read typ b))
-    in
-    (* result * b = a *)
-    let%map () = assert_special_mul result b a in
-    result
+    checked2 Unchecked.( / ) (fun a b ~res -> assert_special_mul res b a) a b
 
   (* TODO: Make sure this is ok *)
   let special_div = special_div_unsafe
@@ -819,13 +836,18 @@ module F4
         val frobenius_coeffs_c1 : Fq2.Impl.Field.t array
     end) =
 struct
-  include E2
-            (Fq2)
-            (struct
-              let non_residue = Fq2.Impl.Field.(zero, one)
+  module Base = Fq2
 
-              let mul_by_non_residue = Fq2.mul_by_primitive_element
-            end)
+  module T =
+    E2
+      (Fq2)
+      (struct
+        let non_residue = Fq2.Impl.Field.(zero, one)
+
+        let mul_by_non_residue = Fq2.mul_by_primitive_element
+      end)
+
+  include (T : module type of T with module Base := Base)
 
   let special_mul = ( * )
 
