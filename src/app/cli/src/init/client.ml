@@ -673,11 +673,22 @@ let constraint_system_digests =
 let snark_job_list =
   let open Deferred.Let_syntax in
   let open Command.Param in
-  Command.async ~summary:"List of snark jobs in JSON format"
+  Command.async ~summary:"List of snark jobs in the scan state in JSON format"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
          match%map
            dispatch_join_errors Daemon_rpcs.Snark_job_list.rpc () port
          with
+         | Ok str ->
+             printf "%s" str
+         | Error e ->
+             print_rpc_error e ))
+
+let snark_pool_list =
+  let open Deferred.Let_syntax in
+  let open Command.Param in
+  Command.async ~summary:"List of snark works in the snark pool in JSON format"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Daemon_rpcs.Snark_pool_list.rpc () port with
          | Ok str ->
              printf "%s" str
          | Error e ->
@@ -905,5 +916,6 @@ let advanced =
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
+    ; ("snark-pool-list", snark_pool_list)
     ; ("unsafe-import", unsafe_import)
     ; ("visualization", Visualization.command_group) ]

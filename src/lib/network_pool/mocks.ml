@@ -32,13 +32,20 @@ module Transaction_snark_work = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          type t = Transaction_snark.Statement.Stable.Latest.t list
+          type t = Transaction_snark.Statement.Stable.V1.t list
           [@@deriving
             sexp, hash, compare, bin_io, yojson, version {unnumbered}]
         end
 
         include T
         include Hashable.Make_binable (T)
+
+        let compact_json : t -> Yojson.Safe.json =
+         fun t ->
+          `List
+            (List.map
+               ~f:(fun s -> `Int (Transaction_snark.Statement.Stable.V1.hash s))
+               t)
       end
     end
 

@@ -516,6 +516,17 @@ module Snark_job_list = struct
     Rpc.Rpc.create ~name:"Snark_job_list" ~version:0 ~bin_query ~bin_response
 end
 
+module Snark_pool_list = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = string [@@deriving bin_io]
+
+  type error = unit
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Snark_pool_list" ~version:0 ~bin_query ~bin_response
+end
+
 module Start_tracing = struct
   type query = unit [@@deriving bin_io]
 
