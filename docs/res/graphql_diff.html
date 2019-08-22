@@ -1,0 +1,4470 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Diff to HTML by rtfpessoa</title>
+
+  <!--
+      Diff to HTML (template.html)
+      Author: rtfpessoa
+  -->
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/github.min.css">
+
+  <style>
+.d2h-wrapper{text-align:left}.d2h-file-header{height:35px;padding:5px 10px;border-bottom:1px solid #d8d8d8;background-color:#f7f7f7}.d2h-file-stats{display:flex;margin-left:auto;font-size:14px}.d2h-lines-added{text-align:right;border:1px solid #b4e2b4;border-radius:5px 0 0 5px;color:#399839;padding:2px;vertical-align:middle}.d2h-lines-deleted{text-align:left;border:1px solid #e9aeae;border-radius:0 5px 5px 0;color:#c33;padding:2px;vertical-align:middle;margin-left:1px}.d2h-file-name-wrapper{display:flex;align-items:center;width:100%;font-family:"Source Sans Pro","Helvetica Neue",Helvetica,Arial,sans-serif;font-size:15px}.d2h-file-name{white-space:nowrap;text-overflow:ellipsis;overflow-x:hidden}.d2h-file-wrapper{border:1px solid #ddd;border-radius:3px;margin-bottom:1em}.d2h-diff-table{width:100%;border-collapse:collapse;font-family:Menlo,Consolas,monospace;font-size:13px}.d2h-files-diff{display:block;width:100%;height:100%}.d2h-file-diff{overflow-y:hidden}.d2h-file-side-diff{display:inline-block;overflow-x:scroll;overflow-y:hidden;width:50%;margin-right:-4px;margin-bottom:-8px}.d2h-code-line{display:inline-block;white-space:nowrap;padding:0 8em}.d2h-code-side-line{display:inline-block;white-space:nowrap;padding:0 4.5em}.d2h-code-line del,.d2h-code-side-line del{display:inline-block;margin-top:-1px;text-decoration:none;background-color:#ffb6ba;border-radius:.2em}.d2h-code-line ins,.d2h-code-side-line ins{display:inline-block;margin-top:-1px;text-decoration:none;background-color:#97f295;border-radius:.2em;text-align:left}.d2h-code-line-prefix{display:inline;background:0 0;padding:0;word-wrap:normal;white-space:pre}.d2h-code-line-ctn{display:inline;background:0 0;padding:0;word-wrap:normal;white-space:pre}.line-num1{box-sizing:border-box;float:left;width:3.5em;overflow:hidden;text-overflow:ellipsis;padding:0 .5em 0 .5em}.line-num2{box-sizing:border-box;float:right;width:3.5em;overflow:hidden;text-overflow:ellipsis;padding:0 .5em 0 .5em}.d2h-code-linenumber{box-sizing:border-box;width:7.5em;position:absolute;display:inline-block;background-color:#fff;color:rgba(0,0,0,.3);text-align:right;border:solid #eee;border-width:0 1px 0 1px;cursor:pointer}.d2h-code-linenumber:after{content:'\200b'}.d2h-code-side-linenumber{position:absolute;display:inline-block;box-sizing:border-box;width:4em;background-color:#fff;color:rgba(0,0,0,.3);text-align:right;border:solid #eee;border-width:0 1px 0 1px;cursor:pointer;overflow:hidden;text-overflow:ellipsis}.d2h-code-side-linenumber:after{content:'\200b'}.d2h-code-side-emptyplaceholder,.d2h-emptyplaceholder{background-color:#f1f1f1;border-color:#e1e1e1}.d2h-del{background-color:#fee8e9;border-color:#e9aeae}.d2h-ins{background-color:#dfd;border-color:#b4e2b4}.d2h-info{background-color:#f8fafd;color:rgba(0,0,0,.3);border-color:#d5e4f2}.d2h-file-diff .d2h-del.d2h-change{background-color:#fdf2d0}.d2h-file-diff .d2h-ins.d2h-change{background-color:#ded}.d2h-file-list-wrapper{margin-bottom:10px}.d2h-file-list-wrapper a{text-decoration:none;color:#3572b0}.d2h-file-list-wrapper a:visited{color:#3572b0}.d2h-file-list-header{text-align:left}.d2h-file-list-title{font-weight:700}.d2h-file-list-line{display:flex;text-align:left}.d2h-file-list{display:block;list-style:none;padding:0;margin:0}.d2h-file-list>li{border-bottom:#ddd solid 1px;padding:5px 10px;margin:0}.d2h-file-list>li:last-child{border-bottom:none}.d2h-file-switch{display:none;font-size:10px;cursor:pointer}.d2h-icon{vertical-align:middle;margin-right:10px;fill:currentColor}.d2h-deleted{color:#c33}.d2h-added{color:#399839}.d2h-changed{color:#d0b44c}.d2h-moved{color:#3572b0}.d2h-tag{display:flex;font-size:10px;margin-left:5px;padding:0 2px;background-color:#fff}.d2h-deleted-tag{border:#c33 1px solid}.d2h-added-tag{border:#399839 1px solid}.d2h-changed-tag{border:#d0b44c 1px solid}.d2h-moved-tag{border:#3572b0 1px solid}.selecting-left .d2h-code-line,.selecting-left .d2h-code-line *,.selecting-left .d2h-code-side-line,.selecting-left .d2h-code-side-line *,.selecting-right td.d2h-code-linenumber,.selecting-right td.d2h-code-linenumber *,.selecting-right td.d2h-code-side-linenumber,.selecting-right td.d2h-code-side-linenumber *{-webkit-touch-callout:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.selecting-left .d2h-code-line ::-moz-selection,.selecting-left .d2h-code-line::-moz-selection,.selecting-left .d2h-code-side-line ::-moz-selection,.selecting-left .d2h-code-side-line::-moz-selection,.selecting-right td.d2h-code-linenumber::-moz-selection,.selecting-right td.d2h-code-side-linenumber ::-moz-selection,.selecting-right td.d2h-code-side-linenumber::-moz-selection{background:0 0}.selecting-left .d2h-code-line ::selection,.selecting-left .d2h-code-line::selection,.selecting-left .d2h-code-side-line ::selection,.selecting-left .d2h-code-side-line::selection,.selecting-right td.d2h-code-linenumber::selection,.selecting-right td.d2h-code-side-linenumber ::selection,.selecting-right td.d2h-code-side-linenumber::selection{background:0 0}
+</style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.3/jquery.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/languages/scala.min.js"></script>
+
+  <script>
+!function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){return o(e[i][1][r]||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}({1:[function(require,module,exports){(function(global){function Diff2HtmlUI(config){var cfg=config||{};cfg.diff?diffJson=Diff2Html.getJsonFromDiff(cfg.diff):cfg.json&&(diffJson=cfg.json),this._initSelection()}var highlightJS,diffJson,currentSelectionColumnId;highlightJS=require("./highlight.js-internals.js").HighlightJS,diffJson=null,currentSelectionColumnId=-1,Diff2HtmlUI.prototype.draw=function(targetId,config){var cfg=config||{};cfg.inputFormat="json";var $target=this._getTarget(targetId);$target.html(Diff2Html.getPrettyHtml(diffJson,cfg)),cfg.synchronisedScroll&&this.synchronisedScroll($target,cfg)},Diff2HtmlUI.prototype.synchronisedScroll=function(targetId){this._getTarget(targetId).find(".d2h-file-side-diff").scroll(function(){var $this=$(this);$this.closest(".d2h-file-wrapper").find(".d2h-file-side-diff").scrollLeft($this.scrollLeft())})},Diff2HtmlUI.prototype.fileListCloseable=function(targetId,startVisible){var $target=this._getTarget(targetId),hashTag=this._getHashTag(),$showBtn=$target.find(".d2h-show"),$hideBtn=$target.find(".d2h-hide"),$fileList=$target.find(".d2h-file-list");function show(){$showBtn.hide(),$hideBtn.show(),$fileList.show()}function hide(){$hideBtn.hide(),$showBtn.show(),$fileList.hide()}"files-summary-show"===hashTag?show():"files-summary-hide"===hashTag?hide():startVisible?show():hide(),$showBtn.click(show),$hideBtn.click(hide)},Diff2HtmlUI.prototype.highlightCode=function(targetId){this._getTarget(targetId).find(".d2h-file-wrapper").map(function(_i,file){var oldLinesState,newLinesState,$file=$(file),language=$file.data("lang");$file.find(".d2h-code-line-ctn").map(function(_j,line){var lineState,$line=$(line),text=line.textContent,lineParent=line.parentNode;lineState=-1!==lineParent.className.indexOf("d2h-del")?oldLinesState:newLinesState;var result=hljs.getLanguage(language)?hljs.highlight(language,text,!0,lineState):hljs.highlightAuto(text);-1!==lineParent.className.indexOf("d2h-del")?oldLinesState=result.top:(-1!==lineParent.className.indexOf("d2h-ins")||(oldLinesState=result.top),newLinesState=result.top);var originalStream=highlightJS.nodeStream(line);if(originalStream.length){var resultNode=document.createElementNS("http://www.w3.org/1999/xhtml","div");resultNode.innerHTML=result.value,result.value=highlightJS.mergeStreams(originalStream,highlightJS.nodeStream(resultNode),text)}$line.addClass("hljs"),$line.addClass(result.language),$line.html(result.value)})})},Diff2HtmlUI.prototype._getTarget=function(targetId){return"object"==typeof targetId&&targetId instanceof jQuery?targetId:"string"==typeof targetId?$(targetId):(console.error("Wrong target provided! Falling back to default value 'body'."),console.log("Please provide a jQuery object or a valid DOM query string."),$("body"))},Diff2HtmlUI.prototype._getHashTag=function(){var docUrl=document.URL,hashTagIndex=docUrl.indexOf("#"),hashTag=null;return-1!==hashTagIndex&&(hashTag=docUrl.substr(hashTagIndex+1)),hashTag},Diff2HtmlUI.prototype._distinct=function(collection){return collection.filter(function(v,i){return collection.indexOf(v)===i})},Diff2HtmlUI.prototype._initSelection=function(){var body=$("body"),that=this;body.on("mousedown",".d2h-diff-table",function(event){var target=$(event.target),table=target.closest(".d2h-diff-table");target.closest(".d2h-code-line,.d2h-code-side-line").length?(table.removeClass("selecting-left"),table.addClass("selecting-right"),currentSelectionColumnId=1):target.closest(".d2h-code-linenumber,.d2h-code-side-linenumber").length&&(table.removeClass("selecting-right"),table.addClass("selecting-left"),currentSelectionColumnId=0)}),body.on("copy",".d2h-diff-table",function(event){var clipboardData=event.originalEvent.clipboardData,text=that._getSelectedText();clipboardData.setData("text",text),event.preventDefault()})},Diff2HtmlUI.prototype._getSelectedText=function(){var doc=window.getSelection().getRangeAt(0).cloneContents(),nodes=doc.querySelectorAll("tr"),text="",idx=currentSelectionColumnId;return 0===nodes.length?text=doc.textContent:[].forEach.call(nodes,function(tr,i){var td=tr.cells[1===tr.cells.length?0:idx];text+=(i?"\n":"")+td.textContent.replace(/(?:\r\n|\r|\n)/g,"")}),text},module.exports.Diff2HtmlUI=Diff2HtmlUI,global.Diff2HtmlUI=Diff2HtmlUI}).call(this,"undefined"!=typeof global?global:"undefined"!=typeof self?self:"undefined"!=typeof window?window:{})},{"./highlight.js-internals.js":2}],2:[function(require,module,exports){function HighlightJS(){}function escape(value){return value.replace(/&/gm,"&amp;").replace(/</gm,"&lt;").replace(/>/gm,"&gt;")}function tag(node){return node.nodeName.toLowerCase()}var ArrayProto;ArrayProto=[],HighlightJS.prototype.nodeStream=function(node){var result=[];return function _nodeStream(node,offset){for(var child=node.firstChild;child;child=child.nextSibling)3===child.nodeType?offset+=child.nodeValue.length:1===child.nodeType&&(result.push({event:"start",offset:offset,node:child}),offset=_nodeStream(child,offset),tag(child).match(/br|hr|img|input/)||result.push({event:"stop",offset:offset,node:child}));return offset}(node,0),result},HighlightJS.prototype.mergeStreams=function(original,highlighted,value){var processed=0,result="",nodeStack=[];function selectStream(){return original.length&&highlighted.length?original[0].offset!==highlighted[0].offset?original[0].offset<highlighted[0].offset?original:highlighted:"start"===highlighted[0].event?original:highlighted:original.length?original:highlighted}function open(node){result+="<"+tag(node)+ArrayProto.map.call(node.attributes,function(a){return" "+a.nodeName+'="'+escape(a.value)+'"'}).join("")+">"}function close(node){result+="</"+tag(node)+">"}function render(event){("start"===event.event?open:close)(event.node)}for(;original.length||highlighted.length;){var stream=selectStream();if(result+=escape(value.substring(processed,stream[0].offset)),processed=stream[0].offset,stream===original){for(nodeStack.reverse().forEach(close);render(stream.splice(0,1)[0]),(stream=selectStream())===original&&stream.length&&stream[0].offset===processed;);nodeStack.reverse().forEach(open)}else"start"===stream[0].event?nodeStack.push(stream[0].node):nodeStack.pop(),render(stream.splice(0,1)[0])}return result+escape(value.substr(processed))},module.exports.HighlightJS=new HighlightJS},{}]},{},[1]);
+</script>
+
+  <script>
+    $(document).ready(function() {
+      var diff2htmlUi = new Diff2HtmlUI();
+      diff2htmlUi.fileListCloseable("#diff", false);
+      diff2htmlUi.synchronisedScroll("#diff", false);
+      diff2htmlUi.highlightCode('#diff');
+    });
+  </script>
+</head>
+<body style="text-align: center; font-family: 'Source Sans Pro',sans-serif;">
+<h1>Diff to HTML by <a href="https://github.com/rtfpessoa">rtfpessoa</a></h1>
+
+<div id="diff">
+  <div class="d2h-file-list-wrapper">
+    <div class="d2h-file-list-header">
+        <span class="d2h-file-list-title">Files changed (1)</span>
+        <a class="d2h-file-switch d2h-hide">hide</a>
+        <a class="d2h-file-switch d2h-show">show</a>
+    </div>
+    <ol class="d2h-file-list">
+    <li class="d2h-file-list-line">
+    <span class="d2h-file-name-wrapper">
+      <svg aria-hidden="true" class="d2h-icon d2h-moved" height="16" title="renamed" version="1.1"
+           viewBox="0 0 14 16" width="14">
+          <path d="M6 9H3V7h3V4l5 4-5 4V9z m8-7v12c0 0.55-0.45 1-1 1H1c-0.55 0-1-0.45-1-1V2c0-0.55 0.45-1 1-1h12c0.55 0 1 0.45 1 1z m-1 0H1v12h12V2z"></path>
+      </svg>      <a href="#d2h-905827" class="d2h-file-name">original_graphql → revised_graphql</a>
+      <span class="d2h-file-stats">
+          <span class="d2h-lines-added">+142</span>
+          <span class="d2h-lines-deleted">-41</span>
+      </span>
+    </span>
+</li>
+    </ol>
+</div><div class="d2h-wrapper">
+    <div id="d2h-905827" class="d2h-file-wrapper" data-lang="">
+    <div class="d2h-file-header">
+      <span class="d2h-file-name-wrapper">
+    <svg aria-hidden="true" class="d2h-icon" height="16" version="1.1" viewBox="0 0 12 16" width="12">
+        <path d="M6 5H2v-1h4v1zM2 8h7v-1H2v1z m0 2h7v-1H2v1z m0 2h7v-1H2v1z m10-7.5v9.5c0 0.55-0.45 1-1 1H1c-0.55 0-1-0.45-1-1V2c0-0.55 0.45-1 1-1h7.5l3.5 3.5z m-1 0.5L8 2H1v12h10V5z"></path>
+    </svg>    <span class="d2h-file-name">original_graphql → revised_graphql</span>
+    <span class="d2h-tag d2h-moved d2h-moved-tag">RENAMED</span></span>
+    </div>
+    <div class="d2h-files-diff">
+        <div class="d2h-file-side-diff">
+            <div class="d2h-code-wrapper">
+                <table class="d2h-diff-table">
+                    <tbody class="d2h-diff-tbody">
+                    <tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info">@@ -7,14 +7,53 @@</div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      7
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      8
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      9
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn"># Sync status of daemon</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      10
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">enum <del>SyncStatus</del> {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      11
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  BOOTSTRAP</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      12
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  <del>SYNCED</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      13
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  OFFLINE</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      14
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  CONNECTING</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      15
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  LISTENING</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      16
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      17
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      18
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type UserCommand {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      19
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  id: ID!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      20
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info">@@ -38,6 +77,10 @@</div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      38
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      39
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # Short arbitrary message provided by the sender</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      40
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  memo: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      41
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      42
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      43
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type FeeTransfer {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info">@@ -46,8 +89,13 @@</div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      46
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      47
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # Amount that the recipient is paid in this fee transfer</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      48
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  fee: UInt64!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      49
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      50
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      51
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type Transactions {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      52
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # List of user commands (payments and stake delegations) included in this block</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      53
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  userCommands: [UserCommand!]!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info">@@ -59,12 +107,32 @@</div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      59
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  coinbase: UInt64!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      60
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      61
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      62
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type ProtocolState {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      63
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # Base58Check-encoded hash of the previous state</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      64
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  previousStateHash: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      65
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      66
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # State related to the succinct blockchain</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      67
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  blockchainState: BlockchainState!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      68
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      69
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      70
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type Block {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info">@@ -77,15 +145,15 @@</div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      77
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  transactions: Transactions!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      78
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      79
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      80
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">input BlockFilterInput {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      81
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  <del>#</del> <del>A public key of a user who has their</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      82
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  <del>#         transaction</del> <del>in the block, or produced the block</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      83
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  relatedTo: PublicKey!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      84
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      85
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      86
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn"># Connection Edge as described by the Relay connections spec</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      87
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type BlockEdge {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      88
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  # <del>Opaque</del> <del>pagination</del> <del>cursor</del> <del>for</del> a block<del> (base58-encoded janestreet&#x2F;bin_prot serialization)</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      89
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  cursor: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      90
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  node: Block!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      91
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info">@@ -97,24 +165,16 @@</div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      97
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  totalCount: Int!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      98
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  pageInfo: PageInfo!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      99
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      100
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      101
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">type <del>PaymentUpdate</del> {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      102
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  <del>payment</del>: <del>Payment</del>!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      103
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  consensus: ConsensusState!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      104
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      105
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      106
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn"><del>#</del> <del>Status</del> <del>of a transaction</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      107
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn"><del>enum</del> <del>TransactionStatus {</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      108
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  <del>#</del> <del>A transaction that is on the longest chain</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      109
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  INCLUDED</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      110
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      111
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  # A transaction either in the transition frontier or in transaction pool but is not on the longest chain</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      112
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  PENDING</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      113
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      114
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  # The transaction has either been snarked, reached finality through consensus or has been dropped</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      115
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  UNKNOWN</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      116
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      117
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      118
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type query {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      119
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # Network sync status</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      120
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  syncStatus: SyncStatus!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info">@@ -152,37 +212,78 @@</div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      152
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">    paymentId: ID!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      153
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  ): TransactionStatus!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      154
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      155
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      156
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">input AddPaymentReceiptInput {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      157
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # Time that a payment gets added to another clients transaction database</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      158
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # (stringified Unix time - number of milliseconds since January 1, 1970)</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      159
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  <del>added_time</del>: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      160
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      161
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  <del>#</del> <del>Serialized payment (base58-encoded janestreet&#x2F;bin_prot serialization)</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      162
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn"><del>  payment: String!</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      163
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      164
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      165
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn"><del>type</del> <del>AddPaymentReceiptPayload</del> {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      166
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  <del>payment</del>: <del>UserCommand</del>!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      167
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      168
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      169
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type mutation {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      170
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  # <del>...</del> <del>Did</del> <del>not</del> <del>include</del> <del>mutations</del> <del>from</del> <del>current</del> <del>design</del> <del>since</del> <del>they</del> <del>are</del> <del>not</del> <del>used</del> <del>in</del> <del>this</del> <del>RFC</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      171
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  </span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      172
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  # Add <del>payment</del> into <del>transaction</del> database</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      173
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  <del>addPaymentReceipt</del>(input: <del>AddPaymentReceiptInput</del>!): <del>AddPaymentReceiptPayload</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      174
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      175
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn"><del>  #</del> <del>...</del> <del>Did not include mutations from current design since they are not used in this RFC</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      176
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      177
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      178
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type subscription {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      179
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  # <del>Event</del> <del>that</del> <del>triggers</del> <del>when</del> the <del>network sync status changes</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      180
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  newSyncUpdate: SyncStatus!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      181
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      182
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  # <del>Event</del> <del>that</del> <del>triggers</del> <del>when</del> a <del>new</del> <del>block</del> <del>is</del> <del>created</del> <del>that</del> <del>either</del> <del>contains</del> <del>a</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      183
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  <del>#</del> <del>transaction</del> <del>with the specified public key, or was produced by it</del></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      184
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  newBlock(</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      185
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">    # Public key that is included in the block</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      186
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">    publicKey: PublicKey!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-del">
+      187
+    </td>
+    <td class="d2h-del">
+        <div class="d2h-code-side-line d2h-del">
+            <span class="d2h-code-line-prefix">-</span>
+            <span class="d2h-code-line-ctn">  ): Block!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      188
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d2h-file-side-diff">
+            <div class="d2h-code-wrapper">
+                <table class="d2h-diff-table">
+                    <tbody class="d2h-diff-tbody">
+                    <tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info"></div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      7
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      8
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      9
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn"># Sync status of daemon</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      10
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">enum <ins>NetworkInteractionStatus</ins> {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      11
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  CONNECTING # You are trying to connect to at least one peer</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      12
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  LISTENING # You are connected to a peer, but you want to listen to</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      13
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  INTERACTING # You have at least listened to one message from the network</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      14
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      15
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      16
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">enum ActiveStatus {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      17
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  BOOTSTRAP</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      18
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  <ins>ONLINE</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      19
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  OFFLINE</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      20
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      21
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      22
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">type SyncStatus {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      23
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  activitiy: ActiveStatus!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      24
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  networkIneraction: NetworkInteractionStatus # This would be none if a node is offline</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      25
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      26
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      27
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">type OnlineStatus {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      28
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  status: NetworkInteractionStatus!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      29
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      30
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      31
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">enum FinalizedStatusEnum {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      32
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  FAILED</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      33
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  CONFIRMED</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      34
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  UNKONWN</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      35
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      36
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      37
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">type FinalizedStatus {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      38
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  status: FinalizedStatusEnum!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      39
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      40
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      41
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">type PendingStatus {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      42
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  blockConfirmationNumber: Int!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      43
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      44
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      45
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">enum ScheduledEnum {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      46
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  SCHEDULED</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      47
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      48
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      49
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">type Scheduled {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      50
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  status: ScheduledEnum!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      51
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      52
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      53
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">union ConsensusStatus = FinalizedStatus | PendingStatus</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      54
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      55
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">union TransactionConsensusStatus = FinalizedStatus  | PendingStatus | Scheduled</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      56
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      57
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type UserCommand {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      58
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  id: ID!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      59
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info"></div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      77
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      78
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # Short arbitrary message provided by the sender</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      79
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  memo: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      80
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      81
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  firstTimeSeen: Date</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      82
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      83
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  is_manually_added: Bool!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      84
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      85
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      86
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type FeeTransfer {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info"></div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      89
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      90
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # Amount that the recipient is paid in this fee transfer</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      91
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  fee: UInt64!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      92
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      93
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  firstTimeSeen: Date</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      94
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      95
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  is_manually_added: Bool!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      96
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      97
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      98
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn"># Different types of transactions in a block</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      99
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type Transactions {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      100
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # List of user commands (payments and stake delegations) included in this block</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      101
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  userCommands: [UserCommand!]!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info"></div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      107
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  coinbase: UInt64!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      108
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      109
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      110
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">type BlockchainState {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      111
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  # date (stringified Unix time - number of milliseconds since January 1, 1970)</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      112
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  date: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      113
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      114
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  # Base58Check-encoded hash of the snarked ledger</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      115
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  snarkedLedgerHash: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      116
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      117
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  # Base58Check-encoded hash of the staged ledger</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      118
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  stagedLedgerHash: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      119
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      120
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      121
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">type ConsensusState {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      122
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  blockchainLength: Int!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      123
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  epoch: Int!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      124
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  slot: Int!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      125
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      126
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      127
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type ProtocolState {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      128
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # Base58Check-encoded hash of the previous state</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      129
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  previousStateHash: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      130
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      131
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # State related to the succinct blockchain</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      132
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  blockchainState: BlockchainState!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      133
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      134
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  #State related to the block in Ouroborus Genesis</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      135
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  consensusState: consensusState!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      136
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      137
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      138
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type Block {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info"></div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      145
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  transactions: Transactions!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      146
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      147
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      148
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      149
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">input BlockFilterInput {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      150
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  <ins>senders:</ins> <ins>[PublicKey!]!</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      151
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  <ins>receivers:</ins> <ins>[PublicKey!]!</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      152
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      153
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      154
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn"># Connection Edge as described by the Relay connections spec</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      155
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type BlockEdge {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      156
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  # <ins>Cursor</ins> <ins>is</ins> <ins>the</ins> <ins>state</ins> <ins>hash of </ins>a block</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      157
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  cursor: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      158
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  node: Block!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      159
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info"></div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      165
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  totalCount: Int!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      166
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  pageInfo: PageInfo!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      167
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      168
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn"><ins>  </ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      169
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">type <ins>PaymentProof</ins> {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      170
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  <ins>proof</ins>: <ins>[UserCommand</ins>!<ins>]! # Inclusive-Exclusive proof of user commands that are used to prove a resuliting receipt</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      171
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      172
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      173
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn"><ins>type</ins> <ins>TransactionStatus</ins> <ins>{</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      174
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn"><ins>  isSnarked:</ins> <ins>bool!</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      175
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  <ins>transactionConsensusStatus:</ins> <ins>TransactionConsensusStatus!</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      176
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      177
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn"><ins>  </ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      178
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type query {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      179
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # Network sync status</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      180
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  syncStatus: SyncStatus!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-info"></td>
+    <td class="d2h-info">
+        <div class="d2h-code-side-line d2h-info"></div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      212
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">    paymentId: ID!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      213
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  ): TransactionStatus!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      214
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      215
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn"><ins>  </ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      216
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">input AddPaymentReceiptInput {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      217
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # Time that a payment gets added to another clients transaction database</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      218
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  # (stringified Unix time - number of milliseconds since January 1, 1970)</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      219
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  <ins>parentReceiptHash</ins>: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      220
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      221
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  <ins>userCommand:</ins> <ins>UserCommand!</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      222
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn"><ins>}</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      223
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      224
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">input AddUserCommandInput {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      225
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  userCommand: UserCommand!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      226
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  parentReceiptChainHash: String</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      227
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      228
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      229
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">input AddTransactionsInput {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      230
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  userCommands: [AddUserCommandInput!]!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      231
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      232
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  # List of fee transfers included in this block</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      233
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  feeTransfer: [FeeTransfer!]!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      234
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      235
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      236
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn"><ins>input</ins> <ins>PublicKeyToReceiptChainHashInput</ins> {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      237
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  <ins>publicKey</ins>: <ins>String</ins>!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      238
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  receiptChainHash: String!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      239
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      240
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      241
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">input AddBlockInput {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      242
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  block: Block!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      243
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  previousAccounts: [PublicKeyToReceiptChainHashInput!]!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      244
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      245
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      246
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">input AddBlocksInput {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      247
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  blocks: [AddBlockInput!]!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      248
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      249
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      250
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type mutation {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      251
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  # <ins>Add</ins> <ins>receipts</ins> <ins>of</ins> <ins>payments</ins> <ins>that</ins> <ins>a</ins> <ins>client</ins> <ins>has</ins> <ins>missed.</ins> <ins>Return</ins> <ins>true</ins> <ins>if</ins> <ins>the</ins> <ins>receipts</ins> <ins>connect</ins> <ins>to a payment</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      252
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  addPaymentReceipt(input: AddPaymentReceiptInput!): Bool!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      253
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      254
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  ... # ignoring obvious mutation commands</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      255
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  </span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      256
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  # Add <ins>a</ins> <ins>user commands </ins>into <ins>the</ins> <ins>archive </ins>database</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      257
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  <ins>addTransactions</ins>(input: <ins>AddTransactionsInput</ins>!): <ins>addTransactionsPayload!</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      258
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      259
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  # Add a block data into the archive database</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      260
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  addBlocks(input: AddBlocksInput!): addBlocksPayload!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      261
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      262
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      263
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn"><ins>type</ins> <ins>BlockUpdate</ins> <ins>{</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      264
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  block: Block!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      265
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  consensusStatus: ConsensusStatus!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      266
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  isSnarked: Bool!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      267
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      268
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      269
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">type UserCommandUpdate {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      270
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  block: UserCommand!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      271
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  consensusStatus: TransactionConsensusStatus!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      272
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  isSnarked: Bool!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      273
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      274
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      275
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">type FeeTransferUpdate {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      276
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  block: FeeTransfer!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      277
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  consensusStatus: TransactionConsensusStatus!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      278
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  isSnarked: Bool!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      279
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      280
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      281
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">union FollowUpdate = BlockUpdate | UserCommandUpdate | FeeTransferUpdate</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      282
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  </span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      283
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">type subscription {</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      284
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  # <ins>Subscribe</ins> <ins>to</ins> <ins>sync</ins> <ins>status</ins> <ins>of </ins>the <ins>node</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      285
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">  newSyncUpdate: SyncStatus!</span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      286
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn"><ins>  </ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      287
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  # <ins>Subscribe</ins> <ins>to</ins> <ins>the</ins> <ins>blocks</ins> <ins>that </ins>a <ins>user</ins> <ins>was</ins> <ins>involved</ins> <ins>and</ins> <ins>the</ins> <ins>transactions</ins> <ins>they</ins> <ins>sent</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-ins">
+      288
+    </td>
+    <td class="d2h-ins">
+        <div class="d2h-code-side-line d2h-ins">
+            <span class="d2h-code-line-prefix">+</span>
+            <span class="d2h-code-line-ctn">  <ins>followUser(publicKey</ins> <ins>:PublicKey!):</ins> <ins>[FollowUpdate!]!</ins></span>
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+      
+    </td>
+    <td class="d2h-cntx d2h-emptyplaceholder">
+        <div class="d2h-code-side-line d2h-code-side-emptyplaceholder d2h-cntx d2h-emptyplaceholder">
+        </div>
+    </td>
+</tr><tr>
+    <td class="d2h-code-side-linenumber d2h-cntx">
+      289
+    </td>
+    <td class="d2h-cntx">
+        <div class="d2h-code-side-line d2h-cntx">
+            <span class="d2h-code-line-prefix">&nbsp;</span>
+            <span class="d2h-code-line-ctn">}</span>
+        </div>
+    </td>
+</tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</div>
+</body>
+</html>

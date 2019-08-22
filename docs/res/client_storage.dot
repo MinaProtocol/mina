@@ -6,13 +6,11 @@ digraph client_process {
 		node [style=filled,color=white];
 		transition_frontier [label="transition frontier"];
         transaction_pool [label="transaction pool"];
-        daemon [color=yellow]
+        API
 		label = "daemon";
 	}
 
     archive_process [label="archive process"]
-
-    API
 
     subgraph cluster_2 {
 		style=filled;
@@ -30,7 +28,9 @@ digraph client_process {
     transition_frontier -> archive_process
     transaction_pool -> archive_process
 
-    API -> daemon
+    API -> transition_frontier
+    API -> transaction_pool
+
     API -> database
 
     archive_process -> user_commands

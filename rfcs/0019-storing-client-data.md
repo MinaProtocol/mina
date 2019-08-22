@@ -160,25 +160,25 @@ A drawback with sorting blocks and transaction based on the time that they are f
 
 ## Implementation
 
-This section will discuss a proposal where all the database updates are written by an `archive_process`. The `archive_process` will get updates of the `transaction_pool` and `transition_frontier` through diffs. Once it receives the diffs, the `archive_process` will update the database appropriately.Then,there will be an API component that make answer client queries using the daemon and the databases.
+This section will discuss a proposal where all the database updates are written by an `archive_process`. The `archive_process` will get updates of the `transaction_pool` and `transition_frontier` through diffs. Once it receives the diffs, the `archive_process` will update the database appropriately. Then, there will be an API component that make answer client queries using the daemon and the databases.
 
 Below is a diagram of how the components in this RFC will depend on each other:
 
 ![Client storage](../docs/res/client_storage.dot.png)
 
-The yellow nodes represent the entire component that the node is in.
+The yellow node represent the entire component that the node is in.
 
-The relational databases that we should use should be agnostic. There are different use cases for using a light database, such as SQLite, and heavier data, such as Postgres. Postgres should be used when we have an archive node or a block explorer trying to make efficient writes to store everything that it hears from the network. We would use SQLite when a user is downloading a wallet for the first time and only stores information about their wallets and their friends. SQLite would also be good to use if we are running a light version of Coda and they would only want to store a small amount of data. If a client wants to upgrade the database from SQLite to Postgres, then use a migration tool to support this.
+The relational databases that we should use should be agnostic. There are different use cases for using a light database, such as SQLite, and heavier database, such as Postgres. Postgres should be used when we have an archive node or a block explorer trying to make efficient writes to store everything that it hears from the network. We would use SQLite when a user is downloading a wallet for the first time and only stores information about their wallets and their friends. SQLite would also be good to use if we are running a light version of Coda and they would only want to store a small amount of data. If a client wants to upgrade the database from SQLite to Postgres, then use a migration tool to support this.
 
-A client can also use AWS Appsync if they want to store their data ina distributed manner for multiple devices.
+A client can also use AWS Appsync if they want to store their data in a distributed manner for multiple devices.
 
 For the objects discussed in the previous section, we can embed them as tables in one global SQL database. Below are the schemas of the tables:
 
 ```
 Enum consensus_status {
   confirmed [note: "The block has reached finality by passing the root"]
-  pending [note: "The block Still in the transition frontier. There is no annotation of block confirmation of number "]
-  failure [note: "The block Got removed from the transition frontier"]
+  pending [note: "The block is still in the transition frontier. There is no annotation of block confirmation of number"]
+  failure [note: "The block got removed from the transition frontier"]
   unknown [note: "After becoming online and bootstrapping, we may not know what will happen to the block"]
 }
 
@@ -476,7 +476,7 @@ Coinbase also uses MongoDB to store all of the data in a blockchain.
 
 # Appendix
 
-The flexibility of this new design changed some parts of the current schema of the GraphqQL database. Here is the new proposed schema:
+The flexibility of this new design changed some parts of the current schema of the GraphqQL database. [../docs/res/graphql_diff.html](../docs/res/graphql_diff.html) is a html file that shows the difference between these two graphql schemas. Here is the new proposed schema:
 
 ```graphql
 # PageInfo object as described by the Relay connections spec
