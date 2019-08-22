@@ -170,9 +170,9 @@ let daemon logger =
             (default: false)"
          (optional bool)
      and memory_profiling =
-       flag "memory-profiling" no_arg ~doc:"enable memory profiling"
+       flag "memory-profiling" no_arg ~doc:"Enable memory profiling"
      and sampling_rate =
-       flag "sampling-rate"
+       flag "memory-profiling-sampling-rate"
          ~doc:
            (sprintf "FLOAT Sampling rate for memory profiling (default: %F)"
               Memprof_helpers.default_sampling_rate)
@@ -656,7 +656,7 @@ let daemon logger =
        (* this has to be after `handle_shutdown` so that it can trap SIGUSR1 *)
        if memory_profiling then
          Memprof_helpers.start ~sampling_rate ~callstack_size:20
-           ~min_samples_print:100 ;
+           ~min_samples_print:100 ~conf_dir ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind {Coda_initialization.coda; client_whitelist; rest_server_port}

@@ -1,3 +1,5 @@
+(* modified version of file at https://github.com/jhjourdan/ocaml/blob/memprof/memprofHelpers.ml *)
+
 open Memprof
 open Printexc
 
@@ -124,7 +126,7 @@ let dump () =
   in
   sort_sampleTree (aux (STC ([], 0, Hashtbl.create 3)) 0)
 
-let start ~sampling_rate ~callstack_size ~min_samples_print =
+let start ~sampling_rate ~callstack_size ~min_samples_print ~conf_dir =
   Memprof.start {sampling_rate; callstack_size; callback} ;
   Sys.set_signal Sys.sigusr1
     (Sys.Signal_handle
@@ -133,7 +135,8 @@ let start ~sampling_rate ~callstack_size ~min_samples_print =
          let chan =
            open_out_gen
              [Open_wronly; Open_creat; Open_text; Open_append]
-             0o666 "memory_profile"
+             0o666
+             Filename.(concat conf_dir "memory_profile")
          in
          print chan min_samples_print (dump ()) ;
          close_out chan ;
