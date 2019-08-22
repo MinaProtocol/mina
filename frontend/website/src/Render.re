@@ -37,28 +37,25 @@ let posts =
   |> Array.to_list
   |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
   |> List.map(fileName => {
-        let length =
-          String.length(fileName) - String.length(Markdown.suffix);
-        let name = String.sub(fileName, 0, length);
-        let path = "posts/" ++ fileName;
-        let (html, content) = Markdown.load(path);
-        let metadata = BlogPost.parseMetadata(content, path);
-        (name, html, metadata);
-      })
-  |> List.sort(
-    ((_, _, metadata1), (_, _, metadata2)) => {
-      let date1 = Js.Date.fromString(metadata1.BlogPost.date);
-      let date2 = Js.Date.fromString(metadata2.date);
-      let diff = Js.Date.getTime(date2) -. Js.Date.getTime(date1);
-      if (diff > 0.) {
-        1;
-      } else if (diff < 0.) {
-        (-1);
-      } else {
-        0;
-      };
-    }
-  );
+       let length = String.length(fileName) - String.length(Markdown.suffix);
+       let name = String.sub(fileName, 0, length);
+       let path = "posts/" ++ fileName;
+       let (html, content) = Markdown.load(path);
+       let metadata = BlogPost.parseMetadata(content, path);
+       (name, html, metadata);
+     })
+  |> List.sort(((_, _, metadata1), (_, _, metadata2)) => {
+       let date1 = Js.Date.fromString(metadata1.BlogPost.date);
+       let date2 = Js.Date.fromString(metadata2.date);
+       let diff = Js.Date.getTime(date2) -. Js.Date.getTime(date1);
+       if (diff > 0.) {
+         1;
+       } else if (diff < 0.) {
+         (-1);
+       } else {
+         0;
+       };
+     });
 
 module MoreFs = {
   type stat;
@@ -83,18 +80,35 @@ module MoreFs = {
 
   [@bs.val] [@bs.module "fs"]
   external symlinkSync: (string, string) => unit = "symlinkSync";
+
+  [@bs.val] [@bs.module "fs"]
+  external existsSync: string => bool = "existsSync";
 };
+
+let makeDirectory = path =>
+  if (!MoreFs.existsSync(path)) {
+    MoreFs.mkdirSync(path, {"recursive": true, "mode": 0o755});
+  };
 
 module Router = {
   type t =
-    | File(string, React.element)
+    | RawFile(string, React.element)
+    | File(string, string => React.element)
     | Dir(string, array(t));
 
   let generateStatic = {
     let rec helper = path =>
       fun
-      | File(name, elem) => {
-          writeStatic(path ++ "/" ++ name, elem);
+      | RawFile(name, element) => {
+          let path_ = path ++ "/" ++ name;
+          writeStatic(path_, element);
+        }
+      | File(name, createElement) => {
+          let path_ = path ++ "/" ++ name;
+          makeDirectory(path_);
+          writeStatic(path_ ++ "/index", createElement("index"));
+          /* TODO: remove when we do the redirect from the .html -> folder */
+          writeStatic(path_, createElement(name));
         }
       | Dir(name, routes) => {
           let path_ = path ++ "/" ++ name;
@@ -102,7 +116,7 @@ module Router = {
           routes |> Array.iter(helper(path_));
         };
 
-    helper("./");
+    helper(".");
   };
 };
 
@@ -124,40 +138,15 @@ let jobOpenings = [|
   ("cryptography-engineer", "Cryptography Engineer (San Francisco)"),
 |];
 
-// GENERATE
-
 Rimraf.sync("site");
 Rimraf.sync("docs-theme");
-
-let blogPage = name =>
-  <Page page=`Blog name extraHeaders={Blog.extraHeaders()}>
-    <Wrapped> <Blog posts /> </Wrapped>
-  </Page>;
-
-let privacyPage = name =>
-  <Page page=`Privacy name>
-    <RawHtml path="html/Privacy.html" />
-  </Page>;
-
-let jobsPage = name =>
-  <Page page=`Jobs name extraHeaders={Careers.extraHeaders()}>
-    <Wrapped> <Careers jobOpenings /> </Wrapped>
-  </Page>;
-
-let testnetPage = name =>
-  <Page page=`Testnet name extraHeaders={Testnet.extraHeaders()}>
-    <Wrapped> <Testnet /> </Wrapped>
-  </Page>;
-
-let tosPage = name =>
-  <Page page=`Tos name> <RawHtml path="html/TOS.html" /> </Page>;
 
 Router.(
   generateStatic(
     Dir(
       "site",
       [|
-        File(
+        RawFile(
           "index",
           <Page page=`Home name="index" footerColor=Style.Colors.navyBlue>
             <Home
@@ -174,7 +163,7 @@ Router.(
           posts
           |> Array.of_list
           |> Array.map(((name, html, metadata)) =>
-               File(
+               RawFile(
                  name,
                  <Page
                    page=`Blog
@@ -184,14 +173,13 @@ Router.(
                    <Wrapped> <BlogPost name html metadata /> </Wrapped>
                  </Page>,
                )
-             )
-          |> Array.append([|File("index", blogPage("index"))|]),
+             ),
         ),
         Dir(
           "jobs",
           jobOpenings
           |> Array.map(((name, _)) =>
-               File(
+               RawFile(
                  name,
                  <Page
                    page=`Jobs
@@ -203,20 +191,42 @@ Router.(
                    </Wrapped>
                  </Page>,
                )
-             )
-          |> Array.append([|File("index", jobsPage("index"))|]),
+             ),
         ),
-        Dir("privacy", [|File("index", privacyPage("index"))|]),
-        Dir("testnet", [|File("index", testnetPage("index"))|]),
-        Dir("tos", [|File("index", tosPage("index"))|]),
-        File("blog", blogPage("blog")),
-        File("privacy", privacyPage("privacy")),
-        File("jobs", jobsPage("jobs")),
-        File("testnet", testnetPage("testnet")),
-        File("tos", tosPage("tos")),
+        File(
+          "blog",
+          name =>
+            <Page page=`Blog name extraHeaders={Blog.extraHeaders()}>
+              <Wrapped> <Blog posts /> </Wrapped>
+            </Page>,
+        ),
+        File(
+          "jobs",
+          name =>
+            <Page page=`Jobs name extraHeaders={Careers.extraHeaders()}>
+              <Wrapped> <Careers jobOpenings /> </Wrapped>
+            </Page>,
+        ),
+        File(
+          "testnet",
+          name =>
+            <Page page=`Testnet name extraHeaders={Testnet.extraHeaders()}>
+              <Wrapped> <Testnet /> </Wrapped>
+            </Page>,
+        ),
+        RawFile(
+          "privacy",
+          <Page page=`Privacy name="privacy">
+            <RawHtml path="html/Privacy.html" />
+          </Page>,
+        ),
+        RawFile(
+          "tos",
+          <Page page=`Tos name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
+        ),
       |],
     ),
-  ),
+  )
 );
 
 Router.(
@@ -224,7 +234,7 @@ Router.(
     Dir(
       "docs-theme",
       [|
-        File(
+        RawFile(
           "main",
           <Page page=`Docs name="/docs/main">
             <Wrapped> <Docs /> </Wrapped>
