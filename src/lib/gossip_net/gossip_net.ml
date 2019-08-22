@@ -246,11 +246,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ~metadata:[("peer", Peer.to_yojson peer)] ;
     Coda_metrics.(Gauge.dec_one Network.peers) ;
     Peer_set.remove t.peers peer ;
-    Hashtbl.update t.peers_by_ip peer.host ~f:(function
-      | None ->
-          failwith "Peer to remove doesn't appear in peers_by_ip"
-      | Some ip_peers ->
-          List.filter ip_peers ~f:(fun ip_peer -> not (Peer.equal ip_peer peer)) )
+    Option.iter (Hashtbl.find t.peers_by_ip peer.host) ~f:(fun ip_peers ->
+        Hashtbl.set t.peers_by_ip ~key:peer.host
+          ~data:
+            (List.filter ip_peers ~f:(fun ip_peer ->
+                 not (Peer.equal ip_peer peer) )) )
 
   let mark_peer_disconnected t peer =
     remove_peer t peer ;
