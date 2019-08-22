@@ -119,7 +119,7 @@ module Pairing_info = struct
     N.of_string
       "204691208819330962009469868104636132783269696790011977400223898462431810102935615891307667367766898917669754470400"
 
-  let is_loop_count_neg = false
+  let loop_count_is_neg = false
 
   let final_exponent =
     N.of_string

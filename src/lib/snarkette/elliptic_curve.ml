@@ -46,6 +46,42 @@ struct
         (z * (y2 - (Coefficients.b * z2)))
         (x * (x2 + (Coefficients.a * z2)))
 
+  let double t1 =
+    let open Fq in
+    let xx = square t1.x in
+    let zz = square t1.z in
+    let w = (Coefficients.a * zz) + (xx + xx + xx) in
+    let y1z1 = t1.y * t1.z in
+    let s = y1z1 + y1z1 in
+    let ss = square s in
+    let sss = s * ss in
+    let r = t1.y * s in
+    let rr = square r in
+    let b = square (t1.x + r) - xx - rr in
+    let h = square w - (b + b) in
+    let x3 = h * s in
+    let y3 = (w * (b - h)) - (rr + rr) in
+    let z3 = sss in
+    {x= x3; y= y3; z= z3}
+
+  let equal t1 t2 =
+    let open Fq in
+    let x1z2 = t1.x * t2.z in
+    let x2z1 = t1.z * t2.x in
+    let y1z2 = t1.y * t2.z in
+    let y2z1 = t1.z * t2.y in
+    equal x1z2 x2z1 && equal y1z2 y2z1
+
+  let%test_unit "equal" =
+    let pair g = Quickcheck.Generator.tuple2 g g in
+    Quickcheck.test
+      (pair (pair Fq.gen))
+      ~f:(fun (p, q) ->
+        assert (
+          Bool.equal
+            ([%eq: Fq.t * Fq.t] p q)
+            (equal (of_affine p) (of_affine q)) ) )
+
   let ( + ) t1 t2 =
     if is_zero t1 then t2
     else if is_zero t2 then t1
@@ -55,23 +91,8 @@ struct
       let x2z1 = t1.z * t2.x in
       let y1z2 = t1.y * t2.z in
       let y2z1 = t1.z * t2.y in
-      if equal x1z2 x2z1 && equal y1z2 y2z1 then
-        (* Double case *)
-        let xx = square t1.x in
-        let zz = square t1.z in
-        let w = (Coefficients.a * zz) + (xx + xx + xx) in
-        let y1z1 = t1.y * t1.z in
-        let s = y1z1 + y1z1 in
-        let ss = square s in
-        let sss = s * ss in
-        let r = t1.y * s in
-        let rr = square r in
-        let b = square (t1.x + r) - xx - rr in
-        let h = square w - (b + b) in
-        let x3 = h * s in
-        let y3 = (w * (b - h)) - (rr + rr) in
-        let z3 = sss in
-        {x= x3; y= y3; z= z3}
+      if equal x1z2 x2z1 && equal y1z2 y2z1 then (* Double case *)
+        double t1
       else
         (* Generic case *)
         let z1z2 = t1.z * t2.z in

@@ -73,7 +73,7 @@ module Make
 
       val loop_count : N.t
 
-      val is_loop_count_neg : bool
+      val loop_count_is_neg : bool
 
       val final_exponent_last_chunk_w1 : N.t
 
@@ -202,7 +202,7 @@ struct
           (loop_count_size_in_bits - 1)
       in
       let add_coeffs =
-        if not Info.is_loop_count_neg then add_coeffs
+        if not Info.loop_count_is_neg then add_coeffs
         else
           let open Fq_twist in
           let rZ_inv = inv r.z in
@@ -257,7 +257,7 @@ struct
           in
           f := Fq_target.(!f * g_RQ_at_P) )
     done ;
-    if Info.is_loop_count_neg then (
+    if Info.loop_count_is_neg then (
       let add_idx = !add_idx_r in
       incr add_idx_r ;
       let ac = q.add_coeffs.(add_idx) in
