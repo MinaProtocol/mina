@@ -1,34 +1,20 @@
 open Core_kernel
 
 module type Inputs_intf = sig
-  module Impl : Snarky.Snark_intf.S
-
-  module Fqk : sig
-    include Snarky_field_extensions.Intf.S with module Impl = Impl
-
-    val cyclotomic_square : t -> (t, _) Impl.Checked.t
-
-    val frobenius : t -> int -> t
-  end
+  module Fqk : Intf.Fqk
 
   module N : Snarkette.Nat_intf.S
 
-  module Params : sig
-    val loop_count : N.t
-
-    val loop_count_is_neg : bool
-
-    val final_exponent_last_chunk_w1 : N.t
-
-    val final_exponent_last_chunk_is_w0_neg : bool
-
-    val final_exponent_last_chunk_abs_of_w0 : N.t
-  end
+  module Params : Intf.Params with module N := N
 end
 
-module Make (Inputs : Inputs_intf) = struct
+module Make (Inputs : Inputs_intf) : sig
+  open Inputs.Fqk
+
+  val final_exponentiation : t -> (t, _) Impl.Checked.t
+end = struct
   open Inputs
-  open Impl
+  open Fqk.Impl
   open Let_syntax
 
   let exponentiate elt power =
@@ -84,4 +70,11 @@ module Make (Inputs : Inputs_intf) = struct
       exponentiate base Params.final_exponent_last_chunk_abs_of_w0
     in
     Fqk.(w0 * w1)
+
+  let final_exponentiation =
+    match Params.embedding_degree with
+    | `_4 ->
+        final_exponentiation4
+    | `_6 ->
+        final_exponentiation6
 end

@@ -1,29 +1,17 @@
 open Core_kernel
 
-module type S = sig
-  module Impl : Snarky.Snark_intf.S
-
-  module Fqe : Snarky_field_extensions.Intf.S with module Impl = Impl
-
-  module Coeff : sig
-    type t = {rx: Fqe.t; ry: Fqe.t; gamma: Fqe.t; gamma_x: Fqe.t}
-  end
-
-  type t = {q: Fqe.t * Fqe.t; coeffs: Coeff.t list}
-
-  val create : Fqe.t * Fqe.t -> (t, _) Impl.Checked.t
-end
-
 module Make
-    (Fqe : Snarky_field_extensions.Intf.S)
+    (Fqe : Intf.Fqe)
+    (G2 : Intf.G2 with module Fqe := Fqe)
     (N : Snarkette.Nat_intf.S) (Params : sig
-        val coeff_a : Fqe.Unchecked.t
+        val g2_coeff_a : Fqe.Unchecked.t
 
         val loop_count : N.t
     end) =
 struct
   module Fqe = Fqe
   module Impl = Fqe.Impl
+  module G2 = G2
 
   module Coeff = struct
     type t = {rx: Fqe.t; ry: Fqe.t; gamma: Fqe.t; gamma_x: Fqe.t}
@@ -70,7 +58,7 @@ struct
     let open Unchecked in
     let gamma =
       let rx_squared = square s.rx in
-      (rx_squared + rx_squared + rx_squared + Params.coeff_a) / (s.ry + s.ry)
+      (rx_squared + rx_squared + rx_squared + Params.g2_coeff_a) / (s.ry + s.ry)
     in
     let c =
       let gamma_x = gamma * s.rx in
@@ -115,7 +103,8 @@ struct
     in
     (s, c)
 
-  let create_constant ((qx, qy) as q) =
+  let create_constant q =
+    let ((qx, qy) as q) = G2.Unchecked.to_affine_exn q in
     let naf = Snarkette.Fields.find_wnaf (module N) 1 Params.loop_count in
     let rec go i found_nonzero (s : Fqe.Unchecked.t loop_state) acc =
       if i < 0 then List.rev acc
@@ -142,7 +131,7 @@ struct
         let%bind gamma =
           let%bind rx_squared = square s.rx in
           div_unsafe
-            (scale rx_squared (Field.of_int 3) + constant Params.coeff_a)
+            (scale rx_squared (Field.of_int 3) + constant Params.g2_coeff_a)
             (scale s.ry (Field.of_int 2))
           (* ry will never be zero. And thus this [div_unsafe] is ok.
              A loop invariant is that s is actually a non-identity curve point.

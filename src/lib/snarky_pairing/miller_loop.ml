@@ -2,44 +2,16 @@ open Core_kernel
 open Sgn_type
 
 module type Inputs_intf = sig
-  module Impl : Snarky.Snark_intf.S
+  module Fq : Intf.Fq with type 'a A.t = 'a and type 'a Base.t_ = 'a
 
-  module Fq :
-    Snarky_field_extensions.Intf.S
-    with module Impl = Impl
-     and type 'a A.t = 'a
-     and type 'a Base.t_ = 'a
+  module Fqe : Intf.Fqe with module Impl = Fq.Impl and module Base = Fq
 
-  module Fqe :
-    Snarky_field_extensions.Intf.S_with_primitive_element
-    with module Impl = Impl
-     and module Base = Fq
+  module Fqk :
+    Intf.Fqk with module Impl = Fq.Impl and type 'a Base.t_ = 'a Fqe.t_
 
-  module Fqk : sig
-    include
-      Snarky_field_extensions.Intf.S
-      with module Impl = Impl
-       and type 'a Base.t_ = 'a Fqe.t_
-       and type 'a A.t = 'a * 'a
+  module G1_precomputation : Intf.G1_precomputation with module Fqe := Fqe
 
-    val special_mul : t -> t -> (t, _) Impl.Checked.t
-
-    val special_div : t -> t -> (t, _) Impl.Checked.t
-
-    val unitary_inverse : t -> t
-  end
-
-  module G1_precomputation :
-    G1_precomputation.S
-    with module Impl = Impl
-     and type 'a Fqe.Base.t_ = 'a Fqe.Base.t_
-     and type 'a Fqe.A.t = 'a Fqe.A.t
-
-  module G2_precomputation :
-    G2_precomputation.S
-    with module Impl = Impl
-     and type 'a Fqe.Base.t_ = 'a Fqe.Base.t_
-     and type 'a Fqe.A.t = 'a Fqe.A.t
+  module G2_precomputation : Intf.G2_precomputation with module Fqe := Fqe
 
   module N : Snarkette.Nat_intf.S
 
@@ -52,7 +24,7 @@ end
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
-  open Impl
+  open Fq.Impl
   open Let_syntax
 
   let double_line_eval (p : G1_precomputation.t)

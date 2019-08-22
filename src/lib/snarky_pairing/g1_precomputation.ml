@@ -1,23 +1,9 @@
-module type S = sig
-  module Impl : Snarky.Snark_intf.S
-
-  module Fqe : Snarky_field_extensions.Intf.S with module Impl = Impl
-
-  open Impl
-
-  type t = {p: Field.Var.t * Field.Var.t; py_twist_squared: Fqe.t}
-
-  val create : Field.Var.t * Field.Var.t -> t
-end
-
 module Make
-    (Impl : Snarky.Snark_intf.S)
-    (Fqe : Snarky_field_extensions.Intf.S with module Impl = Impl)
-                                                                 (Params : sig
+    (Fqe : Snarky_field_extensions.Intf.S) (Params : sig
         val twist : Fqe.Unchecked.t
     end) =
 struct
-  module Impl = Impl
+  module Impl = Fqe.Impl
   module Fqe = Fqe
   open Impl
 
