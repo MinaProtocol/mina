@@ -14,7 +14,7 @@ module Group = Curve_choice.Tick_backend.Inner_curve
 
 let bigint_of_bits bits =
   List.foldi bits ~init:Bigint.zero ~f:(fun i acc b ->
-      if b then Bigint.(acc + (of_int 2 lsl i)) else acc )
+      if b then Bigint.(acc + (of_int 1 lsl i)) else acc )
 
 let rec random_scalar () =
   let n =
