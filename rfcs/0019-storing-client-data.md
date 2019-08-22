@@ -476,9 +476,39 @@ Coinbase also uses MongoDB to store all of the data in a blockchain.
 
 # Appendix
 
-The flexibility of this new design changed some parts of the current schema of the GraphqQL database. Here is the schema:
+The flexibility of this new design changed some parts of the current schema of the GraphqQL database. Here is the new proposed schema:
 
 ```graphql
+# PageInfo object as described by the Relay connections spec
+type PageInfo {
+  hasPreviousPage: Boolean!
+  hasNextPage: Boolean!
+  firstCursor: String
+  lastCursor: String
+}
+
+# Sync status of daemon
+enum NetworkInteractionStatus {
+  CONNECTING # You are trying to connect to at least one peer
+  LISTENING # You are connected to a peer, but you want to listen to
+  INTERACTING # You have at least listened to one message from the network
+}
+
+enum ActiveStatus {
+  BOOTSTRAP
+  ONLINE
+  OFFLINE
+}
+
+type SyncStatus {
+  activitiy: ActiveStatus!
+  networkIneraction: NetworkInteractionStatus # This would be none if a node is offline
+}
+
+type OnlineStatus {
+  status: NetworkInteractionStatus!
+}
+
 enum FinalizedStatusEnum {
   FAILED
   CONFIRMED
@@ -556,10 +586,34 @@ type Transactions {
 
   # Amount of coda granted to the producer of this block
   coinbase: UInt64!
+}
 
-  firstTimeSeen: Date
+type BlockchainState {
+  # date (stringified Unix time - number of milliseconds since January 1, 1970)
+  date: String!
 
-  is_manually_added: Bool!
+  # Base58Check-encoded hash of the snarked ledger
+  snarkedLedgerHash: String!
+
+  # Base58Check-encoded hash of the staged ledger
+  stagedLedgerHash: String!
+}
+
+type ConsensusState {
+  blockchainLength: Int!
+  epoch: Int!
+  slot: Int!
+}
+
+type ProtocolState {
+  # Base58Check-encoded hash of the previous state
+  previousStateHash: String!
+
+  # State related to the succinct blockchain
+  blockchainState: BlockchainState!
+
+  #State related to the block in Ouroborus Genesis
+  consensusState: consensusState!
 }
 
 type Block {
@@ -572,24 +626,17 @@ type Block {
   transactions: Transactions!
 }
 
-type BlockUpdate {
-  block: Block!
-  consensusStatus: ConsensusStatus!
-  isSnarked: Bool!
-}
-
-type TransactionUpdate {
-  block: Transaction!
-  consensusStatus: TransactionConsensusStatus!
-  isSnarked: Bool!
-}
-
 
 input BlockFilterInput {
-  # A public key of a user who has their
-  # transaction in the block, or produced the block
   senders: [PublicKey!]!
   receivers: [PublicKey!]!
+}
+
+# Connection Edge as described by the Relay connections spec
+type BlockEdge {
+  # Cursor is the state hash of a block
+  cursor: String!
+  node: Block!
 }
 
 # Connection as described by the Relay connections spec
@@ -599,25 +646,9 @@ type BlockConnection {
   totalCount: Int!
   pageInfo: PageInfo!
 }
-
-type BlockConfirmation {
-  stateHash: String!
-  blocksAhead: Int!
-}
-
-type PaymentUpdate {
-  payment: Payment!
-  consensus: ConsensusState!
-}
-
-input AddPaymentReceiptInput {
-  hash: [String!]!
-
-  ancestor_hash: String!
-}
   
 type PaymentProof {
-  proof: [String!]!  
+  proof: [UserCommand!]! # Inclusive-Exclusive proof of user commands that are used to prove a resuliting receipt
 }
 
 type TransactionStatus {
@@ -626,11 +657,14 @@ type TransactionStatus {
 }
   
 type query {
+  # Network sync status
+  syncStatus: SyncStatus!
+  
   # Construct a proof of a payment based on the account on the best tip of the transition_frontier
-  provePayment (paymentId: Id!) : PaymentProof
+  provePayment (input: String!) : PaymentProof!
   
   # Verify the proof of a payment constructed by `provePayment` based on the best tip of the transition_frontier
-  verifyPayment (paymentId: Id!, resulting_receipt: String!, PaymentProof!): Bool!
+  verifyPayment (input: String!, resulting_receipt: String!, proof: PaymentProof!): Bool!
 
   blocks(
     # Returns the elements in the list that come before the specified cursor
@@ -660,16 +694,271 @@ type query {
   ): TransactionStatus!
 }
   
-  
+input AddPaymentReceiptInput {
+  # Time that a payment gets added to another clients transaction database
+  # (stringified Unix time - number of milliseconds since January 1, 1970)
+  parentReceiptHash: String!
+
+  userCommand: UserCommand!
+}
+
+input AddUserCommandInput {
+  userCommand: UserCommand!
+  parentReceiptChainHash: String
+}
+
+input AddTransactionsInput {
+  userCommands: [AddUserCommandInput!]!
+
+  # List of fee transfers included in this block
+  feeTransfer: [FeeTransfer!]!
+}
+
+input PublicKeyToReceiptChainHashInput {
+  publicKey: String!
+  receiptChainHash: String!
+}
+
+input AddBlockInput {
+  block: Block!
+  previousAccounts: [PublicKeyToReceiptChainHashInput!]!
+}
+
+input AddBlocksInput {
+  blocks: [AddBlockInput!]!
+}
+
 type mutation {
   # Add receipts of payments that a client has missed. Return true if the receipts connect to a payment
   addPaymentReceipt(input: AddPaymentReceiptInput!): Bool!
+
+  ... # ignoring obvious mutation commands
+  
+  # Add a user commands into the archive database
+  addTransactions(input: AddTransactionsInput!): addTransactionsPayload!
+
+  # Add a block data into the archive database
+  addBlocks(input: AddBlocksInput!): addBlocksPayload!
 }
 
-union FollowUpdate = BlockUpdate | TransactionUpdate
+type BlockUpdate {
+  block: Block!
+  consensusStatus: ConsensusStatus!
+  isSnarked: Bool!
+}
+
+type UserCommandUpdate {
+  block: UserCommand!
+  consensusStatus: TransactionConsensusStatus!
+  isSnarked: Bool!
+}
+
+type FeeTransferUpdate {
+  block: FeeTransfer!
+  consensusStatus: TransactionConsensusStatus!
+  isSnarked: Bool!
+}
+
+union FollowUpdate = BlockUpdate | UserCommandUpdate | FeeTransferUpdate
   
 type subscription {
+  # Subscribe to sync status of the node
+  newSyncUpdate: SyncStatus!
+  
   # Subscribe to the blocks that a user was involved and the transactions they sent
   followUser(publicKey :PublicKey!): [FollowUpdate!]!
+}
+```
+
+Below is the current schema as of 8/20/2019:
+
+```graphql
+# PageInfo object as described by the Relay connections spec
+type PageInfo {
+  hasPreviousPage: Boolean!
+  hasNextPage: Boolean!
+  firstCursor: String
+  lastCursor: String
+}
+
+# Sync status of daemon
+enum SyncStatus {
+  BOOTSTRAP
+  SYNCED
+  OFFLINE
+  CONNECTING
+  LISTENING
+}
+
+type UserCommand {
+  id: ID!
+
+  # If true, this represents a delegation of stake, otherwise it is a payment
+  isDelegation: Boolean!
+
+  # Nonce of the transaction
+  nonce: Int!
+
+  # Public key of the sender
+  from: PublicKey!
+
+  # Public key of the receiver
+  to: PublicKey!
+
+  # Amount that sender is sending to receiver - this is 0 for delegations
+  amount: UInt64!
+
+  # Fee that sender is willing to pay for making the transaction
+  fee: UInt64!
+
+  # Short arbitrary message provided by the sender
+  memo: String!
+}
+
+type FeeTransfer {
+  # Public key of fee transfer recipient
+  recipient: PublicKey!
+
+  # Amount that the recipient is paid in this fee transfer
+  fee: UInt64!
+}
+
+type Transactions {
+  # List of user commands (payments and stake delegations) included in this block
+  userCommands: [UserCommand!]!
+
+  # List of fee transfers included in this block
+  feeTransfer: [FeeTransfer!]!
+
+  # Amount of coda granted to the producer of this block
+  coinbase: UInt64!
+}
+
+type ProtocolState {
+  # Base58Check-encoded hash of the previous state
+  previousStateHash: String!
+
+  # State related to the succinct blockchain
+  blockchainState: BlockchainState!
+}
+
+type Block {
+  # Public key of account that produced this block
+  creator: PublicKey!
+
+  # Base58Check-encoded hash of the state after this block
+  stateHash: String!
+  protocolState: ProtocolState!
+  transactions: Transactions!
+}
+
+input BlockFilterInput {
+  # A public key of a user who has their
+  #         transaction in the block, or produced the block
+  relatedTo: PublicKey!
+}
+
+# Connection Edge as described by the Relay connections spec
+type BlockEdge {
+  # Opaque pagination cursor for a block (base58-encoded janestreet/bin_prot serialization)
+  cursor: String!
+  node: Block!
+}
+
+# Connection as described by the Relay connections spec
+type BlockConnection {
+  edges: [BlockEdge!]!
+  nodes: [Block!]!
+  totalCount: Int!
+  pageInfo: PageInfo!
+}
+
+type PaymentUpdate {
+  payment: Payment!
+  consensus: ConsensusState!
+}
+
+# Status of a transaction
+enum TransactionStatus {
+  # A transaction that is on the longest chain
+  INCLUDED
+
+  # A transaction either in the transition frontier or in transaction pool but is not on the longest chain
+  PENDING
+
+  # The transaction has either been snarked, reached finality through consensus or has been dropped
+  UNKNOWN
+}
+
+type query {
+  # Network sync status
+  syncStatus: SyncStatus!
+  
+  # Construct a proof of a payment based on the account on the best tip of the transition_frontier
+  provePayment (input: String!) : PaymentProof!
+  
+  # Verify the proof of a payment constructed by `provePayment` based on the best tip of the transition_frontier
+  verifyPayment (input: String!, resulting_receipt: String!, proof: PaymentProof!): Bool!
+
+  blocks(
+    # Returns the elements in the list that come before the specified cursor
+    before: String
+
+    # Returns the last _n_ elements from the list
+    last: Int
+
+    # Returns the elements in the list that come after the specified cursor
+    after: String
+
+    # Returns the first _n_ elements from the list
+    first: Int
+    filter: BlockFilterInput!
+  ): BlockConnection!
+  
+  # Retrieve all the user commands sent by a public key
+  pooledUserCommands(
+    # Public key of sender of pooled user commands
+    senders: [PublicKey!]!
+    receivers: [PublicKey!]!
+  ): [UserCommand!]!
+
+  # Get the status of a transaction
+  transactionStatus(
+    paymentId: ID!
+  ): TransactionStatus!
+}
+
+input AddPaymentReceiptInput {
+  # Time that a payment gets added to another clients transaction database
+  # (stringified Unix time - number of milliseconds since January 1, 1970)
+  added_time: String!
+
+  # Serialized payment (base58-encoded janestreet/bin_prot serialization)
+  payment: String!
+}
+
+type AddPaymentReceiptPayload {
+  payment: UserCommand!
+}
+
+type mutation {
+  # ... Did not include mutations from current design since they are not used in this RFC
+  
+  # Add payment into transaction database
+  addPaymentReceipt(input: AddPaymentReceiptInput!): AddPaymentReceiptPayload
+
+  # ... Did not include mutations from current design since they are not used in this RFC
+}
+
+type subscription {
+  # Event that triggers when the network sync status changes
+  newSyncUpdate: SyncStatus!
+
+  # Event that triggers when a new block is created that either contains a
+  # transaction with the specified public key, or was produced by it
+  newBlock(
+    # Public key that is included in the block
+    publicKey: PublicKey!
+  ): Block!
 }
 ```
