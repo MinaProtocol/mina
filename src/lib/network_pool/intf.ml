@@ -107,6 +107,8 @@ module type Snark_resource_pool_intf = sig
     -> [`Rebroadcast | `Don't_rebroadcast]
 
   val request_proof : t -> work -> ledger_proof list Priced_proof.t option
+
+  val snark_pool_json : t -> Yojson.Safe.json
 end
 
 (** A [Snark_pool_diff_intf] is the resource pool diff for
@@ -131,6 +133,8 @@ module type Snark_pool_diff_intf = sig
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
   val summary : t -> string
+
+  val compact_json : t -> Yojson.Safe.json
 
   val apply : resource_pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
 end
