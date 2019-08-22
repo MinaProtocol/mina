@@ -476,7 +476,7 @@ Coinbase also uses MongoDB to store all of the data in a blockchain.
 
 # Appendix
 
-The flexibility of this new design changed some parts of the current schema of the GraphqQL database. [../docs/res/graphql_diff.html](../docs/res/graphql_diff.html) is a html file that shows the difference between these two graphql schemas. Here is the new proposed schema:
+The flexibility of this new design changed some parts of the current schema of the GraphqQL database. [../docs/res/graphql_diff.html](https://raw.githack.com/CodaProtocol/coda/rfc/storing-client-data/docs/res/graphql_diff.html) is a html file that shows the difference between these two graphql schemas. Here is the new proposed schema:
 
 ```graphql
 # PageInfo object as described by the Relay connections spec
