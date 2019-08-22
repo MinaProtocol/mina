@@ -53,30 +53,6 @@ module Tick0 = struct
   module Snarkable = Make_snarkable (Crypto_params.Tick0)
 end
 
-let%test_unit "group-map test" =
-  let params =
-    Group_map.Params.create
-      (module Tick0.Field)
-      ~a:Tick_backend.Inner_curve.Coefficients.a
-      ~b:Tick_backend.Inner_curve.Coefficients.b
-  in
-  let module M = Snarky.Snark.Run.Make (Tick_backend) (Unit) in
-  Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
-      let (), checked_output =
-        M.run_and_check
-          (fun () ->
-            let x, y =
-              Snarky_group_map.Checked.to_group
-                (module M)
-                ~params (M.Field.constant t)
-            in
-            fun () -> M.As_prover.(read_var x, read_var y) )
-          ()
-        |> Or_error.ok_exn
-      in
-      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output
-        (Group_map.to_group (module Tick0.Field) ~params t) )
-
 module Wrap_input = Crypto_params.Wrap_input
 
 module Make_inner_curve_scalar
@@ -231,18 +207,14 @@ module Tock = struct
           let one =
             let x, y = Snarkette_tock.G2.(to_affine_exn one) in
             {x= Fqe.conv x; y= Fqe.conv y; z= Fqe.Unchecked.one}
+
+          let random () = scale one (Tick0.Field.random ())
         end
 
         include Snarky_curves.Make_weierstrass_checked
                   (Fqe)
                   (Inner_curve.Scalar)
-                  (struct
-                    include Unchecked
-
-                    let double x = x + x
-
-                    let random () = scale one (Tick0.Field.random ())
-                  end)
+                  (Unchecked)
                   (Unchecked.Coefficients)
       end
 
@@ -260,38 +232,21 @@ module Tock = struct
         include F4 (Fqe) (Params)
       end
 
-      module G1_precomputation =
-        Snarky_pairing.G1_precomputation.Make (Tock0) (Fqe)
-          (struct
-            let twist = Fq.Unchecked.(zero, one)
-          end)
-
       module N = Snarkette.Mnt6_80.N
 
       module Params = struct
         include Snarkette_tock.Pairing_info
 
-        let loop_count_is_neg = Snarkette_tock.Pairing_info.is_loop_count_neg
-      end
+        let g2_coeff_a = G2.Coefficients.a
 
-      module G2_precomputation = struct
-        include Snarky_pairing.G2_precomputation.Make (Fqe) (N)
-                  (struct
-                    include Params
+        let twist = Fq.Unchecked.(zero, one)
 
-                    let coeff_a = G2.Coefficients.a
-                  end)
-
-        let create_constant =
-          Fn.compose create_constant G2.Unchecked.to_affine_exn
+        let embedding_degree = `_4
       end
     end
 
     include T
-    include Snarky_pairing.Miller_loop.Make (T)
-    module FE = Snarky_pairing.Final_exponentiation.Make (T)
-
-    let final_exponentiation = FE.final_exponentiation4
+    include Snarky_pairing.Make (T)
   end
 
   module Proof = struct
@@ -355,7 +310,7 @@ module Tick = struct
   module Fq = Snarky_field_extensions.Field_extensions.F (Tick0)
 
   module Inner_curve = struct
-    include Crypto_params.Tick_backend.Inner_curve
+    include Tick_backend.Inner_curve
 
     include Sexpable.Of_sexpable (struct
                 type t = Field.t * Field.t [@@deriving sexp]
@@ -542,7 +497,6 @@ module Tick = struct
 
   module Pairing = struct
     module T = struct
-      module Impl = Tick0
       open Snarky_field_extensions.Field_extensions
       module Fq = Fq
 
@@ -603,18 +557,14 @@ module Tick = struct
           let one =
             let x, y = Snarkette_tick.G2.(to_affine_exn one) in
             {z= Fqe.Unchecked.one; x= Fqe.conv x; y= Fqe.conv y}
+
+          let random () = scale one (Tock.Field.random ())
         end
 
         include Snarky_curves.Make_weierstrass_checked
                   (Fqe)
                   (Inner_curve.Scalar)
-                  (struct
-                    include Unchecked
-
-                    let double x = x + x
-
-                    let random () = scale one (Tock.Field.random ())
-                  end)
+                  (Unchecked)
                   (Unchecked.Coefficients)
       end
 
@@ -637,39 +587,21 @@ module Tick = struct
         include F6 (Fq) (Fq2) (Fqe) (Params)
       end
 
-      module G1_precomputation =
-        Snarky_pairing.G1_precomputation.Make (Tick0) (Fqe)
-          (struct
-            let twist = Fq.Unchecked.(zero, one, zero)
-          end)
-
       module N = Snarkette_tick.N
 
       module Params = struct
         include Snarkette_tick.Pairing_info
 
-        let loop_count_is_neg = Snarkette_tick.Pairing_info.is_loop_count_neg
-      end
+        let twist = Fq.Unchecked.(zero, one, zero)
 
-      module G2_precomputation = struct
-        include Snarky_pairing.G2_precomputation.Make (Fqe) (N)
-                  (struct
-                    include Params
+        let embedding_degree = `_6
 
-                    let coeff_a =
-                      Tick0.Field.(zero, zero, G1.Unchecked.Coefficients.a)
-                  end)
-
-        let create_constant =
-          Fn.compose create_constant G2.Unchecked.to_affine_exn
+        let g2_coeff_a = G2.Unchecked.Coefficients.a
       end
     end
 
     include T
-    include Snarky_pairing.Miller_loop.Make (T)
-    module FE = Snarky_pairing.Final_exponentiation.Make (T)
-
-    let final_exponentiation = FE.final_exponentiation6
+    include Snarky_pairing.Make (T)
   end
 
   module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
@@ -680,6 +612,7 @@ module Tick = struct
 
   module Verifier = struct
     include Snarky_verifier.Bowe_gabizon.Make (struct
+      module Impl = Tick0
       include Pairing
 
       module H =
@@ -792,3 +725,43 @@ let pending_coinbase_depth =
 let target_bit_length = Tick.Field.size_in_bits - 8
 
 module type Snark_intf = Snark_intf.S
+
+let%test_unit "group-map test" =
+  let params = Crypto_params.Tock_backend.bg_params in
+  let module M = Snarky.Snark.Run.Make (Tick_backend) (Unit) in
+  Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
+      let (), checked_output =
+        M.run_and_check
+          (fun () ->
+            let x, y =
+              Snarky_group_map.Checked.to_group
+                (module M)
+                ~params (M.Field.constant t)
+            in
+            fun () -> M.As_prover.(read_var x, read_var y) )
+          ()
+        |> Or_error.ok_exn
+      in
+      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output
+        (Group_map.to_group (module Tick0.Field) ~params t) )
+
+let%test_unit "miller-loop" =
+  let open Tick in
+  let open Let_syntax in
+  let open Pairing in
+  let module M = Snarkette.Mnt6753 in
+  Test.test_equal ~sexp_of_t:Fqk.Unchecked.sexp_of_t ~equal:Fqk.Unchecked.equal
+    Typ.(G1.typ * G2.typ)
+    Fqk.typ
+    (fun (p, q) ->
+      let%bind q = G2_precomputation.create q in
+      miller_loop (G1_precomputation.create p) q >>= final_exponentiation )
+    (fun (p, q) ->
+      let open Tuple_lib in
+      let unconv x = Option.value_exn (M.Fq.of_bits (Field.unpack x)) in
+      let unconv23 = Double.map ~f:(Triple.map ~f:unconv) in
+      M.Pairing.reduced_pairing
+        (M.G1.of_affine (Double.map (Inner_curve.to_affine_exn p) ~f:unconv))
+        (M.G2.of_affine (unconv23 (G2.Unchecked.to_affine_exn q)))
+      |> Double.map ~f:(fun _ -> failwith "") )
+    (Inner_curve.random (), G2.Unchecked.random ())
