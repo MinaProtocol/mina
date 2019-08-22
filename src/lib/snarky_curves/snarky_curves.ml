@@ -36,9 +36,9 @@ module type Scalar_intf = sig
 end
 
 module type Shifted_intf = sig
-  type (_, _) checked
+  module Impl : Snarky.Snark_intf.S
 
-  type boolean_var
+  open Impl
 
   type curve_var
 
@@ -46,16 +46,16 @@ module type Shifted_intf = sig
 
   val zero : t
 
-  val add : t -> curve_var -> (t, _) checked
+  val add : t -> curve_var -> (t, _) Checked.t
 
   (* This is only safe if the result is guaranteed to not be zero. *)
 
-  val unshift_nonzero : t -> (curve_var, _) checked
+  val unshift_nonzero : t -> (curve_var, _) Checked.t
 
-  val if_ : boolean_var -> then_:t -> else_:t -> (t, _) checked
+  val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
 
   module Assert : sig
-    val equal : t -> t -> (unit, _) checked
+    val equal : t -> t -> (unit, _) Checked.t
   end
 end
 
@@ -72,10 +72,7 @@ module type Weierstrass_checked_intf = sig
 
   module Shifted : sig
     module type S =
-      Shifted_intf
-      with type ('a, 'b) checked := ('a, 'b) Checked.t
-       and type curve_var := t
-       and type boolean_var := Boolean.var
+      Shifted_intf with module Impl := Impl and type curve_var := t
 
     type 'a m = (module S with type t = 'a)
 
@@ -124,7 +121,7 @@ module Make_weierstrass_checked
 
         val of_int : int -> t
     end) (Curve : sig
-      type t
+      type t [@@deriving eq]
 
       val random : unit -> t
 
@@ -149,12 +146,18 @@ module Make_weierstrass_checked
 
   type t = F.t * F.t
 
-  let assert_on_curve (x, y) =
-    let open F in
-    let%bind x2 = square x in
-    let%bind x3 = x2 * x in
-    let%bind ax = constant Params.a * x in
-    assert_square y (x3 + ax + constant Params.b)
+  module Assert = struct
+    let on_curve (x, y) =
+      let open F in
+      let%bind x2 = square x in
+      let%bind x3 = x2 * x in
+      let%bind ax = constant Params.a * x in
+      assert_square y (x3 + ax + constant Params.b)
+
+    let equal (x1, y1) (x2, y2) =
+      let%map () = F.assert_equal x1 x2 and () = F.assert_equal y1 y2 in
+      ()
+  end
 
   let typ : (t, Curve.t) Typ.t =
     let unchecked =
@@ -162,23 +165,13 @@ module Make_weierstrass_checked
         Typ.(tuple2 F.typ F.typ)
         ~there:Curve.to_affine_exn ~back:Curve.of_affine
     in
-    {unchecked with check= assert_on_curve}
+    {unchecked with check= Assert.on_curve}
 
   let negate ((x, y) : t) : t = (x, F.negate y)
 
   let constant (t : Curve.t) : t =
     let x, y = Curve.to_affine_exn t in
     F.(constant x, constant y)
-
-  let assert_equal (x1, y1) (x2, y2) =
-    let%map () = F.assert_equal x1 x2 and () = F.assert_equal y1 y2 in
-    ()
-
-  module Assert = struct
-    let on_curve = assert_on_curve
-
-    let equal = assert_equal
-  end
 
   open Let_syntax
 
@@ -232,10 +225,7 @@ module Make_weierstrass_checked
 
   module Shifted = struct
     module type S =
-      Shifted_intf
-      with type ('a, 'b) checked := ('a, 'b) Checked.t
-       and type curve_var := t
-       and type boolean_var := Boolean.var
+      Shifted_intf with module Impl := F.Impl and type curve_var := t
 
     type 'a m = (module S with type t = 'a)
 
@@ -255,7 +245,7 @@ module Make_weierstrass_checked
       let add shifted x = add_exn shifted x
 
       module Assert = struct
-        let equal = assert_equal
+        let equal = Assert.equal
       end
     end
 
@@ -324,21 +314,17 @@ module Make_weierstrass_checked
       (c : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~(init : shifted) :
       (shifted, _) Checked.t =
     let c = Bitstring_lib.Bitstring.Lsb_first.to_list c in
-    let open Let_syntax in
-    let rec go i bs0 acc pt =
-      match bs0 with
-      | [] ->
-          return acc
-      | b :: bs ->
-          let%bind acc' =
+    let%map res, _ =
+      Checked.List.foldi c ~init:(init, t) ~f:(fun i (acc, pt) b ->
+          let%map acc' =
             with_label (sprintf "acc_%d" i)
               (let%bind add_pt = Shifted.add acc pt in
                let don't_add_pt = acc in
                Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt)
           and pt' = double pt in
-          go (i + 1) bs acc' pt'
+          (acc', pt') )
     in
-    go 0 c init t
+    res
 
   (* This 'looks up' a field element from a lookup table of size 2^2 = 4 with
    a 2 bit index.  See https://github.com/zcash/zcash/issues/2234#issuecomment-383736266 for
@@ -463,15 +449,54 @@ module Make_weierstrass_checked
     | None ->
         scale m t c ~init
 
-  let sum (type shifted) (module Shifted : Shifted.S with type t = shifted) xs
-      ~init =
-    let open Let_syntax in
-    let rec go acc = function
-      | [] ->
-          return acc
-      | t :: ts ->
-          let%bind acc' = Shifted.add acc t in
-          go acc' ts
-    in
-    go init xs
+  let sum (type shifted) (module Shifted : Shifted.S with type t = shifted) =
+    Checked.List.fold ~f:Shifted.add
+
+  let%test_module "tests" =
+    ( module struct
+      let gen =
+        Quickcheck.Generator.create (fun ~size:_ ~random:_ -> Curve.random ())
+
+      let trials = 5
+
+      let points = Array.init 4 ~f:(fun _ -> Curve.random ())
+
+      let%test_unit "lookup_point" =
+        let quad = (points.(0), points.(1), points.(2), points.(3)) in
+        let to_int (b0, b1) = Bool.to_int b0 + (2 * Bool.to_int b1) in
+        List.iter
+          (List.cartesian_product Bool.all Bool.all)
+          ~f:
+            (Test.test_equal ~equal:Curve.equal
+               Typ.(Boolean.typ * Boolean.typ)
+               typ
+               (Fn.flip lookup_point quad)
+               (fun bs -> points.(to_int bs)))
+
+      let%test_unit "lookup_single_bit" =
+        let pair = (points.(0), points.(1)) in
+        List.iter Bool.all
+          ~f:
+            (Test.test_equal ~equal:Curve.equal Boolean.typ typ
+               (fun b -> Checked.return (lookup_single_bit b pair))
+               (fun b -> points.(Bool.to_int b)))
+
+      let distinct_points =
+        Quickcheck.Generator.(
+          let open Let_syntax in
+          let%bind p = gen in
+          let%map q = filter ~f:(fun q -> not (Curve.equal q p)) gen in
+          (p, q))
+
+      let%test_unit "add_exn" =
+        Quickcheck.test ~trials distinct_points
+          ~f:
+            (Test.test_equal ~equal:Curve.equal (Typ.tuple2 typ typ) typ
+               (Tuple2.uncurry add_exn)
+               (Tuple2.uncurry Curve.( + )))
+
+      let%test_unit "double" =
+        Quickcheck.test ~trials gen
+          ~f:(Test.test_equal ~equal:Curve.equal typ typ double Curve.double)
+    end )
 end
