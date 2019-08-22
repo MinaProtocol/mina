@@ -5,5 +5,6 @@
   (libraries
     sgn_type
     snarky
+    snarky_curves
     snarkette
     core_kernel ))

@@ -15,9 +15,8 @@ module Make
       module Checked : sig
         module Shifted : sig
           module type S =
-            Snarky.Curves.Shifted_intf
-            with type ('a, 'b) checked := ('a, 'b) Checked.t
-             and type boolean_var := Boolean.var
+            Snarky_curves.Shifted_intf
+            with module Impl := Impl
              and type curve_var := var
 
           type 'a m = (module S with type t = 'a)
