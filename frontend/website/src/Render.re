@@ -80,15 +80,7 @@ module MoreFs = {
 
   [@bs.val] [@bs.module "fs"]
   external symlinkSync: (string, string) => unit = "symlinkSync";
-
-  [@bs.val] [@bs.module "fs"]
-  external existsSync: string => bool = "existsSync";
 };
-
-let makeDirectory = path =>
-  if (!MoreFs.existsSync(path)) {
-    MoreFs.mkdirSync(path, {"recursive": true, "mode": 0o755});
-  };
 
 module Router = {
   type t =
@@ -105,7 +97,7 @@ module Router = {
         }
       | File(name, createElement) => {
           let path_ = path ++ "/" ++ name;
-          makeDirectory(path_);
+          MoreFs.mkdirSync(path_, {"recursive": true, "mode": 0o755});
           writeStatic(path_ ++ "/index", createElement("index"));
           /* TODO: remove when we do the redirect from the .html -> folder */
           writeStatic(path_, createElement(name));

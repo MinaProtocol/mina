@@ -1,3 +1,11 @@
 {
-  "trailingSlash": true
+  "trailingSlash": true,
+  "cleanUrls": [
+    "/",
+    "/blog",
+    "/docs",
+    "/docs/**",
+    "/jobs",
+    "/testnet"
+  ]
 }
