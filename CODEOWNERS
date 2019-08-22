@@ -3,9 +3,9 @@
 /dockerfiles/ @jkrauska @yourbuddyconner @bkase @psteckler
 /rfcs/ @imeckler @es92 @bkase
 /scripts/ @jkrauska @yourbuddyconner @cmr @bkase @psteckler
-/scripts/test.py @nholland94 @cmr
+/scripts/test.py @nholland94 @cmr @bkase
 /Makefile @jkrauska @bkase @yourbuddyconner
-/src/config/dev.mlh @nholland94 @cmr
+/src/config/dev.mlh @nholland94 @cmr @bkase
 /src/config/testnet_postake_medium_curves.mlh @nholland94 @jkrauska @cmr
 /CODE_OF_CONDUCT.md @imeckler @cmr @o1pranay
 /CONTRIBUTING.md @imeckler @cmr @o1pranay
