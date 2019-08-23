@@ -59,9 +59,17 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   eval $(opam config env)
 
   opam update
+
+  opam switch list -s
+  # Fixme, don't create if you already have?
+
   # This is dirty, keep the OCaml project version up to date!
   opam switch create 4.07.1+statistical-memprof || true
   opam switch 4.07.1+statistical-memprof
+
+  # Test -- see if curent export is different from saved export
+  opam switch export opam.export.test
+  diff -U1 opam.export.test src/opam.export
 
   # All our ocaml packages
   opam switch -y import src/opam.export

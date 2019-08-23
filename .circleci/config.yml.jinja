@@ -180,7 +180,7 @@ jobs:
                 name: Collect PV Keys
                 command: |
                     mkdir -p package/keys
-                    mv /var/lib/coda/* package/keys/.
+                    cp /var/lib/coda/* package/keys/.
             - run:
                 name: Collect and rewrite aux binaries (kademlia + logproc)
                 command: |
