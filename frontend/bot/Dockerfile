@@ -1,5 +1,7 @@
 FROM node:12.9.0-stretch-slim
 
+WORKDIR /code
+
 COPY package.json yarn.lock ./
 
 RUN yarn && \
