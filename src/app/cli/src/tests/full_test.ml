@@ -238,11 +238,16 @@ let run_test () : unit Deferred.t =
                 ( Coda_commands.get_nonce coda (pk_of_sk sender_sk)
                 |> Participating_state.active_exn )
             in
+            let memo =
+              User_command_memo.create_from_string_exn
+                "A memo created in full-test"
+            in
             let payload : User_command.Payload.t =
-              User_command.Payload.create ~fee ~nonce
-                ~memo:User_command_memo.dummy
+              User_command.Payload.create ~fee ~nonce ~memo
                 ~body:(Payment {receiver= receiver_pk; amount})
             in
+            (* verify memo is in the payload *)
+            assert (User_command_memo.equal memo payload.common.memo) ;
             User_command.sign (Keypair.of_private_key_exn sender_sk) payload )
       in
       let assert_ok x = assert (Or_error.is_ok x) in
