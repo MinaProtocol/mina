@@ -3,15 +3,15 @@ set -eu
 
 export HOMEBREW_NO_AUTO_UPDATE=1
 
-CURRENT_PACKAGES=$(brew list)
-echo "Current: ${CURRENT_PACKAGES}"
-
 NEEDED_PACKAGES="gpatch opam cmake gmp pkg-config openssl libffi libsodium boost zlib libomp"
 echo "Needed:  ${NEEDED_PACKAGES}"
 
+CURRENT_PACKAGES=$(brew list)
+echo "Current: ${CURRENT_PACKAGES}"
+
 # Prune already installed packages from the todo list
 for p in $CURRENT_PACKAGES; do
-  NEEDED_PACKAGES=${PACKAGES//$p/}
+  NEEDED_PACKAGES=${NEEDED_PACKAGES//$p/}
 done;
 
 echo "Todo:    ${NEEDED_PACKAGES}"
