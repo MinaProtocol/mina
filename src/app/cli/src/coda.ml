@@ -321,6 +321,21 @@ let daemon logger =
                ~metadata:[("config_directory", `String conf_dir)] ;
              make_version ~wipe_dir:false
        in
+       don't_wait_for
+         (let rec loop () =
+            let stat = Gc.stat () in
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              "OCaml memory statistics"
+              ~metadata:
+                [ ("heap_size", `Int (stat.heap_words * Sys.word_size))
+                ; ("heap_chunks", `Int stat.heap_chunks)
+                ; ("max_heap_size", `Int (stat.top_heap_words * Sys.word_size))
+                ; ("live_size", `Int (stat.live_words * Sys.word_size))
+                ; ("live_blocks", `Int stat.live_blocks) ] ;
+            let%bind () = after @@ Time.Span.of_min 10. in
+            loop ()
+          in
+          loop ()) ;
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
