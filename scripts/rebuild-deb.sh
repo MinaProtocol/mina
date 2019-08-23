@@ -113,7 +113,7 @@ Description: Coda Client and Daemon
 EOF
 
 # remove proving keys
-rm -f "${BUILDDIR}/var/lib/coda/*_proving"
+rm -f "${BUILDDIR}"/var/lib/coda/*_proving
 
 # build another deb
 dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
