@@ -1,7 +1,7 @@
 ## "Tiny" The Coda Bot
 Tiny is a discord bot, designed to be run in the Coda Protocol Discord Server. 
 
-It is a *Coda Service*, meaning it is necessary to run this alongside a synced and opetational *Coda Daemon*. 
+It is a *Coda Service*, meaning it is necessary to run this alongside a synced and operational *Coda Daemon*. 
 
 ## Environment Variables
 `ECHO_PUBLICKEY`: Coda Public Key that corresponds to a installed wallet
