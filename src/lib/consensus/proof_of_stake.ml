@@ -2373,7 +2373,7 @@ module Hooks = struct
     in
     if slot_diff < 0L then Error `Too_early
     else if slot_diff >= of_int Constants.delta then
-      Error (`Too_late (sub slot_diff (of_int Consensus.Constants.delta)))
+      Error (`Too_late (sub slot_diff (of_int Constants.delta)))
     else Ok ()
 
   let received_at_valid_time (consensus_state : Consensus_state.Value.t)
