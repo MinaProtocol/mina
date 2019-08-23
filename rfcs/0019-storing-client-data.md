@@ -702,17 +702,9 @@ type query {
     paymentId: ID!
   ): TransactionStatus!
 }
-  
-input AddPaymentReceiptInput {
-  # Time that a payment gets added to another clients transaction database
-  # (stringified Unix time - number of milliseconds since January 1, 1970)
-  parentReceiptHash: String!
-
-  userCommand: UserCommand!
-}
 
 input AddUserCommandInput {
-  userCommand: UserCommand!
+  userCommand: UserCommandWithReceipt!
   parentReceiptChainHash: String
 }
 
@@ -738,10 +730,8 @@ input AddBlocksInput {
 }
 
 type mutation {
-  # Add receipts of payments that a client has missed. Return true if the receipts connect to a payment
-  addPaymentReceipt(input: AddPaymentReceiptInput!): Bool!
 
-  ... # ignoring obvious mutation commands
+  ... # ignoring obvious implemented mutation commands
   
   # Add a user commands into the archive database
   addTransactions(input: AddTransactionsInput!): addTransactionsPayload!
