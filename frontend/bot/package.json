@@ -5,6 +5,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "build": "yarn run copy-schema && bsb -make-world",
+    "build-without-copy": "bsb -make-world",
     "build-ci": "yarn build",
     "clean": "bsb -clean-world",
     "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei')",
