@@ -112,6 +112,8 @@ We can use `ledger_proof_nonce` to compute if a transaction is snarked. `ledger_
 
 We also have the `receipt_chain_hash` object and is used to prove a `user_command` has been executed in a block. It does this by forming a Merkle list of `user_command`s from some `proving_receipt` to a `resulting_receipt`. The hash essentially represents a concise footprint of the sequence of user commands that have been executed since genesis to a certain point in time. The `resulting_receipt` is typically the `receipt_chain_hash` of a user's account on the ledger of some block. More info about `receipt_chain_hash` can be found on this [RFC](rfcs/0006-receipt-chain-proving.md) and this [OCaml file](../src/lib/receipt_chain_database_lib/intf.ml).
 
+With each transaction in a block, we should be able to know it’s corresponding produced `receipt_chain_hash`. We need this to help show the clients the receipt_chain_hashes of their transactions so they can prove it any time later.
+
 Below is an OCaml API of involving `receipt_chain_hash` type:
 
 ```ocaml
@@ -224,6 +226,7 @@ Table block_to_transactions {
   time_seen_transaction date
   sender string
   receiver string [not null]
+  receipt_chain_hash string
   block_length length
     Indexes {
     state_hash [name:"block"]
@@ -576,10 +579,16 @@ type FeeTransfer {
   is_manually_added: Bool!
 }
 
+# Useful for a client to know the receiptChainHash of transaction in a block
+type UserCommandWithReceiptHash {
+  userCommand: UserCommand!
+  receiptChainHash: String!
+}
+
 # Different types of transactions in a block
 type Transactions {
   # List of user commands (payments and stake delegations) included in this block
-  userCommands: [UserCommand!]!
+  userCommands: [UserCommandWithReceiptHash!]!
 
   # List of fee transfers included in this block
   feeTransfer: [FeeTransfer!]!
@@ -748,7 +757,7 @@ type BlockUpdate {
 }
 
 type UserCommandUpdate {
-  block: UserCommand!
+  userCommand: UserCommandWithReceiptHash!
   consensusStatus: TransactionConsensusStatus!
   isSnarked: Bool!
 }
