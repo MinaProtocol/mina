@@ -25,12 +25,13 @@ Download and build the app:
 1. Clone the repo via SSH: `git clone git@github.com:CodaProtocol/coda.git`
 2. Navigate into coda/frontend/wallet
 3. Update submodules: `git submodule update --init`
-4. `yarn install` to install dependencies
-5. `yarn pull-macos-binary` to grab the latest coda.exe (macOS only for now)
+4. `yarn` to install dependencies
+5. [Install coda](https://codaprotocol.com/docs/getting-started/)
 7. `yarn build` to build app
 
 Run locally with hot reloading:
-1. `yarn dev` to start dev server
+1. `yarn dev` to start dev server with fake data
+1. `yarn dev-real` to start dev server with real coda daemon
 
 ### Common Issues
 
@@ -43,7 +44,7 @@ Run locally with hot reloading:
    up before you pulled the code. Make sure you ran `git lfs install` and then
    run `git lfs pull` to download files.
 
-### Repackaging coda.exe
+### Repackaging coda.exe [Needs work]
 
 1. cd to root of repo
 2. `make build`

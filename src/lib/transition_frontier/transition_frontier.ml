@@ -35,7 +35,7 @@ module Make (Inputs : Inputs_intf) :
   module Breadcrumb = struct
     type t =
       { validated_transition: External_transition.Validated.t
-      ; mutable staged_ledger: Staged_ledger.t sexp_opaque
+      ; staged_ledger: Staged_ledger.t sexp_opaque
       ; just_emitted_a_proof: bool }
     [@@deriving sexp, fields]
 
