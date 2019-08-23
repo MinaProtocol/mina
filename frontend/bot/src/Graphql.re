@@ -3,7 +3,10 @@
 "global.fetch = require(\"node-fetch\");";
 
 let endpoint =
-  Constants.graphqlHost ++ ":" ++ string_of_int(Constants.graphqlPort) ++ "/graphql";
+  Constants.graphqlHost
+  ++ ":"
+  ++ string_of_int(Constants.graphqlPort)
+  ++ "/graphql";
 
 [@bs.module]
 external websocketImpl: SubscriptionsTransportWS.websocketImpl =

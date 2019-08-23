@@ -15,9 +15,7 @@ let discordApiKey = getEnvOrFail("DISCORD_API_KEY");
 let graphqlPort =
   getEnv(~default=string_of_int(0xc0d), "CODA_GRAPHQL_PORT") |> int_of_string;
 
-let graphqlHost =
-  getEnv(~default="localhost", "CODA_GRAPHQL_HOST");
-
+let graphqlHost = getEnv(~default="localhost", "CODA_GRAPHQL_HOST");
 
 let listeningChannels = ["faucet"];
 let faucetApproveRole = "faucet-approvers";
