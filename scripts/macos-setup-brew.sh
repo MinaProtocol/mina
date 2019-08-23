@@ -6,7 +6,7 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 NEEDED_PACKAGES="gpatch opam cmake gmp pkg-config openssl libffi libsodium boost zlib libomp"
 echo "Needed:  ${NEEDED_PACKAGES}"
 
-CURRENT_PACKAGES=$(brew list)
+CURRENT_PACKAGES=$(brew list | xargs)
 echo "Current: ${CURRENT_PACKAGES}"
 
 # Prune already installed packages from the todo list
