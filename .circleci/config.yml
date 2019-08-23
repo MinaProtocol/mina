@@ -243,48 +243,6 @@ jobs:
                 paths: coda_pvkeys*
             - store_artifacts:
                   path: /tmp/artifacts
-    build-artifacts--testnet_postake_many_proposers_medium_curves:
-        resource_class: xlarge
-        docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
-        environment:
-            DUNE_PROFILE: testnet_postake_many_proposers_medium_curves
-        steps:
-            - checkout
-            - run:
-                  name: Artifacts
-                  command: |
-                      mkdir -p /tmp/artifacts
-                      touch /tmp/artifacts/coda_pvkeys_dummy
-            - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Download candidate stable PV keys
-                  command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
-            - run:
-                  name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
-                  no_output_timeout: 20m
-            - run:
-                  name: Build deb package with PV keys and PV key tar
-                  command: ./scripts/skip_if_only_frontend.sh make deb
-                  no_output_timeout: 20m
-            - run:
-                  name: Store genesis public/private keypairs
-                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
-            - run:
-                  name: Upload deb to repo
-                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
-                  no_output_timeout: 20m
-            - run:
-                  name: Copy artifacts to cloud
-                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
-            - persist_to_workspace:
-                root: /tmp/artifacts
-                paths: coda_pvkeys*
-            - store_artifacts:
-                  path: /tmp/artifacts
     test-unit--test_postake_snarkless_unittest:
         resource_class: large
         docker:
@@ -686,7 +644,6 @@ workflows:
                 requires:
                     - build-artifacts--testnet_postake_medium_curves
             - build-artifacts--testnet_postake_medium_curves
-            - build-artifacts--testnet_postake_many_proposers_medium_curves
             - test-unit--test_postake_snarkless_unittest
             - test-unit--dev
             - test--fake_hash
