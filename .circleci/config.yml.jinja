@@ -122,15 +122,16 @@ jobs:
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
+                    - homebrew-v6-{{'{{'}} checksum "scripts/macos-setup-brew.sh" {{'}}'}}
                     - homebrew-v5-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
                     - homebrew-v5-
             - run:
-                name: Install macos dependancies - homebrew - make macos-setup-download
+                name: Install macos dependencies - homebrew - make macos-setup-download
                 command: |
                     ./scripts/skip_if_only_frontend.sh make macos-setup-download
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v5-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
+                key: homebrew-v6-{{'{{'}} checksum "scripts/macos-setup-brew.sh" {{'}}'}}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
@@ -154,7 +155,7 @@ jobs:
                     sudo chown -R distiller /Users/distiller/.opam
                     sudo chmod -R u+w /Users/distiller/.opam
             - run:
-                name: Install macos dependancies - opam -- make macos-setup-compile
+                name: Install macos dependencies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
                 name: Save cache - opam
