@@ -14,7 +14,8 @@ let (^/) = Filename.concat;
 let codaPath = "_build/coda-daemon-macos";
 let codaCommand = (~port, ~extraArgs) => {
   {
-    Command.executable: ProjectRoot.resource ^/ codaPath ^/ "coda.exe",
+    // Assume coda is installed globally
+    Command.executable: "coda",
     args:
       Js.Array.concat(
         extraArgs,
@@ -26,18 +27,7 @@ let codaCommand = (~port, ~extraArgs) => {
           ProjectRoot.resource ^/ codaPath ^/ "config",
         |],
       ),
-    env:
-      Js.Dict.fromArray(
-        Js.Array.concat(
-          [|
-            (
-              "CODA_KADEMLIA_PATH",
-              ProjectRoot.resource ^/ codaPath ^/ "kademlia",
-            ),
-          |],
-          Js.Dict.entries(ChildProcess.Process.env),
-        ),
-      ),
+    env: ChildProcess.Process.env,
   };
 };
 
