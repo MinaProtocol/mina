@@ -101,6 +101,11 @@ jobs:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
             OPAMYES: 1
         steps:
+            - run:
+                name: Delete xcode simulators (Free 10GB - unused)
+                command: |
+                    sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
+                    df -h
             # Attach workspace from prior linux build
             - attach_workspace:
                 at: /tmp/workspace
@@ -110,7 +115,6 @@ jobs:
                     sudo mkdir -p /var/lib/coda
                     sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
                     sudo rm /tmp/workspace/coda*.bz2
-                    df -h
             - checkout
             - run:
                 name: Update git submodules
@@ -124,7 +128,6 @@ jobs:
                 name: Install macos dependancies - homebrew - make macos-setup-download
                 command: |
                     ./scripts/skip_if_only_frontend.sh make macos-setup-download
-                    df -h
             - save_cache:
                 name: Save cache - homebrew
                 key: homebrew-v5-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
@@ -144,7 +147,6 @@ jobs:
                     set +e
                     sudo chown -R distiller /Users/distiller/.opam
                     sudo chmod -R u+w /Users/distiller/.opam
-                    df -h
             - run:
                 name: Install macos dependancies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
@@ -160,7 +162,6 @@ jobs:
                     curl https://nixos.org/nix/install | sh
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     nix-env -iA cachix -f https://cachix.org/api/v1/install
-                    df -h
             - run:
                 name: Build kademlia using cachix
                 command: |
@@ -168,14 +169,12 @@ jobs:
                     cachix use codaprotocol
                     cd src/app/kademlia-haskell
                     nix-build release2.nix
-                    df -h
             - run:
                 name: Build ocaml
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                 command: |
                     bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
-                    df -h
                 no_output_timeout: 1h
             - run:
                 name: Collect PV Keys

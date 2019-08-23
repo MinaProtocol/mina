@@ -52,11 +52,11 @@ for key in $compile_keys
 do
     echo -n "Looking for keys matching: ${key} -- "
     if [ -f "/var/lib/coda/${key}_proving" ]; then
-        echo " [OK] found in stable key set"
-        cp /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
+        echo " [OK] found key in stable key set"
+        mv /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
     elif [ -f "/tmp/coda_cache_dir/${key}_proving" ]; then
-        echo " [WARN] found in compile-time set"
-        cp /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+        echo " [WARN] found key in compile-time set"
+        mv /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
     else
         echo "Key not found!"
     fi
