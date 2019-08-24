@@ -101,6 +101,11 @@ jobs:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
             OPAMYES: 1
         steps:
+            - run:
+                name: Delete xcode simulators (Free 10GB - unused)
+                command: |
+                    sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
+                    df -h
             # Attach workspace from prior linux build
             - attach_workspace:
                 at: /tmp/workspace
@@ -109,6 +114,7 @@ jobs:
                 command: |
                     sudo mkdir -p /var/lib/coda
                     sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
+                    sudo rm /tmp/workspace/coda*.bz2
             - checkout
             - run:
                 name: Update git submodules
@@ -116,36 +122,44 @@ jobs:
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
+                    - homebrew-v6-{{'{{'}} checksum "scripts/macos-setup-brew.sh" {{'}}'}}
                     - homebrew-v5-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
                     - homebrew-v5-
             - run:
-                name: Install macos dependancies - homebrew - make macos-setup-download
-                command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
+                name: Install macos dependencies - homebrew - make macos-setup-download
+                command: |
+                    ./scripts/skip_if_only_frontend.sh make macos-setup-download
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v5-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
+                key: homebrew-v6-{{'{{'}} checksum "scripts/macos-setup-brew.sh" {{'}}'}}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
 
+            - run:
+                name: Create opam cache signature file
+                command: |
+                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat src/opam.export >> opam_ci_cache.sig
             - restore_cache:
                 name: Restore cache - opam
                 keys:
+                    - opam-v6-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
                     - opam-v5-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                     - opam-v4-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                     - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
             - run:
-                name: Ensure opam permisssions
+                name: Ensure/Fix opam permisssions
                 command: |
                     set +e
                     sudo chown -R distiller /Users/distiller/.opam
                     sudo chmod -R u+w /Users/distiller/.opam
             - run:
-                name: Install macos dependancies - opam -- make macos-setup-compile
+                name: Install macos dependencies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
                 name: Save cache - opam
-                key: opam-v5-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                key: opam-v6-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
@@ -166,7 +180,8 @@ jobs:
                 name: Build ocaml
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-                command: bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                command: |
+                    bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h
             - run:
                 name: Collect PV Keys
