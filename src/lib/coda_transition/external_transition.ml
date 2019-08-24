@@ -44,11 +44,6 @@ module Make
             ; ("staged_ledger_diff", `String "<opaque>")
             ; ("delta_transition_chain_proof", `String "<opaque>") ]
 
-        (* TODO: Important for bkase to review *)
-        let compare t1 t2 =
-          Protocol_state.Value.Stable.V1.compare t1.protocol_state
-            t2.protocol_state
-
         let consensus_state {protocol_state; _} =
           Protocol_state.consensus_state protocol_state
 
@@ -71,6 +66,20 @@ module Make
             (user_commands external_transition)
             ~f:
               (Fn.compose User_command_payload.is_payment User_command.payload)
+
+        let compare =
+          Comparable.lift
+            (fun existing candidate ->
+              (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
+              if Consensus.Data.Consensus_state.Value.equal existing candidate
+              then 0
+              else if
+                `Keep
+                = Consensus.Hooks.select ~existing ~candidate
+                    ~logger:(Logger.null ())
+              then -1
+              else 1 )
+            ~f:consensus_state
       end
 
       include T
