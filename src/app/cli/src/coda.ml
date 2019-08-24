@@ -79,7 +79,7 @@ let daemon logger =
      and external_port =
        flag "external-port"
          ~doc:
-           (Printf.sprintf
+           (sprintf
               "PORT Base server port for daemon TCP (discovery UDP on port+1) \
                (default: %d)"
               Port.default_external)
@@ -87,14 +87,13 @@ let daemon logger =
      and client_port =
        flag "client-port"
          ~doc:
-           (Printf.sprintf
-              "PORT Client to daemon local communication (default: %d)"
+           (sprintf "PORT Client to daemon local communication (default: %d)"
               Port.default_client)
          (optional int16)
      and rest_server_port =
        flag "rest-port"
          ~doc:
-           (Printf.sprintf
+           (sprintf
               "PORT local REST-server for daemon interaction (default: %d)"
               Port.default_rest)
          (optional int16)
@@ -169,14 +168,6 @@ let daemon logger =
            "true|false Log transaction-pool diff received from peers \
             (default: false)"
          (optional bool)
-     and memory_profiling =
-       flag "memory-profiling" no_arg ~doc:"enable memory profiling"
-     and sampling_rate =
-       flag "sampling-rate"
-         ~doc:
-           (sprintf "FLOAT Sampling rate for memory profiling (default: %F)"
-              Memprof_helpers.default_sampling_rate)
-         (optional sampling_rate)
      and no_bans =
        let module Expiration = struct
          [%%expires_after "20190907"]
@@ -321,6 +312,21 @@ let daemon logger =
                ~metadata:[("config_directory", `String conf_dir)] ;
              make_version ~wipe_dir:false
        in
+       don't_wait_for
+         (let rec loop () =
+            let stat = Gc.stat () in
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              "OCaml memory statistics"
+              ~metadata:
+                [ ("heap_size", `Int (stat.heap_words * Sys.word_size))
+                ; ("heap_chunks", `Int stat.heap_chunks)
+                ; ("max_heap_size", `Int (stat.top_heap_words * Sys.word_size))
+                ; ("live_size", `Int (stat.live_words * Sys.word_size))
+                ; ("live_blocks", `Int stat.live_blocks) ] ;
+            let%bind () = after @@ Time.Span.of_min 10. in
+            loop ()
+          in
+          loop ()) ;
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
@@ -648,15 +654,6 @@ let daemon logger =
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
        Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
-       (* we don't check if sampling rate was given without enabling memory profiling *)
-       let sampling_rate =
-         Option.value sampling_rate
-           ~default:Memprof_helpers.default_sampling_rate
-       in
-       (* this has to be after `handle_shutdown` so that it can trap SIGUSR1 *)
-       if memory_profiling then
-         Memprof_helpers.start ~sampling_rate ~callstack_size:20
-           ~min_samples_print:100 ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind {Coda_initialization.coda; client_whitelist; rest_server_port}
