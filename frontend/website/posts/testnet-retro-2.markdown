@@ -56,34 +56,59 @@ So far, this strategy has proven correct as the new testnet release, ‘Share th
 - Plus some bug fixes (including some of the crashes and p2p layer issues)
 - This release also marks the first one where we’ve switched over from Groth-Maller to Bowe-Gabizon SNARKs!
 
-You can find more details and the changelog in the [release notes](https://github.com/CodaProtocol/coda/releases/tag/0.0.1-beta.2), and check out the docs for information on how to get started with the new release.
+You can find more details and the changelog in the [release notes](https://github.com/CodaProtocol/coda/releases/tag/0.0.1-beta.2), and check out [the docs](https://codaprotocol.com/docs/) for information on how to get started with the new release.
 
 Two things to note about the new release:
 
-- If you already have Coda installed, you’ll need to upgrade the package to make sure you’re not using the old client — see the installation section for details.
-- Your testnet tokens do not carry over from ‘Hello, Coda’ to ‘Share the Wealth’. This way we all start on an even playing field for this week’s challenges.
-Additionally, the Coda development team has switched to a git-flow workflow. TL;DR: `develop` will be the branch with active development, `master` will be stable, and release branches will contain code to be shipped. Releases will also happen weekly at 2pm PT on Tuesdays, and code-freeze is enforced Wednesday at 2pm of the previous week — as we automate more of our QA, we’ll push our code-freezes out to further days. Coda is entirely open source, and everyone is encouraged to get involved and begin contributing!
-The Community in Action
+- If you already have Coda installed, you’ll need to upgrade the package to make sure you’re not using the old client — see [the installation section](https://codaprotocol.com/docs/getting-started/#installation) for details.
+- Your testnet tokens *do not* carry over from ‘Hello, Coda’ to ‘Share the Wealth’. This way we all start on an even playing field for this week’s challenges.
+
+Additionally, the Coda development team has switched to a [git-flow workflow](https://datasift.github.io/gitflow/IntroducingGitFlow.html). TL;DR: `develop` will be the branch with active development, `master` will be stable, and release branches will contain code to be shipped. Releases will also happen weekly at 2pm PT on Tuesdays, and code-freeze is enforced Wednesday at 2pm of the previous week — as we automate more of our QA, we’ll push our code-freezes out to further days. Coda is entirely open source, and everyone is encouraged to get involved and [begin contributing](https://codaprotocol.com/docs/contributing/)!
+
+## The Community in Action
+
 In the second week after we launched the first testnet, ‘Hello, Coda’, new early-adopters, like Bj below, are still joining the testnet, and completing challenges.
+
+![](https://miro.medium.com/max/1128/0*nYPsu49QuufZHBQQ)
 
 This week, the number of users who successfully ran a Coda node and sent their first transactions, doubled to 54. It’s fun to see how the community likes to play around with the testnet. Codans, like pk, are even doing a little match-making, finding peers to exchange coda with.
 
+![](https://miro.medium.com/max/1510/0*7EwazOhgzMt8dQ2Q)
+
 Some community members have become a little attached to their testnet coda, but we’re not complaining.
 
+![](https://miro.medium.com/max/998/0*sirL_xt-y2ifS0eJ)
+
 Whatever the fee was, sadly for Bj, and other Codans that accrued coda over the last two weeks, funds will not carry over to the new release and new challenges (read on for details).
+
 Another highlight this week was seeing all the highly-technical Codans in action. Joe_land1 and whataday2day took it to the next level by setting up nodes in operating systems that aren’t officially supported yet. Currently, the documentation includes instructions for macOS and Linux. These two combined forces to get Coda running on Windows.
 
+![](https://miro.medium.com/max/1378/0*Ngk1bppucJ4DLZdI)
+
 After overcoming some struggles, they succeeded in running testnet nodes using Windows Subsystem for Linux.
-Last week, we also hosted our first Office Hours for the testnet with about 15 community members joining. If you missed it, there will be more opportunities to meet our team and to get answers to testnet questions. Click here if you want to add the Testnet [Beta] Office Hours to your calendar.
-Community MVP Winners
+
+Last week, we also hosted our [first Office Hours](https://youtu.be/HF9fLDj5oSc) for the testnet with about 15 community members joining. If you missed it, there will be more opportunities to meet our team and to get answers to testnet questions. Click [here](https://calendar.google.com/calendar/b/1?cid=bzFsYWJzLm9yZ19nZDJmdG52azYyNHFhazYxcHY3bTAybDRwMEBncm91cC5jYWxlbmRhci5nb29nbGUuY29t) if you want to add the Testnet [Beta] Office Hours to your calendar.
+
+## Community MVP Winners
+
 Each week, we reward the community leaders who are making testnet a great, collaborative experience. In the first two weeks, the community members below stood out. Please join me in congratulating the Community MVP Winners!
-Community MVP Gold (+1000 Testnet points*)
+
+**Community MVP Gold (+1000 Testnet points\*)**
+
 @ssh for the spirited participation in this wild ride of launching the testnet! Ssh used their technical knowledge to help other community members get connected to the testnet and did a lot of troubleshooting when they got stuck. Our technical team is super thankful. Thanks, ssh! (week 1 winner)
+
 @Alexander for putting very detailed video & docs together for our technical Russian community. It proved to be very helpful for members to start their validator’s journey. (week 1 winner)
+
 @pk for becoming a leader in the community with their positive and helpful attitude since the testnet [Beta] was released. @pk also documented all its steps to connect to the testnet. It is open-source, so other community members are invited to join and contribute as well! (week 2 winner)
-Community MVP Silver (+500 Testnet points*)
+
+**Community MVP Silver (+500 Testnet points\*)**
+
 @Dmitry D for jumping in when our testnet bot Tiny went asleep during the weekend. His transactions made it possible for many new validators in the community to have a positive experience and fun with the testnet as well! (week 1 winner)
+
 @turbotrainedbamboo for creating a cool visualization on which nodes he was chatting to around the world, and for sharing it with the community. If you want to take a look, the visualization was featured in our previous blog post Testnet [Beta] Retrospective Week 1 (week 1 winner)
+
 @garethdavies for his active involvement in the community since the release of testnet [Beta]. Whether it’s providing the team with feedback on the testnet, helping out other community members to set up a node or sending transactions when our testnet bot fell asleep, @garethdavies was often around! (week 2 winner)
+
 The entire team at O(1) Labs would like to express our sincere gratitude and appreciation to our growing community.
-We look forward to meeting you over on Discord and our new forum!
+
+We look forward to meeting you over on [Discord](http://bit.ly/CodaDiscord) and our new [forum](https://forums.codaprotocol.com/)!
