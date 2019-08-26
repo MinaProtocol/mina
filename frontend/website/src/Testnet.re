@@ -7,6 +7,19 @@ let extraHeaders = () =>
 module Styles = {
   open Css;
 
+  let page =
+    style([
+      selector(
+        "hr",
+        [
+          height(px(4)),
+          borderTop(px(1), `dashed, Style.Colors.marine),
+          borderLeft(`zero, solid, transparent),
+          borderBottom(px(1), `dashed, Style.Colors.marine),
+        ],
+      ),
+    ]);
+
   let header =
     style([
       display(`flex),
@@ -47,15 +60,6 @@ module Styles = {
       selector("div span:last-child", [opacity(0.5)]),
       selector("div span:nth-child(odd)", [justifySelf(`flexEnd)]),
       selector(
-        "hr",
-        [
-          height(px(4)),
-          borderTop(px(1), `dashed, Style.Colors.marine),
-          borderLeft(`zero, solid, transparent),
-          borderBottom(px(1), `dashed, Style.Colors.marine),
-        ],
-      ),
-      selector(
         "#leaderboard-loading",
         [
           textAlign(`center),
@@ -89,7 +93,7 @@ module Styles = {
       ...Style.Body.basicStyles,
     ]);
 
-  let leaderboardLink =
+  let headerLink =
     merge([
       Style.Link.basic,
       Style.H3.basic,
@@ -108,130 +112,165 @@ module Styles = {
 
   let weekHeader =
     merge([Style.H2.basic, style([padding2(~v=`rem(1.), ~h=`zero)])]);
+  
+  let dashboardHeader =
+    merge([
+      header,
+      style([
+        marginTop(rem(1.5)),
+        marginBottom(rem(2.25)),
+      ]),
+    ]);
+
+  let dashboard =
+    style([
+      width(`percent(100.)),
+      height(`rem(30.)),
+      border(`px(0), `solid, white),
+      borderRadius(px(3)),
+    ]);
 };
 
 [@react.component]
 let make = () => {
-  <div>
-    <div className=Styles.header>
-      <h1 className=Style.H1.hero> {React.string("Testnet Leaderboard")} </h1>
-      <a
-        href="https://docs.google.com/spreadsheets/d/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/edit#gid=0"
-        target="_blank"
-        className=Styles.leaderboardLink>
-        {React.string({j|View Full Leaderboard\u00A0→|j})}
-      </a>
-    </div>
-    <div className=Styles.content>
-      <div id="testnet-leaderboard" className=Styles.leaderboard>
-        <div className=Styles.headerRow>
-          <span> {React.string("Rank")} </span>
-          <span> {React.string("Username")} </span>
-          <span id="leaderboard-current-week" />
-          <span> {React.string("Total")} </span>
+  <div className=Styles.page>
+    <div>
+      <div className=Styles.header>
+        <h1 className=Style.H1.hero> {React.string("Testnet Leaderboard")} </h1>
+        <a
+          href="https://docs.google.com/spreadsheets/d/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/edit#gid=0"
+          target="_blank"
+          className=Styles.headerLink>
+          {React.string({j|View Full Leaderboard\u00A0→|j})}
+        </a>
+      </div>
+      <div className=Styles.content>
+        <div id="testnet-leaderboard" className=Styles.leaderboard>
+          <div className=Styles.headerRow>
+            <span> {React.string("Rank")} </span>
+            <span> {React.string("Username")} </span>
+            <span id="leaderboard-current-week" />
+            <span> {React.string("Total")} </span>
+          </div>
+          <hr />
+          <div id="leaderboard-loading"> {React.string("Loading...")} </div>
         </div>
-        <hr />
-        <div id="leaderboard-loading"> {React.string("Loading...")} </div>
+        <div className=Styles.copy>
+          <p>
+            <h4 className=Styles.sidebarHeader>
+              {React.string("Testnet Points")}
+            </h4>
+          </p>
+          <p>
+            {React.string(
+              "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
+            )}
+          </p>
+          <p>
+            <h4 className=Styles.sidebarHeader>
+              {React.string("Community")}
+            </h4>
+          </p>
+          <p>
+            <a className=Style.Link.basic href="/docs">
+              {React.string("Testnet Docs")}
+            </a>
+            <br />
+            <a
+              className=Style.Link.basic
+              href="https://bit.ly/CodaDiscord"
+              target="_blank">
+              {React.string("Discord")}
+            </a>
+            <br />
+            <a
+              className=Style.Link.basic
+              href="https://forums.codaprotocol.com"
+              target="_blank">
+              {React.string("Coda Forums")}
+            </a>
+          </p>
+          <p>
+            <h2 className=Styles.weekHeader> {React.string("Week 5")} </h2>
+          </p>
+          <p>
+            <h4 className=Styles.sidebarHeader>
+              {React.string("Challenge #12: 'CLI FYI'")}
+            </h4>
+          </p>
+          <p>
+            {React.string(
+              "Submit a product improvement or feature you'd like to see in the Coda command line interface (CLI). Post a new thread on the Discourse ",
+            )}
+            <a
+              className=Style.Link.basic
+              href="http://forums.codaprotocol.com"
+              target="_blank">
+              {React.string("forums")}
+            </a>
+            {React.string(
+              " in the 'Product' category and add this to the title: '[CLI Feature]'. The community can vote on it by 'hearting' the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*.",
+            )}
+          </p>
+          <p>
+            {React.string(
+              "Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement -- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts*!",
+            )}
+          </p>
+          <p>
+            <h4 className=Styles.sidebarHeader>
+              {React.string("Challenge #13: 'My two codas'")}
+            </h4>
+          </p>
+          <p>
+            {React.string(
+              "Earn 400 pts* for giving your feedback by filling out this ",
+            )}
+            <a
+              className=Style.Link.basic
+              href="http://bit.ly/CommunityRetro"
+              target="_blank">
+              {React.string("survey")}
+            </a>
+            {React.string(".")}
+          </p>
+          <p>
+            <h4 className=Styles.sidebarHeader>
+              {React.string("Challenge #14: 'Leonardo da Coda'")}
+            </h4>
+          </p>
+          <p>
+            {React.string(
+              "Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the ",
+            )}
+            <a
+              className=Style.Link.basic
+              href="https://forums.codaprotocol.com/t/community-art-contest-gifs/109"
+              target="_blank">
+              {React.string("forums")}
+            </a>
+            {React.string(
+              ". You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by 'hearting' your post, so do not forget to 'heart' your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.",
+            )}
+          </p>
+        </div>
       </div>
-      <div className=Styles.copy>
-        <p>
-          <h4 className=Styles.sidebarHeader>
-            {React.string("Testnet Points")}
-          </h4>
-        </p>
-        <p>
-          {React.string(
-             "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
-           )}
-        </p>
-        <p>
-          <h4 className=Styles.sidebarHeader>
-            {React.string("Community")}
-          </h4>
-        </p>
-        <p>
-          <a className=Style.Link.basic href="/docs">
-            {React.string("Testnet Docs")}
-          </a>
-          <br />
-          <a
-            className=Style.Link.basic
-            href="https://bit.ly/CodaDiscord"
-            target="_blank">
-            {React.string("Discord")}
-          </a>
-          <br />
-          <a
-            className=Style.Link.basic
-            href="https://forums.codaprotocol.com"
-            target="_blank">
-            {React.string("Coda Forums")}
-          </a>
-        </p>
-        <p>
-          <h2 className=Styles.weekHeader> {React.string("Week 5")} </h2>
-        </p>
-        <p>
-          <h4 className=Styles.sidebarHeader>
-            {React.string("Challenge #12: 'CLI FYI'")}
-          </h4>
-        </p>
-        <p>
-          {React.string(
-             "Submit a product improvement or feature you'd like to see in the Coda command line interface (CLI). Post a new thread on the Discourse ",
-           )}
-          <a
-            className=Style.Link.basic
-            href="http://forums.codaprotocol.com"
-            target="_blank">
-            {React.string("forums")}
-          </a>
-          {React.string(
-             " in the 'Product' category and add this to the title: '[CLI Feature]'. The community can vote on it by 'hearting' the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*.",
-           )}
-        </p>
-        <p>
-          {React.string(
-             "Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement -- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts*!",
-           )}
-        </p>
-        <p>
-          <h4 className=Styles.sidebarHeader>
-            {React.string("Challenge #13: 'My two codas'")}
-          </h4>
-        </p>
-        <p>
-          {React.string(
-             "Earn 400 pts* for giving your feedback by filling out this ",
-           )}
-          <a
-            className=Style.Link.basic
-            href="http://bit.ly/CommunityRetro"
-            target="_blank">
-            {React.string("survey")}
-          </a>
-          {React.string(".")}
-        </p>
-        <p>
-          <h4 className=Styles.sidebarHeader>
-            {React.string("Challenge #14: 'Leonardo da Coda'")}
-          </h4>
-        </p>
-        <p>
-          {React.string(
-             "Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the ",
-           )}
-          <a
-            className=Style.Link.basic
-            href="https://forums.codaprotocol.com/t/community-art-contest-gifs/109"
-            target="_blank">
-            {React.string("forums")}
-          </a>
-          {React.string(
-             ". You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by 'hearting' your post, so do not forget to 'heart' your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.",
-           )}
-        </p>
+    </div>
+    <hr/>
+    <div>
+      <div className=Styles.dashboardHeader>
+        <h1 className=Style.H1.hero> {React.string("Network Dashboard")} </h1>
+        <a
+          href="https://o1testnet.grafana.net/d/mO5fAWHWk/testnet-stats?orgId=1"
+          target="_blank"
+          className=Styles.headerLink>
+          {React.string({j|View Full Dashboard\u00A0→|j})}
+        </a>
       </div>
+      <iframe
+        src="https://o1testnet.grafana.net/d-solo/mO5fAWHWk/testnet-stats?orgId=1&from=1566752668214&to=1566839068215&panelId=4"
+        className=Styles.dashboard>
+      </iframe>
     </div>
   </div>;
 };
