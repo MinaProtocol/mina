@@ -687,16 +687,25 @@ let snark_pool_list =
   let open Command.Param in
   Command.async ~summary:"List of snark works in the snark pool in JSON format"
     (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
+         let to_json (work_ids : int list) fee prover : Yojson.Safe.json =
+           `Assoc
+             [ ("work_ids", `List (List.map work_ids ~f:(fun i -> `Int i)))
+             ; ("fee", `Int (Unsigned.UInt64.to_int fee))
+             ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
+             ]
+         in
          Deferred.map
            (Graphql_client.query (Graphql_client.Snark_pool.make ()) port)
            ~f:(fun response ->
-             Array.iter
-               ~f:(fun w ->
-                 printf "Work_ids: %s\n  Prover: %s\n  Fee: %s\n"
-                   (Array.to_list w#work_ids |> List.to_string ~f:Int.to_string)
-                   (Public_key.Compressed.to_base58_check w#prover)
-                   (Unsigned.UInt64.to_string w#fee) )
-               response#snarkPool ) ))
+             let lst =
+               `List
+                 (Array.to_list
+                    (Array.map
+                       ~f:(fun w ->
+                         to_json (Array.to_list w#work_ids) w#fee w#prover )
+                       response#snarkPool))
+             in
+             print_string (Yojson.Safe.to_string lst) ) ))
 
 let start_tracing =
   let open Deferred.Let_syntax in
