@@ -70,9 +70,6 @@ let txn_nonce =
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
 
-let sampling_rate =
-  Command.Arg_type.map Command.Param.string ~f:Float.of_string
-
 type work_selection_method = Sequence | Random [@@deriving bin_io]
 
 let work_selection_method_val = function

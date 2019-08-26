@@ -67,6 +67,5 @@ echo "------------------------------------------------------------"
 echo "Unapacking keys"
 sudo mkdir -p /var/lib/coda
 cd /var/lib/coda
-#sudo tar --strip-components=2 -xvf /tmp/$TARBALL
 sudo tar -xvf /tmp/$TARBALL
 rm /tmp/$TARBALL
