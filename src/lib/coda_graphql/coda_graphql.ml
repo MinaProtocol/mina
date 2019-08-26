@@ -1480,7 +1480,7 @@ module Queries = struct
       ~typ:(non_null @@ list @@ non_null Types.completed_work)
       ~resolve:(fun {ctx= coda; _} () ->
         Coda_lib.snark_pool coda |> Network_pool.Snark_pool.resource_pool
-        |> Network_pool.Snark_pool.Resource_pool.completed_work )
+        |> Network_pool.Snark_pool.Resource_pool.all_completed_work )
 
   let commands =
     [ sync_state

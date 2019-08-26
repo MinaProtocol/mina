@@ -1518,17 +1518,6 @@ let%test_module "test" =
 
               include T
               include Hashable.Make_binable (T)
-
-              let compact_json : t -> Yojson.Safe.json =
-               fun t ->
-                `List
-                  (List.map
-                     ~f:(fun s ->
-                       `Int (Transaction_snark.Statement.Stable.V1.hash s) )
-                     t)
-
-              let work_ids t =
-                List.map t ~f:Transaction_snark.Statement.Stable.V1.hash
             end
 
             module Latest = V1
@@ -1541,6 +1530,15 @@ let%test_module "test" =
           let gen =
             Quickcheck.Generator.list_with_length proofs_length
               Transaction_snark.Statement.gen
+
+          let compact_json : t -> Yojson.Safe.json =
+           fun t ->
+            `List
+              (List.map
+                 ~f:(fun s -> `Int (Transaction_snark.Statement.hash s))
+                 t)
+
+          let work_ids t = List.map t ~f:Transaction_snark.Statement.hash
         end
 
         module Info = struct

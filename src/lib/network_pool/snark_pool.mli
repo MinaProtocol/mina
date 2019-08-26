@@ -87,50 +87,13 @@ module type Transition_frontier_intf = sig
     t -> (int * int Extensions.Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
 end
 
-module Make
-    (Ledger_proof : Coda_intf.Ledger_proof_intf)
-    ((*sig
-  type t [@@deriving bin_io, sexp, yojson, version]
-end)*)
-      Transaction_snark_work : Coda_intf.Transaction_snark_work_intf
-                               with type ledger_proof := Ledger_proof.t)
-    ((*: sig
-  type t =
-    { fee: Currency.Fee.t
-    ; proofs: Ledger_proof.t list
-    ; prover: Public_key.Compressed.t }
-
-  module Statement : sig
-    type t = Transaction_snark.Statement.t list [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, yojson, version]
-
-          include Hashable.S_binable with type t := t
-
-          val compact_json : t -> Yojson.Safe.json
-        end
-      end
-      with type V1.t = t
-
-    include Hashable.S with type t := t
-  end
-
-  module Checked :
-    sig
-      type unchecked
-
-      type t
-
-      val create_unsafe : unchecked -> t
-    end
-    with type unchecked := t
-end)*)
-      Transition_frontier : Transition_frontier_intf
-                            with type work :=
-                                        Transaction_snark_work.Statement.t) :
+module Make (Ledger_proof : sig
+  type t [@@deriving bin_io, sexp, to_yojson, version]
+end)
+(Transaction_snark_work : Coda_intf.Transaction_snark_work_intf
+                          with type ledger_proof := Ledger_proof.t)
+(Transition_frontier : Transition_frontier_intf
+                       with type work := Transaction_snark_work.Statement.t) :
   S
   with type transaction_snark_statement := Transaction_snark.Statement.t
    and type transaction_snark_work_statement :=

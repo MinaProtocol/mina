@@ -1315,7 +1315,7 @@
         {
           "kind": "OBJECT",
           "name": "CompletedWork",
-          "description": "Snark works purchased",
+          "description": "Completed snark works",
           "fields": [
             {
               "name": "prover",

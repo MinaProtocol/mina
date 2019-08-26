@@ -87,49 +87,13 @@ module type Transition_frontier_intf = sig
     t -> (int * int Extensions.Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
 end
 
-module Make
-    (Ledger_proof : Coda_intf.Ledger_proof_intf
-      (*sig
-  type t [@@deriving bin_io, sexp, yojson, version]
-end*))
-    (Transaction_snark_work : Coda_intf.Transaction_snark_work_intf
-                              with type ledger_proof := Ledger_proof.t
-      (*: sig
-  type t =
-    { fee: Currency.Fee.t
-    ; proofs: Ledger_proof.t list
-    ; prover: Public_key.Compressed.t }
-
-  module Statement : sig
-    type t = Transaction_snark.Statement.t list [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, yojson, version]
-
-          include Hashable.S_binable with type t := t
-
-          val compact_json : t -> Yojson.Safe.json
-        end
-      end
-      with type V1.t = t
-
-    include Hashable.S with type t := t
-  end
-
-  module Checked :
-    sig
-      type unchecked
-
-      type t
-
-      val create_unsafe : unchecked -> t
-    end
-    with type unchecked := t
-end*))
-    (Transition_frontier : Transition_frontier_intf
-                           with type work := Transaction_snark_work.Statement.t) :
+module Make (Ledger_proof : sig
+  type t [@@deriving bin_io, sexp, to_yojson, version]
+end)
+(Transaction_snark_work : Coda_intf.Transaction_snark_work_intf
+                          with type ledger_proof := Ledger_proof.t)
+(Transition_frontier : Transition_frontier_intf
+                       with type work := Transaction_snark_work.Statement.t) :
   S
   with type transaction_snark_statement := Transaction_snark.Statement.t
    and type transaction_snark_work_statement :=
@@ -146,8 +110,7 @@ struct
       (* TODO : Version this type *)
       type t =
         { snark_table:
-            Ledger_proof.Stable.V1.t list Priced_proof.Stable.V1.t
-            Statement_table.t
+            Ledger_proof.t list Priced_proof.Stable.V1.t Statement_table.t
         ; mutable ref_table: int Statement_table.t option }
       [@@deriving sexp, bin_io]
 
@@ -167,7 +130,7 @@ struct
           (Statement_table.fold ~init:[] t.snark_table
              ~f:(fun ~key ~data:{proof= _; fee= {fee; prover}} acc ->
                let work_ids =
-                 Transaction_snark_work.Statement.Stable.V1.compact_json key
+                 Transaction_snark_work.Statement.compact_json key
                in
                `Assoc
                  [ ("work_ids", work_ids)
@@ -177,13 +140,10 @@ struct
                        prover ) ]
                :: acc ))
 
-      let completed_work (t : t) : Transaction_snark_work.Info.t list =
+      let all_completed_work (t : t) : Transaction_snark_work.Info.t list =
         Statement_table.fold ~init:[] t.snark_table
           ~f:(fun ~key ~data:{proof= _; fee= {fee; prover}} acc ->
-            let work_ids =
-              Transaction_snark_work.Statement.Stable.V1.work_ids key
-            in
-            (*let key = key :> Transaction_snark_work.Statement.t in*)
+            let work_ids = Transaction_snark_work.Statement.work_ids key in
             {Transaction_snark_work.Info.statements= key; work_ids; fee; prover}
             :: acc )
 
@@ -311,7 +271,8 @@ struct
          ~sender:Envelope.Sender.Local)
 end
 
-include Make (Ledger_proof) (Transaction_snark_work) (Transition_frontier)
+include Make (Ledger_proof.Stable.V1) (Transaction_snark_work)
+          (Transition_frontier)
 
 let%test_module "random set test" =
   ( module struct
