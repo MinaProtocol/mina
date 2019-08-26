@@ -36,6 +36,8 @@ module Styles = {
       display(`flex),
       flexDirection(`columnReverse),
       justifyContent(`center),
+      width(`percent(100.)),
+      marginBottom(`rem(1.)),
       media(Style.MediaQuery.somewhatLarge, [flexDirection(`row)]),
     ]);
 
@@ -129,12 +131,101 @@ module Styles = {
       border(`px(0), `solid, white),
       borderRadius(px(3)),
     ]);
+
+  let expandButton = 
+    merge([
+      Style.Link.basic,
+      style([
+        backgroundColor(Style.Colors.hyperlink),
+        color(white),
+        marginLeft(`auto),
+        marginRight(`auto),
+        marginBottom(`rem(1.)),
+        width(`rem(10.)),
+        height(`rem(2.5)),
+        display(`block),
+        cursor(`pointer),
+        borderRadius(`px(4)),
+        padding2(~v=`rem(0.25), ~h=`rem(3.)),
+        fontWeight(`semiBold),
+        lineHeight(`rem(2.5)),
+      ]),
+    ]);
+  
+  let gradientSection =
+    style([
+      position(`relative),
+      height(`rem(45.)),
+      overflow(`hidden),
+      display(`flex),
+      flexWrap(`wrap),
+      marginLeft(`auto),
+      marginRight(`auto),
+      justifyContent(`center),
+      after([
+        contentRule(""),
+        position(`absolute),
+        bottom(`px(-1)),
+        left(`zero),
+        height(`rem(8.)),
+        width(`percent(100.)),
+        pointerEvents(`none),
+        backgroundImage(
+          `linearGradient((
+            `deg(0),
+            [
+              (0, Style.Colors.white),
+              (100, Style.Colors.whiteAlpha(0.)),
+            ],
+          )),
+        ),
+      ]),
+    ]);
+};
+
+module Section = {
+  [@react.component]
+  let make = (~name, ~children) => {
+    let checkboxName = name ++ "-checkbox";
+    let labelName = name ++ "-label";
+    <div className=Css.(style([display(`flex), flexDirection(`column)]))>
+      <input
+        type_="checkbox"
+        id=checkboxName
+        className=Css.(
+          style([
+            display(`none),
+            selector(
+              ":checked + div",
+              [height(`auto), after([display(`none)])],
+            ),
+            selector(":checked ~ #" ++ labelName, [display(`none)]),
+          ])
+        )
+      />
+      <div className=Styles.gradientSection>
+        children
+      </div>
+      <label
+        id=labelName
+        className=Styles.expandButton
+        htmlFor=checkboxName>
+        {React.string("Expand " ++ name ++ {js| ↓|js})}
+      </label>
+      <RunScript>
+        {Printf.sprintf(
+           {|document.getElementById("%s").checked = false;|},
+           checkboxName,
+         )}
+      </RunScript>
+    </div>;
+  };
 };
 
 [@react.component]
 let make = () => {
   <div className=Styles.page>
-    <div>
+    <Section name="Leaderboard">
       <div className=Styles.header>
         <h1 className=Style.H1.hero> {React.string("Testnet Leaderboard")} </h1>
         <a
@@ -255,7 +346,7 @@ let make = () => {
           </p>
         </div>
       </div>
-    </div>
+    </Section>
     <hr/>
     <div>
       <div className=Styles.dashboardHeader>
