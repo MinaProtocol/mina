@@ -3,6 +3,7 @@ open Async_kernel
 open Pipe_lib
 open Coda_base
 open Coda_incremental
+open Signature_lib
 
 (** An extension to the transition frontier that provides a view onto the data
     other components can use. These are exposed through the broadcast pipes
@@ -137,6 +138,27 @@ module type Transition_frontier_diff_intf = sig
     end
   end
 
+  module Archive_diff : sig
+    type diff =
+      | Breadcrumb_added of
+          { block: external_transition_validated
+          ; senders_previous_receipt_chains:
+              Receipt.Chain_hash.t Public_key.Compressed.Map.t }
+      | Root_transitioned of
+          { new_root: State_hash.t
+          ; garbage: State_hash.t list }
+
+    type view = diff option
+
+    val of_transition_frontier_diff : t -> view
+
+    include
+      Transition_frontier_extension_intf
+      with type transition_frontier_diff := t
+       and type view := view
+       and type input = unit
+  end
+
   module Best_tip_diff : sig
     type view =
       { new_user_commands: User_command.t list
@@ -242,6 +264,7 @@ module type Transition_frontier_extensions_intf = sig
     ; best_tip_diff: Diff.Best_tip_diff.t
     ; root_diff: Diff.Root_diff.t
     ; persistence_diff: Diff.Persistence_diff.t
+    ; archive_diff: Diff.Archive_diff.t
     ; new_transition: external_transition_validated New_transition.Var.t }
   [@@deriving fields]
 
@@ -249,13 +272,15 @@ module type Transition_frontier_extensions_intf = sig
     { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
     ; best_tip_diff: Diff.Best_tip_diff.view Broadcast_pipe.Writer.t
     ; root_diff: Diff.Root_diff.view Broadcast_pipe.Writer.t
-    ; persistence_diff: Diff.Persistence_diff.view Broadcast_pipe.Writer.t }
+    ; persistence_diff: Diff.Persistence_diff.view Broadcast_pipe.Writer.t
+    ; archive_diff: Diff.Archive_diff.view Broadcast_pipe.Writer.t }
 
   type readers =
     { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
     ; best_tip_diff: Diff.Best_tip_diff.view Broadcast_pipe.Reader.t
     ; root_diff: Diff.Root_diff.view Broadcast_pipe.Reader.t
-    ; persistence_diff: Diff.Persistence_diff.view Broadcast_pipe.Reader.t }
+    ; persistence_diff: Diff.Persistence_diff.view Broadcast_pipe.Reader.t
+    ; archive_diff: Diff.Archive_diff.view Broadcast_pipe.Reader.t }
   [@@deriving fields]
 
   val create : breadcrumb -> t
@@ -317,7 +342,7 @@ module type Transition_frontier_breadcrumb_intf = sig
 
   val parent_hash : t -> State_hash.t
 
-  val proposer : t -> Signature_lib.Public_key.Compressed.t
+  val proposer : t -> Public_key.Compressed.t
 
   val user_commands : t -> User_command.t list
 

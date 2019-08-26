@@ -19,3 +19,4 @@ module Receipt_chain_hash = struct
 end
 
 include Database.Make (Payment) (Receipt_chain_hash) (Key_value_store)
+include Verifier.Make (Payment) (Receipt_chain_hash)

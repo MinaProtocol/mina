@@ -1,0 +1,9 @@
+(library
+ (name archive_process)
+ (public_name archive_process)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core coda_base coda_transition with_hash merkle_list_prover merkle_list_verifier transition_frontier)
+ (preprocess
+  (pps ppx_jane ppx_coda ppx_deriving_yojson))
+ )

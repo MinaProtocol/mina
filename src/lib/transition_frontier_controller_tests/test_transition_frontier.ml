@@ -157,8 +157,8 @@ let%test_module "Root_history and Transition_frontier" =
           let%bind frontier = create_root_frontier ~logger in
           let%bind () =
             add_linear_breadcrumbs ~logger ~trust_system ~size:max_length
-              ~accounts_with_secret_keys ~frontier
-              ~parent:(Transition_frontier.root frontier)
+              ~accounts_with_secret_keys ~frontier ~gen_payments
+              (Transition_frontier.root frontier)
           in
           let root = Transition_frontier.root frontier in
           let add_child =

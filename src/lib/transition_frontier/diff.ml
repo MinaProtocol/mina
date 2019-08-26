@@ -1,5 +1,6 @@
 open Core_kernel
 open Coda_base
+open Signature_lib
 
 module Make (Inputs : sig
   include Inputs.Inputs_intf
@@ -306,6 +307,73 @@ end) :
       type with_value =
         | With_value : 'output diff_mutant * 'output -> with_value
     end
+  end
+
+  (* TODO: Make diff oblidge to the standard of extensions when #2664 gets merged  *)
+  module Archive_diff = struct
+    type t = unit
+
+    type input = unit
+
+    type diff =
+      | Breadcrumb_added of
+          { block: External_transition.Validated.t
+          ; senders_previous_receipt_chains:
+              Receipt.Chain_hash.t Public_key.Compressed.Map.t }
+      | Root_transitioned of
+          { new_root: State_hash.t
+          ; garbage: State_hash.t list }
+
+    type view = diff option
+
+    let create () = ()
+
+    let initial_view () = None
+
+    let of_transition_frontier_diff = function
+      | New_breadcrumb {previous; added} ->
+          let previous_ledger =
+            Staged_ledger.ledger @@ Breadcrumb.staged_ledger previous
+          in
+          let user_commands_in_staged_ledger =
+            Breadcrumb.user_commands added
+          in
+          let senders =
+            Public_key.Compressed.Set.of_list
+            @@ List.map user_commands_in_staged_ledger ~f:User_command.sender
+          in
+          let senders_previous_receipt_chains =
+            Set.fold senders ~init:Public_key.Compressed.Map.empty
+              ~f:(fun map sender ->
+                Option.value_exn
+                  (let open Option.Let_syntax in
+                  let%bind account_location =
+                    Ledger.location_of_key previous_ledger sender
+                  in
+                  let%map account =
+                    Ledger.get previous_ledger account_location
+                  in
+                  Map.set map ~key:sender ~data:account.receipt_chain_hash) )
+          in
+          Some
+            (Breadcrumb_added
+               { senders_previous_receipt_chains
+               ; block= Breadcrumb.validated_transition added })
+      | New_frontier _ ->
+          None
+      | New_best_tip {new_root; garbage; _} ->
+          let root_transitioned_diff =
+            Root_transitioned
+              { new_root= Breadcrumb.state_hash new_root
+              ; garbage= List.map ~f:Breadcrumb.state_hash garbage }
+          in
+          Some root_transitioned_diff
+
+    let handle_diff () diff : view Option.t =
+      Option.value_map
+        (of_transition_frontier_diff diff)
+        ~default:None
+        ~f:(Fn.compose Option.some Option.some)
   end
 
   module Best_tip_diff = struct

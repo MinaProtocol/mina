@@ -173,6 +173,7 @@ end) :
     ; best_tip_diff: Diff.Best_tip_diff.t
     ; root_diff: Diff.Root_diff.t
     ; persistence_diff: Diff.Persistence_diff.t
+    ; archive_diff: Diff.Archive_diff.t
     ; new_transition: External_transition.Validated.t New_transition.Var.t }
   [@@deriving fields]
 
@@ -188,19 +189,22 @@ end) :
     ; best_tip_diff= Diff.Best_tip_diff.create ()
     ; root_diff= Diff.Root_diff.create ()
     ; persistence_diff= Diff.Persistence_diff.create ()
+    ; archive_diff= Diff.Archive_diff.create ()
     ; new_transition }
 
   type writers =
     { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
     ; best_tip_diff: Diff.Best_tip_diff.view Broadcast_pipe.Writer.t
     ; root_diff: Diff.Root_diff.view Broadcast_pipe.Writer.t
-    ; persistence_diff: Diff.Persistence_diff.view Broadcast_pipe.Writer.t }
+    ; persistence_diff: Diff.Persistence_diff.view Broadcast_pipe.Writer.t
+    ; archive_diff: Diff.Archive_diff.view Broadcast_pipe.Writer.t }
 
   type readers =
     { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
     ; best_tip_diff: Diff.Best_tip_diff.view Broadcast_pipe.Reader.t
     ; root_diff: Diff.Root_diff.view Broadcast_pipe.Reader.t
-    ; persistence_diff: Diff.Persistence_diff.view Broadcast_pipe.Reader.t }
+    ; persistence_diff: Diff.Persistence_diff.view Broadcast_pipe.Reader.t
+    ; archive_diff: Diff.Archive_diff.view Broadcast_pipe.Reader.t }
   [@@deriving fields]
 
   let make_pipes () : readers * writers =
@@ -212,22 +216,28 @@ end) :
       Broadcast_pipe.create (Diff.Root_diff.initial_view ())
     and persistence_diff_reader, persistence_diff_writer =
       Broadcast_pipe.create (Diff.Persistence_diff.initial_view ())
+    and archive_diff_reader, archive_diff_writer =
+      Broadcast_pipe.create (Diff.Archive_diff.initial_view ())
     in
     ( { snark_pool= snark_reader
       ; best_tip_diff= best_tip_reader
       ; root_diff= root_diff_reader
-      ; persistence_diff= persistence_diff_reader }
+      ; persistence_diff= persistence_diff_reader
+      ; archive_diff= archive_diff_reader }
     , { snark_pool= snark_writer
       ; best_tip_diff= best_tip_writer
       ; root_diff= root_diff_writer
-      ; persistence_diff= persistence_diff_writer } )
+      ; persistence_diff= persistence_diff_writer
+      ; archive_diff= archive_diff_writer } )
 
   let close_pipes
-      ({snark_pool; best_tip_diff; root_diff; persistence_diff} : writers) =
+      ({snark_pool; best_tip_diff; root_diff; persistence_diff; archive_diff} :
+        writers) =
     Broadcast_pipe.Writer.close snark_pool ;
     Broadcast_pipe.Writer.close best_tip_diff ;
     Broadcast_pipe.Writer.close root_diff ;
-    Broadcast_pipe.Writer.close persistence_diff
+    Broadcast_pipe.Writer.close persistence_diff ;
+    Broadcast_pipe.Writer.close archive_diff
 
   let mb_write_to_pipe diff ext_t handle pipe =
     Option.value ~default:Deferred.unit
@@ -256,6 +266,7 @@ end) :
         ~root_diff:(use Diff.Root_diff.handle_diff pipes.root_diff)
         ~persistence_diff:
           (use Diff.Persistence_diff.handle_diff pipes.persistence_diff)
+        ~archive_diff:(use Diff.Archive_diff.handle_diff pipes.archive_diff)
         ~new_transition:(fun acc _ -> acc)
     in
     let bc_opt =

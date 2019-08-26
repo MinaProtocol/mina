@@ -45,10 +45,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
         build_frontier_randomly
           ~gen_root_breadcrumb_builder:(fun root_breadcrumb ->
             Quickcheck.Generator.with_size ~size:num_breadcrumbs
-            @@ Quickcheck_lib.gen_imperative_ktree
+              (Quickcheck_lib.gen_imperative_ktree
                  (root_breadcrumb |> return |> Quickcheck.Generator.return)
                  (gen_breadcrumb ~logger ~trust_system
-                    ~accounts_with_secret_keys) )
+                    accounts_with_secret_keys)) )
           frontier
       in
       frontier

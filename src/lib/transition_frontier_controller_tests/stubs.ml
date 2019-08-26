@@ -89,6 +89,29 @@ struct
     module Transaction_witness = Transaction_witness
   end)
 
+  let create_payment ~staged_ledger ((sender_account : Account.t), sender_sk)
+      receiver_pk send_amount =
+    let open Option.Let_syntax in
+    let sender_keypair = Keypair.of_private_key_exn sender_sk in
+    let nonce =
+      let ledger = Staged_ledger.ledger staged_ledger in
+      let account_location =
+        Option.value_exn
+          (Ledger.location_of_key ledger sender_account.public_key)
+      in
+      (Option.value_exn (Ledger.get ledger account_location)).nonce
+    in
+    let sender_account_amount =
+      sender_account.Account.Poly.balance |> Currency.Balance.to_amount
+    in
+    let%map _ = Currency.Amount.sub sender_account_amount send_amount in
+    let payload : User_command.Payload.t =
+      User_command.Payload.create ~fee:Fee.zero ~nonce
+        ~memo:User_command_memo.dummy
+        ~body:(Payment {receiver= receiver_pk; amount= send_amount})
+    in
+    User_command.sign sender_keypair payload
+
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
      user if they at least one coin*)
@@ -102,28 +125,10 @@ struct
       ~f:(fun (sender_sk, sender_account) ->
         let open Option.Let_syntax in
         let%bind sender_sk = sender_sk in
-        let sender_keypair = Keypair.of_private_key_exn sender_sk in
         let%bind receiver_pk = List.random_element public_keys in
-        let nonce =
-          let ledger = Staged_ledger.ledger staged_ledger in
-          let status, account_location =
-            Ledger.get_or_create_account_exn ledger sender_account.public_key
-              sender_account
-          in
-          assert (status = `Existed) ;
-          (Option.value_exn (Ledger.get ledger account_location)).nonce
-        in
-        let send_amount = Currency.Amount.of_int 1 in
-        let sender_account_amount =
-          sender_account.Account.Poly.balance |> Currency.Balance.to_amount
-        in
-        let%map _ = Currency.Amount.sub sender_account_amount send_amount in
-        let payload : User_command.Payload.t =
-          User_command.Payload.create ~fee:Fee.zero ~nonce
-            ~memo:User_command_memo.dummy
-            ~body:(Payment {receiver= receiver_pk; amount= send_amount})
-        in
-        User_command.sign sender_keypair payload )
+        create_payment ~staged_ledger
+          (sender_account, sender_sk)
+          receiver_pk (Amount.of_int 1) )
 
   module Transition_frontier_inputs = struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
@@ -148,7 +153,8 @@ struct
   module Transition_frontier =
     Transition_frontier.Make (Transition_frontier_inputs)
 
-  let gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys :
+  let gen_breadcrumb ?(gen_payments = gen_payments) ~logger ~trust_system
+      accounts_with_secret_keys :
       (   Transition_frontier.Breadcrumb.t Deferred.t
        -> Transition_frontier.Breadcrumb.t Deferred.t)
       Quickcheck.Generator.t =
@@ -392,17 +398,18 @@ struct
         let%bind breadcrumb = deferred_breadcrumb in
         Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
 
-  let gen_linear_breadcrumbs ~logger ~trust_system ~size
+  let gen_linear_breadcrumbs ?gen_payments ~logger ~trust_system ~size
       ~accounts_with_secret_keys root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_list
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
+         (gen_breadcrumb ?gen_payments ~logger ~trust_system
+            accounts_with_secret_keys)
 
-  let add_linear_breadcrumbs ~logger ~trust_system ~size
-      ~accounts_with_secret_keys ~frontier ~parent =
+  let add_linear_breadcrumbs ?gen_payments ~logger ~trust_system ~size
+      ~frontier ~accounts_with_secret_keys parent =
     let new_breadcrumbs =
-      gen_linear_breadcrumbs ~logger ~trust_system ~size
+      gen_linear_breadcrumbs ?gen_payments ~logger ~trust_system ~size
         ~accounts_with_secret_keys parent
       |> Quickcheck.random_value
     in
@@ -413,8 +420,8 @@ struct
   let add_child ~logger ~trust_system ~accounts_with_secret_keys ~frontier
       ~parent =
     let%bind new_node =
-      ( gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys
-      |> Quickcheck.random_value )
+      Quickcheck.random_value
+        (gen_breadcrumb ~logger ~trust_system accounts_with_secret_keys)
       @@ Deferred.return parent
     in
     let%map () = Transition_frontier.add_breadcrumb_exn frontier new_node in
@@ -425,14 +432,14 @@ struct
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_rose_tree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~trust_system accounts_with_secret_keys)
 
   let gen_tree_list ~logger ~trust_system ~size ~accounts_with_secret_keys
       root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_ktree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~trust_system accounts_with_secret_keys)
 
   module Best_tip_prover = Best_tip_prover.Make (struct
     include Transition_frontier_inputs

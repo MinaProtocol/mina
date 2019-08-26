@@ -69,10 +69,11 @@ let%test_module "Transition Frontier Persistence" =
                raise exn )
 
     let generate_breadcrumbs ~gen_root_breadcrumb_builder frontier size =
-      gen_root_breadcrumb_builder ~logger ~trust_system ~size
-        ~accounts_with_secret_keys:Genesis_ledger.accounts
-        (Transition_frontier.root frontier)
-      |> Quickcheck.random_value |> Deferred.all
+      Quickcheck.random_value
+        (gen_root_breadcrumb_builder ~logger ~trust_system ~size
+           Genesis_ledger.accounts
+           (Transition_frontier.root frontier))
+      |> Deferred.all
 
     let test_breadcrumbs ~gen_root_breadcrumb_builder num_breadcrumbs =
       Thread_safe.block_on_async_exn
@@ -96,7 +97,17 @@ let%test_module "Transition Frontier Persistence" =
           return @@ check_transitions transition_storage breadcrumbs )
 
     let test_linear_breadcrumbs =
-      test_breadcrumbs ~gen_root_breadcrumb_builder:gen_linear_breadcrumbs
+      test_breadcrumbs
+        ~gen_root_breadcrumb_builder:(fun ~logger
+                                     ~trust_system
+                                     ~size
+                                     accounts_with_secret_keys
+                                     ->
+          gen_linear_breadcrumbs ~logger ~trust_system ~size
+            ~accounts_with_secret_keys ~gen_payments )
+
+    let gen_tree_list ~logger ~trust_system ~size accounts_with_secret_keys =
+      gen_tree_list ~logger ~trust_system ~size ~accounts_with_secret_keys
 
     let test_tree_breadcrumbs =
       test_breadcrumbs ~gen_root_breadcrumb_builder:gen_tree_list
@@ -112,9 +123,8 @@ let%test_module "Transition Frontier Persistence" =
       let%bind root, next_breadcrumb =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
             let create_breadcrumb =
-              gen_breadcrumb ~logger ~trust_system
-                ~accounts_with_secret_keys:Genesis_ledger.accounts
-              |> Quickcheck.random_value
+              Quickcheck.random_value
+                (gen_breadcrumb ~logger ~trust_system Genesis_ledger.accounts)
             in
             let root = Transition_frontier.root frontier in
             let%map next_breadcrumb =

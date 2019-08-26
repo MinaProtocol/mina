@@ -13,13 +13,7 @@ module Make (Inputs : Intf.Worker_inputs) :
   type t = {transition_storage: Transition_storage.t; logger: Logger.t}
 
   let create ?directory_name ~logger () =
-    let directory =
-      match directory_name with
-      | None ->
-          Uuid.to_string (Uuid_unix.create ())
-      | Some name ->
-          name
-    in
+    let directory = File_system.make_directory_name directory_name in
     let transition_storage = Transition_storage.create ~directory in
     {transition_storage; logger}
 

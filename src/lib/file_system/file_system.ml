@@ -25,3 +25,9 @@ let dup_stderr ?(f = Core.Fn.id) (process : Process.t) =
     (Reader.pipe @@ Process.stderr process)
     (Writer.pipe @@ Lazy.force Writer.stderr)
   |> don't_wait_for
+
+let make_directory_name = function
+  | None ->
+      Uuid.to_string (Uuid_unix.create ())
+  | Some name ->
+      name
