@@ -59,6 +59,10 @@ module Args = struct
 
   let zip4 arg1 arg2 arg3 arg4 =
     return (fun a b c d -> (a, b, c, d)) <*> arg1 <*> arg2 <*> arg3 <*> arg4
+
+  let zip5 arg1 arg2 arg3 arg4 arg5 =
+    return (fun a b c d e -> (a, b, c, d, e))
+    <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5
 end
 
 let or_error_str ~f_ok ~error = function
@@ -490,12 +494,21 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          transaction pool )"
       (optional txn_nonce)
   in
+  let memo_flag =
+    flag "memo"
+      ~doc:
+        (sprintf
+           "STRING Memo accompanying the transaction (up to %d characters)"
+           User_command_memo.max_input_length)
+      (optional string)
+  in
   let flag =
-    Args.zip4 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
+    Args.zip5 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
+      memo_flag
   in
   Command.async ~summary
     (Cli_lib.Background_daemon.init flag
-       ~f:(fun port (body, from_account, fee_opt, nonce_opt) ->
+       ~f:(fun port (body, from_account, fee_opt, nonce_opt, memo_opt) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp =
            Secrets.Keypair.Terminal_stdin.read_exn from_account
@@ -511,9 +524,12 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          let fee =
            Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
          in
+         let memo =
+           Option.value_map memo_opt ~default:User_command_memo.dummy
+             ~f:User_command_memo.create_from_string_exn
+         in
          let command =
-           Coda_commands.setup_user_command ~fee ~nonce
-             ~memo:User_command_memo.dummy ~sender_kp body
+           Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp body
          in
          dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
            ~success:(fun receipt_chain_hash ->

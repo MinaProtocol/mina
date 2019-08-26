@@ -650,11 +650,6 @@ module Make
           ~error:`Already_in_frontier
       in
       let%bind () =
-        Result.ok_if_true
-          (Transition_frontier.find frontier parent_hash |> Option.is_some)
-          ~error:`Parent_missing_from_frontier
-      in
-      let%map () =
         (* need pervasive (=) in scope for comparing polymorphic variant *)
         let ( = ) = Pervasives.( = ) in
         Result.ok_if_true
@@ -669,6 +664,11 @@ module Make
               ~existing:(Protocol_state.consensus_state root_protocol_state)
               ~candidate:(Protocol_state.consensus_state protocol_state) )
           ~error:`Not_selected_over_frontier_root
+      in
+      let%map () =
+        Result.ok_if_true
+          (Transition_frontier.find frontier parent_hash |> Option.is_some)
+          ~error:`Parent_missing_from_frontier
       in
       (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
   end
