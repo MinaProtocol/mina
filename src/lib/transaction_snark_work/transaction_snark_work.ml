@@ -44,6 +44,9 @@ end) :
             (List.map
                ~f:(fun s -> `Int (Transaction_snark.Statement.Stable.V1.hash s))
                t)
+
+        let work_ids t : int list =
+          List.map t ~f:Transaction_snark.Statement.Stable.V1.hash
       end
 
       module Latest = V1

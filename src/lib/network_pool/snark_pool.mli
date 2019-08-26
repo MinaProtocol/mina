@@ -1,7 +1,6 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib
-open Signature_lib
 
 module type S = sig
   type ledger_proof
@@ -14,12 +13,15 @@ module type S = sig
 
   type transition_frontier
 
+  type transaction_snark_work_info
+
   module Resource_pool : sig
     include
       Intf.Snark_resource_pool_intf
       with type ledger_proof := ledger_proof
        and type work := transaction_snark_work_statement
        and type transition_frontier := transition_frontier
+       and type work_info := transaction_snark_work_info
 
     val remove_solved_work : t -> transaction_snark_work_statement -> unit
 
@@ -85,9 +87,14 @@ module type Transition_frontier_intf = sig
     t -> (int * int Extensions.Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
 end
 
-module Make (Ledger_proof : sig
+module Make
+    (Ledger_proof : Coda_intf.Ledger_proof_intf)
+    ((*sig
   type t [@@deriving bin_io, sexp, yojson, version]
-end) (Transaction_snark_work : sig
+end)*)
+      Transaction_snark_work : Coda_intf.Transaction_snark_work_intf
+                               with type ledger_proof := Ledger_proof.t)
+    ((*: sig
   type t =
     { fee: Currency.Fee.t
     ; proofs: Ledger_proof.t list
@@ -120,9 +127,10 @@ end) (Transaction_snark_work : sig
       val create_unsafe : unchecked -> t
     end
     with type unchecked := t
-end)
-(Transition_frontier : Transition_frontier_intf
-                       with type work := Transaction_snark_work.Statement.t) :
+end)*)
+      Transition_frontier : Transition_frontier_intf
+                            with type work :=
+                                        Transaction_snark_work.Statement.t) :
   S
   with type transaction_snark_statement := Transaction_snark.Statement.t
    and type transaction_snark_work_statement :=
@@ -130,6 +138,7 @@ end)
    and type transaction_snark_work_checked := Transaction_snark_work.Checked.t
    and type transition_frontier := Transition_frontier.t
    and type ledger_proof := Ledger_proof.t
+   and type transaction_snark_work_info := Transaction_snark_work.Info.t
 
 include
   S
@@ -139,3 +148,4 @@ include
    and type transaction_snark_work_checked := Transaction_snark_work.Checked.t
    and type transition_frontier := Transition_frontier.t
    and type ledger_proof := Ledger_proof.t
+   and type transaction_snark_work_info := Transaction_snark_work.Info.t

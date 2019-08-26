@@ -1,9 +1,8 @@
-open Core_kernel
-open Signature_lib
-
 let trust_system = Trust_system.null ()
 
-module Ledger_proof = struct
+module Ledger_proof = Ledger_proof.Debug
+
+(*struct
   module Stable = struct
     module V1 = struct
       module T = struct
@@ -15,9 +14,11 @@ module Ledger_proof = struct
   end
 
   include Stable.V1.T
-end
+end*)
 
-module Transaction_snark_work = struct
+module Transaction_snark_work = Transaction_snark_work.Make (Ledger_proof)
+
+(*= struct
   type t =
     { fee: Currency.Fee.t
     ; proofs: Ledger_proof.t list
@@ -58,7 +59,7 @@ module Transaction_snark_work = struct
 
     let create_unsafe = Fn.id
   end
-end
+end*)
 
 module Transition_frontier = struct
   type t = string
