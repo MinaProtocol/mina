@@ -4,27 +4,29 @@ date: 2019-08-20
 author: Christine Yip & Pranay Mohan
 ---
 
-Today, we've arrived at the fifth week since Coda's first public testnet [BETA] was released. It has been incredibly fun to dive in with the core group of our community evangelists. While stress-testing the network, testing main parts of the core protocol, staking, and producing blocks, unexpected situations arised and the community graciously embraced these surprises. The testing provided us with invaluable feedback, and instead of having a new testnet release, we will focus on improving the infrastructure and stabilizing the testnet this week. The community is also invited to join us in this retrospective week, and earn Testnet Points* along the way! Read on for more details.
+Today, we've arrived at the fifth week since Coda's first public testnet [BETA] was released. It has been incredibly fun to dive in with the core group of our community evangelists. While stress-testing the network, testing main parts of the core protocol, staking, and producing blocks, unexpected situations arised and the community graciously embraced these surprises. The testing provided us with invaluable feedback, and instead of having a new testnet release, we will focus on improving the infrastructure and stabilizing the testnet this week. The community is also invited to join us in this retrospective week, and earn Testnet Points\* along the way! Read on for more details.
+
+![](https://miro.medium.com/max/3520/1*JKk8rrJ2-tCrPe8s9kheEg.jpeg)
 
 ## Week 5 Challenges
 
-The total number of Testnet Points* that 105 users racked up on the [leaderboard](http://bit.ly/TestnetBetaLeaderboard) went over 140,000 last week! If you missed out on previous challenges, it is not too late to catch up, since we're having our biggest points* challenge yet this week! You can also earn bonus points* if you were active in the previous week(s), see Challenge #11 'Don't Break the Chain!'. Check out all challenges [here](https://codaprotocol.com/docs/coda-testnet/#testnet-points).
+The total number of Testnet Points\* that 105 users racked up on the [leaderboard](http://bit.ly/TestnetBetaLeaderboard) went over 140,000 last week! If you missed out on previous challenges, it is not too late to catch up, since we're having our biggest points\* challenge yet this week! You can also earn bonus points\* if you were active in the previous week(s), see Challenge #11 'Don't Break the Chain!'. Check out all challenges [here](https://codaprotocol.com/docs/coda-testnet/#testnet-points).
 
-New challenges are here for you to rack up more Testnet Points*! 
+New challenges are here for you to rack up more Testnet Points\*! 
 
 **Challenge #12 "CLI FYI"**
 
-Submit a product improvement or feature you’d like to see in the Coda command line interface (CLI). Post a new thread on the Discourse [forums](http://forums.codaprotocol.com) in the “Product” category and add this to the title: "[CLI Feature]". The community can vote on it by “hearting” the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*.
+Submit a product improvement or feature you’d like to see in the Coda command line interface (CLI). Post a new thread on the Discourse [forums](http://forums.codaprotocol.com) in the “Product” category and add this to the title: "[CLI Feature]". The community can vote on it by “hearting” the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts\*.
 
-Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive **bonus** of 5000 pts*, which means that you could **win up to 8000 pts\*** with this challenge!
+Every feasible feature suggested will get 500 pts\*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts\* respectively. Feasible feature means well scoped ideas that Coda could technically implement- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive **bonus** of 5000 pts\*, which means that you could **win up to 8000 pts\*** with this challenge!
 
 **Challenge #13 "My two codas"**
 
-We are overwhelmed by the active involvement and enthusiasm from the community for the Testnet [BETA]. Your contributions and feedback are invaluable to us. Earn 400 Testnet Points* for giving your two codas by filling out this [survey](http://bit.ly/CommunityRetro).
+We are overwhelmed by the active involvement and enthusiasm from the community for the Testnet [BETA]. Your contributions and feedback are invaluable to us. Earn 400 Testnet Points\* for giving your two codas by filling out this [survey](http://bit.ly/CommunityRetro).
 
 **Challenge #14 "Leonardo da Coda"**
 
-We're holding a community arts contest! Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF and emoji on the forum in respectively [this thread](https://forums.codaprotocol.com/t/community-art-contest-leonardo-da-coda/) for GIFs and [this thread](https://forums.codaprotocol.com/t/community-art-contest-emojis/) for emojis. You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by “hearting” the entry posts, so do not forget to also "heart" your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place. 
+We're holding a community arts contest! Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF and emoji on the forum in respectively [this thread](https://forums.codaprotocol.com/t/community-art-contest-leonardo-da-coda/) for GIFs and [this thread](https://forums.codaprotocol.com/t/community-art-contest-emojis/) for emojis. You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by “hearting” the entry posts, so do not forget to also "heart" your favorite entries! Top 3 entries will receive bonus points: 300 pts\* for the best GIF and emoji, 200 pts\* for the second place and 100 pts\* for the third place. 
 
 ## Week 4 Retrospective
 
@@ -45,27 +47,27 @@ However, given that another fork happened on day 6 of this testnet, and didn't r
 
 All said and done, a successful week in terms of uncovering issues and fixing issues. We will take a break this week and not have the testnet live, so that the Coda development team can focus on stability again and ensure that these same issues don't pop up in future testnets. Thanks again for the community's support and patience in this process — our spirits are boosted when we see comments like these:
 
-![](Screen_Shot_2019-08-19_at_5-34892170-879d-4473-a168-45a4c2b7c13f.29.29_PM.png)
+![](https://miro.medium.com/max/2760/1*EkWF1VqVlqC4qDdRgcVe5Q.png)
 
 ## Community in Action
 
 When last week's testnet 'Medium Rare' was released, the early adopters in the community were eager to dive in and start staking.
 
-![](Untitled-c67a60b6-f55e-44eb-8e86-999f9c40dff3.png)
+![](https://miro.medium.com/max/1110/1*I7-W3OvMK4GomvClavebng.png)
 
 More than 40 members signed up to participate on 'Medium Rare' as block producers and committed themselves to run their nodes throughout the week. 30 of them were selected and they received 20,000 testnet coda's to participate in staking and produce blocks. One of the community members, *awacate*, enthusiastically started to promote her block producer shortly after she got her node up.
 
-![](Untitled-440a4103-c1e0-40b8-9fba-33a2b29b8e77.png)
+![](https://miro.medium.com/max/1178/1*NoDGjOKli_PuI8zx1F-HtQ.png)
 
 The coolest thing to see, was the core group of the community evangelists banding together to get the block production started, and celebrating when everyone started to successfully sync with the blockchain..
 
-![](Untitled-ab73513a-8e8d-48d7-b368-2f584b45ab57.png)
+![](https://miro.medium.com/max/1112/1*DMoy--u1csfUYJMHdEZs6Q.png)
 
-..however, not everyone was lucky enough to get selected for proposing the next block. One member, *jspadave*, could have used some more luck at the beginning!
+...however, not everyone was lucky enough to get selected for proposing the next block. One member, *jspadave*, could have used some more luck at the beginning!
 
-![](Untitled-2b0915ba-4601-4ef3-94af-501ac5448ff3.png)
+![](https://miro.medium.com/max/1108/1*5VAV9wyZs3QfMlDpSasTRw.png)
 
-.. but no worries! In the end, he produced about 30 blocks last week. In total, the passionate block producers in the community generated more than 400 blocks last week! Read on to see who produced the most blocks last week and won 4000 Testnet Points*!
+...but no worries! In the end, he produced about 30 blocks last week. In total, the passionate block producers in the community generated more than 400 blocks last week! Read on to see who produced the most blocks last week and won 4000 Testnet Points\*!
 
 ## Community MVP Winners
 
@@ -73,13 +75,13 @@ Each week, we reward the community leaders who are making testnet a great, colla
 
 **Winners Challenge #9 'Block Party'**
 
-Last week, we had one of our biggest points* challenge yet, with up to 4000 points* on the line for the person who produces the most blocks. Congratulations to the winners!
+Last week, we had one of our biggest points\* challenge yet, with up to 4000 points\* on the line for the person who produces the most blocks. Congratulations to the winners!
 
-1st place 4000 pts* - @dk808 (47 blocks!)
-2nd place 3000 pts* - @y3v63n
-3rd place 2000 pts* - @Gs
+1st place 4000 pts\* - @dk808 (47 blocks!)
+2nd place 3000 pts\* - @y3v63n
+3rd place 2000 pts\* - @Gs
 
-1000 pts* for everyone who produced at least one block:
+1000 pts\* for everyone who produced at least one block:
 @Prague
 @jspadave
 @Dmitry_D
@@ -100,15 +102,15 @@ Last week, we had one of our biggest points* challenge yet, with up to 4000 poin
 
 **Bug Bounties**
 
-Major Bug Bounty 2000 pts*: @garethdavies for helping debug the CLI command that enabled block production but didn't generate any blocks. (see [Github](https://github.com/CodaProtocol/coda/issues/3234))
+Major Bug Bounty 2000 pts\*: @garethdavies for helping debug the CLI command that enabled block production but didn't generate any blocks. (see [Github](https://github.com/CodaProtocol/coda/issues/3234))
 
-Minor Bug Bounty 200 pts*: @doronz2 for finding an issue related to logging when bootstrapping. (see [Github](https://github.com/CodaProtocol/coda/issues/3172))
+Minor Bug Bounty 200 pts\*: @doronz2 for finding an issue related to logging when bootstrapping. (see [Github](https://github.com/CodaProtocol/coda/issues/3172))
 
-Community MVP Gold (+1000 Testnet Points*)
+Community MVP Gold (+1000 Testnet Points\*)
 
 @whataday2day for always being around, being actively involved in the testnet from the start, and being helpful to other community members when they get stuck.
 
-Community MVP Silver (+500 Testnet Points*)
+Community MVP Silver (+500 Testnet Points\*)
 
 @dk808 , @Bison Paul , @Ilya | Genesis Lab , @Alexander , @Turbotrainedbamboo for active participation in the Testnet [Beta] and helping with uncovering odd behaviour leading to forks.
 
