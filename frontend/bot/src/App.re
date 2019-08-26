@@ -24,6 +24,12 @@ let handleMessage = msg =>
 // Start echo service
 Echo.start(Constants.echoKey, Constants.feeAmount);
 
+// Start up optional second echo service
+switch (Constants.echoKey2) {
+| Some(echoKey2) => Echo.start(echoKey2, Constants.feeAmount)
+| None => ()
+};
+
 Client.onReady(client, _ => Logger.log("App", `Info, "Bot is ready"));
 
 Client.onMessage(client, handleMessage);
