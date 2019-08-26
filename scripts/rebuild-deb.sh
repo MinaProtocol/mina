@@ -40,10 +40,17 @@ echo "Control File:"
 cat "${BUILDDIR}/DEBIAN/control"
 
 echo "------------------------------------------------------------"
+# Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
 cp ./default/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 
+# Build Config
+mkdir -p "${BUILDDIR}/etc/coda/build_config"
+cp ../config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
+rsync -Huav ../config/* "${BUILDDIR}/etc/coda/build_config/."
+
+# Keys
 # Identify actual keys used in build
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
