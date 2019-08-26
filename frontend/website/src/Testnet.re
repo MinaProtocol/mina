@@ -114,14 +114,11 @@ module Styles = {
 
   let weekHeader =
     merge([Style.H2.basic, style([padding2(~v=`rem(1.), ~h=`zero)])]);
-  
+
   let dashboardHeader =
     merge([
       header,
-      style([
-        marginTop(rem(1.5)),
-        marginBottom(rem(2.25)),
-      ]),
+      style([marginTop(rem(1.5)), marginBottom(rem(2.25))]),
     ]);
 
   let dashboard =
@@ -132,7 +129,7 @@ module Styles = {
       borderRadius(px(3)),
     ]);
 
-  let expandButton = 
+  let expandButton =
     merge([
       Style.Link.basic,
       style([
@@ -151,7 +148,7 @@ module Styles = {
         lineHeight(`rem(2.5)),
       ]),
     ]);
-  
+
   let gradientSection =
     style([
       position(`relative),
@@ -173,10 +170,7 @@ module Styles = {
         backgroundImage(
           `linearGradient((
             `deg(0),
-            [
-              (0, Style.Colors.white),
-              (100, Style.Colors.whiteAlpha(0.)),
-            ],
+            [(0, Style.Colors.white), (100, Style.Colors.whiteAlpha(0.))],
           )),
         ),
       ]),
@@ -203,13 +197,8 @@ module Section = {
           ])
         )
       />
-      <div className=Styles.gradientSection>
-        children
-      </div>
-      <label
-        id=labelName
-        className=Styles.expandButton
-        htmlFor=checkboxName>
+      <div className=Styles.gradientSection> children </div>
+      <label id=labelName className=Styles.expandButton htmlFor=checkboxName>
         {React.string("Expand " ++ name ++ {js| ↓|js})}
       </label>
       <RunScript>
@@ -227,7 +216,9 @@ let make = () => {
   <div className=Styles.page>
     <Section name="Leaderboard">
       <div className=Styles.header>
-        <h1 className=Style.H1.hero> {React.string("Testnet Leaderboard")} </h1>
+        <h1 className=Style.H1.hero>
+          {React.string("Testnet Leaderboard")}
+        </h1>
         <a
           href="https://docs.google.com/spreadsheets/d/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/edit#gid=0"
           target="_blank"
@@ -254,8 +245,8 @@ let make = () => {
           </p>
           <p>
             {React.string(
-              "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
-            )}
+               "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
+             )}
           </p>
           <p>
             <h4 className=Styles.sidebarHeader>
@@ -291,8 +282,8 @@ let make = () => {
           </p>
           <p>
             {React.string(
-              "Submit a product improvement or feature you'd like to see in the Coda command line interface (CLI). Post a new thread on the Discourse ",
-            )}
+               "Submit a product improvement or feature you'd like to see in the Coda command line interface (CLI). Post a new thread on the Discourse ",
+             )}
             <a
               className=Style.Link.basic
               href="http://forums.codaprotocol.com"
@@ -300,13 +291,13 @@ let make = () => {
               {React.string("forums")}
             </a>
             {React.string(
-              " in the 'Product' category and add this to the title: '[CLI Feature]'. The community can vote on it by 'hearting' the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*.",
-            )}
+               " in the 'Product' category and add this to the title: '[CLI Feature]'. The community can vote on it by 'hearting' the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*.",
+             )}
           </p>
           <p>
             {React.string(
-              "Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement -- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts*!",
-            )}
+               "Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement -- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts*!",
+             )}
           </p>
           <p>
             <h4 className=Styles.sidebarHeader>
@@ -315,8 +306,8 @@ let make = () => {
           </p>
           <p>
             {React.string(
-              "Earn 400 pts* for giving your feedback by filling out this ",
-            )}
+               "Earn 400 pts* for giving your feedback by filling out this ",
+             )}
             <a
               className=Style.Link.basic
               href="http://bit.ly/CommunityRetro"
@@ -332,8 +323,8 @@ let make = () => {
           </p>
           <p>
             {React.string(
-              "Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the ",
-            )}
+               "Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the ",
+             )}
             <a
               className=Style.Link.basic
               href="https://forums.codaprotocol.com/t/community-art-contest-gifs/109"
@@ -341,13 +332,13 @@ let make = () => {
               {React.string("forums")}
             </a>
             {React.string(
-              ". You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by 'hearting' your post, so do not forget to 'heart' your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.",
-            )}
+               ". You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by 'hearting' your post, so do not forget to 'heart' your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.",
+             )}
           </p>
         </div>
       </div>
     </Section>
-    <hr/>
+    <hr />
     <div>
       <div className=Styles.dashboardHeader>
         <h1 className=Style.H1.hero> {React.string("Network Dashboard")} </h1>
@@ -360,8 +351,8 @@ let make = () => {
       </div>
       <iframe
         src="https://o1testnet.grafana.net/d-solo/mO5fAWHWk/testnet-stats?orgId=1&from=1566752668214&to=1566839068215&panelId=4"
-        className=Styles.dashboard>
-      </iframe>
+        className=Styles.dashboard
+      />
     </div>
   </div>;
 };
