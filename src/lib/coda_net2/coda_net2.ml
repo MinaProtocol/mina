@@ -956,7 +956,7 @@ let create ~logger ~conf_dir =
         Ok p
     | Error e ->
         Or_error.error_string
-          ( "If you are a dev, did you forget to `make libp2p_helper` and set \
+          ( "Could not start libp2p_helper. If you are a dev, did you forget to `make libp2p_helper` and set \
              CODA_LIBP2P_HELPER_PATH? Try \
              CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper "
           ^ Error.to_string_hum e )
