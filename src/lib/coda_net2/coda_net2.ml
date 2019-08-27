@@ -816,12 +816,13 @@ module Protocol_handler = struct
 
   let close_connections (net : net) for_protocol =
     Hashtbl.filter_inplace net.streams ~f:(fun stream ->
-        if stream.protocol <> for_protocol then false
+        if stream.protocol <> for_protocol then true
         else (
           don't_wait_for
+            (* TODO: this probably needs to be more thorough than a reset. Also force the write pipe closed? *)
             (let%map _ = Stream.reset stream in
              ()) ;
-          true ) )
+          false ) )
 
   let close ?(reset_existing_streams = false) ({net; protocol_name; _} : t) =
     Hashtbl.remove net.protocol_handlers protocol_name ;
