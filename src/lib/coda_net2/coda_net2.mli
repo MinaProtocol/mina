@@ -14,7 +14,17 @@ this module/the helper, and not misuse.
 Some errors can arise from calling certain functions before [configure] has been
 called. In general, anything that returns an [Or_error] can fail in this manner.
 
-A note about connection limits: TODO
+A note about connection limits:
+
+In the original coda_net, connection limits were enforced synchronously on
+every received connection. Right now with coda_net2, connection management is
+asynchronous and post-hoc. In the background, once per minute it checks the
+connection count. If it is above the "high water mark", it will close
+("trim") eligible connections until it reaches the "low water mark". All
+connections start with a "grace period" where they won't be closed. Peer IDs
+can be marked as "protected" which prevents them being trimmed. This is
+vulnerable to resource exhaustion by opening many new connections.
+
 *)
 
 open Async
