@@ -89,47 +89,6 @@ struct
     module Transaction_witness = Transaction_witness
   end)
 
-  let create_payment ~staged_ledger ((sender_account : Account.t), sender_sk)
-      receiver_pk send_amount =
-    let open Option.Let_syntax in
-    let sender_keypair = Keypair.of_private_key_exn sender_sk in
-    let nonce =
-      let ledger = Staged_ledger.ledger staged_ledger in
-      let account_location =
-        Option.value_exn
-          (Ledger.location_of_key ledger sender_account.public_key)
-      in
-      (Option.value_exn (Ledger.get ledger account_location)).nonce
-    in
-    let sender_account_amount =
-      sender_account.Account.Poly.balance |> Currency.Balance.to_amount
-    in
-    let%map _ = Currency.Amount.sub sender_account_amount send_amount in
-    let payload : User_command.Payload.t =
-      User_command.Payload.create ~fee:Fee.zero ~nonce
-        ~memo:User_command_memo.dummy
-        ~body:(Payment {receiver= receiver_pk; amount= send_amount})
-    in
-    User_command.sign sender_keypair payload
-
-  (* Generate valid payments for each blockchain state by having
-     each user send a payment of one coin to another random
-     user if they at least one coin*)
-  let gen_payments staged_ledger accounts_with_secret_keys :
-      User_command.With_valid_signature.t Sequence.t =
-    let public_keys =
-      List.map accounts_with_secret_keys ~f:(fun (_, account) ->
-          Account.public_key account )
-    in
-    Sequence.filter_map (accounts_with_secret_keys |> Sequence.of_list)
-      ~f:(fun (sender_sk, sender_account) ->
-        let open Option.Let_syntax in
-        let%bind sender_sk = sender_sk in
-        let%bind receiver_pk = List.random_element public_keys in
-        create_payment ~staged_ledger
-          (sender_account, sender_sk)
-          receiver_pk (Amount.of_int 1) )
-
   module Transition_frontier_inputs = struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Ledger_proof_statement = Transaction_snark.Statement
@@ -153,239 +112,337 @@ struct
   module Transition_frontier =
     Transition_frontier.Make (Transition_frontier_inputs)
 
-  let gen_breadcrumb ?(gen_payments = gen_payments) ~logger ~trust_system
-      accounts_with_secret_keys :
-      (   Transition_frontier.Breadcrumb.t Deferred.t
-       -> Transition_frontier.Breadcrumb.t Deferred.t)
-      Quickcheck.Generator.t =
-    let open Quickcheck.Let_syntax in
-    let gen_slot_advancement = Int.gen_incl 1 10 in
-    let%map make_next_consensus_state =
-      Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
+  let create_payment sender_sk receiver_pk send_amount nonce =
+    let sender_keypair = Keypair.of_private_key_exn sender_sk in
+    let payload : User_command.Payload.t =
+      User_command.Payload.create ~fee:Fee.zero ~nonce
+        ~memo:User_command_memo.dummy
+        ~body:(Payment {receiver= receiver_pk; amount= send_amount})
     in
-    fun parent_breadcrumb_deferred ->
-      let open Deferred.Let_syntax in
-      let%bind parent_breadcrumb = parent_breadcrumb_deferred in
-      let parent_staged_ledger =
-        Transition_frontier.Breadcrumb.staged_ledger parent_breadcrumb
+    User_command.sign sender_keypair payload
+
+  module type Generator_inputs = sig
+    val accounts_with_secret_keys : (Private_key.t option * Account.t) list
+
+    val gen_payments :
+         Staged_ledger.t
+      -> (Private_key.t option * Account.t) list
+      -> User_command.With_valid_signature.t Sequence.t
+  end
+
+  module Make_generators
+      (Gen_inputs : Generator_inputs) (System_inputs : sig
+          (* This input would generally change per test file because logger and trust system are different per test *)
+          val logger : Logger.t
+
+          val trust_system : Trust_system.t
+      end) =
+  struct
+    include Gen_inputs
+    open System_inputs
+
+    let gen_breadcrumb :
+        (   Transition_frontier.Breadcrumb.t Deferred.t
+         -> Transition_frontier.Breadcrumb.t Deferred.t)
+        Quickcheck.Generator.t =
+      let open Quickcheck.Let_syntax in
+      let gen_slot_advancement = Int.gen_incl 1 10 in
+      let%map make_next_consensus_state =
+        Consensus_state_hooks.For_tests.gen_consensus_state
+          ~gen_slot_advancement
       in
-      let transactions =
-        gen_payments parent_staged_ledger accounts_with_secret_keys
+      fun parent_breadcrumb_deferred ->
+        let open Deferred.Let_syntax in
+        let%bind parent_breadcrumb = parent_breadcrumb_deferred in
+        let parent_staged_ledger =
+          Transition_frontier.Breadcrumb.staged_ledger parent_breadcrumb
+        in
+        let transactions =
+          gen_payments parent_staged_ledger accounts_with_secret_keys
+        in
+        let _, largest_account =
+          List.max_elt accounts_with_secret_keys
+            ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2)
+          |> Option.value_exn
+        in
+        let largest_account_public_key = Account.public_key largest_account in
+        let get_completed_work stmts =
+          let {Keypair.public_key; _} = Keypair.create () in
+          let prover = Public_key.compress public_key in
+          Some
+            Transaction_snark_work.Checked.
+              { fee= Fee.of_int 1
+              ; proofs=
+                  List.map stmts ~f:(fun stmt ->
+                      (stmt, Sok_message.Digest.default) )
+              ; prover }
+        in
+        let staged_ledger_diff =
+          Staged_ledger.create_diff parent_staged_ledger ~logger
+            ~self:largest_account_public_key ~transactions_by_fee:transactions
+            ~get_completed_work
+        in
+        let%bind ( `Hash_after_applying next_staged_ledger_hash
+                 , `Ledger_proof ledger_proof_opt
+                 , `Staged_ledger _
+                 , `Pending_coinbase_data _ ) =
+          Staged_ledger.apply_diff_unchecked parent_staged_ledger
+            staged_ledger_diff
+          |> Deferred.Or_error.ok_exn
+        in
+        let previous_transition =
+          Transition_frontier.Breadcrumb.validated_transition parent_breadcrumb
+        in
+        let previous_protocol_state =
+          previous_transition |> External_transition.Validated.protocol_state
+        in
+        let previous_ledger_hash =
+          previous_protocol_state |> Protocol_state.blockchain_state
+          |> Blockchain_state.snarked_ledger_hash
+        in
+        let next_ledger_hash =
+          Option.value_map ledger_proof_opt
+            ~f:(fun (proof, _) ->
+              Ledger_proof.statement proof |> Ledger_proof.statement_target )
+            ~default:previous_ledger_hash
+        in
+        let next_blockchain_state =
+          Blockchain_state.create_value
+            ~timestamp:(Block_time.now Block_time.Controller.basic)
+            ~snarked_ledger_hash:next_ledger_hash
+            ~staged_ledger_hash:next_staged_ledger_hash
+        in
+        let previous_state_hash =
+          Protocol_state.hash previous_protocol_state
+        in
+        let consensus_state =
+          make_next_consensus_state ~snarked_ledger_hash:previous_ledger_hash
+            ~previous_protocol_state:
+              With_hash.
+                {data= previous_protocol_state; hash= previous_state_hash}
+        in
+        let protocol_state =
+          Protocol_state.create_value ~previous_state_hash
+            ~blockchain_state:next_blockchain_state ~consensus_state
+        in
+        let next_external_transition =
+          External_transition.create ~protocol_state
+            ~protocol_state_proof:Proof.dummy
+            ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
+            ~delta_transition_chain_proof:(previous_state_hash, [])
+        in
+        (* We manually created a verified an external_transition *)
+        let (`I_swear_this_is_safe_see_my_comment
+              next_verified_external_transition) =
+          External_transition.Validated.create_unsafe next_external_transition
+        in
+        match%map
+          Transition_frontier.Breadcrumb.build ~logger ~trust_system
+            ~verifier:() ~parent:parent_breadcrumb
+            ~transition:
+              (External_transition.Validation
+               .reset_staged_ledger_diff_validation
+                 next_verified_external_transition)
+            ~sender:None
+        with
+        | Ok new_breadcrumb ->
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ( "state_hash"
+                  , Transition_frontier.Breadcrumb.state_hash new_breadcrumb
+                    |> State_hash.to_yojson ) ]
+              "Producing a breadcrumb with hash: $state_hash" ;
+            new_breadcrumb
+        | Error (`Fatal_error exn) ->
+            raise exn
+        | Error (`Invalid_staged_ledger_diff e) ->
+            failwithf !"Invalid staged ledger diff: %{sexp:Error.t}" e ()
+        | Error (`Invalid_staged_ledger_hash e) ->
+            failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
+
+    let create_snarked_ledger () =
+      let accounts = List.map ~f:snd accounts_with_secret_keys in
+      let proposer_account = List.hd_exn accounts in
+      let root_snarked_ledger = Coda_base.Ledger.Db.create () in
+      List.iter accounts ~f:(fun account ->
+          let status, _ =
+            Coda_base.Ledger.Db.get_or_create_account_exn root_snarked_ledger
+              (Account.public_key account)
+              account
+          in
+          assert (status = `Added) ) ;
+      (root_snarked_ledger, proposer_account)
+
+    let create_frontier_from_genesis_protocol_state ~consensus_local_state
+        ~genesis_protocol_state_with_hash root_snarked_ledger =
+      let root_transaction_snark_scan_state =
+        Staged_ledger.Scan_state.empty ()
       in
-      let _, largest_account =
-        List.max_elt accounts_with_secret_keys
-          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2)
-        |> Option.value_exn
+      let root_pending_coinbases =
+        Pending_coinbase.create () |> Or_error.ok_exn
       in
-      let largest_account_public_key = Account.public_key largest_account in
-      let get_completed_work stmts =
-        let {Keypair.public_key; _} = Keypair.create () in
-        let prover = Public_key.compress public_key in
-        Some
-          Transaction_snark_work.Checked.
-            { fee= Fee.of_int 1
-            ; proofs=
-                List.map stmts ~f:(fun stmt ->
-                    (stmt, Sok_message.Digest.default) )
-            ; prover }
+      let genesis_protocol_state =
+        With_hash.data genesis_protocol_state_with_hash
       in
-      let staged_ledger_diff =
-        Staged_ledger.create_diff parent_staged_ledger ~logger
-          ~self:largest_account_public_key ~transactions_by_fee:transactions
-          ~get_completed_work
-      in
-      let%bind ( `Hash_after_applying next_staged_ledger_hash
-               , `Ledger_proof ledger_proof_opt
-               , `Staged_ledger _
-               , `Pending_coinbase_data _ ) =
-        Staged_ledger.apply_diff_unchecked parent_staged_ledger
-          staged_ledger_diff
-        |> Deferred.Or_error.ok_exn
-      in
-      let previous_transition =
-        Transition_frontier.Breadcrumb.validated_transition parent_breadcrumb
-      in
-      let previous_protocol_state =
-        previous_transition |> External_transition.Validated.protocol_state
-      in
-      let previous_ledger_hash =
-        previous_protocol_state |> Protocol_state.blockchain_state
+      let root_ledger_hash =
+        genesis_protocol_state |> Protocol_state.blockchain_state
         |> Blockchain_state.snarked_ledger_hash
+        |> Frozen_ledger_hash.to_ledger_hash
       in
-      let next_ledger_hash =
-        Option.value_map ledger_proof_opt
-          ~f:(fun (proof, _) ->
-            Ledger_proof.statement proof |> Ledger_proof.statement_target )
-          ~default:previous_ledger_hash
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("root_ledger_hash", Ledger_hash.to_yojson root_ledger_hash)]
+        "Snarked_ledger_hash is $root_ledger_hash" ;
+      let dummy_staged_ledger_diff =
+        let creator =
+          Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
+        in
+        { Staged_ledger_diff.diff=
+            ( { completed_works= []
+              ; user_commands= []
+              ; coinbase= Staged_ledger_diff.At_most_two.Zero }
+            , None )
+        ; creator }
       in
-      let next_blockchain_state =
-        Blockchain_state.create_value
-          ~timestamp:(Block_time.now Block_time.Controller.basic)
-          ~snarked_ledger_hash:next_ledger_hash
-          ~staged_ledger_hash:next_staged_ledger_hash
+      (* the genesis transition is assumed to be valid *)
+      let (`I_swear_this_is_safe_see_my_comment root_transition) =
+        External_transition.Validated.create_unsafe
+          (External_transition.create ~protocol_state:genesis_protocol_state
+             ~protocol_state_proof:Proof.dummy
+             ~staged_ledger_diff:dummy_staged_ledger_diff
+             ~delta_transition_chain_proof:
+               (Protocol_state.previous_state_hash genesis_protocol_state, []))
       in
-      let previous_state_hash = Protocol_state.hash previous_protocol_state in
-      let consensus_state =
-        make_next_consensus_state ~snarked_ledger_hash:previous_ledger_hash
-          ~previous_protocol_state:
-            With_hash.
-              {data= previous_protocol_state; hash= previous_state_hash}
-      in
-      let protocol_state =
-        Protocol_state.create_value ~previous_state_hash
-          ~blockchain_state:next_blockchain_state ~consensus_state
-      in
-      let next_external_transition =
-        External_transition.create ~protocol_state
-          ~protocol_state_proof:Proof.dummy
-          ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
-          ~delta_transition_chain_proof:(previous_state_hash, [])
-      in
-      (* We manually created a verified an external_transition *)
-      let (`I_swear_this_is_safe_see_my_comment
-            next_verified_external_transition) =
-        External_transition.Validated.create_unsafe next_external_transition
-      in
-      match%map
-        Transition_frontier.Breadcrumb.build ~logger ~trust_system ~verifier:()
-          ~parent:parent_breadcrumb
-          ~transition:
-            (External_transition.Validation.reset_staged_ledger_diff_validation
-               next_verified_external_transition)
-          ~sender:None
+      let open Deferred.Let_syntax in
+      let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
+      match%bind
+        Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
+          ~logger ~verifier:() ~scan_state:root_transaction_snark_scan_state
+          ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
+          ~expected_merkle_root ~pending_coinbases:root_pending_coinbases
       with
-      | Ok new_breadcrumb ->
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:
-              [ ( "state_hash"
-                , Transition_frontier.Breadcrumb.state_hash new_breadcrumb
-                  |> State_hash.to_yojson ) ]
-            "Producing a breadcrumb with hash: $state_hash" ;
-          new_breadcrumb
-      | Error (`Fatal_error exn) ->
-          raise exn
-      | Error (`Invalid_staged_ledger_diff e) ->
-          failwithf !"Invalid staged ledger diff: %{sexp:Error.t}" e ()
-      | Error (`Invalid_staged_ledger_hash e) ->
-          failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
+      | Ok root_staged_ledger ->
+          let%map frontier =
+            Transition_frontier.create ~logger ~root_transition
+              ~root_snarked_ledger ~root_staged_ledger ~consensus_local_state
+          in
+          frontier
+      | Error err ->
+          Error.raise err
 
-  let create_snarked_ledger accounts_with_secret_keys =
-    let accounts = List.map ~f:snd accounts_with_secret_keys in
-    let proposer_account = List.hd_exn accounts in
-    let root_snarked_ledger = Coda_base.Ledger.Db.create () in
-    List.iter accounts ~f:(fun account ->
-        let status, _ =
-          Coda_base.Ledger.Db.get_or_create_account_exn root_snarked_ledger
-            (Account.public_key account)
-            account
-        in
-        assert (status = `Added) ) ;
-    (root_snarked_ledger, proposer_account)
+    module Ledger_transfer =
+      Coda_base.Ledger_transfer.Make (Ledger) (Ledger.Db)
 
-  let create_frontier_from_genesis_protocol_state ~logger
-      ~consensus_local_state ~genesis_protocol_state_with_hash
-      root_snarked_ledger =
-    let root_transaction_snark_scan_state =
-      Staged_ledger.Scan_state.empty ()
-    in
-    let root_pending_coinbases =
-      Pending_coinbase.create () |> Or_error.ok_exn
-    in
-    let genesis_protocol_state =
-      With_hash.data genesis_protocol_state_with_hash
-    in
-    let root_ledger_hash =
-      genesis_protocol_state |> Protocol_state.blockchain_state
-      |> Blockchain_state.snarked_ledger_hash
-      |> Frozen_ledger_hash.to_ledger_hash
-    in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("root_ledger_hash", Ledger_hash.to_yojson root_ledger_hash)]
-      "Snarked_ledger_hash is $root_ledger_hash" ;
-    let dummy_staged_ledger_diff =
-      let creator =
-        Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
+    let with_genesis_frontier ~f =
+      File_system.with_temp_dir
+        (Uuid.to_string (Uuid_unix.create ()))
+        ~f:(fun ledger_dir ->
+          let ledger_db =
+            Coda_base.Ledger.Db.create ~directory_name:ledger_dir ()
+          in
+          let root_snarked_ledger =
+            Ledger_transfer.transfer_accounts
+              ~src:(Lazy.force Genesis_ledger.t)
+              ~dest:ledger_db
+            |> Or_error.ok_exn
+          in
+          let consensus_local_state =
+            Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
+          in
+          let%bind frontier =
+            create_frontier_from_genesis_protocol_state ~consensus_local_state
+              ~genesis_protocol_state_with_hash:
+                (Lazy.force Genesis_protocol_state.t)
+              root_snarked_ledger
+          in
+          f frontier )
+
+    let create_root_frontier () : Transition_frontier.t Deferred.t =
+      let root_snarked_ledger, proposer_account = create_snarked_ledger () in
+      let consensus_local_state =
+        Consensus.Data.Local_state.create
+          (Public_key.Compressed.Set.singleton
+             (Account.public_key proposer_account))
       in
-      { Staged_ledger_diff.diff=
-          ( { completed_works= []
-            ; user_commands= []
-            ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-          , None )
-      ; creator }
-    in
-    (* the genesis transition is assumed to be valid *)
-    let (`I_swear_this_is_safe_see_my_comment root_transition) =
-      External_transition.Validated.create_unsafe
-        (External_transition.create ~protocol_state:genesis_protocol_state
-           ~protocol_state_proof:Proof.dummy
-           ~staged_ledger_diff:dummy_staged_ledger_diff
-           ~delta_transition_chain_proof:
-             (Protocol_state.previous_state_hash genesis_protocol_state, []))
-    in
-    let open Deferred.Let_syntax in
-    let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
-    match%bind
-      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
-        ~verifier:() ~scan_state:root_transaction_snark_scan_state
-        ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
-        ~expected_merkle_root ~pending_coinbases:root_pending_coinbases
-    with
-    | Ok root_staged_ledger ->
-        let%map frontier =
-          Transition_frontier.create ~logger ~root_transition
-            ~root_snarked_ledger ~root_staged_ledger ~consensus_local_state
-        in
-        frontier
-    | Error err ->
-        Error.raise err
+      let genesis_protocol_state_with_hash =
+        Genesis_protocol_state.create_with_custom_ledger
+          ~genesis_consensus_state:
+            (Consensus.Data.Consensus_state.create_genesis
+               ~negative_one_protocol_state_hash:
+                 Protocol_state.(hash (Lazy.force negative_one)))
+          ~genesis_ledger:(Ledger.of_database root_snarked_ledger)
+      in
+      create_frontier_from_genesis_protocol_state ~consensus_local_state
+        ~genesis_protocol_state_with_hash root_snarked_ledger
 
-  module Ledger_transfer = Coda_base.Ledger_transfer.Make (Ledger) (Ledger.Db)
+    let gen_linear_breadcrumbs size root_breadcrumb =
+      Quickcheck.Generator.with_size ~size
+      @@ Quickcheck_lib.gen_imperative_list
+           (root_breadcrumb |> return |> Quickcheck.Generator.return)
+           gen_breadcrumb
 
-  let with_genesis_frontier ~logger ~f =
-    File_system.with_temp_dir
-      (Uuid.to_string (Uuid_unix.create ()))
-      ~f:(fun ledger_dir ->
-        let ledger_db =
-          Coda_base.Ledger.Db.create ~directory_name:ledger_dir ()
-        in
-        let root_snarked_ledger =
-          Ledger_transfer.transfer_accounts
-            ~src:(Lazy.force Genesis_ledger.t)
-            ~dest:ledger_db
-          |> Or_error.ok_exn
-        in
-        let consensus_local_state =
-          Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        in
-        let%bind frontier =
-          create_frontier_from_genesis_protocol_state ~logger
-            ~consensus_local_state
-            ~genesis_protocol_state_with_hash:
-              (Lazy.force Genesis_protocol_state.t)
-            root_snarked_ledger
-        in
-        f frontier )
+    let gen_tree size root_breadcrumb =
+      Quickcheck.Generator.with_size ~size
+      @@ Quickcheck_lib.gen_imperative_rose_tree
+           (root_breadcrumb |> return |> Quickcheck.Generator.return)
+           gen_breadcrumb
 
-  let create_root_frontier ~logger accounts_with_secret_keys :
-      Transition_frontier.t Deferred.t =
-    let root_snarked_ledger, proposer_account =
-      create_snarked_ledger accounts_with_secret_keys
+    let gen_tree_list size root_breadcrumb =
+      Quickcheck.Generator.with_size ~size
+      @@ Quickcheck_lib.gen_imperative_ktree
+           (root_breadcrumb |> return |> Quickcheck.Generator.return)
+           gen_breadcrumb
+
+    let instantiate_linear_breadcrumbs size root =
+      Deferred.all
+      @@ Quickcheck.random_value (gen_linear_breadcrumbs size root)
+
+    let instantiate_tree size root =
+      Rose_tree.Deferred.all @@ Quickcheck.random_value (gen_tree size root)
+
+    let add_linear_breadcrumbs ~frontier size parent =
+      let%bind new_breadcrumbs = instantiate_linear_breadcrumbs parent size in
+      let%map () =
+        Deferred.List.iter new_breadcrumbs
+          ~f:(Transition_frontier.add_breadcrumb_exn frontier)
+      in
+      new_breadcrumbs
+
+    let add_child ~frontier parent =
+      let%bind new_node =
+        Quickcheck.random_value gen_breadcrumb @@ Deferred.return parent
+      in
+      let%map () = Transition_frontier.add_breadcrumb_exn frontier new_node in
+      new_node
+  end
+
+  let get_nonce staged_ledger sender_pk =
+    let ledger = Staged_ledger.ledger staged_ledger in
+    let account_location =
+      Option.value_exn (Ledger.location_of_key ledger sender_pk)
     in
-    let consensus_local_state =
-      Consensus.Data.Local_state.create
-        (Public_key.Compressed.Set.singleton
-           (Account.public_key proposer_account))
+    (Option.value_exn (Ledger.get ledger account_location)).nonce
+
+  (* Generate valid payments for each blockchain state by having
+     each user send a payment of one coin to another random
+     user if they at least one coin*)
+  let everybody_sends_a_payment_gen staged_ledger accounts_with_secret_keys :
+      User_command.With_valid_signature.t Sequence.t =
+    let public_keys =
+      List.map accounts_with_secret_keys ~f:(fun (_, account) ->
+          Account.public_key account )
     in
-    let genesis_protocol_state_with_hash =
-      Genesis_protocol_state.create_with_custom_ledger
-        ~genesis_consensus_state:
-          (Consensus.Data.Consensus_state.create_genesis
-             ~negative_one_protocol_state_hash:
-               Protocol_state.(hash (Lazy.force negative_one)))
-        ~genesis_ledger:(Ledger.of_database root_snarked_ledger)
-    in
-    create_frontier_from_genesis_protocol_state ~logger ~consensus_local_state
-      ~genesis_protocol_state_with_hash root_snarked_ledger
+    Sequence.filter_map (accounts_with_secret_keys |> Sequence.of_list)
+      ~f:(fun (sender_sk, sender_account) ->
+        let open Option.Let_syntax in
+        let%bind sender_sk = sender_sk in
+        let%bind receiver_pk = List.random_element public_keys in
+        let sender_account_amount =
+          sender_account.Account.Poly.balance |> Currency.Balance.to_amount
+        in
+        let send_amount = Amount.of_int 1 in
+        let%map _ = Currency.Amount.sub sender_account_amount send_amount in
+        let nonce = get_nonce staged_ledger sender_account.public_key in
+        create_payment sender_sk receiver_pk send_amount nonce )
 
   let build_frontier_randomly ~gen_root_breadcrumb_builder frontier :
       unit Deferred.t =
@@ -398,48 +455,11 @@ struct
         let%bind breadcrumb = deferred_breadcrumb in
         Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
 
-  let gen_linear_breadcrumbs ?gen_payments ~logger ~trust_system ~size
-      ~accounts_with_secret_keys root_breadcrumb =
-    Quickcheck.Generator.with_size ~size
-    @@ Quickcheck_lib.gen_imperative_list
-         (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ?gen_payments ~logger ~trust_system
-            accounts_with_secret_keys)
+  module Make_default_generators = Make_generators (struct
+    let gen_payments = everybody_sends_a_payment_gen
 
-  let add_linear_breadcrumbs ?gen_payments ~logger ~trust_system ~size
-      ~frontier ~accounts_with_secret_keys parent =
-    let new_breadcrumbs =
-      gen_linear_breadcrumbs ?gen_payments ~logger ~trust_system ~size
-        ~accounts_with_secret_keys parent
-      |> Quickcheck.random_value
-    in
-    Deferred.List.iter new_breadcrumbs ~f:(fun breadcrumb ->
-        let%bind breadcrumb = breadcrumb in
-        Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
-
-  let add_child ~logger ~trust_system ~accounts_with_secret_keys ~frontier
-      ~parent =
-    let%bind new_node =
-      Quickcheck.random_value
-        (gen_breadcrumb ~logger ~trust_system accounts_with_secret_keys)
-      @@ Deferred.return parent
-    in
-    let%map () = Transition_frontier.add_breadcrumb_exn frontier new_node in
-    new_node
-
-  let gen_tree ~logger ~trust_system ~size ~accounts_with_secret_keys
-      root_breadcrumb =
-    Quickcheck.Generator.with_size ~size
-    @@ Quickcheck_lib.gen_imperative_rose_tree
-         (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~trust_system accounts_with_secret_keys)
-
-  let gen_tree_list ~logger ~trust_system ~size ~accounts_with_secret_keys
-      root_breadcrumb =
-    Quickcheck.Generator.with_size ~size
-    @@ Quickcheck_lib.gen_imperative_ktree
-         (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~trust_system accounts_with_secret_keys)
+    let accounts_with_secret_keys = Genesis_ledger.accounts
+  end)
 
   module Best_tip_prover = Best_tip_prover.Make (struct
     include Transition_frontier_inputs
@@ -703,9 +723,39 @@ struct
     let snark_pool_diffs _ = failwith "stub"
   end
 
+  module type Generator_intf = sig
+    val accounts_with_secret_keys : (Private_key.t option * Account.t) list
+
+    (* gen_payments will more than likely depend on accounts_with_secret_keys *)
+    val gen_payments :
+         Staged_ledger.t
+      -> (Private_key.t option * Account.t) list
+      -> User_command.With_valid_signature.t Sequence.t
+
+    val gen_breadcrumb :
+      (   Transition_frontier.Breadcrumb.t Deferred.t
+       -> Transition_frontier.Breadcrumb.t Deferred.t)
+      Quickcheck.Generator.t
+
+    val create_snarked_ledger : unit -> Ledger.Db.t * Account.t
+
+    val create_root_frontier : unit -> Transition_frontier.t Deferred.t
+
+    val gen_linear_breadcrumbs :
+         int
+      -> Transition_frontier.Breadcrumb.t
+      -> Transition_frontier.Breadcrumb.t Deferred.t list
+         Quickcheck.Generator.t
+
+    val instantiate_linear_breadcrumbs :
+         int
+      -> Transition_frontier.Breadcrumb.t
+      -> Transition_frontier.Breadcrumb.t sexp_list Deferred.t
+  end
+
   module Network_builder = struct
     type peer_config =
-      {num_breadcrumbs: int; accounts: (Private_key.t option * Account.t) list}
+      {num_breadcrumbs: int; generator_module: (module Generator_intf)}
 
     type peer_with_frontier =
       {peer: Network_peer.Peer.t; frontier: Transition_frontier.t}
@@ -723,20 +773,19 @@ struct
       let time = Block_time.of_span_since_epoch (Block_time.Span.of_ms 1L)
     end
 
-    let setup ~source_accounts ~logger ~trust_system configs =
-      let%bind me = create_root_frontier ~logger source_accounts in
+    let setup ~logger (module Me_module : Generator_intf) configs =
+      let%bind me = Me_module.create_root_frontier () in
       let%map _, _, peers_with_frontiers =
         Deferred.List.fold
           ~init:(Constants.init_ip, Constants.init_discovery_port, []) configs
           ~f:(fun (ip, discovery_port, acc_peers)
-             {num_breadcrumbs; accounts}
+             {num_breadcrumbs; generator_module= (module Peer_module)}
              ->
-            let%bind frontier = create_root_frontier ~logger accounts in
+            let%bind frontier = Peer_module.create_root_frontier () in
             let%map () =
               build_frontier_randomly frontier
                 ~gen_root_breadcrumb_builder:
-                  (gen_linear_breadcrumbs ~logger ~trust_system
-                     ~size:num_breadcrumbs ~accounts_with_secret_keys:accounts)
+                  (Peer_module.gen_linear_breadcrumbs num_breadcrumbs)
             in
             (* each peer has a distinct IP address, so we lookup frontiers by IP *)
             let peer =
@@ -767,13 +816,29 @@ struct
       in
       {me; network; peers= List.rev peers_with_frontiers}
 
-    let setup_me_and_a_peer ~source_accounts ~target_accounts ~logger
-        ~trust_system ~num_breadcrumbs =
+    let setup_me_and_a_peer ~logger (module My_generator : Generator_intf)
+        peer_config =
       let%map {me; network; peers} =
-        setup ~source_accounts ~logger ~trust_system
-          [{num_breadcrumbs; accounts= target_accounts}]
+        setup ~logger (module My_generator) [peer_config]
       in
       (me, List.hd_exn peers, network)
+
+    module Shared_generators = struct
+      let setup ~logger (module Generator_config : Generator_intf)
+          peers_breadcrumbs =
+        setup ~logger
+          (module Generator_config)
+          (List.map peers_breadcrumbs ~f:(fun num_breadcrumbs ->
+               {num_breadcrumbs; generator_module= (module Generator_config)}
+           ))
+
+      let setup_me_and_a_peer ~logger
+          (module Generator_config : Generator_intf) their_num_bereadcrumbs =
+        setup_me_and_a_peer ~logger
+          (module Generator_config)
+          { num_breadcrumbs= their_num_bereadcrumbs
+          ; generator_module= (module Generator_config) }
+    end
 
     let send_transition ~logger ~transition_writer ~peer:{peer; frontier}
         state_hash =

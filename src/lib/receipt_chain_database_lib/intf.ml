@@ -83,6 +83,8 @@ module type Receipt_chain_hash = sig
   val empty : t
 
   val cons : payment_payload -> t -> t
+
+  val to_string : t -> string
 end
 
 module type Payment = sig

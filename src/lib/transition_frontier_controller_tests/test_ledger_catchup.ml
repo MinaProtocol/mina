@@ -94,18 +94,27 @@ let%test_module "Ledger catchup" =
             (Transition_frontier.Breadcrumb.validated_transition
                breadcrumb_tree2) )
 
+    let logger = Logger.create ()
+
+    let trust_system = Trust_system.null ()
+
+    module Generators : Generator_intf = Make_default_generators (struct
+      let logger = logger
+
+      let trust_system = trust_system
+    end)
+
+    let setup_me_and_a_peer =
+      Network_builder.Shared_generators.setup_me_and_a_peer ~logger
+        (module Generators)
+
     let%test "catchup to a peer" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer
-              ~source_accounts:Genesis_ledger.accounts ~logger ~trust_system
-              ~target_accounts:Genesis_ledger.accounts
-              ~num_breadcrumbs:(max_length / 2)
-          in
+          let%bind me, peer, network = setup_me_and_a_peer (max_length / 2) in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
             let transition =
@@ -133,9 +142,9 @@ let%test_module "Ledger catchup" =
             Int.gen_incl max_length (2 * max_length) |> Quickcheck.random_value
           in
           let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
-              ~source_accounts:Genesis_ledger.accounts
-              ~target_accounts:Genesis_ledger.accounts ~num_breadcrumbs
+            Network_builder.Shared_generators.setup_me_and_a_peer ~logger
+              (module Generators)
+              num_breadcrumbs
           in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
@@ -174,11 +183,7 @@ let%test_module "Ledger catchup" =
       let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
-              ~source_accounts:Genesis_ledger.accounts
-              ~target_accounts:Genesis_ledger.accounts ~num_breadcrumbs:1
-          in
+          let%bind me, peer, network = setup_me_and_a_peer 1 in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
             Transition_frontier.Breadcrumb.validated_transition best_breadcrumb
@@ -208,12 +213,7 @@ let%test_module "Ledger catchup" =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
-              ~source_accounts:Genesis_ledger.accounts
-              ~target_accounts:Genesis_ledger.accounts
-              ~num_breadcrumbs:max_length
-          in
+          let%bind me, peer, network = setup_me_and_a_peer max_length in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
             Transition_frontier.Breadcrumb.validated_transition best_breadcrumb
@@ -287,12 +287,7 @@ let%test_module "Ledger catchup" =
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
-          let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer
-              ~source_accounts:Genesis_ledger.accounts ~logger ~trust_system
-              ~target_accounts:Genesis_ledger.accounts
-              ~num_breadcrumbs:max_length
-          in
+          let%bind me, peer, network = setup_me_and_a_peer max_length in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
             Transition_frontier.Breadcrumb.validated_transition best_breadcrumb

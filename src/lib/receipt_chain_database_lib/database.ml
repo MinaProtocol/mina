@@ -25,14 +25,13 @@ module Make
         |> Result.of_option
              ~error:
                (Error.createf
-                  !"Cannot retrieve receipt: %{sexp: Receipt_chain_hash.t}"
-                  last_receipt)
+                  !"Cannot retrieve receipt: %s"
+                  (Receipt_chain_hash.to_string last_receipt))
       with
       | Root ->
           Or_error.errorf
-            !"The payment of root hash %{sexp: Receipt_chain_hash.t} is not \
-              recorded"
-            last_receipt
+            !"The payment of root hash %s is not recorded"
+            (Receipt_chain_hash.to_string last_receipt)
       | Child {value; parent; _} ->
           if Receipt_chain_hash.equal start_receipt last_receipt then
             Or_error.return [value]

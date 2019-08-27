@@ -12,51 +12,38 @@ let%test_module "Root_history and Transition_frontier" =
 
     open Stubs
 
-    let breadcrumbs_path = Transition_frontier.root_history_path_map ~f:Fn.id
-
-    let accounts_with_secret_keys = Genesis_ledger.accounts
-
-    let create_root_frontier = create_root_frontier accounts_with_secret_keys
-
-    let create_breadcrumbs ~logger ~trust_system ~size root =
-      Deferred.all
-      @@ Quickcheck.random_value
-           (gen_linear_breadcrumbs ~logger ~trust_system ~size
-              ~accounts_with_secret_keys root)
-
-    let breadcrumb_trail_equals =
-      List.equal Transition_frontier.Breadcrumb.equal
-
     let logger = Logger.null ()
 
     let trust_system = Trust_system.null ()
 
+    module Generators = Make_default_generators (struct
+      let logger = logger
+
+      let trust_system = trust_system
+    end)
+
+    let breadcrumbs_path = Transition_frontier.root_history_path_map ~f:Fn.id
+
+    let breadcrumb_trail_equals =
+      List.equal Transition_frontier.Breadcrumb.equal
+
     let common_ancestor_test ancestor_length branch1_length branch2_length =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          let%bind frontier = Generators.create_root_frontier () in
           let root = Transition_frontier.root frontier in
-          let%bind ancestors =
-            create_breadcrumbs ~logger ~trust_system ~size:ancestor_length root
+          let%bind _ =
+            Generators.add_linear_breadcrumbs ~frontier root ancestor_length
           in
-          let youngest_ancestor = List.last_exn ancestors in
-          let%bind () =
-            Deferred.List.iter ancestors ~f:(fun ancestor ->
-                Transition_frontier.add_breadcrumb_exn frontier ancestor )
-          in
+          let youngest_ancestor = Transition_frontier.best_tip frontier in
           let%bind branch1 =
-            create_breadcrumbs ~logger ~trust_system ~size:branch1_length
-              youngest_ancestor
+            Generators.add_linear_breadcrumbs ~frontier youngest_ancestor
+              branch1_length
           in
-          let%bind branch2 =
-            create_breadcrumbs ~logger ~trust_system ~size:branch2_length
-              youngest_ancestor
+          let%map branch2 =
+            Generators.add_linear_breadcrumbs ~frontier youngest_ancestor
+              branch2_length
           in
           let bc1, bc2 = (List.last_exn branch1, List.last_exn branch2) in
-          let%map () =
-            Deferred.List.iter (List.append branch1 branch2)
-              ~f:(fun breadcrumb ->
-                Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
-          in
           State_hash.equal
             (Transition_frontier.common_ancestor frontier bc1 bc2)
             (Transition_frontier.Breadcrumb.state_hash youngest_ancestor) )
@@ -78,10 +65,10 @@ let%test_module "Root_history and Transition_frontier" =
     let%test "If a transition does not exists in the transition_frontier or \
               in the root_history, then we should not get an answer" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          let%bind frontier = Generators.create_root_frontier () in
           let root = Transition_frontier.root frontier in
           let%bind breadcrumbs =
-            create_breadcrumbs ~logger ~trust_system ~size:max_length root
+            Generators.instantiate_linear_breadcrumbs max_length root
           in
           let last_breadcrumb, breadcrumbs_to_add =
             let rev_breadcrumbs = List.rev breadcrumbs in
@@ -99,14 +86,10 @@ let%test_module "Root_history and Transition_frontier" =
     let%test "Query transition only from transition_frontier if the \
               root_history is empty" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          let%bind frontier = Generators.create_root_frontier () in
           let root = Transition_frontier.root frontier in
-          let%bind breadcrumbs =
-            create_breadcrumbs ~logger ~trust_system ~size:max_length root
-          in
-          let%map () =
-            Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
-                Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
+          let%map breadcrumbs =
+            Generators.add_linear_breadcrumbs ~frontier root max_length
           in
           let random_index =
             Quickcheck.random_value (Int.gen_incl 0 (max_length - 1))
@@ -126,16 +109,12 @@ let%test_module "Root_history and Transition_frontier" =
 
     let%test "Query transitions only from root_history" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          let%bind frontier = Generators.create_root_frontier () in
           let root = Transition_frontier.root frontier in
           let query_index = 1 in
           let size = max_length + query_index + 2 in
-          let%bind breadcrumbs =
-            create_breadcrumbs ~logger ~trust_system ~size root
-          in
-          let%map () =
-            Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
-                Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
+          let%map breadcrumbs =
+            Generators.add_linear_breadcrumbs ~frontier root size
           in
           let query_breadcrumb = List.nth_exn breadcrumbs query_index in
           let expected_breadcrumbs =
@@ -154,20 +133,17 @@ let%test_module "Root_history and Transition_frontier" =
     let%test "moving the root removes the old root's non-heir children as \
               garbage" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
-          let%bind () =
-            add_linear_breadcrumbs ~logger ~trust_system ~size:max_length
-              ~accounts_with_secret_keys ~frontier ~gen_payments
+          let%bind frontier = Generators.create_root_frontier () in
+          let%bind (_ : Transition_frontier.Breadcrumb.t list) =
+            Generators.add_linear_breadcrumbs ~frontier
               (Transition_frontier.root frontier)
+              max_length
           in
           let root = Transition_frontier.root frontier in
-          let add_child =
-            add_child ~logger ~trust_system ~accounts_with_secret_keys
-              ~frontier
-          in
-          let%bind soon_garbage = add_child ~parent:root in
+          let%bind soon_garbage = Generators.add_child ~frontier root in
           let%map _ =
-            add_child ~parent:(Transition_frontier.best_tip frontier)
+            Generators.add_child ~frontier
+              (Transition_frontier.best_tip frontier)
           in
           Transition_frontier.(
             find frontier @@ Breadcrumb.state_hash soon_garbage)
@@ -175,15 +151,12 @@ let%test_module "Root_history and Transition_frontier" =
 
     let%test "Transitions get popped off from root history" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          let%bind frontier = Generators.create_root_frontier () in
           let root = Transition_frontier.root frontier in
           let root_hash = Transition_frontier.Breadcrumb.state_hash root in
           let size = (3 * max_length) + 1 in
-          let%map () =
-            build_frontier_randomly frontier
-              ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~trust_system ~size
-                   ~accounts_with_secret_keys)
+          let%map (_ : Transition_frontier.Breadcrumb.t list) =
+            Generators.add_linear_breadcrumbs ~frontier root size
           in
           assert (
             not
@@ -193,21 +166,21 @@ let%test_module "Root_history and Transition_frontier" =
 
     let%test "Get transitions from both transition frontier and root history" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          let%bind frontier = Generators.create_root_frontier () in
           let root = Transition_frontier.root frontier in
           let num_root_history_breadcrumbs =
             Quickcheck.random_value (Int.gen_incl 1 (2 * max_length))
           in
           let%bind root_history_breadcrumbs =
-            create_breadcrumbs ~logger ~trust_system
-              ~size:num_root_history_breadcrumbs root
+            Generators.add_linear_breadcrumbs ~frontier root
+              num_root_history_breadcrumbs
           in
           let most_recent_breadcrumb_in_root_history_breadcrumb =
             List.last_exn root_history_breadcrumbs
           in
-          let%bind transition_frontier_breadcrumbs =
-            create_breadcrumbs ~logger ~trust_system ~size:max_length
-              most_recent_breadcrumb_in_root_history_breadcrumb
+          let%map transition_frontier_breadcrumbs =
+            Generators.add_linear_breadcrumbs ~frontier
+              most_recent_breadcrumb_in_root_history_breadcrumb max_length
           in
           let random_breadcrumb_index =
             Quickcheck.random_value (Int.gen_incl 0 (max_length - 1))
@@ -221,12 +194,6 @@ let%test_module "Root_history and Transition_frontier" =
             (root :: root_history_breadcrumbs)
             @ List.take transition_frontier_breadcrumbs
                 (random_breadcrumb_index + 1)
-          in
-          let%map () =
-            Deferred.List.iter
-              (root_history_breadcrumbs @ transition_frontier_breadcrumbs)
-              ~f:(fun breadcrumb ->
-                Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
           in
           let result =
             breadcrumbs_path frontier random_breadcrumb_hash

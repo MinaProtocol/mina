@@ -7,12 +7,16 @@ exception
     ( [`Existing_parent of Receipt.Chain_hash.t]
     * [`New_parent of Receipt.Chain_hash.t] )
 
-module Make (Inputs : Transition_frontier.Inputs_intf) = struct
+module Make (Inputs : Transition_frontier.Inputs_intf) :
+  Intf.Receipt_chain
+  with type external_transition := Inputs.External_transition.t = struct
   open Inputs
 
   type t = {receipt_chain_database: Receipt_chain_database.t; logger: Logger.t}
 
   module Writer = struct
+    type nonrec t = t
+
     let create ~logger receipt_chain_database = {receipt_chain_database; logger}
 
     let add {receipt_chain_database; logger}
@@ -36,11 +40,11 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
           with
           | `Ok receipt_chain ->
               Logger.debug logger
-                !"The $receipt_chain of $user_command is $hash"
+                !"The receipt_chain of $user_command is $hash"
                 ~location:__LOC__ ~module_:__MODULE__
                 ~metadata:
-                  [ ( "receipt_chain"
-                    , Receipt.Chain_hash.to_yojson receipt_chain ) ] ;
+                  [ ("hash", Receipt.Chain_hash.to_yojson receipt_chain)
+                  ; ("user_command", User_command.to_yojson user_command) ] ;
               Public_key.Compressed.Map.set previous_receipt_chains ~key:sender
                 ~data:receipt_chain
           | `Duplicate receipt_chain ->
@@ -59,7 +63,17 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
   end
 
   module Reader = struct
+    type nonrec t = t
+
+    let create ~logger receipt_chain_database = {receipt_chain_database; logger}
+
     let prove {receipt_chain_database; _} =
       Receipt_chain_database.prove receipt_chain_database
+
+    let verify = Receipt_chain_database.verify
   end
+
+  let create ~logger receipt_chain_database =
+    ( Reader.create ~logger receipt_chain_database
+    , Writer.create ~logger receipt_chain_database )
 end

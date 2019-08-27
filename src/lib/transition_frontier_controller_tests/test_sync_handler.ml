@@ -19,14 +19,18 @@ let%test_module "Sync_handler" =
 
     let trust_system = Trust_system.null ()
 
+    module Generators = Make_default_generators (struct
+      let logger = logger
+
+      let trust_system = trust_system
+    end)
+
     let%test "sync with ledgers from another peer via glue_sync_ledger" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       Ledger.with_ephemeral_ledger ~f:(fun dest_ledger ->
           Thread_safe.block_on_async_exn (fun () ->
-              let%bind frontier =
-                create_root_frontier ~logger Genesis_ledger.accounts
-              in
+              let%bind frontier = Generators.create_root_frontier () in
               let source_ledger =
                 Transition_frontier.For_tests.root_snarked_ledger frontier
                 |> Ledger.of_database
@@ -69,21 +73,15 @@ let%test_module "Sync_handler" =
       |> External_transition.Validation.forget_validation
 
     let%test "a node should be able to give a valid proof of their root" =
-      let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
       let max_length = 4 in
       (* Generating this many breadcrumbs will ernsure the transition_frontier to be full  *)
       let num_breadcrumbs = max_length + 2 in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier =
-            create_root_frontier ~logger Genesis_ledger.accounts
-          in
+          let%bind frontier = Generators.create_root_frontier () in
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~trust_system
-                   ~size:num_breadcrumbs
-                   ~accounts_with_secret_keys:Genesis_ledger.accounts)
+                (Generators.gen_linear_breadcrumbs num_breadcrumbs)
           in
           let seen_transition =
             Transition_frontier.(
@@ -119,9 +117,7 @@ let%test_module "Sync_handler" =
         (2 * max_length) + Consensus.Constants.delta + 1
       in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier =
-            create_root_frontier ~logger Genesis_ledger.accounts
-          in
+          let%bind frontier = Generators.create_root_frontier () in
           let root_breadcrumb = Transition_frontier.root frontier in
           let root_transition =
             Transition_frontier.Breadcrumb.validated_transition root_breadcrumb
@@ -129,9 +125,8 @@ let%test_module "Sync_handler" =
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~trust_system
-                   ~size:num_breadcrumbs_to_cause_bootstrap
-                   ~accounts_with_secret_keys:Genesis_ledger.accounts)
+                (Generators.gen_linear_breadcrumbs
+                   num_breadcrumbs_to_cause_bootstrap)
           in
           let root_consensus_state =
             External_transition.Validated.consensus_state root_transition

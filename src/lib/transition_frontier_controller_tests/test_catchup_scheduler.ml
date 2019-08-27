@@ -28,27 +28,25 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let trust_system = Trust_system.null ()
 
+    module Generators = Make_default_generators (struct
+      let logger = logger
+
+      let trust_system = trust_system
+    end)
+
     let time_controller = Block_time.Controller.basic
 
     let timeout_duration = Block_time.Span.of_ms 200L
-
-    let accounts_with_secret_keys = Genesis_ledger.accounts
 
     let num_breadcrumbs = 5
 
     let setup_random_frontier () =
       let open Deferred.Let_syntax in
-      let%bind frontier =
-        create_root_frontier ~logger accounts_with_secret_keys
-      in
+      let%bind frontier = Generators.create_root_frontier () in
       let%map (_ : unit) =
         build_frontier_randomly
-          ~gen_root_breadcrumb_builder:(fun root_breadcrumb ->
-            Quickcheck.Generator.with_size ~size:num_breadcrumbs
-              (Quickcheck_lib.gen_imperative_ktree
-                 (root_breadcrumb |> return |> Quickcheck.Generator.return)
-                 (gen_breadcrumb ~logger ~trust_system
-                    accounts_with_secret_keys)) )
+          ~gen_root_breadcrumb_builder:
+            (Generators.gen_tree_list num_breadcrumbs)
           frontier
       in
       frontier
@@ -85,13 +83,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
-            |> List.permute |> List.hd_exn
+            |> List.random_element_exn
           in
           let%bind upcoming_breadcrumbs =
-            Deferred.all
-            @@ Quickcheck.random_value
-                 (gen_linear_breadcrumbs ~logger ~trust_system ~size:2
-                    ~accounts_with_secret_keys randomly_chosen_breadcrumb)
+            Generators.instantiate_linear_breadcrumbs 2
+              randomly_chosen_breadcrumb
           in
           let missing_hash =
             List.hd_exn upcoming_breadcrumbs
@@ -150,14 +146,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
-            |> List.permute |> List.hd_exn
+            |> List.random_element_exn
           in
           let size = 4 in
           let%bind upcoming_breadcrumbs =
-            Deferred.all
-            @@ Quickcheck.random_value
-                 (gen_linear_breadcrumbs ~logger ~trust_system ~size
-                    ~accounts_with_secret_keys randomly_chosen_breadcrumb)
+            Generators.instantiate_linear_breadcrumbs size
+              randomly_chosen_breadcrumb
           in
           let upcoming_transitions =
             List.map ~f:Transition_frontier.Breadcrumb.validated_transition
@@ -251,13 +245,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
-            |> List.permute |> List.hd_exn
+            |> List.random_element_exn
           in
           let%bind upcoming_rose_tree =
-            Rose_tree.Deferred.all
-            @@ Quickcheck.random_value
-                 (gen_tree ~logger ~trust_system ~size:5
-                    ~accounts_with_secret_keys randomly_chosen_breadcrumb)
+            Generators.instantiate_tree 5 randomly_chosen_breadcrumb
           in
           let upcoming_breadcrumbs = Rose_tree.flatten upcoming_rose_tree in
           let upcoming_transitions =

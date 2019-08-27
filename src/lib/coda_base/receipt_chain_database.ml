@@ -15,7 +15,8 @@ module Receipt_chain_hash = struct
   (* Receipt.Chain_hash.t is not bin_io *)
   include Receipt.Chain_hash.Stable.V1
 
-  let empty, cons = Receipt.Chain_hash.(empty, cons)
+  [%%define_locally
+  Receipt.Chain_hash.(empty, cons, to_string)]
 end
 
 include Database.Make (Payment) (Receipt_chain_hash) (Key_value_store)

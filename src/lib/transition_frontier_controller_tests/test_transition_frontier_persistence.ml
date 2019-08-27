@@ -24,6 +24,12 @@ let%test_module "Transition Frontier Persistence" =
 
     let trust_system = Trust_system.null ()
 
+    module Generators = Make_default_generators (struct
+      let logger = logger
+
+      let trust_system = trust_system
+    end)
+
     let check_transitions transition_storage written_breadcrumbs =
       List.iter written_breadcrumbs ~f:(fun breadcrumb ->
           let expected_transition =
@@ -46,9 +52,7 @@ let%test_module "Transition Frontier Persistence" =
         ~f:(Transition_frontier.add_breadcrumb_exn frontier)
 
     let with_persistence ?directory_name ~logger ~f =
-      let%bind frontier =
-        create_root_frontier ~logger Genesis_ledger.accounts
-      in
+      let%bind frontier = Generators.create_root_frontier () in
       Monitor.try_with (fun () ->
           let frontier_persistence = create_persistence ~directory_name in
           let%bind result = f (frontier, frontier_persistence) in
@@ -70,9 +74,7 @@ let%test_module "Transition Frontier Persistence" =
 
     let generate_breadcrumbs ~gen_root_breadcrumb_builder frontier size =
       Quickcheck.random_value
-        (gen_root_breadcrumb_builder ~logger ~trust_system ~size
-           Genesis_ledger.accounts
-           (Transition_frontier.root frontier))
+        (gen_root_breadcrumb_builder size (Transition_frontier.root frontier))
       |> Deferred.all
 
     let test_breadcrumbs ~gen_root_breadcrumb_builder num_breadcrumbs =
@@ -81,14 +83,14 @@ let%test_module "Transition Frontier Persistence" =
       let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%map breadcrumbs =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
-            let%bind breadcrumbs =
-              generate_breadcrumbs ~gen_root_breadcrumb_builder frontier
-                num_breadcrumbs
-            in
             let reader_frontier, _ = Broadcast_pipe.create (Some frontier) in
             don't_wait_for
             @@ Transition_frontier_persistence
                .listen_to_frontier_broadcast_pipe reader_frontier t ;
+            let%bind breadcrumbs =
+              generate_breadcrumbs ~gen_root_breadcrumb_builder frontier
+                num_breadcrumbs
+            in
             let%map () = store_transitions frontier breadcrumbs in
             breadcrumbs )
       in
@@ -98,19 +100,10 @@ let%test_module "Transition Frontier Persistence" =
 
     let test_linear_breadcrumbs =
       test_breadcrumbs
-        ~gen_root_breadcrumb_builder:(fun ~logger
-                                     ~trust_system
-                                     ~size
-                                     accounts_with_secret_keys
-                                     ->
-          gen_linear_breadcrumbs ~logger ~trust_system ~size
-            ~accounts_with_secret_keys ~gen_payments )
-
-    let gen_tree_list ~logger ~trust_system ~size accounts_with_secret_keys =
-      gen_tree_list ~logger ~trust_system ~size ~accounts_with_secret_keys
+        ~gen_root_breadcrumb_builder:Generators.gen_linear_breadcrumbs
 
     let test_tree_breadcrumbs =
-      test_breadcrumbs ~gen_root_breadcrumb_builder:gen_tree_list
+      test_breadcrumbs ~gen_root_breadcrumb_builder:Generators.gen_tree_list
 
     let%test_unit "Should be able to query transitions from \
                    transition_storage after writing New_frontier and \
@@ -123,8 +116,7 @@ let%test_module "Transition Frontier Persistence" =
       let%bind root, next_breadcrumb =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
             let create_breadcrumb =
-              Quickcheck.random_value
-                (gen_breadcrumb ~logger ~trust_system Genesis_ledger.accounts)
+              Quickcheck.random_value Generators.gen_breadcrumb
             in
             let root = Transition_frontier.root frontier in
             let%map next_breadcrumb =
@@ -178,16 +170,17 @@ let%test_module "Transition Frontier Persistence" =
       let frontier_persistence =
         create_persistence ~directory_name:(Some directory_name)
       in
-      let%bind breadcrumbs =
-        generate_breadcrumbs ~gen_root_breadcrumb_builder:gen_tree_list
-          frontier num_breadcrumbs
-      in
       let root_snarked_ledger =
         Transition_frontier.For_tests.root_snarked_ledger frontier
       in
       don't_wait_for
       @@ Transition_frontier_persistence.listen_to_frontier_broadcast_pipe
            frontier_reader frontier_persistence ;
+      let%bind breadcrumbs =
+        generate_breadcrumbs
+          ~gen_root_breadcrumb_builder:Generators.gen_tree_list frontier
+          num_breadcrumbs
+      in
       let%bind () = store_transitions frontier breadcrumbs in
       let%bind () =
         Transition_frontier_persistence.close_and_finish_copy
@@ -207,9 +200,7 @@ let%test_module "Transition Frontier Persistence" =
       Async.Scheduler.set_record_backtraces true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let%bind frontier =
-        create_root_frontier ~logger Genesis_ledger.accounts
-      in
+      let%bind frontier = Generators.create_root_frontier () in
       test_deserialization max_length frontier
 
     let%test_unit "Serializing a frontier and then deserializing it  from \
@@ -218,7 +209,7 @@ let%test_module "Transition Frontier Persistence" =
       Async.Scheduler.set_record_backtraces true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      Stubs.with_genesis_frontier ~logger ~f:(fun frontier ->
+      Generators.with_genesis_frontier ~f:(fun frontier ->
           let%map is_serialization_correct =
             test_deserialization (max_length / 2) frontier
           in

@@ -1,30 +1,49 @@
+open Core
 open Coda_base
 open Signature_lib
 
-(* TODO: this should be a writer module *)
-module type Receipt_chain = sig
+module type Receipt_chain_writer = sig
   type t
 
   type external_transition
 
-  type user_command
-
-  type merkle_list
-
-  (** Add stores a payment into a client's database as a value.
-      The key is computed by using the payment payload and the previous receipt_chain_hash.
-      This receipt_chain_hash is computed within the `add` function. As a result,
-      the computed receipt_chain_hash is returned *)
+  (* TODO: transition should only have transactions that a user would be
+     interested in *)
   val add :
        t
     -> (external_transition, State_hash.t) With_hash.t
     -> Receipt.Chain_hash.t Public_key.Compressed.Map.t
     -> unit
+end
 
-  (* TODO: put this into another module (as reader) *)
-  (* val prove :
+module type Receipt_chain_reader = sig
+  type t
+
+  val prove :
        t
     -> proving_receipt:Receipt.Chain_hash.t
     -> resulting_receipt:Receipt.Chain_hash.t
-    -> Payment_proof.t Or_error.t *)
+    -> Payment_proof.t Or_error.t
+
+  val verify :
+       resulting_receipt:Receipt.Chain_hash.t
+    -> ( Receipt.Chain_hash.t
+       , User_command.t )
+       Receipt_chain_database_lib.Payment_proof.t
+    -> unit Or_error.t
+end
+
+(** We are separating receipt_chain by reader and writer because one process
+    will be doing writing actions (Archive) and the other will be doing reading
+    actions (Daemon) *)
+module type Receipt_chain = sig
+  type external_transition
+
+  module Writer :
+    Receipt_chain_writer with type external_transition := external_transition
+
+  module Reader : Receipt_chain_reader
+
+  val create :
+    logger:Logger.t -> Receipt_chain_database.t -> Reader.t * Writer.t
 end

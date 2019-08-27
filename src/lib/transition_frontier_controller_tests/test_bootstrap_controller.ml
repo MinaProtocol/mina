@@ -30,23 +30,39 @@ end)
 
 let%test_module "Bootstrap Controller" =
   ( module struct
+    let logger = Logger.create ()
+
+    let trust_system = Trust_system.null ()
+
+    let make_generator accounts_with_secret_keys =
+      ( module Make_generators (struct
+                   let gen_payments = everybody_sends_a_payment_gen
+
+                   let accounts_with_secret_keys = accounts_with_secret_keys
+                 end)
+                 (struct
+                   let logger = logger
+
+                   let trust_system = trust_system
+                 end)
+      : Generator_intf )
+
     let%test "`bootstrap_controller` caches all transitions it is passed \
               through the `transition_reader` pipe" =
       let transition_graph =
         Bootstrap_controller.For_tests.Transition_cache.create ()
       in
       let num_breadcrumbs = (Transition_frontier.max_length * 2) + 2 in
-      let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
       let network =
         Network.create_stub ~logger
           ~ip_table:(Hashtbl.create (module Unix.Inet_addr))
           ~peers:(Hash_set.create (module Network_peer.Peer) ())
       in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier =
-            create_root_frontier ~logger Genesis_ledger.accounts
+          let (module Generators : Generator_intf) =
+            make_generator Genesis_ledger.accounts
           in
+          let%bind frontier = Generators.create_root_frontier () in
           let genesis_root =
             Transition_frontier.root frontier
             |> Transition_frontier.Breadcrumb.validated_transition
@@ -63,9 +79,7 @@ let%test_module "Bootstrap Controller" =
           in
           let parent_breadcrumb = Transition_frontier.best_tip frontier in
           let breadcrumbs_gen =
-            gen_linear_breadcrumbs ~logger ~trust_system ~size:num_breadcrumbs
-              ~accounts_with_secret_keys:Genesis_ledger.accounts
-              parent_breadcrumb
+            Generators.gen_linear_breadcrumbs num_breadcrumbs parent_breadcrumb
             |> Quickcheck.Generator.with_size ~size:num_breadcrumbs
           in
           let%bind breadcrumbs =
@@ -147,17 +161,16 @@ let%test_module "Bootstrap Controller" =
 
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
-      let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
       let num_breadcrumbs = 10 in
-      let accounts = Genesis_ledger.accounts in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger accounts in
+          let (module Generators : Generator_intf) =
+            make_generator Genesis_ledger.accounts
+          in
+          let%bind frontier = Generators.create_root_frontier () in
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~trust_system
-                   ~size:num_breadcrumbs ~accounts_with_secret_keys:accounts)
+                (Generators.gen_linear_breadcrumbs num_breadcrumbs)
           in
           Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
             ~f:(fun breadcrumb ->
@@ -187,17 +200,13 @@ let%test_module "Bootstrap Controller" =
                   (Staged_ledger.hash actual_staged_ledger) ) ) )
 
     let%test "sync with one node after receiving a transition" =
-      Backtrace.elide := false ;
-      Printexc.record_backtrace true ;
-      let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
-              ~num_breadcrumbs
-              ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
-              ~target_accounts:Genesis_ledger.accounts
+            Network_builder.setup_me_and_a_peer ~logger
+              (make_generator [List.hd_exn Genesis_ledger.accounts])
+              { num_breadcrumbs
+              ; generator_module= make_generator Genesis_ledger.accounts }
           in
           let transition_reader, transition_writer = make_transition_pipe () in
           let best_hash = get_best_tip_hash peer in
@@ -219,17 +228,13 @@ let%test_module "Bootstrap Controller" =
       )
 
     let%test "sync with one node eagerly" =
-      Backtrace.elide := false ;
-      Printexc.record_backtrace true ;
-      let logger = Logger.create () in
-      let trust_system = Trust_system.null () in
       let num_breadcrumbs = (2 * max_length) + Consensus.Constants.delta + 2 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
-              ~num_breadcrumbs
-              ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
-              ~target_accounts:Genesis_ledger.accounts
+            Network_builder.setup_me_and_a_peer ~logger
+              (make_generator [List.hd_exn Genesis_ledger.accounts])
+              { num_breadcrumbs
+              ; generator_module= make_generator Genesis_ledger.accounts }
           in
           let transition_reader, _ = make_transition_pipe () in
           let ledger_db =
@@ -260,11 +265,12 @@ let%test_module "Bootstrap Controller" =
       let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind {me; peers; network} =
-            Network_builder.setup ~source_accounts ~logger ~trust_system
+            Network_builder.setup ~logger
+              (make_generator source_accounts)
               [ { num_breadcrumbs= unsynced_peer_num_breadcrumbs
-                ; accounts= unsynced_peers_accounts }
+                ; generator_module= make_generator unsynced_peers_accounts }
               ; { num_breadcrumbs= synced_peer_num_breadcrumbs
-                ; accounts= Genesis_ledger.accounts } ]
+                ; generator_module= make_generator Genesis_ledger.accounts } ]
           in
           let transition_reader, _ = make_transition_pipe () in
           let ledger_db =
@@ -299,11 +305,12 @@ let%test_module "Bootstrap Controller" =
       Thread_safe.block_on_async_exn (fun () ->
           let large_peer_accounts = Genesis_ledger.accounts in
           let%bind {me; peers; network} =
-            Network_builder.setup ~source_accounts ~logger ~trust_system
+            Network_builder.setup ~logger
+              (make_generator source_accounts)
               [ { num_breadcrumbs= small_peer_num_breadcrumbs
-                ; accounts= small_peer_accounts }
+                ; generator_module= make_generator small_peer_accounts }
               ; { num_breadcrumbs= large_peer_num_breadcrumbs
-                ; accounts= large_peer_accounts } ]
+                ; generator_module= make_generator large_peer_accounts } ]
           in
           let transition_reader, transition_writer = make_transition_pipe () in
           let small_peer, large_peer =
@@ -341,9 +348,9 @@ let%test_module "Bootstrap Controller" =
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer_with_frontier, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
-              ~num_breadcrumbs ~source_accounts:Genesis_ledger.accounts
-              ~target_accounts:Genesis_ledger.accounts
+            Network_builder.Shared_generators.setup_me_and_a_peer ~logger
+              (make_generator Genesis_ledger.accounts)
+              num_breadcrumbs
           in
           let root_sync_ledger =
             Root_sync_ledger.create

@@ -79,13 +79,17 @@ let%test_module "transaction_status" =
             (get_status_exn ~frontier_broadcast_pipe ~transaction_pool
                user_command) )
 
+    module Generators = Make_default_generators (struct
+      let logger = logger
+
+      let trust_system = trust_system
+    end)
+
     let%test_unit "A pending transaction is either in the transition frontier \
                    or transaction pool, but not in the best path of the \
                    transition frontier" =
       single_async_test user_command_gen ~f:(fun user_command ->
-          let%bind frontier =
-            create_root_frontier ~logger Genesis_ledger.accounts
-          in
+          let%bind frontier = Generators.create_root_frontier () in
           let frontier_broadcast_pipe, _ =
             Broadcast_pipe.create (Some frontier)
           in
@@ -111,9 +115,7 @@ let%test_module "transaction_status" =
         Non_empty_list.init head_user_command tail_user_commands
       in
       single_async_test user_commands_generator ~f:(fun user_commands ->
-          let%bind frontier =
-            create_root_frontier ~logger Genesis_ledger.accounts
-          in
+          let%bind frontier = Generators.create_root_frontier () in
           let frontier_broadcast_pipe, _ =
             Broadcast_pipe.create (Some frontier)
           in
