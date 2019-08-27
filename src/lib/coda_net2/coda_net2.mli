@@ -109,9 +109,10 @@ module Pubsub : sig
   val subscribe :
        net
     -> string
-    -> should_forward_message:(sender:PeerID.t -> data:string -> bool Deferred.t)
+    -> should_forward_message:(   sender:PeerID.t
+                               -> data:string
+                               -> bool Deferred.t)
     -> Subscription.t Deferred.Or_error.t
-
 end
 
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
