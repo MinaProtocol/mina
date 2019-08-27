@@ -32,7 +32,10 @@ let to_int_res x =
 type keypair = {secret: string; public: string; peer_id: string}
 
 module Helper = struct
-  (* duplicate record field names in same module *)
+  (* Warning 30 is about field labels being defined in multiple types.
+     It means more disambiguation has to happen sometimes but it doesn't
+     seem to be a big deal. *)
+  [@warning "-30"]
   type t =
     { subprocess: Process.t
     ; mutable failure_response: [`Die | `Ignore]
@@ -588,7 +591,7 @@ module Helper = struct
         Deferred.unit )
     |> don't_wait_for ;
     t
-end [@warning "-30"]
+end
 
 type net = Helper.t
 
