@@ -114,10 +114,10 @@ module F4
   val cyclotomic_square :
     Fq2.t * Fq2.t -> (Fq2.t * Fq2.t, 'a) Fq2.Impl.Checked.t
 
+  open Fq2.Impl
+
   val frobenius :
-       ('a * Impl.field Snarky.Cvar.t)
-       * (Impl.field Snarky.Cvar.t * Impl.field Snarky.Cvar.t)
+       ('a * Field.Var.t) * (Field.Var.t * Field.Var.t)
     -> int
-    -> ('a * Impl.field Snarky.Cvar.t)
-       * (Impl.field Snarky.Cvar.t * Impl.field Snarky.Cvar.t)
+    -> ('a * Field.Var.t) * (Field.Var.t * Field.Var.t)
 end

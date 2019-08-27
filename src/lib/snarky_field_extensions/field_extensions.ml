@@ -111,7 +111,7 @@ module Make (F : Intf.Basic) = struct
    - if `y != 0`, then we can divide by `y` and get `div_unsafe x y = z = x / y`.
    - if `y = 0` and `x != 0`, then the equation says `0 * z = x` which means `0 * z != 0`
      and so we will have an unsatisfiable constraint system.
-   - if `y = 0` and `x = 0`, then `y` can be anything since the equation just says `0 * z = 0`
+   - if `y = 0` and `x = 0`, then `z` can be anything since the equation just says `0 * z = 0`
      which is satisfied by all `z`.
 
    Thus this division function should only be called if we know statically that `y != 0` (at least
@@ -187,10 +187,6 @@ struct
     A.sequence (A.map2 then_ else_ ~f:(fun t e -> F.if_ b ~then_:t ~else_:e))
 
   let scale t x = A.map t ~f:(fun a -> F.scale a x)
-
-  let scale' t x = A.map t ~f:(fun a -> F.scale x a)
-
-  let _ = scale' (* potato *)
 
   let negate t = A.map t ~f:F.negate
 
@@ -741,7 +737,8 @@ module F6
         end
     end) (Params : sig
       val frobenius_coeffs_c1 : Fq.Unchecked.t array
-    end)  = struct
+    end) =
+struct
   module Base = Fq3
 
   module T =
