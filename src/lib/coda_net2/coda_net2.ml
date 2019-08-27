@@ -791,6 +791,9 @@ module Stream = struct
   let pipes ({incoming_r; outgoing_w; _} : t) = (incoming_r, outgoing_w)
 
   let reset ({net; idx; _} : t) =
+    (* NOTE: do not close the pipes here. Reset_stream should end up
+    notifying us that the stream was lost. We can reset the stream (telling
+    the remote peer to stop writing) and still be sending data ourselves. *)
     match%map Helper.do_rpc net (module Helper.Rpcs.Reset_stream) {idx} with
     | Ok "resetStream success" ->
         Ok ()
