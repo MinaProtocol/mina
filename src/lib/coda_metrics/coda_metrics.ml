@@ -145,6 +145,26 @@ module Runtime = struct
       (fun () -> float_of_int !current.Gc.Stat.top_heap_words)
       ~help:"Maximum size reached by the major heap, in words."
 
+  let ocaml_gc_live_words =
+    simple_metric ~metric_type:Counter "ocaml_gc_live_words"
+      (fun () -> float_of_int !current.Gc.Stat.live_words)
+      ~help:"Live words allocated by the GC."
+
+  let ocaml_gc_free_words =
+    simple_metric ~metric_type:Counter "ocaml_gc_free_words"
+      (fun () -> float_of_int !current.Gc.Stat.free_words)
+      ~help:"Words freed by the GC."
+
+  let ocaml_gc_largest_free =
+    simple_metric ~metric_type:Counter "ocaml_gc_largest_free"
+      (fun () -> float_of_int !current.Gc.Stat.largest_free)
+      ~help:"Size of the largest block freed by the GC."
+
+  let ocaml_gc_stack_size =
+    simple_metric ~metric_type:Counter "ocaml_gc_stack_size"
+      (fun () -> float_of_int !current.Gc.Stat.stack_size)
+      ~help:"Current stack size."
+
   let process_cpu_seconds_total =
     simple_metric ~metric_type:Counter "process_cpu_seconds_total" Sys.time
       ~help:"Total user and system CPU time spent in seconds."
@@ -163,6 +183,10 @@ module Runtime = struct
     ; ocaml_gc_heap_words
     ; ocaml_gc_compactions
     ; ocaml_gc_top_heap_words
+    ; ocaml_gc_live_words
+    ; ocaml_gc_free_words
+    ; ocaml_gc_largest_free
+    ; ocaml_gc_stack_size
     ; process_cpu_seconds_total
     ; process_uptime_ms_total ]
 
