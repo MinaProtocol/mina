@@ -753,8 +753,11 @@ let configure net ~me ~maddrs ~network_id =
   | Error e ->
       Error e
 
-(** TODO: do we need this? *)
-let peers _ = Deferred.return []
+(** TODO: needs a new helper RPC.
+    What should the semantics be? Only peers we currently have open
+    connections to? Anybody in the peerbook? Only those we're gossiping to?
+    *)
+let peers _ = failwith "Coda_net2.peers not yet implemented"
 
 let listen_on net iface =
   match%map Helper.do_rpc net (module Helper.Rpcs.Listen) {iface} with
