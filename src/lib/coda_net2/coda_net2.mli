@@ -177,7 +177,7 @@ module Stream : sig
   (** [pipes t] returns the reader/writer pipe for our half of the stream. *)
   val pipes : t -> string Pipe.Reader.t * string Pipe.Writer.t
 
-  (** [reset t] informs the other process to close the stream.
+  (** [reset t] informs the other peer to close the stream.
 
     The returned [Deferred.Or_error.t] is fulfilled with [Ok ()] immediately
     once the reset is performed. It does not wait for the other host to
