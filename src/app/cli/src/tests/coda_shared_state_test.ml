@@ -18,6 +18,8 @@ let main () =
     Coda_worker_testnet.test logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
+  (* Wait the nodes to initialize *)
+  let%bind () = after (Time.Span.of_sec 20.) in
   let%bind () =
     Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
       ~keypairs ~n:3

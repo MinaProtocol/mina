@@ -17,17 +17,19 @@ let main n () =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
       Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
-  (* SEND TXNS *)
+  (* Wait the nodes to initialize *)
+  let%bind () = after (Time.Span.of_sec 20.) in
   let keypairs =
     List.map Genesis_ledger.accounts
       ~f:Genesis_ledger.keypair_of_account_record_exn
   in
-  let random_proposer () = Random.int 2 + 1 in
-  let random_non_proposer () = Random.int 2 + 3 in
+  (* SEND TXNS *)
   Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs
     ~n:10
   |> don't_wait_for ;
   (* RESTART NODES *)
+  let random_proposer () = Random.int 2 + 1 in
+  let random_non_proposer () = Random.int 2 + 3 in
   (* catchup *)
   let%bind () = after (Time.Span.of_min 1.) in
   let%bind () =
