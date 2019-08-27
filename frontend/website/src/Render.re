@@ -1,5 +1,5 @@
 [@bs.module "emotion-server"]
-external renderStylesToString: string => string = "";
+external renderStylesToString: string => string = "renderStylesToString";
 
 type critical = {
   .
@@ -8,10 +8,10 @@ type critical = {
 };
 
 [@bs.module "emotion-server"]
-external extractCritical: string => critical = "";
+external extractCritical: string => critical = "extractCritical";
 
 module Rimraf = {
-  [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
+  [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "sync";
 };
 
 Links.Cdn.setPrefix(
@@ -66,11 +66,11 @@ let posts = {
 
 module MoreFs = {
   type stat;
-  [@bs.val] [@bs.module "fs"] external lstatSync: string => stat = "";
-  [@bs.send] external isDirectory: stat => bool = "";
+  [@bs.val] [@bs.module "fs"] external lstatSync: string => stat = "lstatSync";
+  [@bs.send] external isDirectory: stat => bool = "isDirectory";
 
   [@bs.val] [@bs.module "fs"]
-  external copyFileSync: (string, string) => unit = "";
+  external copyFileSync: (string, string) => unit = "copyFileSync";
 
   [@bs.val] [@bs.module "fs"]
   external mkdirSync:
@@ -83,15 +83,15 @@ module MoreFs = {
       }
     ) =>
     unit =
-    "";
+    "mkdirSync";
 
   [@bs.val] [@bs.module "fs"]
-  external symlinkSync: (string, string) => unit = "";
+  external symlinkSync: (string, string) => unit = "symlinkSync";
 };
 
 module Router = {
   type t =
-    | File(string, ReasonReact.reactElement)
+    | File(string, React.element)
     | Dir(string, array(t));
 
   let generateStatic = {
@@ -125,6 +125,7 @@ let jobOpenings = [|
     "Marketing and Communications Manager (San Francisco).",
   ),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
+  ("cryptography-engineer", "Cryptography Engineer (San Francisco)"),
 |];
 
 // GENERATE

@@ -192,6 +192,11 @@ let make = () => {
              | Data(data) =>
                let {blocks, pending} = extractTransactions(data);
                let transactions = Array.concatenate(blocks);
+               let lastCursor =
+                 Option.withDefault(
+                   ~default="",
+                   data##blocks##pageInfo##lastCursor,
+                 );
                switch (Array.length(transactions), Array.length(pending)) {
                | (0, 0) =>
                  <div className=Styles.alertContainer>
@@ -204,10 +209,12 @@ let make = () => {
                  <TransactionsList
                    pending
                    transactions
+                   hasNextPage=data##blocks##pageInfo##hasNextPage
                    onLoadMore={() => {
                      let moreTransactions =
                        TransactionsQueryString.make(
                          ~publicKey=Apollo.Encoders.publicKey(pubkey),
+                         ~after=lastCursor,
                          (),
                        );
 

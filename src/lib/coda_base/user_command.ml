@@ -37,7 +37,7 @@ module Stable = struct
         , Public_key.Stable.V1.t
         , Signature.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving bin_io, compare, sexp, hash, yojson, version]
+      [@@deriving compare, bin_io, sexp, hash, yojson, version]
     end
 
     let description = "User command"

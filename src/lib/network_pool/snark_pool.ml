@@ -102,6 +102,8 @@ end) (Transaction_snark_work : sig
           type t [@@deriving sexp, bin_io, yojson, version]
 
           include Hashable.S_binable with type t := t
+
+          val compact_json : t -> Yojson.Safe.json
         end
       end
       with type V1.t = t
@@ -150,6 +152,21 @@ end)
 
       let removed_breadcrumb_wait = 10
 
+      let snark_pool_json t : Yojson.Safe.json =
+        `List
+          (Statement_table.fold ~init:[] t.snark_table
+             ~f:(fun ~key ~data:{proof= _; fee= {fee; prover}} acc ->
+               let work_ids =
+                 Transaction_snark_work.Statement.Stable.V1.compact_json key
+               in
+               `Assoc
+                 [ ("work_ids", work_ids)
+                 ; ("fee", Currency.Fee.Stable.V1.to_yojson fee)
+                 ; ( "prover"
+                   , Signature_lib.Public_key.Compressed.Stable.V1.to_yojson
+                       prover ) ]
+               :: acc ))
+
       let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t) =
         (* start with empty ref table *)
         t.ref_table <- None ;
@@ -168,11 +185,15 @@ end)
                         return ()
                       else (
                         removedCounter := 0 ;
+                        Statement_table.filter_keys_inplace t.snark_table
+                          ~f:(fun work ->
+                            Option.is_some
+                              (Statement_table.find refcount_table work) ) ;
                         return
-                          (Statement_table.filter_keys_inplace t.snark_table
-                             ~f:(fun work ->
-                               Option.is_some
-                                 (Statement_table.find refcount_table work) )) )
+                          (*when snark works removed from the pool*)
+                          Coda_metrics.(
+                            Gauge.set Snark_work.snark_pool_size
+                              (Float.of_int @@ Hashtbl.length t.snark_table)) )
                   )
                 in
                 deferred
@@ -206,6 +227,10 @@ end)
         if work_is_referenced t work then
           let update_and_rebroadcast () =
             Hashtbl.set t.snark_table ~key:work ~data:{proof; fee} ;
+            (*when snark work added to the pool*)
+            Coda_metrics.(
+              Gauge.set Snark_work.snark_pool_size
+                (Float.of_int @@ Hashtbl.length t.snark_table)) ;
             `Rebroadcast
           in
           match Statement_table.find t.snark_table work with

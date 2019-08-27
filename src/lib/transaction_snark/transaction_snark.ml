@@ -212,15 +212,16 @@ type t = Stable.Latest.t =
 [@@deriving fields, sexp, yojson]
 
 let statement
-    { source
-    ; target
-    ; proof_type
-    ; fee_excess
-    ; supply_increase
-    ; pending_coinbase_stack_state
-    ; sok_digest= _
-    ; proof= _ } =
-  { Statement.source
+    ({ source
+     ; target
+     ; proof_type
+     ; fee_excess
+     ; supply_increase
+     ; pending_coinbase_stack_state
+     ; sok_digest= _
+     ; proof= _ } :
+      t) =
+  { Statement.Stable.V1.source
   ; target
   ; proof_type
   ; supply_increase
@@ -377,12 +378,12 @@ module Base = struct
         sender_compressed ~f:(fun ~is_empty_and_writeable account ->
           with_label __LOC__
             (let%bind next_nonce =
-               Account.Nonce.increment_if_var account.nonce is_user_command
+               Account.Nonce.Checked.succ_if account.nonce is_user_command
              in
              let%bind () =
                with_label __LOC__
                  (let%bind nonce_matches =
-                    Account.Nonce.equal_var nonce account.nonce
+                    Account.Nonce.Checked.equal nonce account.nonce
                   in
                   Boolean.Assert.any
                     [Boolean.not is_user_command; nonce_matches])
