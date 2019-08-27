@@ -501,9 +501,13 @@ module Helper = struct
                     raise handler_exn )) ;
               Ok () )
             else
-              (* silently ignore new streams for closed protocol handlers *)
+              (* silently ignore new streams for closed protocol handlers.
+                 these are buffered stream open RPCs that were enqueued before
+                 our close went into effect. *)
+              (* TODO: we leak the new pipes here*)
               Ok ()
         | None ->
+            (* TODO: punish *)
             Or_error.errorf "incoming stream for protocol we don't know about?"
         )
     (* Received a message on some stream *)
@@ -529,6 +533,7 @@ module Helper = struct
             Or_error.errorf "lost a stream we don't know about: %d" stream_idx
         in
         Hashtbl.remove t.streams stream_idx ;
+        (* TODO: leaking pipes *)
         ret
     (* The remote peer closed its write end of one of our streams *)
     | "streamReadComplete" -> (
