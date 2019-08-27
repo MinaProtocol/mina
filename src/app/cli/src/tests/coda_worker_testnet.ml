@@ -29,13 +29,7 @@ module Api = struct
     ; restart_signals: (restart_type * unit Ivar.t) Option.t Array.t }
 
   let create configs workers start_writer =
-    let status =
-      Array.init (Array.length workers) ~f:(fun _ ->
-          let user_cmds_under_inspection =
-            Hashtbl.create (module User_command)
-          in
-          `On (`Synced user_cmds_under_inspection) )
-    in
+    let status = Array.init (Array.length workers) ~f:(fun _ -> `Off) in
     let locks =
       Array.init (Array.length workers) ~f:(fun _ ->
           (ref 0, Condition.create ()) )
@@ -44,13 +38,25 @@ module Api = struct
     let restart_signals =
       Array.init (Array.length workers) ~f:(fun _ -> None)
     in
-    { workers
-    ; configs
-    ; start_writer
-    ; status
-    ; locks
-    ; root_lengths
-    ; restart_signals }
+    let t =
+      { workers
+      ; configs
+      ; start_writer
+      ; status
+      ; locks
+      ; root_lengths
+      ; restart_signals }
+    in
+    upon
+      ( after
+      @@ Time.Span.of_sec Consensus.Constants.initialization_time_in_secs )
+      (fun () ->
+        Array.iteri workers ~f:(fun i _ ->
+            let user_cmds_under_inspection =
+              Hashtbl.create (module User_command)
+            in
+            t.status.(i) <- `On (`Synced user_cmds_under_inspection) ) ) ;
+    t
 
   let online t i = match t.status.(i) with `On _ -> true | `Off -> false
 

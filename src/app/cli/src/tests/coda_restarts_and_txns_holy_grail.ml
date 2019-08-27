@@ -18,7 +18,11 @@ let main n () =
       Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
   (* Wait the nodes to initialize *)
-  let%bind () = after (Time.Span.of_sec 20.) in
+  let%bind () =
+    after
+      ( Time.Span.of_sec
+      @@ (Consensus.Constants.initialization_time_in_secs +. 5.) )
+  in
   let keypairs =
     List.map Genesis_ledger.accounts
       ~f:Genesis_ledger.keypair_of_account_record_exn

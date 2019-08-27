@@ -35,3 +35,5 @@ let inactivity_ms = block_window_duration_ms * 8
 
 (** Number of slots =24k in ouroboros praos *)
 let slots_per_epoch = Unsigned.UInt32.of_int (3 * c * k)
+
+let initialization_time_in_secs = 15.

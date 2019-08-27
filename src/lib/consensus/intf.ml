@@ -36,6 +36,9 @@ module type Constants_intf = sig
 
   (** Number of slots in one epoch *)
   val slots_per_epoch : Unsigned.UInt32.t
+
+  (** Time to take coda to do initialization. *)
+  val initialization_time_in_secs : float
 end
 
 module type Blockchain_state_intf = sig

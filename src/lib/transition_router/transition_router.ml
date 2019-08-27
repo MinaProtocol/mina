@@ -201,7 +201,9 @@ module Make (Inputs : Inputs_intf) = struct
       ~clear_reader ~verified_transition_writer ~transition_reader_ref
       ~transition_writer_ref =
     let%bind () =
-      let connectivity_time_upper_bound = 15.0 in
+      let connectivity_time_upper_bound =
+        Consensus.Constants.initialization_time_in_secs
+      in
       let high_connectivity_deferred =
         Ivar.read (Network.high_connectivity network)
       in
