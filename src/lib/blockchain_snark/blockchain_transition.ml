@@ -4,6 +4,7 @@ open Snark_params
 open Snark_bits
 open Coda_state
 open Fold_lib
+open Bitstring_lib
 module Digest = Tick.Pedersen.Digest
 module Storage = Storage.List.Make (Storage.Disk)
 
@@ -175,6 +176,8 @@ module Make (T : Transaction_snark.Verification.S) = struct
                     Bitstring_lib.Bitstring.Lsb_first.of_list
                       (x :> Tick.Boolean.var list)
 
+                  let var_of_bits = Fn.id
+
                   let var_to_triples xs =
                     let open Fold in
                     to_list
@@ -185,11 +188,13 @@ module Make (T : Transaction_snark.Verification.S) = struct
                     Tick.Pedersen.Checked.Digest.Unpacked.constant
                 end
 
-                let project_value = Tick.Field.project
+                let project_value =
+                  Fn.compose Tick.Field.project Bitstring.Lsb_first.to_list
 
                 let project_var = Tick.Pedersen.Checked.Digest.Unpacked.project
 
-                let unpack_value = Tick.Field.unpack
+                let unpack_value =
+                  Fn.compose Bitstring.Lsb_first.of_list Tick.Field.unpack
 
                 let choose_preimage_var =
                   Tick.Pedersen.Checked.Digest.choose_preimage

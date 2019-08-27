@@ -674,6 +674,10 @@ module Tick = struct
 
   module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
 
+  let m : Run.field Snarky.Snark.m = (module Run)
+
+  let make_checked c = with_state (As_prover.return ()) (Run.make_checked c)
+
   module Verifier = struct
     include Snarky_verifier.Bowe_gabizon.Make (struct
       include Pairing

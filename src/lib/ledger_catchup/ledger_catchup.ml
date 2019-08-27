@@ -12,7 +12,7 @@ open Coda_base
     asking for. Upon receiving the merkle path/list, it will do the following:
     
     1. verify the merkle path/list is correct by calling
-    [Transition_chain_witness.verify]. This function would returns a list
+    [Transition_chain_verifier.verify]. This function would returns a list
     of state hashes if the verification is successful.
     
     2. using the list of state hashes to poke a transition frontier
@@ -55,15 +55,6 @@ module Make (Inputs : Inputs.S) :
    and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
-  type verification_error =
-    [ `In_frontier of State_hash.t
-    | `In_process of State_hash.t Cache_lib.Intf.final_state
-    | `Disconnected
-    | `Verifier_error of Error.t
-    | `Invalid_proof ]
-
-  type 'a verification_result = ('a, verification_error) Result.t
-
   let verify_transition ~logger ~trust_system ~verifier ~frontier
       ~unprocessed_transition_cache enveloped_transition =
     let sender = Envelope.Incoming.sender enveloped_transition in
@@ -71,25 +62,21 @@ module Make (Inputs : Inputs.S) :
       let open Deferred.Result.Let_syntax in
       let transition = Envelope.Incoming.data enveloped_transition in
       let%bind initially_validated_transition =
-        ( External_transition.Validation.wrap transition
-          |> External_transition.skip_time_received_validation
-               `This_transition_was_not_received_via_gossip
-          |> External_transition.validate_proof ~verifier
-          :> External_transition.with_initial_validation verification_result
-             Deferred.t )
+        External_transition.Validation.wrap transition
+        |> External_transition.skip_time_received_validation
+             `This_transition_was_not_received_via_gossip
+        |> External_transition.validate_proof ~verifier
+        >>= Fn.compose Deferred.return
+              External_transition.validate_delta_transition_chain
       in
       let enveloped_initially_validated_transition =
         Envelope.Incoming.map enveloped_transition
           ~f:(Fn.const initially_validated_transition)
       in
       Deferred.return
-        ( Transition_handler_validator.validate_transition ~logger ~frontier
-            ~unprocessed_transition_cache
-            enveloped_initially_validated_transition
-          :> ( External_transition.with_initial_validation Envelope.Incoming.t
-             , State_hash.t )
-             Cached.t
-             verification_result )
+      @@ Transition_handler_validator.validate_transition ~logger ~frontier
+           ~unprocessed_transition_cache
+           enveloped_initially_validated_transition
     in
     let open Deferred.Let_syntax in
     match%bind cached_initially_validated_transition_result with
@@ -127,6 +114,13 @@ module Make (Inputs : Inputs.S) :
             , Some ("invalid proof", []) )
         in
         Error (Error.of_string "invalid proof")
+    | Error `Invalid_delta_transition_chain_proof ->
+        let%map () =
+          Trust_system.record_envelope_sender trust_system logger sender
+            ( Trust_system.Actions.Gossiped_invalid_transition
+            , Some ("invalid delta transition chain witness", []) )
+        in
+        Error (Error.of_string "invalid delta transition chain witness")
     | Error `Disconnected ->
         Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
 
@@ -152,19 +146,18 @@ module Make (Inputs : Inputs.S) :
       ~target_hash =
     let peers = Network.random_peers network num_peers in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:
-        [("target_hash", `String (State_hash.to_base58_check target_hash))]
+      ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
       "Doing a catchup job with target $target_hash" ;
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
         let open Deferred.Or_error.Let_syntax in
-        let%bind transition_chain_witness =
-          Network.get_transition_chain_witness network peer target_hash
+        let%bind transition_chain_proof =
+          Network.get_transition_chain_proof network peer target_hash
         in
         (* a list of state_hashes from new to old *)
         let%bind hashes =
           match
-            Transition_chain_witness.verify ~target_hash
-              ~transition_chain_witness
+            Transition_chain_verifier.verify ~target_hash
+              ~transition_chain_proof
           with
           | Some hashes ->
               Deferred.Or_error.return hashes
@@ -177,7 +170,9 @@ module Make (Inputs : Inputs.S) :
               ignore
                 Trust_system.(
                   record trust_system logger peer.host
-                    Actions.(Violated_protocol, Some (error_msg, []))) ;
+                    Actions.
+                      ( Sent_invalid_transition_chain_merkle_proof
+                      , Some (error_msg, []) )) ;
               Deferred.Or_error.error_string error_msg
         in
         Deferred.return
@@ -327,8 +322,8 @@ module Make (Inputs : Inputs.S) :
              ~metadata:
                [ ( "hashes_of_missing_transitions"
                  , `List
-                     (List.map hashes_of_missing_transitions ~f:(fun hash ->
-                          `String (State_hash.to_base58_check hash) )) ) ]
+                     (List.map hashes_of_missing_transitions
+                        ~f:State_hash.to_yojson) ) ]
              !"Number of missing transitions is %d"
              num_of_missing_transitions ;
            let%bind transitions =
@@ -353,8 +348,7 @@ module Make (Inputs : Inputs.S) :
                               (fun breadcrumb ->
                                 Cached.peek breadcrumb
                                 |> Transition_frontier.Breadcrumb.state_hash
-                                |> State_hash.to_base58_check
-                                |> fun str -> `String str )
+                                |> State_hash.to_yojson )
                               tree )) ) ]
                "about to write to the catchup breadcrumbs pipe" ;
              if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
@@ -389,5 +383,4 @@ include Make (struct
   module Transition_handler_validator = Transition_handler.Validator
   module Breadcrumb_builder = Transition_handler.Breadcrumb_builder
   module Network = Coda_networking
-  module Transition_chain_witness = Transition_chain_witness
 end)

@@ -3,6 +3,8 @@ open Coda_transition
 
 val refused_answer_query_string : string
 
+type exn += No_initial_peers
+
 module type Base_inputs_intf = Coda_intf.Inputs_intf
 
 module type Inputs_intf = sig
@@ -18,6 +20,8 @@ module type Inputs_intf = sig
         end
       end
       with type V1.t = t
+
+    val compact_json : t -> Yojson.Safe.json
   end
 
   module Transaction_pool_diff : sig

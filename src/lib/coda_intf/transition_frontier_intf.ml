@@ -91,16 +91,14 @@ module type Transition_frontier_diff_intf = sig
         There are comments for each GADT that will discuss the operations that
         changes a `transition_frontier` and their corresponding side-effects.*)
     type _ t =
-      | New_frontier :
-          (external_transition_validated, State_hash.t) With_hash.t Root.t
-          -> unit t
+      | New_frontier : external_transition_validated Root.t -> unit t
           (** New_frontier: When creating a new transition frontier, the
           transition_frontier will begin with a single breadcrumb that can be
           constructed mainly with a root external transition and a
           scan_state. There are no components in the frontier that affects
           the frontier. Therefore, the type of this diff is tagged as a unit. *)
       | Add_transition :
-          (external_transition_validated, State_hash.t) With_hash.t
+          external_transition_validated
           -> Consensus.Data.Consensus_state.Value.t t
           (** Add_transition: Add_transition would simply add a transition to the
           frontier and is therefore the parameter for Add_transition. After
@@ -284,10 +282,7 @@ module type Transition_frontier_breadcrumb_intf = sig
 
   type verifier
 
-  val create :
-       (external_transition_validated, State_hash.t) With_hash.t
-    -> staged_ledger
-    -> t
+  val create : external_transition_validated -> staged_ledger -> t
 
   (** The copied breadcrumb delegates to [Staged_ledger.copy], the other fields are already immutable *)
   val copy : t -> t
@@ -306,22 +301,31 @@ module type Transition_frontier_breadcrumb_intf = sig
        Result.t
        Deferred.t
 
-  val transition_with_hash :
-    t -> (external_transition_validated, State_hash.t) With_hash.t
+  val validated_transition : t -> external_transition_validated
 
   val staged_ledger : t -> staged_ledger
 
   val hash : t -> int
 
-  val external_transition : t -> external_transition_validated
+  val protocol_state : t -> Coda_state.Protocol_state.Value.t
+
+  val blockchain_state : t -> Coda_state.Blockchain_state.Value.t
+
+  val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
   val state_hash : t -> State_hash.t
+
+  val parent_hash : t -> State_hash.t
+
+  val proposer : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+
+  val payments : t -> User_command.t list
 
   val display : t -> display
 
   val name : t -> string
-
-  val to_user_commands : t -> User_command.t list
 end
 
 module type Transition_frontier_base_intf = sig
@@ -349,9 +353,7 @@ module type Transition_frontier_base_intf = sig
 
   val create :
        logger:Logger.t
-    -> root_transition:( external_transition_validated
-                       , State_hash.t )
-                       With_hash.t
+    -> root_transition:external_transition_validated
     -> root_snarked_ledger:Ledger.Db.t
     -> root_staged_ledger:staged_ledger
     -> consensus_local_state:Consensus.Data.Local_state.t

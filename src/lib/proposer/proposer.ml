@@ -237,7 +237,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               !"Producing new block with parent $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
               let transition : External_transition.Validated.t =
-                (Breadcrumb.transition_with_hash crumb).data
+                Breadcrumb.validated_transition crumb
               in
               ( External_transition.Validated.protocol_state transition
               , External_transition.Validated.protocol_state_proof transition
@@ -279,9 +279,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                          over their parent" ;
                     let root_consensus_state =
                       Transition_frontier.root frontier
-                      |> (fun x -> (Breadcrumb.transition_with_hash x).data)
-                      |> External_transition.Validated.protocol_state
-                      |> Protocol_state.consensus_state
+                      |> Breadcrumb.consensus_state
                     in
                     [%test_result: [`Take | `Keep]]
                       (Consensus.Hooks.select ~existing:root_consensus_state
@@ -338,16 +336,27 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       let transition_hash =
                         Protocol_state.hash protocol_state
                       in
+                      let delta_transition_chain_proof =
+                        Transition_chain_prover.prove
+                          ~length:(Consensus.Constants.delta - 1)
+                          ~frontier
+                          (Protocol_state.hash previous_protocol_state)
+                        |> Option.value_exn
+                      in
                       let transition =
                         External_transition.Validation.wrap
                           { With_hash.hash= transition_hash
                           ; data=
                               External_transition.create ~protocol_state
-                                ~protocol_state_proof ~staged_ledger_diff }
+                                ~protocol_state_proof ~staged_ledger_diff
+                                ~delta_transition_chain_proof }
                         |> External_transition.skip_time_received_validation
                              `This_transition_was_not_received_via_gossip
                         |> External_transition.skip_proof_validation
                              `This_transition_was_generated_internally
+                        |> External_transition
+                           .skip_delta_transition_chain_validation
+                             `This_transition_was_not_received_via_gossip
                         |> Transition_frontier_validation
                            .validate_frontier_dependencies ~logger ~frontier
                         |> Result.map_error ~f:(fun err ->
@@ -473,17 +482,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                    in
                    check_for_proposal ())
             | Some transition_frontier -> (
-                let breadcrumb =
-                  Transition_frontier.best_tip transition_frontier
-                in
-                let transition =
-                  (Breadcrumb.transition_with_hash breadcrumb).data
-                in
-                let protocol_state =
-                  External_transition.Validated.protocol_state transition
-                in
                 let consensus_state =
-                  Protocol_state.consensus_state protocol_state
+                  Transition_frontier.best_tip transition_frontier
+                  |> Breadcrumb.consensus_state
                 in
                 assert (
                   Consensus.Hooks.required_local_state_sync ~consensus_state

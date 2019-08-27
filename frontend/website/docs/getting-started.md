@@ -3,7 +3,7 @@
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
 !!! note
-    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for `v0.0.1-beta.2`.
+    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.3-beta`.
 
 ## Requirements
 
@@ -46,12 +46,13 @@ You can run `coda -help` to check if the installation succeeded.
 Add the Coda Debian repo and install:
 
 ```
+sudo apt-get remove coda-testnet-postake-medium-curves
 echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
-sudo apt-get install -t release coda-testnet-postake-medium-curves=0.0.1-beta.2-fd4fb398
+sudo apt-get install -t release coda-testnet-postake-medium-curves
 ```
 
-If you already have `coda` installed from a previous release, running the above commands should automatically uninstall and reinstall the newest version.
+If you already have `coda` installed from a previous release, running the above commands should automatically uninstall and reinstall the newest version. If you're installing Coda from scratch, you may see this error when you run the first command: `E: Unable to locate package coda-testnet-postake-medium-curves`. You can ignore this - it just means there wasn't a prior release installed.
 
 You can run `coda -help` to check if the installation succeeded.
 

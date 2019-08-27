@@ -47,10 +47,12 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Coda_intf.Transition_frontier_intf
     with type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
+                ( [`Time_received] * unit Truth.true_t
+                , [`Proof] * unit Truth.true_t
+                , [`Delta_transition_chain]
+                  * State_hash.t Non_empty_list.t Truth.true_t
+                , [`Frontier_dependencies] * unit Truth.true_t
+                , [`Staged_ledger_diff] * unit Truth.false_t )
                 External_transition.Validation.with_transition
      and type external_transition_validated := External_transition.Validated.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -88,13 +90,8 @@ module Make (Inputs : Inputs_intf) :
             let best_tip_user_commands =
               Sequence.fold (Sequence.of_list best_tip_path)
                 ~init:User_command.Set.empty ~f:(fun acc_set breadcrumb ->
-                  let external_transition =
-                    Transition_frontier.Breadcrumb.external_transition
-                      breadcrumb
-                  in
                   let user_commands =
-                    External_transition.Validated.user_commands
-                      external_transition
+                    Transition_frontier.Breadcrumb.user_commands breadcrumb
                   in
                   List.fold user_commands ~init:acc_set ~f:Set.add )
             in
