@@ -29,7 +29,13 @@ module Api = struct
     ; restart_signals: (restart_type * unit Ivar.t) Option.t Array.t }
 
   let create configs workers start_writer =
-    let status = Array.init (Array.length workers) ~f:(fun _ -> `Off) in
+    let status =
+      Array.init (Array.length workers) ~f:(fun _ ->
+          let user_cmds_under_inspection =
+            Hashtbl.create (module User_command)
+          in
+          `On (`Synced user_cmds_under_inspection) )
+    in
     let locks =
       Array.init (Array.length workers) ~f:(fun _ ->
           (ref 0, Condition.create ()) )
@@ -38,26 +44,13 @@ module Api = struct
     let restart_signals =
       Array.init (Array.length workers) ~f:(fun _ -> None)
     in
-    let t =
-      { workers
-      ; configs
-      ; start_writer
-      ; status
-      ; locks
-      ; root_lengths
-      ; restart_signals }
-    in
-    upon
-      ( after
-      @@ Time.Span.of_sec
-           (Consensus.Constants.initialization_time_in_secs +. 5.) )
-      (fun () ->
-        Array.iteri workers ~f:(fun i _ ->
-            let user_cmds_under_inspection =
-              Hashtbl.create (module User_command)
-            in
-            t.status.(i) <- `On (`Synced user_cmds_under_inspection) ) ) ;
-    t
+    { workers
+    ; configs
+    ; start_writer
+    ; status
+    ; locks
+    ; root_lengths
+    ; restart_signals }
 
   let online t i = match t.status.(i) with `On _ -> true | `Off -> false
 
@@ -424,9 +417,14 @@ let events workers start_reader =
 let start_checks logger (workers : Coda_process.t array) start_reader testnet
     ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
-  start_prefix_check logger workers event_reader testnet ~acceptable_delay
-  |> don't_wait_for ;
-  start_payment_check logger root_reader testnet
+  upon
+    ( after
+    @@ Time.Span.of_sec (Consensus.Constants.initialization_time_in_secs +. 5.)
+    )
+    (fun () ->
+      start_prefix_check logger workers event_reader testnet ~acceptable_delay
+      |> don't_wait_for ;
+      start_payment_check logger root_reader testnet )
 
 (* note: this is very declarative, maybe this should be more imperative? *)
 (* next steps:
