@@ -169,67 +169,28 @@ let make = () => {
           </a>
         </p>
         <p>
-          <h2 className=Styles.weekHeader> {React.string("Week 5")} </h2>
+          <h2 className=Styles.weekHeader> {React.string("Week 6")} </h2>
         </p>
         <p>
           <h4 className=Styles.sidebarHeader>
-            {React.string("Challenge #12: 'CLI FYI'")}
+            {React.string("Challenge #15: 'Something Snarky'")}
           </h4>
         </p>
         <p>
           {React.string(
-             "Submit a product improvement or feature you'd like to see in the Coda command line interface (CLI). Post a new thread on the Discourse ",
-           )}
-          <a
-            className=Style.Link.basic
-            href="http://forums.codaprotocol.com"
-            target="_blank">
-            {React.string("forums")}
-          </a>
-          {React.string(
-             " in the 'Product' category and add this to the title: '[CLI Feature]'. The community can vote on it by 'hearting' the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*.",
+             "This week's challenge makes snark work the primary objective. Node operators that produce at least one SNARK will get 1000 pts*.",
            )}
         </p>
         <p>
           {React.string(
-             "Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement -- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts*!",
+             "BONUS: Top 3 node operators who are able to sell the most SNARKs on the snarketplace (meaning your SNARK was not just produced, but also selected by a block producer) will win 3000, 2000, and 1000 pts* respectively. Hint: your SNARKs are more likely to be bought if the fees are lower ;)",
            )}
         </p>
-        <p>
-          <h4 className=Styles.sidebarHeader>
-            {React.string("Challenge #13: 'My two codas'")}
-          </h4>
-        </p>
-        <p>
+        <p className=Css.(
+          style([ fontStyle(`italic) ]))>
           {React.string(
-             "Earn 400 pts* for giving your feedback by filling out this ",
-           )}
-          <a
-            className=Style.Link.basic
-            href="http://bit.ly/CommunityRetro"
-            target="_blank">
-            {React.string("survey")}
-          </a>
-          {React.string(".")}
-        </p>
-        <p>
-          <h4 className=Styles.sidebarHeader>
-            {React.string("Challenge #14: 'Leonardo da Coda'")}
-          </h4>
-        </p>
-        <p>
-          {React.string(
-             "Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the ",
-           )}
-          <a
-            className=Style.Link.basic
-            href="https://forums.codaprotocol.com/t/community-art-contest-gifs/109"
-            target="_blank">
-            {React.string("forums")}
-          </a>
-          {React.string(
-             ". You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by 'hearting' your post, so do not forget to 'heart' your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.",
-           )}
+            "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points."
+          )}
         </p>
       </div>
     </div>

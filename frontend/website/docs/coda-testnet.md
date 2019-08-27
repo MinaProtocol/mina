@@ -74,17 +74,23 @@ Earn extra bonus points for every uninterrupted weeks that you participated in t
 - If you earned points this week and the previous 2 weeks - 200 pts\*
 - If you earned points this week and the previous 3 weeks  - 300 pts\*
 
-**Challenge #12: "CLI FYI"**
+**Challenge #12 (expired): "CLI FYI"**
 
 Submit a product improvement or feature you’d like to see in the Coda command line interface (CLI). Post a new thread on the Discourse [forums](http://forums.codaprotocol.com) in the “Product” category and add this to the title: "[CLI Feature]". The community can vote on it by “hearting” the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*.
 
 Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts*!
 
-**Challenge #13: "My two codas"** - Earn 400 Testnet Points* for giving your feedback by filling out this [survey](http://bit.ly/CommunityRetro).
+**Challenge #13 (expired): "My two codas"** - Earn 400 Testnet Points* for giving your feedback by filling out this [survey](http://bit.ly/CommunityRetro).
 
-**Challenge #14: "Leonardo da Coda"**
+**Challenge #14 (expired): "Leonardo da Coda"**
 
 Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the [forum](https://forums.codaprotocol.com/t/community-art-contest-gifs/109). You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by “hearting” your post, so do not forget to "heart" your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.
+
+**Challenge #15: "Something Snarky"**
+
+This week's challenge makes snark work the primary objective. Node operators that produce at least one SNARK will get 1000 pts\*.
+
+BONUS: Top 3 node operators who are able to sell the most SNARKs on the snarketplace (meaning your SNARK was not just produced, but also selected by a block producer) will win 3000, 2000, and 1000 pts\* respectively. Hint — your SNARKs are more likely to be bought if the fees are lower ;)
 
 ### Disclaimer
 
