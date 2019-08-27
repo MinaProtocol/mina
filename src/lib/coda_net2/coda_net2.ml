@@ -773,7 +773,8 @@ let listening_addrs net =
   | Error e ->
       Error e
 
-(** TODO: graceful shutdown *)
+(** TODO: graceful shutdown. Reset all our streams, sync the databases, then
+shutdown. Replace kill invocation with an RPC. *)
 let shutdown (net : net) =
   net.failure_response <- `Ignore ;
   let%bind _ =
