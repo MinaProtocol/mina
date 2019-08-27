@@ -8,9 +8,11 @@ let getEnv = (~default, name) =>
   Js.Dict.get(Node.Process.process##env, name)
   ->Belt.Option.getWithDefault(default);
 
+let getEnvOpt = name => Js.Dict.get(Node.Process.process##env, name);
+
 let echoKey = getEnvOrFail("ECHO_PUBLICKEY");
-// Optional second echo key
-let echoKey2 = Js.Dict.get(Node.Process.process##env, "ECHO_PUBLICKEY_2");
+let echoKey2 = getEnvOpt("ECHO_PUBLICKEY_2");
+let repeaterKey = getEnvOpt("REPEATER_PUBLICKEY");
 let faucetKey = getEnvOrFail("FAUCET_PUBLICKEY");
 let discordApiKey = getEnvOrFail("DISCORD_API_KEY");
 
@@ -19,6 +21,12 @@ let graphqlHost = getEnv(~default="localhost", "CODA_GRAPHQL_HOST");
 
 let listeningChannels = ["faucet"];
 let faucetApproveRole = "faucet-approvers";
+
 let feeAmount = getEnv(~default="5", "FEE_AMOUNT") |> Int64.of_string;
+let feeAmount =
+  getEnv(~default=Int64.to_string(feeAmount), "LARGE_FEE_AMOUNT")
+  |> Int64.of_string;
+
 let faucetAmount = Int64.of_int(100);
 let cooldownTimeMs = 1000. *. 60. *. 60. *. 3.; // 3 hrs
+let repeatTimeMs = 1000 * 60 * 5; // 5 mins
