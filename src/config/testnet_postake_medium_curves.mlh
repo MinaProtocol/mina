@@ -17,7 +17,7 @@
 [%%define fake_hash false]
 
 [%%define genesis_ledger "testnet_postake"]
-[%%define genesis_state_timestamp "2019-08-23 1:30:00-07:00"]
+[%%define genesis_state_timestamp "2019-08-26 19:00:00-07:00"]
 [%%define block_window_duration 300000]
 
 [%%define integration_tests false]
