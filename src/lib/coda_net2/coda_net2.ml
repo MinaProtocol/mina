@@ -1006,7 +1006,7 @@ let%test_module "coda network tests" =
 
     let setup_two_nodes network_id =
       let%bind a_tmp = Unix.mkdtemp "p2p_helper_test_a" in
-      let%bind b_tmp = Async.Unix.mkdtemp "p2p_helper_test_b" in
+      let%bind b_tmp = Unix.mkdtemp "p2p_helper_test_b" in
       let%bind a =
         create
           ~logger:(Logger.extend logger [("name", `String "a")])
