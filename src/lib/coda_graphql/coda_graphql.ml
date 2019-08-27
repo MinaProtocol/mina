@@ -1354,7 +1354,9 @@ module Queries = struct
 
   let pooled_user_commands =
     field "pooledUserCommands"
-      ~doc:"Retrieve all the user commands sent by a public key"
+      ~doc:
+        "Retrieve all the user commands submitted by the current daemon that \
+         are pending inclusion"
       ~typ:(non_null @@ list @@ non_null Types.user_command)
       ~args:
         Arg.
