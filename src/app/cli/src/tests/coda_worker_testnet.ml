@@ -660,6 +660,8 @@ end = struct
     (* Send one payment *)
     let%bind () = Api.stop testnet node in
     let%bind () = after duration in
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Triggering restart on %d" node ;
     Api.start testnet node
 
   let trigger_catchup testnet ~logger ~node =

@@ -223,7 +223,7 @@ let run_test () : unit Deferred.t =
       Coda_run.setup_local_server coda ;
       let%bind () = Coda_lib.start coda in
       (* Let the system settle *)
-      let%bind () = Async.after (Time.Span.of_ms 100.) in
+      let%bind () = Async.after (Time.Span.of_sec 15.) in
       (* No proof emitted by the parallel scan at the begining *)
       assert (Option.is_none @@ Coda_lib.staged_ledger_ledger_proof coda) ;
       (* Note: This is much less than half of the high balance account so we can test
