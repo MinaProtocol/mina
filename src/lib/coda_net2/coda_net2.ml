@@ -972,6 +972,7 @@ let create ~logger ~conf_dir =
             let%map () = Sys.remove lock_path in
             Ok ()
         | Error _ ->
+          (* TODO: remove stale lockfile? *)
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "Process %s does not exist and will not be killed" p ;
             return @@ Ok () )
