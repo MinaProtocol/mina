@@ -186,11 +186,10 @@ let make = () => {
              "BONUS: Top 3 node operators who are able to sell the most SNARKs on the snarketplace (meaning your SNARK was not just produced, but also selected by a block producer) will win 3000, 2000, and 1000 pts* respectively. Hint: your SNARKs are more likely to be bought if the fees are lower ;)",
            )}
         </p>
-        <p className=Css.(
-          style([ fontStyle(`italic) ]))>
+        <p className=Css.(style([fontStyle(`italic)]))>
           {React.string(
-            "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points."
-          )}
+             "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
+           )}
         </p>
       </div>
     </div>
