@@ -943,16 +943,16 @@ let create ~logger ~conf_dir =
             p.finished <- true ;
             ( match (p.failure_response, code) with
             | `Ignore, _ | _, Ok () ->
-                ()
+              Hashtbl.iter p.outstanding_requests ~f:(fun iv ->
+                  Ivar.fill iv
+                    (Or_error.error_string
+                      "libp2p_helper process died before answering") )
             | `Die, (Error _ as e) ->
                 Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
                   !"libp2p_helper process died: %s"
                   (Unix.Exit_or_signal.to_string_hum e) ;
                 raise Child_died ) ;
-            Hashtbl.iter p.outstanding_requests ~f:(fun iv ->
-                Ivar.fill iv
-                  (Or_error.error_string
-                     "libp2p_helper process died before answering") ) ) ;
+                      ) ;
         Ok p
     | Error e ->
         Or_error.error_string
