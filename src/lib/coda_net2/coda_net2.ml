@@ -420,7 +420,9 @@ module Helper = struct
                 Strict_pipe.Writer.write sub.write_pipe
                   (Envelope.Incoming.wrap ~data ~sender:Envelope.Sender.Local)
               in
-              () (* TODO: sender *)
+              ()
+              (* TODO: add sender to Publish.t and include it here. *)
+              (* TODO: think about exposing the PeerID of the originator as well? *)
             else
               Logger.warn t.logger
                 "received msg for subscription $sub after unsubscribe, was it \
