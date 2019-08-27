@@ -12,9 +12,8 @@ let main n () =
     @@ Some
          (List.nth_exn Genesis_ledger.accounts 5 |> snd |> Account.public_key)
   in
-  let proposers n = if n < 3 then Some n else None in
   let%bind testnet =
-    Coda_worker_testnet.test logger n proposers snark_work_public_keys
+    Coda_worker_testnet.test logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
   (* Wait the nodes to initialize *)
@@ -32,25 +31,24 @@ let main n () =
     ~n:10
   |> don't_wait_for ;
   (* RESTART NODES *)
-  let random_proposer () = Random.int 2 + 1 in
-  let random_non_proposer () = Random.int 2 + 3 in
+  let random_node () = Random.int 4 + 1 in
   (* catchup *)
   let%bind () = after (Time.Span.of_min 1.) in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger
-      ~node:(random_non_proposer ())
+      ~node:(random_node ())
   in
   let%bind () = after (Time.Span.of_min 1.) in
   (* bootstrap *)
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
-      ~node:(random_non_proposer ())
+      ~node:(random_node ())
   in
   (* random restart *)
   let%bind () = after (Time.Span.of_min 1.) in
   let%bind () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger
-      ~node:(random_proposer ())
+      ~node:(random_node ())
       ~duration:(Time.Span.of_min (Random.float 3.))
   in
   (* settle for a few more min *)

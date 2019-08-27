@@ -19,6 +19,10 @@ let main () =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
       Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
+  let%bind () =
+    after
+      (Time.Span.of_sec (Consensus.Constants.initialization_time_in_secs +. 5.))
+  in
   let previous_status = Sync_status.Hash_set.create () in
   let bootstrapping_node = 1 in
   (let%bind sync_status_pipe_opt =

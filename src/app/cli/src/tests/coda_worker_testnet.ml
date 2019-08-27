@@ -49,7 +49,8 @@ module Api = struct
     in
     upon
       ( after
-      @@ Time.Span.of_sec Consensus.Constants.initialization_time_in_secs )
+      @@ Time.Span.of_sec
+           (Consensus.Constants.initialization_time_in_secs +. 5.) )
       (fun () ->
         Array.iteri workers ~f:(fun i _ ->
             let user_cmds_under_inspection =
