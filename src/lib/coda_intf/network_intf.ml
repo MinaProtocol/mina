@@ -43,6 +43,15 @@ module type Network_intf = sig
        Proof_carrying_data.t
        Deferred.Or_error.t
 
+  val get_best_tip :
+       t
+    -> Network_peer.Peer.t
+    -> unit
+    -> ( external_transition
+       , State_body_hash.t list * external_transition )
+       Proof_carrying_data.t
+       Deferred.Or_error.t
+
   val get_bootstrappable_best_tip :
        t
     -> Network_peer.Peer.t
@@ -142,6 +151,11 @@ module type Network_intf = sig
                                  -> Sync_ledger.Answer.t Deferred.Or_error.t)
     -> get_ancestry:(   Consensus.Data.Consensus_state.Value.t
                         Envelope.Incoming.t
+                     -> ( external_transition
+                        , State_body_hash.t list * external_transition )
+                        Proof_carrying_data.t
+                        Deferred.Option.t)
+    -> get_best_tip:(   unit Envelope.Incoming.t
                      -> ( external_transition
                         , State_body_hash.t list * external_transition )
                         Proof_carrying_data.t

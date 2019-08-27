@@ -621,6 +621,11 @@ struct
         ~f:(Sync_handler.Root.prove ~logger)
         t
 
+    let get_best_tip ({logger; _} as t) =
+      handle_requests ~typ:"best tip"
+        ~f:(fun ~frontier () -> Best_tip_prover.prove ~logger frontier)
+        t
+
     let get_bootstrappable_best_tip ({logger; _} as t) =
       handle_requests ~typ:"bootstrappable best tip"
         ~f:(Sync_handler.Bootstrappable_best_tip.prove ~logger)

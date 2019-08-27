@@ -95,19 +95,18 @@ module Make (Inputs : Inputs_intf) :
           ( merkle_list
           , root |> External_transition.Validation.forget_validation ) }
 
-  let validate_proof ~verifier transition_with_hash =
+  let validate ~verifier transition_with_hash =
     let open Deferred.Result.Monad_infix in
     External_transition.(
       Validation.wrap transition_with_hash
       |> skip_time_received_validation
            `This_transition_was_not_received_via_gossip
       |> validate_proof ~verifier
-      >>= Fn.compose Deferred.Result.return
-            (skip_delta_transition_chain_validation
-               `This_transition_was_not_received_via_gossip)
+      >>= Fn.compose Deferred.return validate_delta_transition_chain
       |> Deferred.map
            ~f:
-             (Result.map_error ~f:(Fn.const (Error.of_string "invalid proof"))))
+             (Result.map_error
+                ~f:(Fn.const (Error.of_string "validation failed"))))
 
   let verify ~verifier
       {Proof_carrying_data.data= best_tip; proof= merkle_list, root} =
@@ -141,8 +140,8 @@ module Make (Inputs : Inputs_intf) :
     in
     let%map root, best_tip =
       Deferred.Or_error.both
-        (validate_proof ~verifier root_transition_with_hash)
-        (validate_proof ~verifier best_tip_with_hash)
+        (validate ~verifier root_transition_with_hash)
+        (validate ~verifier best_tip_with_hash)
     in
     (`Root root, `Best_tip best_tip)
 end

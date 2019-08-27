@@ -1,17 +1,16 @@
-open Async_kernel
 open Coda_base
 open Pipe_lib
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
 
-  module Network : sig
-    type t
-
-    val high_connectivity : t -> unit Ivar.t
-
-    val peers : t -> Network_peer.Peer.t list
-  end
+  module Network :
+    Coda_intf.Network_intf
+    with type external_transition := External_transition.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+     and type snark_pool_diff = Network_pool.Snark_pool.Resource_pool.Diff.t
+     and type transaction_pool_diff =
+                Network_pool.Transaction_pool.Resource_pool.Diff.t
 
   module Transition_frontier :
     Coda_intf.Transition_frontier_intf
@@ -27,6 +26,14 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
+     and type verifier := Verifier.t
+
+  module Best_tip_prover :
+    Coda_intf.Best_tip_prover_intf
+    with type transition_frontier := Transition_frontier.t
+     and type external_transition := External_transition.t
+     and type external_transition_with_initial_validation :=
+                External_transition.with_initial_validation
      and type verifier := Verifier.t
 
   module Transition_frontier_controller :

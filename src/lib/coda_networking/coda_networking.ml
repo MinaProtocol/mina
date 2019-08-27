@@ -326,6 +326,60 @@ module Make_rpcs (Inputs : Base_inputs_intf) = struct
     end
   end
 
+  module Get_best_tip = struct
+    module Master = struct
+      let name = "get_best_tip"
+
+      module T = struct
+        type query = unit [@@deriving sexp, to_yojson]
+
+        type response =
+          ( External_transition.Stable.V1.t
+          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
+          )
+          Proof_carrying_data.Stable.V1.t
+          option
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include Master
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = unit [@@deriving bin_io, sexp, version {rpc}]
+
+        type response =
+          ( External_transition.Stable.V1.t
+          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
+          )
+          Proof_carrying_data.Stable.V1.t
+          option
+        [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      include T
+      include Register (T)
+    end
+  end
+
   module Get_bootstrappable_best_tip = struct
     module Master = struct
       let name = "get_bootstrappable_best_tip"
@@ -586,6 +640,12 @@ module Make (Inputs : Inputs_intf) = struct
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
             Deferred.Option.t)
+      ~(get_best_tip :
+            unit Envelope.Incoming.t
+         -> ( External_transition.t
+            , State_body_hash.t list * External_transition.t )
+            Proof_carrying_data.t
+            Deferred.Option.t)
       ~(get_bootstrappable_best_tip :
             Consensus.Data.Consensus_state.Value.t Envelope.Incoming.t
          -> ( External_transition.t
@@ -674,6 +734,16 @@ module Make (Inputs : Inputs_intf) = struct
       in
       record_unknown_item result sender action_msg msg_args
     in
+    let get_best_tip_rpc conn ~version:_ query =
+      Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
+        "Sending best_tip to peer with IP %s" conn.Host_and_port.host ;
+      let action_msg = "Get_best_tip" in
+      let msg_args = [("query", Rpcs.Get_best_tip.query_to_yojson query)] in
+      let%bind result, sender =
+        run_for_rpc_result conn query ~f:get_best_tip action_msg msg_args
+      in
+      record_unknown_item result sender action_msg msg_args
+    in
     let get_bootstrappable_best_tip_rpc conn ~version:_ query =
       Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
         "Sending best_tip to peer with IP %s" conn.Host_and_port.host ;
@@ -732,6 +802,7 @@ module Make (Inputs : Inputs_intf) = struct
             get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc
         ; Rpcs.Answer_sync_ledger_query.implement_multi
             answer_sync_ledger_query_rpc
+        ; Rpcs.Get_best_tip.implement_multi get_best_tip_rpc
         ; Rpcs.Get_bootstrappable_best_tip.implement_multi
             get_bootstrappable_best_tip_rpc
         ; Rpcs.Get_ancestry.implement_multi get_ancestry_rpc
@@ -910,6 +981,10 @@ module Make (Inputs : Inputs_intf) = struct
   let get_transition_chain =
     make_rpc_request ~rpc_dispatch:Rpcs.Get_transition_chain.dispatch_multi
       ~label:"chain of transitions"
+
+  let get_best_tip =
+    make_rpc_request ~rpc_dispatch:Rpcs.Get_best_tip.dispatch_multi
+      ~label:"best tip"
 
   let get_bootstrappable_best_tip =
     make_rpc_request

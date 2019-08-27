@@ -675,6 +675,9 @@ let create (config : Config.t) =
               ~get_ancestry:
                 (handle_request
                    ~f:(Sync_handler.Root.prove ~logger:config.logger))
+              ~get_best_tip:
+                (handle_request ~f:(fun ~frontier () ->
+                     Best_tip_prover.prove ~logger:config.logger frontier ))
               ~get_bootstrappable_best_tip:
                 (handle_request
                    ~f:
