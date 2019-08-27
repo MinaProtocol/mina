@@ -5,4 +5,5 @@
   (inline_tests)
   (libraries
     snarky
+    snarky_integer
     core_kernel ))

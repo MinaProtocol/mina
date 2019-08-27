@@ -1,9 +1,10 @@
 module Cdn = {
   module Crypto = {
     type t;
-    [@bs.val] [@bs.module "crypto"] external createHash: string => t = "";
-    [@bs.send] external update: (t, string) => unit = "";
-    [@bs.send] external digest: (t, string) => string = "";
+    [@bs.val] [@bs.module "crypto"]
+    external createHash: string => t = "createHash";
+    [@bs.send] external update: (t, string) => unit = "update";
+    [@bs.send] external digest: (t, string) => string = "digest";
   };
 
   let prefix = ref(None);

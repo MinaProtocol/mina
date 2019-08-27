@@ -2,6 +2,7 @@
 .bsb.lock
 .graphql_ppx_cache
 graphql_schema.json
+schema.graphql
 npm-debug.log
 node_modules
 db.json

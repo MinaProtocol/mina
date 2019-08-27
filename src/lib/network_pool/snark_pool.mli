@@ -102,6 +102,8 @@ end) (Transaction_snark_work : sig
           type t [@@deriving sexp, bin_io, yojson, version]
 
           include Hashable.S_binable with type t := t
+
+          val compact_json : t -> Yojson.Safe.json
         end
       end
       with type V1.t = t

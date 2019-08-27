@@ -29,20 +29,19 @@ module Make (Inputs : Inputs_intf) :
   open Inputs
 
   module Merkle_list = Merkle_list_prover.Make (struct
-    type value = External_transition.t
+    type value = External_transition.Validated.t
 
     type context = Transition_frontier.t
 
     type proof_elem = State_body_hash.t
 
     let to_proof_elem transition =
-      transition |> External_transition.protocol_state |> Protocol_state.body
-      |> Protocol_state.Body.hash
+      transition |> External_transition.Validated.protocol_state
+      |> Protocol_state.body |> Protocol_state.Body.hash
 
     let get_previous ~context transition =
       let parent_hash =
-        transition |> External_transition.protocol_state
-        |> Protocol_state.previous_state_hash
+        transition |> External_transition.Validated.parent_hash
       in
       let open Option.Let_syntax in
       let%map breadcrumb =
@@ -51,8 +50,7 @@ module Make (Inputs : Inputs_intf) :
           (Transition_frontier.find_in_root_history context parent_hash)
           ~f:Fn.const
       in
-      Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
-      |> With_hash.data |> External_transition.Validated.forget_validation
+      Transition_frontier.Breadcrumb.validated_transition breadcrumb
   end)
 
   let prove ?length ~frontier state_hash =
@@ -64,13 +62,12 @@ module Make (Inputs : Inputs_intf) :
         ~f:Fn.const
     in
     let requested_transition =
-      Transition_frontier.Breadcrumb.transition_with_hash requested_breadcrumb
-      |> With_hash.data |> External_transition.Validated.forget_validation
+      Transition_frontier.Breadcrumb.validated_transition requested_breadcrumb
     in
     let first_transition, merkle_list =
       Merkle_list.prove ?length ~context:frontier requested_transition
     in
-    (External_transition.state_hash first_transition, merkle_list)
+    (External_transition.Validated.state_hash first_transition, merkle_list)
 end
 
 include Make (struct
