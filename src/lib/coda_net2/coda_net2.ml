@@ -404,7 +404,6 @@ module Helper = struct
     let open Yojson.Safe.Util in
     let open Or_error.Let_syntax in
     let open Upcall in
-    (* TODO: types here please *)
     match member "upcall" v |> to_string with
     (* Message published on one of our subscriptions *)
     | "publish" -> (
