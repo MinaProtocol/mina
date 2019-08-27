@@ -1,56 +1,45 @@
-module Cta = {
-  type t = {
-    copy: string,
-    link: Links.Named.t(string),
-  };
-};
+[@react.component]
+let make = (~className="", ~paragraphs) => {
+  let ps =
+    paragraphs
+    |> Array.mapi((i, entry) => {
+         let key = string_of_int(i);
+         let content =
+           switch (entry) {
+           | `str(s) => [|<span key> {React.string(s)} </span>|]
+           | `styled(xs) =>
+             List.mapi(
+               (i, x) => {
+                 let styleKey = string_of_int(i);
+                 switch (x) {
+                 | `emph(s) =>
+                   <span key=styleKey className=Style.Body.basic_semibold>
+                     {React.string(s)}
+                   </span>
+                 | `str(s) => <span key=styleKey> {React.string(s)} </span>
+                 };
+               },
+               xs,
+             )
+             |> Array.of_list
+           };
 
-let component = ReasonReact.statelessComponent("SideText");
-let make = (~className="", ~paragraphs, ~cta, _children) => {
-  ...component,
-  render: _self => {
-    let {Cta.link} = cta;
-    let ps =
-      Belt.Array.map(
-        paragraphs,
-        entry => {
-          let content =
-            switch (entry) {
-            | `str(s) => [|ReasonReact.string(s)|]
-            | `styled(xs) =>
-              List.map(
-                x =>
-                  switch (x) {
-                  | `emph(s) =>
-                    <span className=Style.Body.basic_semibold>
-                      {ReasonReact.string(s)}
-                    </span>
-                  | `str(s) => <span> {ReasonReact.string(s)} </span>
-                  },
-                xs,
-              )
-              |> Array.of_list
-            };
+         <p
+           key
+           className=Css.(
+             merge([Style.Body.basic, style([marginBottom(`rem(1.5))])])
+           )>
+           {React.array(content)}
+         </p>;
+       });
 
-          <p
-            className=Css.(
-              merge([Style.Body.basic, style([marginBottom(`rem(1.5))])])
-            )>
-            // should be fine to use i here since this is all static content
-             ...content </p>;
-        },
-      );
-
-    <div
-      className=Css.(
-        merge([
-          className,
-          style([
-            media(Style.MediaQuery.notMobile, [width(`rem(20.625))]),
-          ]),
-        ])
-      )>
-      ...ps
-    </div>;
-  },
+  <div
+    className=Css.(
+      merge([
+        className,
+        style([media(Style.MediaQuery.notMobile, [width(`rem(20.625))])]),
+      ])
+    )>
+    {React.array(ps)}
+  </div>;
 };

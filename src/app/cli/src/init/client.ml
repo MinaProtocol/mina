@@ -59,6 +59,10 @@ module Args = struct
 
   let zip4 arg1 arg2 arg3 arg4 =
     return (fun a b c d -> (a, b, c, d)) <*> arg1 <*> arg2 <*> arg3 <*> arg4
+
+  let zip5 arg1 arg2 arg3 arg4 arg5 =
+    return (fun a b c d e -> (a, b, c, d, e))
+    <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5
 end
 
 let or_error_str ~f_ok ~error = function
@@ -490,12 +494,21 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          transaction pool )"
       (optional txn_nonce)
   in
+  let memo_flag =
+    flag "memo"
+      ~doc:
+        (sprintf
+           "STRING Memo accompanying the transaction (up to %d characters)"
+           User_command_memo.max_input_length)
+      (optional string)
+  in
   let flag =
-    Args.zip4 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
+    Args.zip5 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
+      memo_flag
   in
   Command.async ~summary
     (Cli_lib.Background_daemon.init flag
-       ~f:(fun port (body, from_account, fee_opt, nonce_opt) ->
+       ~f:(fun port (body, from_account, fee_opt, nonce_opt, memo_opt) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp =
            Secrets.Keypair.Terminal_stdin.read_exn from_account
@@ -511,9 +524,12 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          let fee =
            Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
          in
+         let memo =
+           Option.value_map memo_opt ~default:User_command_memo.dummy
+             ~f:User_command_memo.create_from_string_exn
+         in
          let command =
-           Coda_commands.setup_user_command ~fee ~nonce
-             ~memo:User_command_memo.dummy ~sender_kp body
+           Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp body
          in
          dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
            ~success:(fun receipt_chain_hash ->
@@ -673,11 +689,22 @@ let constraint_system_digests =
 let snark_job_list =
   let open Deferred.Let_syntax in
   let open Command.Param in
-  Command.async ~summary:"List of snark jobs in JSON format"
+  Command.async ~summary:"List of snark jobs in the scan state in JSON format"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
          match%map
            dispatch_join_errors Daemon_rpcs.Snark_job_list.rpc () port
          with
+         | Ok str ->
+             printf "%s" str
+         | Error e ->
+             print_rpc_error e ))
+
+let snark_pool_list =
+  let open Deferred.Let_syntax in
+  let open Command.Param in
+  Command.async ~summary:"List of snark works in the snark pool in JSON format"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Daemon_rpcs.Snark_pool_list.rpc () port with
          | Ok str ->
              printf "%s" str
          | Error e ->
@@ -905,5 +932,6 @@ let advanced =
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
+    ; ("snark-pool-list", snark_pool_list)
     ; ("unsafe-import", unsafe_import)
     ; ("visualization", Visualization.command_group) ]

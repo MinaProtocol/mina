@@ -20,6 +20,8 @@ module type Inputs_intf = sig
         end
       end
       with type V1.t = t
+
+    val compact_json : t -> Yojson.Safe.json
   end
 
   module Transaction_pool_diff : sig

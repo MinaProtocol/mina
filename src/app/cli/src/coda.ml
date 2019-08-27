@@ -45,14 +45,14 @@ let daemon logger =
          ~doc:
            "Your private key will be copied to the internal wallets folder \
             stripped of its password if it is given using the `propose-key` \
-            flag. (default:don't copy the private key)"
+            flag. (default: don't copy the private key)"
          no_arg
      and propose_key =
        flag "propose-key"
          ~doc:
            "KEYFILE Private key file for the block producer. You cannot \
-            provide both `propose-key` and `propose-public-key`. \
-            (default:don't produce blocks)"
+            provide both `propose-key` and `propose-public-key`. (default: \
+            don't produce blocks)"
          (optional string)
      and propose_public_key =
        flag "propose-public-key"
@@ -74,12 +74,12 @@ let daemon logger =
        flag "work-selection"
          ~doc:
            "seq|rand Choose work sequentially (seq) or randomly (rand) \
-            (default: seq)"
+            (default: rand)"
          (optional work_selection_method)
      and external_port =
        flag "external-port"
          ~doc:
-           (Printf.sprintf
+           (sprintf
               "PORT Base server port for daemon TCP (discovery UDP on port+1) \
                (default: %d)"
               Port.default_external)
@@ -87,14 +87,13 @@ let daemon logger =
      and client_port =
        flag "client-port"
          ~doc:
-           (Printf.sprintf
-              "PORT Client to daemon local communication (default: %d)"
+           (sprintf "PORT Client to daemon local communication (default: %d)"
               Port.default_client)
          (optional int16)
      and rest_server_port =
        flag "rest-port"
          ~doc:
-           (Printf.sprintf
+           (sprintf
               "PORT local REST-server for daemon interaction (default: %d)"
               Port.default_rest)
          (optional int16)
@@ -126,7 +125,7 @@ let daemon logger =
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
-           (Printf.sprintf
+           (sprintf
               "FEE Amount a worker wants to get compensated for generating a \
                snark proof (default: %d)"
               (Currency.Fee.to_int Cli_lib.Default.snark_worker_fee))
@@ -134,8 +133,9 @@ let daemon logger =
      and work_reassignment_wait =
        flag "work-reassignment-wait" (optional int)
          ~doc:
-           (Printf.sprintf
-              "WAIT-TIME in ms before a snark-work is reassigned (default:%dms)"
+           (sprintf
+              "WAIT-TIME in ms before a snark-work is reassigned (default: \
+               %dms)"
               Cli_lib.Default.work_reassignment_wait)
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
@@ -149,7 +149,24 @@ let daemon logger =
        flag "limit-concurrent-connections"
          ~doc:
            "true|false Limit the number of concurrent connections per IP \
-            address (default:true)"
+            address (default: true)"
+         (optional bool)
+     (*TODO: This is being added to log all the snark works received for the 
+     beta-testnet challenge. We might want to remove this later?*)
+     and log_received_snark_pool_diff =
+       flag "log-snark-work-gossip"
+         ~doc:
+           "true|false Log snark-pool diff received from peers (default: false)"
+         (optional bool)
+     and log_received_blocks =
+       flag "log-received-blocks"
+         ~doc:"true|false Log blocks received from peers (default: false)"
+         (optional bool)
+     and log_transaction_pool_diff =
+       flag "log-txn-pool-gossip"
+         ~doc:
+           "true|false Log transaction-pool diff received from peers \
+            (default: false)"
          (optional bool)
      and no_bans =
        let module Expiration = struct
@@ -295,6 +312,21 @@ let daemon logger =
                ~metadata:[("config_directory", `String conf_dir)] ;
              make_version ~wipe_dir:false
        in
+       don't_wait_for
+         (let rec loop () =
+            let stat = Gc.stat () in
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              "OCaml memory statistics"
+              ~metadata:
+                [ ("heap_size", `Int (stat.heap_words * Sys.word_size))
+                ; ("heap_chunks", `Int stat.heap_chunks)
+                ; ("max_heap_size", `Int (stat.top_heap_words * Sys.word_size))
+                ; ("live_size", `Int (stat.live_words * Sys.word_size))
+                ; ("live_blocks", `Int stat.live_blocks) ] ;
+            let%bind () = after @@ Time.Span.of_min 10. in
+            loop ()
+          in
+          loop ()) ;
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
@@ -372,13 +404,31 @@ let daemon logger =
            or_from_config
              (Fn.compose Option.return
                 (Fn.compose work_selection_method_val YJ.Util.to_string))
-             "work-selection" ~default:Cli_lib.Arg_type.Sequence
+             "work-selection" ~default:Cli_lib.Arg_type.Random
              work_selection_method_flag
          in
          let work_reassignment_wait =
            or_from_config YJ.Util.to_int_option "work-reassignment-wait"
              ~default:Cli_lib.Default.work_reassignment_wait
              work_reassignment_wait
+         in
+         let log_received_snark_pool_diff =
+           or_from_config YJ.Util.to_bool_option "log-snark-work-gossip"
+             ~default:false log_received_snark_pool_diff
+         in
+         let log_received_blocks =
+           or_from_config YJ.Util.to_bool_option "log-received-blocks"
+             ~default:false log_received_blocks
+         in
+         let log_transaction_pool_diff =
+           or_from_config YJ.Util.to_bool_option "log-txn-pool-gossip"
+             ~default:false log_transaction_pool_diff
+         in
+         let log_gossip_heard =
+           { Coda_networking.Gossip_net.Config.snark_pool_diff=
+               log_received_snark_pool_diff
+           ; transaction_pool_diff= log_transaction_pool_diff
+           ; new_state= log_received_blocks }
          in
          let initial_peers_raw =
            List.concat
@@ -551,7 +601,8 @@ let daemon logger =
                ; initial_peers= initial_peers_cleaned
                ; addrs_and_ports
                ; trust_system
-               ; max_concurrent_connections } }
+               ; max_concurrent_connections
+               ; log_gossip_heard } }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in

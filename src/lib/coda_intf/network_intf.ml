@@ -28,6 +28,8 @@ module type Network_intf = sig
 
   val first_message : t -> unit Ivar.t
 
+  val high_connectivity : t -> unit Ivar.t
+
   val online_status : t -> [`Online | `Offline] Broadcast_pipe.Reader.t
 
   val random_peers : t -> int -> Network_peer.Peer.t list

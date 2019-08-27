@@ -68,6 +68,10 @@ module type Message_intf = sig
 end
 
 module type Config_intf = sig
+  type log_gossip_heard =
+    {snark_pool_diff: bool; transaction_pool_diff: bool; new_state: bool}
+  [@@deriving make]
+
   type t =
     { timeout: Time.Span.t
     ; target_peer_count: int
@@ -77,7 +81,8 @@ module type Config_intf = sig
     ; chain_id: string
     ; logger: Logger.t
     ; trust_system: Trust_system.t
-    ; max_concurrent_connections: int option }
+    ; max_concurrent_connections: int option
+    ; log_gossip_heard: log_gossip_heard }
   [@@deriving make]
 end
 
@@ -90,29 +95,7 @@ module type S = sig
     type t = Banned | Allowed of Rpc.Connection.t Ivar.t
   end
 
-  type t =
-    { timeout: Time.Span.t
-    ; logger: Logger.t
-    ; trust_system: Trust_system.t
-    ; conf_dir: string
-    ; chain_id: string
-    ; target_peer_count: int
-    ; broadcast_writer: msg Linear_pipe.Writer.t
-    ; received_reader: msg Envelope.Incoming.t Strict_pipe.Reader.t
-    ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
-    ; initial_peers: Host_and_port.t list
-    ; peers: Peer.Hash_set.t
-    ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
-    ; disconnected_peers: Peer.Hash_set.t
-    ; ban_notification_reader: ban_notification Linear_pipe.Reader.t
-    ; ban_notification_writer: ban_notification Linear_pipe.Writer.t
-    ; mutable membership: Membership.t
-    ; connections:
-        ( Unix.Inet_addr.t
-        , (Uuid.t, Connection_with_state.t) Hashtbl.t )
-        Hashtbl.t
-    ; first_connect: unit Ivar.t
-    ; max_concurrent_connections: int option }
+  type t
 
   module Config : Config_intf
 
@@ -141,10 +124,44 @@ module type S = sig
 
   val query_random_peers :
     t -> int -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t List.t
+
+  val first_connect : t -> unit Ivar.t
+
+  val high_connectivity_signal : t -> unit Ivar.t
+
+  val peers_by_ip : t -> Unix.Inet_addr.t -> Peer.t list
 end
 
 module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   type ban_notification = {banned_peer: Peer.t; banned_until: Time.t}
+
+  (* Peer_set is just a wrapper around Peer.Hash_set with an ivar signal that
+     indicates if a node has been connected with a good amount of peers on the
+     network. This is to cause eager bootstrapping *)
+  module Peer_set = struct
+    type t = {set: Peer.Hash_set.t; high_connectivity_signal: unit Ivar.t}
+
+    let is_empty {set; _} = Hash_set.is_empty set
+
+    let add {set; high_connectivity_signal} value =
+      Hash_set.add set value ;
+      if Hash_set.length set >= 8 then
+        Ivar.fill_if_empty high_connectivity_signal ()
+
+    let remove {set; _} value = Hash_set.remove set value
+
+    let length {set; _} = Hash_set.length set
+
+    let to_list {set; _} = Hash_set.to_list set
+
+    let create () =
+      let set = Peer.Hash_set.create () in
+      let high_connectivity_signal = Ivar.create () in
+      {set; high_connectivity_signal}
+
+    let high_connectivity_signal {high_connectivity_signal; _} =
+      high_connectivity_signal
+  end
 
   module Connection_with_state = struct
     type t = Banned | Allowed of Rpc.Connection.t Ivar.t
@@ -164,7 +181,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     ; received_reader: Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
     ; initial_peers: Host_and_port.t list
-    ; peers: Peer.Hash_set.t
+    ; peers: Peer_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
     ; disconnected_peers: Peer.Hash_set.t
     ; ban_notification_reader: ban_notification Linear_pipe.Reader.t
@@ -182,6 +199,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     }
 
   module Config = struct
+    type log_gossip_heard =
+      {snark_pool_diff: bool; transaction_pool_diff: bool; new_state: bool}
+    [@@deriving make]
+
     type t =
       { timeout: Time.Span.t
       ; target_peer_count: int
@@ -191,7 +212,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; chain_id: string
       ; logger: Logger.t
       ; trust_system: Trust_system.t
-      ; max_concurrent_connections: int option }
+      ; max_concurrent_connections: int option
+      ; log_gossip_heard: log_gossip_heard }
     [@@deriving make]
   end
 
@@ -223,18 +245,18 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       (Peer.to_string peer)
       ~metadata:[("peer", Peer.to_yojson peer)] ;
     Coda_metrics.(Gauge.dec_one Network.peers) ;
-    Hash_set.remove t.peers peer ;
-    Hashtbl.update t.peers_by_ip peer.host ~f:(function
-      | None ->
-          failwith "Peer to remove doesn't appear in peers_by_ip"
-      | Some ip_peers ->
-          List.filter ip_peers ~f:(fun ip_peer -> not (Peer.equal ip_peer peer)) )
+    Peer_set.remove t.peers peer ;
+    Option.iter (Hashtbl.find t.peers_by_ip peer.host) ~f:(fun ip_peers ->
+        Hashtbl.set t.peers_by_ip ~key:peer.host
+          ~data:
+            (List.filter ip_peers ~f:(fun ip_peer ->
+                 not (Peer.equal ip_peer peer) )) )
 
   let mark_peer_disconnected t peer =
     remove_peer t peer ;
     Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Moving peer to disconnected peer set : %{sexp: Peer.t}"
-      peer ;
+      ~metadata:[("peer", Peer.to_yojson peer)]
+      !"Moving peer $peer to disconnected peer set" ;
     Hash_set.add t.disconnected_peers peer
 
   let is_unix_errno errno unix_errno =
@@ -255,9 +277,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             if Hash_set.mem t.disconnected_peers peer then (
               (* optimistically, mark all disconnected peers as peers *)
               Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                !"On RPC call, reconnected to a disconnected peer: %{sexp: \
-                  Peer.t}"
-                peer ;
+                ~metadata:[("peer", Peer.to_yojson peer)]
+                !"On RPC call, reconnected to a disconnected peer: $peer" ;
               unmark_all_disconnected_peers t )
             else return ()
           in
@@ -358,10 +379,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 Deferred.List.filter peers ~f:(fun peer ->
                     if%map filter_peer t peer then (
                       Coda_metrics.(Gauge.inc_one Network.peers) ;
-                      Hash_set.add t.peers peer ;
+                      Peer_set.add t.peers peer ;
                       Hashtbl.add_multi t.peers_by_ip ~key:peer.host ~data:peer ;
                       if
-                        Int.equal (Hash_set.length t.peers)
+                        Int.equal (Peer_set.length t.peers)
                           disconnect_clear_threshold
                       then Hash_set.clear t.disconnected_peers
                       else Hash_set.remove t.disconnected_peers peer ;
@@ -439,7 +460,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       let%bind () = Async.after (Time.Span.of_sec 30.0) in
       let%bind () =
         if
-          Hash_set.is_empty t.peers
+          Peer_set.is_empty t.peers
           && not (Hash_set.is_empty t.disconnected_peers)
         then
           let peer =
@@ -488,7 +509,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
        repeatedly in the broadcast loop, that will quickly lead to a ban,
        so we don't be able to re-connect to that peer
      *)
-    let selected_peers = random_sublist (Hash_set.to_list t.peers) n in
+    let selected_peers = random_sublist (Peer_set.to_list t.peers) n in
     broadcast_selected t selected_peers msg
 
   let send_ban_notification t banned_peer banned_until =
@@ -514,7 +535,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           | Kademlia.Membership.Child_died ->
               let t = Option.value_exn !t_for_restarting in
               let peers =
-                List.map (Hash_set.to_list t.peers)
+                List.map (Peer_set.to_list t.peers)
                   ~f:Peer.to_communications_host_and_port
               in
               ( match%map
@@ -572,7 +593,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; broadcast_writer
           ; received_reader
           ; addrs_and_ports= config.addrs_and_ports
-          ; peers= Peer.Hash_set.create ()
+          ; peers= Peer_set.create ()
           ; initial_peers= config.initial_peers
           ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
           ; disconnected_peers= Peer.Hash_set.create ()
@@ -622,7 +643,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
                  ~f:(fun m ->
                    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-                     "broadcasting message" ;
+                     ~metadata:[("message", `String (Message.summary m))]
+                     "broadcasting message: $message" ;
                    broadcast_random t t.target_peer_count m )) ) ;
         let implementations =
           let implementations =
@@ -770,14 +792,18 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let broadcast t = t.broadcast_writer
 
-  let peers t = Hash_set.to_list t.peers
+  let peers t = Peer_set.to_list t.peers
+
+  let high_connectivity_signal t = Peer_set.high_connectivity_signal t.peers
 
   let initial_peers t = t.initial_peers
 
   let ban_notification_reader t = t.ban_notification_reader
 
+  let peers_by_ip t inet_addr = Hashtbl.find_multi t.peers_by_ip inet_addr
+
   let broadcast_all t msg =
-    let to_broadcast = ref (List.permute (Hash_set.to_list t.peers)) in
+    let to_broadcast = ref (List.permute (Peer_set.to_list t.peers)) in
     stage (fun () ->
         let selected = List.take !to_broadcast t.target_peer_count in
         to_broadcast := List.drop !to_broadcast t.target_peer_count ;
@@ -787,7 +813,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let random_peers t n =
     (* choose disconnected peers if no other peers available *)
     let peers =
-      if Hash_set.is_empty t.peers then t.disconnected_peers else t.peers
+      if Peer_set.is_empty t.peers then t.disconnected_peers else t.peers.set
     in
     random_sublist (Hash_set.to_list peers) n
 
@@ -795,7 +821,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     (* choose disconnected peers if no other peers available *)
     let new_peers =
       let open Hash_set in
-      let diff_peers = diff t.peers except in
+      let diff_peers = Hash_set.diff t.peers.set except in
       if is_empty diff_peers then diff t.disconnected_peers except
       else diff_peers
     in
@@ -812,4 +838,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       !"Querying random peers: %s"
       (Peer.pretty_list peers) ;
     List.map peers ~f:(fun peer -> query_peer t peer rpc query)
+
+  let first_connect t = t.first_connect
 end
