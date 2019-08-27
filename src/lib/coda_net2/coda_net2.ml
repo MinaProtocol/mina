@@ -31,6 +31,14 @@ let to_int_res x =
 
 type keypair = {secret: string; public: string; peer_id: string}
 
+type stream_state =
+  (** Streams start in this state. Both sides can still write *)
+  | FullyOpen 
+  (** Streams move from FullyOpen to HalfClosed `Us if when the write pipe is closed. Streams move from FullyOpen to HalfClosed `Them if Stream.reset is called or the remote host closes their write stream. *)
+  | HalfClosed of [`Us | `Them] 
+  (** Streams move from [HalfClosed peer] to FullyClosed once the party that isn't peer has their "close write" event. Once a stream is FullyClosed, its resources are released. *)
+  | FullyClosed 
+
 module Helper = struct
   (* Warning 30 is about field labels being defined in multiple types.
      It means more disambiguation has to happen sometimes but it doesn't
@@ -78,6 +86,7 @@ module Helper = struct
   and stream =
     { net: t
     ; idx: int
+    ; mutable state: stream_state
     ; protocol: string
     ; remote_peerid: string
     ; remote_addr: string
@@ -260,6 +269,22 @@ module Helper = struct
           (Fn.compose (Result.map_error ~f:Error.of_string) M.output_of_yojson) )
     else Deferred.Or_error.error_string "helper process already exited"
 
+  (** Advance the stream_state automata, closing pipes as necessary. *)
+  let update_stream_state t stream = function
+  | `Us ->
+    (* Our write pipe is now closed. Notify helper. *)
+     match%map do_rpc net (module Rpcs.Close_stream) {stream_idx= idx} with
+     | Ok "closeStream success" ->
+         ()
+     | Ok v ->
+         failwithf "helper broke RPC protocol: closeStream got %s" v ()
+     | Error e ->
+         Error.raise e
+  | `Them -> 
+    (* Helper notified us that the Go side closed its write pipe. *)
+    Pipe.close stream.incoming_w ;
+    Deferred.return ()
+
   (** Track a new stream.
 
     This is used for both newly created outbound streams and incomming streams, and
@@ -271,6 +296,16 @@ module Helper = struct
   let make_stream net idx protocol remote_addr remote_peerid =
     let incoming_r, incoming_w = Pipe.create () in
     let outgoing_r, outgoing_w = Pipe.create () in
+    let stream = { net
+    ; idx
+    ; status= FullyOpen
+    ; remote_addr
+    ; remote_peerid
+    ; protocol
+    ; incoming_r
+    ; incoming_w
+    ; outgoing_r
+    ; outgoing_w } in
     (let%bind () =
        Pipe.iter outgoing_r ~f:(fun msg ->
            match%map
@@ -285,23 +320,8 @@ module Helper = struct
            | Error e ->
                Error.raise e )
      in
-     match%map do_rpc net (module Rpcs.Close_stream) {stream_idx= idx} with
-     | Ok "closeStream success" ->
-         ()
-     | Ok v ->
-         failwithf "helper broke RPC protocol: closeStream got %s" v ()
-     | Error e ->
-         Error.raise e)
+     update_stream_state net stream `Us 
     |> don't_wait_for ;
-    { net
-    ; idx
-    ; remote_addr
-    ; remote_peerid
-    ; protocol
-    ; incoming_r
-    ; incoming_w
-    ; outgoing_r
-    ; outgoing_w }
 
   (** Parses a normal RPC response and resolves the deferred it answers. *)
   let handle_response t v =
@@ -542,8 +562,8 @@ module Helper = struct
         let%bind m = Stream_read_complete.of_yojson v |> or_error in
         let stream_idx = m.stream_idx in
         match Hashtbl.find t.streams stream_idx with
-        | Some {incoming_w; _} ->
-            Pipe.close incoming_w ; Ok ()
+        | Some {incoming_w; _} as stream ->
+            update_stream_state t stream `Them ; Ok ()
         | None ->
             Or_error.errorf
               "streamReadComplete for stream we don't know about %d" stream_idx
@@ -794,7 +814,7 @@ module Stream = struct
 
   let reset ({net; idx; _} : t) =
     (* NOTE: do not close the pipes here. Reset_stream should end up
-    notifying us that the stream was lost. We can reset the stream (telling
+    notifying us that streamReadComplete. We can reset the stream (telling
     the remote peer to stop writing) and still be sending data ourselves. *)
     match%map Helper.do_rpc net (module Helper.Rpcs.Reset_stream) {idx} with
     | Ok "resetStream success" ->
@@ -1099,6 +1119,7 @@ let%test_module "coda network tests" =
         let%bind () = Pubsub.Subscription.publish a_sub "msg from a" in
         (* Give the publish time to propagate *)
         let%bind () = after (sec 0.5) in
+        (* FIXME: a shouldn't be receiving its own messages? *)
         let%bind a_msg = Strict_pipe.Reader.read a_r in
         let%bind b_msg = Strict_pipe.Reader.read b_r in
         three_str_eq "msg from a" (unwrap_eof a_msg) (unwrap_eof b_msg) ;
