@@ -1,13 +1,13 @@
 open Core
+open Coda_base
+open Signature_lib
 
 module Make (Inputs : Coda_intf.Tmp_test_stub_hack.For_staged_ledger_intf) : sig
   open Inputs
 
   include
     Coda_intf.Staged_ledger_pre_diff_info_generalized_intf
-    with type user_command := User_command.t
-     and type transaction := Transaction.t
-     and type transaction_snark_work := Transaction_snark_work.t
+    with type transaction_snark_work := Transaction_snark_work.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type valid_staged_ledger_diff :=
                 Staged_ledger_diff.With_valid_signatures_and_proofs.t
@@ -31,8 +31,8 @@ end = struct
           Format.asprintf !"Coinbase error: %s \n" err
       | Insufficient_fee (f1, f2) ->
           Format.asprintf
-            !"Transaction fee %{sexp: Currency.Fee.t} does not suffice proof \
-              fee %{sexp: Currency.Fee.t} \n"
+            !"Transaction fees %{sexp: Currency.Fee.t} does not suffice proof \
+              fees %{sexp: Currency.Fee.t} \n"
             f1 f2
       | Unexpected e ->
           Error.to_string_hum e
@@ -65,7 +65,7 @@ end = struct
     maximum number of provers), in which case, we simply add one coinbase as part
     of the second prediff.
   *)
-  let create_coinbase coinbase_parts (proposer : Compressed_public_key.t) =
+  let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t) =
     let open Result.Let_syntax in
     let coinbase = Coda_compile_config.coinbase in
     let coinbase_or_error = function
@@ -163,14 +163,14 @@ end = struct
     in
     let%bind singles_map =
       Or_error.try_with (fun () ->
-          Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
+          Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
               Option.value_exn (Currency.Fee.add f1 f2) ) )
       |> to_staged_ledger_or_error
     in
     (* deduct the coinbase work fee from the singles_map. It is already part of the coinbase *)
     Or_error.try_with (fun () ->
         List.fold coinbase_fts ~init:singles_map ~f:(fun accum single ->
-            match Compressed_public_key.Map.find accum (fst single) with
+            match Public_key.Compressed.Map.find accum (fst single) with
             | None ->
                 accum
             | Some fee ->
@@ -178,15 +178,15 @@ end = struct
                   Option.value_exn (Currency.Fee.sub fee (snd single))
                 in
                 if new_fee > Currency.Fee.zero then
-                  Compressed_public_key.Map.update accum (fst single)
+                  Public_key.Compressed.Map.update accum (fst single)
                     ~f:(fun _ -> new_fee)
-                else Compressed_public_key.Map.remove accum (fst single) )
+                else Public_key.Compressed.Map.remove accum (fst single) )
         (* TODO: This creates a weird incentive to have a small public_key *)
         |> Map.to_alist ~key_order:`Increasing
         |> Fee_transfer.of_single_list )
     |> to_staged_ledger_or_error
 
-  let get_individual_info coinbase_parts (proposer : Compressed_public_key.t)
+  let get_individual_info coinbase_parts (proposer : Public_key.Compressed.t)
       user_commands completed_works =
     let open Result.Let_syntax in
     let%map user_commands, coinbase, transactions =
@@ -204,29 +204,25 @@ end = struct
         in
         List.rev user_commands'
       in
+      let%bind coinbase = create_coinbase coinbase_parts proposer in
       let coinbase_fts =
-        match coinbase_parts with
-        | `Zero ->
-            []
-        | `One (Some ft) ->
-            [ft]
-        | `Two (Some (ft, None)) ->
-            [ft]
-        | `Two (Some (ft1, Some ft2)) ->
-            [ft1; ft2]
-        | _ ->
-            []
+        List.concat_map coinbase ~f:(fun cb ->
+            Option.value_map cb.fee_transfer ~default:[] ~f:(fun ft -> [ft]) )
       in
       let%bind coinbase_work_fees =
         sum_fees coinbase_fts ~f:snd |> to_staged_ledger_or_error
       in
-      let%bind coinbase = create_coinbase coinbase_parts proposer in
+      let completed_works_others =
+        List.filter completed_works
+          ~f:(fun {Transaction_snark_work.prover; _} ->
+            not (Public_key.Compressed.equal proposer prover) )
+      in
       let%bind delta =
-        fee_remainder user_commands completed_works coinbase_work_fees
+        fee_remainder user_commands completed_works_others coinbase_work_fees
       in
       let%map fee_transfers =
-        create_fee_transfers completed_works delta proposer
-          (coinbase_fts : Fee_transfer.Single.t sexp_list)
+        create_fee_transfers completed_works_others delta proposer
+          (coinbase_fts : Fee_transfer.Single.t list)
       in
       let transactions =
         List.map user_commands ~f:(fun t -> Transaction.User_command t)
@@ -289,27 +285,25 @@ end = struct
     let txn_works =
       List.map ~f:Transaction_snark_work.forget completed_works
     in
-    let coinbase_fts : (Compressed_public_key.t * Currency.Fee.t) sexp_list =
-      match coinbase_parts with
-      | `One (Some ft) ->
-          [ft]
-      | `Two (Some (ft, None)) ->
-          [ft]
-      | `Two (Some (ft1, Some ft2)) ->
-          [ft1; ft2]
-      | _ ->
-          []
-    in
-    let coinbase_work_fees = sum_fees coinbase_fts ~f:snd |> Or_error.ok_exn in
     let coinbase_parts =
       O1trace.measure "create_coinbase" (fun () ->
           ok_exn' (create_coinbase coinbase_parts proposer) )
     in
+    let coinbase_fts =
+      List.concat_map coinbase_parts ~f:(fun cb ->
+          Option.value_map cb.fee_transfer ~default:[] ~f:(fun ft -> [ft]) )
+    in
+    let coinbase_work_fees = sum_fees coinbase_fts ~f:snd |> Or_error.ok_exn in
+    let txn_works_others =
+      List.filter txn_works ~f:(fun {Transaction_snark_work.prover; _} ->
+          not (Public_key.Compressed.equal proposer prover) )
+    in
     let delta =
-      ok_exn' (fee_remainder user_commands txn_works coinbase_work_fees)
+      ok_exn' (fee_remainder user_commands txn_works_others coinbase_work_fees)
     in
     let fee_transfers =
-      ok_exn' (create_fee_transfers txn_works delta proposer coinbase_fts)
+      ok_exn'
+        (create_fee_transfers txn_works_others delta proposer coinbase_fts)
     in
     let transactions =
       List.map user_commands ~f:(fun t -> Transaction.User_command t)

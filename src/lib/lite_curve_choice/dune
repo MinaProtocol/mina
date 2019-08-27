@@ -3,4 +3,4 @@
   (public_name lite_curve_choice)
   (preprocess (pps ppx_jane ppx_deriving.eq ppx_coda))
   (libraries
-    snarkette core_kernel base64))
+    snarkette core_kernel))

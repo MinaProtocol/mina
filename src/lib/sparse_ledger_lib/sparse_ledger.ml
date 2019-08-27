@@ -9,7 +9,7 @@ module Poly = struct
             | Account of 'account
             | Hash of 'hash
             | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
-          [@@deriving bin_io, version, eq, sexp, version]
+          [@@deriving bin_io, version, eq, sexp, to_yojson, version]
         end
 
         include T
@@ -22,7 +22,7 @@ module Poly = struct
       | Account of 'account
       | Hash of 'hash
       | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
-    [@@deriving eq, sexp]
+    [@@deriving eq, sexp, to_yojson]
   end
 
   module Stable = struct
@@ -32,7 +32,7 @@ module Poly = struct
           { indexes: ('key * int) list
           ; depth: int
           ; tree: ('hash, 'account) Tree.Stable.V1.t }
-        [@@deriving bin_io, sexp, version]
+        [@@deriving bin_io, sexp, to_yojson, version]
       end
 
       include T
@@ -45,7 +45,7 @@ module Poly = struct
     { indexes: ('key * int) list
     ; depth: int
     ; tree: ('hash, 'account) Tree.Stable.V1.t }
-  [@@deriving sexp]
+  [@@deriving sexp, to_yojson]
 end
 
 module type S = sig
@@ -58,13 +58,13 @@ module type S = sig
   module Stable : sig
     module V1 : sig
       type t = (hash, key, account) Poly.Stable.V1.t
-      [@@deriving bin_io, sexp, version]
+      [@@deriving bin_io, sexp, to_yojson, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   val of_hash : depth:int -> hash -> t
 
@@ -89,13 +89,13 @@ let tree {Poly.tree; _} = tree
 let of_hash ~depth h = {Poly.indexes= []; depth; tree= Hash h}
 
 module Make (Hash : sig
-  type t [@@deriving bin_io, eq, sexp, compare, version]
+  type t [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
 
   val merge : height:int -> t -> t -> t
 end) (Key : sig
-  type t [@@deriving bin_io, eq, sexp, version]
+  type t [@@deriving bin_io, eq, sexp, to_yojson, version]
 end) (Account : sig
-  type t [@@deriving bin_io, eq, sexp, version]
+  type t [@@deriving bin_io, eq, sexp, to_yojson, version]
 
   val data_hash : t -> Hash.t
 end) : sig
@@ -111,7 +111,7 @@ end = struct
     module V1 = struct
       module T = struct
         type t = (Hash.t, Key.t, Account.t) Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, version {unnumbered}]
+        [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
       end
 
       include T
@@ -120,7 +120,7 @@ end = struct
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   let of_hash ~depth (hash : Hash.t) = of_hash ~depth hash
 
@@ -132,7 +132,7 @@ end = struct
     | Node (h, _, _) ->
         h
 
-  type index = int [@@deriving bin_io, sexp]
+  type index = int [@@deriving bin_io, sexp, to_yojson]
 
   let merkle_root {Poly.tree; _} = hash tree
 
@@ -252,6 +252,7 @@ end = struct
 end
 
 type ('hash, 'key, 'account) t = ('hash, 'key, 'account) Poly.t
+[@@deriving to_yojson]
 
 let%test_module "sparse-ledger-test" =
   ( module struct
@@ -261,6 +262,8 @@ let%test_module "sparse-ledger-test" =
           module T = struct
             type t = Core_kernel.Md5.Stable.V1.t
             [@@deriving bin_io, sexp, version {unnumbered}]
+
+            let to_yojson md5 = `String (Core_kernel.Md5.to_hex md5)
 
             [%%define_locally
             Md5.(equal)]
@@ -280,7 +283,7 @@ let%test_module "sparse-ledger-test" =
         module Latest = V1
       end
 
-      type t = Stable.Latest.t [@@deriving eq, sexp, compare]
+      type t = Stable.Latest.t [@@deriving eq, sexp, to_yojson, compare]
 
       let merge = Stable.Latest.merge
 
@@ -294,7 +297,7 @@ let%test_module "sparse-ledger-test" =
         module V1 = struct
           module T = struct
             type t = {name: string; favorite_number: int}
-            [@@deriving bin_io, eq, sexp, version {unnumbered}]
+            [@@deriving bin_io, eq, sexp, to_yojson, version {unnumbered}]
           end
 
           include T
@@ -314,7 +317,7 @@ let%test_module "sparse-ledger-test" =
       end
 
       type t = Stable.Latest.t = {name: string; favorite_number: int}
-      [@@deriving sexp, eq]
+      [@@deriving sexp, to_yojson, eq]
 
       [%%define_locally
       Stable.Latest.(key, gen)]
@@ -324,7 +327,8 @@ let%test_module "sparse-ledger-test" =
       module Stable = struct
         module V1 = struct
           module T = struct
-            type t = string [@@deriving bin_io, eq, sexp, version {unnumbered}]
+            type t = string
+            [@@deriving bin_io, eq, sexp, to_yojson, version {unnumbered}]
           end
 
           include T
@@ -333,7 +337,7 @@ let%test_module "sparse-ledger-test" =
         module Latest = V1
       end
 
-      type t = Stable.Latest.t [@@deriving sexp]
+      type t = Stable.Latest.t [@@deriving sexp, to_yojson]
     end
 
     include Make (Hash.Stable.Latest) (Key.Stable.Latest)

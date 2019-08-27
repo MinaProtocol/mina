@@ -3,7 +3,8 @@ open Async
 
 let render_keys public_keys =
   String.concat ~sep:"\n"
-  @@ List.map public_keys ~f:Signature_lib.Public_key.Compressed.to_base64
+  @@ List.map public_keys
+       ~f:Signature_lib.Public_key.Compressed.to_base58_check
 
 let command =
   let open Command.Let_syntax in

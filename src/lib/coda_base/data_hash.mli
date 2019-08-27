@@ -21,6 +21,8 @@ module type Basic = sig
       type nonrec t = t
       [@@deriving bin_io, sexp, compare, hash, yojson, version]
 
+      val version_byte : char (* for base58_check *)
+
       include Hashable_binable with type t := t
 
       include Comparable.S with type t := t

@@ -11,4 +11,5 @@
     consensus
     kademlia
     transition_frontier
-    ))
+    coda_networking
+    sync_handler))

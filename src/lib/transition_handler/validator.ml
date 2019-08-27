@@ -26,8 +26,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     let protocol_state = External_transition.protocol_state transition in
     let root_protocol_state =
       Transition_frontier.root frontier
-      |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
-      |> External_transition.Validated.protocol_state
+      |> Transition_frontier.Breadcrumb.protocol_state
     in
     let%bind () =
       Option.fold (Transition_frontier.find frontier transition_hash)
@@ -64,9 +63,6 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          , unit )
          Writer.t) ~unprocessed_transition_cache =
     let module Lru = Core_extended_cache.Lru in
-    let already_reported_duplicates =
-      Lru.create ~destruct:None Consensus.Constants.(k * c)
-    in
     don't_wait_for
       (Reader.iter transition_reader
          ~f:(fun (`Transition transition_env, `Time_received _) ->
@@ -79,12 +75,15 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                ~unprocessed_transition_cache transition_env
            with
            | Ok cached_transition ->
-               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                 "transition $state_hash passed validation"
-                 ~metadata:
-                   [ ("state_hash", State_hash.to_yojson transition_hash)
-                   ; ("transition", External_transition.to_yojson transition)
-                   ] ;
+               let%map () =
+                 Trust_system.record_envelope_sender trust_system logger sender
+                   ( Trust_system.Actions.Sent_useful_gossip
+                   , Some
+                       ( "external transition $state_hash"
+                       , [ ("state_hash", State_hash.to_yojson transition_hash)
+                         ; ( "transition"
+                           , External_transition.to_yojson transition ) ] ) )
+               in
                let transition_time =
                  External_transition.protocol_state transition
                  |> Protocol_state.blockchain_state
@@ -100,22 +99,15 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                Perf_histograms.add_span ~name:hist_name
                  (Core_kernel.Time.diff (Core_kernel.Time.now ())
                     transition_time) ;
-               Writer.write valid_transition_writer cached_transition ;
-               Deferred.return ()
+               Writer.write valid_transition_writer cached_transition
            | Error (`In_frontier _) | Error (`In_process _) ->
-               if
-                 Lru.find already_reported_duplicates transition_hash
-                 |> Option.is_none
-               then (
-                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                   "ignoring transition we've already seen $state_hash"
-                   ~metadata:
-                     [ ("state_hash", State_hash.to_yojson transition_hash)
-                     ; ("transition", External_transition.to_yojson transition)
-                     ] ;
-                 Lru.add already_reported_duplicates ~key:transition_hash
-                   ~data:() ) ;
-               Deferred.return ()
+               Trust_system.record_envelope_sender trust_system logger sender
+                 ( Trust_system.Actions.Sent_old_gossip
+                 , Some
+                     ( "external transition with state hash $hash"
+                     , [ ("state_hash", State_hash.to_yojson transition_hash)
+                       ; ( "transition"
+                         , External_transition.to_yojson transition ) ] ) )
            | Error `Disconnected ->
                Trust_system.record_envelope_sender trust_system logger sender
                  ( Trust_system.Actions.Disconnected_chain

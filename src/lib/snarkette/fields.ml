@@ -5,7 +5,7 @@ open Tuple_lib
 let ( = ) = `Don't_use_polymorphic_equality
 
 module type Intf = sig
-  type t [@@deriving eq, bin_io, sexp, compare]
+  type t [@@deriving eq, bin_io, sexp, to_yojson, compare]
 
   val gen : t Quickcheck.Generator.t
 
@@ -49,6 +49,8 @@ module type Fp_intf = sig
 
   val fold : t -> bool Triple.t Fold.t
 
+  val to_bits : t -> bool list
+
   val length_in_bits : int
 
   val is_square : t -> bool
@@ -77,7 +79,7 @@ module Make_fp
   include Info
 
   (* TODO version *)
-  type t = N.t [@@deriving eq, bin_io, sexp, compare]
+  type t = N.t [@@deriving eq, bin_io, sexp, to_yojson, compare]
 
   let to_bigint = Fn.id
 
@@ -107,6 +109,8 @@ module Make_fp
             else go (f acc (N.test_bit n i)) (i + 1)
           in
           go init 0 ) }
+
+  let to_bits = Fn.compose Fold_lib.Fold.to_list fold_bits
 
   let fold n = Fold_lib.Fold.group3 ~default:false (fold_bits n)
 
@@ -321,7 +325,7 @@ end = struct
 
   type base = Fp.t
 
-  type t = Fp.t * Fp.t * Fp.t [@@deriving eq, bin_io, sexp, compare]
+  type t = Fp.t * Fp.t * Fp.t [@@deriving eq, bin_io, sexp, to_yojson, compare]
 
   let gen = Quickcheck.Generator.tuple3 Fp.gen Fp.gen Fp.gen
 
@@ -396,7 +400,7 @@ module Make_fp2
 end = struct
   type base = Fp.t
 
-  type t = Fp.t * Fp.t [@@deriving eq, bin_io, sexp, compare]
+  type t = Fp.t * Fp.t [@@deriving eq, to_yojson, bin_io, sexp, compare]
 
   let gen = Quickcheck.Generator.tuple2 Fp.gen Fp.gen
 
@@ -468,7 +472,7 @@ module Make_fp6
 
   val unitary_inverse : t -> t
 end = struct
-  type t = Fp3.t * Fp3.t [@@deriving eq, bin_io, sexp, compare]
+  type t = Fp3.t * Fp3.t [@@deriving eq, to_yojson, bin_io, sexp, compare]
 
   type base = Fp3.t
 

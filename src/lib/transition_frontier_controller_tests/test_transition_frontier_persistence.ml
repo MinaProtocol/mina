@@ -8,12 +8,13 @@ end)
 
 open Stubs
 module Transition_storage =
-  Transition_frontier_persistence.Transition_storage.Make (Stubs)
+  Transition_frontier_persistence.Components.Transition_storage.Make (Stubs)
 
 module Transition_frontier_persistence =
 Transition_frontier_persistence.Make (struct
   include Stubs
-  module Make_worker = Transition_frontier_persistence.Worker.Make_async
+  module Make_worker =
+    Transition_frontier_persistence.Components.Worker.Make_async
   module Transition_storage = Transition_storage
 end)
 
@@ -25,12 +26,13 @@ let%test_module "Transition Frontier Persistence" =
 
     let check_transitions transition_storage written_breadcrumbs =
       List.iter written_breadcrumbs ~f:(fun breadcrumb ->
-          let {With_hash.hash; data= expected_transition} =
-            Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
+          let expected_transition =
+            Transition_frontier.Breadcrumb.validated_transition breadcrumb
           in
           let queried_transition, _ =
             Transition_storage.get ~logger transition_storage
-              (Transition_storage.Schema.Transition hash)
+              (Transition_storage.Schema.Transition
+                 (External_transition.Validated.state_hash expected_transition))
           in
           [%test_eq: External_transition.Validated.t] expected_transition
             queried_transition )
@@ -58,11 +60,13 @@ let%test_module "Transition Frontier Persistence" =
       |> Deferred.map ~f:(function
            | Ok value ->
                value
-           | Error e ->
+           | Error exn ->
                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-                 "Encountered an error: Visualizing transition frontier" ;
+                 "Exception when persisting transition frontier: $exn. \
+                  Creating frontier visualization"
+                 ~metadata:[("exn", `String (Exn.to_string exn))] ;
                Transition_frontier.visualize ~filename:"frontier.dot" frontier ;
-               raise e )
+               raise exn )
 
     let generate_breadcrumbs ~gen_root_breadcrumb_builder frontier size =
       gen_root_breadcrumb_builder ~logger ~trust_system ~size
@@ -125,7 +129,7 @@ let%test_module "Transition Frontier Persistence" =
                  (New_frontier
                     Transition_frontier.Diff.Mutant.Root.Poly.
                       { root=
-                          Transition_frontier.Breadcrumb.transition_with_hash
+                          Transition_frontier.Breadcrumb.validated_transition
                             root
                       ; scan_state= Staged_ledger.scan_state staged_ledger
                       ; pending_coinbase=
@@ -136,7 +140,7 @@ let%test_module "Transition Frontier Persistence" =
               Transition_frontier.Diff.Hash.empty
               (E
                  (Add_transition
-                    (Transition_frontier.Breadcrumb.transition_with_hash
+                    (Transition_frontier.Breadcrumb.validated_transition
                        next_breadcrumb)))
             |> ignore ;
             (root, next_breadcrumb) )

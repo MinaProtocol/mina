@@ -1,29 +1,23 @@
 open Core
 open Module_version
+open Snark_params.Tick
 
 module Stable = struct
   module V1 = struct
     module T = struct
-      type t = Snark_params.Tock.Field.t * Snark_params.Tock.Field.t
+      type t = Field.t * Inner_curve.Scalar.t
       [@@deriving sexp, eq, compare, hash, bin_io, version {asserted}]
+
+      let description = "Signature"
+
+      let version_byte = Base58_check.Version_bytes.signature
 
       (* TODO : version Field in snarky *)
     end
 
-    let to_base64 t = Binable.to_string (module T) t |> Base64.encode_string
-
-    let of_base64_exn s = Base64.decode_exn s |> Binable.of_string (module T)
-
     include T
+    include Codable.Make_base58_check (T)
     include Registration.Make_latest_version (T)
-
-    include Codable.Make_of_string (struct
-      type nonrec t = t
-
-      let to_string = to_base64
-
-      let of_string = of_base64_exn
-    end)
   end
 
   module Latest = V1
@@ -41,6 +35,6 @@ end
 include Stable.Latest
 open Snark_params.Tick
 
-type var = Inner_curve.Scalar.var * Inner_curve.Scalar.var
+type var = Field.Var.t * Inner_curve.Scalar.var
 
-let dummy : t = Inner_curve.Scalar.(one, one)
+let dummy : t = (Field.one, Inner_curve.Scalar.one)

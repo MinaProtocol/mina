@@ -188,7 +188,7 @@ module Key = struct
 
   type t = Stable.Latest.t [@@deriving sexp, compare, hash]
 
-  let to_string = Signature_lib.Public_key.Compressed.to_base64
+  let to_string = Signature_lib.Public_key.Compressed.to_base58_check
 
   let gen = Account.key_gen
 

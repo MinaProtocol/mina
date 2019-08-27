@@ -20,19 +20,13 @@ module Styles = {
     ]);
 
   let inactiveWalletItem =
-    merge([
-      walletItem,
-      style([
-        hover([color(Colors.saville)])
-      ]),
-      notText,
-    ]);
+    merge([walletItem, style([hover([color(Colors.saville)])]), notText]);
 
   let activeWalletItem =
     merge([
       walletItem,
       style([
-        color(Colors.marineAlpha(1.)),
+        color(Colors.marine),
         backgroundColor(Colors.hyperlinkAlpha(0.15)),
       ]),
       notText,
@@ -52,7 +46,7 @@ module Styles = {
 let make = (~wallet: Wallet.t) => {
   let isActive =
     Option.map(Hooks.useActiveWallet(), ~f=activeWallet =>
-      PublicKey.equal(activeWallet, wallet.key)
+      PublicKey.equal(activeWallet, wallet.publicKey)
     )
     |> Option.withDefault(~default=false);
 
@@ -64,11 +58,15 @@ let make = (~wallet: Wallet.t) => {
       }
     }
     onClick={_ =>
-      ReasonReact.Router.push("/wallet/" ++ PublicKey.uriEncode(wallet.key))
+      ReasonReact.Router.push(
+        "/wallet/" ++ PublicKey.uriEncode(wallet.publicKey),
+      )
     }>
-    <WalletName pubkey={wallet.key} />
+    <WalletName pubkey={wallet.publicKey} />
     <div className=Styles.balance>
-      {ReasonReact.string({js|■ |js} ++ wallet.balance)}
+      {ReasonReact.string(
+         {js|■ |js} ++ Int64.to_string(wallet.balance##total),
+       )}
     </div>
   </div>;
 };

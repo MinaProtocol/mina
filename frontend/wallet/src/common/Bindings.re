@@ -137,19 +137,22 @@ module ChildProcess = {
   let pipe = makeIOTriple(`Pipe, `Pipe, `Pipe);
   let ignore = makeIOTriple(`Ignore, `Ignore, `Ignore);
 
+  [@bs.deriving abstract]
+  type spawnOptions = {
+    [@bs.optional]
+    env: Js.Dict.t(string),
+    [@bs.optional]
+    shell: string,
+    [@bs.optional]
+    stdio: (io, io, io),
+  };
+
   [@bs.val] [@bs.module "child_process"]
-  external spawn:
-    (
-      string,
-      array(string),
-      {
-        .
-        "env": Js.Dict.t(string),
-        "stdio": (io, io, io),
-      }
-    ) =>
-    Process.t =
+  external spawn: (string, array(string), spawnOptions) => Process.t =
     "spawn";
+
+  [@bs.val] [@bs.module "child_process"]
+  external execSync: (string, array(string)) => unit = "exec";
 };
 
 module Fs = {
@@ -172,6 +175,9 @@ module Fs = {
     "";
 
   [@bs.val] [@bs.module "fs"]
+  external writeSync: (Stream.Writable.t, string) => unit = "";
+
+  [@bs.val] [@bs.module "fs"]
   external watchFile: (string, unit => unit) => unit = "";
 };
 
@@ -181,8 +187,23 @@ module Fetch = {
 
 module LocalStorage = {
   [@bs.val] [@bs.scope "localStorage"]
-  external setItem: (string, string) => unit = "";
+  external setItem:
+    (
+      ~key: [@bs.string] [
+              | [@bs.as "network"] `Network
+              | [@bs.as "addressbook"] `AddressBook
+            ],
+      ~value: string
+    ) =>
+    unit =
+    "";
 
   [@bs.val] [@bs.scope "localStorage"]
-  external getItem: string => Js.nullable(string) = "";
+  external getItem:
+    (
+    [@bs.string]
+    [ | [@bs.as "network"] `Network | [@bs.as "addressbook"] `AddressBook]
+    ) =>
+    Js.nullable(string) =
+    "";
 };

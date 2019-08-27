@@ -3,9 +3,10 @@ include Non_zero_curve_point
 include Codable.Make_of_string (struct
   type nonrec t = t
 
-  let to_string t = Compressed.to_base64 (compress t)
+  let to_string t = Compressed.to_base58_check (compress t)
 
-  let of_string string = decompress_exn (Compressed.of_base64_exn string)
+  let of_string string =
+    Compressed.of_base58_check_exn string |> decompress_exn
 end)
 
 let of_private_key_exn p =

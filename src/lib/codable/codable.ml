@@ -77,21 +77,57 @@ Make (struct
   let decode = Iso.of_string
 end)
 
-module Make_base64 (T : sig
+module Make_base58_check (T : sig
   type t [@@deriving bin_io]
+
+  val description : string
+
+  val version_byte : char
 end) =
 struct
-  let to_base64 t = Binable.to_string (module T) t |> Base64.encode_string
+  module Base58_check = Base58_check.Make (T)
 
-  let of_base64_exn s = Base64.decode_exn s |> Binable.of_string (module T)
+  let to_base58_check t = Base58_check.encode (Binable.to_string (module T) t)
+
+  let of_base58_check s =
+    let open Or_error.Let_syntax in
+    let%bind decoded = Base58_check.decode s in
+    Ok (Binable.of_string (module T) decoded)
+
+  let of_base58_check_exn s = of_base58_check s |> Or_error.ok_exn
 
   module String_ops = struct
     type t = T.t
 
-    let to_string = to_base64
+    let to_string = to_base58_check
 
-    let of_string = of_base64_exn
+    let of_string = of_base58_check_exn
   end
 
   include Make_of_string (String_ops)
+end
+
+module type Base58_check_base_intf = sig
+  type t
+
+  (** Base58Check decoding *)
+  val of_base58_check : string -> t Base.Or_error.t
+
+  (** Base58Check decoding *)
+  val of_base58_check_exn : string -> t
+end
+
+module type Base58_check_intf = sig
+  type t
+
+  (** string encoding (Base58Check) *)
+  val to_string : t -> string
+
+  (** string (Base58Check) decoding *)
+  val of_string : string -> t
+
+  (** explicit Base58Check encoding *)
+  val to_base58_check : t -> string
+
+  include Base58_check_base_intf with type t := t
 end

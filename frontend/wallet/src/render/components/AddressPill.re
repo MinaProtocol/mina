@@ -12,7 +12,7 @@ module Styles = {
       minWidth(`rem(5.)),
       opacity(0.7),
       visibility(hovered ? `hidden : `visible),
-      color(isActive ? Theme.Colors.marineAlpha(1.) : Theme.Colors.midnight),
+      color(isActive ? Theme.Colors.marine : Theme.Colors.midnight),
     ]);
 
   let hoverContainer =

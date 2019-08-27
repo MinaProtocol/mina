@@ -10,10 +10,12 @@ module Make (Inputs : sig
   module Breadcrumb :
     Coda_intf.Transition_frontier_breadcrumb_intf
     with type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
+                ( [`Time_received] * unit Truth.true_t
+                , [`Proof] * unit Truth.true_t
+                , [`Delta_transition_chain]
+                  * State_hash.t Non_empty_list.t Truth.true_t
+                , [`Frontier_dependencies] * unit Truth.true_t
+                , [`Staged_ledger_diff] * unit Truth.false_t )
                 External_transition.Validation.with_transition
      and type external_transition_validated := External_transition.Validated.t
      and type staged_ledger := Staged_ledger.t
@@ -48,18 +50,15 @@ end) :
 
     type input = unit
 
-    let get_work (breadcrumb : Breadcrumb.t) : Work.t Sequence.t =
+    let get_work (breadcrumb : Breadcrumb.t) : Work.t list =
       let ledger = Inputs.Breadcrumb.staged_ledger breadcrumb in
       let scan_state = Inputs.Staged_ledger.scan_state ledger in
-      let work_to_do =
-        Inputs.Staged_ledger.Scan_state.all_work_to_do scan_state
-      in
-      Or_error.ok_exn work_to_do
+      Inputs.Staged_ledger.Scan_state.all_work_statements scan_state
 
     (** Returns true if this update changed which elements are in the table
     (but not if the same elements exist with a different reference count) *)
     let add_breadcrumb_to_ref_table table breadcrumb : bool =
-      Sequence.fold ~init:false (get_work breadcrumb) ~f:(fun acc work ->
+      List.fold ~init:false (get_work breadcrumb) ~f:(fun acc work ->
           match Work.Table.find table work with
           | Some count ->
               Work.Table.set table ~key:work ~data:(count + 1) ;
@@ -71,7 +70,7 @@ end) :
     (** Returns true if this update changed which elements are in the table
     (but not if the same elements exist with a different reference count) *)
     let remove_breadcrumb_from_ref_table table breadcrumb : bool =
-      Sequence.fold (get_work breadcrumb) ~init:false ~f:(fun acc work ->
+      List.fold (get_work breadcrumb) ~init:false ~f:(fun acc work ->
           match Work.Table.find table work with
           | Some 1 ->
               Work.Table.remove table work ;
@@ -114,26 +113,32 @@ end) :
   module Root_history = struct
     module Queue = Hash_queue.Make (State_hash)
 
-    type t =
-      { history: Breadcrumb.t Queue.t
-      ; capacity: int
-      ; mutable most_recent: Breadcrumb.t option }
+    type t = {history: Breadcrumb.t Queue.t; capacity: int}
 
     let create capacity =
       let history = Queue.create () in
-      {history; capacity; most_recent= None}
+      {history; capacity}
 
     let lookup {history; _} = Queue.lookup history
 
-    let most_recent {most_recent; _} = most_recent
+    let most_recent {history; _} =
+      let open Option.Let_syntax in
+      let%map state_hash, breadcrumb = Queue.dequeue_back_with_key history in
+      Queue.enqueue_back history state_hash breadcrumb |> ignore ;
+      breadcrumb
+
+    let oldest {history; _} =
+      let open Option.Let_syntax in
+      let%map state_hash, breadcrumb = Queue.dequeue_front_with_key history in
+      Queue.enqueue_front history state_hash breadcrumb |> ignore ;
+      breadcrumb
 
     let mem {history; _} = Queue.mem history
 
-    let enqueue ({history; capacity; _} as t) state_hash breadcrumb =
+    let enqueue {history; capacity} state_hash breadcrumb =
       if Queue.length history >= capacity then
         Queue.dequeue_front_exn history |> ignore ;
-      Queue.enqueue_back history state_hash breadcrumb |> ignore ;
-      t.most_recent <- Some breadcrumb
+      Queue.enqueue_back history state_hash breadcrumb |> ignore
 
     let is_empty {history; _} = Queue.is_empty history
   end
@@ -175,7 +180,7 @@ end) :
   let create root_breadcrumb =
     let new_transition =
       New_transition.Var.create
-        (Breadcrumb.external_transition root_breadcrumb)
+        (Breadcrumb.validated_transition root_breadcrumb)
     in
     { root_history= Root_history.create (2 * max_length)
     ; snark_pool_refcount= Snark_pool_refcount.create ()
@@ -269,6 +274,6 @@ end) :
         Transition_registry.notify t.transition_registry
           (Breadcrumb.state_hash bc) ;
         New_transition.Var.set t.new_transition
-        @@ Breadcrumb.external_transition bc ;
+        @@ Breadcrumb.validated_transition bc ;
         New_transition.stabilize () )
 end

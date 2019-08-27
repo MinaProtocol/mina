@@ -55,13 +55,13 @@ module Value : sig
         , Currency.Amount.Stable.V1.t
         , Signature_lib.Public_key.Compressed.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving bin_io, sexp, version]
+      [@@deriving bin_io, sexp, to_yojson, version]
     end
 
     module Latest : module type of V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 end
 
 type value = Value.t
@@ -88,7 +88,7 @@ val create_value :
   -> unit
   -> Value.t
 
-val genesis : Value.t
+val genesis : Value.t Lazy.t
 
 val blockchain_state : ('a, _, _, _, _) Poly.t -> 'a
 

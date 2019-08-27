@@ -407,9 +407,9 @@ let%test_module "vrf-test" =
                   (struct
                     type t = Curve.t
 
-                    let to_sexpable = Curve.to_affine_coordinates
+                    let to_sexpable = Curve.to_affine_exn
 
-                    let of_sexpable = Curve.of_affine_coordinates
+                    let of_sexpable = Curve.of_affine
                   end)
       end
 
@@ -433,7 +433,7 @@ let%test_module "vrf-test" =
       let typ = Curve.typ
 
       let to_bits (t : t) =
-        let x, y = Curve.to_affine_coordinates t in
+        let x, y = Curve.to_affine_exn t in
         List.hd_exn (Field.unpack y) :: Field.unpack x
 
       let gen =
@@ -481,7 +481,10 @@ let%test_module "vrf-test" =
     module Pedersen =
       Snarky.Pedersen.Make (Impl) (Curve)
         (struct
-          let params = params
+          let params =
+            Array.map
+              ~f:(Tuple_lib.Quadruple.map ~f:Curve.to_affine_exn)
+              params
         end)
 
     module Message = struct
@@ -495,9 +498,9 @@ let%test_module "vrf-test" =
                 (struct
                   type t = Curve.t
 
-                  let to_sexpable = Curve.to_affine_coordinates
+                  let to_sexpable = Curve.to_affine_exn
 
-                  let of_sexpable = Curve.of_affine_coordinates
+                  let of_sexpable = Curve.of_affine
                 end)
 
       type var = Curve.var
@@ -527,7 +530,7 @@ let%test_module "vrf-test" =
           Curve.add acc
             (Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
                triple) )
-      |> Curve.to_affine_coordinates |> fst
+      |> Curve.to_affine_exn |> fst
 
     let hash_bits_checked bits =
       let open Impl.Checked in

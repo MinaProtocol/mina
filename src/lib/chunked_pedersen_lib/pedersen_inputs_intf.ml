@@ -16,7 +16,7 @@ module type S = sig
   module Curve : sig
     type t
 
-    val to_affine_coordinates : t -> Field.t * Field.t
+    val to_affine_exn : t -> Field.t * Field.t
 
     val point_near_x : Field.t -> t
 

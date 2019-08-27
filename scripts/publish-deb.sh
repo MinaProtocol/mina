@@ -1,11 +1,10 @@
 #!/bin/bash
-set -euo pipefail
-
-# Needed to check variables
-set +u
+set -eo pipefail
 
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
+
+GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
 
 DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120'
 
@@ -14,19 +13,27 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run"
     exit 0
 else
-    # master is 'stable'
-    if [[ "$CIRCLE_BRANCH" == "master" ]]; then
-        CODENAME='stable'
-    else
-        CODENAME='unstable'
-    fi
+    # Determine deb repo to use
+    case $GITBRANCH in
+        develop)
+            CODENAME='develop'
+            ;;
+        release*)
+            CODENAME='stable'
+            ;;
+        *)
+            CODENAME='unstable'
+            ;;
+    esac
 
-    # only publish some jobs
-    if [[ "$CIRCLE_JOB" == "build-artifacts--testnet_postake" || \
-          "$CIRCLE_JOB" == "build-artifacts--testnet_postake_medium_curves" || \
-          "$CIRCLE_JOB" == "build-artifacts--testnet_postake_many_proposers" ]]; then
+    # only publish wanted jobs
+    if [[ "$CIRCLE_JOB" == "build-artifacts--testnet_postake_medium_curves"  ]]; then
           cd src/_build
+          echo "Publishing debs:"
+          ls coda-*.deb
+          set -x
           ${DEBS3} --codename ${CODENAME} --component main coda-*.deb
+          set +x
     else
         echo "WARNING: Circle job: ${CIRCLE_JOB} not in publish list"
     fi

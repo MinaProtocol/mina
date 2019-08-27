@@ -35,15 +35,17 @@ struct
           (* This is an option to allow using a fake trust system in tests. This is
        ugly, but the alternative is functoring half of Coda over the trust
        system. *)
-    ; bans_reader: Peer_id.t Strict_pipe.Reader.t
+    ; bans_reader: (Peer_id.t * Time.t) Strict_pipe.Reader.t
     ; bans_writer:
-        ( Peer_id.t
+        ( Peer_id.t * Time.t
         , Strict_pipe.synchronous
         , unit Deferred.t )
         Strict_pipe.Writer.t
     ; mutable actions_writers: (Action.t * Peer_id.t) Pipe.Writer.t list }
 
   module Record_inst = Record.Make (Now)
+
+  let disable_bans = Record_inst.disable_bans
 
   let create ~db_dir =
     let reader, writer = Strict_pipe.create Strict_pipe.Synchronous in
@@ -69,6 +71,16 @@ struct
         Record_inst.to_peer_status record
     | None ->
         Record_inst.to_peer_status @@ Record_inst.init ()
+
+  let peer_statuses {db; _} =
+    Option.value_map db ~default:[] ~f:(fun db' ->
+        Db.to_alist db'
+        |> List.map ~f:(fun (peer, record) ->
+               (peer, Record_inst.to_peer_status record) ) )
+
+  let reset ({db; _} as t) peer =
+    Option.value_map db ~default:() ~f:(fun db' -> Db.remove db' ~key:peer) ;
+    lookup t peer
 
   let close {db; bans_writer; _} =
     Option.iter db ~f:Db.close ;
@@ -100,6 +112,24 @@ struct
     let simple_old = Record_inst.to_peer_status old_record in
     let simple_new = Record_inst.to_peer_status new_record in
     let action_fmt, action_metadata = Action.to_log action in
+    let log_trust_change () =
+      let verb =
+        if simple_new.trust >. simple_old.trust then "Increasing"
+        else "Decreasing"
+      in
+      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:([("peer", Peer_id.to_yojson peer)] @ action_metadata)
+        "%s trust for peer $peer due to action %s. New trust is %f." verb
+        action_fmt simple_new.trust ;
+      if
+        Record_inst.get_bans_disabled ()
+        && simple_old.trust >. -1. && simple_new.trust <=. -1.
+      then
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Bans are disabled; otherwise, peer $peer would be banned (maybe \
+           already banned)"
+          ~metadata:[("peer", Peer_id.to_yojson peer)]
+    in
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
@@ -112,18 +142,16 @@ struct
                   ) ]
               @ action_metadata )
             "Banning peer $peer until $expiration because it %s" action_fmt ;
-          if Option.is_some db then Strict_pipe.Writer.write bans_writer peer
+          if Option.is_some db then (
+            Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
+            Strict_pipe.Writer.write bans_writer (peer, expiration) )
           else Deferred.unit
-      | _, _ ->
-          let verb =
-            if simple_new.trust >. simple_old.trust then "Increasing"
-            else "Decreasing"
-          in
-          Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:([("peer", Peer_id.to_yojson peer)] @ action_metadata)
-            "%s trust for peer $peer due to action %s. New trust is %f." verb
-            action_fmt simple_new.trust ;
+      | Banned_until _, Unbanned ->
+          Coda_metrics.Gauge.dec_one Coda_metrics.Trust_system.banned_peers ;
+          log_trust_change () ;
           Deferred.unit
+      | _, _ ->
+          log_trust_change () ; Deferred.unit
     in
     Option.iter db ~f:(fun db' -> Db.set db' ~key:peer ~data:new_record)
 
@@ -180,7 +208,8 @@ let%test_module "peer_trust" =
     let ban_pipe_out = ref []
 
     let assert_ban_pipe expected =
-      [%test_eq: int list] expected !ban_pipe_out ;
+      [%test_eq: int list] expected
+        (List.map !ban_pipe_out ~f:(fun (peer, _banned_until) -> peer)) ;
       ban_pipe_out := []
 
     let setup_mock_db () =

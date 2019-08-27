@@ -4,10 +4,6 @@ open Signature_lib
 open Coda_base
 
 module type Staged_ledger_pre_diff_info_generalized_intf = sig
-  type transaction
-
-  type user_command
-
   type transaction_snark_work
 
   type staged_ledger_diff
@@ -16,7 +12,7 @@ module type Staged_ledger_pre_diff_info_generalized_intf = sig
 
   module Error : sig
     type t =
-      | Bad_signature of user_command
+      | Bad_signature of User_command.t
       | Coinbase_error of string
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
       | Unexpected of Error.t
@@ -29,7 +25,7 @@ module type Staged_ledger_pre_diff_info_generalized_intf = sig
 
   val get :
        staged_ledger_diff
-    -> ( transaction list
+    -> ( Transaction.t list
          * transaction_snark_work list
          * int
          * Currency.Amount.t list
@@ -38,10 +34,12 @@ module type Staged_ledger_pre_diff_info_generalized_intf = sig
 
   val get_unchecked :
        valid_staged_ledger_diff
-    -> transaction list * transaction_snark_work list * Currency.Amount.t list
+    -> Transaction.t list
+       * transaction_snark_work list
+       * Currency.Amount.t list
 
   val get_transactions :
-    staged_ledger_diff -> (transaction list, Error.t) result
+    staged_ledger_diff -> (Transaction.t list, Error.t) result
 end
 
 (* TODO: this is temporarily required due to staged ledger test stubs *)
@@ -54,20 +52,18 @@ module type Staged_ledger_diff_generalized_intf = sig
 
   type compressed_public_key
 
-  type staged_ledger_hash
-
   type transaction_snark_work
 
   type transaction_snark_work_checked
 
   module At_most_two : sig
     type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type 'a t [@@deriving sexp, bin_io, version]
+          type 'a t [@@deriving sexp, to_yojson, bin_io, version]
         end
       end
       with type 'a V1.t = 'a t
@@ -76,12 +72,12 @@ module type Staged_ledger_diff_generalized_intf = sig
   end
 
   module At_most_one : sig
-    type 'a t = Zero | One of 'a option [@@deriving sexp]
+    type 'a t = Zero | One of 'a option [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type 'a t [@@deriving sexp, bin_io, version]
+          type 'a t [@@deriving sexp, to_yojson, bin_io, version]
         end
       end
       with type 'a V1.t = 'a t
@@ -94,12 +90,12 @@ module type Staged_ledger_diff_generalized_intf = sig
       { completed_works: transaction_snark_work list
       ; user_commands: user_command list
       ; coinbase: fee_transfer_single At_most_two.Stable.V1.t }
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, version]
+          type t [@@deriving sexp, to_yojson, bin_io, version]
         end
       end
       with type V1.t = t
@@ -110,12 +106,12 @@ module type Staged_ledger_diff_generalized_intf = sig
       { completed_works: transaction_snark_work list
       ; user_commands: user_command list
       ; coinbase: fee_transfer_single At_most_one.t }
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, version]
+          type t [@@deriving sexp, to_yojson, bin_io, version]
         end
       end
       with type V1.t = t
@@ -125,31 +121,25 @@ module type Staged_ledger_diff_generalized_intf = sig
     type t =
       Pre_diff_with_at_most_two_coinbase.Stable.V1.t
       * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, version]
+          type t [@@deriving sexp, bin_io, to_yojson, version]
         end
       end
       with type V1.t = t
   end
 
-  type t =
-    { diff: Diff.t
-    ; prev_hash: staged_ledger_hash
-    ; creator: compressed_public_key }
-  [@@deriving sexp, fields]
+  type t = {diff: Diff.t; creator: compressed_public_key}
+  [@@deriving sexp, to_yojson, fields]
 
   module Stable :
     sig
       module V1 : sig
-        type t =
-          { diff: Diff.t
-          ; prev_hash: staged_ledger_hash
-          ; creator: compressed_public_key }
-        [@@deriving sexp, bin_io, version]
+        type t = {diff: Diff.t; creator: compressed_public_key}
+        [@@deriving sexp, to_yojson, bin_io, version]
       end
 
       module Latest = V1
@@ -174,11 +164,7 @@ module type Staged_ledger_diff_generalized_intf = sig
       * pre_diff_with_at_most_one_coinbase option
     [@@deriving sexp]
 
-    type t =
-      { diff: diff
-      ; prev_hash: staged_ledger_hash
-      ; creator: compressed_public_key }
-    [@@deriving sexp]
+    type t = {diff: diff; creator: compressed_public_key} [@@deriving sexp]
 
     val user_commands : t -> user_command_with_valid_signature list
   end
@@ -195,11 +181,10 @@ end
 module type Staged_ledger_diff_intf =
   Staged_ledger_diff_generalized_intf
   with type fee_transfer_single := Fee_transfer.Single.t
-   and type user_command := User_command.t
+   and type user_command := User_command.Stable.V1.t
    and type user_command_with_valid_signature :=
               User_command.With_valid_signature.t
    and type compressed_public_key := Public_key.Compressed.t
-   and type staged_ledger_hash := Staged_ledger_hash.t
 
 (* TODO: this is temporarily required due to staged ledger test stubs *)
 module type Transaction_snark_scan_state_generalized_intf = sig
@@ -214,8 +199,6 @@ module type Transaction_snark_scan_state_generalized_intf = sig
   type ledger_undo
 
   type transaction
-
-  type transaction_witness
 
   type transaction_snark_work
 
@@ -240,7 +223,7 @@ module type Transaction_snark_scan_state_generalized_intf = sig
     type t =
       { transaction_with_info: ledger_undo
       ; statement: transaction_snark_statement
-      ; witness: transaction_witness }
+      ; witness: Transaction_witness.t }
     [@@deriving sexp]
   end
 
@@ -253,7 +236,7 @@ module type Transaction_snark_scan_state_generalized_intf = sig
   end
 
   module Space_partition : sig
-    type t = {first: int; second: int option} [@@deriving sexp]
+    type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
   end
 
   module Job_view : sig
@@ -293,65 +276,79 @@ module type Transaction_snark_scan_state_generalized_intf = sig
       -> verifier:Verifier.t
       -> error_prefix:string
       -> ledger_hash_end:frozen_ledger_hash
-      -> ledger_hash_begin:frozen_ledger_hash sexp_option
+      -> ledger_hash_begin:frozen_ledger_hash option
       -> (unit, Error.t) result M.t
   end
 
-  val empty : unit -> t
+  (*All the transactions with undos*)
+  module Staged_undos : sig
+    type t
 
-  val capacity : t -> int
+    val apply : t -> Ledger.t -> unit Or_error.t
+  end
+
+  module Bundle : sig
+    type 'a t = 'a list
+  end
+
+  val staged_undos : t -> Staged_undos.t
+
+  val empty : unit -> t
 
   val fill_work_and_enqueue_transactions :
        t
     -> Transaction_with_witness.t list
     -> transaction_snark_work list
-    -> (ledger_proof * transaction list) option Or_error.t
+    -> ((ledger_proof * transaction list) option * t) Or_error.t
 
   val latest_ledger_proof :
     t -> (Ledger_proof_with_sok_message.t * transaction list) option
 
   val free_space : t -> int
 
-  val next_k_jobs : t -> k:int -> Available_job.t list Or_error.t
-
-  val next_jobs : t -> Available_job.t list Or_error.t
-
-  val next_jobs_sequence : t -> Available_job.t Sequence.t Or_error.t
-
   val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
-
-  val is_valid : t -> bool
 
   val hash : t -> staged_ledger_aux_hash
 
-  val staged_transactions : t -> ledger_undo list
+  (** All the transactions in the order in which they were applied*)
+  val staged_transactions : t -> transaction list Or_error.t
 
-  val all_transactions : t -> transaction list Or_error.t
-
-  val extract_from_job :
-       Available_job.t
-    -> ( ledger_undo * transaction_snark_statement * transaction_witness
-       , ledger_proof * ledger_proof )
-       Either.t
-
-  val copy : t -> t
-
+  (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
   val partition_if_overflowing : t -> Space_partition.t
 
   val statement_of_job : Available_job.t -> transaction_snark_statement option
 
-  val current_job_sequence_number : t -> int
-
   val snark_job_list_json : t -> string
 
-  val all_work_to_do :
-    t -> transaction_snark_statement list Sequence.t Or_error.t
+  (** All the proof bundles *)
+  val all_work_statements : t -> transaction_snark_statement Bundle.t list
 
-  val current_job_count : t -> int
+  (** Required proof bundles for a certain number of slots *)
+  val required_work_pairs : t -> slots:int -> Available_job.t Bundle.t list
 
-  val work_capacity : int
+  (**K proof bundles*)
+  val k_work_pairs_for_new_diff : t -> k:int -> Available_job.t Bundle.t list
 
-  val next_on_new_tree : t -> bool Or_error.t
+  (** All the proof bundles for 2**transaction_capacity_log2 slots that can be used up in one diff *)
+  val work_statements_for_new_diff :
+    t -> transaction_snark_statement Bundle.t list
+
+  (** True if the latest tree is full and transactions would be added on to a new tree *)
+  val next_on_new_tree : t -> bool
+
+  (** All the proof bundles for snark workers*)
+  val all_work_pairs_exn :
+       t
+    -> ( ( Transaction.t
+         , Transaction_witness.t
+         , ledger_proof )
+         Snark_work_lib.Work.Single.Spec.t
+       * ( Transaction.t
+         , Transaction_witness.t
+         , ledger_proof )
+         Snark_work_lib.Work.Single.Spec.t
+         option )
+       list
 end
 
 module type Transaction_snark_scan_state_intf =
@@ -361,7 +358,6 @@ module type Transaction_snark_scan_state_intf =
    and type frozen_ledger_hash := Frozen_ledger_hash.t
    and type ledger_undo := Ledger.Undo.t
    and type transaction := Transaction.t
-   and type transaction_witness := Transaction_witness.t
    and type staged_ledger_aux_hash := Staged_ledger_hash.Aux_hash.t
 
 module type Staged_ledger_generalized_intf = sig
@@ -381,37 +377,15 @@ module type Staged_ledger_generalized_intf = sig
 
   type transaction_snark_work_checked
 
-  type compressed_public_key
-
-  type ledger_hash
-
-  type frozen_ledger_hash
-
   type staged_ledger_hash
 
   type staged_ledger_aux_hash
 
-  type pending_coinbase
-
-  type ledger
-
-  type user_command
-
-  type user_command_with_valid_signature
-
-  type transaction
-
-  type transaction_witness
-
   type transaction_snark_statement
-
-  type serializable [@@deriving bin_io]
 
   module Pre_diff_info :
     Staged_ledger_pre_diff_info_generalized_intf
-    with type user_command := user_command
-     and type transaction := transaction
-     and type transaction_snark_work := transaction_snark_work
+    with type transaction_snark_work := transaction_snark_work
      and type staged_ledger_diff := diff
      and type valid_staged_ledger_diff := valid_diff
 
@@ -435,12 +409,10 @@ module type Staged_ledger_generalized_intf = sig
     end
 
     module Space_partition : sig
-      type t = {first: int; second: int option} [@@deriving sexp]
+      type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
     end
 
     val hash : t -> staged_ledger_aux_hash
-
-    val is_valid : t -> bool
 
     val empty : unit -> t
 
@@ -448,23 +420,20 @@ module type Staged_ledger_generalized_intf = sig
 
     val partition_if_overflowing : t -> Space_partition.t
 
-    val all_work_to_do :
-      t -> transaction_snark_statement list Sequence.t Or_error.t
+    val all_work_statements : t -> transaction_snark_work_statement list
 
-    val all_transactions : t -> transaction list Or_error.t
-
-    val work_capacity : int
-
-    val current_job_count : t -> int
+    val work_statements_for_new_diff :
+      t -> transaction_snark_work_statement list
   end
 
   module Staged_ledger_error : sig
     type t =
-      | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
-      | Non_zero_fee_excess of Scan_state.Space_partition.t * transaction list
+      | Non_zero_fee_excess of
+          Scan_state.Space_partition.t * Transaction.t list
       | Invalid_proof of
-          ledger_proof * transaction_snark_statement * compressed_public_key
+          ledger_proof * transaction_snark_statement * Public_key.Compressed.t
       | Pre_diff of Pre_diff_info.Error.t
+      | Insufficient_work of string
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -473,35 +442,30 @@ module type Staged_ledger_generalized_intf = sig
     val to_error : t -> Error.t
   end
 
-  val ledger : t -> ledger
+  val ledger : t -> Ledger.t
 
   val scan_state : t -> Scan_state.t
 
-  val pending_coinbase_collection : t -> pending_coinbase
+  val pending_coinbase_collection : t -> Pending_coinbase.t
 
-  val create_exn : ledger:ledger -> t
+  val create_exn : ledger:Ledger.t -> t
 
   val of_scan_state_and_ledger :
        logger:Logger.t
     -> verifier:verifier
-    -> snarked_ledger_hash:frozen_ledger_hash
-    -> ledger:ledger
+    -> snarked_ledger_hash:Frozen_ledger_hash.t
+    -> ledger:Ledger.t
     -> scan_state:Scan_state.t
-    -> pending_coinbase_collection:pending_coinbase
+    -> pending_coinbase_collection:Pending_coinbase.t
     -> t Or_error.t Deferred.t
 
-  val of_serialized_and_unserialized :
-    serialized:serializable -> unserialized:ledger -> t
+  val replace_ledger_exn : t -> Ledger.t -> t
 
-  val replace_ledger_exn : t -> ledger -> t
-
-  val proof_txns : t -> transaction Non_empty_list.t option
+  val proof_txns : t -> Transaction.t Non_empty_list.t option
 
   val copy : t -> t
 
   val hash : t -> staged_ledger_hash
-
-  val serializable_of_t : t -> serializable
 
   val apply :
        t
@@ -509,7 +473,7 @@ module type Staged_ledger_generalized_intf = sig
     -> logger:Logger.t
     -> verifier:verifier
     -> ( [`Hash_after_applying of staged_ledger_hash]
-         * [`Ledger_proof of (ledger_proof * transaction list) option]
+         * [`Ledger_proof of (ledger_proof * Transaction.t list) option]
          * [`Staged_ledger of t]
          * [`Pending_coinbase_data of bool * Currency.Amount.t]
        , Staged_ledger_error.t )
@@ -519,14 +483,16 @@ module type Staged_ledger_generalized_intf = sig
        t
     -> valid_diff
     -> ( [`Hash_after_applying of staged_ledger_hash]
-       * [`Ledger_proof of (ledger_proof * transaction list) option]
+       * [`Ledger_proof of (ledger_proof * Transaction.t list) option]
        * [`Staged_ledger of t]
        * [`Pending_coinbase_data of bool * Currency.Amount.t] )
        Deferred.Or_error.t
 
   module For_tests : sig
-    val snarked_ledger :
-      t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
+    val materialized_snarked_ledger_hash :
+         t
+      -> expected_target:Frozen_ledger_hash.t
+      -> Frozen_ledger_hash.t Or_error.t
   end
 
   val current_ledger_proof : t -> ledger_proof option
@@ -535,27 +501,12 @@ module type Staged_ledger_generalized_intf = sig
 
   val create_diff :
        t
-    -> self:compressed_public_key
+    -> self:Public_key.Compressed.t
     -> logger:Logger.t
-    -> transactions_by_fee:user_command_with_valid_signature Sequence.t
+    -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
     -> get_completed_work:(   transaction_snark_work_statement
                            -> transaction_snark_work_checked option)
     -> valid_diff
-
-  val all_work_pairs_exn :
-       t
-    -> ( ( transaction_snark_statement
-         , transaction
-         , transaction_witness
-         , ledger_proof )
-         Snark_work_lib.Work.Single.Spec.t
-       * ( transaction_snark_statement
-         , transaction
-         , transaction_witness
-         , ledger_proof )
-         Snark_work_lib.Work.Single.Spec.t
-         option )
-       list
 
   val statement_exn : t -> [`Non_empty of transaction_snark_statement | `Empty]
 
@@ -563,24 +514,27 @@ module type Staged_ledger_generalized_intf = sig
        logger:Logger.t
     -> verifier:verifier
     -> scan_state:Scan_state.t
-    -> snarked_ledger:ledger
-    -> expected_merkle_root:ledger_hash
-    -> pending_coinbases:pending_coinbase
+    -> snarked_ledger:Ledger.t
+    -> expected_merkle_root:Ledger_hash.t
+    -> pending_coinbases:Pending_coinbase.t
     -> t Or_error.t Deferred.t
+
+  val all_work_pairs_exn :
+       t
+    -> ( ( Transaction.t
+         , Transaction_witness.t
+         , ledger_proof )
+         Snark_work_lib.Work.Single.Spec.t
+       * ( Transaction.t
+         , Transaction_witness.t
+         , ledger_proof )
+         Snark_work_lib.Work.Single.Spec.t
+         option )
+       list
 end
 
 module type Staged_ledger_intf =
   Staged_ledger_generalized_intf
-  with type compressed_public_key := Public_key.Compressed.t
-   and type ledger_hash := Ledger_hash.t
-   and type frozen_ledger_hash := Frozen_ledger_hash.t
-   and type staged_ledger_hash := Staged_ledger_hash.t
+  with type staged_ledger_hash := Staged_ledger_hash.t
    and type staged_ledger_aux_hash := Staged_ledger_hash.Aux_hash.t
-   and type pending_coinbase := Pending_coinbase.t
-   and type ledger := Ledger.t
-   and type user_command := User_command.t
-   and type user_command_with_valid_signature :=
-              User_command.With_valid_signature.t
-   and type transaction := Transaction.t
-   and type transaction_witness := Transaction_witness.t
    and type transaction_snark_statement := Transaction_snark.Statement.t

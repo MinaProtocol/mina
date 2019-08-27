@@ -33,6 +33,18 @@ module Transmuter = struct
   end
 end
 
+module Registry = struct
+  type element = State_hash.t
+
+  let element_added _ =
+    Coda_metrics.(
+      Gauge.inc_one Transition_frontier_controller.transitions_being_processed)
+
+  let element_removed _ _ =
+    Coda_metrics.(
+      Gauge.dec_one Transition_frontier_controller.transitions_being_processed)
+end
+
 module Make (Inputs : Inputs.S) :
   Cache_lib.Intf.Transmuter_cache.S
   with module Cached := Cache_lib.Cached
@@ -41,4 +53,4 @@ module Make (Inputs : Inputs.S) :
               Inputs.External_transition.with_initial_validation
               Envelope.Incoming.t
    and type target = State_hash.t =
-  Cache_lib.Transmuter_cache.Make (Transmuter.Make (Inputs)) (Name)
+  Cache_lib.Transmuter_cache.Make (Transmuter.Make (Inputs)) (Registry) (Name)

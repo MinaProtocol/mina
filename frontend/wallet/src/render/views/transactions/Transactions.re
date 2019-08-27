@@ -3,11 +3,8 @@ open Tc;
 module Styles = {
   open Css;
 
-  let container = 
-    style([
-      height(`percent(100.)),
-      borderLeft(`px(1), `solid, white),
-    ]);
+  let container =
+    style([height(`percent(100.)), borderLeft(`px(1), `solid, white)]);
 
   let headerRow =
     merge([
@@ -23,7 +20,6 @@ module Styles = {
         height(`rem(2.)),
         alignItems(`center),
         color(Theme.Colors.slate),
-        userSelect(`none),
       ]),
     ]);
 
@@ -42,7 +38,7 @@ module Styles = {
 
 module TransactionsQueryString = [%graphql
   {|
-    query transactions($after: String, $publicKey: String!) {
+    query transactions($after: String, $publicKey: PublicKey!) {
       blocks(first: 5, after: $after, filter: { relatedTo: $publicKey }) {
         nodes {
           creator @bsDecoder(fn: "Apollo.Decoders.publicKey")
@@ -59,11 +55,10 @@ module TransactionsQueryString = [%graphql
               fee @bsDecoder(fn: "Apollo.Decoders.int64")
               memo
               isDelegation
-              date @bsDecoder(fn: "Apollo.Decoders.date")
             }
             feeTransfer {
               recipient @bsDecoder(fn: "Apollo.Decoders.publicKey")
-              amount @bsDecoder(fn: "Apollo.Decoders.int64")
+              fee @bsDecoder(fn: "Apollo.Decoders.int64")
             }
             coinbase @bsDecoder(fn: "Apollo.Decoders.int64")
           }
@@ -81,7 +76,6 @@ module TransactionsQueryString = [%graphql
         fee @bsDecoder(fn: "Apollo.Decoders.int64")
         memo
         isDelegation
-        date @bsDecoder(fn: "Apollo.Decoders.date")
       }
     }
   |}
@@ -102,6 +96,19 @@ type extractedResponse = {
   pending: array(TransactionCell.Transaction.t),
 };
 
+let gqlUserCommandToRecord = (userCommand, maybeDate) =>
+  TransactionCell.Transaction.(
+    UserCommand({
+      PaymentDetails.isDelegation: userCommand##isDelegation,
+      from: userCommand##from,
+      to_: userCommand##to_,
+      amount: userCommand##amount,
+      fee: userCommand##fee,
+      memo: userCommand##memo,
+      date: maybeDate,
+    })
+  );
+
 let extractTransactions: Js.t('a) => extractedResponse =
   data => {
     let blocks =
@@ -110,7 +117,12 @@ let extractTransactions: Js.t('a) => extractedResponse =
            open TransactionCell.Transaction;
            let userCommands =
              block##transactions##userCommands
-             |> Array.map(~f=userCommand => UserCommand(userCommand));
+             |> Array.map(~f=userCommand =>
+                  gqlUserCommandToRecord(
+                    userCommand,
+                    Some(block##protocolState##blockchainState##date),
+                  )
+                );
            let blockReward =
              BlockReward({
                date: block##protocolState##blockchainState##date,
@@ -124,10 +136,10 @@ let extractTransactions: Js.t('a) => extractedResponse =
     let pending =
       data##pooledUserCommands
       |> Array.map(~f=userCommand =>
-           TransactionCell.Transaction.UserCommand(userCommand)
+           gqlUserCommandToRecord(userCommand, None)
          );
 
-    { pending, blocks }
+    {pending, blocks};
   };
 
 [@react.component]
@@ -145,6 +157,8 @@ let make = () => {
             nodes: [...prevResult.blocks.nodes, ...newBlocks],
             pageInfo,
           },
+          // Since these aren't paginated, we can just reuse the previous result
+          pooledUserCommands: prevResult.pooledUserCommands,
         } : prevResult
     }
     |}
@@ -166,8 +180,7 @@ let make = () => {
      | Some(pubkey) =>
        let transactionQuery =
          TransactionsQueryString.make(
-           ~publicKey=PublicKey.toString(pubkey),
-           ~after="",
+           ~publicKey=Apollo.Encoders.publicKey(pubkey),
            (),
          );
        <TransactionsQuery variables=transactionQuery##variables>
@@ -177,9 +190,14 @@ let make = () => {
              | Loading => <Loader.Page> <Loader /> </Loader.Page>
              | Error(err) => React.string(err##message) /* TODO format this error message */
              | Data(data) =>
-               let { blocks, pending } = extractTransactions(data);
+               let {blocks, pending} = extractTransactions(data);
                let transactions = Array.concatenate(blocks);
-               switch ((Array.length(transactions), Array.length(pending))) {
+               let lastCursor =
+                 Option.withDefault(
+                   ~default="",
+                   data##blocks##pageInfo##lastCursor,
+                 );
+               switch (Array.length(transactions), Array.length(pending)) {
                | (0, 0) =>
                  <div className=Styles.alertContainer>
                    <Alert
@@ -191,10 +209,12 @@ let make = () => {
                  <TransactionsList
                    pending
                    transactions
+                   hasNextPage=data##blocks##pageInfo##hasNextPage
                    onLoadMore={() => {
                      let moreTransactions =
                        TransactionsQueryString.make(
-                         ~publicKey=PublicKey.toString(pubkey),
+                         ~publicKey=Apollo.Encoders.publicKey(pubkey),
+                         ~after=lastCursor,
                          (),
                        );
 

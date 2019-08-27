@@ -12,6 +12,11 @@ let rec prompt_password prompt =
     prompt_password prompt )
   else return pw2
 
+let error_raise e ~error_ctx =
+  raise
+    Error.(
+      to_exn (of_string (sprintf !"%s\n%s" error_ctx (Error.to_string_hum e))))
+
 (** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
 let write_exn {Keypair.private_key; public_key} ~(privkey_path : string)
     ~(password : Secret_file.password) : unit Deferred.t =
@@ -19,7 +24,7 @@ let write_exn {Keypair.private_key; public_key} ~(privkey_path : string)
     Private_key.to_bigstring private_key |> Bigstring.to_bytes
   in
   let pubkey_string =
-    Public_key.Compressed.to_base64 (Public_key.compress public_key)
+    Public_key.Compressed.to_base58_check (Public_key.compress public_key)
   in
   match%bind
     Secret_file.write ~path:privkey_path ~mkdir:true ~plaintext:privkey_bytes
@@ -34,7 +39,7 @@ let write_exn {Keypair.private_key; public_key} ~(privkey_path : string)
       Writer.write_line pubkey_f pubkey_string ;
       Writer.close pubkey_f
   | Error e ->
-      raise (Error.to_exn e)
+      error_raise e ~error_ctx:(sprintf !"Could not write to %s" privkey_path)
 
 (** Reads a private key from [privkey_path] using [Secret_file] *)
 let read ~(privkey_path : string) ~(password : Secret_file.password) :
@@ -65,7 +70,8 @@ let read_exn ~(privkey_path : string) ~(password : Secret_file.password) :
   | Ok keypair ->
       keypair
   | Error e ->
-      raise (Error.to_exn e)
+      error_raise e
+        ~error_ctx:(sprintf !"Could not read privkey-path %s" privkey_path)
 
 let read_exn' path =
   read_exn ~privkey_path:path

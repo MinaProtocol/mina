@@ -9,7 +9,13 @@ module type Simple_elliptic_curve_intf = sig
 
   type t
 
-  val to_affine_coordinates : t -> base * base
+  module Affine : sig
+    type t = base * base
+  end
+
+  val to_affine_exn : t -> Affine.t
+
+  val to_affine : t -> Affine.t option
 end
 
 module type S = sig
@@ -78,15 +84,17 @@ module Make
   S with module G1 := G1 and module G2 := G2 and module Fq_target := Fq_target =
 struct
   module G1_precomputation = struct
-    type t = {px: Fq.t; py: Fq.t; px_twist: Fq_twist.t; py_twist: Fq_twist.t}
+    type t_ = {px: Fq.t; py: Fq.t; px_twist: Fq_twist.t; py_twist: Fq_twist.t}
     [@@deriving bin_io, sexp]
 
+    type t = t_ option [@@deriving bin_io, sexp]
+
     let create (p : G1.t) =
-      let px, py = G1.to_affine_coordinates p in
-      { px
-      ; py
-      ; px_twist= Fq_twist.scale Info.twist px
-      ; py_twist= Fq_twist.scale Info.twist py }
+      Option.map (G1.to_affine p) ~f:(fun (px, py) ->
+          { px
+          ; py
+          ; px_twist= Fq_twist.scale Info.twist px
+          ; py_twist= Fq_twist.scale Info.twist py } )
   end
 
   module Dbl_coeffs = struct
@@ -102,7 +110,7 @@ struct
   let loop_count_size_in_bits = N.num_bits Info.loop_count
 
   module G2_precomputation = struct
-    type t =
+    type t_ =
       { qx: Fq_twist.t
       ; qy: Fq_twist.t
       ; qy2: Fq_twist.t
@@ -111,6 +119,8 @@ struct
       ; dbl_coeffs: Dbl_coeffs.t array
       ; add_coeffs: Add_coeffs.t array }
     [@@deriving bin_io, sexp]
+
+    type t = t_ option [@@deriving bin_io, sexp]
 
     let twist_inv = Fq_twist.inv Info.twist
 
@@ -163,7 +173,8 @@ struct
       (next, {Add_coeffs.c_L1= l1; c_RZ= next.z})
 
     let create (q : G2.t) =
-      let qx, qy = G2.to_affine_coordinates q in
+      let open Option.Let_syntax in
+      let%map qx, qy = G2.to_affine q in
       let qy2 = Fq_twist.square qy in
       let qx_over_twist = Fq_twist.(qx * twist_inv) in
       let qy_over_twist = Fq_twist.(qy * twist_inv) in
@@ -216,6 +227,8 @@ struct
   end
 
   let miller_loop (p : G1_precomputation.t) (q : G2_precomputation.t) =
+    let open Option.Let_syntax in
+    let%map p = p and q = q in
     let l1_coeff = Fq_twist.(of_base p.px - q.qx_over_twist) in
     let f = ref Fq_target.one in
     let found_one = ref false in
@@ -255,6 +268,12 @@ struct
       in
       f := Fq_target.(inv (!f * g_RnegR_at_P)) ) ;
     !f
+
+  let miller_loop p q =
+    (* The none case here means either p or q was the identity, so
+       the pairing should evaluate to "zero" (i.e., one) in the
+       target group. *)
+    match miller_loop p q with None -> Fq_target.one | Some x -> x
 
   let unreduced_pairing p q =
     miller_loop (G1_precomputation.create p) (G2_precomputation.create q)

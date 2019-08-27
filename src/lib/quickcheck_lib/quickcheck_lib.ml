@@ -13,18 +13,120 @@ let rec map_gens ls ~f =
       let%map t' = map_gens t ~f in
       h' :: t'
 
+let replicate_gen g n = map_gens (List.init n ~f:Fn.id) ~f:(Fn.const g)
+
+let init_gen ~f n =
+  let rec go : 'a list -> int -> 'a list Quickcheck.Generator.t =
+   fun xs n' ->
+    if n' < n then f n' >>= fun x -> go (x :: xs) (n' + 1)
+    else return @@ List.rev xs
+  in
+  go [] 0
+
+let init_gen_array ~f n = map ~f:Array.of_list @@ init_gen ~f n
+
 let gen_pair g =
   let%map a = g and b = g in
   (a, b)
 
-let rec gen_division n k =
-  if k = 0 then return []
-  else if k = 1 then return [n]
+let shuffle_arr_inplace arr =
+  (* Fisher-Yates shuffle, you need fast swaps for decent performance, so we
+     want an array if we're not getting unnecessarily fancy. *)
+  let rec go n =
+    if n < Array.length arr then (
+      let%bind swap_idx = Int.gen_uniform_incl n (Array.length arr - 1) in
+      Array.swap arr n swap_idx ;
+      go (n + 1) )
+    else return arr
+  in
+  go 0
+
+let shuffle_arr arr = shuffle_arr_inplace @@ Array.copy arr
+
+let shuffle list =
+  Array.of_list list |> shuffle_arr_inplace |> map ~f:Array.to_list
+
+(* Generate a list with a Dirichlet distribution, used for coming up with random
+   splits of a quantity. Symmetric Dirichlet distribution with alpha = 1.
+*)
+let gen_symm_dirichlet : int -> float list Quickcheck.Generator.t =
+ fun n ->
+  let open Quickcheck.Generator.Let_syntax in
+  let%map gammas =
+    map_gens
+      (List.init n ~f:(Fn.const ()))
+      ~f:(fun _ ->
+        let open Quickcheck.Generator.Let_syntax in
+        (* technically this should be (0, 1] and not (0, 1) but I expect it
+           doesn't matter for our purposes. *)
+        let%map uniform = Float.gen_uniform_excl 0. 1. in
+        Float.log uniform )
+  in
+  let sum = List.fold gammas ~init:0. ~f:(fun x y -> x +. y) in
+  List.map gammas ~f:(fun gamma -> gamma /. sum)
+
+module type Int_s = sig
+  type t
+
+  val zero : t
+
+  val ( + ) : t -> t -> t
+
+  val ( - ) : t -> t -> t
+
+  val of_int : int -> t
+
+  val to_int : t -> int
+end
+
+let gen_division_generic (type t) (module M : Int_s with type t = t) (n : t)
+    (k : int) : M.t list Quickcheck.Generator.t =
+  if k = 0 then Quickcheck.Generator.return []
   else
-    let maximum_value = max 0 (n - k) in
-    let%bind h = Int.gen_incl (min 1 maximum_value) maximum_value in
-    let%map t = gen_division (n - h) (k - 1) in
-    h :: t
+    let open Quickcheck.Generator.Let_syntax in
+    (* Using a symmetric Dirichlet distribution with concentration parameter 1
+       defined above gives a distribution with uniform probability density over
+       all possible splits of the quantity. See the Wikipedia article for some
+       more detail: https://en.wikipedia.org/wiki/Dirichlet_distribution,
+       particularly the sections about the flat Dirichlet distribution and
+       string cutting.
+    *)
+    let%bind dirichlet = gen_symm_dirichlet k in
+    let n_float = Float.of_int @@ M.to_int n in
+    let float_to_mt : float -> t =
+     fun fl ->
+      match Float.iround_down fl with
+      | Some int ->
+          M.of_int int
+      | None ->
+          failwith "gen_division_generic: out of range"
+    in
+    let res = List.map dirichlet ~f:(fun x -> float_to_mt @@ (x *. n_float)) in
+    let total = List.fold res ~f:M.( + ) ~init:M.zero in
+    (* Going through floating point land may have caused some rounding error. We
+     tack it onto the first result so that the sum of the output is equal to n.
+  *)
+    let rounding_error = M.(n - total) in
+    return
+      ( match res with
+      | [] ->
+          failwith
+            "empty result list in gen_symm_dirichlet, this should be \
+             impossible. "
+      | head :: rest ->
+          M.(head + rounding_error) :: rest )
+
+let gen_division = gen_division_generic (module Int)
+
+let gen_division_currency =
+  gen_division_generic
+    ( module struct
+      include Currency.Amount
+
+      let ( + ) a b = Option.value_exn (a + b)
+
+      let ( - ) a b = Option.value_exn (a - b)
+    end )
 
 let imperative_fixed_point root ~f =
   let%map f' = fixed_point f in

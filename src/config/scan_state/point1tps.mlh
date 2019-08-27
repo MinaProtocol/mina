@@ -1,0 +1,2 @@
+[%%define scan_state_transaction_capacity_log_2 6]
+[%%define scan_state_work_delay 3]

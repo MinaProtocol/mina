@@ -18,6 +18,11 @@ module type S = sig
 
   val merge : height:int -> t -> t -> t
 
+  (** string representation of hash is Base58Check of bin_io representation *)
+  val to_string : t -> string
+
+  val of_string : string -> t
+
   val empty_hash : t
 
   val of_digest : Pedersen.Digest.t -> t

@@ -10,7 +10,8 @@ type t = elem list [@@deriving bin_io]
 let merge ~height h1 h2 =
   let open Pedersen in
   digest_fold
-    (State.salt Lite_params.pedersen_params
+    (State.salt
+       (Lazy.force Lite_params.pedersen_params)
        (Hash_prefixes.merkle_tree height :> string))
     Fold.(Digest.fold h1 +> Digest.fold h2)
 

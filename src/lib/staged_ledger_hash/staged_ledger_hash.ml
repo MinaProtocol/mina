@@ -16,17 +16,26 @@ module Aux_hash = struct
       module T = struct
         type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
-        let to_yojson s = `String (Base64.encode_string s)
+        module Base58_check = Base58_check.Make (struct
+          let description = "Aux hash"
+
+          let version_byte =
+            Base58_check.Version_bytes.staged_ledger_hash_aux_hash
+        end)
+
+        let to_yojson s = `String (Base58_check.encode s)
 
         let of_yojson = function
           | `String s -> (
-            match Base64.decode s with
-            | Ok s ->
-                Ok s
-            | Error (`Msg e) ->
-                Error (sprintf "bad base64: %s" e) )
+            match Base58_check.decode s with
+            | Error e ->
+                Error
+                  (sprintf "Aux_hash.of_yojson, bad Base58Check:%s"
+                     (Error.to_string_hum e))
+            | Ok x ->
+                Ok x )
           | _ ->
-              Error "expected `String"
+              Error "Aux_hash.of_yojson expected `String"
       end
 
       include T
@@ -65,17 +74,26 @@ module Pending_coinbase_aux = struct
       module T = struct
         type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
-        let to_yojson s = `String (Base64.encode_string s)
+        module Base58_check = Base58_check.Make (struct
+          let description = "Pending coinbase aux"
+
+          let version_byte =
+            Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
+        end)
+
+        let to_yojson s = `String (Base58_check.encode s)
 
         let of_yojson = function
           | `String s -> (
-            match Base64.decode s with
-            | Ok s ->
-                Ok s
-            | Error (`Msg e) ->
-                Error (sprintf "bad base64: %s" e) )
+            match Base58_check.decode s with
+            | Ok x ->
+                Ok x
+            | Error e ->
+                Error
+                  (sprintf "Pending_coinbase_aux.of_yojson, bad Base58Check:%s"
+                     (Error.to_string_hum e)) )
           | _ ->
-              Error "expected `String"
+              Error "Pending_coinbase_aux.of_yojson expected `String"
       end
 
       include T
@@ -132,10 +150,11 @@ module Non_snark = struct
 
   type value = t [@@deriving sexp, compare, hash, yojson]
 
-  let dummy : t =
-    { ledger_hash= Ledger.merkle_root Genesis_ledger.t
-    ; aux_hash= Aux_hash.dummy
-    ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
+  let dummy : t Lazy.t =
+    lazy
+      { ledger_hash= Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+      ; aux_hash= Aux_hash.dummy
+      ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
 
   type var = Boolean.var Triple.t list
 
@@ -180,7 +199,7 @@ module Non_snark = struct
         * computations. It's useful when debugging to dump the protocol state
         * and so we can just lie here instead. *)
         printf "WARNING: improperly transporting staged-ledger-hash\n" ;
-        dummy )
+        Lazy.force dummy )
 end
 
 module Stable = struct
@@ -264,10 +283,11 @@ let of_aux_ledger_and_coinbase_hash aux_hash ledger_hash pending_coinbase : t =
         (Pending_coinbase.hash_extra pending_coinbase)
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 
-let genesis : t =
-  let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
-  { non_snark= Non_snark.dummy
-  ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
+let genesis : t Lazy.t =
+  lazy
+    (let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
+     { non_snark= Lazy.force Non_snark.dummy
+     ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase })
 
 let var_of_t ({pending_coinbase_hash; non_snark} : t) : var =
   let non_snark = Non_snark.var_of_t non_snark in

@@ -65,7 +65,8 @@ let trace_task (name : string) (f : unit -> 'a) =
   trace_new_thread name new_ctx.tid ;
   match Scheduler.within_context new_ctx f with
   | Error () ->
-      failwith "traced task failed, exception reported to parent monitor"
+      failwithf "traced task `%s` failed, exception reported to parent monitor"
+        name ()
   | Ok x ->
       x
 

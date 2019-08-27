@@ -48,6 +48,7 @@
         ROCKSDB_DISABLE_BACKTRACE=1 \\
         PORTABLE=1 \\
         FORCE_SSE42=1 \\
+        DISABLE_WARNING_AS_ERROR=1 \\
         make static_lib -j${jobs}
 
       strip -S librocksdb.a

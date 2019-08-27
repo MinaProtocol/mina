@@ -4,18 +4,6 @@ open Module_version
 module Digest = struct
   open Fold_lib
 
-  let fold_bits s =
-    { Fold.fold=
-        (fun ~init ~f ->
-          let n = 8 * String.length s in
-          let rec go acc i =
-            if i = n then acc
-            else
-              let b = (Char.to_int s.[i / 8] lsr (i mod 8)) land 1 = 1 in
-              go (f acc b) (i + 1)
-          in
-          go init 0 ) }
-
   module Stable = struct
     module V1 = struct
       module T = struct
@@ -24,17 +12,25 @@ module Digest = struct
 
       include T
 
-      let to_yojson s = `String (Base64.encode_string s)
+      module Base58_check = Base58_check.Make (struct
+        let description = "Random oracle digest"
+
+        let version_byte = Base58_check.Version_bytes.random_oracle_base
+      end)
+
+      let to_yojson s = `String (Base58_check.encode s)
 
       let of_yojson = function
         | `String s -> (
-          match Base64.decode s with
-          | Ok s ->
-              Ok s
-          | Error (`Msg e) ->
-              Error (sprintf "bad base64: %s" e) )
+          match Base58_check.decode s with
+          | Error e ->
+              Error
+                (sprintf "Random_oracle_base.of_yojson, bad Base58Check: %s"
+                   (Error.to_string_hum e))
+          | Ok x ->
+              Ok x )
         | _ ->
-            Error "expected `String"
+            Error "Random_oracle_base.of_yojson expected `String"
 
       include Comparable.Make (T)
       include Registration.Make_latest_version (T)
@@ -51,6 +47,18 @@ module Digest = struct
     module Registrar = Registration.Make (Module_decl)
     module Registered_V1 = Registrar.Register (V1)
   end
+
+  let fold_bits s =
+    { Fold.fold=
+        (fun ~init ~f ->
+          let n = 8 * String.length s in
+          let rec go acc i =
+            if i = n then acc
+            else
+              let b = (Char.to_int s.[i / 8] lsr (i mod 8)) land 1 = 1 in
+              go (f acc b) (i + 1)
+          in
+          go init 0 ) }
 
   let to_bits = Blake2.string_to_bits
 

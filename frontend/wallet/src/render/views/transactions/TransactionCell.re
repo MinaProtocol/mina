@@ -28,7 +28,7 @@ module Transaction = {
     type feeTransfer = {
       .
       "recipient": PublicKey.t,
-      "amount": int64,
+      "fee": int64,
     };
 
     type t = {
@@ -41,19 +41,18 @@ module Transaction = {
 
   module PaymentDetails = {
     type t = {
-      .
       isDelegation: bool,
       from: PublicKey.t,
       to_: PublicKey.t,
       amount: int64,
       fee: int64,
-      memo: option(string),
-      date: Js.Date.t,
+      memo: string,
+      date: option(Js.Date.t),
     };
   };
 
   type t =
-    | UserCommand(Js.t(PaymentDetails.t))
+    | UserCommand(PaymentDetails.t)
     | BlockReward(BlockReward.t);
 };
 
@@ -74,9 +73,8 @@ module ViewModel = {
 
   module Info = {
     type t =
-      | Memo(string, Js.Date.t)
-      | Empty(Js.Date.t)
-      | StakingReward(list((PublicKey.t, int64)), Js.Date.t)
+      | Memo(string, option(Js.Date.t))
+      | StakingReward(list((PublicKey.t, int64)), option(Js.Date.t))
       | MissingReceipts;
   };
 
@@ -91,20 +89,16 @@ module ViewModel = {
   let ofTransaction =
       (transaction: Transaction.t, ~myWallets: list(PublicKey.t), ~pending) => {
     switch (transaction) {
-    | UserCommand(userCmd) =>
-      let date = userCmd##date;
-      {
-        sender: Actor.Key(userCmd##from),
-        recipient: Actor.Key(userCmd##to_),
+    | UserCommand(userCmd) => {
+        sender: Actor.Key(userCmd.from),
+        recipient: Actor.Key(userCmd.to_),
         action: pending ? Action.Pending : Action.Transfer,
-        info:
-          Option.map(userCmd##memo, ~f=x => Info.Memo(x, date))
-          |> Option.withDefault(~default=Info.Empty(date)),
+        info: Info.Memo(userCmd.memo, userCmd.date),
         amountDelta:
-          Caml.List.exists(PublicKey.equal(userCmd##from), myWallets)
-            ? Int64.(neg(one)) *^ userCmd##amount -^ userCmd##fee
-            : userCmd##amount,
-      };
+          Caml.List.exists(PublicKey.equal(userCmd.from), myWallets)
+            ? Int64.(neg(one)) *^ userCmd.amount -^ userCmd.fee
+            : userCmd.amount,
+      }
     | BlockReward({coinbase, creator, date, feeTransfers}) => {
         sender: Actor.Minted,
         recipient: Actor.Key(creator),
@@ -112,11 +106,11 @@ module ViewModel = {
         info:
           Info.StakingReward(
             Array.map(
-              ~f=transfer => (transfer##recipient, transfer##amount),
+              ~f=transfer => (transfer##recipient, transfer##fee),
               feeTransfers,
             )
             |> Array.toList,
-            date,
+            Some(date),
           ),
         amountDelta: coinbase,
       }
@@ -175,11 +169,10 @@ module TimeDisplay = {
   };
 
   [@react.component]
-  let make = (~date: Js.Date.t) => {
+  let make = (~date: Js.Date.t) =>
     <span className=Styles.time>
       {ReasonReact.string(Time.render(~date, ~now=Js.Date.make()))}
     </span>;
-  };
 };
 
 module Amount = {
@@ -260,7 +253,6 @@ module InfoSection = {
       }>
       {switch (viewModel.info) {
        | Memo(message, _) => <MainRow> {React.string(message)} </MainRow>
-       | Empty(_) => <MainRow> {React.string("")} </MainRow>
        | MissingReceipts =>
          <MainRow>
            <Link> {React.string("+ Insert transaction receipts")} </Link>
@@ -342,7 +334,8 @@ module TopLevelStyles = {
 
   let icon = style([opacity(0.5)]);
 
-  let pendingIcon = style([display(`inlineFlex), color(Theme.Colors.clay), opacity(0.5)]);
+  let pendingIcon =
+    style([display(`inlineFlex), color(Theme.Colors.clay), opacity(0.5)]);
 
   module RightSide = {
     let outerWrapper =
@@ -392,7 +385,10 @@ let make = (~transaction: Transaction.t, ~pending=false) => {
            <span className=TopLevelStyles.icon>
              <Icon kind=Icon.BentArrow />
            </span>
-         | Pending => <span className=TopLevelStyles.pendingIcon> <Icon kind=Icon.Dots /> </span>
+         | Pending =>
+           <span className=TopLevelStyles.pendingIcon>
+             <Icon kind=Icon.Dots />
+           </span>
          | Failed => React.string("x ")
          }}
         <ActorName value={viewModel.recipient} />
@@ -405,7 +401,6 @@ let make = (~transaction: Transaction.t, ~pending=false) => {
       <div className=TopLevelStyles.RightSide.topInfoWrapper>
         {switch (viewModel.info) {
          | Memo(_, date)
-         | Empty(date)
          | StakingReward(_, date) =>
            <>
              {switch (viewModel.action) {
@@ -431,7 +426,10 @@ let make = (~transaction: Transaction.t, ~pending=false) => {
                   {ReasonReact.string("Failed")}
                 </span>
               }}
-             <TimeDisplay date />
+             {switch (date) {
+              | Some(date) => <TimeDisplay date />
+              | None => React.null
+              }}
            </>
          | MissingReceipts => <span />
          }}

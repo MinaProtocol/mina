@@ -53,7 +53,8 @@ module Stable = struct
       type t =
         { creator: Public_key.Compressed.Stable.V1.t
         ; protocol_state: Protocol_state.Stable.V1.t
-        ; transactions: Transactions.Stable.V1.t }
+        ; transactions: Transactions.Stable.V1.t
+        ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list }
       [@@deriving bin_io, version {unnumbered}]
     end
 
@@ -66,7 +67,8 @@ end
 type t = Stable.Latest.t =
   { creator: Public_key.Compressed.t
   ; protocol_state: Protocol_state.t
-  ; transactions: Transactions.t }
+  ; transactions: Transactions.t
+  ; snark_jobs: Transaction_snark_work.Info.t list }
 
 let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
     =
@@ -83,8 +85,7 @@ let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
 let user_commands {transactions= {Transactions.user_commands; _}; _} =
   user_commands
 
-let of_transition ~tracked_participants {With_hash.data= external_transition; _}
-    =
+let of_transition tracked_participants external_transition =
   let open External_transition.Validated in
   let creator = proposer external_transition in
   let protocol_state =
@@ -94,9 +95,9 @@ let of_transition ~tracked_participants {With_hash.data= external_transition; _}
         @@ protocol_state external_transition }
   in
   let open Result.Let_syntax in
+  let staged_ledger_diff = staged_ledger_diff external_transition in
   let%map calculated_transactions =
-    Staged_ledger.Pre_diff_info.get_transactions
-    @@ staged_ledger_diff external_transition
+    Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
   in
   let transactions =
     List.fold calculated_transactions
@@ -104,26 +105,40 @@ let of_transition ~tracked_participants {With_hash.data= external_transition; _}
         { Transactions.user_commands= []
         ; fee_transfers= []
         ; coinbase= Currency.Amount.zero } ~f:(fun acc_transactions -> function
-      | User_command checked_user_command ->
+      | User_command checked_user_command -> (
           let user_command = User_command.forget_check checked_user_command in
-          if
+          let should_include_transaction user_command participants =
             List.exists
               (User_command.accounts_accessed user_command)
-              ~f:(Public_key.Compressed.Set.mem tracked_participants)
-          then
-            { acc_transactions with
-              user_commands= user_command :: acc_transactions.user_commands }
-          else acc_transactions
+              ~f:(Public_key.Compressed.Set.mem participants)
+          in
+          match tracked_participants with
+          | `Some interested_participants
+            when not
+                   (should_include_transaction user_command
+                      interested_participants) ->
+              acc_transactions
+          | _ ->
+              { acc_transactions with
+                user_commands= user_command :: acc_transactions.user_commands
+              } )
       | Fee_transfer fee_transfer ->
-          let fee_transfers =
-            List.filter ~f:(fun (pk, _) ->
-                Public_key.Compressed.Set.mem tracked_participants pk )
-            @@
+          let fee_transfer_list =
             match fee_transfer with
             | One fee_transfer1 ->
                 [fee_transfer1]
             | Two (fee_transfer1, fee_transfer2) ->
                 [fee_transfer1; fee_transfer2]
+          in
+          let fee_transfers =
+            match tracked_participants with
+            | `All ->
+                fee_transfer_list
+            | `Some interested_participants ->
+                List.filter
+                  ~f:(fun (pk, _) ->
+                    Public_key.Compressed.Set.mem interested_participants pk )
+                  fee_transfer_list
           in
           { acc_transactions with
             fee_transfers= fee_transfers @ acc_transactions.fee_transfers }
@@ -133,4 +148,9 @@ let of_transition ~tracked_participants {With_hash.data= external_transition; _}
               Currency.Amount.(
                 Option.value_exn (add amount acc_transactions.coinbase)) } )
   in
-  {creator; protocol_state; transactions}
+  let snark_jobs =
+    List.map
+      (Staged_ledger_diff.completed_works staged_ledger_diff)
+      ~f:Transaction_snark_work.info
+  in
+  {creator; protocol_state; transactions; snark_jobs}

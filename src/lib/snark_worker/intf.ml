@@ -21,8 +21,7 @@ module type Inputs_intf = sig
   val perform_single :
        Worker_state.t
     -> message:Coda_base.Sok_message.t
-    -> ( Transaction_snark.Statement.t
-       , Transaction.t
+    -> ( Transaction.t
        , Transaction_witness.t
        , Ledger_proof.t )
        Work.Single.Spec.t
@@ -38,8 +37,7 @@ module type S = sig
     module Single : sig
       module Spec : sig
         type t =
-          ( Transaction_snark.Statement.t
-          , Transaction.t
+          ( Transaction.t
           , Transaction_witness.t
           , ledger_proof )
           Work.Single.Spec.t
@@ -61,7 +59,7 @@ module type S = sig
       module V1 : sig
         type query = unit
 
-        type response = Work.Spec.t option
+        type response = (Work.Spec.t * Public_key.Compressed.t) option
 
         val rpc : (query, response) Rpc.Rpc.t
       end
@@ -85,8 +83,7 @@ module type S = sig
   val command : Command.t
 
   val arguments :
-       public_key:Public_key.Compressed.t
-    -> daemon_address:Host_and_port.t
+       daemon_address:Host_and_port.t
     -> shutdown_on_disconnect:bool
     -> string list
 end

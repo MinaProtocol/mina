@@ -57,3 +57,5 @@ let coinbase_stack = create "CoinbaseStack"
 let coinbase = create "Coinbase"
 
 let checkpoint_list = create "CodaCheckpoints"
+
+let bowe_gabizon_hash = create "CodaTockBGHash"

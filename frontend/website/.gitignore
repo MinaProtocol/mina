@@ -6,6 +6,11 @@ node_modules
 /lib
 /bundle
 /site
+/docs-theme
+/graphql-docs
+/deploy
 PragmataPro-Bold.woff*
 Essential-PragmataPro-Bold.woff*
 Essential-PragmataPro-Regular.woff*
+package-lock.json
+yarn-error.log

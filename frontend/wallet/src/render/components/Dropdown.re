@@ -26,7 +26,6 @@ module Styles = {
     merge([
       Theme.Text.Header.h6,
       style([
-        userSelect(`none),
         textTransform(`uppercase),
         color(Theme.Colors.slateAlpha(0.7)),
         cursor(`default),
@@ -40,7 +39,6 @@ module Styles = {
       style([
         paddingBottom(`px(2)),
         color(Theme.Colors.teal),
-        userSelect(`none),
         flexGrow(1.),
       ]),
     ]);
@@ -71,7 +69,6 @@ module Styles = {
         alignItems(`center),
         padding2(~v=`zero, ~h=`rem(1.)),
         color(Theme.Colors.teal),
-        userSelect(`none),
         hover([backgroundColor(Theme.Colors.slateAlpha(0.1))]),
       ]),
     ]);

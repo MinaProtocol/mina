@@ -1,13 +1,14 @@
 [@react.component]
-let make = (~pubkey) => {
-  let (addressBook, _) =
-    React.useContext(AddressBookProvider.context);
+let make = (~pubkey, ~className="") => {
+  let (addressBook, _) = React.useContext(AddressBookProvider.context);
 
   switch (AddressBook.lookup(addressBook, pubkey)) {
   | Some(name) =>
-    <span className=Theme.Text.Body.regular> {React.string(name)} </span>
+    <span className={Css.merge([Theme.Text.Body.regular, className])}>
+      {React.string(name)}
+    </span>
   | None =>
-    <span className=Theme.Text.Body.mono>
+    <span className={Css.merge([Theme.Text.Body.mono, className])}>
       {React.string(PublicKey.prettyPrint(pubkey))}
     </span>
   };

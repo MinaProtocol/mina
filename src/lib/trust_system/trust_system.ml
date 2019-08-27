@@ -39,6 +39,8 @@ module Actions = struct
     | Sent_invalid_signature
         (** Peer sent us something with a signature that doesn't check *)
     | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
+    | Sent_invalid_transition_chain_merkle_proof
+        (** Peer sent us a transition chain witness that does not verify *)
     | Violated_protocol
         (** Peer violated the specification of the protocol. *)
     | Made_request
@@ -106,10 +108,15 @@ module Actions = struct
         Insta_ban
     | Sent_invalid_proof ->
         Insta_ban
+    | Sent_invalid_transition_chain_merkle_proof ->
+        Insta_ban
+    (* incoming and outgoing connection errors can happen due to network
+       failures, killing the client, or ungraceful shutdown, so we need to be
+       pretty lenient. *)
     | Incoming_connection_error ->
-        Trust_decrease 0.2
+        Trust_decrease 0.05
     | Outgoing_connection_error ->
-        Trust_decrease 0.4
+        Trust_decrease 0.05
     | Violated_protocol ->
         Insta_ban
     | Made_request ->

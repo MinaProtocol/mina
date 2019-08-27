@@ -69,10 +69,7 @@ module Styles = {
 module SyncStatusQ = [%graphql
   {|
     query querySyncStatus {
-      syncState {
-        status
-        description
-      }
+      syncStatus
     }
   |}
 ];
@@ -82,12 +79,9 @@ module SyncStatusQuery = ReasonApollo.CreateQuery(SyncStatusQ);
 module SyncStatus = {
   module SubscriptionGQL = [%graphql
     {|
-    subscription syncStatus {
-      newSyncUpdate {
-        status
-        description
+      subscription syncStatus {
+        newSyncUpdate
       }
-    }
     |}
   ];
 
@@ -97,32 +91,34 @@ module SyncStatus = {
   let make =
       (
         ~result,
-        ~subscribeToMore:
-           (
-             ~document: ReasonApolloTypes.queryString,
-             ~variables: Js.Json.t=?,
-             ~updateQuery: ReasonApolloQuery.updateQuerySubscriptionT=?,
-             ~onError: ReasonApolloQuery.onErrorT=?,
-             unit
-           ) =>
-           unit,
+        ~subscribeToMore as
+          _:
+            (
+              ~document: ReasonApolloTypes.queryString,
+              ~variables: Js.Json.t=?,
+              ~updateQuery: ReasonApolloQuery.updateQuerySubscriptionT=?,
+              ~onError: ReasonApolloQuery.onErrorT=?,
+              unit
+            ) =>
+            unit,
       ) => {
-    let _ =
-      React.useEffect0(() => {
-        subscribeToMore(~document=Subscription.graphQLSubscriptionAST, ());
-        None;
-      });
+    // TODO: Replace/remove when we fix/replace the current subscriptions
+    /* let _ = */
+    /*   React.useEffect0(() => { */
+    /*     subscribeToMore(~document=Subscription.graphQLSubscriptionAST, ()); */
+    /*     None; */
+    /*   }); */
     switch ((result: SyncStatusQuery.response)) {
     | Loading => <Alert kind=`Warning message="Connecting" />
     | Error(_) => <Alert kind=`Danger message="Error" />
     | Data(response) =>
-      let update = response##syncState;
-      switch (update##status) {
-      | `STALE => <Alert kind=`Warning message="Stale" />
-      | `ERROR => <Alert kind=`Danger message="Unsynced" />
+      switch (response##syncStatus) {
+      | `OFFLINE => <Alert kind=`Danger message="Offline" />
       | `SYNCED => <Alert kind=`Success message="Synced" />
       | `BOOTSTRAP => <Alert kind=`Warning message="Syncing" />
-      };
+      | `CONNECTING => <Alert kind=`Warning message="Connecting" />
+      | `LISTENING => <Alert kind=`Warning message="Listening" />
+      }
     };
   };
 };
@@ -153,7 +149,7 @@ let make = () => {
           onSettingsPage
             ? Styles.activatedSettings : Styles.deactivatedSettings
         }
-        onClick={_e => 
+        onClick={_e =>
           ReasonReact.Router.push(onSettingsPage ? "/" : "/settings")
         }>
         <Icon kind=Icon.Settings />

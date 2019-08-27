@@ -272,7 +272,7 @@ struct
     [%%endif]
 
     let digest t =
-      let x, _y = Curve.to_affine_coordinates t.acc in
+      let x, _y = Curve.to_affine_exn t.acc in
       x
 
     let salt s = update_fold (create ()) (Fold.string_triples s)

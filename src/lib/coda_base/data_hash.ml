@@ -26,6 +26,8 @@ module type Basic = sig
       type nonrec t = t
       [@@deriving bin_io, sexp, compare, hash, yojson, version]
 
+      val version_byte : char (* for base58_check *)
+
       include Hashable_binable with type t := t
 
       include Comparable.S with type t := t
@@ -87,6 +89,9 @@ struct
       end
 
       include T
+
+      let version_byte = Base58_check.Version_bytes.data_hash
+
       include Registration.Make_latest_version (T)
       include Hashable.Make_binable (T)
       include Comparable.Make (T)

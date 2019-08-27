@@ -1,3 +1,4 @@
+open Core
 include Curve_choice
 module Pedersen_params = Pedersen_params
 module Pedersen_chunk_table = Pedersen_chunk_table
@@ -15,7 +16,66 @@ end)
 
 module Tock_backend = struct
   module Full = Cycle.Mnt6
-  include Full.GM
+
+  module Bowe_gabizon = struct
+    let bg_salt =
+      lazy
+        (Tick_pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string))
+
+    let bg_params =
+      Group_map.Params.create
+        (module Tick0.Field)
+        ~a:Tick_backend.Inner_curve.Coefficients.a
+        ~b:Tick_backend.Inner_curve.Coefficients.b
+
+    include Snarky.Libsnark.Make_bowe_gabizon
+              (Full)
+              (Bowe_gabizon_hash.Make (struct
+                module Bigint = Tick0.Bigint
+
+                (* TODO: Rename pack/project to to_bits/of_bits *)
+                module Field = struct
+                  include Tick0.Field
+
+                  let to_bits = unpack
+
+                  let of_bits = project
+                end
+
+                module Fqe = struct
+                  type t = Full.Fqe.t
+
+                  let to_list x =
+                    let v = Full.Fqe.to_vector x in
+                    List.init (Field.Vector.length v) ~f:(Field.Vector.get v)
+                end
+
+                module G1 = Full.G1
+                module G2 = Full.G2
+
+                let params = bg_params
+
+                let pedersen x =
+                  Tick_pedersen.digest_fold (Lazy.force bg_salt) x
+              end))
+
+    module Field = Full.Field
+    module Bigint = Full.Bigint
+    module Var = Full.Var
+    module R1CS_constraint = Full.R1CS_constraint
+
+    module R1CS_constraint_system = struct
+      include Full.R1CS_constraint_system
+
+      let finalize = swap_AB_if_beneficial
+    end
+
+    module Linear_combination = Full.Linear_combination
+
+    let field_size = Full.field_size
+  end
+
+  include Bowe_gabizon
   module Inner_curve = Cycle.Mnt4.G1
   module Inner_twisted_curve = Cycle.Mnt4.G2
 end
@@ -142,4 +202,6 @@ module Wrap_input = struct
     else (module Tock_field_larger : S)
 
   include (val m)
+
+  let size = Tock0.Data_spec.size [typ]
 end

@@ -214,7 +214,7 @@ module Writer = struct
         let my_name = Option.value writer.name ~default:"<unnamed>" in
         Logger.warn logger
           ~metadata:[("pipe_name", `String my_name)]
-          ~location:__LOC__ ~module_:__MODULE__ "dropping message on pipe %s"
+          ~location:__LOC__ ~module_:__MODULE__ "Dropping message on pipe %s"
           my_name ;
         ignore (Pipe.read_now writer.strict_reader.reader) ;
         Pipe.write_without_pushback writer.writer data
@@ -252,6 +252,17 @@ let create ?name type_ =
 let transfer reader Writer.{strict_reader; writer; _} ~f =
   Reader0.(reader.downstreams <- [strict_reader]) ;
   Reader0.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
+
+let rec transfer_while_writer_alive reader writer ~f =
+  if Pipe.is_closed writer.Writer.writer then Deferred.unit
+  else
+    match%bind Pipe.read reader.Reader0.reader with
+    | `Ok x ->
+        let%bind () = Pipe.write_if_open writer.Writer.writer (f x) in
+        transfer_while_writer_alive reader writer ~f
+    | `Eof ->
+        Pipe.close_read writer.Writer.strict_reader.reader ;
+        Deferred.unit
 
 module Reader = struct
   include Reader0

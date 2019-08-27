@@ -6,11 +6,9 @@ let make = () => {
   <AddressBookProvider value=settingsValue>
     <ProcessDispatchProvider value=dispatch>
       <ReasonApollo.Provider client=Apollo.client>
-        <Window>
-          <Header />
-          <Main> <SideBar /> <Router /> </Main>
-          <Footer />
-        </Window>
+        <Header />
+        <Main> <SideBar /> <Router /> </Main>
+        <Footer />
       </ReasonApollo.Provider>
     </ProcessDispatchProvider>
   </AddressBookProvider>;

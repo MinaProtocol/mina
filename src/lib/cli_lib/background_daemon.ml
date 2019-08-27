@@ -18,7 +18,9 @@ let run ~f port arg =
         let%bind has_daemon = does_daemon_exist port in
         if has_daemon then go Run_client else go No_daemon
     | No_daemon ->
-        Print.printf !"Error: daemon not running. See `coda daemon`\n" ;
+        Print.printf
+          !"Error: Daemon not running on port %d. See `coda daemon -help`\n"
+          port ;
         go Abort
     | Run_client ->
         f port arg
@@ -27,7 +29,13 @@ let run ~f port arg =
   in
   go Start
 
-let init ~f arg_flag =
+let init ?(rest = false) ~f arg_flag =
   let open Command.Param.Applicative_infix in
-  Command.Param.return (fun port arg () -> run ~f port arg)
-  <*> Flag.port <*> arg_flag
+  if rest then
+    Command.Param.return (fun rest_port arg () ->
+        let port = Option.value rest_port ~default:Port.default_rest in
+        f port arg )
+    <*> Flag.rest_port <*> arg_flag
+  else
+    Command.Param.return (fun port arg () -> run ~f port arg)
+    <*> Flag.port <*> arg_flag

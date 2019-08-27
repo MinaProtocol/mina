@@ -3,9 +3,12 @@ open Coda_base
 open Coda_state
 open Async_kernel
 open Pipe_lib
-module Worker = Worker
 module Intf = Intf
-module Transition_storage = Transition_storage
+
+module Components = struct
+  module Transition_storage = Transition_storage
+  module Worker = Worker
+end
 
 module Make (Inputs : Intf.Main_inputs) = struct
   open Inputs
@@ -25,8 +28,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
 
   let write_diff_and_verify ~logger ~acc_hash worker (diff, ground_truth_mutant)
       =
-    Logger.trace logger "Handling mutant diff" ~module_:__MODULE__
-      ~location:__LOC__
+    Logger.trace logger "Handling mutant diff: $diff_mutant"
+      ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
         [("diff_mutant", Transition_frontier.Diff.Mutant.key_to_yojson diff)] ;
     let ground_truth_hash =
@@ -38,20 +41,30 @@ module Make (Inputs : Intf.Main_inputs) = struct
     with
     | Error e ->
         Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-          "Could not connect to worker" ;
+          "Could not connect to worker to handle mutant diff: $error"
+          ~metadata:[("error", `String (Error.to_string_hum e))] ;
         Error.raise e
     | Ok new_hash ->
         if Transition_frontier.Diff.Hash.equal new_hash ground_truth_hash then
           ground_truth_hash
-        else
-          failwithf
-            !"Unable to write mutant diff correctly as hashes are different:\n\
-             \ %s. Hash of groundtruth %s Hash of actual %s"
-            (Yojson.Safe.to_string
-               (Transition_frontier.Diff.Mutant.key_to_yojson diff))
-            (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
-            (Transition_frontier.Diff.Hash.to_string new_hash)
-            ()
+        else (
+          (* TODO: this should be a failure that never occurs *)
+          Logger.error logger
+            "Mutant diff hashes differ: diff_mutant: $diff_mutant; hash of \
+             ground truth: $hash_of_ground_truth; hash of actual: \
+             $hash_of_actual"
+            ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "diff_mutant"
+                , Transition_frontier.Diff.Mutant.key_to_yojson diff )
+              ; ( "hash_of_ground_truth"
+                , `String
+                    (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
+                )
+              ; ( "hash_of_actual"
+                , `String (Transition_frontier.Diff.Hash.to_string new_hash) )
+              ] ;
+          ground_truth_hash )
 
   let rec flush ({buffer; worker_writer; flush_capacity; _} as t) =
     let list = Queue.to_list buffer in
@@ -137,15 +150,20 @@ module Make (Inputs : Intf.Main_inputs) = struct
     let log_error () =
       Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("hash", State_hash.to_yojson (With_hash.hash transition))]
-        "Failed to add breadcrumb into $hash"
+        "Failed to add breadcrumb to transition $hash"
+    in
+    let previous_state_hash =
+      With_hash.data transition |> External_transition.Validated.parent_hash
     in
     (* TMP HACK: our transition is already validated, so we "downgrade" it's validation #2486 *)
     let mostly_validated_external_transition =
-      ( With_hash.map ~f:External_transition.Validated.forget_validation
+      ( With_hash.map ~f:External_transition.Validation.forget_validation
           transition
-      , ( (`Time_received, Truth.True)
-        , (`Proof, Truth.True)
-        , (`Frontier_dependencies, Truth.True)
+      , ( (`Time_received, Truth.True ())
+        , (`Proof, Truth.True ())
+        , ( `Delta_transition_chain
+          , Truth.True (Non_empty_list.singleton previous_state_hash) )
+        , (`Frontier_dependencies, Truth.True ())
         , (`Staged_ledger_diff, Truth.False) ) )
     in
     let%bind child_breadcrumb =
@@ -191,18 +209,14 @@ module Make (Inputs : Intf.Main_inputs) = struct
       Transition_storage.get transition_storage ~logger (Transition state_hash)
     in
     let root_transition, root_successor_hashes =
-      let verified_transition, children_hashes =
-        get_verified_transition state_hash
-      in
-      ({With_hash.data= verified_transition; hash= state_hash}, children_hashes)
+      get_verified_transition state_hash
     in
     let%bind root_staged_ledger =
       Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
         ~verifier ~scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
         ~pending_coinbases
-        ~expected_merkle_root:
-          (staged_ledger_hash @@ With_hash.data root_transition)
+        ~expected_merkle_root:(staged_ledger_hash root_transition)
       |> Deferred.Or_error.ok_exn
     in
     let%bind transition_frontier =
@@ -249,3 +263,26 @@ module Make (Inputs : Intf.Main_inputs) = struct
     let write_diff_and_verify = write_diff_and_verify
   end
 end
+
+module Base_inputs = struct
+  open Coda_transition
+
+  let max_length = Consensus.Constants.k
+
+  module Verifier = Verifier
+  module Ledger_proof = Ledger_proof
+  module External_transition = External_transition
+  module Internal_transition = Internal_transition
+  module Staged_ledger = Staged_ledger
+  module Transition_frontier = Transition_frontier
+  module Staged_ledger_diff = Staged_ledger_diff
+  module Transaction_snark_work = Transaction_snark_work
+end
+
+module Inputs = struct
+  include Base_inputs
+  module Transition_storage = Transition_storage.Make (Base_inputs)
+  module Make_worker = Worker.Make_async
+end
+
+include Make (Inputs)

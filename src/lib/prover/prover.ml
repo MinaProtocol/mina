@@ -2,7 +2,10 @@ open Core
 open Async
 open Coda_base
 open Coda_state
+open Coda_transition
 open Blockchain_snark
+
+module type S = Intf.S
 
 module Extend_blockchain_input = struct
   type t =
@@ -12,29 +15,6 @@ module Extend_blockchain_input = struct
     ; prover_state: Consensus.Data.Prover_state.Stable.Latest.t
     ; pending_coinbase: Pending_coinbase_witness.Stable.Latest.t }
   [@@deriving bin_io, sexp]
-end
-
-module type S = sig
-  module Worker_state : sig
-    type t
-
-    val create : unit -> t Deferred.t
-  end
-
-  type t
-
-  val create : unit -> t Deferred.t
-
-  val initialized : t -> [`Initialized] Deferred.Or_error.t
-
-  val extend_blockchain :
-       t
-    -> Blockchain.t
-    -> Protocol_state.Value.t
-    -> Snark_transition.value
-    -> Consensus.Data.Prover_state.t
-    -> Pending_coinbase_witness.t
-    -> Blockchain.t Deferred.Or_error.t
 end
 
 module Consensus_mechanism = Consensus
@@ -291,6 +271,24 @@ let extend_blockchain {connection; _} chain next_state block prover_state
                 (Sexp.to_string (Extend_blockchain_input.sexp_of_t input)) )
           ; ( "input-bin-io"
             , `String
-                (Binable.to_string (module Extend_blockchain_input) input) ) ]
-        "Prover failed: %s" (Error.to_string_hum e) ;
+                (Binable.to_string (module Extend_blockchain_input) input) )
+          ; ("error", `String (Error.to_string_hum e)) ]
+        "Prover failed: $error" ;
       Error.raise e
+
+let prove t ~prev_state ~prev_state_proof ~next_state
+    (transition : Internal_transition.t) pending_coinbase =
+  let open Deferred.Or_error.Let_syntax in
+  let start_time = Core.Time.now () in
+  let%map {Blockchain.proof; _} =
+    extend_blockchain t
+      (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
+      next_state
+      (Internal_transition.snark_transition transition)
+      (Internal_transition.prover_state transition)
+      pending_coinbase
+  in
+  Coda_metrics.(
+    Gauge.set Proving_time.blockchain_proving_time_ms
+      (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
+  proof

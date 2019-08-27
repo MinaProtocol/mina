@@ -2,7 +2,7 @@ open Tc;
 
 module Styles = {
   open Css;
-    
+
   let modalBody =
     style([
       display(`flex),
@@ -10,7 +10,7 @@ module Styles = {
       alignItems(`center),
       justifyContent(`center),
     ]);
-  
+
   let bodyMargin = style([margin(`rem(1.0)), width(`percent(100.))]);
 
   let publicKey =
@@ -22,6 +22,7 @@ module Styles = {
         padding(`px(12)),
         backgroundColor(white),
         wordWrap(`breakWord),
+        userSelect(`text),
       ]),
     ]);
 };
@@ -46,22 +47,22 @@ let make = (~wallets, ~setModalState) => {
           options={
             wallets
             |> Array.map(~f=wallet =>
-                (
-                  PublicKey.toString(wallet.Wallet.key),
-                  <WalletDropdownItem wallet />
-                )
-              )
+                 (
+                   PublicKey.toString(wallet.Wallet.publicKey),
+                   <WalletDropdownItem wallet />,
+                 )
+               )
             |> Array.toList
           }
         />
         <Spacer height=1. />
         {switch (selectedWallet) {
-        | None => React.null
-        | Some(selectedWallet) =>
-          <div className=Styles.publicKey>
-            {React.string(PublicKey.toString(selectedWallet))}
-          </div>
-        }}
+         | None => React.null
+         | Some(selectedWallet) =>
+           <div className=Styles.publicKey>
+             {React.string(PublicKey.toString(selectedWallet))}
+           </div>
+         }}
       </div>
       <div className=Css.(style([display(`flex)]))>
         <Button

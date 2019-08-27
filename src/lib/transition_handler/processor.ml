@@ -30,16 +30,17 @@ module Make (Inputs : Inputs.S) :
     External_transition.Transition_frontier_validation (Transition_frontier)
 
   type external_transition_with_initial_validation =
-    ( [`Time_received] * Truth.true_t
-    , [`Proof] * Truth.true_t
-    , [`Frontier_dependencies] * Truth.false_t
-    , [`Staged_ledger_diff] * Truth.false_t )
+    ( [`Time_received] * unit Truth.true_t
+    , [`Proof] * unit Truth.true_t
+    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+    , [`Frontier_dependencies] * unit Truth.false_t
+    , [`Staged_ledger_diff] * unit Truth.false_t )
     External_transition.Validation.with_transition
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
   let catchup_timeout_duration =
     Block_time.Span.of_ms
-      (Consensus.Constants.block_window_duration_ms * 2 |> Int64.of_int)
+      (Consensus.Constants.(delta * block_window_duration_ms) |> Int64.of_int)
 
   let cached_transform_deferred_result ~transform_cached ~transform_result
       cached =
@@ -55,7 +56,7 @@ module Make (Inputs : Inputs.S) :
       else Cached.invalidate_with_success cached_breadcrumb
     in
     let transition =
-      Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
+      Transition_frontier.Breadcrumb.validated_transition breadcrumb
     in
     let add_breadcrumb =
       if only_if_present then Transition_frontier.add_breadcrumb_if_present_exn
@@ -64,7 +65,7 @@ module Make (Inputs : Inputs.S) :
     let%map () = add_breadcrumb frontier breadcrumb in
     Writer.write processed_transition_writer transition ;
     Catchup_scheduler.notify catchup_scheduler
-      ~hash:(With_hash.hash transition)
+      ~hash:(External_transition.Validated.state_hash transition)
 
   let process_transition ~logger ~trust_system ~verifier ~frontier
       ~catchup_scheduler ~processed_transition_writer
@@ -97,21 +98,42 @@ module Make (Inputs : Inputs.S) :
               Trust_system.record_envelope_sender trust_system logger sender
                 ( Trust_system.Actions.Gossiped_invalid_transition
                 , Some
-                    ( "$state_hash was not selected over transition frontier \
-                       root"
+                    ( "The transition with hash $state_hash was not selected \
+                       over the transition frontier root"
                     , metadata ) )
             in
             Error ()
         | Error `Already_in_frontier ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
-              "refusing to process $state_hash because is is already in the \
-               transition frontier" ;
+              "Refusing to process the transition with hash $state_hash \
+               because is is already in the transition frontier" ;
             return (Error ())
-        | Error `Parent_missing_from_frontier ->
-            Catchup_scheduler.watch catchup_scheduler
-              ~timeout_duration:catchup_timeout_duration
-              ~cached_transition:cached_initially_validated_transition ;
-            return (Error ())
+        | Error `Parent_missing_from_frontier -> (
+            let _, validation =
+              Cached.peek cached_initially_validated_transition
+              |> Envelope.Incoming.data
+            in
+            match validation with
+            | ( _
+              , _
+              , (`Delta_transition_chain, Truth.True delta_state_hashes)
+              , _
+              , _ ) ->
+                let timeout_duration =
+                  Option.fold
+                    (Transition_frontier.find frontier
+                       (Non_empty_list.head delta_state_hashes))
+                    ~init:(Block_time.Span.of_ms 0L)
+                    ~f:(fun _ _ -> catchup_timeout_duration)
+                in
+                Catchup_scheduler.watch catchup_scheduler ~timeout_duration
+                  ~cached_transition:cached_initially_validated_transition ;
+                return (Error ())
+            | _ ->
+                failwith
+                  "This is impossible since the transition just passed \
+                   initial_validation so delta_transition_chain_proof must be \
+                   true" )
       in
       (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
       let parent_hash =
@@ -134,13 +156,17 @@ module Make (Inputs : Inputs.S) :
                   ~metadata:
                     ( metadata
                     @ [("error", `String (Error.to_string_hum error))] )
-                  "error while building breadcrumb in processor: $error" ;
+                  "Error while building breadcrumb in the transition handler \
+                   processor: $error" ;
                 Deferred.return (Error ())
             | Error (`Fatal_error exn) ->
                 raise exn
             | Ok breadcrumb ->
                 Deferred.return (Ok breadcrumb) )
       in
+      Coda_metrics.(
+        Counter.inc_one
+          Transition_frontier_controller.breadcrumbs_built_by_processor) ;
       Deferred.map ~f:Result.return
         (add_and_finalize ~frontier ~catchup_scheduler
            ~processed_transition_writer ~only_if_present:false breadcrumb))
@@ -164,12 +190,14 @@ module Make (Inputs : Inputs.S) :
          , unit )
          Writer.t)
       ~(catchup_breadcrumbs_reader :
-         (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
-         list
+         ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
+           list
+         * [`Ledger_catchup of unit Ivar.t | `Catchup_scheduler] )
          Reader.t)
       ~(catchup_breadcrumbs_writer :
          ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
            list
+           * [`Ledger_catchup of unit Ivar.t | `Catchup_scheduler]
          , crash buffered
          , unit )
          Writer.t) ~processed_transition_writer =
@@ -194,47 +222,64 @@ module Make (Inputs : Inputs.S) :
             * transition from the network) can happen iff there is another node
             * with the exact same private key and view of the transaction pool. *)
          [ Reader.map proposer_transition_reader ~f:(fun breadcrumb ->
+               Coda_metrics.(
+                 Gauge.inc_one
+                   Transition_frontier_controller.transitions_being_processed) ;
                `Proposed_breadcrumb (Cached.pure breadcrumb) )
-         ; Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
-               `Catchup_breadcrumbs cb )
+         ; Reader.map catchup_breadcrumbs_reader
+             ~f:(fun (cb, catchup_breadcrumbs_callback) ->
+               `Catchup_breadcrumbs (cb, catchup_breadcrumbs_callback) )
          ; Reader.map primary_transition_reader ~f:(fun vt ->
                `Partially_valid_transition vt ) ]
          ~f:(fun msg ->
            let open Deferred.Let_syntax in
            trace_recurring_task "transition_handler_processor" (fun () ->
                match msg with
-               | `Catchup_breadcrumbs breadcrumb_subtrees -> (
-                   match%map
-                     Deferred.Or_error.List.iter breadcrumb_subtrees
-                       ~f:(fun subtree ->
-                         Rose_tree.Deferred.Or_error.iter
-                           subtree
-                           (* It could be the case that by the time we try and
+               | `Catchup_breadcrumbs
+                   (breadcrumb_subtrees, subsequent_callback_action) -> (
+                   ( match%map
+                       Deferred.Or_error.List.iter breadcrumb_subtrees
+                         ~f:(fun subtree ->
+                           Rose_tree.Deferred.Or_error.iter
+                             subtree
+                             (* It could be the case that by the time we try and
                              * add the breadcrumb, it's no longer relevant when
                              * we're catching up *)
-                           ~f:(add_and_finalize ~only_if_present:true) )
-                   with
+                             ~f:(add_and_finalize ~only_if_present:true) )
+                     with
                    | Ok () ->
                        ()
                    | Error err ->
                        Logger.error logger ~module_:__MODULE__
                          ~location:__LOC__
-                         "failed to attach all catchup breadcrumbs to \
+                         "Error, failed to attach all catchup breadcrumbs to \
                           transition frontier: %s"
                          (Error.to_string_hum err) )
-               | `Proposed_breadcrumb breadcrumb -> (
-                   match%map
-                     add_and_finalize ~only_if_present:false breadcrumb
-                   with
-                   | Ok () ->
-                       ()
-                   | Error err ->
-                       Logger.error logger ~module_:__MODULE__
-                         ~location:__LOC__
-                         ~metadata:
-                           [("error", `String (Error.to_string_hum err))]
-                         "failed to attach breadcrumb proposed internally to \
-                          transition frontier: $error" )
+                   >>| fun () ->
+                   match subsequent_callback_action with
+                   | `Ledger_catchup decrement_signal ->
+                       Ivar.fill decrement_signal ()
+                   | `Catchup_scheduler ->
+                       () )
+               | `Proposed_breadcrumb breadcrumb ->
+                   let%map () =
+                     match%map
+                       add_and_finalize ~only_if_present:false breadcrumb
+                     with
+                     | Ok () ->
+                         ()
+                     | Error err ->
+                         Logger.error logger ~module_:__MODULE__
+                           ~location:__LOC__
+                           ~metadata:
+                             [("error", `String (Error.to_string_hum err))]
+                           "Error, failed to attach proposed breadcrumb to \
+                            transition frontier: $error"
+                   in
+                   Coda_metrics.(
+                     Gauge.dec_one
+                       Transition_frontier_controller
+                       .transitions_being_processed)
                | `Partially_valid_transition transition ->
                    process_transition ~transition ) ))
 end

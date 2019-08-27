@@ -19,14 +19,11 @@ module Message = struct
   let hash t ~nonce =
     let d =
       Pedersen.digest_fold Hash_prefix.signature
-        Fold.(
-          User_command_payload.fold t +> group3 ~default:false (of_list nonce))
+        Fold.(User_command_payload.fold t +> of_list nonce)
     in
     Scalar.of_bits
       ( Random_oracle.digest_field d
       |> Random_oracle.Digest.to_bits |> Array.to_list )
-
-  let () = assert Insecure.signature_hash_function
 
   let%snarkydef hash_checked t ~nonce =
     let init =
@@ -37,9 +34,7 @@ module Message = struct
     let%bind with_t = Pedersen.Checked.Section.disjoint_union_exn init t in
     let%bind digest =
       let%map final =
-        Pedersen.Checked.Section.extend with_t
-          (Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
-             nonce)
+        Pedersen.Checked.Section.extend with_t nonce
           ~start:
             ( Hash_prefix.length_in_triples
             + User_command_payload.length_in_triples )

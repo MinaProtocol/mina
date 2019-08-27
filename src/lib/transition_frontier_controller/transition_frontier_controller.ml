@@ -3,14 +3,33 @@ open Async_kernel
 open Pipe_lib
 
 module type Inputs_intf = sig
-  include Sync_handler.Inputs_intf
+  include Transition_frontier.Inputs_intf
+
+  module Transition_frontier :
+    Coda_intf.Transition_frontier_intf
+    with type external_transition_validated := External_transition.Validated.t
+     and type mostly_validated_external_transition :=
+                ( [`Time_received] * unit Truth.true_t
+                , [`Proof] * unit Truth.true_t
+                , [`Delta_transition_chain]
+                  * Coda_base.State_hash.t Non_empty_list.t Truth.true_t
+                , [`Frontier_dependencies] * unit Truth.true_t
+                , [`Staged_ledger_diff] * unit Truth.false_t )
+                External_transition.Validation.with_transition
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
+     and type staged_ledger := Staged_ledger.t
+     and type verifier := Verifier.t
 
   module Sync_handler :
     Coda_intf.Sync_handler_intf
     with type external_transition := External_transition.t
      and type external_transition_validated := External_transition.Validated.t
+     and type external_transition_with_initial_validation :=
+                External_transition.with_initial_validation
      and type transition_frontier := Transition_frontier.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
+     and type verifier := Verifier.t
 
   module Transition_handler :
     Coda_intf.Transition_handler_intf
@@ -81,9 +100,9 @@ module Make (Inputs : Inputs_intf) :
         (Buffered (`Capacity 30, `Overflow Crash))
     in
     let proposer_transition_reader_copy, proposer_transition_writer_copy =
-      Strict_pipe.create ~name:"proposer transition copy" Synchronous
+      Strict_pipe.create ~name:"block producer transition copy" Synchronous
     in
-    Strict_pipe.transfer proposer_transition_reader
+    Strict_pipe.transfer_while_writer_alive proposer_transition_reader
       proposer_transition_writer_copy ~f:Fn.id
     |> don't_wait_for ;
     let unprocessed_transition_cache =
@@ -124,3 +143,12 @@ module Make (Inputs : Inputs_intf) :
     |> don't_wait_for ;
     processed_transition_reader
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+  module Catchup = Ledger_catchup
+  module Network = Coda_networking
+  module Transition_handler = Transition_handler
+  module Sync_handler = Sync_handler
+end)
