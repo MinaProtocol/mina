@@ -964,20 +964,23 @@ let create ~logger ~conf_dir =
           ^ Error.to_string_hum e )
   in
   let kill_locked_process ~logger =
+    (* TODO: is there something better than this PID file pattern to use? *)
     match%bind Sys.file_exists lock_path with
     | `Yes -> (
-        let%bind p = Reader.file_contents lock_path in
+        let%bind p = (* FIXME: TOCTOU *) Reader.file_contents lock_path in
         match%bind Process.run ~prog:"kill" ~args:[p] () with
         | Ok _ ->
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "Killing dead libp2p_helper process %s" p ;
-            let%map () = Sys.remove lock_path in
+              "Killed dead libp2p_helper process %s" p ;
+            let%bind () = Sys.remove lock_path in
+            (* Let the process die and be reaped. *)
+            let%map () = after (sec 5.) in
             Ok ()
         | Error _ ->
-          (* TODO: remove stale lockfile? *)
+            let%map () = Sys.remove lock_path in
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "Process %s does not exist and will not be killed" p ;
-            return @@ Ok () )
+              "Process %s does not exist and will not be killed (removing lock fle)" p ;
+            Ok () )
     | _ ->
         return @@ Ok ()
   in
