@@ -631,12 +631,23 @@ module Pubsub = struct
       ; write_pipe
       ; read_pipe }
     in
-    let%bind _ =
+    (* Linear scan over all subscriptions. Should generally be small, probably not a problem. *)
+    let already_exists_error = Hashtbl.fold net.subscriptions ~init:None
+      ~f:(fun ~key:_ ~data acc -> if Option.is_some acc then acc else if String.equal data.topic topic
+        then
+          (Strict_pipe.Writer.close write_pipe ; Some (Or_error.errorf "already subscribed to topic %s" topic))
+        else acc
+       )
+    in
+    match already_exists_error with
+    | Some err -> return err
+    | None ->
+    (let%bind _ =
       match Hashtbl.add net.subscriptions ~key:subscription_idx ~data:sub with
       | `Ok ->
           return (Ok ())
       | `Duplicate ->
-          (Strict_pipe.Writer.close write_pipe ; Deferred.Or_error.errorf "already subscribed to topic %s" topic)
+          failwith "fresh genseq was already present in subscription table?"
     in
     match%map
       Helper.do_rpc net (module Helper.Rpcs.Subscribe) {topic; subscription_idx}
@@ -646,7 +657,7 @@ module Pubsub = struct
     | Ok j ->
         (Strict_pipe.Writer.close write_pipe ; failwithf "helper broke RPC protocol: subscribe got %s" j ())
     | Error e ->
-        (Strict_pipe.Writer.close write_pipe ; Error e)
+        (Strict_pipe.Writer.close write_pipe ; Error e))
 end
 
 let me (net : Helper.t) = net.me_keypair
