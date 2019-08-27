@@ -29,13 +29,6 @@ let to_int_res x =
   | None ->
       Or_error.error_string "needed an int"
 
-let to_string_res x =
-  match Yojson.Safe.Util.to_string_option x with
-  | Some i ->
-      Ok i
-  | None ->
-      Or_error.error_string "needed a string"
-
 type keypair = {secret: string; public: string; peer_id: string}
 
 module Helper = struct
@@ -46,7 +39,7 @@ module Helper = struct
     ; lock_path: string
     ; conf_dir: string
     ; outstanding_requests: (int, Yojson.Safe.json Or_error.t Ivar.t) Hashtbl.t
-    (**
+          (**
       seqno is used to assign unique IDs to our outbound requests and index the
       tables below.
 
@@ -334,15 +327,87 @@ module Helper = struct
   (** Parses an "upcall" and performs it.
 
     An upcall is like an RPC from the helper to us.*)
+
+  module Upcall = struct
+    module Data : sig
+      type t = string [@@deriving yojson]
+    end = struct
+      type t = string
+
+      let to_string t =
+        B58.encode alphabet (Bytes.of_string t) |> Bytes.to_string
+
+      let of_string s =
+        Bytes.of_string s |> B58.decode alphabet |> Bytes.to_string
+
+      let to_yojson s = `String (to_string s)
+
+      let of_yojson = function
+        | `String s -> (
+          try Ok (of_string s)
+          with exn -> Error Error.(to_string_hum (of_exn exn)) )
+        | _ ->
+            Error "expected a string"
+    end
+
+    module Publish = struct
+      type t = {upcall: string; subscription_idx: int; data: Data.t}
+      [@@deriving yojson]
+    end
+
+    module Validate = struct
+      type t =
+        { peer_id: string
+        ; data: Data.t
+        ; seqno: int
+        ; upcall: string
+        ; subscription_idx: int }
+      [@@deriving yojson]
+    end
+
+    module Stream_lost = struct
+      type t = {upcall: string; stream_idx: int; reason: string}
+      [@@deriving yojson]
+    end
+
+    module Stream_read_complete = struct
+      type t = {upcall: string; stream_idx: int} [@@deriving yojson]
+    end
+
+    module Incoming_stream_msg = struct
+      type t = {upcall: string; stream_idx: int; data: Data.t}
+      [@@deriving yojson]
+    end
+
+    module Incoming_stream = struct
+      type t =
+        { upcall: string
+        ; remote_addr: string
+        ; remote_peerid: string
+        ; stream_idx: int
+        ; protocol: string }
+      [@@deriving yojson]
+    end
+
+    let or_error (t : ('a, string) Result.t) =
+      match t with
+      | Ok a ->
+          Ok a
+      | Error s ->
+          Or_error.errorf !"Error converting from json: %s" s
+  end
+
   let handle_upcall t v =
     let open Yojson.Safe.Util in
     let open Or_error.Let_syntax in
+    let open Upcall in
     (* TODO: types here please *)
     match member "upcall" v |> to_string with
     (* Message published on one of our subscriptions *)
     | "publish" -> (
-        let%bind idx = v |> member "subscription_idx" |> to_int_res in
-        let%bind data = v |> member "data" |> of_b58_data in
+        let%bind m = Publish.of_yojson v |> or_error in
+        let idx = m.subscription_idx in
+        let data = m.data in
         match Hashtbl.find t.subscriptions idx with
         | Some sub ->
             if not sub.closed then
@@ -366,38 +431,40 @@ module Helper = struct
               "message published with inactive subsubscription %d" idx )
     (* Validate a message received on a subscription *)
     | "validate" -> (
-        let%bind peerid = v |> member "peer_id" |> to_string_res in
-        let%bind data = v |> member "data" |> of_b58_data in
-        let%bind subscription_idx =
-          v |> member "subscription_idx" |> to_int_res
-        in
-        let%bind seqno = v |> member "seqno" |> to_int_res in
-        match Hashtbl.find t.subscriptions subscription_idx with
+        let%bind m = Validate.of_yojson v |> or_error in
+        let idx = m.subscription_idx in
+        let seqno = m.seqno in
+        match Hashtbl.find t.subscriptions idx with
         | Some v ->
             (let open Deferred.Let_syntax in
-            (let%bind is_valid = v.validator peerid data in
-             match%map do_rpc t (module Rpcs.Validation_complete) {seqno; is_valid} with
-             | Ok "validationComplete success" -> ()
-             | Ok v -> failwithf "helper broke RPC protocol: validationComplete got %s" v ()
+            (let%bind is_valid = v.validator m.peer_id m.data in
+             match%map
+               do_rpc t (module Rpcs.Validation_complete) {seqno; is_valid}
+             with
+             | Ok "validationComplete success" ->
+                 ()
+             | Ok v ->
+                 failwithf
+                   "helper broke RPC protocol: validationComplete got %s" v ()
              | Error e ->
-               Logger.error t.logger "error during validationComplete, ignoring and continuing: $error"
-                ~module_:__MODULE__ ~location:__LOC__ ~metadata:["error", `String (Error.to_string_hum e)] ;
-             ) |> don't_wait_for) ;
+                 Logger.error t.logger
+                   "error during validationComplete, ignoring and continuing: \
+                    $error"
+                   ~module_:__MODULE__ ~location:__LOC__
+                   ~metadata:[("error", `String (Error.to_string_hum e))])
+            |> don't_wait_for) ;
             Ok ()
         | None ->
             Or_error.errorf
               "asked to validate message for unregistered subscription idx %d"
-              subscription_idx )
+              idx )
     (* A new inbound stream was opened *)
     | "incomingStream" -> (
-        let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
-        let%bind protocol = v |> member "protocol" |> to_string_res in
-        let%bind remote_addr = v |> member "remote_addr" |> to_string_res in
-        let%bind remote_peerid =
-          v |> member "remote_peerid" |> to_string_res
-        in
+        let%bind m = Incoming_stream.of_yojson v |> or_error in
+        let stream_idx = m.stream_idx in
+        let protocol = m.protocol in
         let stream =
-         make_stream t stream_idx protocol remote_addr remote_peerid
+          make_stream t stream_idx protocol m.remote_addr m.remote_peerid
         in
         match Hashtbl.find t.protocol_handlers protocol with
         | Some ph ->
@@ -439,22 +506,21 @@ module Helper = struct
         )
     (* Received a message on some stream *)
     | "incomingStreamMsg" -> (
-        let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
-        let%bind data = v |> member "data" |> of_b58_data in
-        match Hashtbl.find t.streams stream_idx with
+        let%bind m = Incoming_stream_msg.of_yojson v |> or_error in
+        match Hashtbl.find t.streams m.stream_idx with
         | Some {incoming_w; _} ->
-            don't_wait_for (Pipe.write incoming_w data) ;
+            don't_wait_for (Pipe.write incoming_w m.data) ;
             Ok ()
         | None ->
             Or_error.errorf
               "incoming stream message for stream we don't know about?" )
     (* Stream was reset, either by the remote peer or an error on our end. *)
     | "streamLost" ->
-        let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
-        let%bind reason = v |> member "reason" |> to_string_res in
+        let%bind m = Stream_lost.of_yojson v |> or_error in
+        let stream_idx = m.stream_idx in
         Logger.warn t.logger "Encountered error while reading stream: $error"
           ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("error", `String reason)] ;
+          ~metadata:[("error", `String m.reason)] ;
         let ret =
           if Hashtbl.mem t.streams stream_idx then Ok ()
           else
@@ -464,7 +530,8 @@ module Helper = struct
         ret
     (* The remote peer closed its write end of one of our streams *)
     | "streamReadComplete" -> (
-        let%bind stream_idx = v |> member "stream_idx" |> to_int_res in
+        let%bind m = Stream_read_complete.of_yojson v |> or_error in
+        let stream_idx = m.stream_idx in
         match Hashtbl.find t.streams stream_idx with
         | Some {incoming_w; _} ->
             Pipe.close incoming_w ; Ok ()
