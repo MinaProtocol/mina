@@ -184,17 +184,6 @@ let setup_user_command ~fee ~nonce ~memo ~sender_kp user_command_body =
   let signed_user_command = User_command.sign sender_kp payload in
   User_command.forget_check signed_user_command
 
-module Receipt_chain_hash = struct
-  (* Receipt.Chain_hash does not have bin_io *)
-  include Receipt.Chain_hash.Stable.V1
-
-  [%%define_locally
-  Receipt.Chain_hash.(cons, empty)]
-end
-
-module Payment_verifier =
-  Receipt_chain_database_lib.Verifier.Make (User_command) (Receipt_chain_hash)
-
 let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
     (verifying_txn : User_command.t) proof =
   let open Participating_state.Let_syntax in
@@ -202,7 +191,7 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
   let account = Option.value_exn account in
   let resulting_receipt = account.Account.Poly.receipt_chain_hash in
   let open Or_error.Let_syntax in
-  let%bind () = Payment_verifier.verify ~resulting_receipt proof in
+  let%bind () = Receipt_chain_database.verify ~resulting_receipt proof in
   if
     List.exists (Payment_proof.payments proof) ~f:(fun txn ->
         User_command.equal verifying_txn txn )
