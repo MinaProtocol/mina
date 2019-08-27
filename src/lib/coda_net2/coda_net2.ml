@@ -631,13 +631,12 @@ module Pubsub = struct
       ; write_pipe
       ; read_pipe }
     in
-    (* TODO: check if already subscribed to topic, fail. *)
     let%bind _ =
       match Hashtbl.add net.subscriptions ~key:subscription_idx ~data:sub with
       | `Ok ->
           return (Ok ())
       | `Duplicate ->
-          Deferred.Or_error.errorf "already subscribed to topic %s" topic
+          (Strict_pipe.Writer.close write_pipe ; Deferred.Or_error.errorf "already subscribed to topic %s" topic)
     in
     match%map
       Helper.do_rpc net (module Helper.Rpcs.Subscribe) {topic; subscription_idx}
@@ -645,9 +644,9 @@ module Pubsub = struct
     | Ok "subscribe success" ->
         Ok sub
     | Ok j ->
-        failwithf "helper broke RPC protocol: subscribe got %s" j ()
+        (Strict_pipe.Writer.close write_pipe ; failwithf "helper broke RPC protocol: subscribe got %s" j ())
     | Error e ->
-        Error e
+        (Strict_pipe.Writer.close write_pipe ; Error e)
 end
 
 let me (net : Helper.t) = net.me_keypair
