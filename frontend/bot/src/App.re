@@ -21,10 +21,11 @@ let handleMessage = msg =>
     }
   };
 
-// Start echo service
-Echo.start(Constants.echoKey, Constants.feeAmount);
-
-// Start up optional second echo service
+// Start echo service(s)
+switch (Constants.echoKey) {
+| Some(echoKey) => Echo.start(echoKey, Constants.feeAmount)
+| None => ()
+};
 switch (Constants.echoKey2) {
 | Some(echoKey2) => Echo.start(echoKey2, Constants.feeAmount)
 | None => ()
@@ -38,7 +39,7 @@ switch (Constants.repeaterKey) {
       ~fromKey=repeaterKey,
       ~toKey=Constants.faucetKey,
       ~amount=Int64.of_int(0),
-      ~fee=Constants.feeAmount,
+      ~fee=Constants.repeaterFeeAmount,
       ~timeout=Constants.repeatTimeMs,
     );
   ();

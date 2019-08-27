@@ -10,7 +10,7 @@ let getEnv = (~default, name) =>
 
 let getEnvOpt = name => Js.Dict.get(Node.Process.process##env, name);
 
-let echoKey = getEnvOrFail("ECHO_PUBLICKEY");
+let echoKey = getEnvOpt("ECHO_PUBLICKEY");
 let echoKey2 = getEnvOpt("ECHO_PUBLICKEY_2");
 let repeaterKey = getEnvOpt("REPEATER_PUBLICKEY");
 let faucetKey = getEnvOrFail("FAUCET_PUBLICKEY");
@@ -23,10 +23,10 @@ let listeningChannels = ["faucet"];
 let faucetApproveRole = "faucet-approvers";
 
 let feeAmount = getEnv(~default="5", "FEE_AMOUNT") |> Int64.of_string;
-let feeAmount =
-  getEnv(~default=Int64.to_string(feeAmount), "LARGE_FEE_AMOUNT")
+let repeaterFeeAmount =
+  getEnv(~default=Int64.to_string(feeAmount), "REPEATER_FEE_AMOUNT")
   |> Int64.of_string;
 
 let faucetAmount = Int64.of_int(100);
 let cooldownTimeMs = 1000. *. 60. *. 60. *. 3.; // 3 hrs
-let repeatTimeMs = 1000 * 60 * 5; // 5 mins
+let repeatTimeMs = 1000 * 60 * 3; // 3 mins
