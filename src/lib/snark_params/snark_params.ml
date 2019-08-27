@@ -757,11 +757,13 @@ let%test_unit "miller-loop" =
       let%bind q = G2_precomputation.create q in
       miller_loop (G1_precomputation.create p) q >>= final_exponentiation )
     (fun (p, q) ->
-      let open Tuple_lib in
-      let unconv x = Option.value_exn (M.Fq.of_bits (Field.unpack x)) in
-      let unconv23 = Double.map ~f:(Triple.map ~f:unconv) in
-      M.Pairing.reduced_pairing
-        (M.G1.of_affine (Double.map (Inner_curve.to_affine_exn p) ~f:unconv))
-        (M.G2.of_affine (unconv23 (G2.Unchecked.to_affine_exn q)))
-      |> Double.map ~f:(fun _ -> failwith "") )
+      ( let open Tuple_lib in
+        let unconv x = Option.value_exn (M.Fq.of_bits (Field.unpack x)) in
+        let unconv23 = Double.map ~f:(Triple.map ~f:unconv) in
+        M.Pairing.reduced_pairing
+          (M.G1.of_affine (Double.map (Inner_curve.to_affine_exn p) ~f:unconv))
+          (M.G2.of_affine (unconv23 (G2.Unchecked.to_affine_exn q)))
+        |> Double.map
+             ~f:(Triple.map ~f:(Fn.compose Field.project M.Fq.to_bits))
+        : Fqk.Unchecked.t ) )
     (Inner_curve.random (), G2.Unchecked.random ())
