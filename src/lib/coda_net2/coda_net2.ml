@@ -753,7 +753,8 @@ let handle_protocol net ~on_handler_error ~protocol f =
   let ph : Protocol_handler.t =
     {net; closed= false; on_handler_error; f; protocol_name= protocol}
   in
-  (* TODO: check if protocol is already handled *)
+  if Hashtbl.find net.protocol_handlers protocol |> Option.is_none then
+    Deferred.Or_error.errorf "already handling protocol %s" protocol else
   match%map
     Helper.do_rpc net (module Helper.Rpcs.Add_stream_handler) {protocol}
     |> Deferred.Or_error.ok_exn
