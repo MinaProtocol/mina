@@ -92,7 +92,7 @@ module Make (Inputs : Inputs_intf) :
     in
     let scan_state = Staged_ledger.scan_state staged_ledger in
     let merkle_root =
-      Staged_ledger.ledger staged_ledger |> Ledger.merkle_root
+      Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
     in
     let pending_coinbases =
       Staged_ledger.pending_coinbase_collection staged_ledger
@@ -107,10 +107,9 @@ module Make (Inputs : Inputs_intf) :
              (Transition_frontier.find_in_root_history frontier hash)
              ~f:Fn.const
            |> Option.map ~f:(fun breadcrumb ->
-                  Transition_frontier.Breadcrumb.transition_with_hash
+                  Transition_frontier.Breadcrumb.validated_transition
                     breadcrumb
-                  |> With_hash.data
-                  |> External_transition.Validated.forget_validation ) )
+                  |> External_transition.Validation.forget_validation ) )
 
   module Root = struct
     let prove ~logger ~frontier seen_consensus_state =

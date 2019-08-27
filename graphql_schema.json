@@ -71,6 +71,132 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "SetSnarkWorkFee",
+          "description": null,
+          "fields": [
+            {
+              "name": "fee",
+              "description": "Fee to get rewarded for producing snark work",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "fee",
+              "description": "Fee to get rewarded for producing snark work",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "SetSnarkWorkFeePayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "lastFee",
+              "description": "Returns the last fee set to do snark work",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "SetSnarkWorkerInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "wallet",
+              "description": "Public key you wish to start snark-working on; null to stop doing any snark work",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "wallet",
+              "description": "Public key you wish to start snark-working on; null to stop doing any snark work",
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "SetSnarkWorkerPayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "lastSnarkWorker",
+              "description": "Returns the last public key that was designated for snark work",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "SetStakingInput",
           "description": null,
           "fields": [
@@ -236,7 +362,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "AddPaymentReceipt",
+          "name": "AddPaymentReceiptPayload",
           "description": null,
           "fields": [
             {
@@ -878,7 +1004,7 @@
               ],
               "type": {
                 "kind": "OBJECT",
-                "name": "AddPaymentReceipt",
+                "name": "AddPaymentReceiptPayload",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -909,6 +1035,68 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "SetStakingPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setSnarkWorker",
+              "description": "Set key you wish to snark work with or disable snark working",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "SetSnarkWorkerInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SetSnarkWorkerPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setSnarkWorkFee",
+              "description": "Set fee that you will like to receive for doing snark work",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "SetSnarkWorkFee",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SetSnarkWorkFeePayload",
                   "ofType": null
                 }
               },
@@ -1049,6 +1237,73 @@
                 "kind": "SCALAR",
                 "name": "String",
                 "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "SnarkJobs",
+          "description": "Snark works purchased",
+          "fields": [
+            {
+              "name": "prover",
+              "description": "Public key of the prover",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "fee",
+              "description": "Amount the prover is paid for the snark work",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "workIds",
+              "description": "Unique identifier for the snark work purchased",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -1496,6 +1751,30 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "snarkJobs",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "SnarkJobs",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -1682,6 +1961,16 @@
         },
         {
           "kind": "SCALAR",
+          "name": "Boolean",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "UInt64",
           "description": "String representing a uint64 number in base 10",
           "fields": null,
@@ -1730,6 +2019,16 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "PublicKey",
+          "description": "Base58Check-encoded public key string",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -2218,7 +2517,7 @@
               "deprecationReason": null
             },
             {
-              "name": "getTransitionChainWitness",
+              "name": "getTransitionChainProof",
               "description": null,
               "args": [],
               "type": {
@@ -2339,26 +2638,6 @@
           ],
           "inputFields": null,
           "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "PublicKey",
-          "description": "Base58Check-encoded public key string",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "Boolean",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -2540,7 +2819,19 @@
               "deprecationReason": null
             },
             {
-              "name": "runSnarkWorker",
+              "name": "snarkWorker",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snarkWorkFee",
               "description": null,
               "args": [],
               "type": {
@@ -2548,7 +2839,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Boolean",
+                  "name": "Int",
                   "ofType": null
                 }
               },
@@ -2586,7 +2877,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "SCALAR",
-                      "name": "PublicKey",
+                      "name": "String",
                       "ofType": null
                     }
                   }
@@ -2874,13 +3165,9 @@
                   "name": "filter",
                   "description": null,
                   "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "BlockFilterInput",
-                      "ofType": null
-                    }
+                    "kind": "INPUT_OBJECT",
+                    "name": "BlockFilterInput",
+                    "ofType": null
                   },
                   "defaultValue": null
                 }

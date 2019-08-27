@@ -8,9 +8,15 @@ Join the [Coda server on Discord](http://bit.ly/CodaDiscord) to connect with the
 
 The goal of Testnet Points[\*](#disclaimer) is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.
 
+### Leaderboard
+
+You can track the Testnet Points[\*](#disclaimer) and current leaders in [the public leaderboard](/testnet.html).
+
+### Challenges
+
 The current challenges are:
 
-**Challenge #1: Connect to Testnet** - 1000 pts for anyone who sends a transaction to the [echo service](/docs/my-first-transaction/#make-a-payment).
+**Challenge #1 (on-going): Connect to Testnet** - 1000 pts for anyone who sends a transaction to the [echo service](/docs/my-first-transaction/#make-a-payment).
 
 BONUS: An additional 2000 pts to the first person to complete the challenge, and an additional 1000 points to the second person to complete the challenge.
   
@@ -44,23 +50,23 @@ Points will only be awarded for new issues [reported on Github](https://github.c
 
 Points will only be awarded for pull requests accepted [on Github](https://github.com/codaprotocol/coda/pulls).
 
-**Challenge #8: 'Bonanza'** - Send as many transactions as you can! We’ll link the public key to a discord account by seeing what you use to ask the faucet for funds (we’ll only use the first public key that you requested tokens with).
+**Challenge #8 (expired): 'Bonanza'** - Send as many transactions as you can! We’ll link the public key to a discord account by seeing what you use to ask the faucet for funds (we’ll only use the first public key that you requested tokens with).
 
 1000 pts - sent at least 20 transactions
 
 BONUS: 1st place +3000, 2nd place +2000, 3rd place +1000 pts respectively for most transactions sent over the week.
 
-**Challenge #9: ‘Block Party’**:
+**Challenge #9 (expired): ‘Block Party’**:
 
 This is one of our biggest points challenge yet, with up to 4000 points\* on the line for the winner. In order to complete this challenge, you'll need to stake coda to be an active block producer. Block producers who generate more than 14 blocks this week will successfully complete this challenge - 1000 pts*. 
 
 BONUS for those who produce the most blocks: 1st place - +3000 pts\*, 2nd place - +2000 pts\*, 3rd place - +1000 pts\*.
 
-**Challenge #10: ‘Bookworm’**
+**Challenge #10 (on-going): ‘Bookworm’**
 
 Reach Trust Level 1 'Basic' on Coda Protocol's forum. We believe reading is the most fundamental and healthy action in any community. If you are willing to spend a little time reading, you will quickly be promoted to the first trust level. Sign up on our [forum](https://forums.codaprotocol.com/) , enter at least 5 topics, read at least 30 posts, and spend a total of 10 minutes reading posts to obtain Trust Level 1 'Basic' and 100 Testnet Points*.
 
-**Challenge #11: ‘Don't Break the Chain!’**
+**Challenge #11 (on-going): ‘Don't Break the Chain!’**
 
 Earn extra bonus points for every uninterrupted weeks that you participated in the testnet and earned points*.
 
@@ -68,13 +74,21 @@ Earn extra bonus points for every uninterrupted weeks that you participated in t
 - If you earned points this week and the previous 2 weeks - 200 pts\*
 - If you earned points this week and the previous 3 weeks  - 300 pts\*
 
-## Leaderboard
+**Challenge #12: "CLI FYI"**
 
-You can track the Testnet Points[\*](#disclaimer) and current leaders in [the public leaderboard](http://bit.ly/TestnetBetaLeaderboard).
+Submit a product improvement or feature you’d like to see in the Coda command line interface (CLI). Post a new thread on the Discourse [forums](http://forums.codaprotocol.com) in the “Product” category and add this to the title: "[CLI Feature]". The community can vote on it by “hearting” the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*.
 
-<span id="disclaimer">
+Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts*!
+
+**Challenge #13: "My two codas"** - Earn 400 Testnet Points* for giving your feedback by filling out this [survey](http://bit.ly/CommunityRetro).
+
+**Challenge #14: "Leonardo da Coda"**
+
+Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the [forum](https://forums.codaprotocol.com/t/community-art-contest-gifs/109). You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by “hearting” your post, so do not forget to "heart" your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.
+
+### Disclaimer
+
 \*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
-</span>
 
 ## Next
 
