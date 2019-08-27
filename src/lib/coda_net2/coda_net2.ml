@@ -1040,7 +1040,6 @@ let%test_module "coda network tests" =
         let open Deferred.Let_syntax in
         let%bind a, b, shutdown = setup_two_nodes "test_stream" in
         let a_peerid = Keypair.to_peerid (me a |> Option.value_exn) in
-        let%bind () = after (sec 0.5) in
         let handler_finished = ref false in
         let%bind echo_handler =
           handle_protocol a ~on_handler_error:`Raise ~protocol:"echo"
@@ -1080,7 +1079,6 @@ let%test_module "coda network tests" =
         let%bind a, b, shutdown = setup_two_nodes "test_pubsub" in
         let should_forward_message ~sender:_ ~data:_ = return true in
         (* Give the libp2p helpers time to see each other. *)
-        let%bind () = after (sec 0.5) in
         let%bind a_sub =
           Pubsub.subscribe a "test" ~should_forward_message
           |> Deferred.Or_error.ok_exn
