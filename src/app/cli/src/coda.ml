@@ -151,7 +151,7 @@ let daemon logger =
            "true|false Limit the number of concurrent connections per IP \
             address (default: true)"
          (optional bool)
-     (*TODO: This is being added to log all the snark works received for the 
+     (*TODO: This is being added to log all the snark works received for the
      beta-testnet challenge. We might want to remove this later?*)
      and log_received_snark_pool_diff =
        flag "log-snark-work-gossip"
@@ -313,15 +313,16 @@ let daemon logger =
              make_version ~wipe_dir:false
        in
        don't_wait_for
-         (let rec loop () =
+         (let bytes_per_word = Sys.word_size / 8 in
+          let rec loop () =
             let stat = Gc.stat () in
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               "OCaml memory statistics"
               ~metadata:
-                [ ("heap_size", `Int (stat.heap_words * Sys.word_size))
+                [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
                 ; ("heap_chunks", `Int stat.heap_chunks)
-                ; ("max_heap_size", `Int (stat.top_heap_words * Sys.word_size))
-                ; ("live_size", `Int (stat.live_words * Sys.word_size))
+                ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
+                ; ("live_size", `Int (stat.live_words * bytes_per_word))
                 ; ("live_blocks", `Int stat.live_blocks) ] ;
             let%bind () = after @@ Time.Span.of_min 10. in
             loop ()
