@@ -2147,6 +2147,18 @@
               "deprecationReason": null
             },
             {
+              "name": "inferredNonce",
+              "description": "Like the `nonce` field, except it includes the scheduled transactions (transactions not yet included in a block) (stringified uint32)",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "receiptChainHash",
               "description": "Top hash of the receipt chain merkle-list",
               "args": [],
@@ -2184,7 +2196,7 @@
             },
             {
               "name": "stakingActive",
-              "description": "True if you are actively staking with this account - this may not yet have been updated if the staking key was changed recently",
+              "description": "True if you are actively staking with this account on the current daemon - this may not yet have been updated if the staking key was changed recently",
               "args": [],
               "type": {
                 "kind": "NON_NULL",

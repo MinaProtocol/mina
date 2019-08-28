@@ -473,6 +473,24 @@ module Types = struct
               ~resolve:(fun _ {account; _} ->
                 Option.map ~f:Account.Nonce.to_string
                   account.Account.Poly.nonce )
+          ; field "inferredNonce" ~typ:string
+              ~doc:
+                "Like the `nonce` field, except it includes the scheduled \
+                 transactions (transactions not yet included in a block) \
+                 (stringified uint32)"
+              ~args:Arg.[]
+              ~resolve:(fun {ctx= coda; _} {account; _} ->
+                let open Option.Let_syntax in
+                let%bind public_key = account.Account.Poly.public_key in
+                match
+                  Coda_commands
+                  .get_inferred_nonce_from_transaction_pool_and_ledger coda
+                    public_key
+                with
+                | `Active (Some nonce) ->
+                    Some (Account.Nonce.to_string nonce)
+                | `Active None | `Bootstrapping ->
+                    None )
           ; field "receiptChainHash" ~typ:string
               ~doc:"Top hash of the receipt chain merkle-list"
               ~args:Arg.[]
@@ -495,9 +513,9 @@ module Types = struct
                   account.Account.Poly.voting_for )
           ; field "stakingActive" ~typ:(non_null bool)
               ~doc:
-                "True if you are actively staking with this account - this \
-                 may not yet have been updated if the staking key was changed \
-                 recently"
+                "True if you are actively staking with this account on the \
+                 current daemon - this may not yet have been updated if the \
+                 staking key was changed recently"
               ~args:Arg.[]
               ~resolve:(fun _ {is_actively_staking; _} -> is_actively_staking)
           ; field "privateKeyPath" ~typ:(non_null string)
