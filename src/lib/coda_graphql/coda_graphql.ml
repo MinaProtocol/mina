@@ -332,8 +332,8 @@ module Types = struct
             ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
         ] )
 
-  let snark_jobs =
-    obj "SnarkJobs" ~doc:"Snark works purchased" ~fields:(fun _ ->
+  let completed_work =
+    obj "CompletedWork" ~doc:"Completed snark works" ~fields:(fun _ ->
         [ field "prover"
             ~args:Arg.[]
             ~doc:"Public key of the prover" ~typ:(non_null public_key)
@@ -406,7 +406,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.transactions)
         ; field "snarkJobs"
-            ~typ:(non_null @@ list @@ non_null snark_jobs)
+            ~typ:(non_null @@ list @@ non_null completed_work)
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.snark_jobs) ] )
 
@@ -1354,7 +1354,9 @@ module Queries = struct
 
   let pooled_user_commands =
     field "pooledUserCommands"
-      ~doc:"Retrieve all the user commands sent by a public key"
+      ~doc:
+        "Retrieve all the user commands submitted by the current daemon that \
+         are pending inclusion"
       ~typ:(non_null @@ list @@ non_null Types.user_command)
       ~args:
         Arg.
@@ -1473,6 +1475,15 @@ module Queries = struct
         List.map (Coda_lib.initial_peers coda)
           ~f:(fun {Host_and_port.host; port} -> sprintf !"%s:%i" host port) )
 
+  let snark_pool =
+    field "snarkPool"
+      ~doc:"List of completed snark works that have the lowest fee so far"
+      ~args:Arg.[]
+      ~typ:(non_null @@ list @@ non_null Types.completed_work)
+      ~resolve:(fun {ctx= coda; _} () ->
+        Coda_lib.snark_pool coda |> Network_pool.Snark_pool.resource_pool
+        |> Network_pool.Snark_pool.Resource_pool.all_completed_work )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -1483,7 +1494,10 @@ module Queries = struct
     ; blocks
     ; initial_peers
     ; pooled_user_commands
-    ; transaction_status ]
+    ; transaction_status
+    ; trust_status
+    ; trust_status_all
+    ; snark_pool ]
 end
 
 let schema =

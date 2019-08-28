@@ -93,6 +93,8 @@ module type Snark_resource_pool_intf = sig
 
   type transition_frontier
 
+  type work_info
+
   include
     Resource_pool_base_intf
     with type transition_frontier := transition_frontier
@@ -109,6 +111,8 @@ module type Snark_resource_pool_intf = sig
   val request_proof : t -> work -> ledger_proof list Priced_proof.t option
 
   val snark_pool_json : t -> Yojson.Safe.json
+
+  val all_completed_work : t -> work_info list
 end
 
 (** A [Snark_pool_diff_intf] is the resource pool diff for
@@ -124,13 +128,13 @@ module type Snark_pool_diff_intf = sig
     module V1 : sig
       type t =
         | Add_solved_work of work * ledger_proof list Priced_proof.Stable.V1.t
-      [@@deriving sexp, yojson, bin_io, version]
+      [@@deriving sexp, to_yojson, bin_io, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   val summary : t -> string
 

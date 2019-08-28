@@ -36,9 +36,9 @@ let sendEcho = (echoKey, fee, {from: userKey, amount}) =>
       ~amount=Int64.sub(amount, fee),
       ~fee,
     )
-    |> Wonka.forEach((. response) =>
+    |> Wonka.forEach((. {ReasonUrql.Client.Types.response}) =>
          switch (response) {
-         | Graphql.Data(data) =>
+         | Data(data) =>
            let payment = data##sendPayment##payment;
            log(`Info, "Sent (to %s): %s", payment##to_, payment##id);
          | Error(e) =>
@@ -48,7 +48,7 @@ let sendEcho = (echoKey, fee, {from: userKey, amount}) =>
              Int64.to_string(amount),
              echoKey,
              userKey,
-             e,
+             Js.String.make(e),
            )
          | NotFound =>
            // Shouldn't happen
@@ -65,9 +65,9 @@ let sendEcho = (echoKey, fee, {from: userKey, amount}) =>
   };
 
 let checkAlreadyProcessed =
-  (. response) => {
+  (. {ReasonUrql.Client.Types.response}) => {
     switch (response) {
-    | Graphql.Data(data) =>
+    | Data(data) =>
       let stateHash = data##newBlock##stateHash;
       if (BlockSet.has(processedBlocks, stateHash)) {
         log(`Info, "Already processed block: %s", stateHash);
@@ -83,20 +83,28 @@ let checkAlreadyProcessed =
 
 let start = (echoKey, fee) => {
   log(`Info, "Starting echo on %s", echoKey);
-  Graphql.executeSubscription(
-    ListenBlocks.make(~publicKey=Graphql.Encoders.publicKey(echoKey), ()),
+  ReasonUrql.Client.executeSubscription(
+    ~client=Graphql.client,
+    ~request=
+      ListenBlocks.make(~publicKey=Graphql.Encoders.publicKey(echoKey), ()),
+    (),
   )
   |> Wonka.filter(checkAlreadyProcessed)
-  |> Wonka.forEach((. newBlock) =>
-       switch (newBlock) {
-       | Graphql.Data(d) =>
+  |> Wonka.forEach((. {ReasonUrql.Client.Types.response}) =>
+       switch (response) {
+       | Data(d) =>
          d##newBlock##transactions##userCommands
          |> Array.to_list
          |> List.filter(({to_, isDelegation}) =>
               to_ == echoKey && !isDelegation
             )
          |> List.iter(sendEcho(echoKey, fee))
-       | Error(e) => log(`Error, "Error retrieving new block. Message: %s", e)
+       | Error(e) =>
+         log(
+           `Error,
+           "Error retrieving new block. Message: %s",
+           Js.String.make(e),
+         )
        | NotFound =>
          // Shouldn't happen
          log(`Error, "Got 'NotFound' while listening to blocks")
