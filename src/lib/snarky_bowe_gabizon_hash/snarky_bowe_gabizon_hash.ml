@@ -40,14 +40,16 @@ struct
     make_checked (fun () ->
         Snarky_group_map.Checked.to_group (module M) ~params x )
 
+  let pad_to_triples x = Fold.group3 ~default:Boolean.false_ (Fold.of_list x)
+
+  (* See src/lib/bowe_gabizon_hash/bowe_gabizon_hash.ml for the "unchecked" version of this function. *)
   let hash ?message ~a ~b ~c ~delta_prime =
     let open Impl in
     let open Let_syntax in
     make_checked (fun () ->
-        g1_to_bits a @ g2_to_bits b @ g1_to_bits c @ g2_to_bits delta_prime
-        @ Option.value_map message ~default:[] ~f:Array.to_list
-        |> Fold.of_list
-        |> Fold.group3 ~default:Boolean.false_ )
+        pad_to_triples
+          ( g1_to_bits a @ g2_to_bits b @ g1_to_bits c @ g2_to_bits delta_prime
+          @ Option.value_map message ~default:[] ~f:Array.to_list ) )
     >>= pedersen >>= random_oracle >>= group_map
 end
 
