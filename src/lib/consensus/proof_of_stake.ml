@@ -639,34 +639,31 @@ module Data = struct
     end
 
     module Message = struct
-      type ('epoch, 'slot, 'epoch_seed, 'delegator) t =
-        {epoch: 'epoch; slot: 'slot; seed: 'epoch_seed; delegator: 'delegator}
+      type ('global_slot, 'epoch_seed, 'delegator) t =
+        {global_slot: 'global_slot; seed: 'epoch_seed; delegator: 'delegator}
 
-      type value =
-        (Epoch.t, Epoch.Slot.t, Epoch_seed.t, Coda_base.Account.Index.t) t
+      type value = (Global_slot.t, Epoch_seed.t, Coda_base.Account.Index.t) t
 
       type var =
-        ( Epoch.Unpacked.var
-        , Epoch.Slot.Unpacked.var
+        ( Global_slot.Unpacked.var
         , Epoch_seed.var
         , Coda_base.Account.Index.Unpacked.var )
         t
 
-      let to_hlist {epoch; slot; seed; delegator} =
-        Coda_base.H_list.[epoch; slot; seed; delegator]
+      let to_hlist {global_slot; seed; delegator} =
+        Coda_base.H_list.[global_slot; seed; delegator]
 
       let of_hlist :
              ( unit
-             , 'epoch -> 'slot -> 'epoch_seed -> 'del -> unit )
+             , 'global_slot -> 'epoch_seed -> 'del -> unit )
              Coda_base.H_list.t
-          -> ('epoch, 'slot, 'epoch_seed, 'del) t =
-       fun Coda_base.H_list.[epoch; slot; seed; delegator] ->
-        {epoch; slot; seed; delegator}
+          -> ('global_slot, 'epoch_seed, 'del) t =
+       fun Coda_base.H_list.[global_slot; seed; delegator] ->
+        {global_slot; seed; delegator}
 
       let data_spec =
         let open Snark_params.Tick.Data_spec in
-        [ Epoch.Unpacked.typ
-        ; Epoch.Slot.Unpacked.typ
+        [ Global_slot.Unpacked.typ
         ; Epoch_seed.typ
         ; Coda_base.Account.Index.Unpacked.typ ]
 
@@ -675,9 +672,10 @@ module Data = struct
           ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
 
-      let fold {epoch; slot; seed; delegator} =
+      let fold {global_slot; seed; delegator} =
         let open Fold in
-        Epoch.fold epoch +> Epoch.Slot.fold slot +> Epoch_seed.fold seed
+        Global_slot.fold global_slot
+        +> Epoch_seed.fold seed
         +> Coda_base.Account.Index.fold delegator
 
       let hash_to_group msg =
@@ -688,11 +686,10 @@ module Data = struct
         msg_hash_state.acc
 
       module Checked = struct
-        let var_to_triples {epoch; slot; seed; delegator} =
+        let var_to_triples {global_slot; seed; delegator} =
           let open Snark_params.Tick.Checked.Let_syntax in
           let%map seed_triples = Epoch_seed.var_to_triples seed in
-          Epoch.Unpacked.var_to_triples epoch
-          @ Epoch.Slot.Unpacked.var_to_triples slot
+          Global_slot.Unpacked.var_to_triples global_slot
           @ seed_triples
           @ Coda_base.Account.Index.Unpacked.var_to_triples delegator
 
@@ -706,11 +703,10 @@ module Data = struct
 
       let gen =
         let open Quickcheck.Let_syntax in
-        let%map epoch = Epoch.gen
-        and slot = Epoch.Slot.gen
+        let%map global_slot = Global_slot.gen
         and seed = Epoch_seed.gen
         and delegator = Coda_base.Account.Index.gen in
-        {epoch; slot; seed; delegator}
+        {global_slot; seed; delegator}
     end
 
     module Output = struct
@@ -919,8 +915,8 @@ module Data = struct
       (evaluation, account.balance)
 
     module Checked = struct
-      let%snarkydef check shifted ~(epoch_ledger : Epoch_ledger.var) ~epoch
-          ~slot ~seed =
+      let%snarkydef check shifted ~(epoch_ledger : Epoch_ledger.var)
+          ~global_slot ~seed =
         let open Snark_params.Tick in
         let%bind winner_addr =
           request_witness Coda_base.Account.Index.Unpacked.typ
@@ -928,7 +924,7 @@ module Data = struct
         in
         let%bind result, my_stake =
           get_vrf_evaluation shifted ~ledger:epoch_ledger.hash
-            ~message:{Message.epoch; slot; seed; delegator= winner_addr}
+            ~message:{Message.global_slot; seed; delegator= winner_addr}
         in
         let%map satisifed =
           Threshold.Checked.is_satisfied ~my_stake
@@ -985,29 +981,26 @@ module Data = struct
       let vrf_output =
         let _, sk = keypairs.(0) in
         eval ~private_key:sk
-          { Message.epoch= Epoch.zero
-          ; slot= Epoch.Slot.zero
+          { Message.global_slot= Global_slot.zero
           ; seed= Epoch_seed.initial
           ; delegator= 0 }
     end
 
-    let check ~epoch ~slot ~seed ~private_key ~public_key
+    let check ~global_slot ~seed ~private_key ~public_key
         ~public_key_compressed ~total_stake ~logger ~epoch_snapshot =
       let open Message in
       let open Local_state in
       let open Snapshot in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Checking VRF evaluations at epoch: $epoch, slot: $slot"
-        ~metadata:
-          [ ("epoch", `Int (Epoch.to_int epoch))
-          ; ("slot", `Int (Epoch.Slot.to_int slot)) ] ;
+        "Checking VRF evaluations at global slot: $global_slot"
+        ~metadata:[("global_slot", `Int (Global_slot.to_int global_slot))] ;
       with_return (fun {return} ->
           Hashtbl.iteri
             ( Snapshot.delegators epoch_snapshot public_key_compressed
             |> Option.value ~default:(Core_kernel.Int.Table.create ()) )
             ~f:(fun ~key:delegator ~data:balance ->
               let vrf_result =
-                T.eval ~private_key {epoch; slot; seed; delegator}
+                T.eval ~private_key {global_slot; seed; delegator}
               in
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                 "VRF result for delegator: $delegator, balance: $balance, \
@@ -1036,7 +1029,8 @@ module Data = struct
                          ; public_key
                          ; delegator
                          ; ledger= epoch_snapshot.ledger }
-                     ; epoch_and_slot= (epoch, slot)
+                     ; epoch_and_slot=
+                         Global_slot.to_epoch_and_slot global_slot
                      ; vrf_result }) ) ;
           None )
   end
@@ -1951,7 +1945,7 @@ module Data = struct
         let%bind is_genesis = is_genesis next_global_slot in
         Boolean.Assert.any [global_slot_increased; is_genesis]
       in
-      let%bind next_epoch, next_slot =
+      let%bind next_epoch, _ =
         make_checked (fun () ->
             Global_slot.Checked.to_epoch_and_slot next_global_slot )
       and prev_epoch, prev_slot =
@@ -1971,8 +1965,8 @@ module Data = struct
         let%bind (module M) = Inner_curve.Checked.Shifted.create () in
         Vrf.Checked.check
           (module M)
-          ~epoch_ledger:staking_epoch_data.ledger ~epoch:next_epoch
-          ~slot:next_slot ~seed:staking_epoch_data.seed
+          ~epoch_ledger:staking_epoch_data.ledger ~global_slot:next_global_slot
+          ~seed:staking_epoch_data.seed
       in
       let%bind new_total_currency =
         Currency.Amount.Checked.add previous_state.total_currency
@@ -1989,8 +1983,8 @@ module Data = struct
       in
       let%bind has_ancestor_in_same_checkpoint_window =
         same_checkpoint_window
-          ~prev:(Global_slot.Checked.create ~epoch:prev_epoch ~slot:prev_slot)
-          ~next:(Global_slot.Checked.create ~epoch:next_epoch ~slot:next_slot)
+          ~prev:(Global_slot.pack_var prev_global_slot)
+          ~next:(Global_slot.pack_var next_global_slot)
       in
       let%bind in_seed_update_range =
         Epoch.Slot.in_seed_update_range_var prev_slot
@@ -2635,7 +2629,9 @@ module Hooks = struct
             then Continue_or_stop.Continue ()
             else
               match
-                Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~epoch_snapshot
+                Vrf.check
+                  ~global_slot:(Global_slot.of_epoch_and_slot (epoch, slot))
+                  ~seed:epoch_data.seed ~epoch_snapshot
                   ~private_key:keypair.private_key
                   ~public_key:keypair.public_key ~public_key_compressed
                   ~total_stake ~logger
@@ -2961,7 +2957,7 @@ let%test_module "Proof of stake tests" =
       in
       let proposer_vrf_result =
         let seed = previous_consensus_state.next_epoch_data.seed in
-        Vrf.eval ~private_key {epoch; slot; seed; delegator}
+        Vrf.eval ~private_key {global_slot; seed; delegator}
       in
       let next_consensus_state =
         update ~previous_consensus_state ~consensus_transition
