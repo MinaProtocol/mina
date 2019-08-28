@@ -291,7 +291,7 @@ jobs:
                     # Make sure our nix user can write to libp2p_helper dir
                     chmod -R 777 /home/opam/project/src/app/libp2p_helper
                     # Do the build
-                    sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2_helper && nix-build default.nix'
+                    sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd /home/opam/project/src/app/libp2_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
@@ -324,7 +324,7 @@ jobs:
                     # Make sure our nix user can write to libp2p_helper dir
                     chmod -R 777 /home/opam/project/src/app/libp2p_helper
                     # Do the build
-                    sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2_helper && nix-build default.nix'
+                    sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd /home/opam/project/src/app/libp2_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
