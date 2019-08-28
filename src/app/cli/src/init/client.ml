@@ -599,7 +599,7 @@ let cancel_transaction =
              in
              let cancel_fee =
                let diff =
-                 Unsigned.UInt64.of_int (inferred_nonce - cancelled_nonce)
+                 Unsigned.UInt64.of_int (inferred_nonce - cancelled_nonce + 1)
                in
                let fee =
                  Currency.Fee.to_uint64 (User_command.fee user_command)
