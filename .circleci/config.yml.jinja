@@ -295,13 +295,18 @@ jobs:
             - run:
                 name: Install nix and cachix
                 command: |
+                    # Make a nix user
                     sudo addgroup --system nixbld && sudo adduser --home /home/nix --disabled-password --gecos "" --shell /bin/bash nix && sudo adduser nix nixbld && sudo mkdir -m 0755 /nix && sudo chown nix /nix && sudo mkdir -p /etc/nix && sudo bash -c 'echo "sandbox = false" > /etc/nix/nix.conf'
+                    # Install nix and cachix with that user
                     sudo -H -u nix bash -c 'cd /home/nix && touch ~/.bash_profile && (curl https://nixos.org/nix/install | sh) && cd /home/nix && . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install'
 
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
-                    sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && sudo nix-build default.nix'
+                    # Make sure our nix user can write to libp2p_helper dir
+                    chmod -R 777 /home/opam/project/src/app/libp2p_helper
+                    # Do the build
+                    sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
