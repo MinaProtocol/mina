@@ -703,22 +703,18 @@ let snark_pool_list =
   let open Command.Param in
   Command.async ~summary:"List of snark works in the snark pool in JSON format"
     (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
-         let to_json (work_ids : int list) fee prover : Yojson.Safe.json =
-           `Assoc
-             [ ("work_ids", `List (List.map work_ids ~f:(fun i -> `Int i)))
-             ; ("fee", `Int (Unsigned.UInt64.to_int fee))
-             ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
-             ]
-         in
          Deferred.map
            (Graphql_client.query (Graphql_client.Snark_pool.make ()) port)
            ~f:(fun response ->
              let lst =
-               `List
+               [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
                  (Array.to_list
                     (Array.map
                        ~f:(fun w ->
-                         to_json (Array.to_list w#work_ids) w#fee w#prover )
+                         { Cli_lib.Graphql_types.Completed_works.Work.work_ids=
+                             Array.to_list w#work_ids
+                         ; fee= Currency.Fee.of_uint64 w#fee
+                         ; prover= w#prover } )
                        response#snarkPool))
              in
              print_string (Yojson.Safe.to_string lst) ) ))
