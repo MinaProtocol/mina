@@ -146,10 +146,7 @@ module Styles = {
         padding2(~v=`rem(0.25), ~h=`rem(3.)),
         fontWeight(`semiBold),
         lineHeight(`rem(2.5)),
-        hover([
-          backgroundColor(Style.Colors.hyperlinkHover),
-          color(white),
-        ]),
+        hover([backgroundColor(Style.Colors.hyperlinkHover), color(white)]),
       ]),
     ]);
 
@@ -204,13 +201,14 @@ module Section = {
       <div className=Styles.gradientSection> children </div>
       <label id=labelName className=Styles.expandButton htmlFor=checkboxName>
         {React.string("Expand " ++ name)}
-        <div className=Css.(
-          style([
-            position(`relative),
-            bottom(`rem(2.6)),
-            left(`rem(9.6)),
-          ])
-        )>
+        <div
+          className=Css.(
+            style([
+              position(`relative),
+              bottom(`rem(2.6)),
+              left(`rem(9.6)),
+            ])
+          )>
           {React.string({js| ↓|js})}
         </div>
       </label>
