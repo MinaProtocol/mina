@@ -296,18 +296,18 @@ module Make (Inputs : Inputs_intf) = struct
     let transition_reader_ref = ref transition_reader in
     let transition_writer_ref = ref transition_writer in
     wait_till_genesis ~logger ~time_controller ;
+    let ( valid_protocol_state_transition_reader
+        , valid_protocol_state_transition_writer ) =
+      create_bufferred_pipe ~name:"valid transitions" ()
+    in
+    Initial_validator.run ~logger ~trust_system ~verifier
+      ~transition_reader:network_transition_reader
+      ~valid_transition_writer:valid_protocol_state_transition_writer ;
     upon
       (initialize ~logger ~network ~verifier ~trust_system ~frontier
          ~time_controller ~ledger_db ~frontier_w ~proposer_transition_reader
          ~clear_reader ~verified_transition_writer ~transition_reader_ref
          ~transition_writer_ref) (fun () ->
-        let ( valid_protocol_state_transition_reader
-            , valid_protocol_state_transition_writer ) =
-          create_bufferred_pipe ~name:"valid transitions" ()
-        in
-        Initial_validator.run ~logger ~trust_system ~verifier
-          ~transition_reader:network_transition_reader
-          ~valid_transition_writer:valid_protocol_state_transition_writer ;
         let valid_protocol_state_transition_reader, valid_transition_reader =
           Strict_pipe.Reader.Fork.two valid_protocol_state_transition_reader
         in
