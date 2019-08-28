@@ -269,21 +269,59 @@ module Helper = struct
           (Fn.compose (Result.map_error ~f:Error.of_string) M.output_of_yojson) )
     else Deferred.Or_error.error_string "helper process already exited"
 
+  let stream_state_invariant stream =
+    let us_closed = Pipe.is_closed stream.outgoing_w in
+    let them_closed = Pipe.is_closed stream.incoming_w in
+    match stream.state with
+    | FullyOpen ->
+        (not us_closed) && not them_closed
+    | HalfClosed `Us ->
+        us_closed && not them_closed
+    | HalfClosed `Them ->
+        (not us_closed) && them_closed
+    | FullyClosed ->
+        us_closed && them_closed
+
   (** Advance the stream_state automata, closing pipes as necessary. *)
-  let update_stream_state t stream = function
-  | `Us ->
-    (* Our write pipe is now closed. Notify helper. *)
-     match%map do_rpc net (module Rpcs.Close_stream) {stream_idx= idx} with
-     | Ok "closeStream success" ->
-         ()
-     | Ok v ->
-         failwithf "helper broke RPC protocol: closeStream got %s" v ()
-     | Error e ->
-         Error.raise e
-  | `Them -> 
-    (* Helper notified us that the Go side closed its write pipe. *)
-    Pipe.close stream.incoming_w ;
-    Deferred.return ()
+  let advance_stream_state net (stream : stream) who_closed =
+    let%map () =
+      match who_closed with
+      | `Us -> (
+          match%map
+            do_rpc net (module Rpcs.Close_stream) {stream_idx= stream.idx}
+          with
+          | Ok "closeStream success" ->
+              ()
+          | Ok v ->
+              failwithf "helper broke RPC protocol: closeStream got %s" v ()
+          | Error e ->
+              Error.raise e )
+      | `Them ->
+          (* Helper notified us that the Go side closed its write pipe. *)
+          Pipe.close stream.incoming_w ;
+          Deferred.return ()
+    in
+    let double_close () =
+      Logger.fatal net.logger ~module_:__MODULE__ ~location:__LOC__
+        "stream with index $index closed twice by $party"
+        ~metadata:
+          [ ("index", `Int stream.idx)
+          ; ("party", `String (match who_closed with `Us -> "us" | `Them -> "them")) ] ;
+      failwith "stream double closed"
+    in
+    (* replace with [%derive.eq : [`Us|`Them]] when it is supported.*)
+    let us_them_eq a b =
+      match (a, b) with `Us, `Us | `Them, `Them -> true | _, _ -> false
+    in
+    stream.state
+    <- ( match (stream.state, who_closed) with
+       | FullyOpen, _ ->
+           HalfClosed who_closed
+       | HalfClosed other, _ ->
+           if us_them_eq other who_closed then double_close () else FullyClosed
+       | FullyClosed, _ ->
+           double_close () ) ;
+    assert (stream_state_invariant stream)
 
   (** Track a new stream.
 
@@ -296,16 +334,18 @@ module Helper = struct
   let make_stream net idx protocol remote_addr remote_peerid =
     let incoming_r, incoming_w = Pipe.create () in
     let outgoing_r, outgoing_w = Pipe.create () in
-    let stream = { net
-    ; idx
-    ; status= FullyOpen
-    ; remote_addr
-    ; remote_peerid
-    ; protocol
-    ; incoming_r
-    ; incoming_w
-    ; outgoing_r
-    ; outgoing_w } in
+    let stream =
+      { net
+      ; idx
+      ; state= FullyOpen
+      ; remote_addr
+      ; remote_peerid
+      ; protocol
+      ; incoming_r
+      ; incoming_w
+      ; outgoing_r
+      ; outgoing_w }
+    in
     (let%bind () =
        Pipe.iter outgoing_r ~f:(fun msg ->
            match%map
@@ -320,8 +360,9 @@ module Helper = struct
            | Error e ->
                Error.raise e )
      in
-     update_stream_state net stream `Us 
+     advance_stream_state net stream `Us)
     |> don't_wait_for ;
+    stream
 
   (** Parses a normal RPC response and resolves the deferred it answers. *)
   let handle_response t v =
@@ -562,8 +603,9 @@ module Helper = struct
         let%bind m = Stream_read_complete.of_yojson v |> or_error in
         let stream_idx = m.stream_idx in
         match Hashtbl.find t.streams stream_idx with
-        | Some {incoming_w; _} as stream ->
-            update_stream_state t stream `Them ; Ok ()
+        | Some stream ->
+            advance_stream_state t stream `Them |> don't_wait_for;
+            Ok ()
         | None ->
             Or_error.errorf
               "streamReadComplete for stream we don't know about %d" stream_idx
