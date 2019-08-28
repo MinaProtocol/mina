@@ -276,6 +276,19 @@ jobs:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             - run:
+                name: Install nix and cachix
+                command: |
+                    curl https://nixos.org/nix/install | sh
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
+            - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
@@ -291,6 +304,19 @@ jobs:
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
+            - run:
+                name: Install nix and cachix
+                command: |
+                    curl https://nixos.org/nix/install | sh
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
