@@ -563,7 +563,7 @@ let cancel_transaction =
       "Cancel a transaction -- this submits a replacement transaction with a \
        fee larger than the cancelled transaction."
     (Cli_lib.Background_daemon.init ~rest:true
-       Command.Param.(anon @@ ("txn" %: string))
+       Command.Param.(anon @@ ("txn-id" %: string))
        ~f:(fun port serialized_transaction ->
          match User_command.of_base58_check serialized_transaction with
          | Ok user_command ->
@@ -636,7 +636,7 @@ let cancel_transaction =
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
     (Cli_lib.Background_daemon.init
-       Command.Param.(anon @@ ("txn" %: string))
+       Command.Param.(anon @@ ("txn-id" %: string))
        ~f:(fun port serialized_transaction ->
          match User_command.of_base58_check serialized_transaction with
          | Ok user_command ->
