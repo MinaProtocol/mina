@@ -15,6 +15,9 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
 else
     # Determine deb repo to use
     case $GITBRANCH in
+        master)
+            CODENAME='release'
+            ;;
         develop)
             CODENAME='develop'
             ;;
