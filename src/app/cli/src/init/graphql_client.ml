@@ -41,6 +41,8 @@ module Encoders = struct
 
   let uint64 value = `String (Unsigned.UInt64.to_string value)
 
+  let uint32 value = `String (Unsigned.UInt32.to_string value)
+
   let public_key public_key =
     Yojson.Safe.to_basic @@ Public_key.Compressed.to_yojson public_key
 end
@@ -84,9 +86,31 @@ mutation ($wallet: PublicKey) {
 module Set_snark_work_fee =
 [%graphql
 {|
-mutation ($fee: UInt64!  ) {
+mutation ($fee: UInt64!) {
   setSnarkWorkFee(input: {fee: $fee}) {
     lastFee @bsDecoder(fn: "Decoders.uint64")
     }
+}
+|}]
+
+module Cancel_user_command =
+[%graphql
+{|
+mutation ($from: PublicKey, $to_: PublicKey, $fee: UInt64!, $nonce: UInt32) {
+  sendPayment(input: {from: $from, to: $to_, amount: "0", fee: $fee, nonce: $nonce}) {
+    payment {
+      id
+    }
+  }
+}
+|}]
+
+module Get_inferred_nonce =
+[%graphql
+{|
+query nonce($public_key: PublicKey) {
+  wallet(publicKey: $public_key) {
+    inferredNonce
+  }
 }
 |}]
