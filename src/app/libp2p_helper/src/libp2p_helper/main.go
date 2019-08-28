@@ -577,6 +577,7 @@ func main() {
 	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
 	log.SetOutput(os.Stderr)
 	logging.SetAllLoggers(logging2.INFO)
+	helper_log := logging.Logger("helper top-level JSON handling")
 
 	go func() {
 		i := 0
@@ -602,34 +603,35 @@ func main() {
 
 	for lines.Scan() {
 		line := lines.Text()
-		go func() {
-			app.RpcLock.Lock()
-			defer app.RpcLock.Unlock()
-			var raw json.RawMessage
-			env := envelope{
-				Body: &raw,
+		var raw json.RawMessage
+		env := envelope{
+			Body: &raw,
+		}
+		if err := json.Unmarshal([]byte(line), &env); err != nil {
+			log.Print("when unmarshaling the envelope...")
+			log.Fatal(err)
+		}
+		msg := msgHandlers[env.Method]()
+		if err := json.Unmarshal(raw, msg); err != nil {
+			log.Print("when unmarshaling the method invocation...")
+			log.Fatal(err)
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				helper_log.Error("While handling RPC:", line, "\nThe following panic occurred: ", r)
 			}
-			if err := json.Unmarshal([]byte(line), &env); err != nil {
-				log.Print("when unmarshaling the envelope...")
-				log.Fatal(err)
-			}
-			msg := msgHandlers[env.Method]()
-			if err := json.Unmarshal(raw, msg); err != nil {
-				log.Print("when unmarshaling the method invocation...")
-				log.Fatal(err)
-			}
-			res, err := msg.run(app)
+		}()
+		res, err := msg.run(app)
+		if err == nil {
+			res, err := json.Marshal(res)
 			if err == nil {
-				res, err := json.Marshal(res)
-				if err == nil {
-					app.writeMsg(successResult{Seqno: env.Seqno, Success: res})
-				} else {
-					app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
-				}
+				app.writeMsg(successResult{Seqno: env.Seqno, Success: res})
 			} else {
 				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
 			}
-		}()
+		} else {
+			app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
+		}
 	}
 	os.Exit(0)
 }
