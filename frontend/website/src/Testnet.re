@@ -256,8 +256,8 @@ let make = () => {
           </p>
           <p>
             {React.string(
-              "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
-            )}
+               "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
+             )}
           </p>
           <p>
             <h4 className=Styles.sidebarHeader>
@@ -293,18 +293,18 @@ let make = () => {
           </p>
           <p>
             {React.string(
-              "This week's challenge makes snark work the primary objective. Node operators that produce at least one SNARK will get 1000 pts*.",
-            )}
+               "This week's challenge is to earn testnet tokens by performing SNARK work. Node operators that produce at least one SNARK will get 1000 pts*.",
+             )}
           </p>
           <p>
             {React.string(
-              "BONUS: Top 3 node operators who are able to sell the most SNARKs on the snarketplace (meaning your SNARK was not just produced, but also selected by a block producer) will win 3000, 2000, and 1000 pts* respectively. Hint: your SNARKs are more likely to be bought if the fees are lower ;)",
-            )}
+               "BONUS : Top 3 node operators who are able to earn the most tokens with their SNARKs on the snarketplace will win an additional +3000 pts* , +2000 pts* , and +1000 pts* respectively. Hint: your SNARKs are more likely to be bought if the fees are lower, so feel free to experiment with the economics!",
+             )}
           </p>
           <p className=Css.(style([fontStyle(`italic)]))>
             {React.string(
-              "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
-            )}
+               "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
+             )}
           </p>
         </div>
       </div>
