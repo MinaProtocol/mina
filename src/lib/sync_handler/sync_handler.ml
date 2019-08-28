@@ -155,55 +155,6 @@ module Make (Inputs : Inputs_intf) :
       in
       verified_witness
   end
-
-  module Bootstrappable_best_tip = struct
-    let prove ~logger ~should_select_tip ~frontier clients_consensus_state =
-      let open Option.Let_syntax in
-      let%bind best_tip_with_witness =
-        Best_tip_prover.prove ~logger frontier
-      in
-      let%map () =
-        Option.some_if
-          (should_select_tip ~existing:clients_consensus_state
-             ~candidate:
-               (External_transition.consensus_state best_tip_with_witness.data)
-             ~logger:
-               (Logger.extend logger
-                  [ ( "selection_context"
-                    , `String "Bootstrappable_best_tip.prove" ) ]))
-          ()
-      in
-      best_tip_with_witness
-
-    let verify ~logger ~should_select_tip ~verifier existing_state
-        ( {Proof_carrying_data.data= best_tip; proof= _merkle_list, _root} as
-        peer_best_tip ) =
-      let open Deferred.Or_error.Let_syntax in
-      let%bind () =
-        Deferred.return
-          (Result.ok_if_true
-             ~error:
-               (Error.of_string
-                  "Peer's best tip did not cause you to bootstrap")
-             (should_select_tip ~existing:existing_state
-                ~candidate:(External_transition.consensus_state best_tip)
-                ~logger:
-                  (Logger.extend logger
-                     [ ( "selection_context"
-                       , `String "Bootstrappable_best_tip.verify" ) ])))
-      in
-      Best_tip_prover.verify ~verifier peer_best_tip
-
-    module For_tests = struct
-      let prove = prove
-
-      let verify = verify
-    end
-
-    let prove = prove ~should_select_tip:Consensus.Hooks.should_bootstrap
-
-    let verify = verify ~should_select_tip:Consensus.Hooks.should_bootstrap
-  end
 end
 
 include Make (struct

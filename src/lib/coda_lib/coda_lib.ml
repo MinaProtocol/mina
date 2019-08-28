@@ -678,11 +678,6 @@ let create (config : Config.t) =
               ~get_best_tip:
                 (handle_request ~f:(fun ~frontier () ->
                      Best_tip_prover.prove ~logger:config.logger frontier ))
-              ~get_bootstrappable_best_tip:
-                (handle_request
-                   ~f:
-                     (Sync_handler.Bootstrappable_best_tip.prove
-                        ~logger:config.logger))
               ~get_transition_chain_proof:
                 (handle_request ~f:(fun ~frontier hash ->
                      Transition_chain_prover.prove ~frontier hash ))

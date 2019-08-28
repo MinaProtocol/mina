@@ -242,83 +242,13 @@ let%test_module "Bootstrap Controller" =
                       list) ) =
             Bootstrap_controller.For_tests.run ~logger ~trust_system
               ~verifier:() ~network ~frontier:syncing_frontier ~ledger_db
-              ~transition_reader ~should_ask_best_tip:false
+              ~transition_reader
           in
           assert_transitions_increasingly_sorted
             ~root:(Transition_frontier.root new_frontier)
             sorted_external_transitions ;
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
       )
-
-    let%test "sync with one node eagerly" =
-      Backtrace.elide := false ;
-      Printexc.record_backtrace true ;
-      let logger = Logger.create () in
-      let trust_system = Trust_system.null () in
-      let num_breadcrumbs = (2 * max_length) + Consensus.Constants.delta + 2 in
-      Thread_safe.block_on_async_exn (fun () ->
-          let%bind syncing_frontier, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
-              ~num_breadcrumbs
-              ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
-              ~target_accounts:Genesis_ledger.accounts
-          in
-          let transition_reader, _ = make_transition_pipe () in
-          let ledger_db =
-            Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
-          in
-          let%map ( new_frontier
-                  , (sorted_transitions :
-                      External_transition.with_initial_validation
-                      Envelope.Incoming.t
-                      list) ) =
-            Bootstrap_controller.For_tests.run ~logger ~trust_system
-              ~verifier:() ~network ~frontier:syncing_frontier ~ledger_db
-              ~transition_reader ~should_ask_best_tip:true
-          in
-          let root = Transition_frontier.(root new_frontier) in
-          assert_transitions_increasingly_sorted ~root sorted_transitions ;
-          Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
-      )
-
-    let%test "when eagerly syncing to multiple nodes, you should sync to the \
-              node with the highest transition_frontier" =
-      let logger = Logger.create () in
-      let trust_system = Trust_system.null () in
-      let unsynced_peer_num_breadcrumbs = 6 in
-      let unsynced_peers_accounts =
-        List.take Genesis_ledger.accounts
-          (List.length Genesis_ledger.accounts / 2)
-      in
-      let synced_peer_num_breadcrumbs = unsynced_peer_num_breadcrumbs * 2 in
-      let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
-      Thread_safe.block_on_async_exn (fun () ->
-          let%bind {me; peers; network} =
-            Network_builder.setup ~source_accounts ~logger ~trust_system
-              [ { num_breadcrumbs= unsynced_peer_num_breadcrumbs
-                ; accounts= unsynced_peers_accounts }
-              ; { num_breadcrumbs= synced_peer_num_breadcrumbs
-                ; accounts= Genesis_ledger.accounts } ]
-          in
-          let transition_reader, _ = make_transition_pipe () in
-          let ledger_db =
-            Transition_frontier.For_tests.root_snarked_ledger me
-          in
-          let synced_peer = List.nth_exn peers 1 in
-          let%map ( new_frontier
-                  , (sorted_external_transitions :
-                      External_transition.with_initial_validation
-                      Envelope.Incoming.t
-                      list) ) =
-            Bootstrap_controller.For_tests.run ~logger ~trust_system
-              ~verifier:() ~network ~frontier:me ~ledger_db ~transition_reader
-              ~should_ask_best_tip:true
-          in
-          assert_transitions_increasingly_sorted
-            ~root:(Transition_frontier.root new_frontier)
-            sorted_external_transitions ;
-          Ledger_hash.equal (root_hash new_frontier)
-            (root_hash synced_peer.frontier) )
 
     let%test "if we see a new transition that is better than the transition \
               that we are syncing from, than we should retarget our root" =
@@ -367,7 +297,6 @@ let%test_module "Bootstrap Controller" =
                       list) ) =
             Bootstrap_controller.For_tests.run ~logger ~trust_system
               ~verifier:() ~network ~frontier:me ~ledger_db ~transition_reader
-              ~should_ask_best_tip:false
           in
           assert_transitions_increasingly_sorted
             ~root:(Transition_frontier.root new_frontier)

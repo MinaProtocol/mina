@@ -112,38 +112,4 @@ let%test_module "Sync_handler" =
                  (With_hash.data best_tip_transition)
                  (to_external_transition
                     (Transition_frontier.best_tip frontier))) )
-
-    let%test "a node that is synced to the network should be able to provide \
-              its best tip to an offline node" =
-      let num_breadcrumbs_to_cause_bootstrap =
-        (2 * max_length) + Consensus.Constants.delta + 1
-      in
-      Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier =
-            create_root_frontier ~logger Genesis_ledger.accounts
-          in
-          let root_breadcrumb = Transition_frontier.root frontier in
-          let root_transition =
-            Transition_frontier.Breadcrumb.validated_transition root_breadcrumb
-          in
-          let%bind () =
-            build_frontier_randomly frontier
-              ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~trust_system
-                   ~size:num_breadcrumbs_to_cause_bootstrap
-                   ~accounts_with_secret_keys:Genesis_ledger.accounts)
-          in
-          let root_consensus_state =
-            External_transition.Validated.consensus_state root_transition
-          in
-          let peer_best_tip_with_witness =
-            Option.value_exn
-              (Sync_handler.Bootstrappable_best_tip.prove ~logger ~frontier
-                 root_consensus_state)
-          in
-          let%map verification_result =
-            Sync_handler.Bootstrappable_best_tip.verify ~verifier:() ~logger
-              root_consensus_state peer_best_tip_with_witness
-          in
-          Result.is_ok verification_result )
   end )

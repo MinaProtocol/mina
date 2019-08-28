@@ -454,24 +454,6 @@ struct
     let get_transition_chain = T.get_transition_chain
 
     module Root = T.Root
-
-    (* HACK: This makes it unit tests involving eager bootstrap faster *)
-    module Bootstrappable_best_tip = struct
-      module For_tests = T.Bootstrappable_best_tip.For_tests
-
-      let should_select_tip ~existing ~candidate ~logger:_ =
-        let length =
-          Fn.compose Coda_numbers.Length.to_int
-            Consensus.Data.Consensus_state.blockchain_length
-        in
-        length candidate - length existing
-        > (2 * max_length) + Consensus.Constants.delta
-
-      let prove = T.Bootstrappable_best_tip.For_tests.prove ~should_select_tip
-
-      let verify =
-        T.Bootstrappable_best_tip.For_tests.verify ~should_select_tip
-    end
   end
 
   module Transition_chain_prover = Transition_chain_prover.Make (struct
@@ -624,11 +606,6 @@ struct
     let get_best_tip ({logger; _} as t) =
       handle_requests ~typ:"best tip"
         ~f:(fun ~frontier () -> Best_tip_prover.prove ~logger frontier)
-        t
-
-    let get_bootstrappable_best_tip ({logger; _} as t) =
-      handle_requests ~typ:"bootstrappable best tip"
-        ~f:(Sync_handler.Bootstrappable_best_tip.prove ~logger)
         t
 
     let get_transition_chain_proof =

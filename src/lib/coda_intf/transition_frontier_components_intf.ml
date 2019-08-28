@@ -333,50 +333,6 @@ module type Sync_handler_intf = sig
      and type external_transition_with_initial_validation :=
                 external_transition_with_initial_validation
      and type verifier := verifier
-
-  (** Allows a node to ask peers for their best tip in order to help them
-      bootstrap *)
-  module Bootstrappable_best_tip : sig
-    include
-      Consensus_best_tip_prover_intf
-      with type transition_frontier := transition_frontier
-       and type external_transition := external_transition
-       and type external_transition_with_initial_validation :=
-                  external_transition_with_initial_validation
-       and type verifier := verifier
-
-    module For_tests : sig
-      val prove :
-           logger:Logger.t
-        -> should_select_tip:(   existing:Consensus.Data.Consensus_state.Value.t
-                              -> candidate:Consensus.Data.Consensus_state.Value
-                                           .t
-                              -> logger:Logger.t
-                              -> bool)
-        -> frontier:transition_frontier
-        -> Consensus.Data.Consensus_state.Value.t
-        -> ( external_transition
-           , State_body_hash.t list * external_transition )
-           Proof_carrying_data.t
-           option
-
-      val verify :
-           logger:Logger.t
-        -> should_select_tip:(   existing:Consensus.Data.Consensus_state.Value.t
-                              -> candidate:Consensus.Data.Consensus_state.Value
-                                           .t
-                              -> logger:Logger.t
-                              -> bool)
-        -> verifier:verifier
-        -> Consensus.Data.Consensus_state.Value.t
-        -> ( external_transition
-           , State_body_hash.t list * external_transition )
-           Proof_carrying_data.t
-        -> ( [`Root of external_transition_with_initial_validation]
-           * [`Best_tip of external_transition_with_initial_validation] )
-           Deferred.Or_error.t
-    end
-  end
 end
 
 module type Transition_chain_prover_intf = sig
