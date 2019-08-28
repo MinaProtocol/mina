@@ -278,10 +278,12 @@ jobs:
             - run:
                 name: Install nix and cachix
                 command: |
-                    export USER=$USER
-                    curl https://nixos.org/nix/install | sh
-                    . ~/.nix-profile/etc/profile.d/nix.sh
-                    nix-env -iA cachix -f https://cachix.org/api/v1/install
+                addgroup --system nixbld && \
+  adduser --home /home/nix --disabled-password --gecos "" --shell /bin/bash nix && \
+  adduser nix nixbld && \
+  mkdir -m 0755 /nix && chown nix /nix && \
+  mkdir -p /etc/nix && echo 'sandbox = false' > /etc/nix/nix.conf
+                    sudo -u nix bash -c 'cd /home/nix && touch ~/.bash_profile && (curl https://nixos.org/nix/install | sh) && cd /home/nix && . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install'
 
             - run:
                 name: Build libp2p_helper using cachix
@@ -309,10 +311,12 @@ jobs:
             - run:
                 name: Install nix and cachix
                 command: |
-                    export USER=$USER
-                    curl https://nixos.org/nix/install | sh
-                    . ~/.nix-profile/etc/profile.d/nix.sh
-                    nix-env -iA cachix -f https://cachix.org/api/v1/install
+                addgroup --system nixbld && \
+  adduser --home /home/nix --disabled-password --gecos "" --shell /bin/bash nix && \
+  adduser nix nixbld && \
+  mkdir -m 0755 /nix && chown nix /nix && \
+  mkdir -p /etc/nix && echo 'sandbox = false' > /etc/nix/nix.conf
+                    sudo -u nix bash -c 'cd /home/nix && touch ~/.bash_profile && (curl https://nixos.org/nix/install | sh) && cd /home/nix && . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install'
 
             - run:
                 name: Build libp2p_helper using cachix
