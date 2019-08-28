@@ -73,6 +73,18 @@ query getWallet {
 }
 |}]
 
+module Snark_pool =
+[%graphql
+{|
+query snarkPool {
+  snarkPool {
+  fee @bsDecoder(fn: "Decoders.uint64")
+  prover @bsDecoder(fn: "Decoders.public_key")
+  work_ids: workIds
+}
+}
+|}]
+
 module Set_snark_worker =
 [%graphql
 {|
