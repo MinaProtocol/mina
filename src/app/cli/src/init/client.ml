@@ -700,15 +700,24 @@ let snark_job_list =
              print_rpc_error e ))
 
 let snark_pool_list =
-  let open Deferred.Let_syntax in
   let open Command.Param in
   Command.async ~summary:"List of snark works in the snark pool in JSON format"
-    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
-         match%map dispatch Daemon_rpcs.Snark_pool_list.rpc () port with
-         | Ok str ->
-             printf "%s" str
-         | Error e ->
-             print_rpc_error e ))
+    (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
+         Deferred.map
+           (Graphql_client.query (Graphql_client.Snark_pool.make ()) port)
+           ~f:(fun response ->
+             let lst =
+               [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
+                 (Array.to_list
+                    (Array.map
+                       ~f:(fun w ->
+                         { Cli_lib.Graphql_types.Completed_works.Work.work_ids=
+                             Array.to_list w#work_ids
+                         ; fee= Currency.Fee.of_uint64 w#fee
+                         ; prover= w#prover } )
+                       response#snarkPool))
+             in
+             print_string (Yojson.Safe.to_string lst) ) ))
 
 let start_tracing =
   let open Deferred.Let_syntax in
