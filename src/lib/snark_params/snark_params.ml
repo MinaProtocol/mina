@@ -749,7 +749,7 @@ let%test_unit "miller-loop" =
   let open Tick in
   let open Let_syntax in
   let open Pairing in
-  let module M = Snarkette.Mnt6753 in
+  let module M = Crypto_params.Snarkette_tick in
   Test.test_equal ~sexp_of_t:Fqk.Unchecked.sexp_of_t ~equal:Fqk.Unchecked.equal
     Typ.(G1.typ * G2.typ)
     Fqk.typ
