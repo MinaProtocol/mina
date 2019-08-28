@@ -304,9 +304,9 @@ jobs:
                 name: Build libp2p_helper using cachix
                 command: |
                     # Make sure our nix user can write to libp2p_helper dir
-                    chmod -R 777 /home/opam/project/src/app/libp2p_helper
+                    chmod -R 777 src/app/libp2p_helper
                     # Do the build
-                    sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd /home/opam/project/src/app/libp2_helper && nix-build default.nix'
+                    sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
