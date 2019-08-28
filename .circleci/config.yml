@@ -275,6 +275,8 @@ jobs:
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
+            # I'm sorry for the mess, but somehow this actually works
+            # Derived from: https://github.com/NixOS/nix/issues/971
             - run:
                 name: Install nix and cachix
                 command: |
@@ -284,10 +286,7 @@ jobs:
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
-                    . ~/.nix-profile/etc/profile.d/nix.sh
-                    cachix use codaprotocol
-                    cd src/app/libp2p_helper
-                    nix-build default.nix
+                    sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
@@ -304,6 +303,8 @@ jobs:
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
+            # I'm sorry for the mess, but somehow this actually works
+            # Derived from: https://github.com/NixOS/nix/issues/971
             - run:
                 name: Install nix and cachix
                 command: |
@@ -313,10 +314,7 @@ jobs:
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
-                    . ~/.nix-profile/etc/profile.d/nix.sh
-                    cachix use codaprotocol
-                    cd src/app/libp2p_helper
-                    nix-build default.nix
+                    sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
