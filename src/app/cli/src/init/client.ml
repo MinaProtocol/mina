@@ -557,10 +557,86 @@ let send_payment =
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
 
+let cancel_transaction =
+  Command.async
+    ~summary:
+      "Cancel a transaction -- this submits a replacement transaction with a \
+       fee larger than the cancelled transaction."
+    (Cli_lib.Background_daemon.init ~rest:true
+       Command.Param.(anon @@ ("txn-id" %: string))
+       ~f:(fun port serialized_transaction ->
+         match User_command.of_base58_check serialized_transaction with
+         | Ok user_command ->
+             let receiver =
+               match
+                 User_command.Payload.body (User_command.payload user_command)
+               with
+               | Payment payment ->
+                   payment.receiver
+               | Stake_delegation (Set_delegate {new_delegate}) ->
+                   new_delegate
+             in
+             let nonce_query =
+               let open Graphql_client.Encoders in
+               Graphql_client.Get_inferred_nonce.make
+                 ~public_key:(public_key (User_command.sender user_command))
+                 ()
+             in
+             let open Deferred.Let_syntax in
+             let%bind nonce_response = Graphql_client.query nonce_query port in
+             let maybe_inferred_nonce =
+               let open Option.Let_syntax in
+               let%bind wallet = nonce_response#wallet in
+               let%map nonce = wallet#inferredNonce in
+               int_of_string nonce
+             in
+             let cancelled_nonce =
+               Coda_numbers.Account_nonce.to_int
+                 (User_command.nonce user_command)
+             in
+             let inferred_nonce =
+               Option.value maybe_inferred_nonce ~default:cancelled_nonce
+             in
+             let cancel_fee =
+               let diff =
+                 Unsigned.UInt64.of_int (inferred_nonce - cancelled_nonce + 1)
+               in
+               let fee =
+                 Currency.Fee.to_uint64 (User_command.fee user_command)
+               in
+               let replace_fee =
+                 Currency.Fee.to_uint64 Network_pool.Indexed_pool.replace_fee
+               in
+               let open Unsigned.UInt64.Infix in
+               (* fee amount "inspired by" network_pool/indexed_pool.ml *)
+               fee + (replace_fee * diff)
+             in
+             printf "Fee to cancel transaction is %s coda.\n"
+               (Unsigned.UInt64.to_string cancel_fee) ;
+             let cancel_query =
+               let open Graphql_client.Encoders in
+               Graphql_client.Cancel_user_command.make
+                 ~from:(public_key (User_command.sender user_command))
+                 ~to_:(public_key receiver) ~fee:(uint64 cancel_fee)
+                 ~nonce:
+                   (uint32
+                      (Coda_numbers.Account_nonce.to_uint32
+                         (User_command.nonce user_command)))
+                 ()
+             in
+             let%map cancel_response =
+               Graphql_client.query cancel_query port
+             in
+             printf "Cancelled transaction! Cancel ID: %s\n"
+               ((cancel_response#sendPayment)#payment)#id
+         | Error _e ->
+             eprintf "Could not deserialize user command\n" ;
+             exit 16 ))
+
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
     (Cli_lib.Background_daemon.init
-       Command.Param.(anon @@ ("txn" %: string))
+       Command.Param.(anon @@ ("txn-id" %: string))
        ~f:(fun port serialized_transaction ->
          match User_command.of_base58_check serialized_transaction with
          | Ok user_command ->
@@ -700,15 +776,24 @@ let snark_job_list =
              print_rpc_error e ))
 
 let snark_pool_list =
-  let open Deferred.Let_syntax in
   let open Command.Param in
   Command.async ~summary:"List of snark works in the snark pool in JSON format"
-    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
-         match%map dispatch Daemon_rpcs.Snark_pool_list.rpc () port with
-         | Ok str ->
-             printf "%s" str
-         | Error e ->
-             print_rpc_error e ))
+    (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
+         Deferred.map
+           (Graphql_client.query (Graphql_client.Snark_pool.make ()) port)
+           ~f:(fun response ->
+             let lst =
+               [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
+                 (Array.to_list
+                    (Array.map
+                       ~f:(fun w ->
+                         { Cli_lib.Graphql_types.Completed_works.Work.work_ids=
+                             Array.to_list w#work_ids
+                         ; fee= Currency.Fee.of_uint64 w#fee
+                         ; prover= w#prover } )
+                       response#snarkPool))
+             in
+             print_string (Yojson.Safe.to_string lst) ) ))
 
 let start_tracing =
   let open Deferred.Let_syntax in
@@ -908,6 +993,7 @@ let command =
     ; ("send-payment", send_payment)
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
+    ; ("cancel-transaction", cancel_transaction)
     ; ("set-staking", set_staking)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)
