@@ -41,6 +41,7 @@ type app struct {
 	Streams    map[int]net.Stream
 	OutLock    sync.Mutex
 	Out        *bufio.Writer
+	RpcLock    sync.Mutex
 }
 
 var seqs = make(chan int)
@@ -81,6 +82,7 @@ func (app *app) writeMsg(msg interface{}) {
 			panic(err)
 		}
 		if n != len(bytes) {
+			// TODO: handle this correctly.
 			panic("short write :(")
 		}
 		app.Out.WriteByte(0x0a)
@@ -232,6 +234,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			Idx:    s.Subscription,
 		})
 
+		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
 		select {
 		case <-ctx.Done():
 			// do NOT delete app.Validators[seqno] here! the ocaml side doesn't
@@ -594,11 +597,14 @@ func main() {
 		Streams:    make(map[int]net.Stream),
 		// OutLock doesn't need to be initialized
 		Out: out,
+		// RpcLock doesn't need to be initialized
 	}
 
 	for lines.Scan() {
 		line := lines.Text()
 		go func() {
+			app.RpcLock.Lock()
+			defer app.RpcLock.Unlock()
 			var raw json.RawMessage
 			env := envelope{
 				Body: &raw,
