@@ -159,7 +159,14 @@ docker-toolchain-haskell:
     mkdir -p src/_build ;\
     docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-kademlia.deb > src/_build/coda-kademlia.deb
 
-toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell
+docker-toolchain-libp2p:
+	@echo "Building codaprotocol/coda:toolchain-libp2p-$(LIBP2P_HELPER_SIG)" ;\
+    docker build --file dockerfiles/Dockerfile-toolchain-libp2p --tag codaprotocol/coda:toolchain-libp2p-$(LIBP2P_HELPER_SIG) . ;\
+    echo  'Extracting deb package' ;\
+    mkdir -p src/_build ;\
+    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-libp2p-$(LIBP2P_HELPER_SIG) /src/coda-libp2p_helper.deb > src/_build/coda-libp2p-$(LIBP2P_HELPER_SIG).deb
+
+toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell docker-toolchain-libp2p
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
