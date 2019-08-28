@@ -37,7 +37,7 @@ module Styles = {
       flexDirection(`columnReverse),
       justifyContent(`center),
       width(`percent(100.)),
-      marginBottom(`rem(1.)),
+      marginBottom(`rem(1.5)),
       media(Style.MediaQuery.somewhatLarge, [flexDirection(`row)]),
     ]);
 
@@ -137,7 +137,7 @@ module Styles = {
         color(white),
         marginLeft(`auto),
         marginRight(`auto),
-        marginBottom(`rem(1.)),
+        marginBottom(`rem(1.5)),
         width(`rem(10.)),
         height(`rem(2.5)),
         display(`block),
@@ -146,6 +146,10 @@ module Styles = {
         padding2(~v=`rem(0.25), ~h=`rem(3.)),
         fontWeight(`semiBold),
         lineHeight(`rem(2.5)),
+        hover([
+          backgroundColor(Style.Colors.hyperlinkHover),
+          color(white),
+        ]),
       ]),
     ]);
 
@@ -199,7 +203,16 @@ module Section = {
       />
       <div className=Styles.gradientSection> children </div>
       <label id=labelName className=Styles.expandButton htmlFor=checkboxName>
-        {React.string("Expand " ++ name ++ {js| ↓|js})}
+        {React.string("Expand " ++ name)}
+        <div className=Css.(
+          style([
+            position(`relative),
+            bottom(`rem(2.6)),
+            left(`rem(9.6)),
+          ])
+        )>
+          {React.string({js| ↓|js})}
+        </div>
       </label>
       <RunScript>
         {Printf.sprintf(
@@ -350,7 +363,7 @@ let make = () => {
         </a>
       </div>
       <iframe
-        src="https://o1testnet.grafana.net/d-solo/mO5fAWHWk/testnet-stats?orgId=1&from=1566752668214&to=1566839068215&panelId=4"
+        src="https://o1testnet.grafana.net/d-solo/PeI0mtKWk/live-dashboard-for-website?orgId=1&panelId=2"
         className=Styles.dashboard
       />
     </div>
