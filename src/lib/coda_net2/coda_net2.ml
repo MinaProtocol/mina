@@ -301,7 +301,9 @@ module Helper = struct
         "stream with index $index closed twice by $party"
         ~metadata:
           [ ("index", `Int stream.idx)
-          ; ("party", `String (match who_closed with `Us -> "us" | `Them -> "them")) ] ;
+          ; ( "party"
+            , `String (match who_closed with `Us -> "us" | `Them -> "them") )
+          ] ;
       failwith "stream double closed"
     in
     (* replace with [%derive.eq : [`Us|`Them]] when it is supported.*)
@@ -599,7 +601,7 @@ module Helper = struct
         let stream_idx = m.stream_idx in
         match Hashtbl.find t.streams stream_idx with
         | Some stream ->
-            advance_stream_state t stream `Them |> don't_wait_for;
+            advance_stream_state t stream `Them |> don't_wait_for ;
             Ok ()
         | None ->
             Or_error.errorf
