@@ -95,19 +95,17 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let missing_hash =
             List.hd_exn upcoming_breadcrumbs
-            |> Transition_frontier.Breadcrumb.transition_with_hash
-            |> With_hash.hash
+            |> Transition_frontier.Breadcrumb.state_hash
           in
           let dangling_breadcrumb = List.nth_exn upcoming_breadcrumbs 1 in
           let dangling_transition =
             let transition =
-              External_transition.Validation.lower
-                (Transition_frontier.Breadcrumb.transition_with_hash
-                   dangling_breadcrumb)
-                ( (`Time_received, Truth.True)
-                , (`Proof, Truth.True)
-                , (`Frontier_dependencies, Truth.False)
-                , (`Staged_ledger_diff, Truth.False) )
+              Transition_frontier.Breadcrumb.validated_transition
+                dangling_breadcrumb
+              |> External_transition.Validation
+                 .reset_frontier_dependencies_validation
+              |> External_transition.Validation
+                 .reset_staged_ledger_diff_validation
             in
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
@@ -162,7 +160,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                     ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let upcoming_transitions =
-            List.map ~f:Transition_frontier.Breadcrumb.transition_with_hash
+            List.map ~f:Transition_frontier.Breadcrumb.validated_transition
               upcoming_breadcrumbs
           in
           let missing_breadcrumb = List.hd_exn upcoming_breadcrumbs in
@@ -171,11 +169,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let cached_dangling_transitions =
             List.map dangling_transitions ~f:(fun transition ->
                 let transition =
-                  External_transition.Validation.lower transition
-                    ( (`Time_received, Truth.True)
-                    , (`Proof, Truth.True)
-                    , (`Frontier_dependencies, Truth.False)
-                    , (`Staged_ledger_diff, Truth.False) )
+                  transition
+                  |> External_transition.Validation
+                     .reset_frontier_dependencies_validation
+                  |> External_transition.Validation
+                     .reset_staged_ledger_diff_validation
                 in
                 Envelope.Incoming.wrap ~data:transition
                   ~sender:Envelope.Sender.Local
@@ -194,7 +192,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
           in
           Catchup_scheduler.notify scheduler
-            ~hash:(With_hash.hash missing_transition)
+            ~hash:(External_transition.Validated.state_hash missing_transition)
           |> ignore ;
           assert (Catchup_scheduler.is_empty scheduler) ;
           let%map cached_received_rose_tree =
@@ -206,13 +204,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                 ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
                     (let transition =
-                       External_transition.Validation.lower
-                         (Transition_frontier.Breadcrumb.transition_with_hash
-                            missing_breadcrumb)
-                         ( (`Time_received, Truth.True)
-                         , (`Proof, Truth.True)
-                         , (`Frontier_dependencies, Truth.False)
-                         , (`Staged_ledger_diff, Truth.False) )
+                       Transition_frontier.Breadcrumb.validated_transition
+                         missing_breadcrumb
+                       |> External_transition.Validation
+                          .reset_frontier_dependencies_validation
+                       |> External_transition.Validation
+                          .reset_staged_ledger_diff_validation
                      in
                      Envelope.Incoming.wrap ~data:transition
                        ~sender:Envelope.Sender.Local)
@@ -264,7 +261,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let upcoming_breadcrumbs = Rose_tree.flatten upcoming_rose_tree in
           let upcoming_transitions =
-            List.map ~f:Transition_frontier.Breadcrumb.transition_with_hash
+            List.map ~f:Transition_frontier.Breadcrumb.validated_transition
               upcoming_breadcrumbs
           in
           let missing_breadcrumb = List.hd_exn upcoming_breadcrumbs in
@@ -273,11 +270,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let cached_dangling_transitions =
             List.map dangling_transitions ~f:(fun transition ->
                 let transition =
-                  External_transition.Validation.lower transition
-                    ( (`Time_received, Truth.True)
-                    , (`Proof, Truth.True)
-                    , (`Frontier_dependencies, Truth.False)
-                    , (`Staged_ledger_diff, Truth.False) )
+                  transition
+                  |> External_transition.Validation
+                     .reset_frontier_dependencies_validation
+                  |> External_transition.Validation
+                     .reset_staged_ledger_diff_validation
                 in
                 Envelope.Incoming.wrap ~data:transition
                   ~sender:Envelope.Sender.Local
@@ -293,7 +290,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
           in
           Catchup_scheduler.notify scheduler
-            ~hash:(With_hash.hash missing_transition)
+            ~hash:(External_transition.Validated.state_hash missing_transition)
           |> ignore ;
           assert (Catchup_scheduler.is_empty scheduler) ;
           let%map cached_received_rose_tree =
@@ -305,13 +302,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                 ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
                     (let transition =
-                       External_transition.Validation.lower
-                         (Transition_frontier.Breadcrumb.transition_with_hash
-                            missing_breadcrumb)
-                         ( (`Time_received, Truth.True)
-                         , (`Proof, Truth.True)
-                         , (`Frontier_dependencies, Truth.False)
-                         , (`Staged_ledger_diff, Truth.False) )
+                       Transition_frontier.Breadcrumb.validated_transition
+                         missing_breadcrumb
+                       |> External_transition.Validation
+                          .reset_frontier_dependencies_validation
+                       |> External_transition.Validation
+                          .reset_staged_ledger_diff_validation
                      in
                      Envelope.Incoming.wrap ~data:transition
                        ~sender:Envelope.Sender.Local)

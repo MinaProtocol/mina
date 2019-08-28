@@ -9,10 +9,12 @@ module type Inputs_intf = sig
     Coda_intf.Transition_frontier_intf
     with type external_transition_validated := External_transition.Validated.t
      and type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
+                ( [`Time_received] * unit Truth.true_t
+                , [`Proof] * unit Truth.true_t
+                , [`Delta_transition_chain]
+                  * State_hash.t Non_empty_list.t Truth.true_t
+                , [`Frontier_dependencies] * unit Truth.true_t
+                , [`Staged_ledger_diff] * unit Truth.false_t )
                 External_transition.Validation.with_transition
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -90,7 +92,7 @@ module Make (Inputs : Inputs_intf) :
     in
     let scan_state = Staged_ledger.scan_state staged_ledger in
     let merkle_root =
-      Staged_ledger.ledger staged_ledger |> Ledger.merkle_root
+      Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
     in
     let pending_coinbases =
       Staged_ledger.pending_coinbase_collection staged_ledger
@@ -105,10 +107,9 @@ module Make (Inputs : Inputs_intf) :
              (Transition_frontier.find_in_root_history frontier hash)
              ~f:Fn.const
            |> Option.map ~f:(fun breadcrumb ->
-                  Transition_frontier.Breadcrumb.transition_with_hash
+                  Transition_frontier.Breadcrumb.validated_transition
                     breadcrumb
-                  |> With_hash.data
-                  |> External_transition.Validated.forget_validation ) )
+                  |> External_transition.Validation.forget_validation ) )
 
   module Root = struct
     let prove ~logger ~frontier seen_consensus_state =

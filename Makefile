@@ -117,13 +117,14 @@ endif
 ## Environment setup
 
 macos-setup-download:
-	./scripts/macos-setup.sh download
+	./scripts/macos-setup-brew.sh
 
 macos-setup-compile:
-	./scripts/macos-setup.sh compile
+	./scripts/macos-setup-opam.sh
 
 macos-setup:
-	./scripts/macos-setup.sh all
+	./scripts/macos-setup-brew.sh
+	./scripts/macos-setup-opam.sh
 
 ########################################
 ## Containers and container management

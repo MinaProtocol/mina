@@ -1,0 +1,8 @@
+(library
+  (name snarky_integer)
+  (public_name snarky_integer)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (inline_tests)
+  (libraries
+    snarky
+    core_kernel ))

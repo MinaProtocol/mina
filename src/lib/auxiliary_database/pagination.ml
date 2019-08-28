@@ -55,6 +55,9 @@ struct
           ~data:(Set.add user_cursors (cursor, date)) ) ;
     Hashtbl.set pagination.all_values ~key:cursor ~data:(date, value)
 
+  let get_all_values {all_values; _} =
+    List.map (Hashtbl.data all_values) ~f:(fun (_, value) -> value)
+
   let get_total_values {user_cursors; _} public_key =
     let open Option.Let_syntax in
     let%map cursor_with_dates = Hashtbl.find user_cursors public_key in

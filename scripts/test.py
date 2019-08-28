@@ -10,8 +10,7 @@ import time
 from itertools import chain
 
 build_artifact_profiles = [
-    'testnet_postake_medium_curves',
-    'testnet_postake_many_proposers_medium_curves'
+    'testnet_postake_medium_curves'
 ]
 
 unit_test_profiles = [
@@ -36,6 +35,7 @@ integration_tests = [
     'coda-shared-prefix-test -who-proposes 0',
     'coda-shared-prefix-test -who-proposes 1',
     'coda-restart-node-test',
+    'coda-change-snark-worker-test',
     'coda-archive-node-test'
 ]
 
