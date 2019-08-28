@@ -2,9 +2,9 @@ open Bitstring_lib
 open Core
 open Snarky
 open Snark
+open Snarky_integer
 open Util
 module Floating_point = Floating_point
-module Integer = Integer
 
 (*
     Given

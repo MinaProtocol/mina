@@ -663,6 +663,9 @@ struct
     let%bind transactions, works, user_commands_count, coinbases =
       Deferred.return pre_diff_info
     in
+    Coda_metrics.(
+      Gauge.set Snark_work.completed_snark_work_last_block
+        (Float.of_int (List.length works))) ;
     let%bind is_new_stack, data, stack_update =
       update_coinbase_stack_and_get_data t.scan_state new_ledger
         t.pending_coinbase_collection transactions
@@ -712,6 +715,18 @@ struct
               %!"
             (Error.to_string_hum e) ) ;
       Deferred.return (to_staged_ledger_or_error r)
+    in
+    let () =
+      try
+        Coda_metrics.(
+          Gauge.set Snark_work.scan_state_snark_work
+            (Float.of_int
+               (List.length (Scan_state.all_work_pairs_exn scan_state'))))
+      with exn ->
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("error", `String (Exn.to_string exn))]
+          !"Error when getting all work pairs from scan state: $error" ;
+        Exn.reraise exn "Error when getting all work pairs from scan state"
     in
     let%bind updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
@@ -1492,6 +1507,66 @@ let%test_module "test" =
 
         let compressed_public_key_to_yojson = public_key_to_yojson
 
+        module Statement = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t = statement list
+                [@@deriving
+                  bin_io, compare, hash, sexp, version {for_test}, yojson]
+              end
+
+              include T
+              include Hashable.Make_binable (T)
+
+              let compact_json : t -> Yojson.Safe.json =
+               fun t ->
+                `List
+                  (List.map
+                     ~f:(fun s ->
+                       `Int (Transaction_snark.Statement.Stable.V1.hash s) )
+                     t)
+            end
+
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
+
+          include Hashable.Make (Stable.Latest)
+
+          let gen =
+            Quickcheck.Generator.list_with_length proofs_length
+              Transaction_snark.Statement.gen
+        end
+
+        module Info = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t =
+                  { statements: Statement.Stable.V1.t
+                  ; work_ids: int list
+                  ; fee: Fee.Stable.V1.t
+                  ; prover: Public_key.Compressed.Stable.V1.t }
+                [@@deriving sexp, to_yojson, bin_io, version {for_test}]
+              end
+
+              include T
+            end
+
+            module Latest = V1
+          end
+
+          (* bin_io omitted *)
+          type t = Stable.Latest.t =
+            { statements: Statement.Stable.V1.t
+            ; work_ids: int list
+            ; fee: Fee.Stable.V1.t
+            ; prover: Public_key.Compressed.Stable.V1.t }
+          [@@deriving to_yojson, sexp]
+        end
+
         module Stable = struct
           module V1 = struct
             module T = struct
@@ -1511,30 +1586,12 @@ let%test_module "test" =
 
         let fee {fee; _} = fee
 
-        module Statement = struct
-          module Stable = struct
-            module V1 = struct
-              module T = struct
-                type t = statement list
-                [@@deriving
-                  bin_io, compare, hash, sexp, version {for_test}, yojson]
-              end
-
-              include T
-              include Hashable.Make_binable (T)
-            end
-
-            module Latest = V1
-          end
-
-          type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
-          include Hashable.Make (Stable.Latest)
-
-          let gen =
-            Quickcheck.Generator.list_with_length proofs_length
-              Transaction_snark.Statement.gen
-        end
+        let info t =
+          let statements = List.map t.proofs ~f:Ledger_proof.statement in
+          { Info.statements
+          ; work_ids= List.map statements ~f:Transaction_snark.Statement.hash
+          ; fee= t.fee
+          ; prover= t.prover }
 
         type unchecked = t
 

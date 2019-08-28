@@ -9,15 +9,18 @@ module SendPayment = [%graphql
 ];
 
 let sendPayment = (~from, ~to_, ~amount, ~fee) => {
-  Graphql.executeMutation(
-    Graphql.Encoders.(
-      SendPayment.make(
-        ~from=publicKey(from),
-        ~to_=publicKey(to_),
-        ~amount=int64(amount),
-        ~fee=int64(fee),
-        (),
-      )
-    ),
+  ReasonUrql.Client.executeMutation(
+    ~client=Graphql.client,
+    ~request=
+      Graphql.Encoders.(
+        SendPayment.make(
+          ~from=publicKey(from),
+          ~to_=publicKey(to_),
+          ~amount=int64(amount),
+          ~fee=int64(fee),
+          (),
+        )
+      ),
+    (),
   );
 };

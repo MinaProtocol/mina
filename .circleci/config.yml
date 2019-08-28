@@ -101,6 +101,11 @@ jobs:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
             OPAMYES: 1
         steps:
+            - run:
+                name: Delete xcode simulators (Free 10GB - unused)
+                command: |
+                    sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
+                    df -h
             # Attach workspace from prior linux build
             - attach_workspace:
                 at: /tmp/workspace
@@ -109,6 +114,7 @@ jobs:
                 command: |
                     sudo mkdir -p /var/lib/coda
                     sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
+                    sudo rm /tmp/workspace/coda*.bz2
             - checkout
             - run:
                 name: Update git submodules
@@ -116,36 +122,44 @@ jobs:
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
+                    - homebrew-v6-{{ checksum "scripts/macos-setup-brew.sh" }}
                     - homebrew-v5-{{ checksum "scripts/macos-setup.sh" }}
                     - homebrew-v5-
             - run:
-                name: Install macos dependancies - homebrew - make macos-setup-download
-                command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
+                name: Install macos dependencies - homebrew - make macos-setup-download
+                command: |
+                    ./scripts/skip_if_only_frontend.sh make macos-setup-download
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v5-{{ checksum "scripts/macos-setup.sh" }}
+                key: homebrew-v6-{{ checksum "scripts/macos-setup-brew.sh" }}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
 
+            - run:
+                name: Create opam cache signature file
+                command: |
+                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat src/opam.export >> opam_ci_cache.sig
             - restore_cache:
                 name: Restore cache - opam
                 keys:
+                    - opam-v6-{{ checksum "opam_ci_cache.sig" }}
                     - opam-v5-{{ checksum "src/opam.export" }}
                     - opam-v4-{{ checksum "src/opam.export" }}
                     - opam-v3-{{ checksum "src/opam.export" }}
             - run:
-                name: Ensure opam permisssions
+                name: Ensure/Fix opam permisssions
                 command: |
                     set +e
                     sudo chown -R distiller /Users/distiller/.opam
                     sudo chmod -R u+w /Users/distiller/.opam
             - run:
-                name: Install macos dependancies - opam -- make macos-setup-compile
+                name: Install macos dependencies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
                 name: Save cache - opam
-                key: opam-v5-{{ checksum "src/opam.export" }}
+                key: opam-v6-{{ checksum "opam_ci_cache.sig" }}
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
@@ -163,10 +177,18 @@ jobs:
                     cd src/app/kademlia-haskell
                     nix-build release2.nix
             - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
+            - run:
                 name: Build ocaml
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-                command: bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                command: |
+                    bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h
             - run:
                 name: Collect PV Keys
@@ -174,11 +196,13 @@ jobs:
                     mkdir -p package/keys
                     cp /var/lib/coda/* package/keys/.
             - run:
-                name: Collect and rewrite kademlia
+                name: Collect and rewrite aux binaries (kademlia + logproc)
                 command: |
                     cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
                     chmod +w package/kademlia
                     ./scripts/librewrite-macos.sh package/kademlia
+                    cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
+                    chmod +wx package/coda-logproc
             - run:
                 name: Collect coda binary
                 command: |
@@ -232,47 +256,7 @@ jobs:
             - run:
                   name: Upload deb to repo
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - run:
-                  name: Copy artifacts to cloud
-                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
-            - persist_to_workspace:
-                root: /tmp/artifacts
-                paths: coda_pvkeys*
-            - store_artifacts:
-                  path: /tmp/artifacts
-    build-artifacts--testnet_postake_many_proposers_medium_curves:
-        resource_class: xlarge
-        docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
-        environment:
-            DUNE_PROFILE: testnet_postake_many_proposers_medium_curves
-        steps:
-            - checkout
-            - run:
-                  name: Artifacts
-                  command: |
-                      mkdir -p /tmp/artifacts
-                      touch /tmp/artifacts/coda_pvkeys_dummy
-            - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Download candidate stable PV keys
-                  command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
-            - run:
-                  name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   no_output_timeout: 20m
-            - run:
-                  name: Build deb package with PV keys and PV key tar
-                  command: ./scripts/skip_if_only_frontend.sh make deb
-                  no_output_timeout: 20m
-            - run:
-                  name: Store genesis public/private keypairs
-                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
-            - run:
-                  name: Upload deb to repo
-                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
@@ -291,6 +275,28 @@ jobs:
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
+          # Uncomment if you want to try debugging why this install breaks
+          # some unit tests:
+          # 1. The command_line_tests
+          # 2. Kademlia tests
+          #
+             #I'm sorry for the mess, but somehow this actually works
+             #Derived from: https://github.com/NixOS/nix/issues/971
+            #- run:
+                #name: Install nix and cachix
+                #command: |
+                     #Make a nix user
+                    #sudo addgroup --system nixbld && sudo adduser --home /home/nix --disabled-password --gecos "" --shell /bin/bash nix && sudo adduser nix nixbld && sudo mkdir -m 0755 /nix && sudo chown nix /nix && sudo mkdir -p /etc/nix && sudo bash -c 'echo "sandbox = false" > /etc/nix/nix.conf'
+                     #Install nix and cachix with that user
+                    #sudo -H -u nix bash -c 'cd /home/nix && touch ~/.bash_profile && (curl https://nixos.org/nix/install | sh) && cd /home/nix && . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install'
+
+            #- run:
+                #name: Build libp2p_helper using cachix
+                #command: |
+                     #Make sure our nix user can write to libp2p_helper dir
+                    #chmod -R 777 src/app/libp2p_helper
+                     #Do the build
+                    #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
@@ -307,6 +313,28 @@ jobs:
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
+          # Uncomment if you want to try debugging why this install breaks
+          # some unit tests:
+          # 1. The command_line_tests
+          # 2. Kademlia tests
+          #
+             #I'm sorry for the mess, but somehow this actually works
+             #Derived from: https://github.com/NixOS/nix/issues/971
+            #- run:
+                #name: Install nix and cachix
+                #command: |
+                     #Make a nix user
+                    #sudo addgroup --system nixbld && sudo adduser --home /home/nix --disabled-password --gecos "" --shell /bin/bash nix && sudo adduser nix nixbld && sudo mkdir -m 0755 /nix && sudo chown nix /nix && sudo mkdir -p /etc/nix && sudo bash -c 'echo "sandbox = false" > /etc/nix/nix.conf'
+                     #Install nix and cachix with that user
+                    #sudo -H -u nix bash -c 'cd /home/nix && touch ~/.bash_profile && (curl https://nixos.org/nix/install | sh) && cd /home/nix && . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install'
+
+            #- run:
+                #name: Build libp2p_helper using cachix
+                #command: |
+                     #Make sure our nix user can write to libp2p_helper dir
+                    #chmod -R 777 src/app/libp2p_helper
+                     #Do the build
+                    #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
@@ -682,7 +710,6 @@ workflows:
                 requires:
                     - build-artifacts--testnet_postake_medium_curves
             - build-artifacts--testnet_postake_medium_curves
-            - build-artifacts--testnet_postake_many_proposers_medium_curves
             - test-unit--test_postake_snarkless_unittest
             - test-unit--dev
             - test--fake_hash
