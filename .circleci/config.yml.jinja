@@ -293,9 +293,11 @@ jobs:
             - run:
                 name: Install nix and cachix
                 command: |
+                    export USER=$USER
                     curl https://nixos.org/nix/install | sh
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     nix-env -iA cachix -f https://cachix.org/api/v1/install
+
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
