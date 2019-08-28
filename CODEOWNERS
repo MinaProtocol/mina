@@ -19,6 +19,7 @@
 /src/app/cli/src/coda.ml @nholland94 @bkase @cmr @imeckler
 /src/app/cli/src/init @nholland94 @bkase @cmr @imeckler
 /src/app/kademlia-haskell/ @bkase @enolan @cmr @psteckler
+/src/app/libp2p_helper @cmr @enolan @bkase
 /src/app/reformat/ @bkase
 /src/app/trace-tool/ @cmr @mrmr1993
 /src/app/website/ @bkase @schmavery @figitaki
