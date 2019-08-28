@@ -31,7 +31,6 @@ module Make
    and type frozen_ledger_hash := Frozen_ledger_hash.t
    and type ledger_undo := Ledger.Undo.t
    and type transaction := Transaction.t
-   and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
    and type ledger_proof := Inputs.Ledger_proof.t = struct
   open Inputs
 
@@ -187,7 +186,7 @@ module Make
             (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
             (Binable.to_string (module Transaction_with_witness.Stable.V1))
         in
-        Staged_ledger_aux_hash.of_bytes
+        Staged_ledger_hash.Aux_hash.of_bytes
           (state_hash |> Digestif.SHA256.to_raw_string)
 
       include Binable.Of_binable

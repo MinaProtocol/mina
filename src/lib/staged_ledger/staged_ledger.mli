@@ -10,8 +10,6 @@ module Make (Inputs : Coda_intf.Tmp_test_stub_hack.For_staged_ledger_intf) :
               Inputs.Transaction_snark_work.Statement.t
    and type transaction_snark_work_checked :=
               Inputs.Transaction_snark_work.Checked.t
-   and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
-   and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
    and type transaction_snark_statement := Transaction_snark.Statement.t
 
 include

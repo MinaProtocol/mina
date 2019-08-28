@@ -8,11 +8,11 @@ module type For_transaction_snark_scan_state_intf = sig
     type t = [`Base | `Merge]
   end
 
-  module Staged_ledger_aux_hash : sig
+  (*module Staged_ledger_aux_hash : sig
     type t
 
     val of_bytes : string -> t
-  end
+  end*)
 
   module Proof : sig
     type t
@@ -51,12 +51,12 @@ end
 module type For_staged_ledger_intf = sig
   include For_transaction_snark_scan_state_intf
 
-  module Staged_ledger_hash : sig
+  (*module Staged_ledger_hash : sig
     type t [@@deriving eq, sexp]
 
     val of_aux_ledger_and_coinbase_hash :
       Staged_ledger_aux_hash.t -> Ledger_hash.t -> Pending_coinbase.t -> t
-  end
+  end*)
 
   module Verifier : sig
     type t

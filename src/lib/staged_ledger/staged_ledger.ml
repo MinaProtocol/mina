@@ -28,8 +28,6 @@ end)
               Inputs.Transaction_snark_work.Statement.t
    and type transaction_snark_work_checked :=
               Inputs.Transaction_snark_work.Checked.t
-   and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
-   and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
    and type transaction_snark_statement := Transaction_snark.Statement.t =
 struct
   open Inputs
@@ -1363,14 +1361,14 @@ include Make (struct
   module Ledger_proof = Ledger_proof
   module Verifier = Verifier
 
-  module Staged_ledger_aux_hash = struct
+  (*module Staged_ledger_aux_hash = struct
     include Staged_ledger_hash.Aux_hash.Stable.V1
 
     [%%define_locally
     Staged_ledger_hash.Aux_hash.(of_bytes)]
   end
 
-  module Staged_ledger_hash = Staged_ledger_hash
+  module Staged_ledger_hash = Staged_ledger_hash*)
   module Transaction_snark_work = Transaction_snark_work
   module Staged_ledger_diff = Staged_ledger_diff
   module Account = Account
@@ -1447,7 +1445,7 @@ let%test_module "test" =
         let create t = copy t
       end
 
-      module Staged_ledger_aux_hash = struct
+      (*module Staged_ledger_aux_hash = struct
         include String
 
         let of_bytes : string -> t = fun s -> s
@@ -1486,7 +1484,7 @@ let%test_module "test" =
          fun ah h hh ->
           ah ^ Ledger_hash.to_bytes h
           ^ Pending_coinbase.Hash.to_bytes (Pending_coinbase.merkle_root hh)
-      end
+      end*)
 
       module Transaction_snark_work = struct
         let proofs_length = 2
@@ -1863,8 +1861,6 @@ let%test_module "test" =
                   Test_input1.Transaction_snark_work.Statement.t
        and type transaction_snark_work_checked :=
                   Test_input1.Transaction_snark_work.Checked.t
-       and type staged_ledger_hash := Test_input1.Staged_ledger_hash.t
-       and type staged_ledger_aux_hash := Test_input1.Staged_ledger_aux_hash.t
        and type transaction_snark_statement := Transaction_snark.Statement.t
 
     module Sl = Make (Test_input1)

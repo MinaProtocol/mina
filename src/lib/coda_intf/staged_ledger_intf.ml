@@ -202,8 +202,6 @@ module type Transaction_snark_scan_state_generalized_intf = sig
 
   type transaction_snark_work
 
-  type staged_ledger_aux_hash
-
   type t [@@deriving sexp]
 
   module Stable :
@@ -211,7 +209,7 @@ module type Transaction_snark_scan_state_generalized_intf = sig
       module V1 : sig
         type t [@@deriving sexp, bin_io, version]
 
-        val hash : t -> staged_ledger_aux_hash
+        val hash : t -> Staged_ledger_hash.Aux_hash.t
       end
 
       module Latest = V1
@@ -308,7 +306,7 @@ module type Transaction_snark_scan_state_generalized_intf = sig
 
   val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 
-  val hash : t -> staged_ledger_aux_hash
+  val hash : t -> Staged_ledger_hash.Aux_hash.t
 
   (** All the transactions in the order in which they were applied*)
   val staged_transactions : t -> transaction list Or_error.t
@@ -358,7 +356,6 @@ module type Transaction_snark_scan_state_intf =
    and type frozen_ledger_hash := Frozen_ledger_hash.t
    and type ledger_undo := Ledger.Undo.t
    and type transaction := Transaction.t
-   and type staged_ledger_aux_hash := Staged_ledger_hash.Aux_hash.t
 
 module type Staged_ledger_generalized_intf = sig
   type t [@@deriving sexp]
@@ -377,10 +374,6 @@ module type Staged_ledger_generalized_intf = sig
 
   type transaction_snark_work_checked
 
-  type staged_ledger_hash
-
-  type staged_ledger_aux_hash
-
   type transaction_snark_statement
 
   module Pre_diff_info :
@@ -397,7 +390,7 @@ module type Staged_ledger_generalized_intf = sig
         module V1 : sig
           type t [@@deriving sexp, bin_io, version]
 
-          val hash : t -> staged_ledger_aux_hash
+          val hash : t -> Staged_ledger_hash.Aux_hash.t
         end
 
         module Latest = V1
@@ -412,7 +405,7 @@ module type Staged_ledger_generalized_intf = sig
       type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
     end
 
-    val hash : t -> staged_ledger_aux_hash
+    val hash : t -> Staged_ledger_hash.Aux_hash.t
 
     val empty : unit -> t
 
@@ -465,14 +458,14 @@ module type Staged_ledger_generalized_intf = sig
 
   val copy : t -> t
 
-  val hash : t -> staged_ledger_hash
+  val hash : t -> Staged_ledger_hash.t
 
   val apply :
        t
     -> diff
     -> logger:Logger.t
     -> verifier:verifier
-    -> ( [`Hash_after_applying of staged_ledger_hash]
+    -> ( [`Hash_after_applying of Staged_ledger_hash.t]
          * [`Ledger_proof of (ledger_proof * Transaction.t list) option]
          * [`Staged_ledger of t]
          * [`Pending_coinbase_data of bool * Currency.Amount.t]
@@ -482,7 +475,7 @@ module type Staged_ledger_generalized_intf = sig
   val apply_diff_unchecked :
        t
     -> valid_diff
-    -> ( [`Hash_after_applying of staged_ledger_hash]
+    -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [`Ledger_proof of (ledger_proof * Transaction.t list) option]
        * [`Staged_ledger of t]
        * [`Pending_coinbase_data of bool * Currency.Amount.t] )
@@ -535,6 +528,4 @@ end
 
 module type Staged_ledger_intf =
   Staged_ledger_generalized_intf
-  with type staged_ledger_hash := Staged_ledger_hash.t
-   and type staged_ledger_aux_hash := Staged_ledger_hash.Aux_hash.t
-   and type transaction_snark_statement := Transaction_snark.Statement.t
+  with type transaction_snark_statement := Transaction_snark.Statement.t
