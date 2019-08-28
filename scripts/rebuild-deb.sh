@@ -9,13 +9,19 @@ cd "${SCRIPTPATH}/../src/_build"
 
 GITHASH=$(git rev-parse --short=8 HEAD)
 GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
+GITTAG=$(git describe --abbrev=0)
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
 PVKEYHASH=$(./default/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
-VERSION="${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+
+if [ "$GITBRANCH" == "master" ]; then
+    VERSION="$GITTAG-${GITHASH}"
+else
+    VERSION="${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+fi
 
 BUILDDIR="deb_build"
 
