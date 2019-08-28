@@ -166,9 +166,7 @@ docker-toolchain-libp2p:
     mkdir -p src/_build ;\
     docker run --rm --entrypoint cat codaprotocol/coda:toolchain-libp2p-$(LIBP2P_HELPER_SIG) /src/coda-libp2p_helper.deb > src/_build/coda-libp2p-$(LIBP2P_HELPER_SIG).deb
 
-
-
-toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell
+toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell docker-toolchain-libp2p
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)

@@ -1,7 +1,6 @@
 FROM nixos/nix:latest
 
-# Simple toolchain & build container that compiles and patches a kademlia binary for coda use
-
+# Simple toolchain & build container that compiles and patches a binary for coda use
 ARG PKGNAME=libp2p_helper
 
 # Add OS tools
