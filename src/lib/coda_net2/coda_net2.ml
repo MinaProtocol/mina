@@ -32,18 +32,13 @@ let to_int_res x =
 type keypair = {secret: string; public: string; peer_id: string}
 
 type stream_state =
-  (** Streams start in this state. Both sides can still write *)
-  | FullyOpen 
-  (** Streams move from FullyOpen to HalfClosed `Us if when the write pipe is closed. Streams move from FullyOpen to HalfClosed `Them if Stream.reset is called or the remote host closes their write stream. *)
-  | HalfClosed of [`Us | `Them] 
-  (** Streams move from [HalfClosed peer] to FullyClosed once the party that isn't peer has their "close write" event. Once a stream is FullyClosed, its resources are released. *)
-  | FullyClosed 
+  | FullyOpen  (** Streams start in this state. Both sides can still write *)
+  | HalfClosed of [`Us | `Them]
+      (** Streams move from [FullyOpen] to [HalfClosed `Us] when the write pipe is closed. Streams move from [FullyOpen] to [HalfClosed `Them] when [Stream.reset] is called or the remote host closes their write stream. *)
+  | FullyClosed
+      (** Streams move from [HalfClosed peer] to FullyClosed once the party that isn't peer has their "close write" event. Once a stream is FullyClosed, its resources are released. *)
 
 module Helper = struct
-  (* Warning 30 is about field labels being defined in multiple types.
-     It means more disambiguation has to happen sometimes but it doesn't
-     seem to be a big deal. *)
-  [@warning "-30"]
   type t =
     { subprocess: Process.t
     ; mutable failure_response: [`Die | `Ignore]
@@ -659,7 +654,11 @@ module Helper = struct
         Deferred.unit )
     |> don't_wait_for ;
     t
-end
+end [@(* Warning 30 is about field labels being defined in multiple types.
+     It means more disambiguation has to happen sometimes but it doesn't
+     seem to be a big deal. *)
+      warning
+      "-30"]
 
 type net = Helper.t
 
@@ -770,32 +769,41 @@ module Pubsub = struct
       ; read_pipe }
     in
     (* Linear scan over all subscriptions. Should generally be small, probably not a problem. *)
-    let already_exists_error = Hashtbl.fold net.subscriptions ~init:None
-      ~f:(fun ~key:_ ~data acc -> if Option.is_some acc then acc else if String.equal data.topic topic
-        then
-          (Strict_pipe.Writer.close write_pipe ; Some (Or_error.errorf "already subscribed to topic %s" topic))
-        else acc
-       )
+    let already_exists_error =
+      Hashtbl.fold net.subscriptions ~init:None ~f:(fun ~key:_ ~data acc ->
+          if Option.is_some acc then acc
+          else if String.equal data.topic topic then (
+            Strict_pipe.Writer.close write_pipe ;
+            Some (Or_error.errorf "already subscribed to topic %s" topic) )
+          else acc )
     in
     match already_exists_error with
-    | Some err -> return err
-    | None ->
-    (let%bind _ =
-      match Hashtbl.add net.subscriptions ~key:subscription_idx ~data:sub with
-      | `Ok ->
-          return (Ok ())
-      | `Duplicate ->
-          failwith "fresh genseq was already present in subscription table?"
-    in
-    match%map
-      Helper.do_rpc net (module Helper.Rpcs.Subscribe) {topic; subscription_idx}
-    with
-    | Ok "subscribe success" ->
-        Ok sub
-    | Ok j ->
-        (Strict_pipe.Writer.close write_pipe ; failwithf "helper broke RPC protocol: subscribe got %s" j ())
-    | Error e ->
-        (Strict_pipe.Writer.close write_pipe ; Error e))
+    | Some err ->
+        return err
+    | None -> (
+        let%bind _ =
+          match
+            Hashtbl.add net.subscriptions ~key:subscription_idx ~data:sub
+          with
+          | `Ok ->
+              return (Ok ())
+          | `Duplicate ->
+              failwith
+                "fresh genseq was already present in subscription table?"
+        in
+        match%map
+          Helper.do_rpc net
+            (module Helper.Rpcs.Subscribe)
+            {topic; subscription_idx}
+        with
+        | Ok "subscribe success" ->
+            Ok sub
+        | Ok j ->
+            Strict_pipe.Writer.close write_pipe ;
+            failwithf "helper broke RPC protocol: subscribe got %s" j ()
+        | Error e ->
+            Strict_pipe.Writer.close write_pipe ;
+            Error e )
 end
 
 let me (net : Helper.t) = net.me_keypair
@@ -911,16 +919,17 @@ let handle_protocol net ~on_handler_error ~protocol f =
     {net; closed= false; on_handler_error; f; protocol_name= protocol}
   in
   if Hashtbl.find net.protocol_handlers protocol |> Option.is_some then
-    Deferred.Or_error.errorf "already handling protocol %s" protocol else
-  match%map
-    Helper.do_rpc net (module Helper.Rpcs.Add_stream_handler) {protocol}
-    |> Deferred.Or_error.ok_exn
-  with
-  | "addStreamHandler success" ->
-      Hashtbl.add_exn net.protocol_handlers ~key:protocol ~data:ph ;
-      Ok ph
-  | v ->
-      failwithf "helper broke RPC protocol: addStreamHandler got %s" v ()
+    Deferred.Or_error.errorf "already handling protocol %s" protocol
+  else
+    match%map
+      Helper.do_rpc net (module Helper.Rpcs.Add_stream_handler) {protocol}
+      |> Deferred.Or_error.ok_exn
+    with
+    | "addStreamHandler success" ->
+        Hashtbl.add_exn net.protocol_handlers ~key:protocol ~data:ph ;
+        Ok ph
+    | v ->
+        failwithf "helper broke RPC protocol: addStreamHandler got %s" v ()
 
 let open_stream net ~protocol peer =
   match%map
@@ -1005,23 +1014,22 @@ let create ~logger ~conf_dir =
        * for #550 *)
         Deferred.upon (Process.wait p.subprocess) (fun code ->
             p.finished <- true ;
-            ( match (p.failure_response, code) with
+            match (p.failure_response, code) with
             | `Ignore, _ | _, Ok () ->
-              Hashtbl.iter p.outstanding_requests ~f:(fun iv ->
-                  Ivar.fill iv
-                    (Or_error.error_string
-                      "libp2p_helper process died before answering") )
+                Hashtbl.iter p.outstanding_requests ~f:(fun iv ->
+                    Ivar.fill iv
+                      (Or_error.error_string
+                         "libp2p_helper process died before answering") )
             | `Die, (Error _ as e) ->
                 Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
                   !"libp2p_helper process died: %s"
                   (Unix.Exit_or_signal.to_string_hum e) ;
                 raise Child_died ) ;
-                      ) ;
         Ok p
     | Error e ->
         Or_error.error_string
-          ( "Could not start libp2p_helper. If you are a dev, did you forget to `make libp2p_helper` and set \
-             CODA_LIBP2P_HELPER_PATH? Try \
+          ( "Could not start libp2p_helper. If you are a dev, did you forget \
+             to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
              CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper "
           ^ Error.to_string_hum e )
   in
@@ -1041,7 +1049,9 @@ let create ~logger ~conf_dir =
         | Error _ ->
             let%map () = Sys.remove lock_path in
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "Process %s does not exist and will not be killed (removing lock fle)" p ;
+              "Process %s does not exist and will not be killed (removing \
+               lock fle)"
+              p ;
             Ok () )
     | _ ->
         return @@ Ok ()
