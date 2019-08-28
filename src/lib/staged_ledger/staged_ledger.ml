@@ -1354,10 +1354,12 @@ module Make = Make_with_constants (Transaction_snark_scan_state.Constants)
 
 include Make (struct
   open Coda_base
-  module Pending_coinbase_hash = Pending_coinbase.Hash
+
+  (*module Pending_coinbase_hash = Pending_coinbase.Hash*)
   module Proof_type = Transaction_snark.Proof_type
   module Proof = Proof
-  module Sok_message = Sok_message
+
+  (*module Sok_message = Sok_message*)
   module Ledger_proof = Ledger_proof
   module Verifier = Verifier
 
@@ -1378,7 +1380,7 @@ end)
 let%test_module "test" =
   ( module struct
     module Test_input1 = struct
-      module Sok_message = struct
+      (*module Sok_message = struct
         module Stable = struct
           module V1 = struct
             module T = struct
@@ -1400,12 +1402,13 @@ let%test_module "test" =
         type t = Stable.Latest.t [@@deriving sexp, yojson]
 
         let create ~fee:_ ~prover:_ = ()
-      end
+      end*)
 
       module Proof_type = Transaction_snark.Proof_type
-      module Proof = Transaction_snark.Statement
+      module Proof = Proof
+      module Ledger_proof = Ledger_proof.Debug
 
-      module Ledger_proof = struct
+      (*struct
         (*A proof here is a statement *)
         module Stable = struct
           module V1 = Transaction_snark.Statement.Stable.V1
@@ -1426,7 +1429,7 @@ let%test_module "test" =
         let statement = Fn.id
 
         let create ~(statement : t) ~sok_digest:_ ~proof:_ = statement
-      end
+      end*)
 
       module Verifier = struct
         type t = unit
@@ -1486,7 +1489,9 @@ let%test_module "test" =
           ^ Pending_coinbase.Hash.to_bytes (Pending_coinbase.merkle_root hh)
       end*)
 
-      module Transaction_snark_work = struct
+      module Transaction_snark_work = Transaction_snark_work.Make (Ledger_proof)
+
+      (*struct
         let proofs_length = 2
 
         type proof = Ledger_proof.Stable.V1.t
@@ -1606,9 +1611,12 @@ let%test_module "test" =
         let forget : Checked.t -> t =
          fun {Checked.fee= f; proofs= p; prover= pr} ->
           {fee= f; proofs= p; prover= pr}
-      end
+      end*)
 
-      module Staged_ledger_diff = struct
+      module Staged_ledger_diff =
+        Staged_ledger_diff.Make (Transaction_snark_work)
+
+      (*module Staged_ledger_diff = struct
         type completed_work = Transaction_snark_work.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
@@ -1844,7 +1852,7 @@ let%test_module "test" =
         let completed_works _ = failwith "completed_work : Need to implement"
 
         let coinbase _ = failwith "coinbase: Need to implement"
-      end
+      end*)
     end
 
     module type Staged_ledger_test_intf =
@@ -1974,12 +1982,17 @@ let%test_module "test" =
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen
 
+    let proofs stmts fee prover : Ledger_proof.t list =
+      let sok_digest = Sok_message.(digest @@ create ~fee ~prover) in
+      List.map stmts ~f:(fun s -> (s, sok_digest))
+
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =
       let prover = stmt_to_prover stmts in
+      let fee = Fee.of_int 1 in
       Some
-        { Transaction_snark_work.Checked.fee= Fee.of_int 1
-        ; proofs= stmts
+        { Transaction_snark_work.Checked.fee
+        ; proofs= proofs stmts fee prover
         ; prover }
 
     (* Fixed public key for when there is only one snark worker. *)
@@ -1989,7 +2002,9 @@ let%test_module "test" =
 
     let stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
-      Some {fee= Fee.of_int 1; proofs= stmts; prover= snark_worker_pk}
+      let fee = Fee.of_int 1 in
+      let prover = snark_worker_pk in
+      Some {fee; proofs= proofs stmts fee snark_worker_pk; prover}
 
     let coinbase_fee_transfers_first_prediff = function
       | Staged_ledger_diff.At_most_two.Zero ->
@@ -2040,7 +2055,7 @@ let%test_module "test" =
      fun proof_opt ->
       let fee_excess =
         Option.value_map ~default:Fee.Signed.zero proof_opt ~f:(fun proof ->
-            (fst @@ Ledger_proof.statement proof).fee_excess )
+            (Ledger_proof.statement (fst proof)).fee_excess )
       in
       assert (Fee.Signed.(equal fee_excess zero))
 
@@ -2346,7 +2361,7 @@ let%test_module "test" =
                       List.map
                         ~f:(fun stmts ->
                           { Transaction_snark_work.Checked.fee= Fee.zero
-                          ; proofs= stmts
+                          ; proofs= proofs stmts Fee.zero snark_worker_pk
                           ; prover= snark_worker_pk } )
                         work
                     in
@@ -2395,7 +2410,7 @@ let%test_module "test" =
                       ()
                   | Some proof ->
                       let last_snarked_ledger_hash =
-                        (Tuple2.get1 proof).target
+                        (fst @@ fst proof).target
                       in
                       let materialized_snarked_ledger_hash =
                         Or_error.ok_exn
@@ -2422,9 +2437,10 @@ let%test_module "test" =
           (List.find work_list ~f:(fun s ->
                Transaction_snark_work.Statement.compare s stmts = 0 ))
       then
+        let fee = Fee.of_int 1 in
         Some
-          { Transaction_snark_work.Checked.fee= Fee.of_int 1
-          ; proofs= stmts
+          { Transaction_snark_work.Checked.fee
+          ; proofs= proofs stmts fee prover
           ; prover }
       else None
 

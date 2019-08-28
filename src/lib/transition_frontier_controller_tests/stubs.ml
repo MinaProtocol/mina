@@ -72,20 +72,23 @@ struct
     module User_command = User_command
     module Ledger_proof_statement = Transaction_snark.Statement
     module Proof = Proof
-    module Sok_message = Coda_base.Sok_message
+
+    (*module Sok_message = Coda_base.Sok_message*)
     module Ledger_proof = Ledger_proof
     module Ledger_proof_verifier = Verifier
-    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Staged_ledger_hash = Staged_ledger_hash_binable
+
+    (*module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Staged_ledger_hash = Staged_ledger_hash_binable*)
     module Transaction_snark_work = Transaction_snark_work
     module Transaction_validator = Transaction_validator
     module Staged_ledger_diff = Staged_ledger_diff
     module Account = Coda_base.Account
     module Verifier = Verifier
     module Proof_type = Transaction_snark.Proof_type
-    module Pending_coinbase_hash = Pending_coinbase.Hash
+
+    (*module Pending_coinbase_hash = Pending_coinbase.Hash
     module Pending_coinbase_stack_state =
-      Transaction_snark.Pending_coinbase_stack_state
+      Transaction_snark.Pending_coinbase_stack_state*)
     module Transaction_witness = Transaction_witness
   end)
 

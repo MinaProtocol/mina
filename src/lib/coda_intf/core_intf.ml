@@ -22,10 +22,6 @@ end
 module type Ledger_proof_generalized_intf = sig
   type transaction_snark_statement
 
-  type sok_message_digest
-
-  type proof
-
   type frozen_ledger_hash
 
   (* bin_io omitted intentionally *)
@@ -43,24 +39,22 @@ module type Ledger_proof_generalized_intf = sig
 
   val create :
        statement:transaction_snark_statement
-    -> sok_digest:sok_message_digest
-    -> proof:proof
+    -> sok_digest:Sok_message.Digest.t
+    -> proof:Proof.t
     -> t
 
   val statement_target : transaction_snark_statement -> frozen_ledger_hash
 
   val statement : t -> transaction_snark_statement
 
-  val sok_digest : t -> sok_message_digest
+  val sok_digest : t -> Sok_message.Digest.t
 
-  val underlying_proof : t -> proof
+  val underlying_proof : t -> Proof.t
 end
 
 module type Ledger_proof_intf =
   Ledger_proof_generalized_intf
   with type transaction_snark_statement := Transaction_snark.Statement.t
-   and type sok_message_digest := Sok_message.Digest.t
-   and type proof := Proof.t
    and type frozen_ledger_hash := Frozen_ledger_hash.t
 
 module type Verifier_intf = sig

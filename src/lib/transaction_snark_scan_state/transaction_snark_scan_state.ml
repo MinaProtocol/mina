@@ -27,7 +27,6 @@ module Make
   Coda_intf.Transaction_snark_scan_state_generalized_intf
   with type transaction_snark_work := Inputs.Transaction_snark_work.t
    and type transaction_snark_statement := Transaction_snark.Statement.t
-   and type sok_message := Inputs.Sok_message.t
    and type frozen_ledger_hash := Frozen_ledger_hash.t
    and type ledger_undo := Ledger.Undo.t
    and type transaction := Transaction.t

@@ -44,13 +44,13 @@ end
 
 (* TODO: this is temporarily required due to staged ledger test stubs *)
 module type Staged_ledger_diff_generalized_intf = sig
-  type fee_transfer_single
+  (*type fee_transfer_single
 
   type user_command
 
   type user_command_with_valid_signature
 
-  type compressed_public_key
+  type compressed_public_key*)
 
   type transaction_snark_work
 
@@ -88,8 +88,8 @@ module type Staged_ledger_diff_generalized_intf = sig
   module Pre_diff_with_at_most_two_coinbase : sig
     type t =
       { completed_works: transaction_snark_work list
-      ; user_commands: user_command list
-      ; coinbase: fee_transfer_single At_most_two.Stable.V1.t }
+      ; user_commands: User_command.t list
+      ; coinbase: Fee_transfer.Single.t At_most_two.t }
     [@@deriving sexp, to_yojson]
 
     module Stable :
@@ -104,8 +104,8 @@ module type Staged_ledger_diff_generalized_intf = sig
   module Pre_diff_with_at_most_one_coinbase : sig
     type t =
       { completed_works: transaction_snark_work list
-      ; user_commands: user_command list
-      ; coinbase: fee_transfer_single At_most_one.t }
+      ; user_commands: User_command.t list
+      ; coinbase: Fee_transfer.Single.t At_most_one.t }
     [@@deriving sexp, to_yojson]
 
     module Stable :
@@ -132,13 +132,13 @@ module type Staged_ledger_diff_generalized_intf = sig
       with type V1.t = t
   end
 
-  type t = {diff: Diff.t; creator: compressed_public_key}
+  type t = {diff: Diff.t; creator: Public_key.Compressed.t}
   [@@deriving sexp, to_yojson, fields]
 
   module Stable :
     sig
       module V1 : sig
-        type t = {diff: Diff.t; creator: compressed_public_key}
+        type t = {diff: Diff.t; creator: Public_key.Compressed.t}
         [@@deriving sexp, to_yojson, bin_io, version]
       end
 
@@ -149,14 +149,14 @@ module type Staged_ledger_diff_generalized_intf = sig
   module With_valid_signatures_and_proofs : sig
     type pre_diff_with_at_most_two_coinbase =
       { completed_works: transaction_snark_work_checked list
-      ; user_commands: user_command_with_valid_signature list
-      ; coinbase: fee_transfer_single At_most_two.t }
+      ; user_commands: User_command.With_valid_signature.t list
+      ; coinbase: Fee_transfer.Single.t At_most_two.t }
     [@@deriving sexp]
 
     type pre_diff_with_at_most_one_coinbase =
       { completed_works: transaction_snark_work_checked list
-      ; user_commands: user_command_with_valid_signature list
-      ; coinbase: fee_transfer_single At_most_one.t }
+      ; user_commands: User_command.With_valid_signature.t list
+      ; coinbase: Fee_transfer.Single.t At_most_one.t }
     [@@deriving sexp]
 
     type diff =
@@ -164,32 +164,24 @@ module type Staged_ledger_diff_generalized_intf = sig
       * pre_diff_with_at_most_one_coinbase option
     [@@deriving sexp]
 
-    type t = {diff: diff; creator: compressed_public_key} [@@deriving sexp]
+    type t = {diff: diff; creator: Public_key.Compressed.t} [@@deriving sexp]
 
-    val user_commands : t -> user_command_with_valid_signature list
+    val user_commands : t -> User_command.With_valid_signature.t list
   end
 
   val forget : With_valid_signatures_and_proofs.t -> t
 
-  val user_commands : t -> user_command list
+  val user_commands : t -> User_command.t list
 
   val completed_works : t -> transaction_snark_work list
 
   val coinbase : t -> Currency.Amount.t
 end
 
-module type Staged_ledger_diff_intf =
-  Staged_ledger_diff_generalized_intf
-  with type fee_transfer_single := Fee_transfer.Single.t
-   and type user_command := User_command.Stable.V1.t
-   and type user_command_with_valid_signature :=
-              User_command.With_valid_signature.t
-   and type compressed_public_key := Public_key.Compressed.t
+module type Staged_ledger_diff_intf = Staged_ledger_diff_generalized_intf
 
 (* TODO: this is temporarily required due to staged ledger test stubs *)
 module type Transaction_snark_scan_state_generalized_intf = sig
-  type sok_message
-
   type transaction_snark_statement
 
   type frozen_ledger_hash
@@ -226,7 +218,7 @@ module type Transaction_snark_scan_state_generalized_intf = sig
   end
 
   module Ledger_proof_with_sok_message : sig
-    type t = ledger_proof * sok_message
+    type t = ledger_proof * Sok_message.t
   end
 
   module Available_job : sig
@@ -261,7 +253,7 @@ module type Transaction_snark_scan_state_generalized_intf = sig
                verifier:t
             -> proof:ledger_proof
             -> statement:transaction_snark_statement
-            -> message:sok_message
+            -> message:Sok_message.t
             -> sexp_bool M.t
       end) : sig
     val scan_statement :
@@ -352,7 +344,6 @@ end
 module type Transaction_snark_scan_state_intf =
   Transaction_snark_scan_state_generalized_intf
   with type transaction_snark_statement := Transaction_snark.Statement.t
-   and type sok_message := Sok_message.t
    and type frozen_ledger_hash := Frozen_ledger_hash.t
    and type ledger_undo := Ledger.Undo.t
    and type transaction := Transaction.t

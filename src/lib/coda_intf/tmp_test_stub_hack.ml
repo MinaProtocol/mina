@@ -14,11 +14,11 @@ module type For_transaction_snark_scan_state_intf = sig
     val of_bytes : string -> t
   end*)
 
-  module Proof : sig
+  (*module Proof : sig
     type t
-  end
+  end*)
 
-  module Sok_message : sig
+  (*module Sok_message : sig
     type t [@@deriving sexp]
 
     module Stable : sig
@@ -32,13 +32,11 @@ module type For_transaction_snark_scan_state_intf = sig
     module Digest : sig
       type t
     end
-  end
+  end*)
 
   module Ledger_proof :
     Core_intf.Ledger_proof_generalized_intf
     with type transaction_snark_statement := Transaction_snark.Statement.t
-     and type sok_message_digest := Sok_message.Digest.t
-     and type proof := Proof.t
      and type frozen_ledger_hash := Coda_base.Frozen_ledger_hash.t
 
   module Transaction_snark_work :
@@ -78,12 +76,7 @@ module type For_staged_ledger_intf = sig
 
   module Staged_ledger_diff :
     Staged_ledger_intf.Staged_ledger_diff_generalized_intf
-    with type fee_transfer_single := Fee_transfer.Single.t
-     and type user_command := User_command.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t
-     and type compressed_public_key := Public_key.Compressed.t
-     and type transaction_snark_work := Transaction_snark_work.t
+    with type transaction_snark_work := Transaction_snark_work.t
      and type transaction_snark_work_checked :=
                 Transaction_snark_work.Checked.t
 end
