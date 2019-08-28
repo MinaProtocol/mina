@@ -1,11 +1,5 @@
 # O(1) Labs Next-Gen Deployments
 
-## Purpose
-O(1) Labs requires a deployment system that drastically reduces the human burden of deploying and running software infrastructure. It needs to free up the time of the Operations Engineers and empower O(1) Developers to manage and deploy their own *Testnets* and *Services*.
-
-## Scope
-This document is a portion of a large, complex infrastructure. As such, certain subjects are out of scope. For example, it is addressed that in this system running *Smoke Tests* should be supported, but exactly how these tests should behave or interact with a Coda network is out of scope. 
-
 ## Definitions
 
 **Coda Daemon** - Coda binary connected to the network 
@@ -25,6 +19,47 @@ This document is a portion of a large, complex infrastructure. As such, certain 
 **SNARK Worker** - Coda Daemon completing SNARK jobs and producing SNARK work 
 
 **Testnet** - A **test** **net**work of Coda Daemons
+
+## Summary
+In short, this system will be embodied by a series of container clusters running in various *regions*. 
+
+Builds will be managed by a Container Build pipeline, releasing artifacts to one or more Docker container registries. 
+
+To deploy a testnet, container *Tasks* representing various testnet components can be scheduled to the clusters. 
+
+To facilitate testing, service *Tasks* may be scheduled alongside daemon *Tasks* that will manipulate the Daemon's GraphQL Endpoint and trigger/verify the desired behavior. 
+
+The bulk of the monitoring workload will be handled by Prometheus which will scrape the metrics endpoints of the individual components. 
+
+Logs will be redirected from the container's stdout/stderr and retained in an external log management system. 
+
+Alerting will be handled by Grafana, watching prometheus metrics. 
+
+## Motivation
+O(1) Labs requires a deployment system that drastically reduces the human burden of deploying and running software infrastructure. It needs to free up the time of the Operations Engineers and empower O(1) Developers to manage and deploy their own *Testnets* and *Services*. 
+
+## Why Containers
+Google has set the bar when it comes to running containers at scale. As such, I feel it apropriate to quote them whenever possible for the purposes of this discussion.
+
+The first, obvious question is, "What is a container?" 
+> Containers offer a logical packaging mechanism in which applications can be abstracted from the environment in which they actually run. This decoupling allows container-based applications to be deployed easily and consistently, regardless of whether the target environment is a private data center, the public cloud, or even a developer’s personal laptop. Containerization provides a clean separation of concerns, as developers focus on their application logic and dependencies, while IT operations teams can focus on deployment and management without bothering with application details such as specific software versions and configurations specific to the app.
+</br>
+\- [Containers at Google](https://cloud.google.com/containers/)
+
+"Why Containers?"
+> Instead of virtualizing the hardware stack as with the virtual machines approach, containers virtualize at the operating system level, with multiple containers running atop the OS kernel directly. This means that containers are far more lightweight: they share the OS kernel, start much faster, and use a fraction of the memory compared to booting an entire OS.
+</br>
+\- [Containers at Google](https://cloud.google.com/containers/)
+
+The three high-level reasons for why you'd want to use containers are as follows: 
+- Consistent Environment
+- Run Anywhere
+- Isolation
+  
+For more details see the Containers @ Google article here: https://cloud.google.com/containers/
+
+
+## Detailed Design
 
 ## Business Requirements
 
@@ -62,21 +97,6 @@ This document is a portion of a large, complex infrastructure. As such, certain 
   - Initially, it is important that no two daemons are producing blocks with the same private keys due to a bug in the daemon: https://github.com/CodaProtocol/coda/issues/756
 
 ## Implementation Overview
-
-### Summary
-In short, this system will be embodied by a series of container clusters running in various *regions*. 
-
-Builds will be managed by a Container Build pipeline, releasing artifacts to one or more Docker container registries. 
-
-To deploy a testnet, container *Tasks* representing various testnet components can be scheduled to the clusters. 
-
-To facilitate testing, service *Tasks* may be scheduled alongside daemon *Tasks* that will manipulate the Daemon's GraphQL Endpoint and trigger/verify the desired behavior. 
-
-The bulk of the monitoring workload will be handled by Prometheus which will scrape the metrics endpoints of the individual components. 
-
-Logs will be redirected from the container's stdout/stderr and retained in an external log management system. 
-
-Alerting will be handled by Grafana, watching prometheus metrics. 
 
 ### Infrastructure
 
@@ -162,22 +182,10 @@ If more advanced functionality is required, we can build and release docker imag
 
 (TODO BELOW THIS LINE)
 
-### Deploy
+## Drawbacks 
 
-**Deployment Pipeline**: 
+## Rationale and alternatives
 
-***PROPOSED SOLUTION:***
+## Prior Art
 
-### Testing
-
-**Nightly Smoke Tests**:
-
-### Monitoring
-
-**Prometheus Metrics**
-
-**Logging**
-
-### Alerting
-
-**Grafana Alerts**
+## Unresolved Questions
