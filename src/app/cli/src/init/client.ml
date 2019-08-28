@@ -604,7 +604,7 @@ let cancel_transaction =
                let diff =
                  Unsigned.UInt64.of_int
                    Coda_numbers.Account_nonce.(
-                     to_int inferred_nonce - to_int cancelled_nonce + 1)
+                     to_int inferred_nonce - to_int cancelled_nonce)
                in
                let fee =
                  Currency.Fee.to_uint64 (User_command.fee user_command)
