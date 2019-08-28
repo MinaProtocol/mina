@@ -1,7 +1,6 @@
 open Async_kernel
 open Core_kernel
 open Coda_base
-open Signature_lib
 
 module type For_transaction_snark_scan_state_intf = sig
   module Proof_type : sig
@@ -42,8 +41,6 @@ module type For_transaction_snark_scan_state_intf = sig
   module Transaction_snark_work :
     Core_intf.Transaction_snark_work_generalized_intf
     with type ledger_proof := Ledger_proof.t
-     and type transaction_snark_statement := Transaction_snark.Statement.t
-     and type compressed_public_key := Public_key.Compressed.t
 end
 
 module type For_staged_ledger_intf = sig

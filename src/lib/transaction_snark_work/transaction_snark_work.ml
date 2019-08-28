@@ -23,8 +23,6 @@ end) :
   with type ledger_proof := Ledger_proof.t = struct
   let ledger_proof_to_yojson = Ledger_proof.to_yojson
 
-  let compressed_public_key_to_yojson = Public_key.Compressed.to_yojson
-
   let proofs_length = 2
 
   module Statement = struct
