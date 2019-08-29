@@ -187,6 +187,35 @@ let%test_module "Bootstrap Controller" =
                   (Staged_ledger.hash staged_ledger)
                   (Staged_ledger.hash actual_staged_ledger) ) ) )
 
+    let assert_transitions_increasingly_sorted ~root
+        (incoming_transitions :
+          External_transition.with_initial_validation Envelope.Incoming.t list)
+        =
+      let root =
+        With_hash.data @@ fst
+        @@ Transition_frontier.Breadcrumb.validated_transition root
+      in
+      let blockchain_length =
+        Fn.compose Consensus.Data.Consensus_state.blockchain_length
+          External_transition.consensus_state
+      in
+      List.fold_result ~init:root incoming_transitions
+        ~f:(fun max_acc incoming_transition ->
+          let With_hash.{data= transition; _}, _ =
+            Envelope.Incoming.data incoming_transition
+          in
+          let open Result.Let_syntax in
+          let%map () =
+            Result.ok_if_true
+              Coda_numbers.Length.(
+                blockchain_length max_acc <= blockchain_length transition)
+              ~error:
+                (Error.of_string
+                   "The blocks are not sorted in increasing order")
+          in
+          transition )
+      |> Or_error.ok_exn |> ignore
+
     let%test "sync with one node after receiving a transition" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
@@ -208,7 +237,7 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
           let%map ( new_frontier
-                  , (_ :
+                  , (sorted_external_transitions :
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
@@ -216,6 +245,9 @@ let%test_module "Bootstrap Controller" =
               ~verifier:() ~network ~frontier:syncing_frontier ~ledger_db
               ~transition_reader ~should_ask_best_tip:false
           in
+          assert_transitions_increasingly_sorted
+            ~root:(Transition_frontier.root new_frontier)
+            sorted_external_transitions ;
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
       )
 
@@ -237,7 +269,7 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
           let%map ( new_frontier
-                  , (_ :
+                  , (sorted_transitions :
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
@@ -245,6 +277,8 @@ let%test_module "Bootstrap Controller" =
               ~verifier:() ~network ~frontier:syncing_frontier ~ledger_db
               ~transition_reader ~should_ask_best_tip:true
           in
+          let root = Transition_frontier.(root new_frontier) in
+          assert_transitions_increasingly_sorted ~root sorted_transitions ;
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
       )
 
@@ -273,7 +307,7 @@ let%test_module "Bootstrap Controller" =
           in
           let synced_peer = List.nth_exn peers 1 in
           let%map ( new_frontier
-                  , (_ :
+                  , (sorted_external_transitions :
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
@@ -281,6 +315,9 @@ let%test_module "Bootstrap Controller" =
               ~verifier:() ~network ~frontier:me ~ledger_db ~transition_reader
               ~should_ask_best_tip:true
           in
+          assert_transitions_increasingly_sorted
+            ~root:(Transition_frontier.root new_frontier)
+            sorted_external_transitions ;
           Ledger_hash.equal (root_hash new_frontier)
             (root_hash synced_peer.frontier) )
 
@@ -325,7 +362,7 @@ let%test_module "Bootstrap Controller" =
               (get_best_tip_hash large_peer)
           in
           let%map ( new_frontier
-                  , (_ :
+                  , (sorted_external_transitions :
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
@@ -333,6 +370,9 @@ let%test_module "Bootstrap Controller" =
               ~verifier:() ~network ~frontier:me ~ledger_db ~transition_reader
               ~should_ask_best_tip:false
           in
+          assert_transitions_increasingly_sorted
+            ~root:(Transition_frontier.root new_frontier)
+            sorted_external_transitions ;
           Ledger_hash.equal (root_hash new_frontier)
             (root_hash large_peer.frontier) )
 

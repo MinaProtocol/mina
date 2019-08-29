@@ -13,13 +13,15 @@ module Statement : sig
         type t [@@deriving yojson, version, sexp, bin_io]
 
         include Hashable.S_binable with type t := t
-
-        val compact_json : t -> Yojson.Safe.json
       end
     end
     with type V1.t = t
 
   val gen : t Quickcheck.Generator.t
+
+  val compact_json : t -> Yojson.Safe.json
+
+  val work_ids : t -> int list
 end
 
 module Info : sig

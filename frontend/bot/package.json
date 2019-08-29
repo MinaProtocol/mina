@@ -20,7 +20,7 @@
     "isomorphic-ws": "^4.0.1",
     "node-fetch": "^2.6.0",
     "reason-react": "^0.7.0",
-    "reason-urql": "^1.0.0-beta.2",
+    "reason-urql": "^1.0.0-beta.3",
     "subscriptions-transport-ws": "^0.9.16",
     "ws": "^7.1.1"
   }
