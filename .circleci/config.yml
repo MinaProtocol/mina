@@ -106,6 +106,7 @@ jobs:
                 command: |
                     sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
                     df -h
+                    bash -version
             # Attach workspace from prior linux build
             - attach_workspace:
                 at: /tmp/workspace
@@ -123,7 +124,6 @@ jobs:
                 name: Restore cache - homebrew
                 keys:
                     - homebrew-v6-{{ checksum "scripts/macos-setup-brew.sh" }}
-                    - homebrew-v5-{{ checksum "scripts/macos-setup.sh" }}
                     - homebrew-v5-
             - run:
                 name: Install macos dependencies - homebrew - make macos-setup-download
@@ -141,6 +141,7 @@ jobs:
                 command: |
                     cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
+                    bash --version
             - restore_cache:
                 name: Restore cache - opam
                 keys:
