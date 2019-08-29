@@ -100,11 +100,7 @@ let%test_module "Bootstrap Controller" =
               ~f:(fun x ->
                 Pipe_lib.Strict_pipe.Writer.write sync_ledger_writer x
                 |> don't_wait_for )
-              (List.zip_exn
-                 (List.map ~f:(fun e -> `Transition e) envelopes)
-                 (List.map
-                    ~f:(fun t -> `Time_received t)
-                    (List.init num_breadcrumbs ~f:Fn.id)))
+              envelopes
           in
           let run_sync =
             Bootstrap_controller.For_tests.sync_ledger bootstrap

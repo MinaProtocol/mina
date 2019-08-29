@@ -771,8 +771,7 @@ struct
         Envelope.Incoming.wrap ~data:transition
           ~sender:(Envelope.Sender.Remote peer.host)
       in
-      Pipe_lib.Strict_pipe.Writer.write transition_writer
-        (`Transition enveloped_transition, `Time_received Constants.time)
+      Pipe_lib.Strict_pipe.Writer.write transition_writer enveloped_transition
 
     let make_transition_pipe () =
       Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)

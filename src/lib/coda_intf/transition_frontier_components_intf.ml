@@ -58,10 +58,8 @@ module type Transition_handler_validator_intf = sig
        logger:Logger.t
     -> trust_system:Trust_system.t
     -> frontier:transition_frontier
-    -> transition_reader:( [ `Transition of
-                             external_transition_with_initial_validation
-                             Envelope.Incoming.t ]
-                         * [`Time_received of Block_time.t] )
+    -> transition_reader:external_transition_with_initial_validation
+                         Envelope.Incoming.t
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( ( external_transition_with_initial_validation
                                    Envelope.Incoming.t
@@ -394,10 +392,8 @@ module type Bootstrap_controller_intf = sig
     -> network:network
     -> frontier:transition_frontier
     -> ledger_db:Ledger.Db.t
-    -> transition_reader:( [< `Transition of
-                              external_transition_with_initial_validation
-                              Envelope.Incoming.t ]
-                         * [< `Time_received of Block_time.t] )
+    -> transition_reader:external_transition_with_initial_validation
+                         Envelope.Incoming.t
                          Strict_pipe.Reader.t
     -> ( transition_frontier
        * external_transition_with_initial_validation Envelope.Incoming.t list
@@ -428,10 +424,8 @@ module type Transition_frontier_controller_intf = sig
                              Envelope.Incoming.t
                              list
     -> frontier:transition_frontier
-    -> network_transition_reader:( [ `Transition of
-                                     external_transition_with_initial_validation
-                                     Envelope.Incoming.t ]
-                                 * [`Time_received of Block_time.t] )
+    -> network_transition_reader:external_transition_with_initial_validation
+                                 Envelope.Incoming.t
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> clear_reader:[`Clear] Strict_pipe.Reader.t
@@ -450,10 +444,8 @@ module type Initial_validator_intf = sig
                              external_transition Envelope.Incoming.t ]
                          * [`Time_received of Block_time.t] )
                          Strict_pipe.Reader.t
-    -> valid_transition_writer:( [ `Transition of
-                                   external_transition_with_initial_validation
-                                   Envelope.Incoming.t ]
-                                 * [`Time_received of Block_time.t]
+    -> valid_transition_writer:( external_transition_with_initial_validation
+                                 Envelope.Incoming.t
                                , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t

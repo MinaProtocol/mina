@@ -171,9 +171,7 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
             >>= Fn.compose Deferred.return validate_delta_transition_chain)
         with
         | Ok verified_transition ->
-            ( `Transition
-                (Envelope.Incoming.wrap ~data:verified_transition ~sender)
-            , `Time_received time_received )
+            Envelope.Incoming.wrap ~data:verified_transition ~sender
             |> Writer.write valid_transition_writer ;
             return ()
         | Error error ->

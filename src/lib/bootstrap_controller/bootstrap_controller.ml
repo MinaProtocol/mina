@@ -90,10 +90,8 @@ module Make (Inputs : Inputs_intf) : sig
       -> network:Network.t
       -> frontier:Transition_frontier.t
       -> ledger_db:Ledger.Db.t
-      -> transition_reader:( [< `Transition of
-                                External_transition.with_initial_validation
-                                Envelope.Incoming.t ]
-                           * [< `Time_received of Block_time.t] )
+      -> transition_reader:External_transition.with_initial_validation
+                           Envelope.Incoming.t
                            Pipe_lib.Strict_pipe.Reader.t
       -> ( Transition_frontier.t
          * External_transition.with_initial_validation Envelope.Incoming.t list
@@ -113,10 +111,8 @@ module Make (Inputs : Inputs_intf) : sig
                           * Staged_ledger_hash.t )
                           Root_sync_ledger.t
       -> transition_graph:Transition_cache.t
-      -> sync_ledger_reader:( [< `Transition of
-                                 External_transition.with_initial_validation
-                                 Envelope.Incoming.t ]
-                            * [< `Time_received of 'a] )
+      -> sync_ledger_reader:External_transition.with_initial_validation
+                            Envelope.Incoming.t
                             Pipe_lib.Strict_pipe.Reader.t
       -> unit Deferred.t
   end
@@ -234,8 +230,7 @@ end = struct
     let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
     let response_writer = Root_sync_ledger.answer_writer root_sync_ledger in
     Network.glue_sync_ledger t.network query_reader response_writer ;
-    Reader.iter sync_ledger_reader
-      ~f:(fun (`Transition incoming_transition, `Time_received _) ->
+    Reader.iter sync_ledger_reader ~f:(fun incoming_transition ->
         let ({With_hash.data= transition; hash}, _)
               : External_transition.with_initial_validation =
           Envelope.Incoming.data incoming_transition

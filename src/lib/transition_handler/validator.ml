@@ -64,8 +64,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          Writer.t) ~unprocessed_transition_cache =
     let module Lru = Core_extended_cache.Lru in
     don't_wait_for
-      (Reader.iter transition_reader
-         ~f:(fun (`Transition transition_env, `Time_received _) ->
+      (Reader.iter transition_reader ~f:(fun transition_env ->
            let {With_hash.hash= transition_hash; data= transition}, _ =
              Envelope.Incoming.data transition_env
            in

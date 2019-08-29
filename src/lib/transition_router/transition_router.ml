@@ -216,9 +216,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~time_controller ~proposer_transition_reader
             ~verified_transition_writer ~clear_reader ~transition_reader_ref
             ~transition_writer_ref ~ledger_db ~frontier_w frontier ;
-          Strict_pipe.Writer.write !transition_writer_ref
-            ( `Transition best_tip_enveloped
-            , `Time_received (Coda_base.Block_time.now time_controller) ) )
+          Strict_pipe.Writer.write !transition_writer_ref best_tip_enveloped )
         else
           start_transition_frontier_controller ~logger ~trust_system ~verifier
             ~network ~time_controller ~proposer_transition_reader
@@ -293,8 +291,7 @@ module Make (Inputs : Inputs_intf) = struct
           Strict_pipe.Reader.Fork.two valid_protocol_state_transition_reader
         in
         Strict_pipe.Reader.iter valid_transition_reader
-          ~f:(fun transition_with_time ->
-            let `Transition enveloped_transition, _ = transition_with_time in
+          ~f:(fun enveloped_transition ->
             let transition =
               Envelope.Incoming.data enveloped_transition
               |> fst |> With_hash.data
@@ -315,8 +312,7 @@ module Make (Inputs : Inputs_intf) = struct
         |> don't_wait_for ;
         Strict_pipe.Reader.iter_without_pushback
           valid_protocol_state_transition_reader
-          ~f:(fun transition_with_time ->
-            let `Transition enveloped_transition, _ = transition_with_time in
+          ~f:(fun enveloped_transition ->
             let transition =
               Envelope.Incoming.data enveloped_transition
               |> fst |> With_hash.data
@@ -336,7 +332,7 @@ module Make (Inputs : Inputs_intf) = struct
             | None ->
                 () ) ;
             Strict_pipe.Writer.write !transition_writer_ref
-              transition_with_time )
+              enveloped_transition )
         |> don't_wait_for ) ;
     verified_transition_reader
 end
