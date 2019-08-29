@@ -25,6 +25,10 @@ module type S = sig
   val changes : t -> Peer.Event.t Linear_pipe.Reader.t
 
   val stop : t -> unit Deferred.t
+
+  module Hacky_glue : sig
+    val inject_event : t -> Peer.Event.t -> unit
+  end
 end
 
 module type Process_intf = sig
@@ -471,6 +475,11 @@ end = struct
   let changes t = t.changes_reader
 
   let stop t = P.kill t.p
+
+  module Hacky_glue = struct
+    let inject_event t e =
+      Linear_pipe.write t.changes_writer e |> don't_wait_for
+  end
 
   module For_tests = struct
     let node node_addrs_and_ports (peers : Host_and_port.t list) conf_dir

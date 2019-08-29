@@ -623,8 +623,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                      |> Yojson.Safe.from_string |> Peer.of_yojson
                      |> Result.ok_or_failwith
                    in
-                   ignore them_as_peer)
-                  (* Inject into Membership.changes *)
+                   Option.iter haskell_membership ~f:(fun membership ->
+                       Membership.Hacky_glue.inject_event membership
+                         (Peer.Event.Connect [them_as_peer]) ))
                   |> don't_wait_for
                 in
                 let%bind _disc_handler =
