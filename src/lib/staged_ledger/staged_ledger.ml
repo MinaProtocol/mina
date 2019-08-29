@@ -1863,7 +1863,7 @@ let%test_module "test" =
                       ()
                   | Some proof ->
                       let last_snarked_ledger_hash =
-                        (Transaction_snark.statement (fst proof)).target
+                        (Ledger_proof.statement (fst proof)).target
                       in
                       let materialized_snarked_ledger_hash =
                         Or_error.ok_exn
