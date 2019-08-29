@@ -19,9 +19,6 @@ struct
     let verify _ _ = return true
   end
 
-  module Ledger_proof = Ledger_proof.Debug
-  module Verifier = Verifier.Dummy
-
   module Staged_ledger_aux_hash = struct
     include Staged_ledger_hash.Aux_hash.Stable.V1
 
@@ -125,8 +122,10 @@ struct
           Transaction_snark_work.Checked.
             { fee= Fee.of_int 1
             ; proofs=
-                List.map stmts ~f:(fun stmt ->
-                    (stmt, Sok_message.Digest.default) )
+                List.map stmts ~f:(fun statement ->
+                    Ledger_proof.create ~statement
+                      ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
+                )
             ; prover }
       in
       let staged_ledger_diff =
@@ -186,8 +185,9 @@ struct
             next_verified_external_transition) =
         External_transition.Validated.create_unsafe next_external_transition
       in
+      let%bind verifier = Verifier.create () in
       match%map
-        Transition_frontier.Breadcrumb.build ~logger ~trust_system ~verifier:()
+        Transition_frontier.Breadcrumb.build ~logger ~trust_system ~verifier
           ~parent:parent_breadcrumb
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
@@ -264,9 +264,10 @@ struct
     in
     let open Deferred.Let_syntax in
     let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
+    let%bind verifier = Verifier.create () in
     match%bind
       Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
-        ~verifier:() ~scan_state:root_transaction_snark_scan_state
+        ~verifier ~scan_state:root_transaction_snark_scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
         ~expected_merkle_root ~pending_coinbases:root_pending_coinbases
     with

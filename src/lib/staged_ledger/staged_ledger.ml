@@ -1347,11 +1347,12 @@ let%test_module "test" =
           ~get_completed_work:stmt_to_work
       in
       let diff' = Staged_ledger_diff.forget diff in
+      let%bind verifier = Verifier.create () in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
               , `Pending_coinbase_data _ ) =
-        match%map Sl.apply !sl diff' ~logger ~verifier:() with
+        match%map Sl.apply !sl diff' ~logger ~verifier with
         | Ok x ->
             x
         | Error e ->
@@ -1438,18 +1439,16 @@ let%test_module "test" =
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen
 
-    let proofs stmts fee prover : Ledger_proof.t list =
-      let sok_digest = Sok_message.(digest @@ create ~fee ~prover) in
-      List.map stmts ~f:(fun s -> (s, sok_digest))
+    let proofs stmts : Ledger_proof.t list =
+      List.map stmts ~f:(fun statement ->
+          Ledger_proof.create ~statement ~sok_digest:Sok_message.Digest.default
+            ~proof:Proof.dummy )
 
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =
       let prover = stmt_to_prover stmts in
       let fee = Fee.of_int 1 in
-      Some
-        { Transaction_snark_work.Checked.fee
-        ; proofs= proofs stmts fee prover
-        ; prover }
+      Some {Transaction_snark_work.Checked.fee; proofs= proofs stmts; prover}
 
     (* Fixed public key for when there is only one snark worker. *)
     let snark_worker_pk =
@@ -1459,8 +1458,7 @@ let%test_module "test" =
     let stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
       let fee = Fee.of_int 1 in
-      let prover = snark_worker_pk in
-      Some {fee; proofs= proofs stmts fee snark_worker_pk; prover}
+      Some {fee; proofs= proofs stmts; prover= snark_worker_pk}
 
     let coinbase_fee_transfers_first_prediff = function
       | Staged_ledger_diff.At_most_two.Zero ->
@@ -1817,7 +1815,7 @@ let%test_module "test" =
                       List.map
                         ~f:(fun stmts ->
                           { Transaction_snark_work.Checked.fee= Fee.zero
-                          ; proofs= proofs stmts Fee.zero snark_worker_pk
+                          ; proofs= proofs stmts
                           ; prover= snark_worker_pk } )
                         work
                     in
@@ -1826,9 +1824,8 @@ let%test_module "test" =
                         (Sequence.to_list cmds_this_iter :> User_command.t list)
                         work_done partitions
                     in
-                    let%bind apply_res =
-                      Sl.apply !sl diff ~logger ~verifier:()
-                    in
+                    let%bind verifier = Verifier.create () in
+                    let%bind apply_res = Sl.apply !sl diff ~logger ~verifier in
                     let checked', diff' =
                       match apply_res with
                       | Error (Sl.Staged_ledger_error.Non_zero_fee_excess _) ->
@@ -1866,7 +1863,7 @@ let%test_module "test" =
                       ()
                   | Some proof ->
                       let last_snarked_ledger_hash =
-                        (fst @@ fst proof).target
+                        (Transaction_snark.statement (fst proof)).target
                       in
                       let materialized_snarked_ledger_hash =
                         Or_error.ok_exn
@@ -1893,10 +1890,9 @@ let%test_module "test" =
           (List.find work_list ~f:(fun s ->
                Transaction_snark_work.Statement.compare s stmts = 0 ))
       then
-        let fee = Fee.of_int 1 in
         Some
-          { Transaction_snark_work.Checked.fee
-          ; proofs= proofs stmts fee prover
+          { Transaction_snark_work.Checked.fee= Fee.of_int 1
+          ; proofs= proofs stmts
           ; prover }
       else None
 

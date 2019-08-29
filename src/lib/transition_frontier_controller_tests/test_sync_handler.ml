@@ -20,6 +20,10 @@ let%test_module "Sync_handler" =
 
     let trust_system = Trust_system.null ()
 
+    let create ~f ~logger =
+      let%map verifier = Verifier.create () in
+      f ~logger ~verifier
+
     let%test "sync with ledgers from another peer via glue_sync_ledger" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
@@ -99,11 +103,10 @@ let%test_module "Sync_handler" =
             Option.value_exn ~message:"Could not produce an ancestor proof"
               (Sync_handler.Root.prove ~logger ~frontier observed_state)
           in
+          let%bind verify = create ~f:Sync_handler.Root.verify ~logger in
           let%map `Root (root_transition, _), `Best_tip (best_tip_transition, _)
               =
-            Sync_handler.Root.verify ~logger ~verifier:() observed_state
-              root_with_proof
-            |> Deferred.Or_error.ok_exn
+            verify observed_state root_with_proof |> Deferred.Or_error.ok_exn
           in
           External_transition.(
             equal
@@ -142,9 +145,11 @@ let%test_module "Sync_handler" =
               (Sync_handler.Bootstrappable_best_tip.prove ~logger ~frontier
                  root_consensus_state)
           in
+          let%bind verify =
+            create ~f:Sync_handler.Bootstrappable_best_tip.verify ~logger
+          in
           let%map verification_result =
-            Sync_handler.Bootstrappable_best_tip.verify ~verifier:() ~logger
-              root_consensus_state peer_best_tip_with_witness
+            verify root_consensus_state peer_best_tip_with_witness
           in
           Result.is_ok verification_result )
   end )
