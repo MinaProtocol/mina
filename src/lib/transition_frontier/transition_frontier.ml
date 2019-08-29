@@ -23,8 +23,6 @@ module Make (Inputs : Inputs_intf) :
    and type staged_ledger := Staged_ledger.t
    and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
    and type verifier := Verifier.t = struct
-  (*open Inputs*)
-
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])

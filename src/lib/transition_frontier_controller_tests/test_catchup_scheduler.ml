@@ -63,7 +63,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let%map children = Ivar.read result_ivar in
       Rose_tree.T (root, children)
 
-    let create () =
+    let create_catchup_scheduler () =
       let%map verifier = Verifier.create () in
       Catchup_scheduler.create ~verifier
 
@@ -83,7 +83,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let open Deferred.Let_syntax in
           let%bind frontier = setup_random_frontier () in
           let trust_system = Trust_system.null () in
-          let%bind create = create () in
+          let%bind create = create_catchup_scheduler () in
           let scheduler =
             create ~logger ~trust_system ~frontier ~time_controller
               ~catchup_job_writer ~catchup_breadcrumbs_writer
@@ -149,7 +149,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let open Deferred.Let_syntax in
           let%bind frontier = setup_random_frontier () in
           let trust_system = Trust_system.null () in
-          let%bind create = create () in
+          let%bind create = create_catchup_scheduler () in
           let scheduler =
             create ~logger ~trust_system ~frontier ~time_controller
               ~catchup_job_writer ~catchup_breadcrumbs_writer
@@ -251,7 +251,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let open Deferred.Let_syntax in
           let%bind frontier = setup_random_frontier () in
           let trust_system = Trust_system.null () in
-          let%bind create = create () in
+          let%bind create = create_catchup_scheduler () in
           let scheduler =
             create ~logger ~trust_system ~frontier ~time_controller
               ~catchup_job_writer ~catchup_breadcrumbs_writer

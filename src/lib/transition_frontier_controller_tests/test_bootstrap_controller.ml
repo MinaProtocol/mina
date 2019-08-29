@@ -31,7 +31,7 @@ end)
 
 let%test_module "Bootstrap Controller" =
   ( module struct
-    let with_verifier ~f ~logger ~trust_system =
+    let f_with_verifier ~f ~logger ~trust_system =
       let%map verifier = Verifier.create () in
       f ~logger ~trust_system ~verifier
 
@@ -57,7 +57,7 @@ let%test_module "Bootstrap Controller" =
             |> Transition_frontier.Breadcrumb.validated_transition
           in
           let%bind make_bootstrap =
-            with_verifier ~f:Bootstrap_controller.For_tests.make_bootstrap
+            f_with_verifier ~f:Bootstrap_controller.For_tests.make_bootstrap
               ~logger ~trust_system
           in
           let bootstrap = make_bootstrap ~genesis_root ~network in
@@ -243,7 +243,7 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
           let%bind run =
-            with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
               ~trust_system
           in
           let%map ( new_frontier
@@ -278,7 +278,7 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
           let%bind run =
-            with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
               ~trust_system
           in
           let%map ( new_frontier
@@ -319,7 +319,7 @@ let%test_module "Bootstrap Controller" =
           in
           let synced_peer = List.nth_exn peers 1 in
           let%bind run =
-            with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
               ~trust_system
           in
           let%map ( new_frontier
@@ -377,7 +377,7 @@ let%test_module "Bootstrap Controller" =
               (get_best_tip_hash large_peer)
           in
           let%bind run =
-            with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
               ~trust_system
           in
           let%map ( new_frontier
@@ -421,7 +421,7 @@ let%test_module "Bootstrap Controller" =
           in
           let open Bootstrap_controller.For_tests in
           let%bind make =
-            with_verifier ~f:make_bootstrap ~logger ~trust_system
+            f_with_verifier ~f:make_bootstrap ~logger ~trust_system
           in
           let bootstrap = make ~genesis_root ~network in
           let best_transition =

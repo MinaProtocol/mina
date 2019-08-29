@@ -20,7 +20,7 @@ let%test_module "Sync_handler" =
 
     let trust_system = Trust_system.null ()
 
-    let create ~f ~logger =
+    let f_with_verifier ~f ~logger =
       let%map verifier = Verifier.create () in
       f ~logger ~verifier
 
@@ -103,7 +103,9 @@ let%test_module "Sync_handler" =
             Option.value_exn ~message:"Could not produce an ancestor proof"
               (Sync_handler.Root.prove ~logger ~frontier observed_state)
           in
-          let%bind verify = create ~f:Sync_handler.Root.verify ~logger in
+          let%bind verify =
+            f_with_verifier ~f:Sync_handler.Root.verify ~logger
+          in
           let%map `Root (root_transition, _), `Best_tip (best_tip_transition, _)
               =
             verify observed_state root_with_proof |> Deferred.Or_error.ok_exn
@@ -146,7 +148,8 @@ let%test_module "Sync_handler" =
                  root_consensus_state)
           in
           let%bind verify =
-            create ~f:Sync_handler.Bootstrappable_best_tip.verify ~logger
+            f_with_verifier ~f:Sync_handler.Bootstrappable_best_tip.verify
+              ~logger
           in
           let%map verification_result =
             verify root_consensus_state peer_best_tip_with_witness

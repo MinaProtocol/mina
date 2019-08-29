@@ -32,7 +32,7 @@ end)
 
 let%test_module "Ledger catchup" =
   ( module struct
-    let run () =
+    let run_ledger_catchup () =
       let%map verifier = Verifier.create () in
       Ledger_catchup.run ~verifier
 
@@ -68,7 +68,7 @@ let%test_module "Ledger catchup" =
       in
       Strict_pipe.Writer.write catchup_job_writer
         (parent_hash, [Rose_tree.T (cached_transition, [])]) ;
-      let%bind run = run () in
+      let%bind run = run_ledger_catchup () in
       run ~logger ~trust_system ~network ~frontier:me
         ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
@@ -267,7 +267,7 @@ let%test_module "Ledger catchup" =
                Envelope.Incoming.wrap ~data:transition
                  ~sender:Envelope.Sender.Local)
           in
-          let%bind run = run () in
+          let%bind run = run_ledger_catchup () in
           run ~logger ~trust_system ~network ~frontier:me
             ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
@@ -345,7 +345,7 @@ let%test_module "Ledger catchup" =
                 (after (Core.Time.Span.of_ms 500.))
                 (fun () -> Strict_pipe.Writer.write catchup_job_writer forest)
           ) ;
-          let%bind run = run () in
+          let%bind run = run_ledger_catchup () in
           run ~logger ~trust_system ~network ~frontier:me
             ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
