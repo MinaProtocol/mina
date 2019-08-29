@@ -17,12 +17,6 @@ let main n enable_payments () =
     Coda_worker_testnet.test logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
-  (* Wait the nodes to initialize *)
-  let%bind () =
-    after
-      ( Time.Span.of_sec
-      @@ (Consensus.Constants.initialization_time_in_secs +. 5.) )
-  in
   let%bind () =
     if enable_payments then
       Coda_worker_testnet.Payments.send_several_payments testnet ~node:0

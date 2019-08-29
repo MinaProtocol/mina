@@ -20,10 +20,6 @@ let main () =
       Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
   let%bind () =
-    after
-    @@ Time.Span.of_sec (Consensus.Constants.initialization_time_in_secs +. 5.)
-  in
-  let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:1
   in
   let%bind () = after (Time.Span.of_min 2.) in

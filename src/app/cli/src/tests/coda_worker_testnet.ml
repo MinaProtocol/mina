@@ -417,14 +417,9 @@ let events workers start_reader =
 let start_checks logger (workers : Coda_process.t array) start_reader testnet
     ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
-  upon
-    ( after
-    @@ Time.Span.of_sec (Consensus.Constants.initialization_time_in_secs +. 5.)
-    )
-    (fun () ->
-      start_prefix_check logger workers event_reader testnet ~acceptable_delay
-      |> don't_wait_for ;
-      start_payment_check logger root_reader testnet )
+  start_prefix_check logger workers event_reader testnet ~acceptable_delay
+  |> don't_wait_for ;
+  start_payment_check logger root_reader testnet
 
 (* note: this is very declarative, maybe this should be more imperative? *)
 (* next steps:
@@ -450,10 +445,15 @@ let test ?is_archive_node logger n proposers snark_work_public_keys
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections ?is_archive_node
   in
-  let%map workers = Coda_processes.spawn_local_processes_exn configs in
+  let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in
   let start_reader, start_writer = Linear_pipe.create () in
   let testnet = Api.create configs workers start_writer in
+  (* Wait nodes to finish initialization *)
+  let%map () =
+    after
+      (Time.Span.of_sec (Consensus.Constants.initialization_time_in_secs +. 5.))
+  in
   start_checks logger workers start_reader testnet ~acceptable_delay ;
   testnet
 
