@@ -1,254 +1,228 @@
 module Legend = {
   module Square = {
-    let component =
-      ReasonReact.statelessComponent("InclusiveSection.Legend.Square");
-    let make = (~className, ~borderColor, ~fillColor, ~dims, _children) => {
-      ...component,
-      render: _self => {
-        let borderRule =
-          switch (borderColor) {
-          | None => []
-          | Some(color) => [Css.border(`px(3), `solid, color)]
-          };
+    [@react.component]
+    let make = (~className, ~borderColor, ~fillColor, ~dims) => {
+      let borderRule =
+        switch (borderColor) {
+        | None => []
+        | Some(color) => [Css.border(`px(3), `solid, color)]
+        };
 
-        <div
-          className=Css.(
-            merge([
-              className,
-              style([
-                width(fst(dims)),
-                height(snd(dims)),
-                backgroundColor(fillColor),
-                ...borderRule,
-              ]),
-            ])
-          )
-        />;
-      },
-    };
-  };
-
-  module SmallRow = {
-    let component =
-      ReasonReact.statelessComponent("InclusiveSection.Legend.SmallRow");
-    let make = (~themeColor, ~copy, _children) => {
-      ...component,
-      render: _self => {
-        <div className=Css.(style([display(`flex), alignItems(`center)]))>
-          <Square
-            className=Css.(
-              style([
-                marginRight(`rem(0.5)),
-                media(
-                  Style.MediaQuery.notMobile,
-                  [marginRight(`rem(0.75))],
-                ),
-              ])
-            )
-            borderColor=None
-            fillColor=themeColor
-            dims=(`rem(1.0), `rem(1.0))
-          />
-          <h3
-            className=Css.(
-              merge([
-                Style.H3.basic,
-                style([
-                  fontWeight(`medium),
-                  marginTop(`zero),
-                  marginBottom(`zero),
-                  color(themeColor),
-                ]),
-              ])
-            )>
-            {ReasonReact.string(copy)}
-          </h3>
-        </div>;
-      },
-    };
-  };
-
-  let component = ReasonReact.statelessComponent("InclusiveSection.Legend");
-  let make = (~className, _children) => {
-    ...component,
-    render: _self => {
       <div
         className=Css.(
           merge([
             className,
             style([
-              justifyContent(`flexStart),
-              alignItems(`center),
-              media(Style.MediaQuery.notMobile, [justifyContent(`center)]),
+              width(fst(dims)),
+              height(snd(dims)),
+              backgroundColor(fillColor),
+              ...borderRule,
             ]),
           ])
-        )>
-        <div
-          ariaHidden=true
-          className=Css.(
-            style([
-              display(`flex),
-              marginTop(`zero),
-              marginBottom(`zero),
-              marginRight(`rem(1.0)),
-              media(Style.MediaQuery.notMobile, [marginRight(`rem(2.25))]),
-            ])
-          )>
-          <Square
-            className=Css.(style([marginRight(`rem(0.75))]))
-            borderColor={Some(Style.Colors.clover)}
-            fillColor=Style.Colors.lightClover
-            dims=(`rem(2.5), `rem(2.5))
-          />
-          <h5
-            className=Css.(
-              merge([
-                Style.H5.tight,
-                style([
-                  width(`rem(8.0)),
-                  marginTop(`zero),
-                  marginBottom(`zero),
-                ]),
-              ])
-            )>
-            {ReasonReact.string("Consensus Participants")}
-          </h5>
-        </div>
-        <div ariaHidden=true>
-          <SmallRow themeColor=Style.Colors.teal copy="Individuals" />
-          <SmallRow themeColor=Style.Colors.navy copy="Organizations" />
-        </div>
-      </div>;
-    },
+        )
+      />;
+    };
   };
-};
 
-module Figure = {
-  let component = ReasonReact.statelessComponent("InclusiveSection.Figure");
-  let make = (~captionColor, ~link, ~dims, ~caption, ~alt, _children) => {
-    ...component,
-    render: _self => {
-      let (w, h) = dims;
-      <figure
-        className=Css.(
-          style([
-            unsafe("margin-block-start", "0"),
-            unsafe("margin-block-end", "0"),
-            unsafe("margin-inline-start", "0"),
-            unsafe("margin-inline-end", "0"),
-            marginTop(`rem(2.0)),
-            display(`flex),
-            flexDirection(`column),
-            alignItems(`center),
-            justifyContent(`center),
-            width(`rem(19.5)),
-            media(Style.MediaQuery.notMobile, [width(`rem(20.625))]),
-          ])
-        )>
-        <Svg
+  module SmallRow = {
+    [@react.component]
+    let make = (~themeColor, ~copy) => {
+      <div className=Css.(style([display(`flex), alignItems(`center)]))>
+        <Square
           className=Css.(
             style([
-              // on mobile we want to square our figures with the height size
-              width(`rem(h)),
-              media(Style.MediaQuery.notMobile, [width(`rem(w))]),
+              marginRight(`rem(0.5)),
+              media(Style.MediaQuery.notMobile, [marginRight(`rem(0.75))]),
             ])
           )
-          dims
-          link
-          alt
+          borderColor=None
+          fillColor=themeColor
+          dims=(`rem(1.0), `rem(1.0))
         />
-        <figcaption
+        <h3
           className=Css.(
             merge([
               Style.H3.basic,
               style([
-                marginTop(`rem(1.5)),
-                color(captionColor),
                 fontWeight(`medium),
-                textAlign(`center),
+                marginTop(`zero),
+                marginBottom(`zero),
+                color(themeColor),
               ]),
             ])
           )>
-          {ReasonReact.string(caption)}
-        </figcaption>
-      </figure>;
-    },
+          {React.string(copy)}
+        </h3>
+      </div>;
+    };
+  };
+
+  [@react.component]
+  let make = (~className) => {
+    <div
+      className=Css.(
+        merge([
+          className,
+          style([
+            justifyContent(`flexStart),
+            alignItems(`center),
+            media(Style.MediaQuery.notMobile, [justifyContent(`center)]),
+          ]),
+        ])
+      )>
+      <div
+        ariaHidden=true
+        className=Css.(
+          style([
+            display(`flex),
+            marginTop(`zero),
+            marginBottom(`zero),
+            marginRight(`rem(1.0)),
+            media(Style.MediaQuery.notMobile, [marginRight(`rem(2.25))]),
+          ])
+        )>
+        <Square
+          className=Css.(style([marginRight(`rem(0.75))]))
+          borderColor={Some(Style.Colors.clover)}
+          fillColor=Style.Colors.lightClover
+          dims=(`rem(2.5), `rem(2.5))
+        />
+        <h5
+          className=Css.(
+            merge([
+              Style.H5.tight,
+              style([
+                width(`rem(8.0)),
+                marginTop(`zero),
+                marginBottom(`zero),
+              ]),
+            ])
+          )>
+          {React.string("Consensus Participants")}
+        </h5>
+      </div>
+      <div ariaHidden=true>
+        <SmallRow themeColor=Style.Colors.teal copy="Individuals" />
+        <SmallRow themeColor=Style.Colors.navy copy="Organizations" />
+      </div>
+    </div>;
+  };
+};
+
+module Figure = {
+  [@react.component]
+  let make = (~captionColor, ~link, ~dims, ~caption, ~alt) => {
+    let (w, h) = dims;
+    <figure
+      className=Css.(
+        style([
+          unsafe("margin-block-start", "0"),
+          unsafe("margin-block-end", "0"),
+          unsafe("margin-inline-start", "0"),
+          unsafe("margin-inline-end", "0"),
+          marginTop(`rem(2.0)),
+          display(`flex),
+          flexDirection(`column),
+          alignItems(`center),
+          justifyContent(`center),
+          width(`rem(19.5)),
+          media(Style.MediaQuery.notMobile, [width(`rem(20.625))]),
+        ])
+      )>
+      <Svg
+        className=Css.(
+          style([
+            // on mobile we want to square our figures with the height size
+            width(`rem(h)),
+            media(Style.MediaQuery.notMobile, [width(`rem(w))]),
+          ])
+        )
+        dims
+        link
+        alt
+      />
+      <figcaption
+        className=Css.(
+          merge([
+            Style.H3.basic,
+            style([
+              marginTop(`rem(1.5)),
+              color(captionColor),
+              fontWeight(`medium),
+              textAlign(`center),
+            ]),
+          ])
+        )>
+        {React.string(caption)}
+      </figcaption>
+    </figure>;
   };
 };
 
 let legendQuery = "(min-width: 68.8125rem)";
 
-let component = ReasonReact.statelessComponent("InclusiveSection");
-let make = _ => {
-  ...component,
-  render: _self =>
-    <div className=Css.(style([marginTop(`rem(2.5))]))>
-      <Title fontColor=Style.Colors.denimTwo text="Inclusive consensus" />
-      <Legend
-        className=Css.(
-          style([display(`none), media(legendQuery, [display(`flex)])])
-        )
+[@react.component]
+let make = () => {
+  <div className=Css.(style([marginTop(`rem(2.5))]))>
+    <Title fontColor=Style.Colors.denimTwo text="Inclusive consensus" />
+    <Legend
+      className=Css.(
+        style([display(`none), media(legendQuery, [display(`flex)])])
+      )
+    />
+    <div
+      className=Css.(
+        style([
+          display(`flex),
+          justifyContent(`spaceBetween),
+          alignItems(`center),
+          flexWrap(`wrapReverse),
+          media(Style.MediaQuery.notMobile, [justifyContent(`spaceAround)]),
+        ])
+      )>
+      <Figure
+        link="/static/img/coda-figure.svg"
+        dims=(15.125, 15.125)
+        caption="Coda"
+        alt="Figure showing everyone participating in consensus, including individual users of Coda."
+        captionColor=Style.Colors.clover
       />
-      <div
-        className=Css.(
-          style([
-            display(`flex),
-            justifyContent(`spaceBetween),
-            alignItems(`center),
-            flexWrap(`wrapReverse),
-            media(
-              Style.MediaQuery.notMobile,
-              [justifyContent(`spaceAround)],
-            ),
-          ])
-        )>
-        <Figure
-          link="/static/img/coda-figure.svg"
-          dims=(15.125, 15.125)
-          caption="Coda"
-          alt="Figure showing everyone participating in consensus, including individual users of Coda."
-          captionColor=Style.Colors.clover
-        />
-        <Figure
-          link="/static/img/other-blockchains-figure.svg"
-          dims=(CryptoAppsSection.middleElementWidthRems, 13.75)
-          caption="Other Blockchains"
-          alt="Figure showing few participants in consensus, most of which are organizations, rather than individuals."
-          captionColor=Style.Colors.navy
-        />
-        <div>
-          <div
-            className=Css.(style([display(`flex), justifyContent(`center)]))>
-            <SideText
-              paragraphs=[|
-                `styled([
-                  `emph(
-                    "Simple, fair consensus designed so you can participate",
-                  ),
-                  `str(
-                    ". Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
-                  ),
-                ]),
-                `str(
-                  "With just a small stake you'll be able to participate directly in consensus.",
+      <Figure
+        link="/static/img/other-blockchains-figure.svg"
+        dims=(CryptoAppsSection.middleElementWidthRems, 13.75)
+        caption="Other Blockchains"
+        alt="Figure showing few participants in consensus, most of which are organizations, rather than individuals."
+        captionColor=Style.Colors.navy
+      />
+      <div>
+        <div
+          className=Css.(style([display(`flex), justifyContent(`center)]))>
+          <SideText
+            paragraphs=[|
+              `styled([
+                `emph(
+                  "Simple, fair consensus designed so you can participate",
                 ),
-              |]
-              cta={
-                SideText.Cta.copy: {j|Sign up to learn more about about staking with\u00A0Coda|j},
-                link: Links.Forms.participateInConsensus,
-              }
-            />
-          </div>
-          <Legend
-            className=Css.(
-              style([
-                display(`flex),
-                marginTop(`rem(2.0)),
-                media(legendQuery, [display(`none)]),
-              ])
-            )
+                `str(
+                  ". Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
+                ),
+              ]),
+              `str(
+                "With just a small stake you'll be able to participate directly in consensus.",
+              ),
+            |]
           />
         </div>
+        <Legend
+          className=Css.(
+            style([
+              display(`flex),
+              marginTop(`rem(2.0)),
+              media(legendQuery, [display(`none)]),
+            ])
+          )
+        />
       </div>
-    </div>,
+    </div>
+  </div>;
 };

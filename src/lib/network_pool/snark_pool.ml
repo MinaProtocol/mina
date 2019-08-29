@@ -1,6 +1,5 @@
 open Core_kernel
 open Async
-open Signature_lib
 open Pipe_lib
 
 module type S = sig
@@ -14,12 +13,15 @@ module type S = sig
 
   type transition_frontier
 
+  type transaction_snark_work_info
+
   module Resource_pool : sig
     include
       Intf.Snark_resource_pool_intf
       with type ledger_proof := ledger_proof
        and type work := transaction_snark_work_statement
        and type transition_frontier := transition_frontier
+       and type work_info := transaction_snark_work_info
 
     val remove_solved_work : t -> transaction_snark_work_statement -> unit
 
@@ -86,39 +88,10 @@ module type Transition_frontier_intf = sig
 end
 
 module Make (Ledger_proof : sig
-  type t [@@deriving bin_io, sexp, yojson, version]
-end) (Transaction_snark_work : sig
-  type t =
-    { fee: Currency.Fee.t
-    ; proofs: Ledger_proof.t list
-    ; prover: Public_key.Compressed.t }
-
-  module Statement : sig
-    type t = Transaction_snark.Statement.t list [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, yojson, version]
-
-          include Hashable.S_binable with type t := t
-        end
-      end
-      with type V1.t = t
-
-    include Hashable.S with type t := t
-  end
-
-  module Checked :
-    sig
-      type unchecked
-
-      type t
-
-      val create_unsafe : unchecked -> t
-    end
-    with type unchecked := t
+  type t [@@deriving bin_io, sexp, to_yojson, version]
 end)
+(Transaction_snark_work : Coda_intf.Transaction_snark_work_intf
+                          with type ledger_proof := Ledger_proof.t)
 (Transition_frontier : Transition_frontier_intf
                        with type work := Transaction_snark_work.Statement.t) :
   S
@@ -127,7 +100,9 @@ end)
               Transaction_snark_work.Statement.t
    and type transaction_snark_work_checked := Transaction_snark_work.Checked.t
    and type transition_frontier := Transition_frontier.t
-   and type ledger_proof := Ledger_proof.t = struct
+   and type ledger_proof := Ledger_proof.t
+   and type transaction_snark_work_info := Transaction_snark_work.Info.t =
+struct
   module Statement_table = Transaction_snark_work.Statement.Stable.V1.Table
 
   module Resource_pool = struct
@@ -150,6 +125,28 @@ end)
 
       let removed_breadcrumb_wait = 10
 
+      let snark_pool_json t : Yojson.Safe.json =
+        `List
+          (Statement_table.fold ~init:[] t.snark_table
+             ~f:(fun ~key ~data:{proof= _; fee= {fee; prover}} acc ->
+               let work_ids =
+                 Transaction_snark_work.Statement.compact_json key
+               in
+               `Assoc
+                 [ ("work_ids", work_ids)
+                 ; ("fee", Currency.Fee.Stable.V1.to_yojson fee)
+                 ; ( "prover"
+                   , Signature_lib.Public_key.Compressed.Stable.V1.to_yojson
+                       prover ) ]
+               :: acc ))
+
+      let all_completed_work (t : t) : Transaction_snark_work.Info.t list =
+        Statement_table.fold ~init:[] t.snark_table
+          ~f:(fun ~key ~data:{proof= _; fee= {fee; prover}} acc ->
+            let work_ids = Transaction_snark_work.Statement.work_ids key in
+            {Transaction_snark_work.Info.statements= key; work_ids; fee; prover}
+            :: acc )
+
       let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t) =
         (* start with empty ref table *)
         t.ref_table <- None ;
@@ -168,11 +165,15 @@ end)
                         return ()
                       else (
                         removedCounter := 0 ;
+                        Statement_table.filter_keys_inplace t.snark_table
+                          ~f:(fun work ->
+                            Option.is_some
+                              (Statement_table.find refcount_table work) ) ;
                         return
-                          (Statement_table.filter_keys_inplace t.snark_table
-                             ~f:(fun work ->
-                               Option.is_some
-                                 (Statement_table.find refcount_table work) )) )
+                          (*when snark works removed from the pool*)
+                          Coda_metrics.(
+                            Gauge.set Snark_work.snark_pool_size
+                              (Float.of_int @@ Hashtbl.length t.snark_table)) )
                   )
                 in
                 deferred
@@ -206,6 +207,10 @@ end)
         if work_is_referenced t work then
           let update_and_rebroadcast () =
             Hashtbl.set t.snark_table ~key:work ~data:{proof; fee} ;
+            (*when snark work added to the pool*)
+            Coda_metrics.(
+              Gauge.set Snark_work.snark_pool_size
+                (Float.of_int @@ Hashtbl.length t.snark_table)) ;
             `Rebroadcast
           in
           match Statement_table.find t.snark_table work with
@@ -221,6 +226,7 @@ end)
     include T
     module Diff =
       Snark_pool_diff.Make (Ledger_proof) (Transaction_snark_work.Statement)
+        (Transaction_snark_work.Info)
         (Transition_frontier)
         (T)
 
