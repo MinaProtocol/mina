@@ -1,6 +1,7 @@
 open Coda_base
 open Async_kernel
 open Pipe_lib
+open Coda_transition
 
 module type Transition_database_schema = sig
   type external_transition_validated

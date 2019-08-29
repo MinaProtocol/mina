@@ -11,7 +11,7 @@ open Signature_lib
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
-module Make_with_constants (Constants : sig
+(*module Make_with_constants (Constants : sig
   val transaction_capacity_log_2 : int
 
   val work_delay : int
@@ -30,9 +30,10 @@ end)
               Inputs.Transaction_snark_work.Checked.t
    and type transaction_snark_statement := Transaction_snark.Statement.t =
 struct
-  open Inputs
-  module Scan_state = Transaction_snark_scan_state.Make (Inputs) (Constants)
-  module Pre_diff_info = Pre_diff_info.Make (Inputs)
+  open Inputs*)
+module T = struct
+  module Scan_state = Transaction_snark_scan_state
+  module Pre_diff_info = Pre_diff_info
 
   module Staged_ledger_error = struct
     type t =
@@ -91,9 +92,7 @@ struct
     if not (statement_eq (Ledger_proof.statement proof) statement) then
       Deferred.return false
     else
-      match%map
-        Inputs.Verifier.verify_transaction_snark verifier proof ~message
-      with
+      match%map Verifier.verify_transaction_snark verifier proof ~message with
       | Ok b ->
           b
       | Error e ->
@@ -1350,6 +1349,10 @@ struct
   end
 end
 
+include T
+
+(*end
+
 module Make = Make_with_constants (Transaction_snark_scan_state.Constants)
 
 include Make (struct
@@ -1361,7 +1364,8 @@ include Make (struct
 
   (*module Sok_message = Sok_message*)
   module Ledger_proof = Ledger_proof
-  module Verifier = Verifier
+
+  (*module Verifier = Verifier*)
 
   (*module Staged_ledger_aux_hash = struct
     include Staged_ledger_hash.Aux_hash.Stable.V1
@@ -1375,7 +1379,7 @@ include Make (struct
   module Staged_ledger_diff = Staged_ledger_diff
   module Account = Account
   module Transaction_validator = Transaction_validator
-end)
+end)*)
 
 let%test_module "test" =
   ( module struct
@@ -1431,14 +1435,14 @@ let%test_module "test" =
         let create ~(statement : t) ~sok_digest:_ ~proof:_ = statement
       end*)
 
-      module Verifier = struct
+      (*module Verifier = struct
         type t = unit
 
         let verify_transaction_snark () _proof ~message:_ =
           Deferred.Or_error.return true
-      end
+      end*)
 
-      module Transaction_validator = struct
+      (*module Transaction_validator = struct
         include Ledger
         module Hashless_ledger = Ledger
 
@@ -1446,7 +1450,7 @@ let%test_module "test" =
           apply_transaction l txn |> Result.map ~f:(Fn.const ())
 
         let create t = copy t
-      end
+      end*)
 
       (*module Staged_ledger_aux_hash = struct
         include String
@@ -1489,7 +1493,7 @@ let%test_module "test" =
           ^ Pending_coinbase.Hash.to_bytes (Pending_coinbase.merkle_root hh)
       end*)
 
-      module Transaction_snark_work = Transaction_snark_work.Make (Ledger_proof)
+      module Transaction_snark_work = Transaction_snark_work
 
       (*struct
         let proofs_length = 2
@@ -1613,8 +1617,7 @@ let%test_module "test" =
           {fee= f; proofs= p; prover= pr}
       end*)
 
-      module Staged_ledger_diff =
-        Staged_ledger_diff.Make (Transaction_snark_work)
+      module Staged_ledger_diff = Staged_ledger_diff
 
       (*module Staged_ledger_diff = struct
         type completed_work = Transaction_snark_work.Stable.V1.t
@@ -1855,7 +1858,7 @@ let%test_module "test" =
       end*)
     end
 
-    module type Staged_ledger_test_intf =
+    (*module type Staged_ledger_test_intf =
       Coda_intf.Staged_ledger_generalized_intf
       with type diff := Test_input1.Staged_ledger_diff.t
        and type valid_diff :=
@@ -1863,7 +1866,6 @@ let%test_module "test" =
                   .With_valid_signatures_and_proofs
                   .t
        and type ledger_proof := Test_input1.Ledger_proof.t
-       and type verifier := Test_input1.Verifier.t
        and type transaction_snark_work := Test_input1.Transaction_snark_work.t
        and type transaction_snark_work_statement :=
                   Test_input1.Transaction_snark_work.Statement.t
@@ -1872,104 +1874,106 @@ let%test_module "test" =
        and type transaction_snark_statement := Transaction_snark.Statement.t
 
     module Sl = Make (Test_input1)
-    open Test_input1
+    open Test_input1*)
+
+    module Sl = T
 
     let self_pk =
       Quickcheck.random_value ~seed:(`Deterministic "self_pk")
         Public_key.Compressed.gen
 
     (* Functor for testing with different instantiated staged ledger modules. *)
-    module Make_test_utils (Sl : Staged_ledger_test_intf) = struct
-      let create_and_apply sl logger txns stmt_to_work =
-        let open Deferred.Let_syntax in
-        let diff =
-          Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
-            ~get_completed_work:stmt_to_work
-        in
-        let diff' = Staged_ledger_diff.forget diff in
-        let%map ( `Hash_after_applying hash
-                , `Ledger_proof ledger_proof
-                , `Staged_ledger sl'
-                , `Pending_coinbase_data _ ) =
-          match%map Sl.apply !sl diff' ~logger ~verifier:() with
-          | Ok x ->
-              x
-          | Error e ->
-              Error.raise (Sl.Staged_ledger_error.to_error e)
-        in
-        assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
-        sl := sl' ;
-        (ledger_proof, diff')
+    let create_and_apply sl logger txns stmt_to_work =
+      let open Deferred.Let_syntax in
+      let diff =
+        Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
+          ~get_completed_work:stmt_to_work
+      in
+      let diff' = Staged_ledger_diff.forget diff in
+      let%map ( `Hash_after_applying hash
+              , `Ledger_proof ledger_proof
+              , `Staged_ledger sl'
+              , `Pending_coinbase_data _ ) =
+        match%map Sl.apply !sl diff' ~logger ~verifier:() with
+        | Ok x ->
+            x
+        | Error e ->
+            Error.raise (Sl.Staged_ledger_error.to_error e)
+      in
+      assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
+      sl := sl' ;
+      (ledger_proof, diff')
 
-      (* Run the given function inside of the Deferred monad, with a staged
+    (* Run the given function inside of the Deferred monad, with a staged
          ledger and a separate test ledger, after applying the given
          init_state to both. In the below tests we apply the same commands to
          the staged and test ledgers, and verify they are in the same state.
       *)
-      let async_with_ledgers ledger_init_state
-          (f : Sl.t ref -> Ledger.Mask.Attached.t -> unit Deferred.t) =
-        Ledger.with_ephemeral_ledger ~f:(fun ledger ->
-            Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-            let casted = Ledger.Any_ledger.cast (module Ledger) ledger in
-            let test_mask =
-              Ledger.Maskable.register_mask casted (Ledger.Mask.create ())
-            in
-            let sl = ref @@ Sl.create_exn ~ledger in
-            Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
-            ignore @@ Ledger.Maskable.unregister_mask_exn casted test_mask )
+    let async_with_ledgers ledger_init_state
+        (f : Sl.t ref -> Ledger.Mask.Attached.t -> unit Deferred.t) =
+      Ledger.with_ephemeral_ledger ~f:(fun ledger ->
+          Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+          let casted = Ledger.Any_ledger.cast (module Ledger) ledger in
+          let test_mask =
+            Ledger.Maskable.register_mask casted (Ledger.Mask.create ())
+          in
+          let sl = ref @@ Sl.create_exn ~ledger in
+          Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
+          ignore @@ Ledger.Maskable.unregister_mask_exn casted test_mask )
 
-      (* Assert the given staged ledger is in the correct state after applying
+    (* Assert the given staged ledger is in the correct state after applying
          the first n user commands passed to the given base ledger. Checks the
          states of the proposer account and user accounts but ignores snark
          workers for simplicity. *)
-      let assert_ledger :
-             Ledger.t
-          -> Sl.t
-          -> User_command.With_valid_signature.t list
-          -> int
-          -> Public_key.Compressed.t list
-          -> unit =
-       fun test_ledger staged_ledger cmds_all cmds_used pks_to_check ->
-        let old_proposer_balance =
-          Option.value_map
-            (Option.bind
-               (Ledger.location_of_key test_ledger self_pk)
-               ~f:(Ledger.get test_ledger))
-            ~default:Currency.Balance.zero
-            ~f:(fun a -> a.balance)
-        in
-        let rec apply_cmds =
-          let open Or_error.Let_syntax in
-          function
-          | [] ->
-              return ()
-          | cmd :: cmds ->
-              let%bind _ = Ledger.apply_user_command test_ledger cmd in
-              apply_cmds cmds
-        in
-        Or_error.ok_exn @@ apply_cmds @@ List.take cmds_all cmds_used ;
-        let get_account_exn ledger pk =
-          Option.value_exn
-            (Option.bind
-               (Ledger.location_of_key ledger pk)
-               ~f:(Ledger.get ledger))
-        in
-        (* Check the user accounts in the updated staged ledger are as
+    let assert_ledger :
+           Ledger.t
+        -> Sl.t
+        -> User_command.With_valid_signature.t list
+        -> int
+        -> Public_key.Compressed.t list
+        -> unit =
+     fun test_ledger staged_ledger cmds_all cmds_used pks_to_check ->
+      let old_proposer_balance =
+        Option.value_map
+          (Option.bind
+             (Ledger.location_of_key test_ledger self_pk)
+             ~f:(Ledger.get test_ledger))
+          ~default:Currency.Balance.zero
+          ~f:(fun a -> a.balance)
+      in
+      let rec apply_cmds =
+        let open Or_error.Let_syntax in
+        function
+        | [] ->
+            return ()
+        | cmd :: cmds ->
+            let%bind _ = Ledger.apply_user_command test_ledger cmd in
+            apply_cmds cmds
+      in
+      Or_error.ok_exn @@ apply_cmds @@ List.take cmds_all cmds_used ;
+      let get_account_exn ledger pk =
+        Option.value_exn
+          (Option.bind
+             (Ledger.location_of_key ledger pk)
+             ~f:(Ledger.get ledger))
+      in
+      (* Check the user accounts in the updated staged ledger are as
            expected. *)
-        List.iter pks_to_check ~f:(fun pk ->
-            let expect = get_account_exn test_ledger pk in
-            let actual = get_account_exn (Sl.ledger staged_ledger) pk in
-            [%test_result: Account.t] ~expect actual ) ;
-        (* We only test that the proposer got any reward here, since calculating
+      List.iter pks_to_check ~f:(fun pk ->
+          let expect = get_account_exn test_ledger pk in
+          let actual = get_account_exn (Sl.ledger staged_ledger) pk in
+          [%test_result: Account.t] ~expect actual ) ;
+      (* We only test that the proposer got any reward here, since calculating
          the exact correct amount depends on the snark fees and tx fees. *)
-        let new_proposer_balance =
-          (get_account_exn (Sl.ledger staged_ledger) self_pk).balance
-        in
-        assert (Currency.Balance.(new_proposer_balance > old_proposer_balance))
-    end
+      let new_proposer_balance =
+        (get_account_exn (Sl.ledger staged_ledger) self_pk).balance
+      in
+      assert (Currency.Balance.(new_proposer_balance > old_proposer_balance))
 
-    module Utils = Make_test_utils (Sl)
-    open Utils
+    (*end*)
+
+    (*module Utils = Make_test_utils (Sl)
+    open Utils*)
 
     (* Deterministically compute a prover public key from a snark work statement. *)
     let stmt_to_prover :

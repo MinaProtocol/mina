@@ -1,5 +1,6 @@
 open Coda_base
 open Core
+open Coda_transition
 
 (* Cache represents a graph. The key is a State_hash, which is the node in
    the graph, and the value is the children transitions of the node *)
@@ -27,10 +28,10 @@ module type Inputs_intf = Transition_frontier.Inputs_intf
 module Make (Inputs : Inputs_intf) :
   S
   with type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
+              External_transition.with_initial_validation
    and type state_hash := State_hash.t = struct
   type t =
-    Inputs.External_transition.with_initial_validation Envelope.Incoming.t list
+    External_transition.with_initial_validation Envelope.Incoming.t list
     State_hash.Table.t
 
   let create () = State_hash.Table.create ()

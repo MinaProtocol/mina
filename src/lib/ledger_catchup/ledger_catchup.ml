@@ -3,6 +3,7 @@ open Async
 open Cache_lib
 open Pipe_lib
 open Coda_base
+open Coda_transition
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
@@ -45,14 +46,14 @@ open Coda_base
 module Make (Inputs : Inputs.S) :
   Coda_intf.Catchup_intf
   with type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
+              External_transition.with_initial_validation
    and type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
    and type network := Inputs.Network.t
-   and type verifier := Inputs.Verifier.t = struct
+   and type verifier := Verifier.t = struct
   open Inputs
 
   let verify_transition ~logger ~trust_system ~verifier ~frontier

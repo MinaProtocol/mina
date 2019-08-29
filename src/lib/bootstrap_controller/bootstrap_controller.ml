@@ -3,6 +3,7 @@ open Async
 open Coda_base
 open Coda_state
 open Pipe_lib.Strict_pipe
+open Coda_transition
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf

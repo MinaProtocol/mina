@@ -3,6 +3,7 @@ open Core_kernel
 open Coda_base
 open Coda_incremental
 open Pipe_lib
+open Coda_transition
 
 module Make (Inputs : sig
   include Inputs.Inputs_intf
@@ -29,9 +30,8 @@ module Make (Inputs : sig
 end) :
   Coda_intf.Transition_frontier_extensions_intf
   with type breadcrumb := Inputs.Breadcrumb.t
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
+   and type external_transition_validated := External_transition.Validated.t
+   and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
    and module Diff := Inputs.Diff = struct
   open Inputs
 
@@ -42,7 +42,7 @@ end) :
   module Work = Transaction_snark_work.Statement
 
   module Snark_pool_refcount = struct
-    module Work = Inputs.Transaction_snark_work.Statement
+    module Work = Transaction_snark_work.Statement
 
     type t = int Work.Table.t
 
@@ -52,8 +52,8 @@ end) :
 
     let get_work (breadcrumb : Breadcrumb.t) : Work.t list =
       let ledger = Inputs.Breadcrumb.staged_ledger breadcrumb in
-      let scan_state = Inputs.Staged_ledger.scan_state ledger in
-      Inputs.Staged_ledger.Scan_state.all_work_statements scan_state
+      let scan_state = Staged_ledger.scan_state ledger in
+      Staged_ledger.Scan_state.all_work_statements scan_state
 
     (** Returns true if this update changed which elements are in the table
     (but not if the same elements exist with a different reference count) *)

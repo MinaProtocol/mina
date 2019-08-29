@@ -4,10 +4,9 @@ open Pipe_lib.Strict_pipe
 open Coda_base
 open Coda_state
 open Signature_lib
+open Coda_transition
 
 module Make (Inputs : Transition_frontier.Inputs_intf) = struct
-  open Inputs
-
   type validation_error =
     [ `Invalid_time_received of [`Too_early | `Too_late of int64]
     | `Invalid_proof

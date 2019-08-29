@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
+open Coda_transition
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -62,14 +63,13 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Coda_intf.Transition_frontier_controller_intf
-  with type external_transition_validated :=
-              Inputs.External_transition.Validated.t
+  with type external_transition_validated := External_transition.Validated.t
    and type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
+              External_transition.with_initial_validation
    and type transition_frontier := Inputs.Transition_frontier.t
    and type breadcrumb := Inputs.Transition_frontier.Breadcrumb.t
    and type network := Inputs.Network.t
-   and type verifier := Inputs.Verifier.t = struct
+   and type verifier := Verifier.t = struct
   open Inputs
 
   let run ~logger ~trust_system ~verifier ~network ~time_controller

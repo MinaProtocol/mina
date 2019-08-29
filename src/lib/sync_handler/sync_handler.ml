@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 open Coda_base
+open Coda_transition
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -32,14 +33,13 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Coda_intf.Sync_handler_intf
-  with type external_transition := Inputs.External_transition.t
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t
+  with type external_transition := External_transition.t
+   and type external_transition_validated := External_transition.Validated.t
    and type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
+              External_transition.with_initial_validation
    and type transition_frontier := Inputs.Transition_frontier.t
-   and type parallel_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type verifier := Inputs.Verifier.t = struct
+   and type parallel_scan_state := Staged_ledger.Scan_state.t
+   and type verifier := Verifier.t = struct
   open Inputs
 
   let get_breadcrumb_ledgers frontier =

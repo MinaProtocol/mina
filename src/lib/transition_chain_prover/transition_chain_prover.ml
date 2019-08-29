@@ -1,6 +1,7 @@
 open Core
 open Coda_base
 open Coda_state
+open Coda_transition
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -25,7 +26,7 @@ end
 module Make (Inputs : Inputs_intf) :
   Coda_intf.Transition_chain_prover_intf
   with type transition_frontier := Inputs.Transition_frontier.t
-   and type external_transition := Inputs.External_transition.t = struct
+   and type external_transition := External_transition.t = struct
   open Inputs
 
   module Merkle_list = Merkle_list_prover.Make (struct

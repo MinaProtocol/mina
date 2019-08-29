@@ -34,19 +34,21 @@ struct
   module Ledger_proof_statement = Transaction_snark.Statement
   module Pending_coinbase_stack_state =
     Transaction_snark.Pending_coinbase_stack_state
-  module Transaction_snark_work = Transaction_snark_work.Make (Ledger_proof)
-  module Staged_ledger_diff = Staged_ledger_diff.Make (Transaction_snark_work)
+  module Transaction_snark_work = Transaction_snark_work
+  module Staged_ledger_diff = Staged_ledger_diff
+  module External_transition = External_transition
 
-  module External_transition =
-    External_transition.Make (Ledger_proof) (Verifier)
+  (*.Make (Ledger_proof) (Verifier)
       (struct
         include Staged_ledger_diff.Stable.V1
 
         [%%define_locally
         Staged_ledger_diff.(creator, user_commands)]
-      end)
+      end)*)
 
-  module Internal_transition = Internal_transition.Make (Staged_ledger_diff)
+  module Internal_transition = Internal_transition
+
+  (*.Make (Staged_ledger_diff)*)
 
   module Staged_ledger_hash_binable = struct
     include Staged_ledger_hash
@@ -68,7 +70,9 @@ struct
     let fee_excess, supply_increase = Transaction.(fee_excess, supply_increase)
   end
 
-  module Staged_ledger = Staged_ledger.Make (struct
+  module Staged_ledger = Staged_ledger
+
+  (*.Make (struct
     module User_command = User_command
     module Ledger_proof_statement = Transaction_snark.Statement
     module Proof = Proof
@@ -90,7 +94,7 @@ struct
     module Pending_coinbase_stack_state =
       Transaction_snark.Pending_coinbase_stack_state*)
     module Transaction_witness = Transaction_witness
-  end)
+  end)*)
 
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random

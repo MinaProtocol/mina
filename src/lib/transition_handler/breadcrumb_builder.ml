@@ -2,15 +2,16 @@ open Coda_base
 open Core
 open Async
 open Cache_lib
+open Coda_transition
 
 module Make (Inputs : Inputs.S) :
   Coda_intf.Breadcrumb_builder_intf
   with type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
+              External_transition.with_initial_validation
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
-   and type verifier := Inputs.Verifier.t = struct
+   and type verifier := Verifier.t = struct
   open Inputs
 
   let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier

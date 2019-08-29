@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Coda_state
 open Pipe_lib
+open Coda_transition
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf

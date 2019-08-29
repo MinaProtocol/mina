@@ -1,5 +1,6 @@
 open Core_kernel
 open Coda_base
+open Coda_transition
 
 module Make (Inputs : sig
   include Inputs.Inputs_intf
@@ -20,9 +21,9 @@ module Make (Inputs : sig
 end) :
   Coda_intf.Transition_frontier_diff_intf
   with type breadcrumb := Inputs.Breadcrumb.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t = struct
+   and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+   and type external_transition_validated := External_transition.Validated.t =
+struct
   open Inputs
 
   (* TODO: Remove New_frontier. 

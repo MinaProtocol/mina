@@ -2,6 +2,7 @@ open Core_kernel
 open Coda_base
 open Coda_state
 open Async_kernel
+open Coda_transition
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -26,10 +27,10 @@ end
 module Make (Inputs : Inputs_intf) :
   Coda_intf.Best_tip_prover_intf
   with type transition_frontier := Inputs.Transition_frontier.t
-   and type external_transition := Inputs.External_transition.t
+   and type external_transition := External_transition.t
    and type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
-   and type verifier := Inputs.Verifier.t = struct
+              External_transition.with_initial_validation
+   and type verifier := Verifier.t = struct
   open Inputs
 
   module Merkle_list_prover = Merkle_list_prover.Make (struct

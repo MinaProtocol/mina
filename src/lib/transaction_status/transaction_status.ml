@@ -1,6 +1,7 @@
 open Core_kernel
 open Coda_base
 open Pipe_lib
+open Coda_transition
 
 module State = struct
   module Stable = struct

@@ -1,11 +1,10 @@
-open Core_kernel
+(*open Core_kernel
 open Async_kernel
 open Signature_lib
 open Coda_base
 open Coda_state
 
 module type Internal_transition_intf = sig
-  type staged_ledger_diff
 
   type t [@@deriving sexp]
 
@@ -22,14 +21,14 @@ module type Internal_transition_intf = sig
   val create :
        snark_transition:Snark_transition.Value.t
     -> prover_state:Consensus.Data.Prover_state.t
-    -> staged_ledger_diff:staged_ledger_diff
+    -> staged_ledger_diff:Staged_ledger_diff.t
     -> t
 
   val snark_transition : t -> Snark_transition.Value.t
 
   val prover_state : t -> Consensus.Data.Prover_state.t
 
-  val staged_ledger_diff : t -> staged_ledger_diff
+  val staged_ledger_diff : t -> Staged_ledger_diff.t
 end
 
 module type External_transition_base_intf = sig
@@ -70,9 +69,6 @@ module type External_transition_base_intf = sig
 end
 
 module type External_transition_intf = sig
-  type verifier
-
-  type ledger_proof
 
   include External_transition_base_intf
 
@@ -449,4 +445,4 @@ module type External_transition_intf = sig
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t
   end
-end
+end*)

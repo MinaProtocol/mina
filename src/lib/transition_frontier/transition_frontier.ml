@@ -17,14 +17,13 @@ module Make (Inputs : Inputs_intf) :
                 * State_hash.t Non_empty_list.t Truth.true_t
               , [`Frontier_dependencies] * unit Truth.true_t
               , [`Staged_ledger_diff] * unit Truth.false_t )
-              Inputs.External_transition.Validation.with_transition
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t
-   and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
-   and type staged_ledger := Inputs.Staged_ledger.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type verifier := Inputs.Verifier.t = struct
-  open Inputs
+              External_transition.Validation.with_transition
+   and type external_transition_validated := External_transition.Validated.t
+   and type staged_ledger_diff := Staged_ledger_diff.t
+   and type staged_ledger := Staged_ledger.t
+   and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+   and type verifier := Verifier.t = struct
+  (*open Inputs*)
 
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
@@ -53,7 +52,7 @@ module Make (Inputs : Inputs_intf) :
     let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
     module Staged_ledger_validation =
-      External_transition.Staged_ledger_validation (Staged_ledger)
+      External_transition.Staged_ledger_validation
 
     let build ~logger ~verifier ~trust_system ~parent
         ~transition:transition_with_validation ~sender =
@@ -198,7 +197,7 @@ module Make (Inputs : Inputs_intf) :
           Set.union acc_set (User_command.Set.of_list user_commands) )
   end
 
-  let max_length = max_length
+  let max_length = Inputs.max_length
 
   module Diff = Diff.Make (struct
     include Inputs

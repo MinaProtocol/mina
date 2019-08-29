@@ -1,4 +1,5 @@
 open Coda_base
+open Coda_transition
 
 module type S = sig
   include Transition_frontier.Inputs_intf
