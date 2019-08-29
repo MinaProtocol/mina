@@ -28,19 +28,6 @@ module type S = sig
   val staged_ledger_diff : t -> Staged_ledger_diff.t
 end
 
-(*module Make (Staged_ledger_diff : sig
-  type t [@@deriving sexp, to_yojson]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving bin_io, sexp, to_yojson, version]
-      end
-    end
-    with type V1.t = t
-end) : S with module Staged_ledger_diff = Staged_ledger_diff = struct
-  module Staged_ledger_diff = Staged_ledger_diff*)
-
 module Stable = struct
   module V1 = struct
     module T = struct
@@ -76,7 +63,3 @@ type t = Stable.Latest.t =
 
 let create ~snark_transition ~prover_state ~staged_ledger_diff =
   {Stable.Latest.snark_transition; staged_ledger_diff; prover_state}
-
-(*end
-
-include Make (Staged_ledger_diff)*)

@@ -2,18 +2,6 @@ open Core
 open Coda_base
 open Signature_lib
 
-(*module Make (Inputs : Coda_intf.Tmp_test_stub_hack.For_staged_ledger_intf) : sig
-  open Inputs
-
-  include
-    Coda_intf.Staged_ledger_pre_diff_info_generalized_intf
-    with type transaction_snark_work := Transaction_snark_work.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type valid_staged_ledger_diff :=
-                Staged_ledger_diff.With_valid_signatures_and_proofs.t
-end = struct
-  open Inputs
-*)
 module type S = sig
   module Error : sig
     type t =
@@ -379,5 +367,3 @@ let get_transactions (sl_diff : t) =
   let open Result.Let_syntax in
   let%map transactions, _, _, _ = get sl_diff in
   transactions
-
-(*end*)

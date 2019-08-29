@@ -1,6 +1,7 @@
 open Async
 open Core
 open Pipe_lib
+open Coda_transition
 
 module Stubs = Stubs.Make (struct
   let max_length = 4

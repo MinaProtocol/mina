@@ -34,67 +34,6 @@ struct
   module Ledger_proof_statement = Transaction_snark.Statement
   module Pending_coinbase_stack_state =
     Transaction_snark.Pending_coinbase_stack_state
-  module Transaction_snark_work = Transaction_snark_work
-  module Staged_ledger_diff = Staged_ledger_diff
-  module External_transition = External_transition
-
-  (*.Make (Ledger_proof) (Verifier)
-      (struct
-        include Staged_ledger_diff.Stable.V1
-
-        [%%define_locally
-        Staged_ledger_diff.(creator, user_commands)]
-      end)*)
-
-  module Internal_transition = Internal_transition
-
-  (*.Make (Staged_ledger_diff)*)
-
-  module Staged_ledger_hash_binable = struct
-    include Staged_ledger_hash
-
-    let ( of_aux_ledger_and_coinbase_hash
-        , aux_hash
-        , ledger_hash
-        , pending_coinbase_hash ) =
-      Staged_ledger_hash.
-        ( of_aux_ledger_and_coinbase_hash
-        , aux_hash
-        , ledger_hash
-        , pending_coinbase_hash )
-  end
-
-  module Transaction = struct
-    include Transaction.Stable.Latest
-
-    let fee_excess, supply_increase = Transaction.(fee_excess, supply_increase)
-  end
-
-  module Staged_ledger = Staged_ledger
-
-  (*.Make (struct
-    module User_command = User_command
-    module Ledger_proof_statement = Transaction_snark.Statement
-    module Proof = Proof
-
-    (*module Sok_message = Coda_base.Sok_message*)
-    module Ledger_proof = Ledger_proof
-    module Ledger_proof_verifier = Verifier
-
-    (*module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Staged_ledger_hash = Staged_ledger_hash_binable*)
-    module Transaction_snark_work = Transaction_snark_work
-    module Transaction_validator = Transaction_validator
-    module Staged_ledger_diff = Staged_ledger_diff
-    module Account = Coda_base.Account
-    module Verifier = Verifier
-    module Proof_type = Transaction_snark.Proof_type
-
-    (*module Pending_coinbase_hash = Pending_coinbase.Hash
-    module Pending_coinbase_stack_state =
-      Transaction_snark.Pending_coinbase_stack_state*)
-    module Transaction_witness = Transaction_witness
-  end)*)
 
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random

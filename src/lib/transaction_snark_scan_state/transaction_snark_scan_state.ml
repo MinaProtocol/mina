@@ -17,22 +17,6 @@ let map2_or_error xs ys ~f =
   in
   go xs ys []
 
-(*module Make
-    (Inputs : Coda_intf.Tmp_test_stub_hack
-              .For_transaction_snark_scan_state_intf) (Constants : sig
-        val transaction_capacity_log_2 : int
-
-        val work_delay : int
-    end) :
-  Coda_intf.Transaction_snark_scan_state_generalized_intf
-  with type transaction_snark_work := Inputs.Transaction_snark_work.t
-   and type transaction_snark_statement := Transaction_snark.Statement.t
-   and type frozen_ledger_hash := Frozen_ledger_hash.t
-   and type ledger_undo := Ledger.Undo.t
-   and type transaction := Transaction.t
-   and type ledger_proof := Inputs.Ledger_proof.t = struct
-  open Inputs
-*)
 module type Monad_with_Or_error_intf = sig
   type 'a t
 
@@ -684,7 +668,5 @@ let fill_work_and_enqueue_transactions t transactions work =
         else Or_error.error_string "Unexpected ledger proof emitted" )
   in
   (result_opt, updated_scan_state)
-
-(*end*)
 
 module Constants = Constants

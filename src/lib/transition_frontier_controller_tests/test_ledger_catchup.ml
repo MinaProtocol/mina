@@ -2,6 +2,7 @@ open Core
 open Pipe_lib
 open Async
 open Coda_base
+open Coda_transition
 
 let max_length = 4
 

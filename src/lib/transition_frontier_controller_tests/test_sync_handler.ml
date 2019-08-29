@@ -2,6 +2,7 @@ open Core
 open Async
 open Coda_base
 open Coda_state
+open Coda_transition
 
 let num_breadcrumb_to_add = 3
 

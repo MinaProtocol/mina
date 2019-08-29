@@ -11,13 +11,6 @@ let refused_answer_query_string = "Refused to answer_query"
 
 type exn += No_initial_peers
 
-(* assumption: the Rpcs functor is applied only once in the codebase, so that
-   any versions appearing in Inputs represent unique types
-
-   with that assumption, it's legitimate for the choice of versions to be made
-   inside the Rpcs functor, rather than at the locus of application
-*)
-
 module Rpcs = struct
   (* for versioning of the types here, see
 

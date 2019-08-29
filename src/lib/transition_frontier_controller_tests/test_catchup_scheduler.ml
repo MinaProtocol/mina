@@ -3,6 +3,7 @@ open Core
 open Coda_base
 open Cache_lib
 open Pipe_lib
+open Coda_transition
 
 module Stubs = Stubs.Make (struct
   let max_length = 4

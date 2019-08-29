@@ -4,15 +4,6 @@ open Coda_base
 open Coda_state
 open Module_version
 
-(*module type Staged_ledger_diff_intf = sig
-  type t [@@deriving bin_io, sexp, version]
-
-  val creator : t -> Public_key.Compressed.t
-
-  val user_commands : t -> User_command.t list
-end
-
-module Make (Staged_ledger_diff : Staged_ledger_diff_intf) = struct*)
 module Stable = struct
   module V1 = struct
     module T = struct
@@ -742,13 +733,3 @@ module Staged_ledger_validation = struct
                 (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
             , `Staged_ledger transitioned_staged_ledger ) )
 end
-
-(*end
-
-include Make
-          (struct
-            include Staged_ledger_diff.Stable.V1
-
-            [%%define_locally
-            Staged_ledger_diff.(creator, user_commands)]
-          end)*)
