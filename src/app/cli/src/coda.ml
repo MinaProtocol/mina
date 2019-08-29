@@ -181,6 +181,17 @@ let daemon logger =
      and disable_haskell =
        flag "disable-old-discovery" no_arg
          ~doc:"Disable the old discovery mechanism"
+     and libp2p_keypair =
+       flag "libp2p-keypair" (optional string)
+         ~doc:
+           "Keypair (generated from `coda advanced generate-libp2p-keypair`) \
+            to use with libp2p (default: generate new keypair)"
+     and libp2p_peers_raw =
+       flag "libp2p-peer"
+         ~doc:
+           "/ip4/HOST/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
+            libp2p discovery"
+         (listed string)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -255,6 +266,17 @@ let daemon logger =
            ; ("branch", `String Coda_version.branch) ] ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Booting may take several seconds, please wait" ;
+       let libp2p_keypair =
+         Option.map libp2p_keypair ~f:(fun s ->
+             match Coda_net2.Keypair.of_string s with
+             | Ok kp ->
+                 kp
+             | Error e ->
+                 Logger.fatal logger "failed to parse -libp2p-keypair: $err"
+                   ~module_:__MODULE__ ~location:__LOC__
+                   ~metadata:[("err", `String (Error.to_string_hum e))] ;
+                 Core.exit 19 )
+       in
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
@@ -622,6 +644,9 @@ let daemon logger =
                ; log_gossip_heard
                ; enable_libp2p
                ; disable_haskell
+               ; libp2p_keypair
+               ; libp2p_peers=
+                   List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
                ; max_concurrent_connections } }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in

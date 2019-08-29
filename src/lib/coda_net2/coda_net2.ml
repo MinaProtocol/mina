@@ -230,6 +230,24 @@ module Helper = struct
 
       let name = "validationComplete"
     end
+
+    module Add_peer = struct
+      type input = {multiaddr: string} [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "addPeer"
+    end
+
+    module Begin_advertising = struct
+      type input = unit
+
+      let input_to_yojson () = `Assoc []
+
+      type output = string [@@deriving yojson]
+
+      let name = "beginAdvertising"
+    end
   end
 
   (** Generate the next sequence number for our side of the connection *)
@@ -692,8 +710,20 @@ module Keypair = struct
 
   let secret_key_base58 {secret; _} = to_b58_data secret
 
-  let to_string {secret; public; _} =
-    String.concat ~sep:";" [to_b58_data secret; to_b58_data public]
+  let to_string {secret; public; peer_id} =
+    String.concat ~sep:";"
+      [to_b58_data secret; to_b58_data public; to_b58_data peer_id]
+
+  let of_string s =
+    match String.split s ~on:';' with
+    | [secret_b58; public_b58; peer_id_b58] ->
+        let open Or_error.Let_syntax in
+        let%map secret = of_b58_data (`String secret_b58)
+        and public = of_b58_data (`String public_b58)
+        and peer_id = of_b58_data (`String peer_id_b58) in
+        {secret; public; peer_id}
+    | _ ->
+        Or_error.errorf "%s is not a valid Keypair.to_string output" s
 
   let to_peerid {peer_id; _} = peer_id
 end
@@ -957,6 +987,27 @@ let open_stream net ~protocol peer =
       in
       Hashtbl.add_exn net.streams ~key:stream_idx ~data:stream ;
       Ok stream
+  | Error e ->
+      Error e
+
+let add_peer net maddr =
+  match%map
+    Helper.(
+      do_rpc net (module Rpcs.Add_peer) {multiaddr= Multiaddr.to_string maddr})
+  with
+  | Ok "addPeer success" ->
+      Ok ()
+  | Ok v ->
+      failwithf "helper broke RPC protocol: addPeer got %s" v ()
+  | Error e ->
+      Error e
+
+let begin_advertising net =
+  match%map Helper.(do_rpc net (module Rpcs.Begin_advertising) ()) with
+  | Ok "beginAdvertising success" ->
+      Ok ()
+  | Ok v ->
+      failwithf "helper broke RPC protocol: beginAdvertising got %s" v ()
   | Error e ->
       Error e
 

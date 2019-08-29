@@ -43,6 +43,8 @@ type Helper struct {
 	Pubsub          *pubsub.PubSub
 	Logger          logging.EventLogger
 	DiscoveredPeers chan peer.AddrInfo
+	Rendezvous      string
+	Discovery       *discovery.RoutingDiscovery
 }
 
 type mdnsListener struct {
@@ -142,7 +144,6 @@ func MakeHelper(ctx context.Context, listenOn []multiaddr.Multiaddr, statedir st
 	routingDiscovery := discovery.NewRoutingDiscovery(kad)
 
 	log.Println("Announcing ourselves for", rendezvousString)
-	discovery.Advertise(ctx, routingDiscovery, rendezvousString)
 
 	discovered := make(chan peer.AddrInfo)
 
@@ -196,5 +197,7 @@ func MakeHelper(ctx context.Context, listenOn []multiaddr.Multiaddr, statedir st
 		Pubsub:          pubsub,
 		Logger:          logger,
 		DiscoveredPeers: discovered,
+		Rendezvous:      rendezvousString,
+		Discovery:       routingDiscovery,
 	}, nil
 }

@@ -84,6 +84,8 @@ module type Config_intf = sig
     ; max_concurrent_connections: int option
     ; enable_libp2p: bool
     ; disable_haskell: bool
+    ; libp2p_keypair: Coda_net2.Keypair.t option
+    ; libp2p_peers: Coda_net2.Multiaddr.t list
     ; log_gossip_heard: log_gossip_heard }
   [@@deriving make]
 end
@@ -189,6 +191,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; max_concurrent_connections: int option
       ; enable_libp2p: bool
       ; disable_haskell: bool
+      ; libp2p_keypair: Coda_net2.Keypair.t option
+      ; libp2p_peers: Coda_net2.Multiaddr.t list
       ; log_gossip_heard: log_gossip_heard }
     [@@deriving make]
   end
@@ -590,9 +594,21 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                         ~conf_dir:(config.conf_dir ^/ "coda_net2") ) )
             with
             | Ok (Ok net2) -> (
-                let open (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
-                Coda_net2 in
-                let%bind me = Keypair.random net2 in
+                let open Coda_net2 in
+                (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
+                let%bind me =
+                  match config.libp2p_keypair with
+                  | Some kp ->
+                      return kp
+                  | None ->
+                      Keypair.random net2
+                in
+                Logger.info config.logger
+                  "libp2p peer ID this session is $peer_id" ~location:__LOC__
+                  ~module_:__MODULE__
+                  ~metadata:
+                    [ ( "peer_id"
+                      , `String (Keypair.to_peerid me |> PeerID.to_string) ) ] ;
                 let disc_proto = "coda/0.0.1/discovery-port" in
                 let on_new_peer peerid =
                   (let%bind stream =
@@ -631,6 +647,14 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                     ~network_id:"libp2p phase2 test network" ~on_new_peer
                 with
                 | Ok () ->
+                    Deferred.ignore
+                      (let%bind _results =
+                         Deferred.all
+                           (List.map ~f:(Coda_net2.add_peer net2)
+                              config.libp2p_peers)
+                       in
+                       Coda_net2.begin_advertising net2)
+                    |> don't_wait_for ;
                     Some net2
                 | Error e ->
                     fail (Error.to_string_hum e) )

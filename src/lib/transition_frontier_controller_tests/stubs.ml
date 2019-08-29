@@ -552,6 +552,8 @@ struct
           ; max_concurrent_connections: int option
           ; enable_libp2p: bool
           ; disable_haskell: bool
+          ; libp2p_keypair: Coda_net2.Keypair.t option
+          ; libp2p_peers: Coda_net2.Multiaddr.t list
           ; log_gossip_heard: log_gossip_heard }
         [@@deriving make]
       end
