@@ -106,7 +106,6 @@ jobs:
                 command: |
                     sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
                     df -h
-                    bash -version
             # Attach workspace from prior linux build
             - attach_workspace:
                 at: /tmp/workspace
@@ -141,7 +140,6 @@ jobs:
                 command: |
                     cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
-                    bash --version
             - restore_cache:
                 name: Restore cache - opam
                 keys:
