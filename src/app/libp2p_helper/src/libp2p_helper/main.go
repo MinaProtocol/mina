@@ -134,6 +134,12 @@ type configureMsg struct {
 	ListenOn  []string `json:"ifaces"`
 }
 
+type discoveredPeerUpcall struct {
+	ID     string   `json:"peer_id"`
+	Addrs  []string `json:"multiaddrs"`
+	Upcall string   `json:"upcall"`
+}
+
 func (m *configureMsg) run(app *app) (interface{}, error) {
 	privkBytes, err := b58.Decode(m.Privk)
 	if err != nil {
@@ -152,6 +158,19 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		maddrs[i] = res
 	}
 	helper, err := codanet.MakeHelper(app.Ctx, maddrs, m.Statedir, privk, m.NetworkID)
+	go func() {
+		for info := range helper.DiscoveredPeers {
+			addrStrings := make([]string, len(info.Addrs))
+			for i, a := range info.Addrs {
+				addrStrings[i] = a.String()
+			}
+			app.writeMsg(discoveredPeerUpcall{
+				ID:     peer.IDB58Encode(info.ID),
+				Addrs:  addrStrings,
+				Upcall: "discoveredPeer",
+			})
+		}
+	}()
 	if err != nil {
 		return nil, badHelper(err)
 	}

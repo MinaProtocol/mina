@@ -638,7 +638,7 @@ let%test_module "Tests" =
         ; bind_ip= Unix.Inet_addr.localhost
         ; communication_port= base
         ; discovery_port= base + 1
-        ; libp2p_port= base + 2 
+        ; libp2p_port= base + 2
         ; client_port= 1000 + i }
 
     let conf_dir = Filename.temp_dir_name ^/ ".kademlia-test-"
@@ -785,7 +785,7 @@ let%test_module "Tests" =
                 let%bind () = Haskell_trust.stop new_banner_node
                 and () = Haskell.stop normal_node in
                 Deferred.unit ) *)
-
+      
       end )
 
     let%test_unit "lockfile does not exist after connection calling stop" =

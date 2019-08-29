@@ -6,7 +6,7 @@ open Async
 
 let init () = Parallel.init_master ()
 
-type ports = {communication_port:int;discovery_port:int;libp2p_port:int}
+type ports = {communication_port: int; discovery_port: int; libp2p_port: int}
 
 let net_configs n =
   let ips =
@@ -15,7 +15,7 @@ let net_configs n =
   in
   let addrs_and_ports_list =
     List.mapi ips ~f:(fun i ip ->
-        let base  = 23000  + (i * 3 ) in
+        let base = 23000 + (i * 3) in
         let communication_port = base in
         let discovery_port = base + 1 in
         let libp2p_port = base + 2 in

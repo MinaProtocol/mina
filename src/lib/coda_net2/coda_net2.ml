@@ -63,7 +63,7 @@ module Helper = struct
     ; subscriptions: (int, subscription) Hashtbl.t
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
-    ; mutable new_peer_callback: (Network_peer.Peer.t -> unit) option
+    ; mutable new_peer_callback: (string -> unit) option
     ; mutable finished: bool }
 
   and subscription =
@@ -451,6 +451,10 @@ module Helper = struct
       [@@deriving yojson]
     end
 
+    module Discovered_peer = struct
+      type t = {peer_id: string; multiaddrs: string list} [@@deriving yojson]
+    end
+
     let or_error (t : ('a, string) Result.t) =
       match t with
       | Ok a ->
@@ -571,13 +575,9 @@ module Helper = struct
             (* TODO: punish *)
             Or_error.errorf "incoming stream for protocol we don't know about?"
         )
-    | "newPeer" -> (
-      let%bind ip = v |> member "ip" |> to_string_res in
-      let%bind communication_port = v |> member "communication_port" |> to_int_res in
-      let%map discovery_port = v |> member "discovery_port" |> to_int_res in
-      Option.iter t.new_peer_callback ~f:(fun cb -> cb (Network_peer.Peer.create (Unix.Inet_addr.of_string ip) ~communication_port ~discovery_port)) ;
-      ()
-    )
+    | "discoveredPeer" ->
+        let%map p = Discovered_peer.of_yojson v |> or_error in
+        Option.iter t.new_peer_callback ~f:(fun cb -> cb p.peer_id)
     (* Received a message on some stream *)
     | "incomingStreamMsg" -> (
         let%bind m = Incoming_stream_msg.of_yojson v |> or_error in
@@ -819,7 +819,7 @@ end
 
 let me (net : Helper.t) = net.me_keypair
 
-let configure net ~me ~maddrs ~network_id ?on_new_peer =
+let configure net ~me ~maddrs ~network_id ~on_new_peer =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -830,6 +830,8 @@ let configure net ~me ~maddrs ~network_id ?on_new_peer =
   with
   | Ok "configure success" ->
       net.me_keypair <- Some me ;
+      net.new_peer_callback
+      <- Some (fun peer_id_string -> on_new_peer (peer_id_string :> PeerID.t)) ;
       Ok ()
   | Ok j ->
       failwithf "helper broke RPC protocol: configure got %s" j ()

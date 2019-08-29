@@ -189,14 +189,12 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; max_concurrent_connections: int option
       ; enable_libp2p: bool
       ; disable_haskell: bool
-      ; log_gossip_heard: log_gossip_heard 
-      ; max_concurrent_connections: int option }
+      ; log_gossip_heard: log_gossip_heard }
     [@@deriving make]
   end
 
   type t =
-    {
-      config: Config.t
+    { config: Config.t
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
     ; received_reader: Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; peers: Peer_set.t
@@ -249,7 +247,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let mark_peer_disconnected t peer =
     remove_peer t peer ;
-    Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+    Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("peer", Peer.to_yojson peer)]
       !"Moving peer $peer to disconnected peer set" ;
     Hash_set.add t.disconnected_peers peer
@@ -271,7 +269,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           let%map () =
             if Hash_set.mem t.disconnected_peers peer then (
               (* optimistically, mark all disconnected peers as peers *)
-              Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+              Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:[("peer", Peer.to_yojson peer)]
                 !"On RPC call, reconnected to a disconnected peer: $peer" ;
               unmark_all_disconnected_peers t )
@@ -342,8 +340,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               mark_peer_disconnected t peer ;
               Or_error.of_exn exn
           | _ ->
-              Logger.error t.config.logger ~module_:__MODULE__ ~location:__LOC__
-                "RPC call raised an exception: $exn"
+              Logger.error t.config.logger ~module_:__MODULE__
+                ~location:__LOC__ "RPC call raised an exception: $exn"
                 ~metadata:[("exn", `String (Exn.to_string exn))] ;
               return (Or_error.of_exn exn) )
     in
@@ -367,55 +365,64 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   and record_peer_events t =
     let open Peer.Event in
     trace_task "peer events" (fun () ->
-        Linear_pipe.iter_unordered ~max_concurrency:64
-          (Membership.changes t.membership) ~f:(function
-          | Connect peers ->
-              let%map kept_peers =
-                Deferred.List.filter peers ~f:(fun peer ->
-                    if%map filter_peer t peer then (
-                      Coda_metrics.(Gauge.inc_one Network.peers) ;
-                      Peer_set.add t.peers peer ;
-                      Hashtbl.add_multi t.peers_by_ip ~key:peer.host ~data:peer ;
-                      if
-                        Int.equal (Peer_set.length t.peers)
-                          disconnect_clear_threshold
-                      then Hash_set.clear t.disconnected_peers
-                      else Hash_set.remove t.disconnected_peers peer ;
-                      true )
-                    else false )
-              in
-              Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                !"Connected to some peers [%s]"
-                (Peer.pretty_list kept_peers) ;
-              Ivar.fill_if_empty t.first_connect ()
-          | Disconnect peers ->
-              Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                "Some peers disconnected: %s" (Peer.pretty_list peers) ;
-              List.iter peers ~f:(mark_peer_disconnected t) ;
-              Deferred.unit )
+        Option.map t.haskell_membership ~f:(fun membership ->
+            Linear_pipe.iter_unordered ~max_concurrency:64
+              (Membership.changes membership) ~f:(function
+              | Connect peers ->
+                  let%map kept_peers =
+                    Deferred.List.filter peers ~f:(fun peer ->
+                        if%map filter_peer t peer then (
+                          Coda_metrics.(Gauge.inc_one Network.peers) ;
+                          Peer_set.add t.peers peer ;
+                          Hashtbl.add_multi t.peers_by_ip ~key:peer.host
+                            ~data:peer ;
+                          if
+                            Int.equal (Peer_set.length t.peers)
+                              disconnect_clear_threshold
+                          then Hash_set.clear t.disconnected_peers
+                          else Hash_set.remove t.disconnected_peers peer ;
+                          true )
+                        else false )
+                  in
+                  Logger.info t.config.logger ~module_:__MODULE__
+                    ~location:__LOC__
+                    !"Connected to some peers [%s]"
+                    (Peer.pretty_list kept_peers) ;
+                  Ivar.fill_if_empty t.first_connect ()
+              | Disconnect peers ->
+                  Logger.info t.config.logger ~module_:__MODULE__
+                    ~location:__LOC__ "Some peers disconnected: %s"
+                    (Peer.pretty_list peers) ;
+                  List.iter peers ~f:(mark_peer_disconnected t) ;
+                  Deferred.unit ) )
         |> ignore )
 
   and restart_kademlia t addl_peers =
-    Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+    Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
       "Restarting Kademlia" ;
-    let%bind () = Membership.stop t.membership in
-    let%map new_membership =
-      let initial_peers =
-        List.dedup_and_sort ~compare:Host_and_port.compare
-        @@ t.initial_peers @ addl_peers
-      in
-      Membership.connect ~node_addrs_and_ports:t.addrs_and_ports ~initial_peers
-        ~conf_dir:t.conf_dir ~logger:t.logger ~trust_system:t.trust_system
-    in
-    match new_membership with
-    | Ok membership ->
-        t.membership <- membership ;
-        record_peer_events t
-    | Error _ ->
-        failwith "Could not restart Kademlia"
+    match t.haskell_membership with
+    | Some membership -> (
+        let%bind () = Membership.stop membership in
+        let%map new_membership =
+          let initial_peers =
+            List.dedup_and_sort ~compare:Host_and_port.compare
+            @@ t.config.initial_peers @ addl_peers
+          in
+          Membership.connect ~node_addrs_and_ports:t.config.addrs_and_ports
+            ~initial_peers ~conf_dir:t.config.conf_dir ~logger:t.config.logger
+            ~trust_system:t.config.trust_system
+        in
+        match new_membership with
+        | Ok membership ->
+            t.haskell_membership <- Some membership ;
+            record_peer_events t
+        | Error _ ->
+            failwith "Could not restart Kademlia" )
+    | None ->
+        Deferred.unit
 
   and unmark_all_disconnected_peers t =
-    Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+    Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
       !"Clearing disconnected peer set : %{sexp: Peer.t list}"
       (Hash_set.to_list t.disconnected_peers) ;
     let disconnected_peers =
@@ -429,18 +436,19 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   and filter_peer t peer =
     match%map try_call_rpc t peer Get_chain_id.dispatch_multi () with
     | Ok their_chain_id ->
-        if String.equal their_chain_id t.chain_id then true
+        if String.equal their_chain_id t.config.chain_id then true
         else (
-          Logger.warn t.logger "Chain ID mismatch: refusing to connect to %s"
-            ~location:__LOC__ ~module_:__MODULE__
+          Logger.warn t.config.logger
+            "Chain ID mismatch: refusing to connect to %s" ~location:__LOC__
+            ~module_:__MODULE__
             ~metadata:
               [ ("peer", Peer.to_yojson peer)
               ; ("theirs", `String their_chain_id)
-              ; ("ours", `String t.chain_id) ]
+              ; ("ours", `String t.config.chain_id) ]
             (Peer.to_string peer) ;
           false )
     | Error e ->
-        Logger.warn t.logger
+        Logger.warn t.config.logger
           "Retrieving chain ID failed: refusing to connect to %s: $error"
           ~location:__LOC__ ~module_:__MODULE__
           ~metadata:
@@ -466,7 +474,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                (fun conn ->
                  match%bind Versioned_rpc.Connection_with_menu.create conn with
                  | Ok _conn' ->
-                     Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                     Logger.info t.config.logger ~module_:__MODULE__
+                       ~location:__LOC__
                        !"Reconnected to a random disconnected peer: %{sexp: \
                          Peer.t}"
                        peer ;
@@ -554,41 +563,82 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         in
         let%bind haskell_membership =
           if not config.disable_haskell then
-          (match%map
-            Monitor.try_with
-              (fun () ->
-                trace_task "membership" (fun () ->
-                    Membership.connect ~initial_peers:config.initial_peers
-                      ~node_addrs_and_ports:config.addrs_and_ports
-                      ~conf_dir:config.conf_dir ~logger:config.logger
-                      ~trust_system:config.trust_system ) )
-              ~rest:(`Call handle_exn)
-          with
-          | Ok (Ok membership) ->
-              Some membership
-          | Ok (Error e) ->
-              fail (Error.to_string_hum e)
-          | Error e ->
-              fail (Exn.to_string e)) else Deferred.return None
+            match%map
+              Monitor.try_with
+                (fun () ->
+                  trace_task "membership" (fun () ->
+                      Membership.connect ~initial_peers:config.initial_peers
+                        ~node_addrs_and_ports:config.addrs_and_ports
+                        ~conf_dir:config.conf_dir ~logger:config.logger
+                        ~trust_system:config.trust_system ) )
+                ~rest:(`Call handle_exn)
+            with
+            | Ok (Ok membership) ->
+                Some membership
+            | Ok (Error e) ->
+                fail (Error.to_string_hum e)
+            | Error e ->
+                fail (Exn.to_string e)
+          else Deferred.return None
         in
         let%bind libp2p_membership =
           if config.enable_libp2p then
-          (match%bind
-            Monitor.try_with
-              (fun () ->
-                trace_task "coda_net2" (fun () ->
-                  Coda_net2.create ~logger:config.logger ~conf_dir:(config.conf_dir ^/ "coda_net2")))
-          with
-          | Ok (Ok net2) ->
-            (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
-            let%bind me = Coda_net2.Keypair.random net2 in
-            (match%map Coda_net2.configure net2 ~me ~maddrs:[Coda_net2.Multiaddr.of_string (sprintf "/ip4/%s/tcp/%d" (config.addrs_and_ports.bind_ip |> Unix.Inet_addr.to_string) config.addrs_and_ports.libp2p_port)] ~network_id:"libp2p phase2 test network" with
-            |  Ok () -> Some net2
-            | Error e -> fail (Error.to_string_hum e))
-          | Ok (Error e) ->
-              fail (Error.to_string_hum e)
-          | Error e ->
-              fail (Exn.to_string e)) else Deferred.return None
+            match%bind
+              Monitor.try_with (fun () ->
+                  trace_task "coda_net2" (fun () ->
+                      Coda_net2.create ~logger:config.logger
+                        ~conf_dir:(config.conf_dir ^/ "coda_net2") ) )
+            with
+            | Ok (Ok net2) -> (
+                let open (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
+                Coda_net2 in
+                let%bind me = Keypair.random net2 in
+                let disc_proto = "coda/0.0.1/discovery-port" in
+                let on_new_peer peerid =
+                  (let%bind stream =
+                     open_stream net2 ~protocol:disc_proto peerid
+                     >>| Or_error.ok_exn
+                   in
+                   let r, w = Stream.pipes stream in
+                   Pipe.close w ;
+                   let%map msg = Pipe.read_all r in
+                   let them_as_peer =
+                     Queue.to_list msg |> String.concat
+                     |> Yojson.Safe.from_string |> Peer.of_yojson
+                     |> Result.ok_or_failwith
+                   in
+                   ignore them_as_peer)
+                  (* Inject into Membership.changes *)
+                  |> don't_wait_for
+                in
+                let%bind _disc_handler =
+                  handle_protocol net2 ~on_handler_error:`Raise
+                    ~protocol:disc_proto (fun stream ->
+                      let _, w = Stream.pipes stream in
+                      Pipe.write w
+                        ( Node_addrs_and_ports.to_peer config.addrs_and_ports
+                        |> Peer.to_yojson |> Yojson.Safe.to_string ) )
+                in
+                (* TODO: chain ID as network ID. *)
+                match%map
+                  configure net2 ~me
+                    ~maddrs:
+                      [ Multiaddr.of_string
+                          (sprintf "/ip4/%s/tcp/%d"
+                             ( config.addrs_and_ports.bind_ip
+                             |> Unix.Inet_addr.to_string )
+                             config.addrs_and_ports.libp2p_port) ]
+                    ~network_id:"libp2p phase2 test network" ~on_new_peer
+                with
+                | Ok () ->
+                    Some net2
+                | Error e ->
+                    fail (Error.to_string_hum e) )
+            | Ok (Error e) ->
+                fail (Error.to_string_hum e)
+            | Error e ->
+                fail (Exn.to_string e)
+          else Deferred.return None
         in
         let first_connect = Ivar.create () in
         let broadcast_reader, broadcast_writer = Linear_pipe.create () in
@@ -603,14 +653,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           { config
           ; broadcast_writer
           ; received_reader
-          ; addrs_and_ports= config.addrs_and_ports
           ; peers= Peer_set.create ()
-          ; initial_peers= config.initial_peers
           ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
           ; disconnected_peers= Peer.Hash_set.create ()
           ; ban_notification_reader
           ; ban_notification_writer
-          ; chain_id= config.chain_id
           ; haskell_membership
           ; libp2p_membership
           ; connections= Hashtbl.create (module Unix.Inet_addr)
@@ -632,7 +679,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                | None ->
                    Deferred.unit
                | Some conn_tbl ->
-                   Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
+                   Logger.debug t.config.logger ~module_:__MODULE__
+                     ~location:__LOC__
                      !"Peer %s banned, disconnecting."
                      (Unix.Inet_addr.to_string addr) ;
                    let%map () =
@@ -653,10 +701,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
                  ~f:(fun m ->
-                   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+                   Logger.trace t.config.logger ~module_:__MODULE__
+                     ~location:__LOC__
                      ~metadata:[("message", `String (Message.summary m))]
                      "broadcasting message: $message" ;
-                   broadcast_random t t.target_peer_count m )) ) ;
+                   broadcast_random t t.config.target_peer_count m )) ) ;
         let implementations =
           let implementations =
             Versioned_rpc.Menu.add
@@ -699,7 +748,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             ~on_handler_error:
               (`Call
                 (fun addr exn ->
-                  Logger.error t.config.logger ~module_:__MODULE__ ~location:__LOC__
+                  Logger.error t.config.logger ~module_:__MODULE__
+                    ~location:__LOC__
                     "Exception raised in gossip net TCP server handler when \
                      connected to address $address: $exn"
                     ~metadata:
@@ -709,7 +759,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             Tcp.(
               Where_to_listen.bind_to
                 (Bind_to_address.Address t.config.addrs_and_ports.bind_ip)
-                (Bind_to_port.On_port t.config.addrs_and_ports.communication_port))
+                (Bind_to_port.On_port
+                   t.config.addrs_and_ports.communication_port))
             (fun client reader writer ->
               let client_inet_addr = Socket.Address.Inet.addr client in
               let%bind () =
@@ -735,8 +786,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                     false
               in
               if is_client_banned then (
-                Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-                  "Rejecting connection from banned peer %s"
+                Logger.info t.config.logger ~module_:__MODULE__
+                  ~location:__LOC__ "Rejecting connection from banned peer %s"
                   (Socket.Address.Inet.to_string client) ;
                 Deferred.unit )
               else if
@@ -744,15 +795,17 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 && Hashtbl.length conn_map
                    >= Option.value_exn t.config.max_concurrent_connections
               then (
-                Logger.error t.config.logger ~module_:__MODULE__ ~location:__LOC__
+                Logger.error t.config.logger ~module_:__MODULE__
+                  ~location:__LOC__
                   "Gossip net TCP server cannot open another connection. \
                    Number of open connections from client $client equals the \
                    limit $max_connections"
                   ~metadata:
                     [ ("client", `String (Socket.Address.Inet.to_string client))
                     ; ( "max_connections"
-                      , `Int (Option.value_exn t.config.max_concurrent_connections) )
-                    ] ;
+                      , `Int
+                          (Option.value_exn t.config.max_concurrent_connections)
+                      ) ] ;
                 Deferred.unit )
               else
                 let conn_id = Uuid_unix.create () in
@@ -779,7 +832,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                       (`Call
                         (fun exn ->
                           Trust_system.(
-                            record t.config.trust_system t.config.logger client_inet_addr
+                            record t.config.trust_system t.config.logger
+                              client_inet_addr
                               Actions.
                                 ( Incoming_connection_error
                                 , Some

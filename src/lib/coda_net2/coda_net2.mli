@@ -147,7 +147,7 @@ val configure :
   -> me:Keypair.t
   -> maddrs:Multiaddr.t list
   -> network_id:string
-  -> ?on_new_peer:(Network_peer.Peer.t -> unit)
+  -> on_new_peer:(PeerID.t -> unit)
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.

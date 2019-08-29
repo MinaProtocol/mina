@@ -7,7 +7,8 @@ type t =
   ; discovery_port: int
   ; client_port: int
   ; libp2p_port: int
-  ; communication_port: int } [@@deriving bin_io]
+  ; communication_port: int }
+[@@deriving bin_io]
 
 let to_peer : t -> Peer.t = function
   | {external_ip; discovery_port; communication_port; _} ->
