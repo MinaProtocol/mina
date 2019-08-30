@@ -161,19 +161,19 @@ let daemon logger =
        flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
      and libp2p_port =
        flag "libp2p-port" (optional int)
-         ~doc:"Port to use for libp2p (default: 28675)"
+         ~doc:"PORT Port to use for libp2p (default: 28675)"
      and disable_haskell =
        flag "disable-old-discovery" no_arg
          ~doc:"Disable the old discovery mechanism"
      and libp2p_keypair =
        flag "libp2p-keypair" (optional string)
          ~doc:
-           "Keypair (generated from `coda advanced generate-libp2p-keypair`) \
+           "KEYPAIR Keypair (generated from `coda advanced generate-libp2p-keypair`) \
             to use with libp2p (default: generate new keypair)"
      and libp2p_peers_raw =
        flag "libp2p-peer"
          ~doc:
-           "/ip4/HOST/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
+           "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             libp2p discovery"
          (listed string)
      in
