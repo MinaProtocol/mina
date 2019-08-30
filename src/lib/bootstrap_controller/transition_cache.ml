@@ -7,8 +7,6 @@ open Coda_transition
 module type S = sig
   type t
 
-  type external_transition_with_initial_validation
-
   type state_hash
 
   val create : unit -> t
@@ -16,20 +14,17 @@ module type S = sig
   val add :
        t
     -> parent:state_hash
-    -> external_transition_with_initial_validation Envelope.Incoming.t
+    -> External_transition.with_initial_validation Envelope.Incoming.t
     -> unit
 
   val data :
-    t -> external_transition_with_initial_validation Envelope.Incoming.t list
+    t -> External_transition.with_initial_validation Envelope.Incoming.t list
 end
 
 module type Inputs_intf = Transition_frontier.Inputs_intf
 
-module Make (Inputs : Inputs_intf) :
-  S
-  with type external_transition_with_initial_validation :=
-              External_transition.with_initial_validation
-   and type state_hash := State_hash.t = struct
+module Make (Inputs : Inputs_intf) : S with type state_hash := State_hash.t =
+struct
   type t =
     External_transition.with_initial_validation Envelope.Incoming.t list
     State_hash.Table.t

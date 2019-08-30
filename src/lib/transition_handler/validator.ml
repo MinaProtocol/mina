@@ -8,12 +8,9 @@ open Coda_transition
 
 module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   Coda_intf.Transition_handler_validator_intf
-  with type external_transition_with_initial_validation :=
-              External_transition.with_initial_validation
-   and type unprocessed_transition_cache :=
+  with type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
-   and type transition_frontier := Inputs.Transition_frontier.t
-   and type staged_ledger := Staged_ledger.t = struct
+   and type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
   let validate_transition ~logger ~frontier ~unprocessed_transition_cache

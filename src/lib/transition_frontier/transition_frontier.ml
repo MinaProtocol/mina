@@ -8,21 +8,8 @@ open Pipe_lib
 
 module type Inputs_intf = Inputs.Inputs_intf
 
-module Make (Inputs : Inputs_intf) :
-  Coda_intf.Transition_frontier_intf
-  with type mostly_validated_external_transition :=
-              ( [`Time_received] * unit Truth.true_t
-              , [`Proof] * unit Truth.true_t
-              , [`Delta_transition_chain]
-                * State_hash.t Non_empty_list.t Truth.true_t
-              , [`Frontier_dependencies] * unit Truth.true_t
-              , [`Staged_ledger_diff] * unit Truth.false_t )
-              External_transition.Validation.with_transition
-   and type external_transition_validated := External_transition.Validated.t
-   and type staged_ledger_diff := Staged_ledger_diff.t
-   and type staged_ledger := Staged_ledger.t
-   and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-   and type verifier := Verifier.t = struct
+module Make (Inputs : Inputs_intf) : Coda_intf.Transition_frontier_intf =
+struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])

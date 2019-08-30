@@ -17,13 +17,9 @@ open Coda_transition
 
 module Make (Inputs : Inputs.S) :
   Coda_intf.Transition_handler_processor_intf
-  with type external_transition_with_initial_validation :=
-              External_transition.with_initial_validation
-   and type external_transition_validated := External_transition.Validated.t
-   and type transition_frontier := Inputs.Transition_frontier.t
+  with type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
-              Inputs.Transition_frontier.Breadcrumb.t
-   and type verifier := Verifier.t = struct
+              Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
   module Catchup_scheduler = Catchup_scheduler.Make (Inputs)
   module Transition_frontier_validation =

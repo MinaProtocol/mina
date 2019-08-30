@@ -45,15 +45,12 @@ open Coda_transition
 
 module Make (Inputs : Inputs.S) :
   Coda_intf.Catchup_intf
-  with type external_transition_with_initial_validation :=
-              External_transition.with_initial_validation
-   and type unprocessed_transition_cache :=
+  with type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
-   and type network := Inputs.Network.t
-   and type verifier := Verifier.t = struct
+   and type network := Inputs.Network.t = struct
   open Inputs
 
   let verify_transition ~logger ~trust_system ~verifier ~frontier
