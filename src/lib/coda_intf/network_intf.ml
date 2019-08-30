@@ -46,7 +46,6 @@ module type Network_intf = sig
   val get_best_tip :
        t
     -> Network_peer.Peer.t
-    -> unit
     -> ( external_transition
        , State_body_hash.t list * external_transition )
        Proof_carrying_data.t

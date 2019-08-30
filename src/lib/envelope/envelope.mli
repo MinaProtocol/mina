@@ -17,14 +17,14 @@ end
 module Incoming : sig
   module Stable : sig
     module V1 : sig
-      type 'a t = {data: 'a; sender: Sender.Stable.V1.t}
-      [@@deriving eq, sexp, bin_io, yojson, version]
+      type 'a t = {data: 'a; sender: Sender.Stable.V1.t [@compare.ignore]}
+      [@@deriving eq, sexp, bin_io, yojson, version, compare]
     end
 
     module Latest = V1
   end
 
-  type 'a t = 'a Stable.Latest.t [@@deriving eq, sexp, yojson]
+  type 'a t = 'a Stable.Latest.t [@@deriving eq, sexp, yojson, compare]
 
   val sender : 'a t -> Sender.t
 
@@ -35,4 +35,6 @@ module Incoming : sig
   val map : f:('a -> 'b) -> 'a t -> 'b t
 
   val local : 'a -> 'a t
+
+  val max : f:('a -> 'a -> int) -> 'a t -> 'a t -> 'a t
 end

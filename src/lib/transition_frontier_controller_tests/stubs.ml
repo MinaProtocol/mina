@@ -603,10 +603,10 @@ struct
         ~f:(Sync_handler.Root.prove ~logger)
         t
 
-    let get_best_tip ({logger; _} as t) =
+    let get_best_tip ({logger; _} as t) peer =
       handle_requests ~typ:"best tip"
         ~f:(fun ~frontier () -> Best_tip_prover.prove ~logger frontier)
-        t
+        t peer ()
 
     let get_transition_chain_proof =
       handle_requests ~typ:"transition chain witness" ~f:(fun ~frontier hash ->

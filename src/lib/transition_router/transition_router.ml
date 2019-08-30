@@ -128,7 +128,7 @@ module Make (Inputs : Inputs_intf) = struct
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Requesting peers for their best tip to do initialization" ;
     Deferred.List.fold peers ~init:None ~f:(fun acc peer ->
-        match%bind Network.get_best_tip network peer () with
+        match%bind Network.get_best_tip network peer with
         | Error e ->
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("peer", Network_peer.Peer.to_yojson peer)]
@@ -162,25 +162,17 @@ module Make (Inputs : Inputs_intf) = struct
                 @@ Option.merge acc
                      (Option.return enveloped_candidate_best_tip)
                      ~f:(fun existing_best_tip candidate_best_tip ->
-                       if
-                         Consensus.Hooks.select
-                           ~existing:
-                             ( existing_best_tip |> Envelope.Incoming.data
-                             |> fst |> With_hash.data
-                             |> External_transition.consensus_state )
-                           ~candidate:
-                             ( candidate_best_tip |> Envelope.Incoming.data
-                             |> fst |> With_hash.data
-                             |> External_transition.consensus_state )
-                           ~logger
-                         = `Take
-                       then candidate_best_tip
-                       else existing_best_tip ) ) )
+                       Envelope.Incoming.max
+                         ~f:(fun t1 t2 ->
+                           External_transition.compare
+                             (With_hash.data @@ fst t1)
+                             (With_hash.data @@ fst t2) )
+                         existing_best_tip candidate_best_tip ) ) )
 
   let initialize ~logger ~network ~verifier ~trust_system ~frontier
       ~time_controller ~ledger_db ~frontier_w ~proposer_transition_reader
       ~clear_reader ~verified_transition_writer ~transition_reader_ref
-      ~transition_writer_ref =
+      ~transition_writer_ref ~most_recent_valid_block_writer =
     let%bind () =
       let connectivity_time_upper_bound =
         Consensus.Constants.initialization_time_in_secs
@@ -207,6 +199,9 @@ module Make (Inputs : Inputs_intf) = struct
     in
     match%map download_best_tip ~logger ~network ~verifier ~trust_system with
     | Some best_tip_enveloped ->
+        best_tip_enveloped |> Envelope.Incoming.data |> fst |> With_hash.data
+        |> Broadcast_pipe.Writer.write most_recent_valid_block_writer
+        |> don't_wait_for ;
         if
           is_transition_for_bootstrap ~logger ~frontier
             ( best_tip_enveloped |> Envelope.Incoming.data |> fst
@@ -286,7 +281,7 @@ module Make (Inputs : Inputs_intf) = struct
       (initialize ~logger ~network ~verifier ~trust_system ~frontier
          ~time_controller ~ledger_db ~frontier_w ~proposer_transition_reader
          ~clear_reader ~verified_transition_writer ~transition_reader_ref
-         ~transition_writer_ref) (fun () ->
+         ~transition_writer_ref ~most_recent_valid_block_writer) (fun () ->
         let valid_protocol_state_transition_reader, valid_transition_reader =
           Strict_pipe.Reader.Fork.two valid_protocol_state_transition_reader
         in

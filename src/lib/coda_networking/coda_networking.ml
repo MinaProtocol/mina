@@ -904,9 +904,9 @@ module Make (Inputs : Inputs_intf) = struct
     make_rpc_request ~rpc_dispatch:Rpcs.Get_transition_chain.dispatch_multi
       ~label:"chain of transitions"
 
-  let get_best_tip =
+  let get_best_tip t peer =
     make_rpc_request ~rpc_dispatch:Rpcs.Get_best_tip.dispatch_multi
-      ~label:"best tip"
+      ~label:"best tip" t peer ()
 
   let ban_notify t peer banned_until =
     Gossip_net.query_peer t.gossip_net peer Rpcs.Ban_notify.dispatch_multi

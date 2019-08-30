@@ -56,8 +56,8 @@ module Incoming = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type 'a t = {data: 'a; sender: Sender.Stable.V1.t}
-        [@@deriving eq, sexp, bin_io, yojson, version]
+        type 'a t = {data: 'a; sender: Sender.Stable.V1.t [@compare.ignore]}
+        [@@deriving eq, sexp, bin_io, yojson, version, compare]
       end
 
       include T
@@ -67,7 +67,7 @@ module Incoming = struct
   end
 
   (* bin_io intentionally omitted *)
-  type 'a t = 'a Stable.Latest.t [@@deriving eq, sexp, yojson]
+  type 'a t = 'a Stable.Latest.t [@@deriving eq, sexp, yojson, compare]
 
   let sender t = t.Stable.Latest.sender
 
@@ -80,4 +80,6 @@ module Incoming = struct
   let local data =
     let sender = Sender.Local in
     Stable.Latest.{data; sender}
+
+  let max ~f e1 e2 = if compare f e1 e2 > 0 then e1 else e2
 end
