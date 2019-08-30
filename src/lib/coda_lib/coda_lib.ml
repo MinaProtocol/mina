@@ -24,7 +24,9 @@ exception Snark_worker_signal_interrupt of Signal.t
    assigned to a public key. This public key can change throughout the entire time
    the daemon is running *)
 type snark_worker =
-  {public_key: Public_key.Compressed.t; process: Process.t Ivar.t}
+  { public_key: Public_key.Compressed.t
+  ; process: Process.t Ivar.t
+  ; kill_ivar: unit Ivar.t }
 
 type processes =
   { prover: Prover.t
@@ -84,7 +86,7 @@ let propose_public_keys t : Public_key.Compressed.Set.t =
 let replace_propose_keypairs t kps = Agent.update t.propose_keypairs kps
 
 module Snark_worker = struct
-  let run_process ~logger client_port =
+  let run_process ~logger client_port kill_ivar =
     let%map snark_worker_process =
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
@@ -118,6 +120,7 @@ module Snark_worker = struct
                   !"Snark worker process fully died after receiving term \
                     signal."
                   ~module_:__MODULE__ ~location:__LOC__ ;
+                Ivar.fill kill_ivar () ;
                 Deferred.unit
             | Error error -> (
                 Logger.info logger
@@ -163,13 +166,14 @@ module Snark_worker = struct
 
   let start t =
     match t.processes.snark_worker with
-    | `On ({process= process_ivar; _}, _) ->
+    | `On ({process= process_ivar; kill_ivar; _}, _) ->
         Logger.debug t.config.logger
           !"Starting snark worker process"
           ~module_:__MODULE__ ~location:__LOC__ ;
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
             t.config.net_config.gossip_net_params.addrs_and_ports.client_port
+            kill_ivar
         in
         Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
@@ -184,16 +188,17 @@ module Snark_worker = struct
           ~module_:__MODULE__ ~location:__LOC__ ;
         Deferred.unit
 
-  let stop t =
+  let stop ?(should_wait_kill = false) t =
     match t.processes.snark_worker with
-    | `On ({public_key= _; process}, _) ->
-        let%map process = Ivar.read process in
+    | `On ({public_key= _; process; kill_ivar}, _) ->
+        let%bind process = Ivar.read process in
         Logger.info t.config.logger
           "Killing snark worker process with pid: $snark_worker_pid"
           ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [("snark_worker_pid", `Int (Pid.to_int (Process.pid process)))] ;
-        Signal.send_exn Signal.term (`Pid (Process.pid process))
+        Signal.send_exn Signal.term (`Pid (Process.pid process)) ;
+        if should_wait_kill then Ivar.read kill_ivar else Deferred.unit
     | `Off _ ->
         Logger.warn t.config.logger
           "Attempted to turn off snark worker, but no snark worker was running"
@@ -218,13 +223,16 @@ module Snark_worker = struct
         Deferred.unit
     | `Off fee, Some new_key ->
         let process = Ivar.create () in
-        t.processes.snark_worker <- `On ({public_key= new_key; process}, fee) ;
+        let kill_ivar = Ivar.create () in
+        t.processes.snark_worker
+        <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
         start t
-    | `On ({public_key= _; process}, fee), Some new_key ->
+    | `On ({public_key= _; process; kill_ivar}, fee), Some new_key ->
         Logger.debug logger
           !"Changing snark worker key from $old to $new"
           ~module_:__MODULE__ ~location:__LOC__ ;
-        t.processes.snark_worker <- `On ({public_key= new_key; process}, fee) ;
+        t.processes.snark_worker
+        <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
         Deferred.unit
     | `On (_, fee), None ->
         let%map () = stop t in
@@ -596,8 +604,10 @@ let create (config : Config.t) =
               config.snark_worker_config.initial_snark_worker_key
               ~default:(`Off config.snark_work_fee) ~f:(fun public_key ->
                 `On
-                  ({public_key; process= Ivar.create ()}, config.snark_work_fee)
-            )
+                  ( { public_key
+                    ; process= Ivar.create ()
+                    ; kill_ivar= Ivar.create () }
+                  , config.snark_work_fee ) )
           in
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
