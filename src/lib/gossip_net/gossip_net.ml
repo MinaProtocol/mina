@@ -628,34 +628,41 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                          (Peer.Event.Connect [them_as_peer]) ))
                   |> don't_wait_for
                 in
-                let%bind _disc_handler =
-                  handle_protocol net2 ~on_handler_error:`Raise
-                    ~protocol:disc_proto (fun stream ->
-                      let _, w = Stream.pipes stream in
-                      Pipe.write w
-                        ( Node_addrs_and_ports.to_peer config.addrs_and_ports
-                        |> Peer.to_yojson |> Yojson.Safe.to_string ) )
+                let initializing_libp2p_result : unit Deferred.Or_error.t =
+                  let open Deferred.Or_error.Let_syntax in
+                  let%bind () =
+                    configure net2 ~me ~maddrs:[]
+                      ~network_id:"libp2p phase2 test network" ~on_new_peer
+                  in
+                  let%bind _disc_handler =
+                    handle_protocol net2 ~on_handler_error:`Raise
+                      ~protocol:disc_proto (fun stream ->
+                        let _, w = Stream.pipes stream in
+                        Pipe.write w
+                          ( Node_addrs_and_ports.to_peer config.addrs_and_ports
+                          |> Peer.to_yojson |> Yojson.Safe.to_string ) )
+                  in
+                  (* TODO: chain ID as network ID. *)
+                  let%map _ =
+                    listen_on net2
+                      (Multiaddr.of_string
+                         (sprintf "/ip4/%s/tcp/%d"
+                            ( config.addrs_and_ports.bind_ip
+                            |> Unix.Inet_addr.to_string )
+                            config.addrs_and_ports.libp2p_port))
+                  in
+                  Deferred.ignore
+                    (Deferred.bind
+                       ~f:(fun _ -> Coda_net2.begin_advertising net2)
+                       (* TODO: timeouts here in addition to the libp2p side? *)
+                       (Deferred.all
+                          (List.map ~f:(Coda_net2.add_peer net2)
+                             config.libp2p_peers)))
+                  |> don't_wait_for ;
+                  ()
                 in
-                (* TODO: chain ID as network ID. *)
-                match%map
-                  configure net2 ~me
-                    ~maddrs:
-                      [ Multiaddr.of_string
-                          (sprintf "/ip4/%s/tcp/%d"
-                             ( config.addrs_and_ports.bind_ip
-                             |> Unix.Inet_addr.to_string )
-                             config.addrs_and_ports.libp2p_port) ]
-                    ~network_id:"libp2p phase2 test network" ~on_new_peer
-                with
+                match%map initializing_libp2p_result with
                 | Ok () ->
-                    Deferred.ignore
-                      (let%bind _results =
-                         Deferred.all
-                           (List.map ~f:(Coda_net2.add_peer net2)
-                              config.libp2p_peers)
-                       in
-                       Coda_net2.begin_advertising net2)
-                    |> don't_wait_for ;
                     Some net2
                 | Error e ->
                     fail (Error.to_string_hum e) )

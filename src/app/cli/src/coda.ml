@@ -168,8 +168,9 @@ let daemon logger =
      and libp2p_keypair =
        flag "libp2p-keypair" (optional string)
          ~doc:
-           "KEYPAIR Keypair (generated from `coda advanced generate-libp2p-keypair`) \
-            to use with libp2p (default: generate new keypair)"
+           "KEYPAIR Keypair (generated from `coda advanced \
+            generate-libp2p-keypair`) to use with libp2p (default: generate \
+            new keypair)"
      and libp2p_peers_raw =
        flag "libp2p-peer"
          ~doc:
