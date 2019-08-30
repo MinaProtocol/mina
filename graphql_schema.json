@@ -1110,6 +1110,71 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "Float",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "TrustStatusPayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "ip_addr",
+              "description": "IP address",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "trust",
+              "description": "Trust score",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "banned_status",
+              "description": "Banned status",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "ENUM",
           "name": "TransactionStatus",
           "description": "Status of a transaction",
@@ -1249,8 +1314,8 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnarkJobs",
-          "description": "Snark works purchased",
+          "name": "CompletedWork",
+          "description": "Completed snark works",
           "fields": [
             {
               "name": "prover",
@@ -1767,7 +1832,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "SnarkJobs",
+                      "name": "CompletedWork",
                       "ofType": null
                     }
                   }
@@ -2082,6 +2147,18 @@
               "deprecationReason": null
             },
             {
+              "name": "inferredNonce",
+              "description": "Like the `nonce` field, except it includes the scheduled transactions (transactions not yet included in a block) (stringified uint32)",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "receiptChainHash",
               "description": "Top hash of the receipt chain merkle-list",
               "args": [],
@@ -2119,7 +2196,7 @@
             },
             {
               "name": "stakingActive",
-              "description": "True if you are actively staking with this account - this may not yet have been updated if the staking key was changed recently",
+              "description": "True if you are actively staking with this account on the current daemon - this may not yet have been updated if the staking key was changed recently",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3273,6 +3350,81 @@
                   "kind": "ENUM",
                   "name": "TransactionStatus",
                   "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "trustStatus",
+              "description": "Trust status for an IPv4 or IPv6 address",
+              "args": [
+                {
+                  "name": "ipAddress",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "OBJECT",
+                "name": "TrustStatusPayload",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "trustStatusAll",
+              "description": "IP address and trust status for all peers",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "TrustStatusPayload",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snarkPool",
+              "description": "List of completed snark works that have the lowest fee so far",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "CompletedWork",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,

@@ -22,7 +22,7 @@ BONUS: An additional 2000 pts to the first person to complete the challenge, and
   
   - NOTE: Degraded to 50% of original point value and bonus has expired.
 
-**Challenge #2 (on-going): Community Helper** - 300 pts are awarded to anyone who helps another member of the community. This could include answering a question, helping them navigate the docs, and generally giving support and encouragement for those trying hard to get involved. We can only award points for what we see, so make sure you’re doing it in one of the official testnet channels so everyone can learn! 
+**Challenge #2 (expired): Community Helper** - 300 pts are awarded to anyone who helps another member of the community. This could include answering a question, helping them navigate the docs, and generally giving support and encouragement for those trying hard to get involved. We can only award points for what we see, so make sure you’re doing it in one of the official testnet channels so everyone can learn!
 
 **Challenge #3 (on-going): Join Discord** - 100 pts awarded for introducing yourself in the #testnet-general channel. Name, location and what you’re excited about are all good things to share in order to get the points!
 
@@ -58,33 +58,39 @@ BONUS: 1st place +3000, 2nd place +2000, 3rd place +1000 pts respectively for mo
 
 **Challenge #9 (expired): ‘Block Party’**:
 
-This is one of our biggest points challenge yet, with up to 4000 points\* on the line for the winner. In order to complete this challenge, you'll need to stake coda to be an active block producer. Block producers who generate more than 14 blocks this week will successfully complete this challenge - 1000 pts*. 
+This is one of our biggest points challenge yet, with up to 4000 points\* on the line for the winner. In order to complete this challenge, you'll need to stake coda to be an active block producer. Block producers who generate more than 14 blocks this week will successfully complete this challenge - 1000 pts\*. 
 
 BONUS for those who produce the most blocks: 1st place - +3000 pts\*, 2nd place - +2000 pts\*, 3rd place - +1000 pts\*.
 
 **Challenge #10 (on-going): ‘Bookworm’**
 
-Reach Trust Level 1 'Basic' on Coda Protocol's forum. We believe reading is the most fundamental and healthy action in any community. If you are willing to spend a little time reading, you will quickly be promoted to the first trust level. Sign up on our [forum](https://forums.codaprotocol.com/) , enter at least 5 topics, read at least 30 posts, and spend a total of 10 minutes reading posts to obtain Trust Level 1 'Basic' and 100 Testnet Points*.
+Reach Trust Level 1 'Basic' on Coda Protocol's forum. We believe reading is the most fundamental and healthy action in any community. If you are willing to spend a little time reading, you will quickly be promoted to the first trust level. Sign up on our [forum](https://forums.codaprotocol.com/) , enter at least 5 topics, read at least 30 posts, and spend a total of 10 minutes reading posts to obtain Trust Level 1 'Basic' and 100 Testnet Points\*.
 
 **Challenge #11 (on-going): ‘Don't Break the Chain!’**
 
-Earn extra bonus points for every uninterrupted weeks that you participated in the testnet and earned points*.
+Earn extra bonus points for every uninterrupted weeks that you participated in the testnet and earned points\*.
 
 - If you earned points this week and last week - 100 pts\*
 - If you earned points this week and the previous 2 weeks - 200 pts\*
 - If you earned points this week and the previous 3 weeks  - 300 pts\*
 
-**Challenge #12: "CLI FYI"**
+**Challenge #12 (expired): "CLI FYI"**
 
-Submit a product improvement or feature you’d like to see in the Coda command line interface (CLI). Post a new thread on the Discourse [forums](http://forums.codaprotocol.com) in the “Product” category and add this to the title: "[CLI Feature]". The community can vote on it by “hearting” the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*.
+Submit a product improvement or feature you’d like to see in the Coda command line interface (CLI). Post a new thread on the Discourse [forums](http://forums.codaprotocol.com) in the “Product” category and add this to the title: "[CLI Feature]". The community can vote on it by “hearting” the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts\*.
 
-Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts*!
+Every feasible feature suggested will get 500 pts\*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts\* respectively. Feasible feature means well scoped ideas that Coda could technically implement- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts\*!
 
-**Challenge #13: "My two codas"** - Earn 400 Testnet Points* for giving your feedback by filling out this [survey](http://bit.ly/CommunityRetro).
+**Challenge #13 (expired): "My two codas"** - Earn 400 Testnet Points\* for giving your feedback by filling out this [survey](http://bit.ly/CommunityRetro).
 
-**Challenge #14: "Leonardo da Coda"**
+**Challenge #14 (expired): "Leonardo da Coda"**
 
-Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the [forum](https://forums.codaprotocol.com/t/community-art-contest-gifs/109). You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by “hearting” your post, so do not forget to "heart" your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.
+Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the [forum](https://forums.codaprotocol.com/t/community-art-contest-gifs/109). You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by “hearting” your post, so do not forget to "heart" your favorite entries! Top 3 entries will receive bonus points: 300 pts\* for the best GIF and emoji, 200 pts\* for the second place and 100 pts\* for the third place.
+
+**Challenge #15: "Something Snarky"**
+
+This week's challenge is to earn testnet tokens by performing SNARK work. Node operators that produce at least one SNARK will get 1000 pts\*.
+
+BONUS : Top 3 node operators who are able to earn the most tokens with their SNARKs on the snarketplace will win an additional +3000 pts\* , +2000 pts\* , and +1000 pts\* respectively. Hint — your SNARKs are more likely to be bought if the fees are lower, so feel free to experiment with the economics!
 
 ### Disclaimer
 
