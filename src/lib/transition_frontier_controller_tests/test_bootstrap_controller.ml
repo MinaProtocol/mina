@@ -253,7 +253,7 @@ let%test_module "Bootstrap Controller" =
     let%test "sync with one node eagerly" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let trust_system = Trust_system.null () in
       let num_breadcrumbs = (2 * max_length) + Consensus.Constants.delta + 2 in
       Thread_safe.block_on_async_exn (fun () ->
@@ -283,7 +283,7 @@ let%test_module "Bootstrap Controller" =
 
     let%test "when eagerly syncing to multiple nodes, you should sync to the \
               node with the highest transition_frontier" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let trust_system = Trust_system.null () in
       let unsynced_peer_num_breadcrumbs = 6 in
       let unsynced_peers_accounts =

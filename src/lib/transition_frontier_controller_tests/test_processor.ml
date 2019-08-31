@@ -23,7 +23,7 @@ let%test_module "Transition_handler.Processor tests" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       let test_size = 10 in
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let gen_next_breadcrumb frontier =
         let open Core.Quickcheck.Let_syntax in
         let%map create_breadcrumb = gen_breadcrumb ~logger in

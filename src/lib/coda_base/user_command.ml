@@ -185,24 +185,33 @@ module Gen = struct
       (* within the accounts, how will the currency be split into separate
          payments? *)
       let%bind currency_splits =
-        Quickcheck_lib.init_gen_array
-          ~f:(fun i ->
-            let%bind spend_all = bool in
-            let balance = Tuple3.get2 account_info.(i) in
-            let amount_to_spend =
-              if spend_all then balance
-              else Currency.Amount.of_int (Currency.Amount.to_int balance / 2)
-            in
-            Quickcheck_lib.gen_division_currency amount_to_spend
-              command_splits'.(i) )
-          n_accounts
-        |> (* We need to ensure each command has enough currency for a fee of 2
+        let t =
+          Quickcheck_lib.init_gen_array
+            ~f:(fun i ->
+              let%bind spend_all = bool in
+              let balance = Tuple3.get2 account_info.(i) in
+              let amount_to_spend =
+                if spend_all then balance
+                else Currency.Amount.of_int (Currency.Amount.to_int balance / 2)
+                (*Why are we doing this? we need more money in the case there are more user commands*)
+              in
+              Quickcheck_lib.gen_division_currency amount_to_spend
+                command_splits'.(i) )
+            n_accounts
+        in
+        (* We need to ensure each command has enough currency for a fee of 2
              or more, so it'll be enough to buy the requisite transaction snarks.
           *)
-           Quickcheck.Generator.filter ~f:(fun splits ->
-               Array.for_all splits ~f:(fun split ->
-                   List.for_all split ~f:(fun amt ->
-                       Currency.Amount.(amt >= of_int 2) ) ) )
+        Quickcheck.Generator.filter
+          ~f:(fun splits ->
+            Array.for_all splits ~f:(fun split ->
+                List.for_all split ~f:(fun amt ->
+                    if Currency.Amount.(amt < of_int 2) then
+                      (*gen_division_currency splits it the same way everytime leading to an infinite loop*)
+                      failwith
+                        "Insufficient account balance to create user command" ;
+                    true ) ) )
+          t
       in
       let account_nonces = Array.map ~f:Tuple3.get3 account_info in
       let uncons_exn = function

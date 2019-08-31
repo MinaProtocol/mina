@@ -17,7 +17,7 @@ let%test_module "transaction_status" =
       module Transaction_pool = Transaction_pool
     end)
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
 
     let trust_system = Trust_system.null ()
 
