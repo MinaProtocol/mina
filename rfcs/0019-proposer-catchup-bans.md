@@ -6,11 +6,6 @@ By `Disconnected` transitions I mean transitions older than one's root.
 This would cause some trouble for proposers that is doing ledger catchup. I propose several
 different solutions to this problem.
 
-I propose that we should decrease some amount of trust score instead of instant ban
-for transitions that are older than the root by still better than root history.
-As for peers that broadcast transitions that are even worse than root history, we should
-still ban them instantly.
-
 ## Motivation
 
 The problem with currently design is that if a peer has some catchup job undergoing and
