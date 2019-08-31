@@ -21,7 +21,7 @@ We’re seeking a full-stack product engineer who is also excited about building
 - Familiarity with functional programming, know your way around map and reduce.
 - Experience working on collaborative projects with a product team
 
-## Nice to have (at least one of the following)
+## Nice to have
 
 - Exposure to working with cryptocurrencies
 - Experience with ReasonML, OCaml, Haskell, or Rust
