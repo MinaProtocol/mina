@@ -122,52 +122,61 @@ module Make (Inputs : Inputs_intf) = struct
           ~transition_reader_ref ~transition_writer_ref ~frontier_w
           new_frontier )
 
-  let download_best_tip ~logger ~network ~verifier ~trust_system =
+  let download_best_tip ~logger ~network ~verifier ~trust_system
+      ~most_recent_valid_block_writer =
     let num_peers = 8 in
     let peers = Network.random_peers network num_peers in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Requesting peers for their best tip to do initialization" ;
-    Deferred.List.fold peers ~init:None ~f:(fun acc peer ->
-        match%bind Network.get_best_tip network peer with
-        | Error e ->
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:[("peer", Network_peer.Peer.to_yojson peer)]
-              !"Could not get best tip from peer: %{sexp:Error.t}"
-              e ;
-            return acc
-        | Ok peer_best_tip -> (
-            match%bind Best_tip_prover.verify ~verifier peer_best_tip with
-            | Error e ->
-                let error_msg =
-                  sprintf
-                    !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof for \
-                      their best tip"
-                    peer
-                in
-                Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-                  ~metadata:[("error", `String (Error.to_string_hum e))]
-                  !"%s" error_msg ;
-                let%map () =
-                  Trust_system.(
-                    record trust_system logger peer.host
-                      Actions.(Violated_protocol, Some (error_msg, [])))
-                in
-                acc
-            | Ok (`Root _, `Best_tip candidate_best_tip) ->
-                let enveloped_candidate_best_tip =
-                  Envelope.Incoming.wrap ~data:candidate_best_tip
-                    ~sender:(Envelope.Sender.Remote peer.host)
-                in
-                return
-                @@ Option.merge acc
-                     (Option.return enveloped_candidate_best_tip)
-                     ~f:(fun existing_best_tip candidate_best_tip ->
-                       Envelope.Incoming.max
-                         ~f:(fun t1 t2 ->
-                           External_transition.compare
-                             (With_hash.data @@ fst t1)
-                             (With_hash.data @@ fst t2) )
-                         existing_best_tip candidate_best_tip ) ) )
+    let open Deferred.Option.Let_syntax in
+    let%map best_tip =
+      Deferred.List.fold peers ~init:None ~f:(fun acc peer ->
+          let open Deferred.Let_syntax in
+          match%bind Network.get_best_tip network peer with
+          | Error e ->
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("peer", Network_peer.Peer.to_yojson peer)]
+                !"Could not get best tip from peer: %{sexp:Error.t}"
+                e ;
+              return acc
+          | Ok peer_best_tip -> (
+              match%bind Best_tip_prover.verify ~verifier peer_best_tip with
+              | Error e ->
+                  let error_msg =
+                    sprintf
+                      !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof \
+                        for their best tip"
+                      peer
+                  in
+                  Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:[("error", `String (Error.to_string_hum e))]
+                    !"%s" error_msg ;
+                  let%map () =
+                    Trust_system.(
+                      record trust_system logger peer.host
+                        Actions.(Violated_protocol, Some (error_msg, [])))
+                  in
+                  acc
+              | Ok (`Root _, `Best_tip candidate_best_tip) ->
+                  let enveloped_candidate_best_tip =
+                    Envelope.Incoming.wrap ~data:candidate_best_tip
+                      ~sender:(Envelope.Sender.Remote peer.host)
+                  in
+                  return
+                  @@ Option.merge acc
+                       (Option.return enveloped_candidate_best_tip)
+                       ~f:(fun existing_best_tip candidate_best_tip ->
+                         Envelope.Incoming.max
+                           ~f:(fun t1 t2 ->
+                             External_transition.compare
+                               (With_hash.data @@ fst t1)
+                               (With_hash.data @@ fst t2) )
+                           existing_best_tip candidate_best_tip ) ) )
+    in
+    best_tip |> Envelope.Incoming.data |> fst |> With_hash.data
+    |> Broadcast_pipe.Writer.write most_recent_valid_block_writer
+    |> don't_wait_for ;
+    best_tip
 
   let initialize ~logger ~network ~verifier ~trust_system ~frontier
       ~time_controller ~ledger_db ~frontier_w ~proposer_transition_reader
@@ -197,11 +206,11 @@ module Make (Inputs : Inputs_intf) = struct
                 2. The network is slow. \n\n\n\
                 Would start initialization anyway." ) ]
     in
-    match%map download_best_tip ~logger ~network ~verifier ~trust_system with
+    match%map
+      download_best_tip ~logger ~network ~verifier ~trust_system
+        ~most_recent_valid_block_writer
+    with
     | Some best_tip_enveloped ->
-        best_tip_enveloped |> Envelope.Incoming.data |> fst |> With_hash.data
-        |> Broadcast_pipe.Writer.write most_recent_valid_block_writer
-        |> don't_wait_for ;
         if
           is_transition_for_bootstrap ~logger ~frontier
             ( best_tip_enveloped |> Envelope.Incoming.data |> fst
