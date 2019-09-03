@@ -31,7 +31,7 @@ other nodes in order to prevent them from proposing.
 
 ### Proposal 2: Modify trust system so that `Disconnected` won't cause instant ban
 This means we should decrease some trust score instead of banning peers for transitions
-that are older than the root by still better than root history. As for peers that broadcast
+that are older than the root but still better than root history. As for peers that broadcast
 transitions that are worse than root history, we should still ban them.
 
 If we decides to stick with this one, we should pick the amount of trust score being deducted
