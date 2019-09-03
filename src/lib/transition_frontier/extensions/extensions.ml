@@ -1,34 +1,20 @@
 open Async_kernel
 open Core_kernel
+open Coda_base
+open Pipe_lib
 
+(* TODO: don't query logger from frontier, pass it in at extension initialization *)
+(* TODO: extensions can (and likely should) receive full diffs *)
 (* TODO: revisit existing extensions and split off into new files *)
 module Make (Inputs : sig
-  include Inputs.Inputs_intf
-
-  module Transition_frontier :
-    Coda_intf.Transition_frontier_base_intf
-    with type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
-                External_transition.Validation.with_transition
-     and type external_transition_validated := External_transition.Validated.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type staged_ledger := Staged_ledger.t
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type verifier := Verifier.t
-
-  module Diff :
-    Coda_intf.Transition_frontier_diff_intf
-    with type breadcrumb := Transition_frontier.Breadcrumb.t
-     and type external_transition_validated := External_transition.Validated.t
-end) =
-struct
-  (* Have to treat functor Transition_frontier as Inputs.Transition_frontier *)
+  include Inputs.With_base_frontier_intf
+  val max_length : int
+end) = struct
+  (* Have to treat functor Frontier as Frontier *)
   (* Invariant: No mutations are allowed to the transition_frontier on the transactions *)
   open Inputs
-  module Breadcrumb = Inputs.Transition_frontier.Breadcrumb
+
+  module Breadcrumb = Frontier.Breadcrumb
 
   module type Base_ext_intf = sig
     type t
@@ -39,7 +25,7 @@ struct
 
     (* It is of upmost importance to make this synchronous. To prevent data races via context switching *)
     val handle_diffs :
-      t -> Inputs.Transition_frontier.t -> Diff.E.t list -> view option
+      t -> Frontier.t -> Frontier.Diff.Lite.E.t list -> view option
   end
 
   module type Broadcast_extension_intf = sig
@@ -57,8 +43,8 @@ struct
 
     val update_and_create_broadcast_job :
          t
-      -> Inputs.Transition_frontier.t
-      -> Diff.E.t list
+      -> Frontier.t
+      -> Frontier.Diff.Lite.E.t list
       -> unit
       -> unit Deferred.t
   end
@@ -145,13 +131,14 @@ struct
       (root_history, View.to_view root_history)
 
     let handle_diffs root_history transition_frontier diffs =
+      let open Frontier.Diff in
       let should_produce_view =
         List.exists diffs ~f:(function
-          | Diff.E.E (Diff.Root_transitioned _) ->
+          | Lite.E.E (Root_transitioned _) ->
               T.enqueue root_history
-                (Inputs.Transition_frontier.root transition_frontier) ;
+                (Frontier.root transition_frontier) ;
               true
-          | Diff.E.E _ ->
+          | Lite.E.E _ ->
               false )
       in
       Option.some_if should_produce_view @@ View.to_view root_history
@@ -192,13 +179,14 @@ struct
       (registry, registry)
 
     let handle_diffs transition_registry _ diffs =
+      let open Frontier.Diff in
       let should_produce_view =
         List.exists diffs ~f:(function
-          | Diff.E.E (Diff.New_breadcrumb breadcrumb) ->
-              let state_hash = Breadcrumb.state_hash breadcrumb in
+          | Lite.E.E (New_node (Lite transition_with_hash)) ->
+              let state_hash = With_hash.hash transition_with_hash in
               T.notify transition_registry state_hash ;
               true
-          | Diff.E.E _ ->
+          | Lite.E.E _ ->
               false )
       in
       Option.some_if should_produce_view @@ transition_registry
@@ -208,7 +196,7 @@ struct
   end
 
   module Snark_pool_refcount = struct
-    module Work = Inputs.Transaction_snark_work.Statement
+    module Work = Transaction_snark_work.Statement
 
     type t = int Work.Table.t
 
@@ -216,11 +204,11 @@ struct
 
     let get_work (breadcrumb : Breadcrumb.t) : Work.t Sequence.t =
       let staged_ledger =
-        Inputs.Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+        Breadcrumb.staged_ledger breadcrumb
       in
-      let scan_state = Inputs.Staged_ledger.scan_state staged_ledger in
+      let scan_state = Staged_ledger.scan_state staged_ledger in
       let work_to_do =
-        Inputs.Staged_ledger.Scan_state.all_work_to_do scan_state
+        Staged_ledger.Scan_state.all_work_to_do scan_state
       in
       Or_error.ok_exn work_to_do
 
@@ -257,25 +245,29 @@ struct
 
     type diff_update = {num_removed: int; is_added: bool}
 
-    let handle_diffs t (_ : Inputs.Transition_frontier.t) diffs =
+    let handle_diffs (t : t) (frontier : Frontier.t) diffs =
+      let open Frontier.Diff in
       let {num_removed; is_added} =
         List.fold diffs ~init:{num_removed= 0; is_added= false}
           ~f:(fun ({num_removed; is_added} as init) -> function
-          | Diff.E.E (New_breadcrumb breadcrumb) ->
+          | Lite.E.E (New_node (Lite transition_with_hash)) ->
+              (* TODO: extensions need full diffs *)
               { num_removed
-              ; is_added= is_added || add_breadcrumb_to_ref_table t breadcrumb
+              ; is_added= is_added || add_breadcrumb_to_ref_table t (Frontier.find_exn frontier (With_hash.hash transition_with_hash))
               }
-          | Diff.E.E (Root_transitioned {new_= _; garbage}) ->
+          | Lite.E.E (Root_transitioned {new_root= _; garbage}) ->
               let extra_num_removed =
                 List.fold ~init:0
-                  ~f:(fun acc bc ->
-                    acc
-                    + if remove_breadcrumb_from_ref_table t bc then 1 else 0 )
+                  ~f:(fun acc hash ->
+                    acc + if remove_breadcrumb_from_ref_table t (Frontier.find_exn frontier hash) then 1 else 0 )
                   garbage
               in
               {num_removed= num_removed + extra_num_removed; is_added}
-          | Diff.E.E (Best_tip_changed _) ->
-              init )
+          | Lite.E.E (Best_tip_changed _) ->
+              init
+          | Lite.E.E (New_node (Full _)) ->
+              (* cannot refute despite impossibility *)
+              failwith "impossible")
       in
       if num_removed > 0 || is_added then Some (num_removed, t) else None
   end
@@ -296,26 +288,26 @@ struct
        Ordered oldest to newest. *)
     let get_path_diff t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
         Breadcrumb.t list * Breadcrumb.t list =
-      let ancestor = Inputs.Transition_frontier.common_ancestor t bc1 bc2 in
+      let ancestor = Frontier.common_ancestor t bc1 bc2 in
       (* Find the breadcrumbs connecting bc1 and bc2, excluding bc1. Precondition:
          bc1 is an ancestor of bc2. *)
-      let open Inputs.Transition_frontier in
       let path_from_to bc1 bc2 =
         let rec go cursor acc =
           if Breadcrumb.equal cursor bc1 then acc
-          else go (find_exn t @@ Breadcrumb.parent_hash cursor) (cursor :: acc)
+          else go (Frontier.find_exn t @@ Breadcrumb.parent_hash cursor) (cursor :: acc)
         in
         go bc2 []
       in
-      Logger.debug (logger t) ~module_:__MODULE__ ~location:__LOC__
+      Logger.debug (Frontier.logger t) ~module_:__MODULE__ ~location:__LOC__
         !"Common ancestor: %{sexp: State_hash.t}"
         ancestor ;
-      ( path_from_to (find_exn t ancestor) bc1
-      , path_from_to (find_exn t ancestor) bc2 )
+      ( path_from_to (Frontier.find_exn t ancestor) bc1
+      , path_from_to (Frontier.find_exn t ancestor) bc2 )
 
     let handle_diffs () transition_frontier diffs : view option =
+      let open Frontier.Diff in
       let old_best_tip =
-        Inputs.Transition_frontier.best_tip transition_frontier
+        Frontier.best_tip transition_frontier
       in
       let view, _, should_broadcast =
         List.fold diffs
@@ -327,13 +319,14 @@ struct
             (fun ( ({new_user_commands; removed_user_commands} as acc)
                  , old_best_tip
                  , should_broadcast ) -> function
-            | Diff.E.E (Best_tip_changed new_best_tip_breadcrumb) ->
+            | Lite.E.E (Best_tip_changed new_best_tip) ->
+                let new_best_tip_breadcrumb = Frontier.find_exn transition_frontier new_best_tip in
                 let added_to_best_tip_path, removed_from_best_tip_path =
                   get_path_diff transition_frontier new_best_tip_breadcrumb
                     old_best_tip
                 in
                 Logger.debug
-                  (Inputs.Transition_frontier.logger transition_frontier)
+                  (Frontier.logger transition_frontier)
                   ~module_:__MODULE__ ~location:__LOC__
                   "added %d breadcrumbs and removed %d making path to new \
                    best tip"
@@ -360,10 +353,13 @@ struct
                 in
                 ( {new_user_commands; removed_user_commands}
                 , new_best_tip_breadcrumb
-                , true ) | Diff.E.E (New_breadcrumb _) ->
+                , true )
+            | Lite.E.E (New_node (Lite _)) ->
                 (acc, old_best_tip, should_broadcast)
-            | Diff.E.E (Root_transitioned _) ->
-                (acc, old_best_tip, should_broadcast) )
+            | Lite.E.E (Root_transitioned _) ->
+                (acc, old_best_tip, should_broadcast)
+            | Lite.E.E (New_node (Full _)) ->
+                failwith "impossible" )
       in
       Option.some_if should_broadcast view
   end
@@ -373,7 +369,7 @@ struct
   module Identity = struct
     type t = unit
 
-    type view = Diff.E.t list
+    type view = Frontier.Diff.Lite.E.t list
 
     let create _ = ((), [])
 
@@ -424,11 +420,11 @@ struct
       ~transition_registry:(close_extension (module Transition_registry))
       ~identity:(close_extension (module Identity))
 
-  let update_all (t : t) transition_frontier diffs =
+  let notify (t : t) ~frontier ~diffs =
     let run_updates_and_setup_broadcast_jobs (type t)
         (module Broadcast : Broadcast_extension_intf with type t = t) field =
       let extension = Field.get field t in
-      Broadcast.update_and_create_broadcast_job extension transition_frontier
+      Broadcast.update_and_create_broadcast_job extension frontier
         diffs
     in
     let open Broadcast in

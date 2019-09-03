@@ -5,7 +5,7 @@ open Coda_base
 open Coda_state
 open Signature_lib
 
-module Make (Inputs : Transition_frontier.Inputs_intf) = struct
+module Make (Inputs : Coda_intf.Inputs_intf) = struct
   open Inputs
 
   type validation_error =

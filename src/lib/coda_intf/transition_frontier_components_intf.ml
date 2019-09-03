@@ -292,6 +292,8 @@ module type Bootstrap_controller_intf = sig
 
   type transition_frontier
 
+  type transition_frontier_persistent_root
+
   type external_transition_with_initial_validation
 
   val run :
@@ -300,7 +302,6 @@ module type Bootstrap_controller_intf = sig
     -> verifier:verifier
     -> network:network
     -> frontier:transition_frontier
-    -> ledger_db:Ledger.Db.t
     -> transition_reader:( [< `Transition of
                               external_transition_with_initial_validation
                               Envelope.Incoming.t ]
@@ -377,6 +378,8 @@ module type Transition_router_intf = sig
 
   type transition_frontier
 
+  type transition_frontier_persistent_root
+
   type breadcrumb
 
   type network
@@ -391,7 +394,6 @@ module type Transition_router_intf = sig
                                Pipe_lib.Broadcast_pipe.Reader.t
                                * transition_frontier option
                                  Pipe_lib.Broadcast_pipe.Writer.t
-    -> ledger_db:Ledger.Db.t
     -> network_transition_reader:( [ `Transition of
                                      external_transition Envelope.Incoming.t ]
                                  * [`Time_received of Block_time.t] )

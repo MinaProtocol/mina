@@ -25,6 +25,8 @@ module type Db_intf = sig
 
   type scan_state
 
+  type minimal_root_data
+
   type root_data
 
   type frontier_hash
@@ -32,43 +34,68 @@ module type Db_intf = sig
   type t
 
   val create :
-       directory:string
+       logger:Logger.t
+    -> directory:string
     -> t
+
+  val close : t -> unit
+
+  val clear : t -> unit
 
   val check :
        t
-    -> (unit, [`Not_initialized | `Corrupt]) Result.t
+    -> ( unit
+       , [ `Not_initialized
+         | `Corrupt of
+             [ `Invalid_version
+             | `Not_found of
+                 [ `Best_tip
+                 | `Best_tip_transition
+                 | `Frontier_hash
+                 | `Root
+                 | `Root_transition ] ] ] )
+       Result.t
 
   val initialize :
        t
-    -> root_transition:external_transition_validated
     -> root_data:root_data
     -> base_hash:frontier_hash
     -> unit
 
+  (* is this just a clear + initialize? *)
+  val reset : t -> root_data:root_data -> unit
+
   val add :
        t
     -> transition:(external_transition_validated, State_hash.t) With_hash.t
-    -> unit Or_error.t
+    -> (unit, [`Not_found of [`Parent_transition]]) Result.t
 
   val move_root :
        t
-    -> new_root:root_data
+    -> new_root:minimal_root_data
     -> garbage:State_hash.t list
-    -> State_hash.t Or_error.t
+    -> (State_hash.t, [`Not_found of [`New_root_transition | `Old_root_transition]]) Result.t
+
+  val get_root :
+       t
+    -> (minimal_root_data, [`Not_found of [`Root]]) Result.t
+
+  val get_root_hash :
+       t
+    -> (State_hash.t, [`Not_found of [`Root]]) Result.t
 
   val get_best_tip :
        t
-    -> State_hash.t
+    -> (State_hash.t, [`Not_found of [`Best_tip]]) Result.t
 
   val set_best_tip :
        t
     -> State_hash.t
-    -> State_hash.t
+    -> (State_hash.t, [`Not_found of [`Best_tip]]) Result.t
 
   val get_frontier_hash :
        t
-    -> frontier_hash
+    -> (frontier_hash, [`Not_found of [`Frontier_hash]]) Result.t
 
   val set_frontier_hash :
        t
@@ -77,12 +104,13 @@ module type Db_intf = sig
 end
 
 module type Inputs_with_db_intf = sig
-  include Inputs.With_base_frontier
+  include Inputs.With_base_frontier_intf
 
   module Db : Db_intf
     with type external_transition_validated := External_transition.Validated.t
      and type scan_state := Staged_ledger.Scan_state.t
-     and type root_data := Frontier.Diff.root_data
+     and type minimal_root_data := Frontier.Diff.minimal_root_data
+     and type root_data := Frontier.root_data
      and type frontier_hash := Frontier.Hash.t
 end
 
@@ -98,7 +126,7 @@ module type Worker_intf = sig
   include Otp_lib.Worker_supervisor.S
     with type create_args := create_args
      and type input := e_lite_diff list * frontier_hash
-     and type output := unit Or_error.t
+     and type output := unit
 end
 
 module type Inputs_with_worker_intf = sig

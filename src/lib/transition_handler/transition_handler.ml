@@ -40,6 +40,4 @@ include Make (struct
   module Internal_transition = Internal_transition
   module Staged_ledger = Staged_ledger
   module Transition_frontier = Transition_frontier
-
-  let max_length = Consensus.Constants.k
 end)

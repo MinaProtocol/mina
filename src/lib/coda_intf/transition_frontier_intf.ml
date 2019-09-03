@@ -59,7 +59,7 @@ module type Transition_frontier_diff_intf = sig
     | Full : breadcrumb -> full node_representation
     | Lite : (external_transition_validated, State_hash.t) With_hash.t -> lite node_representation
 
-  type root_data = 
+  type minimal_root_data = 
     { hash: State_hash.Stable.V1.t
     ; scan_state: scan_state
     ; pending_coinbase: Pending_coinbase.Stable.V1.t }
@@ -72,7 +72,7 @@ module type Transition_frontier_diff_intf = sig
    *  by transitioning the root.
    *)
   type root_transition =
-    { new_root: root_data
+    { new_root: minimal_root_data
     ; garbage: State_hash.t list }
   [@@deriving bin_io]
 
@@ -122,11 +122,21 @@ module type Transition_frontier_diff_intf = sig
 
   val key_to_yojson : ('repr, 'mutant) t -> Yojson.Safe.json
 
+  val to_lite : (full, 'mutant) t -> (lite, 'mutant) t
+
+  module Full : sig
+    type 'mutant t = (full, 'mutant) diff
+
+    module E : sig
+      type t = E : (full, 'mutant) diff -> t
+    end
+  end
+
   module Lite : sig
     type 'mutant t = (lite, 'mutant) diff
 
     module E : sig
-      type t = E : (lite, 'output) diff -> t
+      type t = E : (lite, 'mutant) diff -> t
       [@@deriving bin_io]
     end
   end
@@ -135,7 +145,7 @@ end
 module type Transition_frontier_incremental_hash_intf = sig
   type 'mutant lite_diff
 
-  type t [@@deriving eq, bin_io]
+  type t [@@deriving eq, bin_io, yojson]
 
   type transition = { source: t; target: t }
 
@@ -180,13 +190,14 @@ module type Broadcast_extension_intf = sig
   val update : t -> base_transition_frontier -> diff list -> unit Deferred.t
 end
 
-module type Exntesions = sig
+module type Extensions = sig
   type breadcrumb
 
   type base_transition_frontier
 
   type diff
 
+  (* [new] TODO: add this back?
   module Snark_pool_refcount : sig
     module Work : sig
       type t = Transaction_snark.Statement.t list [@@deriving sexp, yojson]
@@ -226,6 +237,7 @@ module type Exntesions = sig
        and type base_transition_frontier := base_transition_frontier
        and type diff := diff
   end
+  *)
 
   module Identity : sig
     type view = diff list
@@ -318,6 +330,8 @@ module type Transition_frontier_base_intf = sig
 
   type verifier
 
+  type root_ledger
+
   type t [@@deriving eq]
 
   module Breadcrumb :
@@ -328,17 +342,28 @@ module type Transition_frontier_base_intf = sig
      and type staged_ledger := staged_ledger
      and type verifier := verifier
 
-  val create :
-       logger:Logger.t
-    -> root_transition:( external_transition_validated
-                       , State_hash.t )
-                       With_hash.t
-    -> root_snarked_ledger:Ledger.Db.t
-    -> root_staged_ledger:staged_ledger
-    -> consensus_local_state:Consensus.Data.Local_state.t
-    -> t
+  module Diff : Transition_frontier_diff_intf
+    with type breadcrumb := Breadcrumb.t
+     and type external_transition_validated := external_transition_validated
+     and type scan_state := transaction_snark_scan_state
+
+  module Hash : Transition_frontier_incremental_hash_intf
+    with type 'mutant lite_diff := 'mutant Diff.Lite.t
+
+  type root_identifier =
+    { state_hash: State_hash.t
+    ; frontier_hash: Hash.t }
+  [@@deriving yojson]
+
+  type root_data =
+    { transition: (external_transition_validated, State_hash.t) With_hash.t
+    ; staged_ledger: staged_ledger }
 
   val find_exn : t -> State_hash.t -> Breadcrumb.t
+
+  val get_root : t -> Breadcrumb.t option
+
+  val get_root_exn : t -> Breadcrumb.t
 
   val logger : t -> Logger.t
 
@@ -381,28 +406,50 @@ module type Transition_frontier_base_intf = sig
   val visualize : filename:string -> t -> unit
 end
 
-module type Transition_frontier_intf = sig
+module type Transition_frontier_creatable_intf = sig
   include Transition_frontier_base_intf
 
   val create :
        logger:Logger.t
-    -> root_transition:( external_transition_validated
-                       , State_hash.t )
-                       With_hash.t
-    -> root_snarked_ledger:Ledger.Db.t
-    -> root_staged_ledger:staged_ledger
+    -> root_data:root_data
+    -> root_ledger:root_ledger
+    -> base_hash:Hash.t
     -> consensus_local_state:Consensus.Data.Local_state.t
-    -> t Deferred.t
+    -> t
+end
 
-  module Transition_frontier_base :
-    Transition_frontier_base_intf
-    with type mostly_validated_external_transition :=
-                mostly_validated_external_transition
-     and type external_transition_validated := external_transition_validated
-     and type staged_ledger_diff := staged_ledger_diff
-     and type staged_ledger := staged_ledger
-     and type transaction_snark_scan_state := transaction_snark_scan_state
-     and type verifier := verifier
+module type Transition_frontier_intf = sig
+  include Transition_frontier_base_intf
+  type 'a transaction_snark_work_statement_table
+
+  module Persistent_root : sig
+    type t
+
+    val create : directory:string -> t
+
+    module Instance : sig
+      type t
+
+      val snarked_ledger : t -> Ledger.Db.t
+    end
+  end
+
+  module Persistent_frontier : sig
+    type t
+
+    val create : logger:Logger.t -> directory:string -> t
+  end
+
+  type config =
+    { logger: Logger.t
+    ; verifier: verifier
+    ; consensus_local_state: Consensus.Data.Local_state.t }
+
+  val load :
+       config
+    -> persistent_root:Persistent_root.t
+    -> persistent_frontier:Persistent_frontier.t
+    -> (t, [`Bootstrap_required]) Deferred.Result.t
 
   (** Adds a breadcrumb to the transition_frontier. It will first compute diffs
       corresponding to the add breadcrumb mutation. Then, these diffs will be
@@ -417,33 +464,44 @@ module type Transition_frontier_intf = sig
       races in the protocol. Thus, the writes must occur last on this function. *)
   val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
-  (** Like add_breadcrumb_exn except it doesn't throw if the parent hash is
-      missing from the transition frontier *)
-  val add_breadcrumb_if_present_exn : t -> Breadcrumb.t -> unit Deferred.t
-
-  val find_in_root_history : t -> State_hash.t -> Breadcrumb.t option
-
-  val root_history_path_map :
-    t -> State_hash.t -> f:(Breadcrumb.t -> 'a) -> 'a Non_empty_list.t option
-
   val wait_for_transition : t -> State_hash.t -> unit Deferred.t
 
-  module Diff :
-    Transition_frontier_diff_intf
-    with type breadcrumb := Breadcrumb.t
-     and type external_transition_validated := external_transition_validated
+  val persistent_root : t -> Persistent_root.t
+
+  val persistent_frontier : t -> Persistent_frontier.t
+
+  val root_snarked_ledger : t -> Ledger.Db.t
 
   module Extensions :
-    Exntesions
+    Extensions
     with type breadcrumb := Breadcrumb.t
-     and type base_transition_frontier := Transition_frontier_base.t
+     and type base_transition_frontier := t
+     (* [new] TODO: extensions should probably take in full diffs, not lite ones *)
      and type diff := Diff.Lite.E.t
 
   val snark_pool_refcount_pipe :
-    t -> Extensions.Snark_pool_refcount.view Broadcast_pipe.Reader.t
+       t
+    -> (int * int transaction_snark_work_statement_table)
+       Pipe_lib.Broadcast_pipe.Reader.t
+
+  type best_tip_diff =
+    { new_user_commands: User_command.t list
+    ; removed_user_commands: User_command.t list }
 
   val best_tip_diff_pipe :
-    t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
+       t
+    -> best_tip_diff Pipe_lib.Broadcast_pipe.Reader.t
+
+  val root_history_path_map :
+       t
+    -> State_hash.t
+    -> f:(Breadcrumb.t -> 'a)
+    -> 'a Non_empty_list.t option
+
+  val find_in_root_history :
+       t
+    -> State_hash.t
+    -> Breadcrumb.t option
 
   val close : t -> unit
 

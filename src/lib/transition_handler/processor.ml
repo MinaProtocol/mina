@@ -48,7 +48,7 @@ module Make (Inputs : Inputs.S) :
     >>= Fn.compose transform_result Cached.sequence_result
 
   (* add a breadcrumb and perform post processing *)
-  let add_and_finalize ~frontier ~catchup_scheduler
+  let add_and_finalize ~logger ~frontier ~catchup_scheduler
       ~processed_transition_writer ~only_if_present cached_breadcrumb =
     let breadcrumb =
       if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
@@ -57,11 +57,21 @@ module Make (Inputs : Inputs.S) :
     let transition =
       Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
     in
-    let add_breadcrumb =
-      if only_if_present then Transition_frontier.add_breadcrumb_if_present_exn
-      else Transition_frontier.add_breadcrumb_exn
+    let%map () =
+      if only_if_present then
+        let parent_hash = Transition_frontier.Breadcrumb.parent_hash breadcrumb in
+        match Transition_frontier.find frontier parent_hash with
+        | Some _ ->
+            Transition_frontier.add_breadcrumb_exn frontier breadcrumb
+        | None ->
+            Logger.warn logger ~module_:__MODULE__
+              ~location:__LOC__
+              !"When trying to add breadcrumb, its parent had been removed from \
+                transition frontier: %{sexp: State_hash.t}"
+              parent_hash ;
+            Deferred.unit
+      else Transition_frontier.add_breadcrumb_exn frontier breadcrumb
     in
-    let%map () = add_breadcrumb frontier breadcrumb in
     Writer.write processed_transition_writer transition ;
     Catchup_scheduler.notify catchup_scheduler
       ~hash:(With_hash.hash transition)
@@ -142,7 +152,7 @@ module Make (Inputs : Inputs.S) :
                 Deferred.return (Ok breadcrumb) )
       in
       Deferred.map ~f:Result.return
-        (add_and_finalize ~frontier ~catchup_scheduler
+        (add_and_finalize ~logger ~frontier ~catchup_scheduler
            ~processed_transition_writer ~only_if_present:false breadcrumb))
 
   let run ~logger ~verifier ~trust_system ~time_controller ~frontier
@@ -212,7 +222,7 @@ module Make (Inputs : Inputs.S) :
                            (* It could be the case that by the time we try and
                              * add the breadcrumb, it's no longer relevant when
                              * we're catching up *)
-                           ~f:(add_and_finalize ~only_if_present:true) )
+                           ~f:(add_and_finalize ~logger ~only_if_present:true) )
                    with
                    | Ok () ->
                        ()
@@ -224,7 +234,7 @@ module Make (Inputs : Inputs.S) :
                          (Error.to_string_hum err) )
                | `Proposed_breadcrumb breadcrumb -> (
                    match%map
-                     add_and_finalize ~only_if_present:false breadcrumb
+                     add_and_finalize ~logger ~only_if_present:false breadcrumb
                    with
                    | Ok () ->
                        ()

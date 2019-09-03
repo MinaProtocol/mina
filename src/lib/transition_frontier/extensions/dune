@@ -1,4 +1,5 @@
 (library
   (name extensions)
   (public_name extensions)
-  (libraries async_kernel core_kernel))
+  (libraries inputs async_kernel core_kernel coda_base pipe_lib)
+  (preprocess (pps ppx_jane ppx_coda)))

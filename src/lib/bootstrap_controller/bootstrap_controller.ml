@@ -5,7 +5,7 @@ open Coda_state
 open Pipe_lib.Strict_pipe
 
 module type Inputs_intf = sig
-  include Transition_frontier.Inputs_intf
+  include Coda_intf.Inputs_intf
 
   module Transition_frontier :
     Coda_intf.Transition_frontier_intf
@@ -61,6 +61,7 @@ module Make (Inputs : Inputs_intf) : sig
     with type network := Network.t
      and type verifier := Verifier.t
      and type transition_frontier := Transition_frontier.t
+     and type transition_frontier_persistent_root := Transition_frontier.Persistent_root.t
      and type external_transition_with_initial_validation :=
                 External_transition.with_initial_validation
 
@@ -242,12 +243,14 @@ end = struct
           @@ on_transition t ~sender ~root_sync_ledger transition
         else Deferred.unit )
 
-  let run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
-      ~transition_reader =
+  let run ~logger ~trust_system ~verifier ~network ~frontier ~consensus_local_state
+      ~initial_root_transition ~transition_reader =
     let initial_breadcrumb = Transition_frontier.root frontier in
+    let persistent_root = Transition_frontier.persistent_root frontier in
+    let persistent_frontier = Transition_frontier.persistent_frontier frontier in
     let initial_root_transition =
       External_transition.Validation.lower
-        (Transition_frontier.Breadcrumb.transition_with_hash initial_breadcrumb)
+        initial_root_transition
         ( (`Time_received, Truth.True)
         , (`Proof, Truth.True)
         , (`Frontier_dependencies, Truth.False)
@@ -262,17 +265,21 @@ end = struct
       ; current_root= initial_root_transition }
     in
     let transition_graph = Transition_cache.create () in
-    let%bind synced_db, (hash, sender, expected_staged_ledger_hash) =
+    let ledger_db = Transition_frontier.root_snarked_ledger frontier in
+    let%bind (hash, sender, expected_staged_ledger_hash) =
       let root_sync_ledger =
         Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
       in
       sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
       |> don't_wait_for ;
-      let%map synced_db, root_data =
+      (* We ignore the resulting ledger returned here since it will always
+       * be the same as the ledger we started with because we are syncing
+       * a db ledger. *)
+      let%map _, root_data =
         Root_sync_ledger.valid_tree root_sync_ledger
       in
       Root_sync_ledger.destroy root_sync_ledger ;
-      (synced_db, root_data)
+      root_data
     in
     assert (
       Ledger.Db.(
@@ -333,7 +340,6 @@ end = struct
           |> External_transition.Validated.protocol_state
           |> Protocol_state.consensus_state
         in
-        let local_state = Transition_frontier.consensus_local_state frontier in
         let%bind () =
           match
             Consensus.Hooks.required_local_state_sync ~consensus_state
@@ -367,10 +373,21 @@ end = struct
               | Error e ->
                   Error.raise e )
         in
+        (* [new] TODO: does the persistent_root need to be updated with the new
+         * synced_db object? Should be the same reference, no? *)
+        let persistent_root =
+          Transition_frontier.Persistent_root.create
+            ~logger:t.logger
+            ~directory:persistent_frontier_directory
+        in
         let%map new_frontier =
-          Transition_frontier.create ~logger ~root_transition:new_root
-            ~root_snarked_ledger:synced_db ~root_staged_ledger
-            ~consensus_local_state:local_state
+          Transition_frontier.(create
+            { logger= t.logger
+            ; verifier
+            ; consensus_local_state= local_state }
+            ~persistent_root
+            ~persistent_frontier )
+					>>| Fn.(compose Or_error.ok_exn (Result.map_error ~f:(const @@ Error.of_string "failed to initialize transition frontier after bootstrapping")))
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Bootstrap state: complete." ;

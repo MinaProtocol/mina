@@ -2,12 +2,20 @@ open Core_kernel
 open Coda_base
 open Signature_lib
 
-module Make (Inputs : Inputs.With_diff) : Coda_intf.Transition_frontier_incremental_hash_intf with type 'mutant lite_diff := 'mutant Inputs.Diff.Lite.t = struct
+module Make (Inputs : Inputs.With_diff_intf) : Coda_intf.Transition_frontier_incremental_hash_intf with type 'mutant lite_diff := 'mutant Inputs.Diff.Lite.t = struct
   open Inputs
 
-  open Digestif.SHA256	
+  open Digestif.SHA256
 
-  type nonrec t = t	
+  type nonrec t = t
+
+  let to_yojson hash = [%derive.to_yojson: string] (to_raw_string hash)
+  let of_yojson json =
+    let open Result.Let_syntax in
+    let%bind str = [%derive.of_yojson: string] json in
+    match of_raw_string_opt str with
+    | Some hash -> Ok hash
+    | None -> Error "invalid raw hash"
 
   type transition = { source: t; target: t }
 

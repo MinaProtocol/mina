@@ -1,7 +1,7 @@
 open Core_kernel
 open Coda_base
 
-module Make (Inputs : Inputs.With_breadcrumb) :
+module Make (Inputs : Inputs.With_breadcrumb_intf) :
   Coda_intf.Transition_frontier_diff_intf
   with type breadcrumb := Inputs.Breadcrumb.t
    and type external_transition_validated := Inputs.External_transition.Validated.t
@@ -15,14 +15,14 @@ module Make (Inputs : Inputs.With_breadcrumb) :
     | Full : Breadcrumb.t -> full node_representation
     | Lite : (External_transition.Validated.t, State_hash.t) With_hash.t -> lite node_representation
 
-  type root_data = 
+  type minimal_root_data = 
     { hash: State_hash.Stable.V1.t
     ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
     ; pending_coinbase: Pending_coinbase.Stable.V1.t }
   [@@deriving bin_io]
 
   type root_transition =
-    { new_root: root_data
+    { new_root: minimal_root_data
     ; garbage: State_hash.Stable.V1.t list }
   [@@deriving bin_io]
 
@@ -60,6 +60,20 @@ module Make (Inputs : Inputs.With_breadcrumb) :
     in
     `List [`String (name key); json_key]
 
+  let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
+    match diff with
+    | New_node (Full breadcrumb) -> New_node (Lite (Breadcrumb.transition_with_hash breadcrumb))
+    | Root_transitioned r -> Root_transitioned r
+    | Best_tip_changed b -> Best_tip_changed b
+
+  module Full = struct
+    type 'mutant t = (full, 'mutant) diff
+
+    module E = struct
+      type t = E : (full, 'mutant) diff -> t
+    end
+  end
+
   module Lite = struct
     type 'mutant t = (lite, 'mutant) diff
 
@@ -73,7 +87,7 @@ module Make (Inputs : Inputs.With_breadcrumb) :
       end
 
       module T = struct
-        type t = E : (lite, 'output) diff -> t
+        type t = E : (lite, 'mutant) diff -> t
 
         let to_binable = function
           | E (New_node (Lite x))    -> T_binable.New_node x

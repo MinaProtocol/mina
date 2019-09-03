@@ -3,8 +3,8 @@ _build*
 *.install
 .merlin*
 result
-test.log
-build.log
+*.log
+*.aux
 src/config.mlh
 src/config/config.mlh
 src/external/ocaml-rocksdb/rocksdb

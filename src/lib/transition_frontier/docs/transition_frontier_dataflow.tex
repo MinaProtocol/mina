@@ -1,0 +1,67 @@
+\documentclass{article}
+\usepackage{calc}
+\usepackage{tikz}
+\usepackage{trace}
+\usepackage{forloop}
+\usetikzlibrary{arrows.meta}
+\usetikzlibrary{calc}
+
+\newlinechar=`\^^n
+
+%\newcommand{\forrange}[5][1]{%
+%  \setcounter{#2}{#3}%
+%  \ifthenelse{\value{#2} < \value{#4}}%
+%    {%
+%      #5%
+%      \addtocounter{#2}{#1}%
+%      \forrange[#1]{#2}{\value{#2}}{#4}{#5}%
+%    }%
+%    {%
+%    }%
+%}%
+
+\def\tfhistory(#1)#2(#3)#4(#5){
+  %\forrange{n}{1}{#1}{
+  %  \pgfmathtruncatemacro{\ni}{\value{n}}
+  %  \node[draw,circle] (xx-tfh-\ni) at ($(#3)+(\value{n},0)$) {};
+  %}
+  %\draw[thick] ($(xx-tfh-1)+(-0.25,0.25)$) rectangle ($(xx-tfh-\ni)+(0.25,-0.25)$);
+  \newcounter{n}
+  \newcounter{max}
+  \setcounter{max}{#3}
+  \newcommand{\name}[1]{#1-##1}
+  %\node[draw,circle] (\name{1}) at (#5) {};
+  \forloop{n}{1}{\value{n} < \value{max}}{
+    \pgfmathtruncatemacro{\ni}{\value{n}+1}
+    \node[draw,circle] (\name{\ni}) at ($(#5)+(\value{n},0)$) {};
+    \draw[thick] (\name{\value{n}}) -- (\name{\ni});
+  }
+  \addtocounter{n}{1}
+  \draw[thick] ($(\name{1})+(-0.25,0.25)$) rectangle ($(\name{#3})+(0.25,-0.25)$);
+}%
+
+\begin{document}
+\begin{figure}
+\begin{tikzpicture}
+  \node[draw,circle] (tfh-1) at (0,0) {};
+  \node[draw,circle] (tfh-2) at (1,0) {};
+  \node[draw,circle] (tfh-3) at (2,0) {};
+  \node[draw,circle] (tfh-4) at (3,0) {};
+  \draw[thick] (tfh-1) -- (tfh-2);
+  \draw[thick] (tfh-2) -- (tfh-3);
+  \draw[thick] (tfh-3) -- (tfh-4);
+  \draw[thick] ($(tfh-1)+(-0.25,0.25)$) rectangle ($(tfh-4)+(0.25,-0.25)$);
+
+  %\newcounter{n}
+  %\newcounter{max}
+  %\setcounter{max}{4+1}
+  %\pgfmathtruncatemacro{\ni}{\value{n}}
+  %\forloop{n}{1}{\value{n} < \value{max}}{
+  %  \node[draw,circle] (tfh2-\ni) at ($(0,-4)+(\value{n},0)$) {{}};
+  %}
+  \traceon
+  \tfhistory (xx-tfh) (4) (0,-4);
+  \traceoff
+\end{tikzpicture}
+\end{figure}
+\end{document}

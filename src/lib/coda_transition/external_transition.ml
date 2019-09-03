@@ -105,6 +105,35 @@ module Make
   let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff =
     {protocol_state; protocol_state_proof; staged_ledger_diff}
 
+  let genesis =
+    failwith "TODO: update functor inputs to make this compile"
+    (*
+    let genesis_protocol_state = With_hash.data Genesis_protocol_state.t in
+    (* the genesis transition is assumed to be valid *)
+    let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
+    let empty_diff =
+      { Staged_ledger_diff.diff=
+          ( { completed_works= []
+            ; user_commands= []
+            ; coinbase= Staged_ledger_diff.At_most_two.Zero }
+          , None )
+      ; prev_hash=
+          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+            (Staged_ledger_hash.Aux_hash.of_bytes "")
+            (Ledger.merkle_root Genesis_ledger.t)
+            pending_coinbases
+      ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
+      }
+    in
+    let (`I_swear_this_is_safe_see_my_comment transition) =
+      External_transition.Validated.create_unsafe
+        (External_transition.create ~protocol_state:genesis_protocol_state
+           ~protocol_state_proof:Genesis.proof
+           ~staged_ledger_diff:empty_diff)
+    in
+    transition
+    *)
+
   let timestamp {protocol_state; _} =
     Protocol_state.blockchain_state protocol_state
     |> Blockchain_state.timestamp

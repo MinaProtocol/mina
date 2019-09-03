@@ -161,6 +161,8 @@ module type External_transition_intf = sig
     -> staged_ledger_diff:staged_ledger_diff
     -> t
 
+  val genesis : (Validated.t, State_hash.t) With_hash.t
+
   val timestamp : t -> Block_time.t
 
   val skip_time_received_validation :

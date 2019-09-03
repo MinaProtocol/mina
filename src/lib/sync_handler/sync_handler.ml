@@ -3,7 +3,7 @@ open Async
 open Coda_base
 
 module type Inputs_intf = sig
-  include Transition_frontier.Inputs_intf
+  include Coda_intf.Inputs_intf
 
   module Transition_frontier :
     Coda_intf.Transition_frontier_intf

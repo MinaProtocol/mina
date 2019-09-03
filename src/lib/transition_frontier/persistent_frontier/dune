@@ -1,5 +1,5 @@
 (library
   (name persistent_frontier)
   (public_name persistent_frontier)
-  (libraries inputs coda_base core async rocksdb coda_intf consensus)
-  (preprocess (pps ppx_jane ppx_coda ppx_deriving.std ppx_deriving_yojson)))
+  (libraries inputs coda_base core async rocksdb coda_intf signature_lib consensus storage yojson rpc_parallel otp_lib)
+  (preprocess (pps ppx_jane ppx_deriving.eq ppx_bin_prot ppx_deriving_yojson)))

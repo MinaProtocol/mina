@@ -4,7 +4,7 @@ open Coda_state
 open Pipe_lib
 
 module type Inputs_intf = sig
-  include Transition_frontier.Inputs_intf
+  include Coda_intf.Inputs_intf
 
   module Network : sig
     type t
@@ -95,7 +95,7 @@ module Make (Inputs : Inputs_intf) = struct
   let peek_exn p = Broadcast_pipe.Reader.peek p |> Option.value_exn
 
   let run ~logger ~trust_system ~verifier ~network ~time_controller
-      ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
+      ~frontier_broadcast_pipe:(frontier_r, frontier_w)
       ~network_transition_reader ~proposer_transition_reader =
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader ~collected_transitions frontier =
@@ -137,7 +137,7 @@ module Make (Inputs : Inputs_intf) = struct
         (`Transition _incoming_transition, `Time_received tm) ;
       upon
         (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
-           ~ledger_db ~frontier:old_frontier
+           ~frontier:old_frontier
            ~transition_reader:bootstrap_controller_reader)
         (fun (new_frontier, collected_transitions) ->
           Strict_pipe.Writer.kill bootstrap_controller_writer ;

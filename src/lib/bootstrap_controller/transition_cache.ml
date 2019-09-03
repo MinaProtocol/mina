@@ -22,7 +22,7 @@ module type S = sig
     t -> external_transition_with_initial_validation Envelope.Incoming.t list
 end
 
-module type Inputs_intf = Transition_frontier.Inputs_intf
+module type Inputs_intf = Coda_intf.Inputs_intf
 
 module Make (Inputs : Inputs_intf) :
   S

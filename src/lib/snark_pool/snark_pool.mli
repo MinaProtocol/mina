@@ -17,31 +17,13 @@ module Priced_proof : sig
 end
 
 module type Transition_frontier_intf = sig
-  type work
+  type 'a transaction_snark_work_statement_table
 
   type t
 
-  module Extensions : sig
-    module Snark_pool_refcount : sig
-      module Work : sig
-        type t = work [@@deriving sexp]
-
-        module Stable : sig
-          module V1 : sig
-            type nonrec t = t [@@deriving sexp, bin_io]
-
-            include Hashable.S_binable with type t := t
-          end
-        end
-
-        include Hashable.S with type t := t
-      end
-    end
-  end
-
   val snark_pool_refcount_pipe :
        t
-    -> (int * int Extensions.Snark_pool_refcount.Work.Table.t)
+    -> (int * int transaction_snark_work_statement_table)
        Pipe_lib.Broadcast_pipe.Reader.t
 end
 
@@ -91,7 +73,7 @@ end) (Work : sig
 
   include Hashable.S with type t := t
 end)
-(Transition_frontier : Transition_frontier_intf with type work := Work.t) :
+(Transition_frontier : Transition_frontier_intf with type 'a transaction_snark_work_statement_table := 'a Work.Table.t) :
   S
   with type work := Work.t
    and type transition_frontier := Transition_frontier.t

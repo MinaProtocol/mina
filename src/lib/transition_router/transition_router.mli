@@ -1,7 +1,7 @@
 open Pipe_lib
 
 module type Inputs_intf = sig
-  include Transition_frontier.Inputs_intf
+  include Coda_intf.Inputs_intf
 
   module Network : sig
     type t
@@ -40,28 +40,12 @@ module type Inputs_intf = sig
                 External_transition.with_initial_validation
 end
 
-module Make (Inputs : Inputs_intf) : sig
-  open Inputs
-  open Coda_base
-
-  val run :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> verifier:Verifier.t
-    -> network:Network.t
-    -> time_controller:Block_time.Controller.t
-    -> frontier_broadcast_pipe:Transition_frontier.t option
-                               Broadcast_pipe.Reader.t
-                               * Transition_frontier.t option
-                                 Broadcast_pipe.Writer.t
-    -> ledger_db:Ledger.Db.t
-    -> network_transition_reader:( [ `Transition of
-                                     External_transition.t Envelope.Incoming.t
-                                   ]
-                                 * [`Time_received of Block_time.t] )
-                                 Strict_pipe.Reader.t
-    -> proposer_transition_reader:Transition_frontier.Breadcrumb.t
-                                  Strict_pipe.Reader.t
-    -> (External_transition.Validated.t, State_hash.t) With_hash.t
-       Strict_pipe.Reader.t
-end
+module Make (Inputs : Inputs_intf) :
+  Coda_intf.Transition_router_intf
+    with type verifier := Inputs.Verifier.t
+     and type external_transition := Inputs.External_transition.t
+     and type external_transition_validated := Inputs.External_transition.Validated.t
+     and type transition_frontier := Inputs.Transition_frontier.t
+     and type transition_frontier_persistent_root := Inputs.Transition_frontier.Persistent_root.t
+     and type breadcrumb := Inputs.Transition_frontier.Breadcrumb.t
+     and type network := Inputs.Network.t

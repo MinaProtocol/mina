@@ -20,18 +20,14 @@ module type Transition_frontier_intf = sig
     val staged_ledger : t -> staged_ledger
   end
 
-  module Extensions : sig
-    module Best_tip_diff : sig
-      type view =
-        { new_user_commands: User_command.t list
-        ; removed_user_commands: User_command.t list }
-    end
-  end
-
   val best_tip : t -> Breadcrumb.t
 
+  type best_tip_diff =
+    { new_user_commands: User_command.t list
+    ; removed_user_commands: User_command.t list }
+
   val best_tip_diff_pipe :
-    t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
+    t -> best_tip_diff Broadcast_pipe.Reader.t
 end
 
 (* Functor over user command, base ledger and transaction validator for mocking. *)
@@ -115,8 +111,7 @@ struct
     go pool @@ Sequence.empty
 
   let handle_diff t frontier
-      ({new_user_commands; removed_user_commands} :
-        Transition_frontier.Extensions.Best_tip_diff.view) =
+      ({new_user_commands; removed_user_commands} : Transition_frontier.best_tip_diff) =
     (* This runs whenever the best tip changes. The simple case is when the new
        best tip is an extension of the old one. There, we remove any user
        commands that were included in it from the transaction pool. Dealing with
@@ -482,25 +477,20 @@ let%test_module _ =
         let staged_ledger = Fn.id
       end
 
-      module Extensions = struct
-        module Best_tip_diff = struct
-          type view =
-            { new_user_commands: User_command.t list
-            ; removed_user_commands: User_command.t list }
-        end
-      end
+      type best_tip_diff =
+        { new_user_commands: User_command.t list
+        ; removed_user_commands: User_command.t list }
 
       type t =
-        Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
+        best_tip_diff Broadcast_pipe.Reader.t
         * Breadcrumb.t ref
 
       let create :
-          unit -> t * Extensions.Best_tip_diff.view Broadcast_pipe.Writer.t =
+          unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
        fun () ->
         let pipe_r, pipe_w =
           Broadcast_pipe.create
-            Extensions.Best_tip_diff.
-              {new_user_commands= []; removed_user_commands= []}
+            {new_user_commands= []; removed_user_commands= []}
         in
         let accounts =
           List.map (Array.to_list test_keys) ~f:(fun kp ->

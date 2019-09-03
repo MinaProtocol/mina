@@ -1,0 +1,5 @@
+(library
+  (name persistent_root)
+  (public_name persistent_root)
+  (libraries inputs core_kernel coda_base)
+  (preprocess (pps ppx_jane ppx_coda)))

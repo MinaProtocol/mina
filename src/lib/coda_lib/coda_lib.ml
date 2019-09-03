@@ -248,16 +248,16 @@ module Make (Inputs : Intf.Inputs) = struct
               (Transition_frontier.For_tests.identity_pipe frontier)
               ~f:
                 (Deferred.List.iter ~f:(function
-                  | Transition_frontier.Diff.E.E (New_breadcrumb _) ->
+                  | Transition_frontier.Diff.Lite.E.E (New_node _) ->
                       Deferred.unit
-                  | Transition_frontier.Diff.E.E (Best_tip_changed _) ->
+                  | Transition_frontier.Diff.Lite.E.E (Best_tip_changed _) ->
                       Deferred.unit
-                  | Transition_frontier.Diff.E.E
-                      (Root_transitioned {new_= new_root; _}) ->
+                  | Transition_frontier.Diff.Lite.E.E
+                      (Root_transitioned {new_root; _}) ->
                       Strict_pipe.Writer.write root_diff_writer
                         ( `User_commands
                             (Transition_frontier.Breadcrumb.to_user_commands
-                               new_root)
+                               (Transition_frontier.find_exn frontier new_root.hash))
                         , `New_length
                             (Transition_frontier.root_length frontier + 1) ) ;
                       Deferred.unit )) )) ;
@@ -288,8 +288,8 @@ module Make (Inputs : Intf.Inputs) = struct
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; wallets_disk_location: string
-      ; ledger_db_location: string option
-      ; transition_frontier_location: string option
+      ; persistent_root_location: string
+      ; persistent_frontier_location: string
       ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller: Block_time.Controller.t
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
@@ -313,62 +313,6 @@ module Make (Inputs : Intf.Inputs) = struct
       ~frontier_reader:t.transition_frontier
       ~transition_writer:t.proposer_transition_writer
 
-  let create_genesis_frontier (config : Config.t) =
-    let consensus_local_state = config.consensus_local_state in
-    let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
-    let empty_diff =
-      { Staged_ledger_diff.diff=
-          ( { completed_works= []
-            ; user_commands= []
-            ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-          , None )
-      ; prev_hash=
-          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-            (Staged_ledger_hash.Aux_hash.of_bytes "")
-            (Ledger.merkle_root Genesis_ledger.t)
-            pending_coinbases
-      ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
-      }
-    in
-    let genesis_protocol_state = With_hash.data Genesis_protocol_state.t in
-    (* the genesis transition is assumed to be valid *)
-    let (`I_swear_this_is_safe_see_my_comment first_transition) =
-      External_transition.Validated.create_unsafe
-        (External_transition.create ~protocol_state:genesis_protocol_state
-           ~protocol_state_proof:Genesis.proof ~staged_ledger_diff:empty_diff)
-    in
-    let ledger_db =
-      Ledger.Db.create ?directory_name:config.ledger_db_location ()
-    in
-    let root_snarked_ledger =
-      Ledger_transfer.transfer_accounts ~src:Genesis.ledger ~dest:ledger_db
-    in
-    let snarked_ledger_hash =
-      Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root Genesis.ledger
-    in
-    let%bind root_staged_ledger =
-      match%map
-        Staged_ledger.of_scan_state_and_ledger ~logger:config.logger
-          ~verifier:config.verifier ~snarked_ledger_hash ~ledger:Genesis.ledger
-          ~scan_state:(Staged_ledger.Scan_state.empty ())
-          ~pending_coinbase_collection:pending_coinbases
-      with
-      | Ok staged_ledger ->
-          staged_ledger
-      | Error err ->
-          Error.raise err
-    in
-    let%map frontier =
-      Transition_frontier.create ~logger:config.logger
-        ~root_transition:
-          (With_hash.of_data first_transition
-             ~hash_data:
-               (Fn.compose Protocol_state.hash
-                  External_transition.Validated.protocol_state))
-        ~root_staged_ledger ~root_snarked_ledger ~consensus_local_state
-    in
-    (root_snarked_ledger, frontier)
-
   let create (config : Config.t) =
     let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
     Async.Scheduler.within' ~monitor (fun () ->
@@ -380,8 +324,25 @@ module Make (Inputs : Intf.Inputs) = struct
               Strict_pipe.create Synchronous
             in
             let net_ivar = Ivar.create () in
-            let%bind ledger_db, transition_frontier =
-              create_genesis_frontier config
+            (* TODO: (#3053) push transition frontier ownership down into transition router
+             * (then persistent root can be owned by transition frontier only) *)
+            let%bind transition_frontier_result =
+              Transition_frontier.load
+                { Transition_frontier.logger= config.logger
+                ; verifier= config.verifier
+                ; consensus_local_state= config.consensus_local_state }
+                ~persistent_root:(
+                  Transition_frontier.Persistent_root.create
+                    ~directory:config.persistent_root_location)
+                ~persistent_frontier:(
+                  Transition_frontier.Persistent_frontier.create
+                    ~logger:config.logger
+                    ~directory:config.persistent_frontier_location)
+            in
+            let transition_frontier =
+              transition_frontier_result
+              |> Result.map_error ~f:(Fn.const (Error.of_string "TMP: failed to initialize transition frontier"))
+              |> Or_error.ok_exn
             in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)
@@ -443,7 +404,6 @@ module Make (Inputs : Intf.Inputs) = struct
                 ~network:net ~time_controller:config.time_controller
                 ~frontier_broadcast_pipe:
                   (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
-                ~ledger_db
                 ~network_transition_reader:
                   (Strict_pipe.Reader.map external_transitions_reader
                      ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
