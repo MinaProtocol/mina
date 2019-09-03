@@ -3,7 +3,7 @@
 "global.fetch = require(\"node-fetch\");";
 
 let endpoint =
-  "localhost:" ++ string_of_int(Constants.graphqlPort) ++ "/graphql";
+  Constants.graphqlHost ++ ":" ++ Constants.graphqlPort ++ "/graphql";
 
 [@bs.module]
 external websocketImpl: SubscriptionsTransportWS.websocketImpl =
@@ -38,67 +38,6 @@ let client = {
       ),
     (),
   );
-};
-
-type response('a) =
-  | NotFound
-  | Data('a)
-  | Error(string);
-
-type err;
-
-[@bs.deriving abstract]
-type responseJs = {
-  data: Js.Nullable.t(Js.Json.t),
-  [@bs.optional]
-  error: err,
-};
-
-let processResponse = (parse, response) => {
-  let data = response->dataGet->Js.Nullable.toOption->Belt.Option.map(parse);
-  let error = response->errorGet;
-
-  switch (data, error) {
-  | (Some(data), _) => Data(data)
-  | (_, Some(error)) => Error(Js.String.make(error))
-  | (None, None) => NotFound
-  };
-};
-
-let executeQuery = gqlReq => {
-  let req =
-    ReasonUrql.Request.createRequest(
-      ~query=gqlReq##query,
-      ~variables=gqlReq##variables,
-      (),
-    );
-  let parse = processResponse(gqlReq##parse);
-  ReasonUrql.Client.executeQuery(~client, ~query=req, ())
-  |> Wonka.map((. a) => parse(a));
-};
-
-let executeMutation = gqlReq => {
-  let req =
-    ReasonUrql.Request.createRequest(
-      ~query=gqlReq##query,
-      ~variables=gqlReq##variables,
-      (),
-    );
-  let parse = processResponse(gqlReq##parse);
-  ReasonUrql.Client.executeMutation(~client, ~mutation=req, ())
-  |> Wonka.map((. a) => parse(a));
-};
-
-let executeSubscription = gqlReq => {
-  let req =
-    ReasonUrql.Request.createRequest(
-      ~query=gqlReq##query,
-      ~variables=gqlReq##variables,
-      (),
-    );
-  let parse = processResponse(gqlReq##parse);
-  ReasonUrql.Client.executeSubscription(~client, ~subscription=req, ())
-  |> Wonka.map((. a) => parse(a));
 };
 
 module Decoders = {

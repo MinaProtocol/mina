@@ -1,5 +1,5 @@
 ---
-title: Product Engineer (Full-stack)
+title: Senior Product Engineer (Full-stack)
 date: 2019-08-04
 ---
 Help us build accessible, usable, delightful products on top of the Coda Protocol!
@@ -12,17 +12,17 @@ We’re seeking a full-stack product engineer who is also excited about building
 
 ## Requirements
 
-- 2+ years engineering experience
+- 3+ years engineering experience
     - Bonus: Experience building developer-facing APIs and libraries
 - Willingness to work on-site in a San Francisco based office
 - Knowledge and passion for React internals
     - Bonus: Experience with React Hooks or GraphQL
 - Experience with AWS or other public cloud providers
 - Familiarity with functional programming, know your way around map and reduce.
+- Experience working on collaborative projects with a product team
 
-## Nice to have (at least one of the following)
+## Nice to have
 
-- Experience working on collaborative projects with a product team (or larger team-based projects at a university/bootcamp)
 - Exposure to working with cryptocurrencies
 - Experience with ReasonML, OCaml, Haskell, or Rust
 - Early stage startup experience

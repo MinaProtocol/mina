@@ -9,13 +9,19 @@ cd "${SCRIPTPATH}/../src/_build"
 
 GITHASH=$(git rev-parse --short=8 HEAD)
 GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
+GITTAG=$(git describe --abbrev=0)
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
 PVKEYHASH=$(./default/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
-VERSION="${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+
+if [ "$GITBRANCH" == "master" ]; then
+    VERSION="$GITTAG-${GITHASH}"
+else
+    VERSION="${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+fi
 
 BUILDDIR="deb_build"
 
@@ -40,10 +46,17 @@ echo "Control File:"
 cat "${BUILDDIR}/DEBIAN/control"
 
 echo "------------------------------------------------------------"
+# Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
 cp ./default/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 
+# Build Config
+mkdir -p "${BUILDDIR}/etc/coda/build_config"
+cp ../config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
+rsync -Huav ../config/* "${BUILDDIR}/etc/coda/build_config/."
+
+# Keys
 # Identify actual keys used in build
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
@@ -52,10 +65,10 @@ for key in $compile_keys
 do
     echo -n "Looking for keys matching: ${key} -- "
     if [ -f "/var/lib/coda/${key}_proving" ]; then
-        echo " [OK] found in stable key set"
+        echo " [OK] found key in stable key set"
         cp /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
     elif [ -f "/tmp/coda_cache_dir/${key}_proving" ]; then
-        echo " [WARN] found in compile-time set"
+        echo " [WARN] found key in compile-time set"
         cp /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
     else
         echo "Key not found!"
@@ -113,7 +126,7 @@ Description: Coda Client and Daemon
 EOF
 
 # remove proving keys
-rm -f "${BUILDDIR}/var/lib/coda/*_proving"
+rm -f "${BUILDDIR}"/var/lib/coda/*_proving
 
 # build another deb
 dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
