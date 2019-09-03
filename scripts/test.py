@@ -50,6 +50,7 @@ small_curves_tests = {
     'test_postake': simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap': ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
+    'test_postake_secular_grail': ['coda-secular-grail'],    
     'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5', 'coda-long-fork -num-proposers 5'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
