@@ -27,7 +27,7 @@ let%test_module "Root_history and Transition_frontier" =
     let breadcrumb_trail_equals =
       List.equal Transition_frontier.Breadcrumb.equal
 
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let trust_system = Trust_system.null ()
 

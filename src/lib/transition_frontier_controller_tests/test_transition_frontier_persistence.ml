@@ -20,7 +20,7 @@ end)
 
 let%test_module "Transition Frontier Persistence" =
   ( module struct
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let trust_system = Trust_system.null ()
 

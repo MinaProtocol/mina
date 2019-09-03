@@ -13,6 +13,19 @@ struct
   (** [Stubs] is a set of modules used for testing different components of tfc  *)
   let max_length = Inputs.max_length
 
+  let heartbeat_flag = ref true
+
+  let print_heartbeat logger =
+    let rec loop () =
+      if !heartbeat_flag then (
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          "Heartbeat for CI" ;
+        let%bind () = after (Time.Span.of_min 10.) in
+        loop () )
+      else return ()
+    in
+    loop ()
+
   module State_proof = struct
     include Proof
 

@@ -15,7 +15,7 @@ open Stubs
 
 let%test_module "Sync_handler" =
   ( module struct
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let trust_system = Trust_system.null ()
 
@@ -69,7 +69,7 @@ let%test_module "Sync_handler" =
       |> External_transition.Validation.forget_validation
 
     let%test "a node should be able to give a valid proof of their root" =
-      let logger = Logger.null () in
+      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       let max_length = 4 in
       (* Generating this many breadcrumbs will ernsure the transition_frontier to be full  *)
