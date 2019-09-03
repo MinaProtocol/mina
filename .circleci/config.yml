@@ -342,7 +342,7 @@ jobs:
             - store_artifacts:
                 path: core_dumps
     test-unit--test_postake_snarkless_medium_curves_unit_test:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
@@ -358,7 +358,7 @@ jobs:
             - store_artifacts:
                 path: core_dumps
     test-unit--dev_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
@@ -578,7 +578,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
     test--test_postake_delegation_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
@@ -592,7 +592,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
     test--test_postake_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
@@ -611,7 +611,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
     test--test_postake_snarkless_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
@@ -628,7 +628,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
     test--test_postake_split_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
@@ -642,7 +642,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
     test--test_postake_split_snarkless_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
@@ -677,7 +677,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
     test--test_postake_txns_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
