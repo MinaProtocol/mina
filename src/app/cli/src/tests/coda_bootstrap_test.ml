@@ -32,6 +32,7 @@ let main () =
        Hash_set.add previous_status sync_status ;
        Deferred.unit ))
   |> don't_wait_for ;
+  let%bind () = after (Time.Span.of_min 1.) in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
       ~node:bootstrapping_node
