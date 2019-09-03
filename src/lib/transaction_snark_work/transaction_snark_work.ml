@@ -38,12 +38,6 @@ end) :
         include T
         include Registration.Make_latest_version (T)
         include Hashable.Make_binable (T)
-
-        let compact_json t =
-          `List
-            (List.map
-               ~f:(fun s -> `Int (Transaction_snark.Statement.Stable.V1.hash s))
-               t)
       end
 
       module Latest = V1
@@ -66,6 +60,12 @@ end) :
     let gen =
       Quickcheck.Generator.list_with_length proofs_length
         Transaction_snark.Statement.gen
+
+    let compact_json t =
+      `List
+        (List.map ~f:(fun s -> `Int (Transaction_snark.Statement.hash s)) t)
+
+    let work_ids t : int list = List.map t ~f:Transaction_snark.Statement.hash
   end
 
   module Info = struct

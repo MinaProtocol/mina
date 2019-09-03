@@ -118,8 +118,10 @@ let jobOpenings = [|
     "senior-frontend-engineer",
     "Senior Product Engineer (Frontend) (San Francisco).",
   ),
-  ("frontend-engineer", "Product Engineer (Frontend) (San Francisco)."),
-  ("fullstack-engineer", "Product Engineer (Full-stack) (San Francisco)."),
+  (
+    "fullstack-engineer",
+    "Senior Product Engineer (Full-stack) (San Francisco).",
+  ),
   (
     "marketing-and-communications-manager",
     "Marketing and Communications Manager (San Francisco).",

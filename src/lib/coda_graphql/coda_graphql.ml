@@ -332,8 +332,8 @@ module Types = struct
             ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
         ] )
 
-  let snark_jobs =
-    obj "SnarkJobs" ~doc:"Snark works purchased" ~fields:(fun _ ->
+  let completed_work =
+    obj "CompletedWork" ~doc:"Completed snark works" ~fields:(fun _ ->
         [ field "prover"
             ~args:Arg.[]
             ~doc:"Public key of the prover" ~typ:(non_null public_key)
@@ -406,7 +406,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.transactions)
         ; field "snarkJobs"
-            ~typ:(non_null @@ list @@ non_null snark_jobs)
+            ~typ:(non_null @@ list @@ non_null completed_work)
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.snark_jobs) ] )
 
@@ -473,6 +473,24 @@ module Types = struct
               ~resolve:(fun _ {account; _} ->
                 Option.map ~f:Account.Nonce.to_string
                   account.Account.Poly.nonce )
+          ; field "inferredNonce" ~typ:string
+              ~doc:
+                "Like the `nonce` field, except it includes the scheduled \
+                 transactions (transactions not yet included in a block) \
+                 (stringified uint32)"
+              ~args:Arg.[]
+              ~resolve:(fun {ctx= coda; _} {account; _} ->
+                let open Option.Let_syntax in
+                let%bind public_key = account.Account.Poly.public_key in
+                match
+                  Coda_commands
+                  .get_inferred_nonce_from_transaction_pool_and_ledger coda
+                    public_key
+                with
+                | `Active (Some nonce) ->
+                    Some (Account.Nonce.to_string nonce)
+                | `Active None | `Bootstrapping ->
+                    None )
           ; field "receiptChainHash" ~typ:string
               ~doc:"Top hash of the receipt chain merkle-list"
               ~args:Arg.[]
@@ -495,9 +513,9 @@ module Types = struct
                   account.Account.Poly.voting_for )
           ; field "stakingActive" ~typ:(non_null bool)
               ~doc:
-                "True if you are actively staking with this account - this \
-                 may not yet have been updated if the staking key was changed \
-                 recently"
+                "True if you are actively staking with this account on the \
+                 current daemon - this may not yet have been updated if the \
+                 staking key was changed recently"
               ~args:Arg.[]
               ~resolve:(fun _ {is_actively_staking; _} -> is_actively_staking)
           ; field "privateKeyPath" ~typ:(non_null string)
@@ -1475,6 +1493,15 @@ module Queries = struct
         List.map (Coda_lib.initial_peers coda)
           ~f:(fun {Host_and_port.host; port} -> sprintf !"%s:%i" host port) )
 
+  let snark_pool =
+    field "snarkPool"
+      ~doc:"List of completed snark works that have the lowest fee so far"
+      ~args:Arg.[]
+      ~typ:(non_null @@ list @@ non_null Types.completed_work)
+      ~resolve:(fun {ctx= coda; _} () ->
+        Coda_lib.snark_pool coda |> Network_pool.Snark_pool.resource_pool
+        |> Network_pool.Snark_pool.Resource_pool.all_completed_work )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -1485,7 +1512,10 @@ module Queries = struct
     ; blocks
     ; initial_peers
     ; pooled_user_commands
-    ; transaction_status ]
+    ; transaction_status
+    ; trust_status
+    ; trust_status_all
+    ; snark_pool ]
 end
 
 let schema =
