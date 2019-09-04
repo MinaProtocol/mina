@@ -465,7 +465,7 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
 You might be trying to connect to a different network version, or need to troubleshoot your configuration. See https://codaprotocol.com/docs/troubleshooting/ for details.
 
 %!|err}
-      | exn ->
+      | _ ->
           handle_crash exn ~conf_dir ~top_logger coda_ref ) ;
       Stdlib.exit 1 ) ;
   Async_unix.Signal.(

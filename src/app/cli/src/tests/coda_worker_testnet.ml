@@ -670,7 +670,11 @@ module Restarts : sig
     Api.t -> logger:Logger.t -> node:int -> unit Deferred.t
 end = struct
   let restart_node testnet ~logger ~node ~duration =
-    let%bind () = after (Time.Span.of_sec 5.) in
+    let%bind () =
+      after
+        (Time.Span.of_sec
+           (Consensus.Constants.initialization_time_in_secs +. 5.))
+    in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
       node ;
     (* Send one payment *)
@@ -681,7 +685,11 @@ end = struct
     Api.start testnet node
 
   let trigger_catchup testnet ~logger ~node =
-    let%bind () = after (Time.Span.of_sec 5.) in
+    let%bind () =
+      after
+        (Time.Span.of_sec
+           (Consensus.Constants.initialization_time_in_secs +. 5.))
+    in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
       node ;
     let%bind () = Api.stop testnet node in
@@ -692,7 +700,11 @@ end = struct
     Api.start testnet node
 
   let trigger_bootstrap testnet ~logger ~node =
-    let%bind () = after (Time.Span.of_sec 5.) in
+    let%bind () =
+      after
+        (Time.Span.of_sec
+           (Consensus.Constants.initialization_time_in_secs +. 5.))
+    in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
       node ;
     let%bind () = Api.stop testnet node in
