@@ -17,7 +17,24 @@ function renderParticipant(participant, rank) {
   return row;
 }
 
-function start() {
+function renderChallenge(challenge) {
+  const challengeItem = document.createElement("div");
+  challengeItem.className = "challenge-item";
+
+  const challengeName = document.createElement("h4");
+  challengeName.className = "challenge-name";
+  challengeName.textContent = challenge.name;
+
+  const challengeDescript = document.createElement("p");
+  challengeDescript.className = "challenge-description";
+  challengeDescript.innerHTML = marked(challenge.description);
+
+  challengeItem.appendChild(challengeName);
+  challengeItem.appendChild(challengeDescript);
+  return challengeItem;
+}
+
+function startLeaderboard() {
   gapi.client
     .init({
       apiKey: "AIzaSyDIFwMr7SPGCLl_o6e4UZKi1q9l8snkUZs"
@@ -39,7 +56,9 @@ function start() {
         if (values.length) {
           const headers = values.shift();
           const currentWeekElem = document.getElementById("leaderboard-current-week");
+          const currentWeekChall = document.getElementById("challenges-current-week");
           currentWeekElem.textContent = headers[values[0].length - 1];
+          currentWeekChall.textContent = headers[values[0].length - 1];
         }
         // Sort values by latest week
         values.sort((a, b) => {
@@ -60,5 +79,44 @@ function start() {
     );
 }
 
+function startChallenges() {
+  gapi.client
+    .init({
+      apiKey: "AIzaSyDIFwMr7SPGCLl_o6e4UZKi1q9l8snkUZs"
+    })
+    .then(function() {
+      return gapi.client.request({
+        path:
+          "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/Challenges!B:M"
+      });
+    })
+    .then(
+      function(response) {
+        const {
+          result: {
+            values,
+          }
+        } = response;
+
+        console.log(response);
+        const parentElem = document.getElementById("challenges-list");
+        
+        const latestChallenges = values[values.length - 1];
+      
+        for(var i = 0; i < latestChallenges.length; i+=2){
+          var challenge = {
+            name: latestChallenges[i], 
+            description: latestChallenges[i+1]
+          }
+          parentElem.appendChild(renderChallenge(challenge));
+        }
+      },
+      function(reason) {
+        console.log("Error: " + reason.result.error.message);
+      }
+    );
+}
+
 // 1. Load the JavaScript client library.
-gapi.load("client", start);
+gapi.load("client", startLeaderboard);
+gapi.load("client", startChallenges);

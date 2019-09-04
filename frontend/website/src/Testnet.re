@@ -2,10 +2,41 @@ let extraHeaders = () =>
   <>
     <script src="https://apis.google.com/js/api.js" />
     <script src={Links.Cdn.url("/static/js/leaderboard.js")} />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/0.7.0/marked.min.js" integrity="sha256-0Ed5s/n37LIeAWApZmZUhY9icm932KvYkTVdJzUBiI4=" crossOrigin="anonymous"></script>
+
   </>;
 
 module Styles = {
   open Css;
+
+
+  let markdownStyles = 
+  style([
+    selector(
+      "a",
+      [
+        hover([color(Style.Colors.hyperlinkHover)]),
+        cursor(`pointer),
+         ...Style.Link.basicStyles
+      ]),
+    selector(
+      "h4", 
+      Style.H4.wideStyles @ [textAlign(`left), fontSize(`rem(1.)), fontWeight(`light)]
+      ),
+    selector(
+       "code",
+        [Style.Typeface.pragmataPro, color(Style.Colors.midnight)]
+    ),
+    selector(
+      "p > code, li > code",
+      [
+        boxSizing(`borderBox),
+        padding2(~v=`px(2), ~h=`px(6)),
+        backgroundColor(Style.Colors.slateAlpha(0.05)),
+        borderRadius(`px(4)),
+      ],
+    ),
+  ]);
 
   let page =
     style([
@@ -224,6 +255,7 @@ module Section = {
 
 [@react.component]
 let make = () => {
+ 
   <div className=Styles.page>
     <Section name="Leaderboard">
       <div className=Styles.header>
@@ -284,22 +316,11 @@ let make = () => {
             </a>
           </p>
           <p>
-            <h2 className=Styles.weekHeader> {React.string("Week 6")} </h2>
+            <h2 id="challenges-current-week" className=Styles.weekHeader> </h2>
           </p>
           <p>
-            <h4 className=Styles.sidebarHeader>
-              {React.string("Challenge #15: 'Something Snarky'")}
-            </h4>
-          </p>
-          <p>
-            {React.string(
-               "This week's challenge is to earn testnet tokens by performing SNARK work. Node operators that produce at least one SNARK will get 1000 pts*.",
-             )}
-          </p>
-          <p>
-            {React.string(
-               "BONUS : Top 3 node operators who are able to earn the most tokens with their SNARKs on the snarketplace will win an additional +3000 pts* , +2000 pts* , and +1000 pts* respectively. Hint: your SNARKs are more likely to be bought if the fees are lower, so feel free to experiment with the economics!",
-             )}
+            <div id="challenges-list" className=Styles.markdownStyles>
+            </div>
           </p>
           <p className=Css.(style([fontStyle(`italic)]))>
             {React.string(
