@@ -97,12 +97,8 @@ function startChallenges() {
             values,
           }
         } = response;
-
-        console.log(response);
         const parentElem = document.getElementById("challenges-list");
-        
         const latestChallenges = values[values.length - 1];
-      
         for(var i = 0; i < latestChallenges.length; i+=2){
           var challenge = {
             name: latestChallenges[i], 
