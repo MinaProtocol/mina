@@ -4,10 +4,12 @@ open Tuple_lib
 
 let ( = ) = `Don't_use_polymorphic_equality
 
-module type Intf = sig
-  type t [@@deriving eq, bin_io, sexp, to_yojson, compare]
+module type Basic_intf = sig
+  module Nat : Nat_intf.S
 
-  val gen : t Quickcheck.Generator.t
+  type t [@@deriving eq]
+
+  val order : Nat.t
 
   val one : t
 
@@ -21,11 +23,35 @@ module type Intf = sig
 
   val ( / ) : t -> t -> t
 
+  val square : t -> t
+end
+
+module type Intf = sig
+  type t [@@deriving bin_io, sexp, to_yojson, compare]
+
+  include Basic_intf with type t := t
+
+  val gen : t Quickcheck.Generator.t
+
   val negate : t -> t
 
   val inv : t -> t
 
-  val square : t -> t
+  val parity : t -> bool
+end
+
+module type Sqrt_field_intf = sig
+  include Intf
+
+  val is_square : t -> bool
+
+  val sqrt : t -> t
+end
+
+module type Extended_intf = sig
+  include Sqrt_field_intf
+
+  val ( ** ) : t -> Nat.t -> t
 end
 
 module type Fp_intf = sig
@@ -33,17 +59,13 @@ module type Fp_intf = sig
 
   include Stringable.S with type t := t
 
-  type nat
-
   include Stringable.S with type t := t
 
   val of_int : int -> t
 
   val of_bits : bool list -> t option
 
-  val order : nat
-
-  val to_bigint : t -> nat
+  val to_bigint : t -> Nat.t
 
   val fold_bits : t -> bool Fold.t
 
@@ -61,7 +83,7 @@ end
 module type Extension_intf = sig
   type base
 
-  include Intf
+  include Extended_intf
 
   val scale : t -> base -> t
 
@@ -72,133 +94,46 @@ module type Extension_intf = sig
   val to_list : t -> base list
 end
 
-module Make_fp
-    (N : Nat_intf.S) (Info : sig
-        val order : N.t
-    end) : Fp_intf with type nat := N.t = struct
-  include Info
-
-  (* TODO version *)
-  type t = N.t [@@deriving eq, bin_io, sexp, to_yojson, compare]
-
-  let to_bigint = Fn.id
-
-  let zero = N.of_int 0
-
-  let one = N.of_int 1
-
-  let length_in_bits = N.num_bits N.(Info.order - one)
-
-  let gen =
-    let length_in_int32s = (length_in_bits + 31) / 32 in
-    Quickcheck.Generator.(
-      map
-        (list_with_length length_in_int32s
-           (Int32.gen_incl Int32.zero Int32.max_value))
-        ~f:(fun xs ->
-          List.foldi xs ~init:zero ~f:(fun i acc x ->
-              N.log_or acc
-                (N.shift_left (N.of_int (Int32.to_int_exn x)) (32 * i)) )
-          |> fun x -> N.(x % order) ))
-
-  let fold_bits n : bool Fold_lib.Fold.t =
-    { fold=
-        (fun ~init ~f ->
-          let rec go acc i =
-            if Int.(i = length_in_bits) then acc
-            else go (f acc (N.test_bit n i)) (i + 1)
-          in
-          go init 0 ) }
-
-  let to_bits = Fn.compose Fold_lib.Fold.to_list fold_bits
-
-  let fold n = Fold_lib.Fold.group3 ~default:false (fold_bits n)
-
-  let of_bits bits =
-    let rec go acc i = function
-      | [] ->
-          acc
-      | b :: bs ->
-          let acc = if b then N.log_or acc (N.shift_left one i) else acc in
-          go acc (i + 1) bs
-    in
-    let r = go zero 0 bits in
-    if N.( < ) r Info.order then Some r else None
-
-  open N
-
-  let of_int = N.of_int
-
-  let of_string = N.of_string
-
-  let to_string = N.to_string
-
-  let rec extended_euclidean a b =
-    if equal b zero then (a, one, zero)
-    else
-      match extended_euclidean b (a % b) with
-      | d, x, y ->
-          (d, y, x - (a // b * y))
-
-  let ( + ) x y = (x + y) % Info.order
-
-  let negate x = N.( - ) Info.order x
-
-  let ( - ) x y = (x - y) % Info.order
-
-  let ( * ) x y = x * y % Info.order
-
-  let square x = x * x
+module Extend (F : Basic_intf) = struct
+  open F
 
   let ( ** ) x n =
-    let k = N.num_bits n in
+    let k = Nat.num_bits n in
     let rec go acc i =
       if Int.(i < 0) then acc
       else
-        let acc = acc * acc in
-        let acc = if N.test_bit n i then acc * x else acc in
+        let acc = square acc in
+        let acc = if Nat.test_bit n i then acc * x else acc in
         go acc Int.(i - 1)
     in
     go one Int.(k - 1)
 
-  let%test_unit "exp test" = [%test_eq: t] (of_int 8) (of_int 2 ** of_int 3)
-
   let is_square =
-    let euler = N.((Info.order - one) // of_int 2) in
-    fun x -> N.equal (x ** euler) one
-
-  let inv_no_mod x =
-    let _, a, _b = extended_euclidean x Info.order in
-    a
-
-  let inv x = inv_no_mod x % Info.order
-
-  let ( / ) x y = x * inv_no_mod y
+    let euler = Nat.((order - of_int 1) // of_int 2) in
+    fun x -> equal (x ** euler) one
 
   module Sqrt_params = struct
     let two_adicity n =
-      let rec go i = if N.test_bit n i then i else go Int.(i + 1) in
+      let rec go i = if Nat.test_bit n i then i else go Int.(i + 1) in
       go 0
 
     type nonrec t =
-      {two_adicity: int; quadratic_non_residue_to_t: t; t_minus_1_over_2: t}
+      {two_adicity: int; quadratic_non_residue_to_t: t; t_minus_1_over_2: Nat.t}
 
     let first f =
-      let rec go i = match f i with Some x -> x | None -> go Int.(i + 1) in
-      go 1
+      let rec go i = match f i with Some x -> x | None -> go (i + one) in
+      go one
 
     let create () =
-      let p_minus_one = N.(Info.order - one) in
+      let p_minus_one = Nat.(order - of_int 1) in
       let s = two_adicity p_minus_one in
-      let t = N.shift_right p_minus_one s in
+      let t = Nat.shift_right p_minus_one s in
       let quadratic_non_residue =
-        first (fun i ->
-            let i = of_int i in
-            Option.some_if (not (is_square i)) i )
+        first (fun i -> Option.some_if (not (is_square i)) i)
       in
       { two_adicity= s
       ; quadratic_non_residue_to_t= quadratic_non_residue ** t
-      ; t_minus_1_over_2= (t - one) / of_int 2 }
+      ; t_minus_1_over_2= Nat.((t - of_int 1) // of_int 2) }
 
     let t = lazy (create ())
   end
@@ -206,20 +141,12 @@ module Make_fp
   let rec loop ~while_ ~init f =
     if while_ init then loop ~while_ ~init:(f init) f else init
 
-  let ( = ) = equal
-
   let rec pow2 b n = if n > 0 then pow2 (square b) Int.(n - 1) else b
-
-  let%test_unit "pow2" =
-    let b = 7 in
-    if N.(of_int Int.(7 ** 8) < order) then
-      [%test_eq: t] (pow2 (of_int b) 3) (of_int Int.(7 ** 8))
-    else ()
 
   let sqrt =
     let pow2_order b =
       loop
-        ~while_:(fun (b2m, _) -> not (b2m = one))
+        ~while_:(fun (b2m, _) -> not (equal b2m one))
         ~init:(b, 0)
         (fun (b2m, m) -> (square b2m, Int.succ m))
       |> snd
@@ -239,7 +166,7 @@ module Make_fp
       let b = x * w in
       let {x; _} =
         loop
-          ~while_:(fun p -> not (p.b = one))
+          ~while_:(fun p -> not (equal p.b one))
           ~init:{z; b; x; v}
           (fun {z; b; x; v} ->
             let m = pow2_order b in
@@ -248,6 +175,115 @@ module Make_fp
             {z; b= b * z; x= x * w; v= m} )
       in
       x
+end
+
+module Sqrt_params = struct end
+
+module Make_fp
+    (N : Nat_intf.S) (Info : sig
+        val order : N.t
+    end) : Fp_intf with module Nat = N = struct
+  include Info
+
+  module T = struct
+    module Nat = N
+    open Nat
+
+    let order = Info.order
+
+    (* TODO version *)
+    type t = N.t [@@deriving eq, bin_io, sexp, to_yojson, compare]
+
+    let zero = N.of_int 0
+
+    let one = N.of_int 1
+
+    let ( + ) x y = (x + y) % Info.order
+
+    let ( - ) x y = (x - y) % Info.order
+
+    let ( * ) x y = x * y % Info.order
+
+    let square x = x * x
+
+    let rec extended_euclidean a b =
+      if equal b zero then (a, one, zero)
+      else
+        match extended_euclidean b (a % b) with
+        | d, x, y ->
+            (d, y, x - (a // b * y))
+
+    let inv_no_mod x =
+      let _, a, _b = extended_euclidean x Info.order in
+      a
+
+    let inv x = inv_no_mod x % Info.order
+
+    let ( / ) x y = x * inv_no_mod y
+  end
+
+  include Extend (T)
+  include T
+
+  let to_bigint = Fn.id
+
+  let parity t = N.test_bit (to_bigint t) 0
+
+  let length_in_bits = N.num_bits N.(Info.order - one)
+
+  let gen =
+    let length_in_int32s = Int.((length_in_bits + 31) / 32) in
+    Quickcheck.Generator.(
+      map
+        (list_with_length length_in_int32s
+           (Int32.gen_incl Int32.zero Int32.max_value))
+        ~f:(fun xs ->
+          List.foldi xs ~init:zero ~f:(fun i acc x ->
+              N.log_or acc
+                (N.shift_left (N.of_int (Int32.to_int_exn x)) Int.(32 * i)) )
+          |> fun x -> N.(x % order) ))
+
+  let fold_bits n : bool Fold_lib.Fold.t =
+    { fold=
+        (fun ~init ~f ->
+          let rec go acc i =
+            if Int.(i = length_in_bits) then acc
+            else go (f acc (N.test_bit n i)) Int.(i + 1)
+          in
+          go init 0 ) }
+
+  let to_bits = Fn.compose Fold_lib.Fold.to_list fold_bits
+
+  let fold n = Fold_lib.Fold.group3 ~default:false (fold_bits n)
+
+  let of_bits bits =
+    let rec go acc i = function
+      | [] ->
+          acc
+      | b :: bs ->
+          let acc = if b then N.log_or acc (N.shift_left one i) else acc in
+          go acc Int.(i + 1) bs
+    in
+    let r = go zero 0 bits in
+    if N.( < ) r Info.order then Some r else None
+
+  open N
+
+  let of_int = N.of_int
+
+  let of_string = N.of_string
+
+  let to_string = N.to_string
+
+  let negate x = N.( - ) Info.order x
+
+  let%test_unit "exp test" = [%test_eq: t] (of_int 8) (of_int 2 ** of_int 3)
+
+  let%test_unit "pow2" =
+    let b = 7 in
+    if N.(of_int Int.(7 ** 8) < order) then
+      [%test_eq: t] (pow2 (of_int b) 3) (of_int Int.(7 ** 8))
+    else ()
 
   let%test_unit "sqrt agrees with integer square root on small values" =
     let rec mem a = function
@@ -315,7 +351,7 @@ module Make_fp3
 
         val frobenius_coeffs_c2 : Fp.t array
     end) : sig
-  include Degree_3_extension_intf with type base = Fp.t
+  include Degree_3_extension_intf with type base = Fp.t and module Nat = Fp.Nat
 
   val non_residue : Fp.t
 
@@ -325,65 +361,77 @@ end = struct
 
   type base = Fp.t
 
-  type t = Fp.t * Fp.t * Fp.t [@@deriving eq, bin_io, sexp, to_yojson, compare]
+  let componentwise f (x1, x2, x3) (y1, y2, y3) = (f x1 y1, f x2 y2, f x3 y3)
+
+  let of_base x = (x, Fp.zero, Fp.zero)
+
+  module T = struct
+    module Nat = Fp.Nat
+
+    let order = Nat.(Fp.order * Fp.order * Fp.order)
+
+    type t = Fp.t * Fp.t * Fp.t
+    [@@deriving eq, bin_io, sexp, to_yojson, compare]
+
+    let ( + ) = componentwise Fp.( + )
+
+    let ( - ) = componentwise Fp.( - )
+
+    let ( * ) (a1, b1, c1) (a2, b2, c2) =
+      let a = Fp.(a1 * a2) in
+      let b = Fp.(b1 * b2) in
+      let c = Fp.(c1 * c2) in
+      let open Fp in
+      ( a + (non_residue * (((b1 + c1) * (b2 + c2)) - b - c))
+      , ((a1 + b1) * (a2 + b2)) - a - b + (non_residue * c)
+      , ((a1 + c1) * (a2 + c2)) - a + b - c )
+
+    let square (a, b, c) =
+      let s0 = Fp.square a in
+      let ab = Fp.(a * b) in
+      let s1 = Fp.(ab + ab) in
+      let s2 = Fp.(square (a - b + c)) in
+      let bc = Fp.(b * c) in
+      let s3 = Fp.(bc + bc) in
+      let s4 = Fp.square c in
+      let open Fp in
+      (s0 + (non_residue * s3), s1 + (non_residue * s4), s1 + s2 + s3 - s0 - s4)
+
+    let inv (a, b, c) =
+      let open Fp in
+      let t0 = square a in
+      let t1 = square b in
+      let t2 = square c in
+      let t3 = a * b in
+      let t4 = a * c in
+      let t5 = b * c in
+      let c0 = t0 - (non_residue * t5) in
+      let c1 = (non_residue * t2) - t3 in
+      let c2 = t1 - t4 in
+      let t6 = (a * c0) + (non_residue * ((c * c1) + (b * c2))) |> inv in
+      (t6 * c0, t6 * c1, t6 * c2)
+
+    let ( / ) x y = x * inv y
+
+    let one = of_base Fp.one
+
+    let zero = of_base Fp.zero
+  end
+
+  include T
+  include Extend (T)
 
   let gen = Quickcheck.Generator.tuple3 Fp.gen Fp.gen Fp.gen
 
   let to_list (x, y, z) = [x; y; z]
 
-  let componentwise f (x1, x2, x3) (y1, y2, y3) = (f x1 y1, f x2 y2, f x3 y3)
-
-  let of_base x = (x, Fp.zero, Fp.zero)
-
   let project_to_base (x, _, _) = x
 
-  let one = of_base Fp.one
-
-  let zero = of_base Fp.zero
+  let parity = Fn.compose Fp.parity project_to_base
 
   let scale (x1, x2, x3) s = Fp.(s * x1, s * x2, s * x3)
 
   let negate (x1, x2, x3) = Fp.(negate x1, negate x2, negate x3)
-
-  let ( + ) = componentwise Fp.( + )
-
-  let ( - ) = componentwise Fp.( - )
-
-  let ( * ) (a1, b1, c1) (a2, b2, c2) =
-    let a = Fp.(a1 * a2) in
-    let b = Fp.(b1 * b2) in
-    let c = Fp.(c1 * c2) in
-    let open Fp in
-    ( a + (non_residue * (((b1 + c1) * (b2 + c2)) - b - c))
-    , ((a1 + b1) * (a2 + b2)) - a - b + (non_residue * c)
-    , ((a1 + c1) * (a2 + c2)) - a + b - c )
-
-  let square (a, b, c) =
-    let s0 = Fp.square a in
-    let ab = Fp.(a * b) in
-    let s1 = Fp.(ab + ab) in
-    let s2 = Fp.(square (a - b + c)) in
-    let bc = Fp.(b * c) in
-    let s3 = Fp.(bc + bc) in
-    let s4 = Fp.square c in
-    let open Fp in
-    (s0 + (non_residue * s3), s1 + (non_residue * s4), s1 + s2 + s3 - s0 - s4)
-
-  let inv (a, b, c) =
-    let open Fp in
-    let t0 = square a in
-    let t1 = square b in
-    let t2 = square c in
-    let t3 = a * b in
-    let t4 = a * c in
-    let t5 = b * c in
-    let c0 = t0 - (non_residue * t5) in
-    let c1 = (non_residue * t2) - t3 in
-    let c2 = t1 - t4 in
-    let t6 = (a * c0) + (non_residue * ((c * c1) + (b * c2))) |> inv in
-    (t6 * c0, t6 * c1, t6 * c2)
-
-  let ( / ) x y = x * inv y
 
   let frobenius (c0, c1, c2) power =
     let open Fp in
@@ -396,56 +444,68 @@ module Make_fp2
     (Fp : Intf) (Info : sig
         val non_residue : Fp.t
     end) : sig
-  include Degree_2_extension_intf with type base = Fp.t
+  include Degree_2_extension_intf with type base = Fp.t and module Nat = Fp.Nat
 end = struct
   type base = Fp.t
 
-  type t = Fp.t * Fp.t [@@deriving eq, to_yojson, bin_io, sexp, compare]
+  let of_base x = (x, Fp.zero)
+
+  let componentwise f (x1, x2) (y1, y2) = (f x1 y1, f x2 y2)
+
+  module T = struct
+    type t = Fp.t * Fp.t [@@deriving eq, to_yojson, bin_io, sexp, compare]
+
+    module Nat = Fp.Nat
+
+    let order = Nat.(Fp.order * Fp.order)
+
+    let one = of_base Fp.one
+
+    let zero = of_base Fp.zero
+
+    let ( + ) = componentwise Fp.( + )
+
+    let ( - ) = componentwise Fp.( - )
+
+    let square (a, b) =
+      let open Info in
+      let ab = Fp.(a * b) in
+      Fp.
+        (((a + b) * (a + (non_residue * b))) - ab - (non_residue * ab), ab + ab)
+
+    let ( * ) (a1, b1) (a2, b2) =
+      let open Fp in
+      let a = a1 * a2 in
+      let b = b1 * b2 in
+      (a + (Info.non_residue * b), ((a1 + b1) * (a2 + b2)) - a - b)
+
+    let inv (a, b) =
+      let open Fp in
+      let t0 = square a in
+      let t1 = square b in
+      let t2 = t0 - (Info.non_residue * t1) in
+      let t3 = inv t2 in
+      let c0 = a * t3 in
+      let c1 = negate (b * t3) in
+      (c0, c1)
+
+    let ( / ) x y = x * inv y
+  end
+
+  include T
+  include Extend (T)
 
   let gen = Quickcheck.Generator.tuple2 Fp.gen Fp.gen
-
-  let of_base x = (x, Fp.zero)
 
   let to_list (x, y) = [x; y]
 
   let project_to_base (x, _) = x
 
-  let one = of_base Fp.one
-
-  let zero = of_base Fp.zero
-
-  let componentwise f (x1, x2) (y1, y2) = (f x1 y1, f x2 y2)
-
-  let ( + ) = componentwise Fp.( + )
-
-  let ( - ) = componentwise Fp.( - )
+  let parity = Fn.compose Fp.parity project_to_base
 
   let scale (x1, x2) s = Fp.(s * x1, s * x2)
 
   let negate (a, b) = Fp.(negate a, negate b)
-
-  let square (a, b) =
-    let open Info in
-    let ab = Fp.(a * b) in
-    Fp.(((a + b) * (a + (non_residue * b))) - ab - (non_residue * ab), ab + ab)
-
-  let ( * ) (a1, b1) (a2, b2) =
-    let open Fp in
-    let a = a1 * a2 in
-    let b = b1 * b2 in
-    (a + (Info.non_residue * b), ((a1 + b1) * (a2 + b2)) - a - b)
-
-  let inv (a, b) =
-    let open Fp in
-    let t0 = square a in
-    let t1 = square b in
-    let t2 = t0 - (Info.non_residue * t1) in
-    let t3 = inv t2 in
-    let c0 = a * t3 in
-    let c1 = negate (b * t3) in
-    (c0, c1)
-
-  let ( / ) x y = x * inv y
 end
 
 module Make_fp6
@@ -462,7 +522,8 @@ module Make_fp6
 
       val frobenius_coeffs_c1 : Fp.t array
     end) : sig
-  include Degree_2_extension_intf with type base = Fp3.t
+  include
+    Degree_2_extension_intf with type base = Fp3.t and module Nat = Fp.Nat
 
   val mul_by_2345 : t -> t -> t
 
@@ -472,7 +533,55 @@ module Make_fp6
 
   val unitary_inverse : t -> t
 end = struct
-  type t = Fp3.t * Fp3.t [@@deriving eq, to_yojson, bin_io, sexp, compare]
+  module T = struct
+    module Nat = Fp.Nat
+
+    let of_base x = (x, Fp3.zero)
+
+    let componentwise f (x1, x2) (y1, y2) = (f x1 y1, f x2 y2)
+
+    type t = Fp3.t * Fp3.t [@@deriving eq, to_yojson, bin_io, sexp, compare]
+
+    let order =
+      let open Nat in
+      let square x = x * x in
+      let p = Fp.order in
+      square (p * square p)
+
+    let zero = of_base Fp3.zero
+
+    let one = of_base Fp3.one
+
+    let ( + ) = componentwise Fp3.( + )
+
+    let ( - ) = componentwise Fp3.( - )
+
+    let mul_by_non_residue ((c0, c1, c2) : Fp3.t) =
+      Fp.(Info.non_residue * c2, c0, c1)
+
+    let square (a, b) =
+      let ab = Fp3.(a * b) in
+      let open Fp3 in
+      ( ((a + b) * (a + mul_by_non_residue b)) - ab - mul_by_non_residue ab
+      , ab + ab )
+
+    let ( * ) (a1, b1) (a2, b2) =
+      let a = Fp3.(a1 * a2) in
+      let b = Fp3.(b1 * b2) in
+      let beta_b = mul_by_non_residue b in
+      Fp3.(a + beta_b, ((a1 + b1) * (a2 + b2)) - a - b)
+
+    let inv (a, b) =
+      let t1 = Fp3.square b in
+      let t0 = Fp3.(square a - mul_by_non_residue t1) in
+      let new_t1 = Fp3.inv t0 in
+      Fp3.(a * new_t1, negate (b * new_t1))
+
+    let ( / ) x y = x * inv y
+  end
+
+  include T
+  include Extend (T)
 
   type base = Fp3.t
 
@@ -480,26 +589,11 @@ end = struct
 
   let to_list (x, y) = [x; y]
 
-  let int_sub = ( - )
-
-  let of_base x = (x, Fp3.zero)
-
   let project_to_base (x, _) = x
 
-  let zero = of_base Fp3.zero
-
-  let one = of_base Fp3.one
-
-  let componentwise f (x1, x2) (y1, y2) = (f x1 y1, f x2 y2)
-
-  let ( + ) = componentwise Fp3.( + )
-
-  let ( - ) = componentwise Fp3.( - )
+  let parity = Fn.compose Fp3.parity project_to_base
 
   let scale (x1, x2) s = Fp3.(s * x1, s * x2)
-
-  let mul_by_non_residue ((c0, c1, c2) : Fp3.t) =
-    Fp.(Info.non_residue * c2, c0, c1)
 
   let mul_by_2345 (a1, b1) (a2, b2) =
     let open Info in
@@ -515,27 +609,7 @@ end = struct
     let beta_b = mul_by_non_residue b in
     Fp3.(a + beta_b, ((a1 + b2) * (a2 + b2)) - a - b)
 
-  let square (a, b) =
-    let ab = Fp3.(a * b) in
-    let open Fp3 in
-    ( ((a + b) * (a + mul_by_non_residue b)) - ab - mul_by_non_residue ab
-    , ab + ab )
-
   let negate (a, b) = Fp3.(negate a, negate b)
-
-  let ( * ) (a1, b1) (a2, b2) =
-    let a = Fp3.(a1 * a2) in
-    let b = Fp3.(b1 * b2) in
-    let beta_b = mul_by_non_residue b in
-    Fp3.(a + beta_b, ((a1 + b1) * (a2 + b2)) - a - b)
-
-  let inv (a, b) =
-    let t1 = Fp3.square b in
-    let t0 = Fp3.(square a - mul_by_non_residue t1) in
-    let new_t1 = Fp3.inv t0 in
-    Fp3.(a * new_t1, negate (b * new_t1))
-
-  let ( / ) x y = x * inv y
 
   let unitary_inverse (x, y) = (x, Fp3.negate y)
 
@@ -589,10 +663,10 @@ end = struct
         if naf.(i) <> 0 then
           let found_nonzero = true in
           let res = if naf.(i) > 0 then res * x else res * x_inv in
-          go found_nonzero res (int_sub i 1)
-        else go found_nonzero res (int_sub i 1)
+          go found_nonzero res Int.(i - 1)
+        else go found_nonzero res Int.(i - 1)
     in
-    go false one (int_sub (Array.length naf) 1)
+    go false one Int.(Array.length naf - 1)
 
   let frobenius (c0, c1) power =
     ( Fp3.frobenius c0 power
