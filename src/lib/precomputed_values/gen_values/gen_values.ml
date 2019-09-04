@@ -21,15 +21,11 @@ let use_dummy_values = true
 [%%endif]
 
 module type S = sig
-  val base_hash_expr : Parsetree.expression
-
   val base_proof_expr : Parsetree.expression
 end
 
 module Dummy = struct
   let loc = Ppxlib.Location.none
-
-  let base_hash_expr = [%expr Snark_params.Tick.Field.zero]
 
   let base_proof_expr = [%expr Dummy_values.Tock.Bowe_gabizon18.proof]
 end
@@ -37,56 +33,23 @@ end
 module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
-  let base_hash =
-    Keys.Step.instance_hash (Lazy.force Genesis_protocol_state.t).data
-
-  let base_hash_expr =
-    [%expr
-      Snark_params.Tick.Field.t_of_sexp
-        [%e
-          Ppx_util.expr_of_sexp ~loc
-            (Snark_params.Tick.Field.sexp_of_t base_hash)]]
-
-  let wrap hash proof =
-    let open Snark_params in
-    let module Wrap = Keys.Wrap in
-    let input = Wrap_input.of_tick_field hash in
-    let proof =
-      Tock.prove
-        (Tock.Keypair.pk Wrap.keys)
-        Wrap.input {Wrap.Prover_state.proof} Wrap.main input
-    in
-    assert (Tock.verify proof (Tock.Keypair.vk Wrap.keys) Wrap.input input) ;
-    proof
-
   let base_proof_expr =
-    let open Snark_params in
-    let prover_state =
-      { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
-      ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state= Lazy.force Protocol_state.negative_one
-      ; expected_next_state= None
-      ; update= Lazy.force Snark_transition.genesis }
-    in
-    let main x =
-      Tick.handle (Keys.Step.main x)
+    let genesis = (Lazy.force Genesis_protocol_state.t).data in
+    let base_proof =
+      Keys.create_state_proof
         (Lazy.force Consensus.Data.Prover_state.precomputed_handler)
+        genesis
+        { previous_state= Lazy.force Protocol_state.negative_one
+        ; proof= Snark_params.Tock.Proof.dummy
+        ; update= Lazy.force Snark_transition.genesis }
+      |> Or_error.ok_exn
     in
-    let tick =
-      Tick.prove
-        (Tick.Keypair.pk Keys.Step.keys)
-        (Keys.Step.input ()) prover_state main base_hash
-    in
-    assert (
-      Tick.verify tick
-        (Tick.Keypair.vk Keys.Step.keys)
-        (Keys.Step.input ()) base_hash ) ;
-    let proof = wrap base_hash tick in
+    assert (Keys.verify_state_proof genesis base_proof) ;
     [%expr
       Coda_base.Proof.Stable.V1.t_of_sexp
         [%e
           Ppx_util.expr_of_sexp ~loc
-            (Coda_base.Proof.Stable.V1.sexp_of_t proof)]]
+            (Coda_base.Proof.Stable.V1.sexp_of_t base_proof)]]
 end
 
 open Async
@@ -101,12 +64,7 @@ let main () =
       let%map (module K) = Keys_lib.Keys.create () in
       (module Make_real (K) : S)
   in
-  let structure =
-    [%str
-      let base_hash = [%e M.base_hash_expr]
-
-      let base_proof = [%e M.base_proof_expr]]
-  in
+  let structure = [%str let base_proof = [%e M.base_proof_expr]] in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0
 
