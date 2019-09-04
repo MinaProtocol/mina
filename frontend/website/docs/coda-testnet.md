@@ -94,11 +94,11 @@ BONUS : Top 3 node operators who are able to earn the most tokens with their SNA
 
 **Challenge #16: "New Member Bonus"**
 
-This week, we have a package deal with a big bonus for new members. This would be a great chance to invite your friends to join! New members who complete all of the following three challenges this week will receive two times the total points\* value as a bonus: #1 'Connect to Testnet', #3 'Join Discord', and #6 'Nice to Meet You' (check out all challenge descriptions here). So instead of 700 pts\* (respectively 500 + 100 + 100), new users will receive 1400 pts\* ! - Get started!
+This week, we have a package deal with a big bonus for new members. This would be a great chance to invite your friends to join! New members who complete *all* of the following three challenges this week will receive **two times the total points* value as a bonus**: #1 'Connect to Testnet', #3 'Join Discord', and #6 'Nice to Meet You' (check out all challenge descriptions [here](/docs/coda-testnet/)). So instead of 700 pts\* (respectively 500 + 100 + 100), new users will receive **1400 pts**\* ! - [Get started!](/docs/getting-started/)
 
-**Challenge #17: "Hello Coda"**
+**Challenge #17: "Hello Memo"**
 
-Did you know that Coda supports 32bytes of memos in its transactions? You can fit a SHA256 hash. Think of the possibilities! For this challenge, we'd like you to send a single transaction with a memo inside of it. `coda client send-transaction` now supports a `-memo` flag. In that memo please stick the string "Hello Memo". You can send this transaction to anyone, for example a friend. You'll earn 500 pts\* for doing so. As always, please hit the faucet with your discord account so that we can associate a public key with your discord username in order to add your score to the leaderboard.
+Did you know that Coda supports 32bytes of memos in its transactions? You can fit a SHA256 hash. Think of the possibilities! For this challenge, we'd like you to send a single transaction with a memo inside of it. `coda client send-payment` now supports a `-memo` flag. In that memo please stick the string "Hello Memo". You can send this transaction to anyone, for example a friend. You'll earn 500 pts\* for doing so. As always, please hit the faucet with your discord account so that we can associate a public key with your discord username in order to add your score to the leaderboard.
 
 **Challenge #18: "Oops"**
 
