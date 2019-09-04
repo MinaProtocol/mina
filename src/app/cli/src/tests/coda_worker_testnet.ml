@@ -444,18 +444,18 @@ let test ?is_archive_node logger n proposers snark_work_public_keys
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections ?is_archive_node
   in
-  let%bind workers = Coda_processes.spawn_local_processes_exn configs in
+  let%map workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in
   let start_reader, start_writer = Linear_pipe.create () in
   let testnet = Api.create configs workers start_writer in
   let event_reader, root_reader = events workers start_reader in
   (* Wait nodes to finish initialization *)
-  let%map () =
-    after
-      (Time.Span.of_sec (Consensus.Constants.initialization_time_in_secs +. 5.))
-  in
-  start_checks logger workers ~event_reader ~root_reader testnet
-    ~acceptable_delay ;
+  upon
+    (after
+       (Time.Span.of_sec (Consensus.Constants.initialization_time_in_secs +. 5.)))
+    (fun () ->
+      start_checks logger workers ~event_reader ~root_reader testnet
+        ~acceptable_delay ) ;
   testnet
 
 module Delegation : sig
@@ -519,6 +519,11 @@ module Payments : sig
 end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
+    let%bind () =
+      after
+        (Time.Span.of_sec
+           (Consensus.Constants.initialization_time_in_secs +. 5.))
+    in
     let amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 1 in
     let%bind (_ : unit option list) =
@@ -571,6 +576,11 @@ end = struct
      This is most appropriate todo when #2336 is completed *)
   let send_batch_consecutive_payments (testnet : Api.t) ~node ~sender
       ~(keypairs : Keypair.t list) ~n =
+    let%bind () =
+      after
+        (Time.Span.of_sec
+           (Consensus.Constants.initialization_time_in_secs +. 5.))
+    in
     let amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 1 in
     let%bind new_payment_readers =
