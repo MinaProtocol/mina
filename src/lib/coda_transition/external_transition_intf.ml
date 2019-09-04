@@ -1,40 +1,10 @@
 open Core_kernel
 open Async_kernel
-open Signature_lib
 open Coda_base
 open Coda_state
-
-module type Internal_transition_intf = sig
-  type staged_ledger_diff
-
-  type t [@@deriving sexp]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving sexp, bin_io]
-      end
-
-      module Latest = V1
-    end
-    with type V1.t = t
-
-  val create :
-       snark_transition:Snark_transition.Value.t
-    -> prover_state:Consensus.Data.Prover_state.t
-    -> staged_ledger_diff:staged_ledger_diff
-    -> t
-
-  val snark_transition : t -> Snark_transition.Value.t
-
-  val prover_state : t -> Consensus.Data.Prover_state.t
-
-  val staged_ledger_diff : t -> staged_ledger_diff
-end
+open Signature_lib
 
 module type External_transition_base_intf = sig
-  type staged_ledger_diff
-
   (* TODO: delegate forget here *)
   type t [@@deriving sexp, compare, to_yojson]
 
@@ -56,7 +26,7 @@ module type External_transition_base_intf = sig
 
   val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
-  val staged_ledger_diff : t -> staged_ledger_diff
+  val staged_ledger_diff : t -> Staged_ledger_diff.t
 
   val state_hash : t -> State_hash.t
 
@@ -69,11 +39,7 @@ module type External_transition_base_intf = sig
   val payments : t -> User_command.t list
 end
 
-module type External_transition_intf = sig
-  type verifier
-
-  type ledger_proof
-
+module type S = sig
   include External_transition_base_intf
 
   type external_transition = t
@@ -222,16 +188,13 @@ module type External_transition_intf = sig
     val create_unsafe :
       external_transition -> [`I_swear_this_is_safe_see_my_comment of t]
 
-    include
-      External_transition_base_intf
-      with type staged_ledger_diff := staged_ledger_diff
-       and type t := t
+    include External_transition_base_intf with type t := t
   end
 
   val create :
        protocol_state:Protocol_state.Value.t
     -> protocol_state_proof:Proof.t
-    -> staged_ledger_diff:staged_ledger_diff
+    -> staged_ledger_diff:Staged_ledger_diff.t
     -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
     -> t
 
@@ -307,7 +270,7 @@ module type External_transition_intf = sig
        , 'frontier_dependencies
        , 'staged_ledger_diff )
        Validation.with_transition
-    -> verifier:verifier
+    -> verifier:Verifier.t
     -> ( ( 'time_received
          , [`Proof] * unit Truth.true_t
          , 'delta_transition_chain
@@ -400,28 +363,7 @@ module type External_transition_intf = sig
        , [`Staged_ledger_diff] * unit Truth.true_t )
        Validation.with_transition
 
-  (* TODO: this functor can be killed once Staged_ledger is defunctor *)
-  module Staged_ledger_validation (Staged_ledger : sig
-    type t
-
-    module Staged_ledger_error : sig
-      type t
-    end
-
-    val apply :
-         t
-      -> staged_ledger_diff
-      -> logger:Logger.t
-      -> verifier:verifier
-      -> ( [`Hash_after_applying of Staged_ledger_hash.t]
-           * [`Ledger_proof of (ledger_proof * Transaction.t list) option]
-           * [`Staged_ledger of t]
-           * [`Pending_coinbase_data of bool * Currency.Amount.t]
-         , Staged_ledger_error.t )
-         Deferred.Result.t
-
-    val current_ledger_proof : t -> ledger_proof option
-  end) : sig
+  module Staged_ledger_validation : sig
     val validate_staged_ledger_diff :
          ( 'time_received
          , 'proof
@@ -430,7 +372,7 @@ module type External_transition_intf = sig
          , [`Staged_ledger_diff] * unit Truth.false_t )
          Validation.with_transition
       -> logger:Logger.t
-      -> verifier:verifier
+      -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
       -> ( [`Just_emitted_a_proof of bool]
            * [ `External_transition_with_validation of

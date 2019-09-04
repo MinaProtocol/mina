@@ -1,6 +1,7 @@
 open Async
 open Core
 open Pipe_lib
+open Coda_transition
 
 module Stubs = Stubs.Make (struct
   let max_length = 4
@@ -183,9 +184,10 @@ let%test_module "Transition Frontier Persistence" =
         Transition_frontier_persistence.close_and_finish_copy
           frontier_persistence
       in
+      let%bind verifier = Verifier.create () in
       let%map deserialized_frontier =
         Transition_frontier_persistence.deserialize ~directory_name ~logger
-          ~trust_system ~verifier:() ~root_snarked_ledger
+          ~trust_system ~verifier ~root_snarked_ledger
           ~consensus_local_state:
             (Transition_frontier.consensus_local_state frontier)
       in
