@@ -52,7 +52,7 @@ module Make (Inputs : Inputs_intf) = struct
       let%map g1s = Checked.List.map g1s ~f:(fun (_, y) -> parity y)
       and g2s = Checked.List.map g2s ~f:(fun (_, y) -> real_part_parity y)
       and gts = Checked.List.map gts ~f:(fun (_, b) -> real_part_parity b) in
-      g1s @ g2s @ gts
+      g2s @ gts @ g1s
     in
     elts @ signs
 
@@ -69,9 +69,9 @@ module Make (Inputs : Inputs_intf) = struct
         assert (not (Field.equal Field.zero x)) ;
         parity x
       in
-      List.map g1s ~f:(fun (_, y) -> parity y)
-      @ List.map g2s ~f:(fun (_, y) -> real_part_parity y)
+      List.map g2s ~f:(fun (_, y) -> real_part_parity y)
       @ List.map gts ~f:(fun (_, b) -> real_part_parity b)
+      @ List.map g1s ~f:(fun (_, y) -> parity y)
     in
     elts @ signs
 end
