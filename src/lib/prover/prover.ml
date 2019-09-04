@@ -17,13 +17,10 @@ module Extend_blockchain_input = struct
   [@@deriving bin_io, sexp]
 end
 
-module Consensus_mechanism = Consensus
 module Blockchain = Blockchain
 
 module Worker_state = struct
   module type S = sig
-    module Transaction_snark : Transaction_snark.Verification.S
-
     val extend_blockchain :
          Blockchain.t
       -> Protocol_state.Value.t
@@ -47,103 +44,39 @@ module Worker_state = struct
          let keys = Keys.transaction_snark_keys
        end) in
        let m =
+         let run k make_proof chain next_state block state_for_handler
+             pending_coinbase =
+           let open Or_error in
+           k
+             (Consensus.Data.Prover_state.handler state_for_handler
+                ~pending_coinbase)
+             next_state
+             { Transition_system.Step.Witness.proof= chain.Blockchain.proof
+             ; previous_state= chain.state
+             ; update= block }
+           >>| fun res -> {Blockchain.state= next_state; proof= make_proof res}
+         in
          match Coda_compile_config.proof_level with
          | "full" ->
              ( module struct
-               open Snark_params
                open Keys
-               module Consensus_mechanism = Consensus
-               module Transaction_snark = Transaction_snark
-               module Blockchain_state = Blockchain_snark_state
-               module State =
-                 Blockchain_snark_state.Make_update (Transaction_snark)
 
-               let wrap hash proof =
-                 let module Wrap = Keys.Wrap in
-                 Tock.prove
-                   (Tock.Keypair.pk Wrap.keys)
-                   Wrap.input {Wrap.Prover_state.proof} Wrap.main
-                   (Wrap_input.of_tick_field hash)
+               let extend_blockchain = run create_state_proof Fn.id
 
-               let extend_blockchain (chain : Blockchain.t)
-                   (next_state : Protocol_state.Value.t)
-                   (block : Snark_transition.value) state_for_handler
-                   pending_coinbase =
-                 let next_state_top_hash =
-                   Keys.Step.instance_hash next_state
-                 in
-                 let prover_state =
-                   { Keys.Step.Prover_state.prev_proof= chain.proof
-                   ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-                   ; prev_state= chain.state
-                   ; expected_next_state= Some next_state
-                   ; update= block }
-                 in
-                 let main x =
-                   Tick.handle (Keys.Step.main x)
-                     (Consensus.Data.Prover_state.handler state_for_handler
-                        ~pending_coinbase)
-                 in
-                 Or_error.try_with (fun () ->
-                     let prev_proof =
-                       Tick.prove
-                         (Tick.Keypair.pk Keys.Step.keys)
-                         (Keys.Step.input ()) prover_state main
-                         next_state_top_hash
-                     in
-                     { Blockchain.state= next_state
-                     ; proof= wrap next_state_top_hash prev_proof } )
-
-               let verify state proof =
-                 Tock.verify proof
-                   (Tock.Keypair.vk Wrap.keys)
-                   Wrap.input
-                   (Wrap_input.of_tick_field (Keys.Step.instance_hash state))
+               let verify = Keys.verify_state_proof
              end
              : S )
          | "check" ->
              ( module struct
-               open Snark_params
-               module Consensus_mechanism = Consensus
-               module Transaction_snark = Transaction_snark
-               module Blockchain_state = Blockchain_snark_state
-               module State =
-                 Blockchain_snark_state.Make_update (Transaction_snark)
-
-               let extend_blockchain (chain : Blockchain.t)
-                   (next_state : Protocol_state.Value.t)
-                   (block : Snark_transition.value) state_for_handler
-                   pending_coinbase =
-                 let next_state_top_hash =
-                   Keys.Step.instance_hash next_state
-                 in
-                 let prover_state =
-                   { Keys.Step.Prover_state.prev_proof= chain.proof
-                   ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-                   ; prev_state= chain.state
-                   ; expected_next_state= Some next_state
-                   ; update= block }
-                 in
-                 let main x =
-                   Tick.handle (Keys.Step.main x)
-                     (Consensus.Data.Prover_state.handler state_for_handler
-                        ~pending_coinbase)
-                 in
-                 Or_error.map
-                   (Tick.check
-                      (main @@ Tick.Field.Var.constant next_state_top_hash)
-                      prover_state)
-                   ~f:(fun () ->
-                     { Blockchain.state= next_state
-                     ; proof= Precomputed_values.base_proof } )
+               let extend_blockchain =
+                 run Keys.check_constraints (fun _ ->
+                     Precomputed_values.base_proof )
 
                let verify _state _proof = true
              end
              : S )
          | "none" ->
              ( module struct
-               module Transaction_snark = Transaction_snark
-
                let extend_blockchain _chain next_state _block
                    _state_for_handler _pending_coinbase =
                  Ok
