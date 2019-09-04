@@ -44,11 +44,6 @@ module Make
             ; ("staged_ledger_diff", `String "<opaque>")
             ; ("delta_transition_chain_proof", `String "<opaque>") ]
 
-        (* TODO: Important for bkase to review *)
-        let compare t1 t2 =
-          Protocol_state.Value.Stable.V1.compare t1.protocol_state
-            t2.protocol_state
-
         let consensus_state {protocol_state; _} =
           Protocol_state.consensus_state protocol_state
 
@@ -71,6 +66,20 @@ module Make
             (user_commands external_transition)
             ~f:
               (Fn.compose User_command_payload.is_payment User_command.payload)
+
+        let compare =
+          Comparable.lift
+            (fun existing candidate ->
+              (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
+              if Consensus.Data.Consensus_state.Value.equal existing candidate
+              then 0
+              else if
+                `Keep
+                = Consensus.Hooks.select ~existing ~candidate
+                    ~logger:(Logger.null ())
+              then -1
+              else 1 )
+            ~f:consensus_state
       end
 
       include T
@@ -650,11 +659,6 @@ module Make
           ~error:`Already_in_frontier
       in
       let%bind () =
-        Result.ok_if_true
-          (Transition_frontier.find frontier parent_hash |> Option.is_some)
-          ~error:`Parent_missing_from_frontier
-      in
-      let%map () =
         (* need pervasive (=) in scope for comparing polymorphic variant *)
         let ( = ) = Pervasives.( = ) in
         Result.ok_if_true
@@ -669,6 +673,11 @@ module Make
               ~existing:(Protocol_state.consensus_state root_protocol_state)
               ~candidate:(Protocol_state.consensus_state protocol_state) )
           ~error:`Not_selected_over_frontier_root
+      in
+      let%map () =
+        Result.ok_if_true
+          (Transition_frontier.find frontier parent_hash |> Option.is_some)
+          ~error:`Parent_missing_from_frontier
       in
       (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
   end

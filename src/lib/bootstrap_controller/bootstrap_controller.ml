@@ -544,7 +544,21 @@ end = struct
                         (External_transition.consensus_state transition)
                       ~logger )
             in
-            (new_frontier, filtered_collected_transitions) )
+            Logger.debug logger
+              "Sorting filtered transitions by consensus state" ~metadata:[]
+              ~location:__LOC__ ~module_:__MODULE__ ;
+            let sorted_filtered_collected_transitins =
+              List.sort filtered_collected_transitions
+                ~compare:
+                  (Comparable.lift
+                     ~f:(fun incoming_transition ->
+                       let With_hash.{data= transition; _}, _ =
+                         Envelope.Incoming.data incoming_transition
+                       in
+                       transition )
+                     External_transition.compare)
+            in
+            (new_frontier, sorted_filtered_collected_transitins) )
 
   module For_tests = struct
     type nonrec t = t
