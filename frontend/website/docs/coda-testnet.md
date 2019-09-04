@@ -86,11 +86,30 @@ Every feasible feature suggested will get 500 pts\*. Top 5 features will win a b
 
 Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the [forum](https://forums.codaprotocol.com/t/community-art-contest-gifs/109). You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by “hearting” your post, so do not forget to "heart" your favorite entries! Top 3 entries will receive bonus points: 300 pts\* for the best GIF and emoji, 200 pts\* for the second place and 100 pts\* for the third place.
 
-**Challenge #15: "Something Snarky"**
+**Challenge #15 (expired): "Something Snarky"**
 
 This week's challenge is to earn testnet tokens by performing SNARK work. Node operators that produce at least one SNARK will get 1000 pts\*.
 
 BONUS : Top 3 node operators who are able to earn the most tokens with their SNARKs on the snarketplace will win an additional +3000 pts\* , +2000 pts\* , and +1000 pts\* respectively. Hint — your SNARKs are more likely to be bought if the fees are lower, so feel free to experiment with the economics!
+
+**Challenge #16: "New Member Bonus"**
+
+This week, we have a package deal with a big bonus for new members. This would be a great chance to invite your friends to join! New members who complete all of the following three challenges this week will receive two times the total points\* value as a bonus: #1 'Connect to Testnet', #3 'Join Discord', and #6 'Nice to Meet You' (check out all challenge descriptions here). So instead of 700 pts\* (respectively 500 + 100 + 100), new users will receive 1400 pts\* ! - Get started!
+
+**Challenge #17: "Hello Coda"**
+
+Did you know that Coda supports 32bytes of memos in its transactions? You can fit a SHA256 hash. Think of the possibilities! For this challenge, we'd like you to send a single transaction with a memo inside of it. `coda client send-transaction` now supports a `-memo` flag. In that memo please stick the string "Hello Memo". You can send this transaction to anyone, for example a friend. You'll earn 500 pts\* for doing so. As always, please hit the faucet with your discord account so that we can associate a public key with your discord username in order to add your score to the leaderboard.
+
+**Challenge #18: "Oops"**
+
+Coda also supports cancelling transactions -- you just need to make sure to cancel it before it gets included inside a block! For this challenge, we'd like you to cancel a transaction. This means, (a) you must send a transaction and (b) take the transaction-id that comes out and then cancel it again with coda client cancel-transaction . You'll earn 500 pts\* for doing so.  In order to incentivize nodes to accept your cancellations, a fee is debited from your account greater than the fee that's present in the transaction pool. You'll know if the cancellation when through if after a while you notice your balance is lowered (by the fees from the cancellation). As always, please hit the faucet with your discord account so that we can associate a public key with your discord username in order to add your score to the leaderboard.
+
+**Challenge #19: "GraphCoolL"**
+
+Coda has a GraphQL API! It's super experimental, and we are already in the process of changing several parts of it, but we've noticed that some in the community have already successfully built interesting tools on top of our API. We're interested in getting your feedback! We want you to build something cool on GraphQL and tell us how we can make it better. You'll earn 500 pts\* for building something and including some sort of constructive feedback (note anything you have issues with, you wish were different, things that were easy, etc). Please share it as a post on discourse with a [GraphQL] tag. [GraphQL] Your title here . In order to receive points, you must (a) include your source code (via a link to a public repo on github or embedded on the forums) and license it under the Apache2 license and (b) include some sort of constructive feedback (note anything you have issues with, you wish were different, things that were easy, etc).
+
+You'll earn 500 pts\* for sending us anything that we feel has achieved (a) and (b), as described above, and we'll award a BONUS of an additional 2000 pts\* for the coolest use and 1000 pts\* for second place! Good luck.
+
 
 ### Disclaimer
 
