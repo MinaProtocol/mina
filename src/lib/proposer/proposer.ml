@@ -549,7 +549,6 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
          * for a long while.
          * *)
         Agent.on_update keypairs ~f:(fun _new_keypairs ->
-            Singleton_supervisor.cancel proposal_supervisor ;
             Singleton_scheduler.schedule scheduler (Time.now time_controller)
               ~f:check_for_proposal ) ;
         check_for_proposal ()
