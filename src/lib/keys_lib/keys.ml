@@ -1,52 +1,27 @@
 open Core
 open Snark_params
 open Coda_state
-open Fold_lib
 
 module type S = sig
-  module Step_prover_state : sig
-    type t =
-      { wrap_vk: Tock.Verification_key.t
-      ; prev_proof: Tock.Proof.t
-      ; prev_state: Protocol_state.value
-      ; expected_next_state: Protocol_state.value option
-      ; update: Snark_transition.value }
-  end
-
-  module Wrap_prover_state : sig
-    type t = {proof: Tick.Proof.t}
-  end
-
   val transaction_snark_keys : Transaction_snark.Keys.Verification.t
 
-  module Step : sig
-    val keys : Tick.Keypair.t
+  val create_state_proof :
+       Tick.Handler.t
+    -> Protocol_state.value
+    -> ( Protocol_state.value
+       , Snark_transition.value )
+       Transition_system.Step.Witness.t
+    -> Tock.Proof.t Or_error.t
 
-    val input :
-         unit
-      -> ('a, 'b, Tick.Field.Var.t -> 'a, Tick.Field.t -> 'b) Tick.Data_spec.t
+  val check_constraints :
+       Tick.Handler.t
+    -> Protocol_state.value
+    -> ( Protocol_state.value
+       , Snark_transition.value )
+       Transition_system.Step.Witness.t
+    -> unit Or_error.t
 
-    module Verification_key : sig
-      val to_bool_list : Tock.Verification_key.t -> bool list
-    end
-
-    module Prover_state = Step_prover_state
-
-    val instance_hash : Protocol_state.value -> Tick.Field.t
-
-    val main : Tick.Field.Var.t -> (unit, Prover_state.t) Tick.Checked.t
-  end
-
-  module Wrap : sig
-    val keys : Tock.Keypair.t
-
-    val input :
-      ('a, 'b, Wrap_input.var -> 'a, Wrap_input.t -> 'b) Tock.Data_spec.t
-
-    module Prover_state = Wrap_prover_state
-
-    val main : Wrap_input.var -> (unit, Prover_state.t) Tock.Checked.t
-  end
+  val verify_state_proof : Protocol_state.value -> Tock.Proof.t -> bool
 end
 
 let tx_vk = lazy (Snark_keys.transaction_verification ())
@@ -70,106 +45,32 @@ let create () : (module S) Async.Deferred.t =
         let keys = tx_vk
       end) in
       let module B = Blockchain_snark.Blockchain_transition.Make (T) in
-      let module Step = B.Step (struct
-        let keys = Tick.Keypair.create ~pk:bc_pk.step ~vk:bc_vk.step
-      end) in
-      let module Wrap =
-        B.Wrap (struct
-            let verification_key = bc_vk.step
-          end)
-          (struct
-            let keys = Tock.Keypair.create ~pk:bc_pk.wrap ~vk:bc_vk.wrap
-          end)
-      in
       let module M = struct
         let transaction_snark_keys = tx_vk
 
-        module Step_prover_state = struct
-          type t =
-            { wrap_vk: Tock.Verification_key.t
-            ; prev_proof: Tock.Proof.t
-            ; prev_state: Protocol_state.value
-            ; expected_next_state: Protocol_state.value option
-            ; update: Snark_transition.value }
-        end
+        open Transition_system
 
-        module Wrap_prover_state = struct
-          type t = {proof: Tick.Proof.t}
-        end
+        let vks =
+          Step.Verification_keys.create ~wrap_vk:bc_vk.wrap ~step_vk:bc_vk.step
 
-        module Step = struct
-          include (
-            Step :
-              module type of Step with module Prover_state := Step.Prover_state )
+        let check_constraints handler state witness =
+          B.Step.check_constraints ~handler vks state witness
 
-          module Prover_state = Step_prover_state
-
-          module Verification_key = struct
-            let to_bool_list = Snark_params.tock_vk_to_bool_list
-          end
-
-          let instance_hash =
-            let open Coda_base in
-            let s =
-              let wrap_vk = Tock.Keypair.vk Wrap.keys in
-              Tick.Pedersen.State.update_fold
-                Hash_prefix.transition_system_snark
-                Fold.(
-                  Verification_key.to_bool_list wrap_vk
-                  |> of_list |> group3 ~default:false)
+        let create_state_proof =
+          let wrap =
+            unstage (Transition_system.Wrap.prove bc_vk.step bc_pk.wrap)
+          in
+          fun handler next_state witness ->
+            let open Or_error.Let_syntax in
+            let%bind top_hash, proof =
+              B.Step.prove ~handler vks bc_pk.step next_state witness
             in
-            fun state ->
-              Tick.Pedersen.digest_fold s
-                (State_hash.fold (Protocol_state.hash state))
+            wrap top_hash proof
 
-          let main x =
-            let there
-                { Prover_state.wrap_vk
-                ; prev_proof
-                ; prev_state
-                ; update
-                ; expected_next_state } =
-              { Step.Prover_state.wrap_vk
-              ; prev_proof
-              ; prev_state
-              ; update
-              ; expected_next_state }
-            in
-            let back
-                { Step.Prover_state.wrap_vk
-                ; prev_proof
-                ; prev_state
-                ; update
-                ; expected_next_state } =
-              { Prover_state.wrap_vk
-              ; prev_proof
-              ; prev_state
-              ; update
-              ; expected_next_state }
-            in
-            let open Tick in
-            with_state
-              ~and_then:(fun s -> As_prover.set_state (back s))
-              As_prover.(map get_state ~f:there)
-              (main (Logger.create ()) x)
-        end
-
-        module Wrap = struct
-          include (
-            Wrap :
-              module type of Wrap with module Prover_state := Wrap.Prover_state )
-
-          module Prover_state = Wrap_prover_state
-
-          let main x =
-            let there {Prover_state.proof} = {Wrap.Prover_state.proof} in
-            let back {Wrap.Prover_state.proof} = {Prover_state.proof} in
-            let open Tock in
-            with_state
-              ~and_then:(fun s -> As_prover.set_state (back s))
-              As_prover.(map get_state ~f:there)
-              (main x)
-        end
+        let verify_state_proof =
+          let verify = unstage (Wrap.verify bc_vk.step bc_vk.wrap) in
+          fun protocol_state wrapped_proof ->
+            verify (B.Step.instance_hash vks protocol_state) wrapped_proof
       end in
       Set_once.set_exn keys Lexing.dummy_pos (module M : S) ;
       (module M : S)

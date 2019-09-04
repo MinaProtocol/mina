@@ -1,10 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Snark_params
-open Snark_bits
 open Coda_state
-open Fold_lib
-open Bitstring_lib
 module Digest = Tick.Pedersen.Digest
 module Storage = Storage.List.Make (Storage.Disk)
 
@@ -71,7 +68,7 @@ module Keys = struct
     let dummy =
       { step=
           Tick_backend.Verification_key.dummy
-            ~input_size:Coda_base.Transition_system.step_input_size
+            ~input_size:Transition_system.Step.input_size
       ; wrap=
           Tock_backend.Bowe_gabizon.Verification_key.dummy
             ~input_size:Wrap_input.size }
@@ -129,80 +126,54 @@ module Keys = struct
 end
 
 module Make (T : Transaction_snark.Verification.S) = struct
-  module System = struct
-    module U = Blockchain_snark_state.Make_update (T)
-    module Update = Snark_transition
-
-    module State = struct
-      include Protocol_state
-
-      include (
-        Blockchain_snark_state :
-          module type of Blockchain_snark_state
-          with module Checked := Blockchain_snark_state.Checked )
-
-      include (U : module type of U with module Checked := U.Checked)
-
-      module Hash = Coda_base.State_hash
-
-      module Checked = struct
-        include Blockchain_snark_state.Checked
-        include U.Checked
-      end
-    end
-  end
-
   open Coda_base
 
-  include Transition_system.Make (struct
-              module Tick = struct
-                module Packed = struct
-                  type value = Tick.Pedersen.Digest.t
+  (* This code here is just munging stuff so that it's in the shape expected
+   by [Transition_system.Step.Make]. Ultimately the modules upstream should
+   be refactored so they can be passed in directly. *)
+  module Step = Transition_system.Step.Make (struct
+    let ( ! ) = Tick.Run.run_checked
 
-                  type var = Tick.Pedersen.Checked.Digest.var
+    module Update = struct
+      type t = Snark_transition.var
 
-                  let typ = Tick.Pedersen.Checked.Digest.typ
-                end
+      module Unchecked = struct
+        type t = Snark_transition.value
+      end
 
-                module Unpacked = struct
-                  type value = Tick.Pedersen.Checked.Digest.Unpacked.t
+      let typ = Snark_transition.typ
+    end
 
-                  type var = Tick.Pedersen.Checked.Digest.Unpacked.var
+    module State = struct
+      type t = Protocol_state.var
 
-                  let typ : (var, value) Tick.Typ.t =
-                    Tick.Pedersen.Checked.Digest.Unpacked.typ
+      module Hash = struct
+        type t = State_hash.var
 
-                  let var_to_bits (x : var) =
-                    Bitstring_lib.Bitstring.Lsb_first.of_list
-                      (x :> Tick.Boolean.var list)
+        module Unchecked = State_hash
 
-                  let var_of_bits = Fn.id
+        let is_base h = !(Blockchain_snark_state.Checked.is_base_hash h)
 
-                  let var_to_triples xs =
-                    let open Fold in
-                    to_list
-                      (group3 ~default:Tick.Boolean.false_
-                         (of_list (var_to_bits xs :> Tick.Boolean.var list)))
+        let to_triples t = !(State_hash.var_to_triples t)
 
-                  let var_of_value =
-                    Tick.Pedersen.Checked.Digest.Unpacked.constant
-                end
+        let typ = State_hash.typ
+      end
 
-                let project_value =
-                  Fn.compose Tick.Field.project Bitstring.Lsb_first.to_list
+      module Unchecked = struct
+        type t = Protocol_state.value [@@deriving sexp]
 
-                let project_var = Tick.Pedersen.Checked.Digest.Unpacked.project
+        let hash = Protocol_state.hash
+      end
 
-                let unpack_value =
-                  Fn.compose Bitstring.Lsb_first.of_list Tick.Field.unpack
+      let typ = Protocol_state.typ
 
-                let choose_preimage_var =
-                  Tick.Pedersen.Checked.Digest.choose_preimage
-              end
+      let hash t = !(Blockchain_snark_state.Checked.hash t)
 
-              module Tock = Bits.Snarkable.Field (Tock)
-            end)
-            (System)
+      module U = Blockchain_snark_state.Make_update (T)
+
+      let update s_with_hash u = !(U.Checked.update s_with_hash u)
+    end
+  end)
 
   module Keys = struct
     include Keys
@@ -223,40 +194,35 @@ module Make (T : Transaction_snark.Verification.S) = struct
         ~autogen_path:Cache_dir.autogen_path
         ~manual_install_path:Cache_dir.manual_install_path
         ~brew_install_path:Cache_dir.brew_install_path
-        ~digest_input:
-          (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
-        ~create_env:Tick.Keypair.generate
-        ~input:
-          (Tick.constraint_system ~exposing:(Step_base.input ())
-             (Step_base.main (Logger.null ())))
+        ~digest_input:(fun x ->
+          Md5.to_hex (Tick.R1CS_constraint_system.digest (Lazy.force x)) )
+        ~create_env:(Fn.compose Tick.Keypair.generate Lazy.force)
+        ~input:(lazy (Step.constraint_system ()))
+
+    let wrap_cached =
+      let load =
+        let open Tock in
+        let open Cached.Let_syntax in
+        let%map verification =
+          Cached.component ~label:"verification" ~f:Keypair.vk
+            (module Verification_key)
+        and proving =
+          Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+        in
+        (verification, {proving with value= ()})
+      in
+      Cached.Spec.create ~load ~name:"blockchain-snark wrap keys"
+        ~autogen_path:Cache_dir.autogen_path
+        ~manual_install_path:Cache_dir.manual_install_path
+        ~brew_install_path:Cache_dir.brew_install_path
+        ~digest_input:(fun x ->
+          Md5.to_hex (Tock.R1CS_constraint_system.digest (Lazy.force x)) )
+        ~input:(lazy (Transition_system.Wrap.constraint_system ()))
+        ~create_env:(fun x -> Tock.Keypair.generate (Lazy.force x))
 
     let cached () =
       let paths = Fn.compose Cache_dir.possible_paths Filename.basename in
       let%bind step_vk, step_pk = Cached.run step_cached in
-      let module Wrap = Wrap_base (struct
-        let verification_key = step_vk.value
-      end) in
-      let wrap_cached =
-        let load =
-          let open Tock in
-          let open Cached.Let_syntax in
-          let%map verification =
-            Cached.component ~label:"verification" ~f:Keypair.vk
-              (module Verification_key)
-          and proving =
-            Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
-          in
-          (verification, {proving with value= ()})
-        in
-        Cached.Spec.create ~load ~name:"blockchain-snark wrap keys"
-          ~autogen_path:Cache_dir.autogen_path
-          ~manual_install_path:Cache_dir.manual_install_path
-          ~brew_install_path:Cache_dir.brew_install_path
-          ~digest_input:(fun x ->
-            Md5.to_hex (Tock.R1CS_constraint_system.digest (Lazy.force x)) )
-          ~input:(lazy (Tock.constraint_system ~exposing:Wrap.input Wrap.main))
-          ~create_env:(fun x -> Tock.Keypair.generate (Lazy.force x))
-      in
       let%map wrap_vk, wrap_pk = Cached.run wrap_cached in
       let location : Location.t =
         { proving= {step= paths step_pk.path; wrap= paths wrap_pk.path}
@@ -278,15 +244,8 @@ let constraint_system_digests () =
   let module M = Make (Transaction_snark.Verification.Make (struct
     let keys = Transaction_snark.Keys.Verification.dummy
   end)) in
-  let module W = M.Wrap_base (struct
-    let verification_key = Keys.Verification.dummy.step
-  end) in
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in
-  [ ( "blockchain-step"
-    , digest
-        M.Step_base.(
-          Tick.constraint_system ~exposing:(input ()) (main (Logger.null ())))
-    )
-  ; ("blockchain-wrap", digest' W.(Tock.constraint_system ~exposing:input main))
+  [ ("blockchain-step", digest (M.Step.constraint_system ()))
+  ; ("blockchain-wrap", digest' (Transition_system.Wrap.constraint_system ()))
   ]
