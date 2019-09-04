@@ -165,13 +165,30 @@ module Make (Inputs : Inputs_intf) = struct
                   return
                   @@ Option.merge acc
                        (Option.return enveloped_candidate_best_tip)
-                       ~f:(fun existing_best_tip candidate_best_tip ->
-                         Envelope.Incoming.max
-                           ~f:(fun t1 t2 ->
-                             External_transition.compare
-                               (With_hash.data @@ fst t1)
-                               (With_hash.data @@ fst t2) )
-                           existing_best_tip candidate_best_tip ) ) )
+                       ~f:(fun existing_best_tip_enveloped
+                          candidate_best_tip_enveloped
+                          ->
+                         let candidate_best_tip =
+                           With_hash.data @@ fst
+                           @@ Envelope.Incoming.data
+                                candidate_best_tip_enveloped
+                         in
+                         let existing_best_tip =
+                           With_hash.data @@ fst
+                           @@ Envelope.Incoming.data
+                                existing_best_tip_enveloped
+                         in
+                         if
+                           External_transition.compare candidate_best_tip
+                             existing_best_tip
+                           > 0
+                         then (
+                           candidate_best_tip
+                           |> Broadcast_pipe.Writer.write
+                                most_recent_valid_block_writer
+                           |> don't_wait_for ;
+                           candidate_best_tip_enveloped )
+                         else existing_best_tip_enveloped ) ) )
     in
     best_tip |> Envelope.Incoming.data |> fst |> With_hash.data
     |> Broadcast_pipe.Writer.write most_recent_valid_block_writer
