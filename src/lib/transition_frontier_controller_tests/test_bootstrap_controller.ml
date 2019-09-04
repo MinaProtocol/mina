@@ -1,6 +1,7 @@
 open Core
 open Async
 open Coda_base
+open Coda_transition
 
 module Stubs = Stubs.Make (struct
   let max_length = 4
@@ -30,6 +31,10 @@ end)
 
 let%test_module "Bootstrap Controller" =
   ( module struct
+    let f_with_verifier ~f ~logger ~trust_system =
+      let%map verifier = Verifier.create () in
+      f ~logger ~trust_system ~verifier
+
     let%test "`bootstrap_controller` caches all transitions it is passed \
               through the `transition_reader` pipe" =
       let transition_graph =
@@ -51,10 +56,11 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.root frontier
             |> Transition_frontier.Breadcrumb.validated_transition
           in
-          let bootstrap =
-            Bootstrap_controller.For_tests.make_bootstrap ~logger ~trust_system
-              ~verifier:() ~genesis_root ~network
+          let%bind make_bootstrap =
+            f_with_verifier ~f:Bootstrap_controller.For_tests.make_bootstrap
+              ~logger ~trust_system
           in
+          let bootstrap = make_bootstrap ~genesis_root ~network in
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger frontier
           in
@@ -174,10 +180,11 @@ let%test_module "Bootstrap Controller" =
               let pending_coinbases =
                 Staged_ledger.pending_coinbase_collection staged_ledger
               in
+              let%bind verifier = Verifier.create () in
               let%map actual_staged_ledger =
                 Staged_ledger
                 .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
-                  ~logger ~verifier:() ~snarked_ledger ~expected_merkle_root
+                  ~logger ~verifier ~snarked_ledger ~expected_merkle_root
                   ~pending_coinbases
                 |> Deferred.Or_error.ok_exn
               in
@@ -235,13 +242,16 @@ let%test_module "Bootstrap Controller" =
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
+          let%bind run =
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+              ~trust_system
+          in
           let%map ( new_frontier
                   , (sorted_external_transitions :
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
-            Bootstrap_controller.For_tests.run ~logger ~trust_system
-              ~verifier:() ~network ~frontier:syncing_frontier ~ledger_db
+            run ~network ~frontier:syncing_frontier ~ledger_db
               ~transition_reader ~should_ask_best_tip:false
           in
           assert_transitions_increasingly_sorted
@@ -267,13 +277,16 @@ let%test_module "Bootstrap Controller" =
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
+          let%bind run =
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+              ~trust_system
+          in
           let%map ( new_frontier
                   , (sorted_transitions :
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
-            Bootstrap_controller.For_tests.run ~logger ~trust_system
-              ~verifier:() ~network ~frontier:syncing_frontier ~ledger_db
+            run ~network ~frontier:syncing_frontier ~ledger_db
               ~transition_reader ~should_ask_best_tip:true
           in
           let root = Transition_frontier.(root new_frontier) in
@@ -305,13 +318,16 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.For_tests.root_snarked_ledger me
           in
           let synced_peer = List.nth_exn peers 1 in
+          let%bind run =
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+              ~trust_system
+          in
           let%map ( new_frontier
                   , (sorted_external_transitions :
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
-            Bootstrap_controller.For_tests.run ~logger ~trust_system
-              ~verifier:() ~network ~frontier:me ~ledger_db ~transition_reader
+            run ~network ~frontier:me ~ledger_db ~transition_reader
               ~should_ask_best_tip:true
           in
           assert_transitions_increasingly_sorted
@@ -360,13 +376,16 @@ let%test_module "Bootstrap Controller" =
               ~peer:large_peer
               (get_best_tip_hash large_peer)
           in
+          let%bind run =
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+              ~trust_system
+          in
           let%map ( new_frontier
                   , (sorted_external_transitions :
                       External_transition.with_initial_validation
                       Envelope.Incoming.t
                       list) ) =
-            Bootstrap_controller.For_tests.run ~logger ~trust_system
-              ~verifier:() ~network ~frontier:me ~ledger_db ~transition_reader
+            run ~network ~frontier:me ~ledger_db ~transition_reader
               ~should_ask_best_tip:false
           in
           assert_transitions_increasingly_sorted
@@ -401,10 +420,10 @@ let%test_module "Bootstrap Controller" =
             |> Transition_frontier.Breadcrumb.validated_transition
           in
           let open Bootstrap_controller.For_tests in
-          let bootstrap =
-            make_bootstrap ~logger ~trust_system ~verifier:() ~genesis_root
-              ~network
+          let%bind make =
+            f_with_verifier ~f:make_bootstrap ~logger ~trust_system
           in
+          let bootstrap = make ~genesis_root ~network in
           let best_transition =
             Transition_frontier.best_tip peer_with_frontier.frontier
             |> Transition_frontier.Breadcrumb.validated_transition
