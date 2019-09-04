@@ -2,17 +2,47 @@ open Core_kernel
 
 let ( = ) = `Don't_use_polymorphic_compare
 
+module type Fq_intf = sig
+  type t
+
+  val is_square : t -> bool
+
+  val sqrt : t -> t
+
+  val square : t -> t
+
+  val ( + ) : t -> t -> t
+
+  val ( * ) : t -> t -> t
+end
+
+let find_y (type t) (module Fq : Fq_intf with type t = t) ~a ~b x =
+  let open Fq in
+  let y2 = (x * square x) + (a * x) + b in
+  if Fq.is_square y2 then Some (Fq.sqrt y2) else None
+
+let decompress ~find_y ~parity ~negate (x, is_odd) =
+  Option.map (find_y x) ~f:(fun y ->
+      let y_parity = parity y in
+      let y = if Bool.(is_odd = y_parity) then y else negate y in
+      (x, y) )
+
 module Make (N : sig
   type t
 
   val test_bit : t -> int -> bool
 
   val num_bits : t -> int
-end)
-(Fq : Fields.Intf) (Coefficients : sig
-    val a : Fq.t
+end) (Fq : sig
+  include Fq_intf
 
-    val b : Fq.t
+  include Fields.Intf with type t := t
+
+  val parity : t -> bool
+end) (Coefficients : sig
+  val a : Fq.t
+
+  val b : Fq.t
 end) =
 struct
   type t = {x: Fq.t; y: Fq.t; z: Fq.t} [@@deriving bin_io, sexp]
@@ -34,6 +64,12 @@ struct
     Fq.(x * z_inv, y * z_inv)
 
   let to_affine t = if is_zero t then None else Some (to_affine_exn t)
+
+  let find_y = find_y (module Fq) ~a:Coefficients.a ~b:Coefficients.b
+
+  let decompress x =
+    let open Fq in
+    decompress ~find_y ~parity ~negate x |> Option.map ~f:of_affine
 
   let is_well_formed ({x; y; z} as t) =
     if is_zero t then true

@@ -145,7 +145,20 @@ module Tock = struct
   module Fq = Snarky_field_extensions.Field_extensions.F (Tock0)
 
   module Inner_curve = struct
-    include Tock_backend.Inner_curve
+    module T0 = struct
+      include Tock_backend.Inner_curve
+
+      let decompress t =
+        let open Snarkette.Elliptic_curve in
+        let open Coefficients in
+        decompress t
+          ~negate:Field.(( - ) zero)
+          ~find_y:(find_y (module Field) ~a ~b)
+          ~parity:(fun x -> Bigint.(test_bit (of_field x) 0))
+        |> Option.map ~f:of_affine
+    end
+
+    include T0
 
     include Sexpable.Of_sexpable (struct
                 type t = Field.t * Field.t [@@deriving sexp]
@@ -167,7 +180,7 @@ module Tock = struct
     module Checked = struct
       include Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
                 (struct
-                  include Tock_backend.Inner_curve
+                  include T0
 
                   let scale = scale_field
                 end)
@@ -300,7 +313,11 @@ module Tock = struct
     let dummy = Dummy_values.Tock.Bowe_gabizon18.proof
   end
 
-  module Groth_verifier = struct
+  module Run = Snarky.Snark.Run.Make (Tock_backend) (Unit)
+
+  let m : Run.field Snarky.Snark.m = (module Run)
+
+  module Verifier = struct
     include Snarky_verifier.Groth.Make (Pairing)
 
     let conv_fqe v =
@@ -355,7 +372,20 @@ module Tick = struct
   module Fq = Snarky_field_extensions.Field_extensions.F (Tick0)
 
   module Inner_curve = struct
-    include Crypto_params.Tick_backend.Inner_curve
+    module T0 = struct
+      include Crypto_params.Tick_backend.Inner_curve
+
+      let decompress t =
+        let open Snarkette.Elliptic_curve in
+        let open Coefficients in
+        decompress t
+          ~negate:Field.(( - ) zero)
+          ~find_y:(find_y (module Field) ~a ~b)
+          ~parity:(fun x -> Bigint.(test_bit (of_field x) 0))
+        |> Option.map ~f:of_affine
+    end
+
+    include T0
 
     include Sexpable.Of_sexpable (struct
                 type t = Field.t * Field.t [@@deriving sexp]
@@ -377,7 +407,7 @@ module Tick = struct
     module Checked = struct
       include Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
                 (struct
-                  include Crypto_params.Tick_backend.Inner_curve
+                  include T0
 
                   let scale = scale_field
                 end)

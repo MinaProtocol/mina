@@ -88,7 +88,18 @@ let%test_module "test" =
 
                        let of_int = Fn.compose of_field D.Field.of_int
                      end)
-                  (D.G1)
+                  (struct
+                    include D.G1
+
+                    let decompress t =
+                      let open Snarkette.Elliptic_curve in
+                      let open Coefficients in
+                      decompress t
+                        ~negate:C.Field.(( - ) zero)
+                        ~find_y:(find_y (module C.Field) ~a ~b)
+                        ~parity:(fun x -> C.Bigint.R.(test_bit (of_field x) 0))
+                      |> Option.map ~f:of_affine
+                  end)
                   (D.G1.Coefficients)
 
         let add_known_unsafe t x = add_unsafe t (constant x)

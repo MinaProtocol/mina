@@ -35,11 +35,17 @@ module Tick_backend = struct
   module Inner_curve = struct
     include Tock_full.G1
 
-    let find_y x =
-      let ( + ) = Field.add in
-      let ( * ) = Field.mul in
-      let y2 = (x * Field.square x) + (Coefficients.a * x) + Coefficients.b in
-      if Field.is_square y2 then Some (Field.sqrt y2) else None
+    let find_y =
+      let open Coefficients in
+      Snarkette.Elliptic_curve.find_y
+        ( module struct
+          include Field
+
+          let ( + ) = add
+
+          let ( * ) = mul
+        end )
+        ~a ~b
 
     let point_near_x x =
       let rec go x = function
