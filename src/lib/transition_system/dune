@@ -1,0 +1,14 @@
+(library
+ (name transition_system)
+ (public_name transition_system)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries 
+    logger
+    sexp_diff_kernel
+    hash_prefix_states coda_compile_config snarky snark_params core)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess
+  (pps 
+    ppx_snarky ppx_coda ppx_jane ppx_deriving.eq ppx_deriving_yojson))
+ (synopsis "The core recursive composition for a transition system"))
