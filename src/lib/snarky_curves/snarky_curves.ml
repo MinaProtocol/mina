@@ -66,6 +66,8 @@ module type Weierstrass_checked_intf = sig
 
   type unchecked
 
+  type base_field
+
   type t
 
   val typ : (t, unchecked) Typ.t
@@ -116,34 +118,42 @@ module type Weierstrass_checked_intf = sig
 
     val equal : t -> t -> (unit, _) Checked.t
   end
+
+  val decompress : base_field * Boolean.var -> (t, _) Checked.t
 end
 
-module Make_weierstrass_checked
-    (F : Snarky_field_extensions.Intf.S) (Scalar : sig
-        type t
+module Make_weierstrass_checked (F : sig
+  include Snarky_field_extensions.Intf.S
 
-        val of_int : int -> t
-    end) (Curve : sig
-      type t
+  val real_part : 'a t_ -> 'a
+end) (Scalar : sig
+  type t
 
-      val random : unit -> t
+  val of_int : int -> t
+end) (Curve : sig
+  type t
 
-      val to_affine_exn : t -> F.Unchecked.t * F.Unchecked.t
+  val random : unit -> t
 
-      val of_affine : F.Unchecked.t * F.Unchecked.t -> t
+  val to_affine_exn : t -> F.Unchecked.t * F.Unchecked.t
 
-      val double : t -> t
+  val of_affine : F.Unchecked.t * F.Unchecked.t -> t
 
-      val ( + ) : t -> t -> t
+  val double : t -> t
 
-      val negate : t -> t
+  val ( + ) : t -> t -> t
 
-      val scale : t -> Scalar.t -> t
-    end)
-    (Params : Params_intf with type field := F.Unchecked.t) :
+  val negate : t -> t
+
+  val scale : t -> Scalar.t -> t
+
+  val decompress : F.Unchecked.t * bool -> t option
+end)
+(Params : Params_intf with type field := F.Unchecked.t) :
   Weierstrass_checked_intf
   with module Impl := F.Impl
    and type unchecked := Curve.t
+   and type base_field := F.t
    and type t = F.t * F.t = struct
   open F.Impl
 
@@ -179,6 +189,24 @@ module Make_weierstrass_checked
 
     let equal = assert_equal
   end
+
+  let decompress ((x, is_odd) as c) : (t, _) Checked.t =
+    let open Checked in
+    let%bind y =
+      exists F.typ
+        ~compute:
+          As_prover.(
+            map
+              (read Typ.(F.typ * Boolean.typ) c)
+              ~f:(fun t ->
+                Curve.(snd (to_affine_exn (Option.value_exn (decompress t))))
+                ))
+    in
+    let%map () = Assert.on_curve (x, y)
+    and () =
+      Field.Checked.parity (F.real_part y) >>= Boolean.Assert.(( = ) is_odd)
+    in
+    (x, y)
 
   open Let_syntax
 

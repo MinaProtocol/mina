@@ -48,6 +48,7 @@ module Make
         with module Impl := Impl
          and type unchecked := t
          and type t = var
+         and type base_field := Impl.Field.Var.t
     end) (Message : sig
       open Impl
 
@@ -384,6 +385,8 @@ let%test_module "vrf-test" =
                   (Snarky_field_extensions.Field_extensions.F (Impl)) (Scalar)
                   (struct
                     include Snarky.Libsnark.Mnt6.G1
+
+                    let decompress _ = failwith "for tests"
 
                     let scale = scale_field
                   end)
