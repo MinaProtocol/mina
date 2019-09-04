@@ -292,15 +292,19 @@ let make = () => {
             </h4>
           </p>
           <p>
-          <span>
-            {React.string("This week, we have a package deal with a big bonus for new members. This would be a great chance to invite your friends to join! New members who complete all of the following three challenges this week will receive two times the total points* value as a bonus: #1 'Connect to Testnet', #3 'Join Discord', and #6 'Nice to Meet You' (check out all challenge descriptions ")}
-          </span>
+            <span>
+              {React.string(
+                 "This week, we have a package deal with a big bonus for new members. This would be a great chance to invite your friends to join! New members who complete all of the following three challenges this week will receive two times the total points* value as a bonus: #1 'Connect to Testnet', #3 'Join Discord', and #6 'Nice to Meet You' (check out all challenge descriptions ",
+               )}
+            </span>
             <a className=Style.Link.basic href="/docs/coda-testnet">
               {React.string("here")}
             </a>
-          <span>
-            {React.string("). So instead of 700 pts* (respectively 500 + 100 + 100), new users will receive 1400 pts* ! - ")}
-          </span>
+            <span>
+              {React.string(
+                 "). So instead of 700 pts* (respectively 500 + 100 + 100), new users will receive 1400 pts* ! - ",
+               )}
+            </span>
             <a className=Style.Link.basic href="/docs/getting-started">
               {React.string("Get started!")}
             </a>
