@@ -96,7 +96,7 @@ BONUS : Top 3 node operators who are able to earn the most tokens with their SNA
 
 This week, we have a package deal with a big bonus for new members. This would be a great chance to invite your friends to join! New members who complete all of the following three challenges this week will receive two times the total points[\*](#disclaimer) value as a bonus: #1 'Connect to Testnet', #3 'Join Discord', and #6 'Nice to Meet You' (check out the individual challenge descriptions above). So instead of 700 pts[\*](#disclaimer) (respectively 500 + 100 + 100), new users will receive 1400 pts[\*](#disclaimer) ! 
 
-**Challenge #17 (on-going): "Hello Coda"**
+**Challenge #17 (on-going): "Hello Memo"**
 
 Did you know that Coda supports 32bytes of memos in its transactions? You can fit a SHA256 hash. Think of the possibilities! For this challenge, we'd like you to send a single transaction with a memo inside of it. `coda client send-transaction` now supports a `-memo` flag. In that memo please stick the string "Hello Memo". You can send this transaction to anyone, for example a friend. You'll earn 500 pts[\*](#disclaimer) for doing so. As always, please hit the faucet with your discord account so that we can associate a public key with your discord username in order to add your score to the leaderboard.
 
