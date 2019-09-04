@@ -40,7 +40,7 @@ module type S = sig
 
   module Shifted : sig
     module type S =
-      Curves.Shifted_intf
+      Snarky_curves.Shifted_intf
       with type curve_var := curve_var
        and type boolean_var := Boolean.var
        and type ('a, 'b) checked := ('a, 'b) Checked.t
@@ -128,10 +128,11 @@ module Schnorr
         type var = Field.Var.t * Field.Var.t
 
         module Checked :
-          Curves.Weierstrass_checked_intf
+          Snarky_curves.Weierstrass_checked_intf
           with module Impl := Impl
-           and type t := t
-           and type var := var
+           and type t = var
+           and type unchecked := t
+           and type base_field := Impl.Field.Var.t
 
         val one : t
 
