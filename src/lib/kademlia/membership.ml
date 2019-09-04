@@ -25,6 +25,10 @@ module type S = sig
   val changes : t -> Peer.Event.t Linear_pipe.Reader.t
 
   val stop : t -> unit Deferred.t
+
+  module Hacky_glue : sig
+    val inject_event : t -> Peer.Event.t -> unit
+  end
 end
 
 module type Process_intf = sig
@@ -166,7 +170,8 @@ module Haskell_process = struct
         ; bind_ip= ip1
         ; discovery_port= 8000
         ; communication_port= 8001
-        ; client_port= 3000 }
+        ; client_port= 3000
+        ; libp2p_port= 8002 }
     in
     let me_discovery = Host_and_port.create ~host:"1.1.1.1" ~port:8000 in
     let other = Host_and_port.create ~host:"1.1.1.2" ~port:8000 in
@@ -471,6 +476,11 @@ end = struct
 
   let stop t = P.kill t.p
 
+  module Hacky_glue = struct
+    let inject_event t e =
+      Linear_pipe.write t.changes_writer e |> don't_wait_for
+  end
+
   module For_tests = struct
     let node node_addrs_and_ports (peers : Host_and_port.t list) conf_dir
         trust_system =
@@ -521,7 +531,8 @@ let%test_module "Tests" =
                 ; bind_ip= Unix.Inet_addr.localhost
                 ; discovery_port= 3001
                 ; communication_port= 3000
-                ; client_port= 2000 }
+                ; client_port= 2000
+                ; libp2p_port= 3002 }
               ~logger:(Logger.null ())
               ~conf_dir:(Filename.temp_dir_name ^/ "membership-test")
           with
@@ -630,11 +641,13 @@ let%test_module "Tests" =
       fold_membership (module M) ~init:false ~f:(fun b _e -> b || true)
 
     let node_addrs_and_ports_of_int i =
+      let base = 3005 + (i * 3) in
       Node_addrs_and_ports.
         { external_ip= Unix.Inet_addr.localhost
         ; bind_ip= Unix.Inet_addr.localhost
-        ; discovery_port= 3006 + i
-        ; communication_port= 3005 + i
+        ; communication_port= base
+        ; discovery_port= base + 1
+        ; libp2p_port= base + 2
         ; client_port= 1000 + i }
 
     let conf_dir = Filename.temp_dir_name ^/ ".kademlia-test-"

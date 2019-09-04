@@ -6,9 +6,7 @@ let%test_module "network pool test" =
   ( module struct
     let trust_system = Mocks.trust_system
 
-    module Mock_snark_pool =
-      Snark_pool.Make (Mocks.Ledger_proof) (Mocks.Transaction_snark_work)
-        (Mocks.Transition_frontier)
+    module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
