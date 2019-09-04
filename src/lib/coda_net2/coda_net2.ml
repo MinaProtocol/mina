@@ -63,6 +63,7 @@ module Helper = struct
     ; subscriptions: (int, subscription) Hashtbl.t
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
+    ; mutable new_peer_callback: (string -> unit) option
     ; mutable finished: bool }
 
   and subscription =
@@ -228,6 +229,24 @@ module Helper = struct
       type output = string [@@deriving yojson]
 
       let name = "validationComplete"
+    end
+
+    module Add_peer = struct
+      type input = {multiaddr: string} [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "addPeer"
+    end
+
+    module Begin_advertising = struct
+      type input = unit
+
+      let input_to_yojson () = `Assoc []
+
+      type output = string [@@deriving yojson]
+
+      let name = "beginAdvertising"
     end
   end
 
@@ -450,6 +469,10 @@ module Helper = struct
       [@@deriving yojson]
     end
 
+    module Discovered_peer = struct
+      type t = {peer_id: string; multiaddrs: string list} [@@deriving yojson]
+    end
+
     let or_error (t : ('a, string) Result.t) =
       match t with
       | Ok a ->
@@ -570,6 +593,9 @@ module Helper = struct
             (* TODO: punish *)
             Or_error.errorf "incoming stream for protocol we don't know about?"
         )
+    | "discoveredPeer" ->
+        let%map p = Discovered_peer.of_yojson v |> or_error in
+        Option.iter t.new_peer_callback ~f:(fun cb -> cb p.peer_id)
     (* Received a message on some stream *)
     | "incomingStreamMsg" -> (
         let%bind m = Incoming_stream_msg.of_yojson v |> or_error in
@@ -621,6 +647,7 @@ module Helper = struct
       ; outstanding_requests= Hashtbl.create (module Int)
       ; subscriptions= Hashtbl.create (module Int)
       ; streams= Hashtbl.create (module Int)
+      ; new_peer_callback= None
       ; protocol_handlers= Hashtbl.create (module String)
       ; seqno= 1
       ; finished= false }
@@ -683,8 +710,20 @@ module Keypair = struct
 
   let secret_key_base58 {secret; _} = to_b58_data secret
 
-  let to_string {secret; public; _} =
-    String.concat ~sep:";" [to_b58_data secret; to_b58_data public]
+  let to_string {secret; public; peer_id} =
+    String.concat ~sep:";"
+      [to_b58_data secret; to_b58_data public; to_b58_data peer_id]
+
+  let of_string s =
+    match String.split s ~on:';' with
+    | [secret_b58; public_b58; peer_id_b58] ->
+        let open Or_error.Let_syntax in
+        let%map secret = of_b58_data (`String secret_b58)
+        and public = of_b58_data (`String public_b58)
+        and peer_id = of_b58_data (`String peer_id_b58) in
+        {secret; public; peer_id}
+    | _ ->
+        Or_error.errorf "%s is not a valid Keypair.to_string output" s
 
   let to_peerid {peer_id; _} = peer_id
 end
@@ -810,7 +849,7 @@ end
 
 let me (net : Helper.t) = net.me_keypair
 
-let configure net ~me ~maddrs ~network_id =
+let configure net ~me ~maddrs ~network_id ~on_new_peer =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -821,6 +860,8 @@ let configure net ~me ~maddrs ~network_id =
   with
   | Ok "configure success" ->
       net.me_keypair <- Some me ;
+      net.new_peer_callback
+      <- Some (fun peer_id_string -> on_new_peer (peer_id_string :> PeerID.t)) ;
       Ok ()
   | Ok j ->
       failwithf "helper broke RPC protocol: configure got %s" j ()
@@ -946,6 +987,27 @@ let open_stream net ~protocol peer =
       in
       Hashtbl.add_exn net.streams ~key:stream_idx ~data:stream ;
       Ok stream
+  | Error e ->
+      Error e
+
+let add_peer net maddr =
+  match%map
+    Helper.(
+      do_rpc net (module Rpcs.Add_peer) {multiaddr= Multiaddr.to_string maddr})
+  with
+  | Ok "addPeer success" ->
+      Ok ()
+  | Ok v ->
+      failwithf "helper broke RPC protocol: addPeer got %s" v ()
+  | Error e ->
+      Error e
+
+let begin_advertising net =
+  match%map Helper.(do_rpc net (module Rpcs.Begin_advertising) ()) with
+  | Ok "beginAdvertising success" ->
+      Ok ()
+  | Ok v ->
+      failwithf "helper broke RPC protocol: beginAdvertising got %s" v ()
   | Error e ->
       Error e
 
@@ -1105,8 +1167,8 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~me:kp_a ~maddrs ~network_id >>| Or_error.ok_exn
-      and () = configure b ~me:kp_b ~maddrs ~network_id >>| Or_error.ok_exn in
+        configure a ~me:kp_a ~maddrs ~network_id ~on_new_peer:None >>| Or_error.ok_exn
+      and () = configure b ~me:kp_b ~maddrs ~network_id ~on_new_peer:None >>| Or_error.ok_exn in
       (* Give the helpers time to announce and discover each other on localhost *)
       let%map () = after (Time.Span.of_sec 0.5) in
       let shutdown () =

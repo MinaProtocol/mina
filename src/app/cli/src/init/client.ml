@@ -33,7 +33,7 @@ let dispatch_join_errors rpc query port =
     Or_error. *)
 let dispatch_with_message rpc query port ~success ~error
     ~(join_error : 'a Or_error.t -> 'b Or_error.t) =
-  let fail err = eprintf "%s\n%!" err ; exit 14 in
+  let fail err = eprintf "%s\n%!" err ; exit 18 in
   let%bind res = dispatch rpc query port in
   match join_error res with
   | Ok x ->
@@ -948,6 +948,30 @@ let list_accounts =
                    (Unsigned.UInt64.to_string (w#balance)#total) )
                response#ownedWallets ) ))
 
+let generate_libp2p_keypair =
+  Command.async
+    ~summary:
+      "Generate a new libp2p keypair and print it out (this contains the \
+       secret key!)"
+    (Command.Param.return
+       ( handle_exception_nicely
+       @@ fun () ->
+       Deferred.ignore
+         (let open Deferred.Let_syntax in
+         let logger = Logger.create () in
+         (* Using the helper only for keypair generation requires no state. *)
+         match%map Coda_net2.create ~logger ~conf_dir:"/dev/null" with
+         | Ok net ->
+             let%bind me = Coda_net2.Keypair.random net in
+             let%map () = Coda_net2.shutdown net in
+             printf "libp2p keypair: %s" (Coda_net2.Keypair.to_string me) ;
+             exit 0
+         | Error e ->
+             Logger.fatal logger "failed to generate libp2p keypair: $err"
+               ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:[("err", `String (Error.to_string_hum e))] ;
+             exit 20) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1030,4 +1054,5 @@ let advanced =
     ; ("snark-job-list", snark_job_list)
     ; ("snark-pool-list", snark_pool_list)
     ; ("unsafe-import", unsafe_import)
+    ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("visualization", Visualization.command_group) ]
