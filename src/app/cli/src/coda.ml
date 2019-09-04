@@ -854,7 +854,7 @@ let coda_commands logger =
         ; (module Coda_bootstrap_test)
         ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
-        ; (module Coda_secular_grail)
+        ; (module Coda_txns_and_restart_non_proposers)
         ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)

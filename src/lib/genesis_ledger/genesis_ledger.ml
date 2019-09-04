@@ -25,9 +25,9 @@ genesis_ledger = "test_five_even_stakes"]
 include Test_five_even_stakes
 
 [%%elif
-genesis_ledger = "test_secular_grail"]
+genesis_ledger = "test_three_even_stakes"]
 
-include Test_secular_grail
+include Test_three_even_stakes_ledger
 
 [%%elif
 genesis_ledger = "test_delegation"]

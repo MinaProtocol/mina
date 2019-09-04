@@ -2,7 +2,7 @@ open Core
 open Async
 open Coda_base
 
-let name = "coda-secular-grail"
+let name = "coda-txns-and-restart-non-proposers"
 
 let main () =
   let logger = Logger.create () in
@@ -42,7 +42,7 @@ let main () =
   let%bind () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger
       ~node:(random_non_proposer ())
-      ~duration:(Time.Span.of_min (Random.float 3.))
+      ~duration:(Time.Span.of_min (Random.float 3. +. 1.))
   in
   (* settle for a few more min *)
   let%bind () = after (Time.Span.of_min 1.) in
