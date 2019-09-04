@@ -879,7 +879,6 @@ module Data = struct
     type _ Snarky.Request.t +=
       | Winner_address : Coda_base.Account.Index.t Snarky.Request.t
       | Private_key : Scalar.value Snarky.Request.t
-      | Public_key : Public_key.t Snarky.Request.t
 
     let%snarkydef get_vrf_evaluation shifted ~ledger ~message =
       let open Coda_base in
@@ -887,18 +886,12 @@ module Data = struct
       let%bind private_key =
         request_witness Scalar.typ (As_prover.return Private_key)
       in
-      let%bind public_key =
-        request_witness Public_key.typ (As_prover.return Public_key)
-      in
       let staker_addr = message.Message.delegator in
       let%bind account =
         with_label __LOC__ (Frozen_ledger_hash.get ledger staker_addr)
       in
       let%bind delegate =
         with_label __LOC__ (Public_key.decompress_var account.delegate)
-      in
-      let%bind () =
-        with_label __LOC__ (Public_key.assert_equal public_key delegate)
       in
       let%map evaluation =
         with_label __LOC__
@@ -962,8 +955,6 @@ module Data = struct
                  respond (Provide 0)
              | Private_key ->
                  respond (Provide sk)
-             | Public_key ->
-                 respond (Provide (Public_key.decompress_exn pk))
              | _ ->
                  respond
                    (Provide
@@ -980,8 +971,8 @@ module Data = struct
           ; delegator= 0 }
     end
 
-    let check ~epoch ~slot ~seed ~private_key ~public_key
-        ~public_key_compressed ~total_stake ~logger ~epoch_snapshot =
+    let check ~epoch ~slot ~seed ~private_key ~public_key_compressed
+        ~total_stake ~logger ~epoch_snapshot =
       let open Message in
       let open Local_state in
       let open Snapshot in
@@ -1021,10 +1012,7 @@ module Data = struct
                 return
                   (Some
                      { Proposal_data.stake_proof=
-                         { private_key
-                         ; public_key
-                         ; delegator
-                         ; ledger= epoch_snapshot.ledger }
+                         {private_key; delegator; ledger= epoch_snapshot.ledger}
                      ; epoch_and_slot= (epoch, slot)
                      ; vrf_result }) ) ;
           None )
@@ -2060,7 +2048,7 @@ module Data = struct
 
     let precomputed_handler = Vrf.Precomputed.handler
 
-    let handler {delegator; ledger; private_key; public_key}
+    let handler {delegator; ledger; private_key}
         ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
                           ; is_new_stack } : Snark_params.Tick.Handler.t =
       let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
@@ -2080,8 +2068,6 @@ module Data = struct
             respond (Provide delegator)
         | Vrf.Private_key ->
             respond (Provide private_key)
-        | Vrf.Public_key ->
-            respond (Provide public_key)
         | _ ->
             respond
               (Provide
@@ -2581,8 +2567,7 @@ module Hooks = struct
             else
               match
                 Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~epoch_snapshot
-                  ~private_key:keypair.private_key
-                  ~public_key:keypair.public_key ~public_key_compressed
+                  ~private_key:keypair.private_key ~public_key_compressed
                   ~total_stake ~logger
               with
               | None ->
@@ -2947,10 +2932,9 @@ let%test_module "Proof of stake tests" =
         let sparse_ledger =
           Sparse_ledger.of_ledger_index_subset_exn ledger indices
         in
-        let public_key = Public_key.decompress_exn public_key_compressed in
         let handler =
           Prover_state.handler
-            {delegator; ledger= sparse_ledger; private_key; public_key}
+            {delegator; ledger= sparse_ledger; private_key}
             ~pending_coinbase:
               {Pending_coinbase_witness.pending_coinbases; is_new_stack= true}
         in
