@@ -1,45 +1,18 @@
 digraph client_process {
-    
-    subgraph cluster_0 {
-		style=filled;
-		color=lightgrey;
-		node [style=filled,color=white];
-		transition_frontier [label="transition frontier"];
-        transaction_pool [label="transaction pool"];
-        API
-		label = "daemon";
-	}
+
+    daemon [shape=record label="{<daemon>daemon|{<transaction_pool> transaction pool|<transition_frontier> transition frontier}}"]
 
     archive_process [label="archive process"]
 
-    subgraph cluster_2 {
-		style=filled;
-		color=lightgrey;
-		node [style=filled,color=white];
-        blocks [label="external transitions"];
-        user_commands [label="user commands"];
-        receipt_chain_table [label="receipt chain hashes"];
-        transition_to_transaction_table [label="transition to transaction"];
-        fee_transfers [label="Fee transfers"];
-        database [color=yellow]
-        label = "Database"
-    }
+    database [shape=record label="<database>database|{blocks|user_commands|fee_transfers|receipt_chain|transition_to_transaction|transition_to_snark_jobs}"]
 
-    transition_frontier -> archive_process
-    transaction_pool -> archive_process
+    daemon:transaction_pool -> archive_process
+    daemon:transition_frontier -> archive_process
 
-    API -> transition_frontier
-    API -> transaction_pool
-
-    API -> database
-
-    archive_process -> user_commands
-
-    archive_process -> receipt_chain_table
-    archive_process -> transition_to_transaction_table
-    archive_process -> fee_transfers
-    archive_process -> blocks
+    API -> daemon:daemon
 
 
+    API -> database:database
 
+    archive_process -> database:database
 }

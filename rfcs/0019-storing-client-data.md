@@ -2,7 +2,7 @@ __NOTE: We refer `external_transitions` or transitions as blocks in this RFC__
 
 # Summary
 
-The Coda protocol contains many different types of objects (blocks, transactions, accounts) and these objects have relationships with each other. A client communicating with the protocol would often make queries involving the relationship of these objects (i.e. Find the 10 most recent transactions that Alice sent after sending transactions, TXN). This RFC will discuss how we can take advantage of these relationships by using relational databases. This will accelerate our process in writing concise and maintainable queries that are extremely performant. We will also discuss the pros and cons of using this new design.
+The Coda protocol contains many different types of objects (blocks, transactions, accounts) and these objects have relationships with each other. A client communicating with the protocol would often make queries involving the relationship of these objects (i.e. Find the 10 most recent transactions that Alice sent after sending transactions, TXN). This RFC will discuss how we can take advantage of these relationships by using relational databases. This will accelerate our process in writing concise and maintainable queries that are extremely performant. We will further more discuss the data flow that connects the daemon to these storage components and make efficient queries. We will also discuss the pros and cons of using this new design.
 
 # Motivation
 
@@ -12,7 +12,7 @@ This RFC will also formally define some APIs that a client would make (in the fo
 
 # Detailed Design
 
-The first section will talk about the requirements and basic primitives that a client should be able to do when interacting with the protocol. This will make a good segway for explaining the proposed design. The last section will discuss consistency issues that could occur with this design.
+The first section will talk about the requirements and basic primitives that a client should be able to do when interacting with the protocol. This will make a good segway for explaining the proposed design. This will entail the schema of the SQL schemas, the data flow of the client storage and the sample client queries. The last section will discuss consistency issues that could occur with this design.
 
 <a href="requirements"></a>
 
@@ -110,6 +110,18 @@ type transaction_status =
 
 We can use `ledger_proof_nonce` to compute if a transaction is snarked. `ledger_proof_nonce` which start at 0 and is incremented every time a ledger proof is included into the blockchain proof. When you add transactions to a block, mark each transaction with an expected ledger nonce of `state.ledger_proof_nonce + m + {0,1}`, where `m` is the depth (and parallelization factor) of the staged ledger, and `{0,1}` is picked based on whether the transaction fits in the current staged ledger layer or rolls over into the next one. You know a transaction has been snarked at some state in the network iff `state.ledger_proof_nonce >= transaction.expected_ledger_proof_nonce`.
 
+Additionally, we would also like to know which snark jobs are included in a block. The type of a snark job looks like the following:
+
+```ocaml
+module Snark_job = struct
+  type t = {
+    prover: Public_key.Compressed.t;
+    fee: Fee.t;
+    workIds: int list
+  }
+end
+```
+
 We also have the `receipt_chain_hash` object and is used to prove a `user_command` has been executed in a block. It does this by forming a Merkle list of `user_command`s from some `proving_receipt` to a `resulting_receipt`. The hash essentially represents a concise footprint of the sequence of user commands that have been executed since genesis to a certain point in time. The `resulting_receipt` is typically the `receipt_chain_hash` of a user's account on the ledger of some block. More info about `receipt_chain_hash` can be found on this [RFC](rfcs/0006-receipt-chain-proving.md) and this [OCaml file](../src/lib/receipt_chain_database_lib/intf.ml).
 
 With each transaction in a block, we should be able to know it’s corresponding produced `receipt_chain_hash`. We need this to help show the clients the receipt_chain_hashes of their transactions so they can prove it any time later.
@@ -144,7 +156,7 @@ These containers should also have performant pagination queries, which is essent
 
 Blocks and transactions can be ordered by the time it is first seen. The first time we see a block is considered to be the time it gets added to the `transition_frontier`. The first time we see a transaction would be the first time we see it in the `transaction_pool` or when it gets added into a block in the `transition_frontier`.
 
-We can order these objects by the lexicographic ordering of block length, epoch and slot. We will denote this ordering as `block_compare`. `block_compare` length can arguably be a better ordering for blocks because clients can receive blocks at different times, but what remains constant is the `block_compare` that the block appears in the blockchain.
+We can also order these objects by the lexicographic ordering of block length, epoch and slot. We will denote this ordering as `block_compare`. `block_compare` length can arguably be a better ordering for blocks because clients can receive blocks at different times, but what remains constant is the `block_compare` that the block appears in the blockchain.
 
 The ocaml code to sort blocks can be seen as the following:
 
@@ -158,45 +170,43 @@ val block_compare = lexicographic [
 
 Additionally, we can sort transactions by the minimum `block_compare` of the blocks that they appear in. Typically, a client would expect to receive a transaction at the chain that honest peers are building. This honest chain should have a small `block_compare` to other blocks. If the transactions do not appear in an block, they will not appear in the sorting.
 
-A drawback with sorting blocks and transaction based on the time that they are first seen is that if the client wants to store an arbitrary transaction and block, then they would not have the extra burden of tagging these objects with a timestamp for pagination. Block length alleviates this issue.
+A drawback with sorting blocks and transaction based on the time that they are first seen is that if the client wants to store an arbitrary transaction and block, then they would not have the extra burden of tagging these objects with a timestamp for pagination. `block_compare` alleviates this issue.
 
-## Implementation
+## SQL Database
 
-This section will discuss a proposal where all the database updates are written by an `archive_process`. The `archive_process` will get updates of the `transaction_pool` and `transition_frontier` through diffs. Once it receives the diffs, the `archive_process` will update the database appropriately. Then, there will be an API component that make answer client queries using the daemon and the databases.
+The relational databases that we should use should be agnostic. There are different use cases for using a light database, such as SQLite, and heavier database, such as Postgres. Postgres should be used when we have an archive node or a block explorer trying to make efficient writes to store everything that it hears from the network. It also supports built-in subscriptions that would be convient for clients to listen to.
 
-Below is a diagram of how the components in this RFC will depend on each other:
+We would use SQLite when a user is downloading a wallet for the first time and only stores information about their wallets and their friends. SQLite would also be good to use if we are running a light version of Coda and they would only want to store a small amount of data. The downside of using SQLite is that subscriptions are not offered. To circumvent this issue, we can use a polling system that gets data in a short amount of time (about 5 seconds). We can also create a wrapper process that enables clients to write subscriptions on mutations in SQLite.
 
-![Client storage](../docs/res/client_storage.dot.png)
+If a client wants to upgrade the database from SQLite to Postgres, then a migration tool would support this.
 
-The yellow node represent the entire component that the node is in.
-
-The relational databases that we should use should be agnostic. There are different use cases for using a light database, such as SQLite, and heavier database, such as Postgres. Postgres should be used when we have an archive node or a block explorer trying to make efficient writes to store everything that it hears from the network. We would use SQLite when a user is downloading a wallet for the first time and only stores information about their wallets and their friends. SQLite would also be good to use if we are running a light version of Coda and they would only want to store a small amount of data. If a client wants to upgrade the database from SQLite to Postgres, then use a migration tool to support this.
-
-A client can also use AWS Appsync if they want to store their data in a distributed manner for multiple devices.
+A client can also use AWS Appsync if they want to store their data in a distributed manner for multiple devices or if they want to store their data in the code.
 
 For the objects discussed in the previous section, we can embed them as tables in one global SQL database. Below are the schemas of the tables:
 
 ```
-Enum consensus_status {
-  confirmed [note: "The block has reached finality by passing the root"]
-  pending [note: "The block is still in the transition frontier. There is no annotation of block confirmation of number"]
-  failure [note: "The block got removed from the transition frontier"]
-  unknown [note: "After becoming online and bootstrapping, we may not know what will happen to the block"]
-}
-
 Table block {
   state_hash string [pk]
   creator string [not null]
-  .... (fields of relevant protocol_state and consensus_state are flattened and explicitly written )
   staged_ledger_hash string [not null]
   ledger_hash string [not null]
   epoch int [not null]
   slot int [not null]
-  ...
-  columns
   ledger_proof_nonce int [not null]
-  status consensus_status
+  status int [not null]
   block_length int [not null]
+}
+
+  // Consensus_status is an ADT, but with a small amount of state spaces, it can be coerced into an integer to make it easy to store it in a database. Here are the following states:
+  // - pending : The block is still in the transition frontier. Value[0, (k-1)]
+  // - confirmed : The block has reached finality by passing the root. Value=k
+  // - failure: The block got removed from the transition frontier. Value=k+1
+  // - unknown: After becoming online and bootstrapping, we may not know what will happen to the block. Value=k+2
+
+Enum transaction_pool_status {
+  Unkown
+  Member
+  Dropped
 }
 
 Table user_commands {
@@ -209,7 +219,11 @@ Table user_commands {
   fee int64 [not null]
   memo string [not null]
   time_first_seen date
-  is_manually_added bool [not null]
+  status transaction_pool_status [not null]
+  Indexes {
+    (status, from) [name: "fast_pooled_user_command_sender"]
+    (status, to) [name: "fast_pooled_user_command_receiver"]
+  }
 }
 
 Table fee_transfers {
@@ -217,18 +231,18 @@ Table fee_transfers {
   fee int64 [not null]
   receiver string [not null]
   time_first_seen date
-  is_manually_added bool [not null]
 }
 
 Table block_to_transactions {
-  state_hash string [ref: > block.state_hash]
+  state_hash string [not null, ref: > block.state_hash]
   transaction_id int [not null, ref: > user_commands.id, ref: > fee_transfers.id]
-  time_seen_transaction date
+  time_seen_transaction date [ref: > user_commands.time_first_seen, ref: > fee_transfers.time_first_seen]
   sender string
   receiver string [not null]
-  receipt_chain_hash string
-  block_length length
-    Indexes {
+  block_length int [not null, ref: > block.block_length]
+  epoch int [not null, ref: > block.epoch]
+  slot int [not null, ref: > block.slot]
+  Indexes {
     state_hash [name:"block"]
     transaction_id [name: "transaction"]
     (receiver, block_length, epoch, slot) [name: "fast_receiver_block_compare_pagination"]
@@ -239,23 +253,56 @@ Table block_to_transactions {
   // Rows are uniquely identified by `state_hash` and `transaction_id`
 }
 
+Table block_to_snark_job {
+  state_hash string [ref: > block.state_hash]
+  work_id int64 [ref: > snark_job.work_id]
+}
 
-// Use Rocksdb for this
+Table snark_job {
+  prover int
+  fee int
+  work_id int64 // the list of work_ids are coerced to a single int64 work_id because the list will hold at most two jobs
+}
+
 Table receipt_chain_hashes {
   hash string [pk]
   previous_hash string
+  user_command_id string [not null, ref: > user_commands.id]
+  Indexes {
+    user_command_id
+  }
 }
 ```
-
-Below is an image of the relationships of the schemas:
-
-![Client process](../docs/res/coda_sqlite.png)
 
 Here is a link of an interactive version of the schema: https://dbdiagram.io/d/5d30b14cced98361d6dccbc8
 
 Notice that all the possible joins that we have to run through the `block_to_transactions` table. The `transaction_id` and `state_hash` columns are indexed to make it fast to compute which transactions are in an block and which blocks have a certain transaction for the `transactionStatus` query. We have multicolumn indexes for `(receiver, block_length, epoch, slot)` and `(sender, block_length, epoch, slot)` to boost the performance of pagination queries where are sorting based on `block_compare`.
 
 We also have multicolumn indexes for `(receiver, time_seen_transaction)` and `(sender, time_seen_transaction)` to boost the performance of pagination queries where we are sorting based on the time we first see a transaction. The join table has quite a bit of indexes, which will impact the performance of the table when performing write updates. If the writes are too slow, then the join table should have only one type of pagination comparison. It is hard to predict the performance of these writes with these indexes. We should write benchmark performance tests to see how fast writes are with these indices. If the writes are too slow, we should prefer `block_compare` over `time_seen_transaction` since `time_seen_transaction` is a mutable field and the change to this field would cause more index updates to `time_seen_transaction`.
+
+### Deleting data
+
+For this design, we are assuming that objects will never get deleted because the client will only be following transactions involving a small number of public keys. These transactions cannot be deleted because they are components used to prove the existence of transaction. We could delete blocks that failed to reach finality and the transaction involving them. However, the concept is outside of the scope of this RFC.
+
+### Adding Arbitrary Data
+
+Since a node can go offline, it can miss gossipped objects. If this happens, a client would be interested in adding manually adding these objects into the client storage system. This storage system has the flexibility to do this.
+
+For adding arbitrary transactions, the client could simply add it to the `transactions` database. We can add arbitrary `receipt_chain_hashes` along with its parents to the `receipt_chain` database. The user can add arbitrary blocks along with their transactions into the `blocks_to_transactions` table, `block` and `transactions` database. When we add a block whose block length is greater than root length, the block will be added through the `transition_frontier_controller`. Namely, the block will be added to the `network_transition_writer` pipe in `Coda_networking.ml`.
+
+<a href="bootstrap"></a>
+
+### Running Bootstrap
+
+If a client is offline for long time and they have to bootstrap, then they would not have a `transition_frontier`. Therefore, all the transitions in the `transition_frontier` would have their `consensus_status` be considered to `UNKOWN`. Also, the transactions would not be in an `transaction_pool` anymore, so all the transaction's in `User_command.mem` would be `false`.
+
+## Data Flow
+
+This section will discuss how data flows between the daemon and the databases.
+
+Below is a diagram of how the components in this RFC will depend on each other:
+
+![Client storage](../docs/res/client_storage.dot.png)
 
 ### Archive Process
 
@@ -269,47 +316,59 @@ module Transition_frontier_diff = struct
 end
 ```
 
-`Breadcrumb_added` has the field `sender_receipt_chains_from_parent_ledger` because we will use the `receipt_chain_hashes` from the interested senders of the parent ledger of the new added breadcrumb to compute the `receipt_chain_hashes` of the transactions that appear in the breadcrumb. More of this will be discussed later.
+`Breadcrumb_added` has the field `sender_receipt_chains_from_parent_ledger` because we will use the previous `receipt_chain_hashes` from senders involved in sending a `user_command` in the new added breadcrumb to compute the `receipt_chain_hashes` of the transactions that appear in the breadcrumb. More of this will be discussed later.
 
-The `transaction_pool` diffs will essentially list the transactions that got added to the `transaction_pool`
+The `transaction_pool` diffs will essentially list the transactions that got added and removed from the `transaction_pool` after an operation has been done onto it
 
 ```ocaml
 module Transaction_pool_diff = struct
-  type t = User_command.t list
+  type t = {added: User_command.t list ; removed: User_command.t list}
 end
 ```
 
-The daemon will send data involving users that they are interested in following. Therefore, when the daemon sends a `Transaction_diff` to the archive process, it will only send transactions involving participants that a client is interested in following. Likewise, when the daemon sends `Transition_frontier_diff.Breadcrumb_added`, the block will only contains transactions that a client is interested in following as well.
+Whenever the daemon produces a new `Transition_frontier_diff`, it will batch them into the buffer, `transition_frontier_diff_pipe`. The buffer will have a max size. Once the size of the buffer exceeds the max size, it will flush the diffs to the archive process. To make sure that the archive process applies the diff with a low amount of latency, the buffer will flush the diffs in a short intervals (like every 5 seconds). There will be a similar buffering process for the `transaction_pool`. However, when flushing the diffs in the `transaction_pool`, it will be coalesced into one diff. This would less memory to the archive process and ultimately reduce the amount of writes that have to hit to the databases.
 
-Whenever the daemon produces a new `Transition_frontier_diff`, it will batch them into the buffer, `transition_frontier_diff_pipe`. The buffer will have a max size. Once the size of the buffer exceeds the max size, it will flush the diffs to the archive process. To make sure that the archive process applies the diff with a low amount of latency, the buffer will flush the diffs in a short period amount of time (like 5 seconds). There will be a similar buffering process for the `transaction_pool`.
+The archive process will then filter transactions in the `Transaction_pool_diff` and `Transition_frontier.Breadcrumb_added` based on what a client is interested in following. It will also compute the ids of each of these transactions, which are hashes.
 
 Below is psuedocode for persisting a transaction when the archive process receives a `Transaction_pool_diff`:
 
 ```ocaml
-let write_transaction_with_no_commit sql txn ?time_first_seen ~is_manually_added external_transition_opt =
-  Sql.write sql['transaction'] txn;
-  let state_hash = Option.map external_transition_opt ~f:With_hash.hash
-  in
-  let block_length = Option.map external_transition_opt ~f:External_transition.block_length
-  in
-  let slot = Option.map external_transition_opt ~f:External_transition.slot
-  in
-  let epoch = Option.map external_transition_opt ~f:External_transition.epoch
-  in
-  get_time_first_seen sql['transaction'] Transaction.hash_id(txn)
-  Sql.write sql['block_to_transactions']
-    {transaction_id=Transaction.hash_id(txn); state_hash; sender= Some (txn.sender); receiver = txn.receiver; block_length = None; time_first_seen; block_length; slot; epoch; is_manually_added }
+let write_transaction_with_no_commit sql txn ?time_first_seen_in_block ?transaction_pool_mem_status external_transition_opt =
+  match transaction_pool_mem_status with
+  | Some transaction_pool_mem_status ->
+    if Sql.mem sql['transaction'] txn then
+    Sql.update sql['transaction']
+      ~condition:(fun txn_in_database -> txn_in_database.id = txn.id)
+      ~key:"status" ~data:transaction_pool_mem_status  else
+    Sql.write sql['transaction'] txn transaction_pool_mem_status
+  | None ->
+    if not Sql.mem sql['transaction'] txn then
+      Sql.write sql['transaction']
+        txn (Option.value ~default:Unkown transaction_pool_mem_status)
+  
+  Option.iter external_transition_opt ~f:(fun {hash=state_hash; data=external_transition} -> 
+    let block_length = external_transition.block_length in
+    let slot = external_transition.slot in
+    let epoch = external_transition.epoch in
+    let time_first_seen = Option.merge
+      (get_time_first_seen sql['transaction'] Transaction.hash_id(txn))
+      time_first_seen_in_block
+    in
+    Sql.write sql['block_to_transactions']
+      {transaction_id=Transaction.hash_id(txn); state_hash; sender= Some (txn.sender); receiver = txn.receiver; block_length = None; time_first_seen; block_length; slot; epoch }
+  
+  )
 
 let write_transaction sql txn account_before_sending_txn =
   write_transaction_with_no_commit sql txn account_before_sending_txn None
   Sql.commit sql
 ```
 
-The archive process will similarly persist a block along with its transactions whenever it receives the `Breadcrumb_added` diff. Additionally, we will compute the `receipt_chain_hash` of each `user_command` in the block using `Breadcrumb_added.sender_receipt_chains_from_parent_ledger`. This new computed `receipt_chain_hash` along with its parent `receipt_chain_hash` will be added to the `Receipt_chain_datbase` Below is psuedocode for persisting a block:
+The archive process will persist a block along with its transactions whenever it receives filtered `Breadcrumb_added` diff. Additionally, it will compute the `receipt_chain_hash` of each interested `user_command` in the block using `Breadcrumb_added.sender_receipt_chains_from_parent_ledger`. This new computed `receipt_chain_hash` along with its parent `receipt_chain_hash` will be added to the `Receipt_chain_datbase` Below is psuedocode for persisting a block:
 
 ```ocaml
 (* filtered transition only contains transitions that we are interested in following *)
-let write_block (~sender_receipt_chains_from_parent_ledger: Receipt_chain_hash.t Public_key.Compressed.Map.t) ~sql ~receipt_chain_database filtered_transition_with_hash previous_ledger date =
+let write_block (~sender_receipt_chains_from_parent_ledger: Receipt_chain_hash.t Public_key.Compressed.Map.t) ~sql filtered_transition_with_hash previous_ledger date =
   let {With_hash.data=filtered_transition; hash=state_hash} = filtered_transition_with_hash in
   let transactions = Staged_ledger_diff.transactions @@  External_transition.staged_ledger_diff filtered_transition in
   let saved_block = {
@@ -318,16 +377,17 @@ let write_block (~sender_receipt_chains_from_parent_ledger: Receipt_chain_hash.t
     status=Pending
     ...
   } in
-  Sql.write sql['block'] saved_block;  
+  Sql.write sql['receipt_chain'] saved_block;
   List.iter transactions ~f:(fun transaction ->
     (* Add receipt chain hashes*)
     (match transaction with
     | User_command user_command ->
-      let previous = Option.value_exn (Ledger.get sender_receipt_chains_from_parent_ledger transaction.sender) in
-      Receipt_chain_database.add ~previous receipt_chain_database transaction
+      let previous = Option.value_exn (Map.get sender_receipt_chains_from_parent_ledger transaction.sender) in
+      let receipt = Receipt.Chain.cons previous (User_command.payload transaction) in
+      Sql.write sql['receipt_chain'] {previous; user_command_id=Transaction.id transaction; receipt}
     | _ -> ());
     let previous_sender_account = Option.value_exn (Ledger.get_account ledger location) in
-    write_transaction_with_no_commit ~time_first_seen:date sql ~is_manually_added:false transaction previous_sender_account transition_with_hash
+    write_transaction_with_no_commit ~time_first_seen_in_block:date sql transaction previous_sender_account transition_with_hash
   )
   Sql.commit sql
 ```
@@ -343,15 +403,19 @@ let update_status sql finalized_transition deleted_transitions =
   Sql.commit sql
 ```
 
-We can also use `RPC_parallel` to ensure that the daemon will die if the archive process will die and vice versa using RPC parallel. 
+We can also use `RPC_parallel` to ensure that the daemon will die if the archive process will die and vice versa using RPC parallel.
 
-#### Client Queries
+### API Process
 
-When a client wants to make a query, it will talk to the daemon's GraphQL server. The server will service any commands involving in-memory data structures of the daemon (i.e. `transition_frontier`, `transaction_pool`). It will also send SQL calls to the database. There shouldn't be much of a performance issue if the API calls are being sent to the daemon since most of the queries involving the in-memory data structures are O(1) and we asynchronously wait for databases to perform SQL calls.
+When a client wants to make a query, it will communicate with another process, the API process. Having the API process would offload many asynchronous tasks that the daemon has to perform since it will mainly make queries to the the database. The positive effect of having an API process is that it allows other developers to make modifications to queries without having to change the inner works of the daemon or the archive process. For example,this modification would enable users to query data using RPC serialization or Haxl rather than using GraphQL. This also gives us the opprotunity to use services such as Hasura that converts SQL schemas to Graphql schemas to make writing API commands very concise.
 
-In the future, we can offload these API queries on another process if the queries significantly slow down the performance of the daemon. This API process will run its own server taking client calls. It will talk to the daemon through Graphql. The API process will make direct SQL calls to the database and present it to the client. The following subsections will describe queries how to use the databases to make complicated queries:
+The API process will also make subscription to changes in the daemon and changes in the database. The various subscriptions will be discussed in a later part of this RFC.
 
-#### Transaction_status
+The following section will describe SQL queries to make complicated queries.
+
+## Queries
+
+### Transaction_status
 
 This service can tell us the consensus status of transaction as well as if it is snarked or not. The consensus status is based on which blocks that they are in. The snarked status is based on the `ledger_proof_nonce` of the blocks that they are in as well as the `ledger_proof_nonce` of the best tip. Below is the SQL query that can help us compute the status of a transaction:
 
@@ -362,8 +426,8 @@ blocks
 INNER JOIN block_to_transactions on
   block_to_transactions.transaction_id = $TRANSACTION_ID
 
---- is transaction_added_manually
-SELECT is_manually_added FROM
+--- transaction_pool_status
+SELECT status FROM
 transactions
 WHERE id = $TXN_ID
 ```
@@ -372,51 +436,54 @@ We can use this query in psuedocode as the following:
 
 ```ocaml
 val compute_block_confirmations Transition_frontier.t -> State_hash.t list -> (State_hash.t * int) list
-let compute_block_confirmations frontier state_hashes =
-  failwith("Need to implement: For a given set of state_hashes, compute their block confirmation number in a memorized manner. We can make an extension that computes the block confirmation number for each block in the transition_frontier")
 
 let is_transaction_snarked = failwith("Need to implement")
 
-let get_transaction_status ~frontier ~sql ~txn_pool txn best_tip_breadcrumb : (bool * transaction_status)=
-  let sql_result = transaction_status_sql_query sql txn_id in
-  if Transaction_pool.member txn_pool txn then (false, Scheduled) else
-  (
+let get_transaction_status ~sql txn best_tip_breadcrumb : (bool * transaction_status) =
+  let sql_result = query_transaction_status sql txn_id in
   match sql_result with
   | [] ->
-    if (not Transaction_pool.mem txn_pool txn_id) || is_transaction_added_manually_sql_query sql txn_id then
-    (false, Unknown) else (false, Failed)
+    match (transaction_pool_status sql["transaction"] txn_id) with
+    | Unkown -> (false, Unkown)
+    | Added -> (false, Scheduled)
+    | Dropped -> (false, Failed)
   | results ->
       let transaction_status =
-        if List.for_all results ~f:(fun (_, _, `Consensus_status status)  -> Consensus_status.equal status Failed) then
+        if List.for_all results ~f:(fun (_, _, `Cosensus_status consensus_status_id)  ->
+        let status = Consensus_status.of_int status in
+         Consensus_status.equal status Failed) then
           (false, Failed)
-        else
-        List.find_map results ~f:(fun (_, `Ledger_proof_nonce nonce, `Consensus_status status)  ->
+      else
+         let confirmed_result = List.find_map results ~f:(fun (_, `Ledger_proof_nonce nonce, `Cosensus_status consensus_status_id)  ->
+          let status = Consensus_status.of_int status in
           Option.some_if (Consensus_status.equal status Confirmed) nonce)  |>
         Option.map  
           ~f:(fun ledger_proof_nonce ->
             (is_transaction_snarked best_tip_breadcrumb ledger_proof_nonce, true)
-          ) |>
-        (function
+          ) in
+        (match confirmed_result ~with
         | Some result -> result
         | None -> (* Transaction is in the transition_frontier *)
-          let block_confirmations = compute_block_confirmations frontier (List.map results ~f:(fun (`State_hash hash, _, _) -> hash )) in
-          let (arg_max_state_hash, max_block_confirmation) = List.fold block_confirmations ~f:(fun ((curr_max_state_hash, curr_max_confirmations) as acc) (state_hash, confirmations) ->
+          let block_confirmation_with_ledger_proof_nonces = Option.value_exn (List.filter_map results ~f:(fun (_, `Ledger_proof ledger_proof, `Consensus_status consensus_status_id) ->
+            match Consensus_status.of_int status with
+            | Pending block_confirmation ->  Some (block_confirmation, ledger_proof_nonce)
+            | _ -> None))
+          in
+          let (arg_max_ledger_proof_nonce, max_block_confirmation) = List.fold block_confirmation_with_ledger_proof_nonces ~f:(fun ((curr_max_confirmations, _) as acc) (confirmations, ledger_proof_nonce) ->
           if confirmations > curr_max_confirmations then
-            (state_hash, confirmations) else acc
+            (confirmations, ledger_proof_nonce) else acc
           ) in
-          (is_transaction_snarked best_tip_breadcrumb (List.find_map_exn results ~f:(fun `State_hash state_hash, `Ledger_proof_nonce nonce _) -> Option.some_if (State_hash.equal arg_max_state_hash state_hash) ), Transaction_status.Pending max_block_confirmation)
-        )
-  )
+          (is_transaction_snarked best_tip_breadcrumb ledger_proof_nonce, Pending confirmations)
+      )
 ```
 
-#### Pagination Queries
+### Pagination Queries
 
-We can paginate `blocks` (sorting by `first_seen`) query using the following SQL query
+We can paginate `blocks` (sorting by `time_seen`) query using the following SQL query
 
 ```SQL
--- blocks
 
-SELECT state_hash, transaction_ids, time_seen, creator, ....FROM
+SELECT state_hash, transaction_ids, time_seen, creator, .... FROM
 (
 SELECT state_hash, CONCAT(block_to_transactions.transaction_id) as transaction_ids, MIN (block_to_transactions.time_seen_transaction) as time_seen
 FROM block_to_transactions
@@ -432,26 +499,21 @@ LIMIT 10
 -- Would need to use a groupby query to make query the transactions as well
 ```
 
-#### Pooled_user_command
+### Pooled_user_command
 
-`pooled_user_commands` should query the `user_commands` that is either sent or received by a certain public key.
-The current implementation of `pooled_user_commands` would query all the `user_commands` that a sender sent in the transaction pool. This was straightforward to implement as the `indexed_pool` have a look up from sender's public keys to their transactions in the pool. If we would like to query all `user_commands` for a receiver, we can look up all the `user_commands` received by a user in the `user_command` and `fee_transfer` table. Then, see if those transactions appear in the transaction id look up table.
+```SQL
+-- querying specific receivers from the transaction pool
+SELECT * FROM
+transactions
+WHERE status = ADDED AND to = $RECEIVER
+```
 
-### Deleting data
-
-For this design, we are assuming that objects will never get deleted because the client will only be following transactions involving a small number of public keys. These transactions cannot be deleted because they are components used to prove the existence of transaction. We could delete blocks that failed to reach finality and the transaction involving them. However, the concept is outside of the scope of this RFC.
-
-### Adding Arbitrary Data
-
-Since a node can go offline, it can miss gossipped objects. If this happens, a client would be interested in adding manually adding these objects into the client storage system. This storage system has the flexibility to do this.
-
-For adding arbitrary transactions, the client could simply add it to the `transactions` database with `is_manually_added=true`. We can add arbitrary `receipt_chain_hashes` along with its parents to the `receipt_chain` database. The user can add arbitrary blocks along with their transactions into the `blocks_to_transactions` table, `block` and `transactions` database. When we add a block whose block length is greater than root length, the block will be added through the `transition_frontier_controller`. Namely, the block will be added to the `network_transition_writer` pipe in `Coda_networking.ml`.
-
-<a href="bootstrap"></a>
-
-### Running Bootstrap
-
-If a client is offline for long time and they have to bootstrap, then they would not have a `transition_frontier`. Therefore, all the transitions in the `transition_frontier` would have their `consensus_status` be considered to `UNKOWN`.
+```SQL
+-- querying specific senders from the transaction pool
+SELECT * FROM
+transactions
+WHERE status = ADDED AND to = $RECEIVER
+```
 
 ## Consistency Issues
 
