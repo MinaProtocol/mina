@@ -19,9 +19,6 @@ struct
     let verify _ _ = return true
   end
 
-  module Ledger_proof = Ledger_proof.Debug
-  module Verifier = Verifier.Dummy
-
   module Staged_ledger_aux_hash = struct
     include Staged_ledger_hash.Aux_hash.Stable.V1
 
@@ -34,61 +31,6 @@ struct
   module Ledger_proof_statement = Transaction_snark.Statement
   module Pending_coinbase_stack_state =
     Transaction_snark.Pending_coinbase_stack_state
-  module Transaction_snark_work =
-    Transaction_snark_work.Make (Ledger_proof.Stable.V1)
-  module Staged_ledger_diff = Staged_ledger_diff.Make (Transaction_snark_work)
-
-  module External_transition =
-    External_transition.Make (Ledger_proof) (Verifier)
-      (struct
-        include Staged_ledger_diff.Stable.V1
-
-        [%%define_locally
-        Staged_ledger_diff.(creator, user_commands)]
-      end)
-
-  module Internal_transition = Internal_transition.Make (Staged_ledger_diff)
-
-  module Staged_ledger_hash_binable = struct
-    include Staged_ledger_hash
-
-    let ( of_aux_ledger_and_coinbase_hash
-        , aux_hash
-        , ledger_hash
-        , pending_coinbase_hash ) =
-      Staged_ledger_hash.
-        ( of_aux_ledger_and_coinbase_hash
-        , aux_hash
-        , ledger_hash
-        , pending_coinbase_hash )
-  end
-
-  module Transaction = struct
-    include Transaction.Stable.Latest
-
-    let fee_excess, supply_increase = Transaction.(fee_excess, supply_increase)
-  end
-
-  module Staged_ledger = Staged_ledger.Make (struct
-    module User_command = User_command
-    module Ledger_proof_statement = Transaction_snark.Statement
-    module Proof = Proof
-    module Sok_message = Coda_base.Sok_message
-    module Ledger_proof = Ledger_proof
-    module Ledger_proof_verifier = Verifier
-    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Staged_ledger_hash = Staged_ledger_hash_binable
-    module Transaction_snark_work = Transaction_snark_work
-    module Transaction_validator = Transaction_validator
-    module Staged_ledger_diff = Staged_ledger_diff
-    module Account = Coda_base.Account
-    module Verifier = Verifier
-    module Proof_type = Transaction_snark.Proof_type
-    module Pending_coinbase_hash = Pending_coinbase.Hash
-    module Pending_coinbase_stack_state =
-      Transaction_snark.Pending_coinbase_stack_state
-    module Transaction_witness = Transaction_witness
-  end)
 
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
@@ -180,8 +122,10 @@ struct
           Transaction_snark_work.Checked.
             { fee= Fee.of_int 1
             ; proofs=
-                List.map stmts ~f:(fun stmt ->
-                    (stmt, Sok_message.Digest.default) )
+                List.map stmts ~f:(fun statement ->
+                    Ledger_proof.create ~statement
+                      ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
+                )
             ; prover }
       in
       let staged_ledger_diff =
@@ -197,12 +141,11 @@ struct
           staged_ledger_diff
         |> Deferred.Or_error.ok_exn
       in
-      let previous_transition_with_hash =
-        Transition_frontier.Breadcrumb.transition_with_hash parent_breadcrumb
+      let previous_transition =
+        Transition_frontier.Breadcrumb.validated_transition parent_breadcrumb
       in
       let previous_protocol_state =
-        With_hash.data previous_transition_with_hash
-        |> External_transition.Validated.protocol_state
+        previous_transition |> External_transition.Validated.protocol_state
       in
       let previous_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
@@ -242,36 +185,21 @@ struct
             next_verified_external_transition) =
         External_transition.Validated.create_unsafe next_external_transition
       in
-      let next_verified_external_transition_with_hash =
-        With_hash.of_data next_verified_external_transition
-          ~hash_data:
-            (Fn.compose Protocol_state.hash
-               External_transition.Validated.protocol_state)
-      in
+      let%bind verifier = Verifier.create () in
       match%map
-        Transition_frontier.Breadcrumb.build ~logger ~trust_system ~verifier:()
+        Transition_frontier.Breadcrumb.build ~logger ~trust_system ~verifier
           ~parent:parent_breadcrumb
           ~transition:
-            (External_transition.Validation.lower
-               next_verified_external_transition_with_hash
-               ( (`Time_received, Truth.True ())
-               , (`Proof, Truth.True ())
-               , ( `Delta_transition_chain
-                 , Truth.True
-                     (Non_empty_list.singleton
-                        (Transition_frontier.Breadcrumb.state_hash
-                           parent_breadcrumb)) )
-               , (`Frontier_dependencies, Truth.True ())
-               , (`Staged_ledger_diff, Truth.False) ))
+            (External_transition.Validation.reset_staged_ledger_diff_validation
+               next_verified_external_transition)
           ~sender:None
       with
       | Ok new_breadcrumb ->
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ( "state_hash"
-                , Transition_frontier.Breadcrumb.transition_with_hash
-                    new_breadcrumb
-                  |> With_hash.hash |> State_hash.to_yojson ) ]
+                , Transition_frontier.Breadcrumb.state_hash new_breadcrumb
+                  |> State_hash.to_yojson ) ]
             "Producing a breadcrumb with hash: $state_hash" ;
           new_breadcrumb
       | Error (`Fatal_error exn) ->
@@ -306,9 +234,6 @@ struct
     let genesis_protocol_state =
       With_hash.data genesis_protocol_state_with_hash
     in
-    let genesis_protocol_state_hash =
-      With_hash.hash genesis_protocol_state_with_hash
-    in
     let root_ledger_hash =
       genesis_protocol_state |> Protocol_state.blockchain_state
       |> Blockchain_state.snarked_ledger_hash
@@ -337,22 +262,19 @@ struct
            ~delta_transition_chain_proof:
              (Protocol_state.previous_state_hash genesis_protocol_state, []))
     in
-    let root_transition_with_data =
-      {With_hash.data= root_transition; hash= genesis_protocol_state_hash}
-    in
     let open Deferred.Let_syntax in
     let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
+    let%bind verifier = Verifier.create () in
     match%bind
       Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
-        ~verifier:() ~scan_state:root_transaction_snark_scan_state
+        ~verifier ~scan_state:root_transaction_snark_scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
         ~expected_merkle_root ~pending_coinbases:root_pending_coinbases
     with
     | Ok root_staged_ledger ->
         let%map frontier =
-          Transition_frontier.create ~logger
-            ~root_transition:root_transition_with_data ~root_snarked_ledger
-            ~root_staged_ledger ~consensus_local_state
+          Transition_frontier.create ~logger ~root_transition
+            ~root_snarked_ledger ~root_staged_ledger ~consensus_local_state
         in
         frontier
     | Error err ->
@@ -561,6 +483,10 @@ struct
 
     module Gossip_net = struct
       module Config = struct
+        type log_gossip_heard =
+          {snark_pool_diff: bool; transaction_pool_diff: bool; new_state: bool}
+        [@@deriving make]
+
         type t =
           { timeout: Time.Span.t
           ; target_peer_count: int
@@ -570,7 +496,12 @@ struct
           ; chain_id: string
           ; logger: Logger.t
           ; trust_system: Trust_system.t
-          ; max_concurrent_connections: int option }
+          ; max_concurrent_connections: int option
+          ; enable_libp2p: bool
+          ; disable_haskell: bool
+          ; libp2p_keypair: Coda_net2.Keypair.t option
+          ; libp2p_peers: Coda_net2.Multiaddr.t list
+          ; log_gossip_heard: log_gossip_heard }
         [@@deriving make]
       end
     end
@@ -610,6 +541,8 @@ struct
     let first_message _ = Ivar.create ()
 
     let first_connection _ = Ivar.create ()
+
+    let high_connectivity _ = Ivar.create ()
 
     let random_peers {peers; _} num_peers =
       let peer_list = Hash_set.to_list peers in
@@ -789,20 +722,14 @@ struct
     let send_transition ~logger ~transition_writer ~peer:{peer; frontier}
         state_hash =
       let transition =
-        let transition_with_hash =
+        let validated_transition =
           Transition_frontier.find_exn frontier state_hash
-          |> Transition_frontier.Breadcrumb.transition_with_hash
+          |> Transition_frontier.Breadcrumb.validated_transition
         in
-        External_transition.Validation.lower transition_with_hash
-          ( (`Time_received, Truth.True ())
-          , (`Proof, Truth.True ())
-          , ( `Delta_transition_chain
-            , Truth.True
-                (Non_empty_list.singleton
-                   ( With_hash.data transition_with_hash
-                   |> External_transition.Validated.parent_hash )) )
-          , (`Frontier_dependencies, Truth.False)
-          , (`Staged_ledger_diff, Truth.False) )
+        validated_transition
+        |> External_transition.Validation
+           .reset_frontier_dependencies_validation
+        |> External_transition.Validation.reset_staged_ledger_diff_validation
       in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:

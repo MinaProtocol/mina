@@ -6,7 +6,7 @@ In this section, we'll make our first transaction on the Coda network. After [in
 
 Run the following command to start up a Coda node instance and connect to the network:
 
-    coda daemon -peer medium-rare.o1test.net:8303
+    coda daemon -peer grab-bag.o1test.net:8303
 
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8302 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
 
@@ -79,7 +79,7 @@ While you're waiting take a look at your daemon logs for new blocks being genera
 Finally we get to the good stuff, sending our first transaction! For testing purposes, there's already an [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service) set up that will immediately refund your payment minus the transaction fees.
 
 !!! warning
-    Currently, there is a known issue with the echo service that prevents it from sending multiple transactions within the same 5 minute window. As such, it may not return funds currently, but you will still receive Testnet Points[\*](#disclaimer) for completing the challenge.
+    Currently, there is a known issue with the echo service that prevents it from properly echoing back your payment! Don't worry, we'll still give you Testnet Points[\*](#disclaimer) for completing the challenge.
 
 Let's send some of our newly received coda to this service to see what a payment looks like:
 

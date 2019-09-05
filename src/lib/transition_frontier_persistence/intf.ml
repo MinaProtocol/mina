@@ -1,6 +1,7 @@
 open Coda_base
 open Async_kernel
 open Pipe_lib
+open Coda_transition
 
 module type Transition_database_schema = sig
   type external_transition_validated
@@ -27,7 +28,7 @@ module type Frontier_diff = sig
 
   type scan_state
 
-  type add_transition = (external_transition_verified, state_hash) With_hash.t
+  type add_transition = external_transition_verified
 
   type move_root =
     { best_tip: add_transition
@@ -55,21 +56,7 @@ module type Worker_inputs = sig
     val get : t -> logger:Logger.t -> ?location:string -> 'a Schema.t -> 'a
   end
 
-  module Transition_frontier :
-    Coda_intf.Transition_frontier_intf
-    with type external_transition_validated := External_transition.Validated.t
-     and type mostly_validated_external_transition :=
-                ( [`Time_received] * unit Truth.true_t
-                , [`Proof] * unit Truth.true_t
-                , [`Delta_transition_chain]
-                  * State_hash.t Non_empty_list.t Truth.true_t
-                , [`Frontier_dependencies] * unit Truth.true_t
-                , [`Staged_ledger_diff] * unit Truth.false_t )
-                External_transition.Validation.with_transition
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type staged_ledger := Staged_ledger.t
-     and type verifier := Verifier.t
+  module Transition_frontier : Coda_intf.Transition_frontier_intf
 end
 
 module type Worker = sig

@@ -78,15 +78,68 @@ let div_mod (type f) ~m:((module M) as m : f m) a b =
   ( {value= q; upper_bound= B.(one lsl q_bit_length); bits= Some q_bits}
   , {value= r; upper_bound= b.upper_bound; bits= Some r_bits} )
 
-let to_bits (type f) ~m:((module M) : f m) t =
-  Bitstring.Lsb_first.of_list
-    ( match t.bits with
-    | Some bs ->
-        bs
-    | None ->
-        let bs =
-          M.Field.choose_preimage_var t.value
-            ~length:(bits_needed t.upper_bound)
-        in
-        t.bits <- Some bs ;
-        bs )
+let to_bits ?length (type f) ~m:((module M) : f m) t =
+  match t.bits with
+  | Some bs -> (
+      let bs = Bitstring.Lsb_first.of_list bs in
+      match length with
+      | None ->
+          bs
+      | Some n ->
+          Bitstring.Lsb_first.pad bs
+            ~padding_length:(n - Bitstring.Lsb_first.length bs)
+            ~zero:M.Boolean.false_ )
+  | None ->
+      let bs =
+        M.Field.choose_preimage_var t.value
+          ~length:(Option.value ~default:(bits_needed t.upper_bound) length)
+      in
+      t.bits <- Some bs ;
+      Bitstring.Lsb_first.of_list bs
+
+let to_bits_exn t = Bitstring.Lsb_first.of_list (Option.value_exn t.bits)
+
+let min (type f) ~m:((module M) : f m) (a : f t) (b : f t) =
+  let open M in
+  let bit_length =
+    Int.max (bits_needed a.upper_bound) (bits_needed b.upper_bound)
+  in
+  let c = Field.compare ~bit_length a.value b.value in
+  { value= Field.if_ c.less_or_equal ~then_:a.value ~else_:b.value
+  ; upper_bound= B.min a.upper_bound b.upper_bound
+  ; bits= None }
+
+let if_ (type f) ~m:((module M) : f m) cond ~then_ ~else_ =
+  { value= M.Field.if_ cond ~then_:then_.value ~else_:else_.value
+  ; upper_bound= B.max then_.upper_bound else_.upper_bound
+  ; bits= None }
+
+let succ_if (type f) ~m:((module M) : f m) t (cond : f Cvar.t Boolean.t) =
+  let open M in
+  { value= Field.(add (cond :> t) t.value)
+  ; upper_bound= B.(one + t.upper_bound)
+  ; bits= None }
+
+let succ (type f) ~m:((module M) : f m) t =
+  let open M in
+  { value= Field.(add one t.value)
+  ; upper_bound= B.(one + t.upper_bound)
+  ; bits= None }
+
+let equal (type f) ~m:((module M) : f m) a b = M.Field.equal a.value b.value
+
+let lt (type f) ~m:((module M) : f m) a b =
+  let bit_length =
+    Int.max (bits_needed a.upper_bound) (bits_needed b.upper_bound)
+  in
+  (M.Field.compare ~bit_length a.value b.value).less
+
+let lte (type f) ~m:((module M) : f m) a b =
+  let bit_length =
+    Int.max (bits_needed a.upper_bound) (bits_needed b.upper_bound)
+  in
+  (M.Field.compare ~bit_length a.value b.value).less_or_equal
+
+let gte (type f) ~m:((module M) as m : f m) a b = M.Boolean.not (lt ~m a b)
+
+let gt (type f) ~m:((module M) as m : f m) a b = M.Boolean.not (lte ~m a b)

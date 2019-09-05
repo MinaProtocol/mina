@@ -3,6 +3,7 @@ open Async
 open Cache_lib
 open Pipe_lib
 open Coda_base
+open Coda_transition
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
@@ -44,15 +45,12 @@ open Coda_base
 
 module Make (Inputs : Inputs.S) :
   Coda_intf.Catchup_intf
-  with type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
-   and type unprocessed_transition_cache :=
+  with type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
-   and type network := Inputs.Network.t
-   and type verifier := Inputs.Verifier.t = struct
+   and type network := Inputs.Network.t = struct
   open Inputs
 
   let verify_transition ~logger ~trust_system ~verifier ~frontier
@@ -146,8 +144,7 @@ module Make (Inputs : Inputs.S) :
       ~target_hash =
     let peers = Network.random_peers network num_peers in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:
-        [("target_hash", `String (State_hash.to_base58_check target_hash))]
+      ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
       "Doing a catchup job with target $target_hash" ;
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
         let open Deferred.Or_error.Let_syntax in
@@ -323,8 +320,8 @@ module Make (Inputs : Inputs.S) :
              ~metadata:
                [ ( "hashes_of_missing_transitions"
                  , `List
-                     (List.map hashes_of_missing_transitions ~f:(fun hash ->
-                          `String (State_hash.to_base58_check hash) )) ) ]
+                     (List.map hashes_of_missing_transitions
+                        ~f:State_hash.to_yojson) ) ]
              !"Number of missing transitions is %d"
              num_of_missing_transitions ;
            let%bind transitions =
@@ -349,8 +346,7 @@ module Make (Inputs : Inputs.S) :
                               (fun breadcrumb ->
                                 Cached.peek breadcrumb
                                 |> Transition_frontier.Breadcrumb.state_hash
-                                |> State_hash.to_base58_check
-                                |> fun str -> `String str )
+                                |> State_hash.to_yojson )
                               tree )) ) ]
                "about to write to the catchup breadcrumbs pipe" ;
              if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (

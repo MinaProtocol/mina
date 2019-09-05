@@ -44,7 +44,7 @@
 
   Within signatures, the declaration
 
-    val __versioned__ : bool
+    val __versioned__ : unit
 
   is generated. If the "numbered" option is given, then
 
@@ -350,7 +350,7 @@ let generate_versioned_decls ~asserted generation_kind type_decl =
     let loc = type_decl.ptype_loc
   end) in
   let open E in
-  let versioned_current = [%stri let __versioned__ = true] in
+  let versioned_current = [%stri let __versioned__ = ()] in
   if asserted then [versioned_current]
   else
     match generation_kind with
@@ -458,7 +458,7 @@ let generate_val_decls_for_type_decl type_decl ~numbered =
   (* the structure of the type doesn't affect what we generate for signatures *)
   | Ptype_abstract | Ptype_variant _ | Ptype_record _ ->
       let loc = type_decl.ptype_loc in
-      let versioned = [%sigi: val __versioned__ : bool] in
+      let versioned = [%sigi: val __versioned__ : unit] in
       if numbered then [[%sigi: val version : int]; versioned] else [versioned]
   | Ptype_open ->
       (* but the type can't be open, else it might vary over time *)

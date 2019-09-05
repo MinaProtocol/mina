@@ -9,6 +9,9 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
+[%%check_ocaml_word_size
+64]
+
 [%%if
 fake_hash]
 
@@ -42,14 +45,14 @@ let daemon logger =
          ~doc:
            "Your private key will be copied to the internal wallets folder \
             stripped of its password if it is given using the `propose-key` \
-            flag. (default:don't copy the private key)"
+            flag. (default: don't copy the private key)"
          no_arg
      and propose_key =
        flag "propose-key"
          ~doc:
            "KEYFILE Private key file for the block producer. You cannot \
-            provide both `propose-key` and `propose-public-key`. \
-            (default:don't produce blocks)"
+            provide both `propose-key` and `propose-public-key`. (default: \
+            don't produce blocks)"
          (optional string)
      and propose_public_key =
        flag "propose-public-key"
@@ -71,12 +74,12 @@ let daemon logger =
        flag "work-selection"
          ~doc:
            "seq|rand Choose work sequentially (seq) or randomly (rand) \
-            (default: seq)"
+            (default: rand)"
          (optional work_selection_method)
      and external_port =
        flag "external-port"
          ~doc:
-           (Printf.sprintf
+           (sprintf
               "PORT Base server port for daemon TCP (discovery UDP on port+1) \
                (default: %d)"
               Port.default_external)
@@ -84,14 +87,13 @@ let daemon logger =
      and client_port =
        flag "client-port"
          ~doc:
-           (Printf.sprintf
-              "PORT Client to daemon local communication (default: %d)"
+           (sprintf "PORT Client to daemon local communication (default: %d)"
               Port.default_client)
          (optional int16)
      and rest_server_port =
        flag "rest-port"
          ~doc:
-           (Printf.sprintf
+           (sprintf
               "PORT local REST-server for daemon interaction (default: %d)"
               Port.default_rest)
          (optional int16)
@@ -123,7 +125,7 @@ let daemon logger =
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
-           (Printf.sprintf
+           (sprintf
               "FEE Amount a worker wants to get compensated for generating a \
                snark proof (default: %d)"
               (Currency.Fee.to_int Cli_lib.Default.snark_worker_fee))
@@ -131,8 +133,9 @@ let daemon logger =
      and work_reassignment_wait =
        flag "work-reassignment-wait" (optional int)
          ~doc:
-           (Printf.sprintf
-              "WAIT-TIME in ms before a snark-work is reassigned (default:%dms)"
+           (sprintf
+              "WAIT-TIME in ms before a snark-work is reassigned (default: \
+               %dms)"
               Cli_lib.Default.work_reassignment_wait)
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
@@ -146,13 +149,49 @@ let daemon logger =
        flag "limit-concurrent-connections"
          ~doc:
            "true|false Limit the number of concurrent connections per IP \
-            address (default:true)"
+            address (default: true)"
+         (optional bool)
+     (*TODO: This is being added to log all the snark works received for the
+     beta-testnet challenge. We might want to remove this later?*)
+     and log_received_snark_pool_diff =
+       flag "log-snark-work-gossip"
+         ~doc:
+           "true|false Log snark-pool diff received from peers (default: false)"
+         (optional bool)
+     and log_received_blocks =
+       flag "log-received-blocks"
+         ~doc:"true|false Log blocks received from peers (default: false)"
+         (optional bool)
+     and log_transaction_pool_diff =
+       flag "log-txn-pool-gossip"
+         ~doc:
+           "true|false Log transaction-pool diff received from peers \
+            (default: false)"
          (optional bool)
      and no_bans =
        let module Expiration = struct
          [%%expires_after "20190907"]
        end in
        flag "no-bans" no_arg ~doc:"don't ban peers (**TEMPORARY FOR TESTNET**)"
+     and enable_libp2p =
+       flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
+     and libp2p_port =
+       flag "libp2p-port" (optional int)
+         ~doc:"Port to use for libp2p (default: 28675)"
+     and disable_haskell =
+       flag "disable-old-discovery" no_arg
+         ~doc:"Disable the old discovery mechanism"
+     and libp2p_keypair =
+       flag "libp2p-keypair" (optional string)
+         ~doc:
+           "Keypair (generated from `coda advanced generate-libp2p-keypair`) \
+            to use with libp2p (default: generate new keypair)"
+     and libp2p_peers_raw =
+       flag "libp2p-peer"
+         ~doc:
+           "/ip4/HOST/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
+            libp2p discovery"
+         (listed string)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -196,10 +235,8 @@ let daemon logger =
          if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
              conf_dir ;
-           Daemon.daemonize
-             ~redirect_stdout:(`File_append (conf_dir ^/ "coda.log"))
-             ~redirect_stderr:(`File_append (conf_dir ^/ "coda.log"))
-             () )
+           Daemon.daemonize ~redirect_stdout:`Dev_null
+             ~redirect_stderr:`Dev_null () )
          else ()
        in
        let stdout_log_processor =
@@ -229,6 +266,17 @@ let daemon logger =
            ; ("branch", `String Coda_version.branch) ] ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Booting may take several seconds, please wait" ;
+       let libp2p_keypair =
+         Option.map libp2p_keypair ~f:(fun s ->
+             match Coda_net2.Keypair.of_string s with
+             | Ok kp ->
+                 kp
+             | Error e ->
+                 Logger.fatal logger "failed to parse -libp2p-keypair: $err"
+                   ~module_:__MODULE__ ~location:__LOC__
+                   ~metadata:[("err", `String (Error.to_string_hum e))] ;
+                 Core.exit 19 )
+       in
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
@@ -294,6 +342,22 @@ let daemon logger =
                ~metadata:[("config_directory", `String conf_dir)] ;
              make_version ~wipe_dir:false
        in
+       don't_wait_for
+         (let bytes_per_word = Sys.word_size / 8 in
+          let rec loop () =
+            let stat = Gc.stat () in
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              "OCaml memory statistics"
+              ~metadata:
+                [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
+                ; ("heap_chunks", `Int stat.heap_chunks)
+                ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
+                ; ("live_size", `Int (stat.live_words * bytes_per_word))
+                ; ("live_blocks", `Int stat.live_blocks) ] ;
+            let%bind () = after @@ Time.Span.of_min 10. in
+            loop ()
+          in
+          loop ()) ;
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
@@ -353,6 +417,14 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "rest-port"
              ~default:Port.default_rest rest_server_port
          in
+         ignore libp2p_port ;
+         (* FIXME HACK: make this configurable when we can pass the port in the CLI *)
+         let libp2p_port =
+           (*
+           or_from_config YJ.Util.to_int_option "libp2p-port"
+             ~default:Port.default_libp2p libp2p_port *)
+           Port.default_libp2p
+         in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
@@ -371,13 +443,31 @@ let daemon logger =
            or_from_config
              (Fn.compose Option.return
                 (Fn.compose work_selection_method_val YJ.Util.to_string))
-             "work-selection" ~default:Cli_lib.Arg_type.Sequence
+             "work-selection" ~default:Cli_lib.Arg_type.Random
              work_selection_method_flag
          in
          let work_reassignment_wait =
            or_from_config YJ.Util.to_int_option "work-reassignment-wait"
              ~default:Cli_lib.Default.work_reassignment_wait
              work_reassignment_wait
+         in
+         let log_received_snark_pool_diff =
+           or_from_config YJ.Util.to_bool_option "log-snark-work-gossip"
+             ~default:false log_received_snark_pool_diff
+         in
+         let log_received_blocks =
+           or_from_config YJ.Util.to_bool_option "log-received-blocks"
+             ~default:false log_received_blocks
+         in
+         let log_transaction_pool_diff =
+           or_from_config YJ.Util.to_bool_option "log-txn-pool-gossip"
+             ~default:false log_transaction_pool_diff
+         in
+         let log_gossip_heard =
+           { Coda_networking.Gossip_net.Config.snark_pool_diff=
+               log_received_snark_pool_diff
+           ; transaction_pool_diff= log_transaction_pool_diff
+           ; new_state= log_received_blocks }
          in
          let initial_peers_raw =
            List.concat
@@ -444,7 +534,8 @@ let daemon logger =
            ; bind_ip
            ; discovery_port
            ; communication_port= external_port
-           ; client_port }
+           ; client_port
+           ; libp2p_port }
          in
          let wallets_disk_location = conf_dir ^/ "wallets" in
          (* HACK: Until we can properly change propose keys at runtime we'll
@@ -550,6 +641,12 @@ let daemon logger =
                ; initial_peers= initial_peers_cleaned
                ; addrs_and_ports
                ; trust_system
+               ; log_gossip_heard
+               ; enable_libp2p
+               ; disable_haskell
+               ; libp2p_keypair
+               ; libp2p_peers=
+                   List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
                ; max_concurrent_connections } }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
@@ -788,7 +885,7 @@ let print_version_info () =
     (String.sub Coda_version.commit_id ~pos:0 ~len:7)
     Coda_version.branch
 
-let start () =
+let () =
   Random.self_init () ;
   let logger = Logger.create ~initialize_default_consumer:false () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;

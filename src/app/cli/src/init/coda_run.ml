@@ -14,6 +14,11 @@ let snark_job_list_json t =
   let%map sl = Coda_lib.best_staged_ledger t in
   Staged_ledger.Scan_state.snark_job_list_json (Staged_ledger.scan_state sl)
 
+let snark_pool_list t =
+  Coda_lib.snark_pool t |> Network_pool.Snark_pool.resource_pool
+  |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
+  |> Yojson.Safe.to_string
+
 let get_lite_chain :
     (Coda_lib.t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
     option =
@@ -21,9 +26,8 @@ let get_lite_chain :
     ~f:(fun consensus_state_to_lite t pks ->
       let ledger = Coda_lib.best_ledger t |> Participating_state.active_exn in
       let transition =
-        With_hash.data
-          (Transition_frontier.Breadcrumb.transition_with_hash
-             (Coda_lib.best_tip t |> Participating_state.active_exn))
+        Transition_frontier.Breadcrumb.validated_transition
+          (Coda_lib.best_tip t |> Participating_state.active_exn)
       in
       let state = External_transition.Validated.protocol_state transition in
       let proof =
@@ -87,31 +91,36 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
           (Visualization_message.bootstrap "transition frontier") )
 
 let remove_prev_crash_reports ~conf_dir =
-  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*.tar.xz" conf_dir)
+  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*" conf_dir)
 
-let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
-  Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
-    "Unhandled top-level exception. Generating crash report"
-    ~metadata:[("exn", `String exn_str)] ;
+let summary exn_str =
+  let uname = Core.Unix.uname () in
+  let daemon_command = sprintf !"Command: %{sexp: string array}" Sys.argv in
+  `Assoc
+    [ ("OS_type", `String Sys.os_type)
+    ; ("Release", `String (Core.Unix.Utsname.release uname))
+    ; ("Machine", `String (Core.Unix.Utsname.machine uname))
+    ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
+    ; ("Exception", `String exn_str)
+    ; ("Command", `String daemon_command) ]
+
+let coda_status coda_ref =
+  Option.value_map coda_ref
+    ~default:(`String "Shutdown before Coda instance was created") ~f:(fun t ->
+      Coda_commands.get_status ~flag:`Performance t
+      |> Daemon_rpcs.Types.Status.to_yojson )
+
+let make_report exn_str ~conf_dir ~top_logger coda_ref =
   let _ = remove_prev_crash_reports ~conf_dir in
-  let temp_config = Core.Unix.mkdtemp "coda_config_temp" in
+  let crash_time = Time.to_filename_string ~zone:Time.Zone.utc (Time.now ()) in
+  let temp_config = conf_dir ^/ "coda_crash_report_" ^ crash_time in
+  let () = Core.Unix.mkdir temp_config in
   (*Transition frontier and ledger visualization*)
   log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
-  let crash_time = Time.now () in
-  let report_file =
-    conf_dir ^/ "coda_crash_report_"
-    ^ Time.to_filename_string ~zone:Time.Zone.utc crash_time
-    ^ ".tar.xz"
-  in
+  let report_file = temp_config ^ ".tar.gz" in
   (*Coda status*)
   let status_file = temp_config ^/ "coda_status.json" in
-  let status =
-    Option.value_map !coda_ref
-      ~default:(`String "Shutdown before Coda instance was created")
-      ~f:(fun t ->
-        Coda_commands.get_status ~flag:`Performance t
-        |> Daemon_rpcs.Types.Status.to_yojson )
-  in
+  let status = coda_status !coda_ref in
   Yojson.Safe.to_file status_file status ;
   (*coda logs*)
   let coda_log = conf_dir ^/ "coda.log" in
@@ -133,28 +142,15 @@ let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
         ()
   in
   (*System info/crash summary*)
-  let uname = Core.Unix.uname () in
-  let daemon_command = sprintf !"Command: %{sexp: string array}" Sys.argv in
-  let sys_info : Yojson.json =
-    `Assoc
-      [ ("OS_type", `String Sys.os_type)
-      ; ("Release", `String (Core.Unix.Utsname.release uname))
-      ; ("Machine", `String (Core.Unix.Utsname.machine uname))
-      ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
-      ; ("Crash_time", `String (Time.to_string crash_time))
-      ; ("Exception", `String exn_str)
-      ; ("Command", `String daemon_command) ]
-  in
-  Yojson.to_file (temp_config ^/ "crash_summary.json") sys_info ;
+  let summary = summary exn_str in
+  Yojson.to_file (temp_config ^/ "crash_summary.json") summary ;
   (*copy daemon_json to the temp dir *)
   let daemon_config = conf_dir ^/ "daemon.json" in
   let _ =
-    match Core.Sys.file_exists daemon_config with
-    | `Yes ->
-        Core.Sys.command
-          (sprintf "cp %s %s" daemon_config (temp_config ^/ "daemon.json"))
-    | _ ->
-        0
+    if Core.Sys.file_exists daemon_config = `Yes then
+      Core.Sys.command
+        (sprintf "cp %s %s" daemon_config (temp_config ^/ "daemon.json"))
+      |> ignore
   in
   (*Zip them all up*)
   let tmp_files =
@@ -168,36 +164,14 @@ let make_report_and_log_shutdown exn_str ~conf_dir ~top_logger coda_ref =
   in
   let files = tmp_files |> String.concat ~sep:" " in
   let tar_command =
-    sprintf "tar  -C %s -cJf %s %s" temp_config report_file files
+    sprintf "tar  -C %s -czf %s %s" temp_config report_file files
   in
   let exit = Core.Sys.command tar_command in
-  let action_string =
-    if exit = 2 then (
-      Core.eprintf !"Error making the crash report. Exit code: %d\n" exit ;
-      sprintf
-        "include the last 20 lines from .coda-config/coda.log and then paste \
-         the following:\n\
-         Status:\n\
-         %s\n\
-         Exception:\n\
-         %s\n"
-        (Yojson.Safe.to_string status)
-        exn_str )
-    else sprintf "attach the crash report %s" report_file
-  in
-  let _ = Core.Sys.command (sprintf "rm -rf %s" temp_config) in
-  Core.eprintf
-    !{err|
-
-  ☠  Coda daemon crashed. The Coda Protocol developers would like to know why!
-
-  Please:
-    Open an issue:
-      <https://github.com/CodaProtocol/coda/issues/new>
-
-    Briefly describe what you were doing and %s
-%!|err}
-    action_string
+  if exit = 2 then (
+    Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
+      "Error making the crash report. Exit code: %d" exit ;
+    None )
+  else Some (report_file, temp_config)
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_whitelist = []) ?rest_server_port
@@ -285,6 +259,8 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
     ; implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
           return (snark_job_list_json coda |> Participating_state.active_error)
       )
+    ; implement Daemon_rpcs.Snark_pool_list.rpc (fun () () ->
+          return (snark_pool_list coda) )
     ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
           let open Coda_lib.Config in
           Coda_tracing.start (Coda_lib.config coda).conf_dir )
@@ -317,9 +293,12 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                   , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r) )
                 ]
               "responding to a Get_work request with some new work" ;
+            Coda_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (r, snark_worker_key)) )
     ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
+          Coda_metrics.(
+            Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
             "received completed work from a snark worker"
             ~metadata:
@@ -427,21 +406,52 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                     Deferred.unit )) ) )
   |> ignore
 
-let handle_crash e =
+let handle_crash e ~conf_dir ~top_logger coda_ref =
+  let exn_str = Exn.to_string e in
+  Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
+    "Unhandled top-level exception: $exn\nGenerating crash report"
+    ~metadata:[("exn", `String exn_str)] ;
+  let no_report () =
+    sprintf
+      "include the last 20 lines from .coda-config/coda.log and then paste \
+       the following:\n\
+       Summary:\n\
+       %s\n\
+       Status:\n\
+       %s\n"
+      (Yojson.Safe.to_string (coda_status !coda_ref))
+      (Yojson.Safe.to_string (summary exn_str))
+  in
+  let action_string =
+    match
+      try Ok (make_report exn_str ~conf_dir coda_ref ~top_logger)
+      with exn -> Error (Error.of_exn exn)
+    with
+    | Ok (Some (report_file, temp_config)) ->
+        ( try Core.Sys.command (sprintf "rm -rf %s" temp_config) |> ignore
+          with _ -> () ) ;
+        sprintf "attach the crash report %s" report_file
+    | Ok None ->
+        (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
+        no_report ()
+    | Error e ->
+        Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
+          "Exception when generating crash report: $exn"
+          ~metadata:[("exn", `String (Error.to_string_hum e))] ;
+        no_report ()
+  in
   Core.eprintf
     !{err|
 
-  💀 Coda's Daemon Crashed. The Coda Protocol developers would like to know why!
+  ☠  Coda daemon crashed. The Coda Protocol developers would like to know why!
 
   Please:
     Open an issue:
-      https://github.com/CodaProtocol/coda/issues/new
+      <https://github.com/CodaProtocol/coda/issues/new>
 
-    Tell us what you were doing, and paste the last 20 lines of log messages.
-    And then paste the following:
-
-    %s%!|err}
-    (Exn.to_string e)
+    Briefly describe what you were doing and %s
+%!|err}
+    action_string
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
@@ -455,9 +465,8 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
 You might be trying to connect to a different network version, or need to troubleshoot your configuration. See https://codaprotocol.com/docs/troubleshooting/ for details.
 
 %!|err}
-      | exn ->
-          make_report_and_log_shutdown (Exn.to_string exn) ~conf_dir
-            ~top_logger coda_ref ) ;
+      | _ ->
+          handle_crash exn ~conf_dir ~top_logger coda_ref ) ;
       Stdlib.exit 1 ) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->
