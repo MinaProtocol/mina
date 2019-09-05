@@ -18,6 +18,7 @@ let main n waiting_time () =
     Coda_worker_testnet.test logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
+  let%bind () = after (Time.Span.of_sec 30.) in
   let epoch_duration =
     Consensus.Constants.(block_window_duration_ms * 3 * c * k)
   in
