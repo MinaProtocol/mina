@@ -32,93 +32,88 @@ function renderChallenge(challenge) {
   challengeDescription.innerHTML = marked(challenge.description);
 
   challengeItem.appendChild(challengeName);
-  challengeItem.appendChild(challengeDescript);
+  challengeItem.appendChild(challengeDescription);
   return challengeItem;
 }
 
 function startLeaderboard() {
-  gapi.client
-    .init({
-      apiKey: apiKey
-    })
-    .then(function () {
-      return gapi.client.request({
-        path:
-          "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/C3:N"
-      });
-    })
-    .then(
-      function (response) {
-        const {
-          result: {
-            values,
-          }
-        } = response;
-        // Update the current week header dynamically
-        if (values.length) {
-          const headers = values.shift();
-          const currentWeekElem = document.getElementById("leaderboard-current-week");
-          const currentWeekChall = document.getElementById("challenges-current-week");
-          currentWeekElem.textContent = headers[values[0].length - 1];
-          currentWeekChall.textContent = headers[values[0].length - 1];
+  return gapi.client.request({
+    path:
+      "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/C3:N"
+  }).then(
+    function (response) {
+      const {
+        result: {
+          values,
         }
-        // Sort values by latest week
-        values.sort((a, b) => {
-          const size = a.length;
-          return b[size - 1] - a[size - 1];
-        });
-        // Add rows to leaderboard container
-        const parentElem = document.getElementById("testnet-leaderboard");
-        values.map((participant, index) => {
-          parentElem.appendChild(renderParticipant(participant, index + 1));
-        });
-        // Hide the loader
-        document.getElementById("leaderboard-loading").style.display = "none";
-      },
-      function (reason) {
-        console.log("Error: " + reason.result.error.message);
+      } = response;
+      // Update the current week header dynamically
+      if (values.length) {
+        const headers = values.shift();
+        const currentWeekElem = document.getElementById("leaderboard-current-week");
+        const currentWeekChall = document.getElementById("challenges-current-week");
+        currentWeekElem.textContent = headers[values[0].length - 1];
+        currentWeekChall.textContent = headers[values[0].length - 1];
       }
-    );
+      // Sort values by latest week
+      values.sort((a, b) => {
+        const size = a.length;
+        return b[size - 1] - a[size - 1];
+      });
+      // Add rows to leaderboard container
+      const parentElem = document.getElementById("testnet-leaderboard");
+      values.map((participant, index) => {
+        parentElem.appendChild(renderParticipant(participant, index + 1));
+      });
+      // Hide the loader
+      document.getElementById("leaderboard-loading").style.display = "none";
+    },
+    function (reason) {
+      console.log("Error: " + reason.result.error.message);
+    }
+  );
 }
 
 function startChallenges() {
+  return gapi.client.request({
+    path:
+      "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/Challenges!B:M"
+  }).then(
+    function (response) {
+      const {
+        result: {
+          values,
+        }
+      } = response;
+      const parentElem = document.getElementById("challenges-list");
+      const latestChallenges = values[values.length - 1];
+      // Pop extra challenge name if description is missing
+      if (latestChallenges.length % 2 !== 0) {
+        latestChallenges.pop();
+      }
+      for (var i = 0; i < latestChallenges.length; i += 2) {
+        var challenge = {
+          name: latestChallenges[i],
+          description: latestChallenges[i + 1]
+        }
+        parentElem.appendChild(renderChallenge(challenge));
+      }
+    },
+    function (reason) {
+      console.log("Error: " + reason.result.error.message);
+    }
+  );
+}
+
+function start() {
   gapi.client
     .init({
       apiKey: apiKey
     })
     .then(function () {
-      return gapi.client.request({
-        path:
-          "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/Challenges!B:M"
-      });
+      startChallenges();
+      startLeaderboard();
     })
-    .then(
-      function (response) {
-        const {
-          result: {
-            values,
-          }
-        } = response;
-        const parentElem = document.getElementById("challenges-list");
-        const latestChallenges = values[values.length - 1];
-        // Pop extra challenge name if description is missing
-        if (latestChallenges.length % 2 !== 0) {
-          latestChallenges.pop();
-        }
-        for (var i = 0; i < latestChallenges.length; i += 2) {
-          var challenge = {
-            name: latestChallenges[i],
-            description: latestChallenges[i + 1]
-          }
-          parentElem.appendChild(renderChallenge(challenge));
-        }
-      },
-      function (reason) {
-        console.log("Error: " + reason.result.error.message);
-      }
-    );
 }
-
 // 1. Load the JavaScript client library.
-gapi.load("client", startLeaderboard);
-gapi.load("client", startChallenges);
+gapi.load("client", start);
