@@ -322,7 +322,7 @@ let make = () => {
             <h2 id="challenges-current-week" className=Styles.weekHeader />
           </p>
           <p> <div id="challenges-list" className=Styles.markdownStyles /> </p>
-          <p className=Css.(style([fontStyle(`italic)]))>
+          <p id="disclaimer" className=Css.(style([fontStyle(`italic)]))>
             {React.string(
                "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
              )}

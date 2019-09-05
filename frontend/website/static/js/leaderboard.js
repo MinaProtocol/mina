@@ -49,9 +49,9 @@ function startLeaderboard() {
       if (values.length) {
         const headers = values.shift();
         const currentWeekElem = document.getElementById("leaderboard-current-week");
-        const currentWeekChall = document.getElementById("challenges-current-week");
+        const currentWeekChallenge = document.getElementById("challenges-current-week");
         currentWeekElem.textContent = headers[values[0].length - 1];
-        currentWeekChall.textContent = headers[values[0].length - 1];
+        currentWeekChallenge.textContent = headers[values[0].length - 1];
       }
       // Sort values by latest week
       values.sort((a, b) => {
