@@ -7,7 +7,7 @@ let make = (~path) => {
       className=Css.(
         style([
           Style.Typeface.ibmplexsans,
-          color(Style.Colors.metallicBlue),
+          color(Style.Colors.saville),
           lineHeight(`em(1.5)),
           maxWidth(`rem(48.0)),
           marginLeft(`auto),

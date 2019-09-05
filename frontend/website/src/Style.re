@@ -198,7 +198,7 @@ module MediaQuery = {
   let veryVeryLarge = "(min-width: 77rem)";
   let veryLarge = "(min-width: 70.8125rem)";
   let somewhatLarge = "(min-width: 65.5rem)";
-  let full = "(min-width: 48rem)";
+  let full = "(min-width: 54rem)";
   let notMobile = "(min-width: 32rem)";
   let notSmallMobile = "(min-width: 25rem)";
   let statusLiftAlways = "(min-width: 38rem)";
@@ -428,7 +428,7 @@ module Body = {
   let (basic, basicStyles) =
     generateStyles([
       Typeface.ibmplexsans,
-      color(Colors.metallicBlue),
+      color(Colors.saville),
       fontSize(`rem(1.0)),
       lineHeight(`rem(1.5)),
       fontWeight(`normal),
