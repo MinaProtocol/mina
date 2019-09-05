@@ -87,13 +87,9 @@ module type Transition_frontier_intf = sig
     t -> (int * int Extensions.Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
 end
 
-module Make (Ledger_proof : sig
-  type t [@@deriving bin_io, sexp, to_yojson, version]
-end)
-(Transaction_snark_work : Coda_intf.Transaction_snark_work_intf
-                          with type ledger_proof := Ledger_proof.t)
-(Transition_frontier : Transition_frontier_intf
-                       with type work := Transaction_snark_work.Statement.t) :
+module Make
+    (Transition_frontier : Transition_frontier_intf
+                           with type work := Transaction_snark_work.Statement.t) :
   S
   with type transaction_snark_statement := Transaction_snark.Statement.t
    and type transaction_snark_work_statement :=
@@ -110,7 +106,8 @@ struct
       (* TODO : Version this type *)
       type t =
         { snark_table:
-            Ledger_proof.t list Priced_proof.Stable.V1.t Statement_table.t
+            Ledger_proof.Stable.V1.t list Priced_proof.Stable.V1.t
+            Statement_table.t
         ; mutable ref_table: int Statement_table.t option }
       [@@deriving sexp, bin_io]
 
@@ -225,7 +222,9 @@ struct
 
     include T
     module Diff =
-      Snark_pool_diff.Make (Ledger_proof) (Transaction_snark_work.Statement)
+      Snark_pool_diff.Make
+        (Ledger_proof.Stable.V1)
+        (Transaction_snark_work.Statement)
         (Transaction_snark_work.Info)
         (Transition_frontier)
         (T)
@@ -271,8 +270,7 @@ struct
          ~sender:Envelope.Sender.Local)
 end
 
-include Make (Ledger_proof.Stable.V1) (Transaction_snark_work)
-          (Transition_frontier)
+include Make (Transition_frontier)
 
 let%test_module "random set test" =
   ( module struct
@@ -280,9 +278,7 @@ let%test_module "random set test" =
 
     let trust_system = Mocks.trust_system
 
-    module Mock_snark_pool =
-      Make (Mocks.Ledger_proof) (Mocks.Transaction_snark_work)
-        (Mocks.Transition_frontier)
+    module Mock_snark_pool = Make (Mocks.Transition_frontier)
 
     let gen =
       let open Quickcheck.Generator.Let_syntax in
