@@ -434,15 +434,11 @@ end = struct
                 , Some ("Received valid scan state from peer", []) ))
         in
         let new_root =
-          let root_transition =
-            External_transition.Validation.forget_validation t.current_root
-          in
-          (* TODO: review the correctness of this action #2480 *)
-          let (`I_swear_this_is_safe_see_my_comment validated_root_transition)
-              =
-            External_transition.Validated.create_unsafe root_transition
-          in
-          validated_root_transition
+          t.current_root
+          |> External_transition.skip_frontier_dependencies_validation
+               `This_transition_belongs_to_a_detached_subtree
+          |> External_transition.skip_staged_ledger_diff_validation
+               `This_is_unsafe
         in
         let consensus_state =
           new_root |> External_transition.Validated.consensus_state
