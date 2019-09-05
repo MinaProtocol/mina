@@ -1,3 +1,5 @@
+const apiKey = "AIzaSyDIFwMr7SPGCLl_o6e4UZKi1q9l8snkUZs";
+
 function renderParticipant(participant, rank) {
   const row = document.createElement("div");
   row.className = "leaderboard-row";
@@ -25,9 +27,9 @@ function renderChallenge(challenge) {
   challengeName.className = "challenge-name";
   challengeName.textContent = challenge.name;
 
-  const challengeDescript = document.createElement("p");
-  challengeDescript.className = "challenge-description";
-  challengeDescript.innerHTML = marked(challenge.description);
+  const challengeDescription = document.createElement("p");
+  challengeDescription.className = "challenge-description";
+  challengeDescription.innerHTML = marked(challenge.description);
 
   challengeItem.appendChild(challengeName);
   challengeItem.appendChild(challengeDescript);
@@ -37,16 +39,16 @@ function renderChallenge(challenge) {
 function startLeaderboard() {
   gapi.client
     .init({
-      apiKey: "AIzaSyDIFwMr7SPGCLl_o6e4UZKi1q9l8snkUZs"
+      apiKey: apiKey
     })
-    .then(function() {
+    .then(function () {
       return gapi.client.request({
         path:
           "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/C3:N"
       });
     })
     .then(
-      function(response) {
+      function (response) {
         const {
           result: {
             values,
@@ -73,7 +75,7 @@ function startLeaderboard() {
         // Hide the loader
         document.getElementById("leaderboard-loading").style.display = "none";
       },
-      function(reason) {
+      function (reason) {
         console.log("Error: " + reason.result.error.message);
       }
     );
@@ -82,16 +84,16 @@ function startLeaderboard() {
 function startChallenges() {
   gapi.client
     .init({
-      apiKey: "AIzaSyDIFwMr7SPGCLl_o6e4UZKi1q9l8snkUZs"
+      apiKey: apiKey
     })
-    .then(function() {
+    .then(function () {
       return gapi.client.request({
         path:
           "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/Challenges!B:M"
       });
     })
     .then(
-      function(response) {
+      function (response) {
         const {
           result: {
             values,
@@ -99,15 +101,19 @@ function startChallenges() {
         } = response;
         const parentElem = document.getElementById("challenges-list");
         const latestChallenges = values[values.length - 1];
-        for(var i = 0; i < latestChallenges.length; i+=2){
+        // Pop extra challenge name if description is missing
+        if (latestChallenges.length % 2 !== 0) {
+          latestChallenges.pop();
+        }
+        for (var i = 0; i < latestChallenges.length; i += 2) {
           var challenge = {
-            name: latestChallenges[i], 
-            description: latestChallenges[i+1]
+            name: latestChallenges[i],
+            description: latestChallenges[i + 1]
           }
           parentElem.appendChild(renderChallenge(challenge));
         }
       },
-      function(reason) {
+      function (reason) {
         console.log("Error: " + reason.result.error.message);
       }
     );

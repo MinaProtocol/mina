@@ -2,41 +2,45 @@ let extraHeaders = () =>
   <>
     <script src="https://apis.google.com/js/api.js" />
     <script src={Links.Cdn.url("/static/js/leaderboard.js")} />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/0.7.0/marked.min.js" integrity="sha256-0Ed5s/n37LIeAWApZmZUhY9icm932KvYkTVdJzUBiI4=" crossOrigin="anonymous"></script>
-
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/marked/0.7.0/marked.min.js"
+      integrity="sha256-0Ed5s/n37LIeAWApZmZUhY9icm932KvYkTVdJzUBiI4="
+      crossOrigin="anonymous"
+    />
   </>;
 
 module Styles = {
   open Css;
 
-
-  let markdownStyles = 
-  style([
-    selector(
-      "a",
-      [
-        hover([color(Style.Colors.hyperlinkHover)]),
-        cursor(`pointer),
-         ...Style.Link.basicStyles
-      ]),
-    selector(
-      "h4", 
-      Style.H4.wideStyles @ [textAlign(`left), fontSize(`rem(1.)), fontWeight(`light)]
+  let markdownStyles =
+    style([
+      selector(
+        "a",
+        [
+          hover([color(Style.Colors.hyperlinkHover)]),
+          cursor(`pointer),
+          ...Style.Link.basicStyles,
+        ],
       ),
-    selector(
-       "code",
-        [Style.Typeface.pragmataPro, color(Style.Colors.midnight)]
-    ),
-    selector(
-      "p > code, li > code",
-      [
-        boxSizing(`borderBox),
-        padding2(~v=`px(2), ~h=`px(6)),
-        backgroundColor(Style.Colors.slateAlpha(0.05)),
-        borderRadius(`px(4)),
-      ],
-    ),
-  ]);
+      selector(
+        "h4",
+        Style.H4.wideStyles
+        @ [textAlign(`left), fontSize(`rem(1.)), fontWeight(`light)],
+      ),
+      selector(
+        "code",
+        [Style.Typeface.pragmataPro, color(Style.Colors.midnight)],
+      ),
+      selector(
+        "p > code, li > code",
+        [
+          boxSizing(`borderBox),
+          padding2(~v=`px(2), ~h=`px(6)),
+          backgroundColor(Style.Colors.slateAlpha(0.05)),
+          borderRadius(`px(4)),
+        ],
+      ),
+    ]);
 
   let page =
     style([
@@ -255,7 +259,6 @@ module Section = {
 
 [@react.component]
 let make = () => {
- 
   <div className=Styles.page>
     <Section name="Leaderboard">
       <div className=Styles.header>
@@ -316,12 +319,9 @@ let make = () => {
             </a>
           </p>
           <p>
-            <h2 id="challenges-current-week" className=Styles.weekHeader> </h2>
+            <h2 id="challenges-current-week" className=Styles.weekHeader />
           </p>
-          <p>
-            <div id="challenges-list" className=Styles.markdownStyles>
-            </div>
-          </p>
+          <p> <div id="challenges-list" className=Styles.markdownStyles /> </p>
           <p className=Css.(style([fontStyle(`italic)]))>
             {React.string(
                "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
