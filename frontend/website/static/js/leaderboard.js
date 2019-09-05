@@ -1,5 +1,3 @@
-const apiKey = "AIzaSyDIFwMr7SPGCLl_o6e4UZKi1q9l8snkUZs";
-
 function renderParticipant(participant, rank) {
   const row = document.createElement("div");
   row.className = "leaderboard-row";
@@ -108,7 +106,8 @@ function startChallenges() {
 function start() {
   gapi.client
     .init({
-      apiKey: apiKey
+      apiKey: "AIzaSyDIFwMr7SPGCLl_o6e4UZKi1q9l8snkUZs"
+
     })
     .then(function () {
       startChallenges();
