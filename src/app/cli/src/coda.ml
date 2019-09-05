@@ -346,7 +346,7 @@ let daemon logger =
          (let bytes_per_word = Sys.word_size / 8 in
           let rec loop () =
             let stat = Gc.stat () in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "OCaml memory statistics"
               ~metadata:
                 [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
