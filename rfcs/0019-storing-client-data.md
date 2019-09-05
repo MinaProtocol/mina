@@ -199,12 +199,12 @@ Table block {
 
   // Consensus_status is an ADT, but with a small amount of state spaces, it can be coerced into an integer to make it easy to store it in a database. Here are the following states:
   // - pending : The block is still in the transition frontier. Value[0, (k-1)]
-  // - confirmed : The block has reached finality by passing the root. Value=k
-  // - failure: The block got removed from the transition frontier. Value=k+1
-  // - unknown: After becoming online and bootstrapping, we may not know what will happen to the block. Value=k+2
-
+  // - confirmed : The block has reached finality by passing the root. Value=-1
+  // - failure: The block got removed from the transition frontier. Value=-2
+  // - unknown: After becoming online and bootstrapping, we may not know what will happen to the block. Value=-3
+  
 Enum transaction_pool_status {
-  Unkown
+  Unknown
   Member
   Dropped
 }
@@ -242,7 +242,7 @@ Table block_to_transactions {
   block_length int [not null, ref: > block.block_length]
   epoch int [not null, ref: > block.epoch]
   slot int [not null, ref: > block.slot]
-  Indexes {
+    Indexes {
     state_hash [name:"block"]
     transaction_id [name: "transaction"]
     (receiver, block_length, epoch, slot) [name: "fast_receiver_block_compare_pagination"]
@@ -274,6 +274,10 @@ Table receipt_chain_hashes {
 }
 ```
 
+Below is an image of the relationships of the schemas:
+
+![Client process](../docs/res/coda_sql.png)
+
 Here is a link of an interactive version of the schema: https://dbdiagram.io/d/5d30b14cced98361d6dccbc8
 
 Notice that all the possible joins that we have to run through the `block_to_transactions` table. The `transaction_id` and `state_hash` columns are indexed to make it fast to compute which transactions are in an block and which blocks have a certain transaction for the `transactionStatus` query. We have multicolumn indexes for `(receiver, block_length, epoch, slot)` and `(sender, block_length, epoch, slot)` to boost the performance of pagination queries where are sorting based on `block_compare`.
@@ -286,15 +290,15 @@ For this design, we are assuming that objects will never get deleted because the
 
 ### Adding Arbitrary Data
 
-Since a node can go offline, it can miss gossipped objects. If this happens, a client would be interested in adding manually adding these objects into the client storage system. This storage system has the flexibility to do this.
+Since a node can go offline, it can miss gossipped objects. If this happens, a client would be interested in manually adding these objects into the client storage system. This storage system has the flexibility to do this.
 
-For adding arbitrary transactions, the client could simply add it to the `transactions` database. We can add arbitrary `receipt_chain_hashes` along with its parents to the `receipt_chain` database. The user can add arbitrary blocks along with their transactions into the `blocks_to_transactions` table, `block` and `transactions` database. When we add a block whose block length is greater than root length, the block will be added through the `transition_frontier_controller`. Namely, the block will be added to the `network_transition_writer` pipe in `Coda_networking.ml`.
+For adding arbitrary transactions, the client could simply add it to the `transactions` database. We can also include the previous receipt chain hashes involving that transaction and use these components and add them to the `receipt_chain` database. The user can add arbitrary blocks along with their transactions into the `blocks_to_transactions` table, `block` and `transactions` database. When we add a block whose block length is greater than root length, the block will be added through the `transition_frontier_controller`. Namely, the block will be added to the `network_transition_writer` pipe in `Coda_networking.ml`.
 
 <a href="bootstrap"></a>
 
 ### Running Bootstrap
 
-If a client is offline for long time and they have to bootstrap, then they would not have a `transition_frontier`. Therefore, all the transitions in the `transition_frontier` would have their `consensus_status` be considered to `UNKOWN`. Also, the transactions would not be in an `transaction_pool` anymore, so all the transaction's in `User_command.mem` would be `false`.
+If a client is offline for long time and they have to bootstrap, then they would not have a `transition_frontier`. Therefore, all the transitions in the `transition_frontier` would have their `consensus_status` be considered to `UNKNOWN`. Also, the transactions would not be in an `transaction_pool` anymore, so all the transaction's in `User_command.mem` would be `false`.
 
 ## Data Flow
 
@@ -322,11 +326,13 @@ The `transaction_pool` diffs will essentially list the transactions that got add
 
 ```ocaml
 module Transaction_pool_diff = struct
-  type t = {added: User_command.t list ; removed: User_command.t list}
+  type t = {added: User_command.t Set.t ; removed: User_command.t Set.t}
 end
 ```
 
-Whenever the daemon produces a new `Transition_frontier_diff`, it will batch them into the buffer, `transition_frontier_diff_pipe`. The buffer will have a max size. Once the size of the buffer exceeds the max size, it will flush the diffs to the archive process. To make sure that the archive process applies the diff with a low amount of latency, the buffer will flush the diffs in a short intervals (like every 5 seconds). There will be a similar buffering process for the `transaction_pool`. However, when flushing the diffs in the `transaction_pool`, it will be coalesced into one diff. This would less memory to the archive process and ultimately reduce the amount of writes that have to hit to the databases.
+Whenever the daemon produces a new `Transition_frontier_diff`, it will batch the transactions into the buffer, `transition_frontier_diff_pipe`. The buffer will have a max size. Once the size of the buffer exceeds the max size, it will flush the diffs to the archive process. To make sure that the archive process applies the diff with a low amount of latency, the buffer will flush the diffs in a short interval (like every 5 seconds). There will be a similar buffering process for the `transaction_pool`. The `transaction_pool` diffs can be seen as a monoid and it would be trivial to concate them into one diff. This would send less memory to the archive process and ultimately reduce the amount of writes that have to hit to the databases.
+
+It is worthy to note that whenever the archive process makes a write to the databases using deffers. The archive process will write the diffs it receives in a sequential manner and will not context switch to another task. This prevent any weird consistency issues.
 
 The archive process will then filter transactions in the `Transaction_pool_diff` and `Transition_frontier.Breadcrumb_added` based on what a client is interested in following. It will also compute the ids of each of these transactions, which are hashes.
 
@@ -344,9 +350,9 @@ let write_transaction_with_no_commit sql txn ?time_first_seen_in_block ?transact
   | None ->
     if not Sql.mem sql['transaction'] txn then
       Sql.write sql['transaction']
-        txn (Option.value ~default:Unkown transaction_pool_mem_status)
+        txn (Option.value ~default:Unknown transaction_pool_mem_status)
   
-  Option.iter external_transition_opt ~f:(fun {hash=state_hash; data=external_transition} -> 
+  Option.iter external_transition_opt ~f:(fun {hash=state_hash; data=external_transition} ->
     let block_length = external_transition.block_length in
     let slot = external_transition.slot in
     let epoch = external_transition.epoch in
@@ -407,7 +413,9 @@ We can also use `RPC_parallel` to ensure that the daemon will die if the archive
 
 ### API Process
 
-When a client wants to make a query, it will communicate with another process, the API process. Having the API process would offload many asynchronous tasks that the daemon has to perform since it will mainly make queries to the the database. The positive effect of having an API process is that it allows other developers to make modifications to queries without having to change the inner works of the daemon or the archive process. For example,this modification would enable users to query data using RPC serialization or Haxl rather than using GraphQL. This also gives us the opprotunity to use services such as Hasura that converts SQL schemas to Graphql schemas to make writing API commands very concise.
+When a client wants to make a query, it will communicate with another process, the API process. Having the API process would offload many asynchronous tasks that the daemon has to perform since it will mainly make queries to the the database. We are confident that a large bottleneck for performance improvements in Coda would be the number of async tasks. As a result, we cannot afford to make a lot of queries to the dademon process. This means that the tasks be delegated to another process, namely the SQL server.
+
+The positive effect of having an API process is that it allows other developers to make modifications to queries without having to change the inner works of the daemon or the archive process. For example,this modification would enable users to query data using RPC serialization or Haxl rather than using GraphQL. This also gives us the opprotunity to use services such as Hasura that converts SQL schemas to Graphql schemas to make writing API commands very concise.
 
 The API process will also make subscription to changes in the daemon and changes in the database. The various subscriptions will be discussed in a later part of this RFC.
 
@@ -444,7 +452,7 @@ let get_transaction_status ~sql txn best_tip_breadcrumb : (bool * transaction_st
   match sql_result with
   | [] ->
     match (transaction_pool_status sql["transaction"] txn_id) with
-    | Unkown -> (false, Unkown)
+    | Unknown -> (false, Unknown)
     | Added -> (false, Scheduled)
     | Dropped -> (false, Failed)
   | results ->
