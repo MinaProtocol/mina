@@ -1635,19 +1635,17 @@ let%test_module "test" =
       val work_delay : int
     end
 
-    let min_blocks_before_first_snarked_ledger_generic
-        (module C : Constants_intf) =
+    (* How many blocks do we need to fully exercise the ledger
+       behavior and produce one ledger proof *)
+    let min_blocks_for_first_snarked_ledger_generic (module C : Constants_intf)
+        =
       let open C in
-      (transaction_capacity_log_2 + 1) * (work_delay + 1)
+      ((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1
 
-    (* How many blocks to we need to produce to fully exercise the ledger
-       behavior i.e., produce one ledger proof? min_blocks_before_first_snarked_ledger_generic + 1*)
-    let max_blocks_for_coverage_generic (module C : Constants_intf) =
-      min_blocks_before_first_snarked_ledger_generic (module C) + 1
-
-    (* n-1 extra blocks for n ledger proofs since we are already producing one proof *)
+    (* n-1 extra blocks for n ledger proofs since we are already producing one
+    proof *)
     let max_blocks_for_coverage n =
-      max_blocks_for_coverage_generic
+      min_blocks_for_first_snarked_ledger_generic
         (module Transaction_snark_scan_state.Constants)
       + n - 1
 
