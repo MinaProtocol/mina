@@ -57,7 +57,9 @@ let%test_module "transaction_status" =
       transaction_pool
 
     let single_async_test ~f gen =
+      heartbeat_flag := true ;
       Async.Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat logger |> don't_wait_for ;
           Quickcheck.async_test ~trials:1 gen ~f )
 
     let get_status_exn ~frontier_broadcast_pipe ~transaction_pool user_command
@@ -73,6 +75,7 @@ let%test_module "transaction_status" =
           let%bind transaction_pool = create_pool ~frontier_broadcast_pipe in
           let%map () = Transaction_pool.add transaction_pool user_command in
           Logger.info logger "Hello" ~module_:__MODULE__ ~location:__LOC__ ;
+          heartbeat_flag := false ;
           [%test_eq: Transaction_status.State.t]
             ~equal:Transaction_status.State.equal
             Transaction_status.State.Unknown
@@ -93,6 +96,7 @@ let%test_module "transaction_status" =
           let%map () = Transaction_pool.add transaction_pool user_command in
           Logger.info logger "Computing status" ~module_:__MODULE__
             ~location:__LOC__ ;
+          heartbeat_flag := false ;
           [%test_eq: Transaction_status.State.t]
             ~equal:Transaction_status.State.equal
             Transaction_status.State.Pending
@@ -127,6 +131,7 @@ let%test_module "transaction_status" =
           in
           Logger.info logger "Computing status" ~module_:__MODULE__
             ~location:__LOC__ ;
+          heartbeat_flag := false ;
           [%test_eq: Transaction_status.State.t]
             ~equal:Transaction_status.State.equal
             Transaction_status.State.Unknown
