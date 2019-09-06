@@ -221,6 +221,14 @@ module Bootstrap = struct
     Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
 end
 
+module Catchup = struct
+  let subsystem = "Catchup"
+
+  let catchup_time_ms =
+    let help = "time elapsed while doing catchup" in
+    Gauge.v "catchup_time_ms" ~help ~namespace ~subsystem
+end
+
 (* TODO:
 module Transaction_pool = struct
   let subsystem = "Transaction_pool"
