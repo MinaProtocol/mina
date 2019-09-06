@@ -1,0 +1,5 @@
+(library
+  (name delta_transition_chain_prover)
+  (public_name delta_transition_chain_prover)
+  (preprocess (pps ppx_jane))
+  (libraries core_kernel coda_intf coda_base transition_frontier merkle_list_prover))
