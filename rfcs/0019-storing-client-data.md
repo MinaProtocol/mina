@@ -2,17 +2,21 @@ __NOTE: We refer `external_transitions` or transitions as blocks in this RFC__
 
 # Summary
 
-The Coda protocol contains many different types of objects (blocks, transactions, accounts) and these objects have relationships with each other. A client communicating with the protocol would often make queries involving the relationship of these objects (i.e. Find the 10 most recent transactions that Alice sent after sending transactions, TXN). This RFC will discuss how we can take advantage of these relationships by using relational databases. This will accelerate our process in writing concise and maintainable queries that are extremely performant. We will further more discuss the data flow that connects the daemon to these storage components and make efficient queries. We will also discuss the pros and cons of using this new design.
+The Coda protocol contains many different types of objects (blocks, transactions, accounts) and these objects have relationships with each other. A client communicating with the protocol would often make queries involving the relationship of these objects (i.e. Find the 10 most recent transactions that Alice sent after sending transactions, TXN). This RFC will discuss how we can take optionally advantage of these relationships by using relational databases to answer these queries. Note that the proposed architecture does not limit a node to one particular database. On the contrary, it moves the current existing database storages that we have and move them to an architecutre that allows a user to optionally use a database and change the database.
+
+This will accelerate our process in writing concise and maintainable queries that are extremely performant. We will further more discuss the data flow that connects the daemon to these optional storage components and make efficient queries. This architecture entails ripping out the API and archive related work into separate processes. By keeping the API separate, it can be scaled in load balanced, as can the database, without having to scale the number of nodes that are speaking to the archiver (unless you want higher network consistency). We will also discuss the pros and cons of using this new design.
 
 # Motivation
 
-The primary database that we use to store transactions and blocks is Rocksdb. When we load the Rocksdb databases, we read all of the key-value pairs and load them into an in-memory cache that is designed for making fast in-memory reads and pagination queries. The downside of this is that this design limits us from making complex queries. Namely, we make a pagination query that is sent from or received by a public key, but not strictly one or the other. Additionally, the indexes for the current design is limited to the keys of the database. This enables to answer queries about which transactions are in an block but not the other way around (i.e. for a given transaction, which blocks have the transaction). We can put this auxiliary information that tells us which blocks contain a certain transaction in the value of the transaction database. However, this results in verbose code and extra invariants to take care, leading to potential bugs. Relational databases are good at taking care of these type of details. Relational databases can give us more indexes and they can grant us more flexible and fast queries with less code.
+The primary database that we use to store transactions and blocks is Rocksdb. When we load the Rocksdb databases, we read all of the key-value pairs and load them into an in-memory cache that is designed for making fast in-memory reads and pagination queries. The downside of this is that this design limits us from making complex queries. Namely, we make a pagination query that is sent from or received by a public key, but not strictly one or the other. Additionally, the indexes for the current design is limited to the keys of the database. This enables us to answer queries about which transactions are in an block but not the other way around (i.e. for a given transaction, which blocks have the transaction). We can put this auxiliary information that tells us which blocks contain a certain transaction in the value of the transaction database. However, this results in verbose code and extra invariants to take care, leading to potential bugs. Relational databases are good at taking care of these type of details. Relational databases can give us more indexes and they can grant us more flexible and fast queries with less code.
+
+We would also want to decouple the database logic from the daemon code. This can give users the ability to optionally run their own databases. This would be helpful to run a slim version of Coda and could allow a user to easily use a distributed cloud database to store data for their archive node.
 
 This RFC will also formally define some APIs that a client would make (in the form of GraphQL queries) as some of them were loosely defined in the past. This would give us more robustness for this RFC's design and less reason to refactor the architecture in the long run.
 
 # Detailed Design
 
-The first section will talk about the requirements and basic primitives that a client should be able to do when interacting with the protocol. This will make a good segway for explaining the proposed design. This will entail the schema of the SQL schemas, the data flow of the client storage and the sample client queries. The last section will discuss consistency issues that could occur with this design.
+The first section will talk about the requirements and basic primitives that a client should be able to do when interacting with the protocol. This will make a good segway for explaining the proposed design. This will entail the schema of the databases, the data flow of the client storage and how clients can query information from the daemon and the client storage systems via GraphQL. The last section will discuss consistency issues that could occur with this design.
 
 <a href="requirements"></a>
 
@@ -54,7 +58,6 @@ module Blockchain_state = struct
     snarked_ledger_hash: string;
     time_stamp: Date.t
   }
-
 end
 
 module Consensus_state = struct
@@ -72,7 +75,6 @@ module Protocol_state = struct
     ledger_proof_nonce: Int64.t; (* Need to implement #3083 *)
   }
 end
-
 
 module Block = struct
   type t = {
@@ -97,14 +99,23 @@ type consensus_status =
 
 Notice that `PENDING` in `consensus_status` is the number of block confirmations for a block. This position has nothing to do with a block being snarked or not, so `Snarked` is not a constructor of this variant.
 
-With the blocks and `consensus_status`, we can compute the status of a transaction. We will denote the status of a transaction as the type `transaction_status`. `transaction_status` is very similar to `consensus_status` with the additional variant of a transaction being `Scheduled`. Below is the variant of the type:
+With the blocks and `consensus_status`, we can compute the status of a transaction. The status of a transaction also depends on it's membership in the transaction pool. The membership of a transaction is described below:
+
+```ocaml
+type transaction_pool_membership =
+  | Unkown
+  | Added
+  | Dropped
+```
+
+We will denote the status of a transaction as the type `transaction_status`. `transaction_status` is very similar to `consensus_status` with the additional variant of a transaction being `Scheduled`. Below is the variant of the type:
 
 ```ocaml
 type transaction_status =
-  | Failed (* The block has been evicted by the `transaction_pool` but never gotten added to a block OR all of the transitions containing that transaction have the status Failed *)
-  | Confirmed (* One of the transitions containing the transaction is confirmed *)
-  | Pending of int (* The transaction is in the `transition_frontier` and all of transitions are in the pending state. The block confirmation number of this transaction is minimum of all block confirmation number of all the transitions *)
-  | Scheduled (* Is in the `transaction_pool` and not in the `transition_frontier`. *)
+  | Failed (* The transaction has been dropped by the `transaction_pool` but never gotten added to a block OR all of the transitions containing that transaction have the status Failed *)
+  | Confirmed (* One of the blocks containing the transaction is confirmed *)
+  | Pending of int (* The transaction is in the `transition_frontier` and all of transitions are in the pending state. The block confirmation number of this transaction is maximum of all block confirmation number of all the transitions *)
+  | Scheduled (* Transaction is added into the `transaction_pool` and has not left the pool. It's also not in the `transition_frontier`. *)
   | Unknown
 ```
 
@@ -124,7 +135,7 @@ end
 
 We also have the `receipt_chain_hash` object and is used to prove a `user_command` has been executed in a block. It does this by forming a Merkle list of `user_command`s from some `proving_receipt` to a `resulting_receipt`. The hash essentially represents a concise footprint of the sequence of user commands that have been executed since genesis to a certain point in time. The `resulting_receipt` is typically the `receipt_chain_hash` of a user's account on the ledger of some block. More info about `receipt_chain_hash` can be found on this [RFC](rfcs/0006-receipt-chain-proving.md) and this [OCaml file](../src/lib/receipt_chain_database_lib/intf.ml).
 
-With each transaction in a block, we should be able to know it’s corresponding produced `receipt_chain_hash`. We need this to help show the clients the receipt_chain_hashes of their transactions so they can prove it any time later.
+With each transaction in a block, we should be able to know it’s corresponding produced `receipt_chain_hash`. We need this to help show the clients the `receipt_chain_hash`es of their transactions so they can prove it any time later.
 
 Below is an OCaml API of involving `receipt_chain_hash` type:
 
@@ -168,19 +179,13 @@ val block_compare = lexicographic [
 ]
 ```
 
-Additionally, we can sort transactions by the minimum `block_compare` of the blocks that they appear in. Typically, a client would expect to receive a transaction at the chain that honest peers are building. This honest chain should have a small `block_compare` to other blocks. If the transactions do not appear in an block, they will not appear in the sorting.
+Additionally, we can order transactions by the minimum `block_compare` of the blocks that they appear in. Typically, a client would expect to receive a transaction at the chain that honest peers are building. This honest chain should have a small `block_compare` to other blocks. If the transactions do not appear in an block, they will not appear in the sorting.
 
 A drawback with sorting blocks and transaction based on the time that they are first seen is that if the client wants to store an arbitrary transaction and block, then they would not have the extra burden of tagging these objects with a timestamp for pagination. `block_compare` alleviates this issue.
 
 ## SQL Database
 
-The relational databases that we should use should be agnostic. There are different use cases for using a light database, such as SQLite, and heavier database, such as Postgres. Postgres should be used when we have an archive node or a block explorer trying to make efficient writes to store everything that it hears from the network. It also supports built-in subscriptions that would be convient for clients to listen to.
-
-We would use SQLite when a user is downloading a wallet for the first time and only stores information about their wallets and their friends. SQLite would also be good to use if we are running a light version of Coda and they would only want to store a small amount of data. The downside of using SQLite is that subscriptions are not offered. To circumvent this issue, we can use a polling system that gets data in a short amount of time (about 5 seconds). We can also create a wrapper process that enables clients to write subscriptions on mutations in SQLite.
-
-If a client wants to upgrade the database from SQLite to Postgres, then a migration tool would support this.
-
-A client can also use AWS Appsync if they want to store their data in a distributed manner for multiple devices or if they want to store their data in the code.
+This architecture supports many SQL databases and it can even exclude a database entirely to make the architecture modular. When it is included, there are different use cases for using a light database, such as SQLite, and heavier database, such as Postgres. Postgres or even a distributed cloud database, such as AppSync, should be used when we have an archive node or a block explorer trying to make efficient writes to store everything that it hears from the network. These databases also support built-in subscriptions that would be convinient for clients to listen to.
 
 For the objects discussed in the previous section, we can embed them as tables in one global SQL database. Below are the schemas of the tables:
 
@@ -197,7 +202,7 @@ Table block {
   block_length int [not null]
 }
 
-  // Consensus_status is an ADT, but with a small amount of state spaces, it can be coerced into an integer to make it easy to store it in a database. Here are the following states:
+  // Consensus_status is an ADT, but with it's small state spaces, it can be coerced into an integer to make it easy to store it in a database. Here are the following states:
   // - pending : The block is still in the transition frontier. Value[0, (k-1)]
   // - confirmed : The block has reached finality by passing the root. Value=-1
   // - failure: The block got removed from the transition frontier. Value=-2
@@ -253,15 +258,15 @@ Table block_to_transactions {
   // Rows are uniquely identified by `state_hash` and `transaction_id`
 }
 
-Table block_to_snark_job {
-  state_hash string [ref: > block.state_hash]
-  work_id int64 [ref: > snark_job.work_id]
-}
-
 Table snark_job {
   prover int
   fee int
-  work_id int64 // the list of work_ids are coerced to a single int64 work_id because the list will hold at most two jobs
+  work_id int66 // the list of work_ids are coerced to a single int64 work_id because the list will hold at most two jobs.
+}
+
+Table block_to_snark_job {
+  state_hash string [ref: > block.state_hash]
+  work_id int64 [ref: > snark_job.work_id]
 }
 
 Table receipt_chain_hashes {
@@ -310,19 +315,22 @@ Below is a diagram of how the components in this RFC will depend on each other:
 
 ### Archive Process
 
-To offload many database writes that has to be conducted by the daemon, we are going to delegate the writes to another process, which will be called an Archive Process. Whenever the `transition_frontier` and the `transaction_pool` makes an update, they will send the diff representing the update to the process. The diffs of the `transition_frontier` that the archive process will receive will be similar to `Transition_frontier` extension diffs. Currently, these diffs contain breadcrumbs and we cannot serialize breadcrumbs, so the diffs that clients will be receiving will be the following:
+To offload many database writes that has to be conducted by the daemon, we are going to delegate the writes to another process, which will be called the Archive Process. This means that some production versions of Coda, such as Codaslim, would not have the binary of this Archive Process. Whenever the `transition_frontier` and the `transaction_pool` makes an update, they will send the diff representing the update to the process. The archive process will receive the diffs from the daemon through GraphQL subscriptions. The diffs of the `transition_frontier` that the archive process will receive would be similar to `Transition_frontier` extension diffs. Currently, these diffs contain breadcrumbs and we cannot serialize breadcrumbs, so the diffs that clients will be receiving will be the following:
 
 ```ocaml
 module Transition_frontier_diff = struct
   type t =
     | Breadcrumb_added of {block:  (block, State_hash.t) With_hash.t; sender_receipt_chains_from_parent_ledger: Receipt_chain_hash.t Public_key.Compressed.Map.t}
     | Root_transitioned: of {new_: state_hash; garbage: state_hash.t list}
+    | Bootstrap of {lost_blocks : state_hash list}
 end
 ```
 
 `Breadcrumb_added` has the field `sender_receipt_chains_from_parent_ledger` because we will use the previous `receipt_chain_hashes` from senders involved in sending a `user_command` in the new added breadcrumb to compute the `receipt_chain_hashes` of the transactions that appear in the breadcrumb. More of this will be discussed later.
 
-The `transaction_pool` diffs will essentially list the transactions that got added and removed from the `transaction_pool` after an operation has been done onto it
+Whenever a node is bootstrapping, it will produce a diff containing the `state_hash` of all the blocks it has. These blocks would be lost and their consensus state in the database would be labeled as UNKNOWN.
+
+The `transaction_pool` diffs will essentially have a set of transactions that got added and removed from the `transaction_pool` after an operation has been done onto it
 
 ```ocaml
 module Transaction_pool_diff = struct
@@ -332,11 +340,29 @@ end
 
 Whenever the daemon produces a new `Transition_frontier_diff`, it will batch the transactions into the buffer, `transition_frontier_diff_pipe`. The buffer will have a max size. Once the size of the buffer exceeds the max size, it will flush the diffs to the archive process. To make sure that the archive process applies the diff with a low amount of latency, the buffer will flush the diffs in a short interval (like every 5 seconds). There will be a similar buffering process for the `transaction_pool`. The `transaction_pool` diffs can be seen as a monoid and it would be trivial to concate them into one diff. This would send less memory to the archive process and ultimately reduce the amount of writes that have to hit to the databases.
 
-It is worthy to note that whenever the archive process makes a write to the databases using deffers. The archive process will write the diffs it receives in a sequential manner and will not context switch to another task. This prevent any weird consistency issues.
+It is worthy to note that whenever the archive process makes a write to the databases using deffereds. The archive process will write the diffs it receives in a sequential manner and will not context switch to another task. This will prevent any consistency issues.
 
-The archive process will then filter transactions in the `Transaction_pool_diff` and `Transition_frontier.Breadcrumb_added` based on what a client is interested in following. It will also compute the ids of each of these transactions, which are hashes.
+The archive process will then filter transactions in the `Transaction_pool_diff` and `Transition_frontier.Breadcrumb_added` based on what a client is interested in following. A client would have the flexibility to filter transactions in `Transaction_pool_diff` and `Transition_frontier.Breadcrumb_added` based on the senders and receivers that they are interested in following. The client also has the ability to filter snark jobs in blocks. The client can further filter proposers of a block.  The archive process will have this filter rule in memory as the following type:
 
-Below is psuedocode for persisting a transaction when the archive process receives a `Transaction_pool_diff`:
+```ocaml
+(* Simple way to get an existential type for GADTs *)
+type filter_block_transaction_option =
+  E : (`filter_blocks Truth.t * `filter_transactions Truth.t)
+
+type filter_block_snark_option =
+  E : (`filter_blocks Truth.t * `filter_snarks Truth.t)
+
+type filter = {
+  senders: filter_block_transaction_option Public_key.Compressed.Hashtbl.t;
+  receivers: filter_block_transaction_option Public_key.Compressed.Hashtbl.t;
+  creators: Public_key.Compressed.t list
+  snark_provers: filter_block_snark_option Public_key.Compressed.Hashtbl.t;
+}
+```
+
+It will also compute the ids of each of these transactions, which are hashes.
+
+Below is psuedocode for persisting a transaction when the archive process receives a `Transaction_pool_diff` after it gets filtered:
 
 ```ocaml
 let write_transaction_with_no_commit sql txn ?time_first_seen_in_block ?transaction_pool_mem_status external_transition_opt =
@@ -365,8 +391,8 @@ let write_transaction_with_no_commit sql txn ?time_first_seen_in_block ?transact
   
   )
 
-let write_transaction sql txn account_before_sending_txn =
-  write_transaction_with_no_commit sql txn account_before_sending_txn None
+let write_transaction ~filter_rules sql txn account_before_sending_txn =
+  write_transaction_with_no_commit ~filter_rules sql txn account_before_sending_txn None
   Sql.commit sql
 ```
 
@@ -413,7 +439,9 @@ We can also use `RPC_parallel` to ensure that the daemon will die if the archive
 
 ### API Process
 
-When a client wants to make a query, it will communicate with another process, the API process. Having the API process would offload many asynchronous tasks that the daemon has to perform since it will mainly make queries to the the database. We are confident that a large bottleneck for performance improvements in Coda would be the number of async tasks. As a result, we cannot afford to make a lot of queries to the dademon process. This means that the tasks be delegated to another process, namely the SQL server.
+When a client wants to make a query, it will communicate with another process, the API process. Having the API process would offload many asynchronous tasks that the daemon has to perform since it will mainly make queries to the database. These queries should support the query language of the database. Therefore, the API process should know about what database it is writing to.
+
+We are confident that a large bottleneck for performance improvements in Coda would be the number of async tasks. As a result, we cannot afford to make a lot of queries to the dademon process. This means that the tasks be delegated to another process, namely the SQL server.
 
 The positive effect of having an API process is that it allows other developers to make modifications to queries without having to change the inner works of the daemon or the archive process. For example,this modification would enable users to query data using RPC serialization or Haxl rather than using GraphQL. This also gives us the opprotunity to use services such as Hasura that converts SQL schemas to Graphql schemas to make writing API commands very concise.
 
@@ -426,6 +454,8 @@ The following section will describe SQL queries to make complicated queries.
 The notion document below discusses the GraphQL commands proposed in this new architecture. It succinctly discusses how it will evolve from the current GraphQL commands. It also discusses which components of the new architecture are involved in making these GraphQL queries. It also shows some sample code on complicated queries such as `transaction_status`. The advantage of this architecutre is that there are no GraphQL queries that depend on both the daemon and the database simultaneously:
 
 https://www.notion.so/codaprotocol/Proposed-Graphql-Commands-57a434c59bf24b649d8df7b10befa2a0
+
+A HTML rendered version of the notion document can be found [here](../docs/res/graphql_diff.html).
 
 ## Consistency Issues
 
@@ -450,3 +480,5 @@ Coinbase also uses MongoDB to store all of the data in a blockchain.
 # Unresolved questions
 
 - How can we extend this design so that a client has multiple devices (i.e. Desktop application, mobile, etc...).
+- What happens if the archive node dies, how would we appropriate deal with the diffs?
+- What happens if the database is full and writes stop? What are the appriopriate actions to do?
