@@ -1,0 +1,9 @@
+(executable
+ (name base58uncheck)
+ (public_name base58uncheck)
+ (package base58uncheck)
+ (libraries core base58 base58_check)
+ (preprocess (pps ppx_jane))
+ (modes native)
+ )
+
