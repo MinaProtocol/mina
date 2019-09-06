@@ -677,7 +677,6 @@ end = struct
     in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
       node ;
-    (* Send one payment *)
     let%bind () = Api.stop testnet node in
     let%bind () = after duration in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
