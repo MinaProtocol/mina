@@ -3,7 +3,7 @@
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
 !!! note
-    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.5-beta`.
+    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.6-beta`.
 
 ## Requirements
 
