@@ -334,7 +334,7 @@ module Data = struct
       ; epoch_and_slot: Epoch_and_slot.t
       ; vrf_result: Random_oracle.Digest.t }
 
-    let global_epoch {epoch_and_slot; _} =
+    let global_slot {epoch_and_slot; _} =
       Global_slot.to_int @@ Global_slot.of_epoch_and_slot epoch_and_slot
 
     let prover_state {stake_proof; _} = stake_proof

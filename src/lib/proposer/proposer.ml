@@ -337,9 +337,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         Protocol_state.hash protocol_state
                       in
                       let delta_transition_chain_proof =
-                        Transition_chain_prover.prove
-                          ~length:(Consensus.Constants.delta - 1)
-                          ~frontier
+                        Delta_transition_chain_prover.prove ~frontier
+                          ~global_slot:
+                            (Consensus.Data.Proposal_data.global_slot
+                               proposal_data)
                           (Protocol_state.hash previous_protocol_state)
                         |> Option.value_exn
                       in
