@@ -1,31 +1,17 @@
 open Core
 open Coda_base
 open Coda_state
+open Coda_transition
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
 
-  module Transition_frontier :
-    Coda_intf.Transition_frontier_intf
-    with type external_transition_validated := External_transition.Validated.t
-     and type mostly_validated_external_transition :=
-                ( [`Time_received] * unit Truth.true_t
-                , [`Proof] * unit Truth.true_t
-                , [`Delta_transition_chain]
-                  * State_hash.t Non_empty_list.t Truth.true_t
-                , [`Frontier_dependencies] * unit Truth.true_t
-                , [`Staged_ledger_diff] * unit Truth.false_t )
-                External_transition.Validation.with_transition
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type staged_ledger := Staged_ledger.t
-     and type verifier := Verifier.t
+  module Transition_frontier : Coda_intf.Transition_frontier_intf
 end
 
 module Make (Inputs : Inputs_intf) :
   Coda_intf.Transition_chain_prover_intf
-  with type transition_frontier := Inputs.Transition_frontier.t
-   and type external_transition := Inputs.External_transition.t = struct
+  with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
   module Merkle_list = Merkle_list_prover.Make (struct

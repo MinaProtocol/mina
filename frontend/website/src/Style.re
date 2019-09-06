@@ -380,8 +380,8 @@ module H4 = {
       color(Colors.greyishBrown),
     ]);
 
-  let wide =
-    style([
+  let (wide, wideStyles) =
+    generateStyles([
       whiteSpace(`nowrap),
       fontSize(`rem(0.75)),
       letterSpacing(`rem(0.125)),

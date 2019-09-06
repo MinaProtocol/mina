@@ -123,7 +123,6 @@ jobs:
                 name: Restore cache - homebrew
                 keys:
                     - homebrew-v6-{{'{{'}} checksum "scripts/macos-setup-brew.sh" {{'}}'}}
-                    - homebrew-v5-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
                     - homebrew-v5-
             - run:
                 name: Install macos dependencies - homebrew - make macos-setup-download

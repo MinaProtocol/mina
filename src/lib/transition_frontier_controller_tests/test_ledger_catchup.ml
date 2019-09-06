@@ -2,6 +2,7 @@ open Core
 open Pipe_lib
 open Async
 open Coda_base
+open Coda_transition
 
 let max_length = 4
 
@@ -31,6 +32,10 @@ end)
 
 let%test_module "Ledger catchup" =
   ( module struct
+    let run_ledger_catchup () =
+      let%map verifier = Verifier.create () in
+      Ledger_catchup.run ~verifier
+
     let assert_catchup_jobs_are_flushed transition_frontier =
       [%test_result: [`Normal | `Catchup]]
         ~message:
@@ -63,8 +68,9 @@ let%test_module "Ledger catchup" =
       in
       Strict_pipe.Writer.write catchup_job_writer
         (parent_hash, [Rose_tree.T (cached_transition, [])]) ;
-      Ledger_catchup.run ~logger ~trust_system ~verifier:() ~network
-        ~frontier:me ~catchup_breadcrumbs_writer ~catchup_job_reader
+      let%bind run = run_ledger_catchup () in
+      run ~logger ~trust_system ~network ~frontier:me
+        ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
       let result_ivar = Ivar.create () in
       (* TODO: expose Strict_pipe.read *)
@@ -281,8 +287,9 @@ let%test_module "Ledger catchup" =
                Envelope.Incoming.wrap ~data:transition
                  ~sender:Envelope.Sender.Local)
           in
-          Ledger_catchup.run ~logger ~trust_system ~verifier:() ~network
-            ~frontier:me ~catchup_breadcrumbs_writer ~catchup_job_reader
+          let%bind run = run_ledger_catchup () in
+          run ~logger ~trust_system ~network ~frontier:me
+            ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
           let%bind () = after (Core.Time.Span.of_sec 1.) in
           Cache_lib.Cached.invalidate_with_failure cached_failing_transition
@@ -361,8 +368,9 @@ let%test_module "Ledger catchup" =
                 (after (Core.Time.Span.of_ms 500.))
                 (fun () -> Strict_pipe.Writer.write catchup_job_writer forest)
           ) ;
-          Ledger_catchup.run ~logger ~trust_system ~verifier:() ~network
-            ~frontier:me ~catchup_breadcrumbs_writer ~catchup_job_reader
+          let%bind run = run_ledger_catchup () in
+          run ~logger ~trust_system ~network ~frontier:me
+            ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
           let missing_breadcrumbs_queue =
             List.map missing_breadcrumbs ~f:(fun breadcrumb ->

@@ -3,6 +3,7 @@ open Core
 open Coda_base
 open Cache_lib
 open Pipe_lib
+open Coda_transition
 
 module Stubs = Stubs.Make (struct
   let max_length = 4
@@ -62,6 +63,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let%map children = Ivar.read result_ivar in
       Rose_tree.T (root, children)
 
+    let create_catchup_scheduler () =
+      let%map verifier = Verifier.create () in
+      Catchup_scheduler.create ~verifier
+
     let%test_unit "after the timeout expires, the missing node still doesn't \
                    show up, so the catchup job is fired" =
       Core.Backtrace.elide := false ;
@@ -80,10 +85,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           print_heartbeat logger |> don't_wait_for ;
           let%bind frontier = setup_random_frontier () in
           let trust_system = Trust_system.null () in
+          let%bind create = create_catchup_scheduler () in
           let scheduler =
-            Catchup_scheduler.create ~logger ~trust_system ~frontier
-              ~verifier:() ~time_controller ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+            create ~logger ~trust_system ~frontier ~time_controller
+              ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
@@ -148,10 +154,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           print_heartbeat logger |> don't_wait_for ;
           let%bind frontier = setup_random_frontier () in
           let trust_system = Trust_system.null () in
+          let%bind create = create_catchup_scheduler () in
           let scheduler =
-            Catchup_scheduler.create ~logger ~verifier:() ~trust_system
-              ~frontier ~time_controller ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+            create ~logger ~trust_system ~frontier ~time_controller
+              ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
@@ -252,10 +259,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let open Deferred.Let_syntax in
           let%bind frontier = setup_random_frontier () in
           let trust_system = Trust_system.null () in
+          let%bind create = create_catchup_scheduler () in
           let scheduler =
-            Catchup_scheduler.create ~logger ~trust_system ~verifier:()
-              ~frontier ~time_controller ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+            create ~logger ~trust_system ~frontier ~time_controller
+              ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
