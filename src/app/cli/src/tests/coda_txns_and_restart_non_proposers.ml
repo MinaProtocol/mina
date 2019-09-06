@@ -27,6 +27,7 @@ let main () =
   (* restart non-proposers *)
   let random_non_proposer () = Random.int 2 + 3 in
   (* catchup *)
+  let%bind () = after (Time.Span.of_sec 30.) in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger
       ~node:(random_non_proposer ())
