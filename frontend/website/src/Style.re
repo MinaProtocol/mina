@@ -429,9 +429,14 @@ module Body = {
     generateStyles([
       Typeface.ibmplexsans,
       color(Colors.saville),
-      fontSize(`rem(1.0)),
-      lineHeight(`rem(1.5)),
+      fontSize(`rem(1.125)),
+      lineHeight(`rem(1.625)),
       fontWeight(`normal),
+      letterSpacing(`rem(0.016)),
+      media(
+        MediaQuery.notMobile,
+        [fontSize(`rem(1.0)), lineHeight(`rem(1.5))],
+      ),
     ]);
 
   let basic_semibold = merge([basic, style([fontWeight(`semiBold)])]);
