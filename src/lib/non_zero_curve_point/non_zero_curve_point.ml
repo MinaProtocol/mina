@@ -173,13 +173,6 @@ module Stable = struct
 
                   let to_binable = compress
                 end)
-
-      let to_yojson (x, y) =
-        Tick.Field.(`List [`String (to_string x); `String (to_string y)])
-
-      let description = "Non zero curve point"
-
-      let version_byte = Base58_check.Version_bytes.non_zero_curve_point
     end
 
     include T
@@ -197,7 +190,16 @@ module Stable = struct
       let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
       bs
 
-    include Codable.Make_base58_check (T)
+    (* We reuse the base58check based yojson (de)serialization from the
+       compressed representation. *)
+    let of_yojson json =
+      let open Result in
+      Compressed.of_yojson json
+      >>= fun compressed ->
+      Result.of_option ~error:"couldn't decompress, curve point invalid"
+        (decompress compressed)
+
+    let to_yojson t = Compressed.to_yojson @@ compress t
   end
 
   module Latest = V1
@@ -213,7 +215,7 @@ module Stable = struct
 end
 
 (* bin_io omitted *)
-type t = Stable.Latest.t [@@deriving sexp, compare, hash]
+type t = Stable.Latest.t [@@deriving compare, hash, sexp, yojson]
 
 (* so we can make sets of public keys *)
 include Comparable.Make_binable (Stable.Latest)
