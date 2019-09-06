@@ -7,17 +7,6 @@ open Pipe_lib
 
 let request_service_name = "CODA_WEB_CLIENT_SERVICE"
 
-module type Intf = sig
-  type t
-
-  val get_lite_chain :
-    (t -> Signature_lib.Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
-    option
-
-  val validated_transitions :
-    t -> External_transition.Validated.t Strict_pipe.Reader.t
-end
-
 module Base58_check = Base58_check.Make (struct
   let description = "CODA_WEB_CLIENT_SERVICE"
 
