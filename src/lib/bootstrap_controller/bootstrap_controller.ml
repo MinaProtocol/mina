@@ -532,6 +532,18 @@ end = struct
             in
             (new_frontier, sorted_filtered_collected_transitins) )
 
+  let run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
+      ~transition_reader ~should_ask_best_tip =
+    let start_time = Core.Time.now () in
+    let%map result =
+      run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
+        ~transition_reader ~should_ask_best_tip
+    in
+    Coda_metrics.(
+      Gauge.set Bootstrap.bootstrap_time_ms
+        Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+    result
+
   module For_tests = struct
     type nonrec t = t
 

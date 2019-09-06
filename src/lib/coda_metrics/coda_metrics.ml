@@ -213,6 +213,14 @@ module Proving_time = struct
   *)
 end
 
+module Bootstrap = struct
+  let subsystem = "Bootstrap"
+
+  let bootstrap_time_ms =
+    let help = "time elapsed while bootstrapping" in
+    Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
+end
+
 (* TODO:
 module Transaction_pool = struct
   let subsystem = "Transaction_pool"
@@ -234,7 +242,9 @@ module Network = struct
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
-  (* TODO: track non gossip RPC messages as well *)
+  let rpc_latency_ms ~name : Gauge.t =
+    let help = "time elapsed while doing rpc calls in ms" in
+    Gauge.v name ~help ~namespace ~subsystem
 end
 
 module Snark_work = struct
