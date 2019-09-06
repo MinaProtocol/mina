@@ -902,7 +902,12 @@ let unsafe_import =
     (let open Command.Let_syntax in
     (* We'll do this entirely without talking to the daemon for now, though in the future this may change *)
     let%map_open privkey_path = Cli_lib.Flag.privkey_read_path
-    and conf_dir = Cli_lib.Flag.conf_dir in
+    and conf_dir = Cli_lib.Flag.conf_dir
+    and password =
+      let open Command.Param in
+      flag "password" ~doc:"NEW Password with which to encrypt the key"
+        (optional string)
+    in
     fun () ->
       let open Deferred.Let_syntax in
       let%bind home = Sys.home_directory () in
@@ -918,8 +923,12 @@ let unsafe_import =
         Secrets.Wallets.load ~logger:(Logger.create ())
           ~disk_location:wallets_disk_location
       in
+      let byte_password =
+        Option.value password ~default:"" |> Bytes.of_string
+      in
+      let wrapped_password = lazy (Deferred.Or_error.return byte_password) in
       (* Either we already are tracking it *)
-      match Secrets.Wallets.find wallets ~needle:pk with
+      match Secrets.Wallets.check_locked wallets ~needle:pk with
       | Some _ ->
           printf
             !"Key already present, no need to import : %s\n"
@@ -928,7 +937,10 @@ let unsafe_import =
           Deferred.unit
       | None ->
           (* Or we import it *)
-          let%map _ = Secrets.Wallets.import_keypair wallets keypair in
+          let%map _ =
+            Secrets.Wallets.import_keypair wallets keypair
+              ~password:wrapped_password
+          in
           printf
             !"Key imported successfully : %s\n"
             (Public_key.Compressed.to_base58_check
