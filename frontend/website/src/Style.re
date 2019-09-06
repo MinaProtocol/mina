@@ -435,7 +435,11 @@ module Body = {
       letterSpacing(`rem(0.016)),
       media(
         MediaQuery.notMobile,
-        [fontSize(`rem(1.0)), lineHeight(`rem(1.5))],
+        [
+          fontSize(`rem(1.0)),
+          lineHeight(`rem(1.5)),
+          letterSpacing(`rem(0.01)),
+        ],
       ),
     ]);
 
