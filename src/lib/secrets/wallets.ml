@@ -3,7 +3,7 @@ open Async
 module Secret_keypair = Keypair
 open Signature_lib
 
-(* type key_info = {filename: string; empty_password: bool} *)
+(** The string is the filename of the secret key file *)
 type locked_key = Locked of string | Unlocked of (string * Keypair.t)
 
 (* A simple cache on top of the fs *)
@@ -44,12 +44,12 @@ let load ~logger ~disk_location : t Deferred.t =
   let%bind keypairs =
     Deferred.List.filter_map files ~f:(fun file ->
         match String.chop_suffix file ~suffix:".pub" with
-        | Some file_base -> (
+        | Some sk_filename -> (
             let%map lines = Reader.file_lines file in
             match lines with
             | public_key :: _ ->
                 decode_public_key public_key file path logger
-                |> Option.map ~f:(fun pk -> (pk, Locked file_base))
+                |> Option.map ~f:(fun pk -> (pk, Locked sk_filename))
             | _ ->
                 None )
         | None ->
