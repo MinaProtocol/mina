@@ -292,8 +292,6 @@ module type Bootstrap_controller_intf = sig
 
   type transition_frontier
 
-  type transition_frontier_persistent_root
-
   type external_transition_with_initial_validation
 
   val run :
@@ -302,6 +300,7 @@ module type Bootstrap_controller_intf = sig
     -> verifier:verifier
     -> network:network
     -> frontier:transition_frontier
+    -> consensus_local_state:Consensus.Data.Local_state.t
     -> transition_reader:( [< `Transition of
                               external_transition_with_initial_validation
                               Envelope.Incoming.t ]
@@ -374,7 +373,7 @@ module type Transition_router_intf = sig
 
   type external_transition
 
-  type external_transition_verified
+  type external_transition_validated
 
   type transition_frontier
 
@@ -390,6 +389,7 @@ module type Transition_router_intf = sig
     -> verifier:verifier
     -> network:network
     -> time_controller:Block_time.Controller.t
+    -> consensus_local_state:Consensus.Data.Local_state.t
     -> frontier_broadcast_pipe:transition_frontier option
                                Pipe_lib.Broadcast_pipe.Reader.t
                                * transition_frontier option
@@ -399,6 +399,6 @@ module type Transition_router_intf = sig
                                  * [`Time_received of Block_time.t] )
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> (external_transition_verified, State_hash.t) With_hash.t
+    -> (external_transition_validated, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 end

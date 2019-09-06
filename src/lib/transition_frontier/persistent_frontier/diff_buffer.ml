@@ -19,7 +19,10 @@ module Make (Inputs : Intf.Inputs_with_worker_intf) = struct
     ; worker: Worker.t
     ; mutable target_hash: Frontier.Hash.t }
 
-  let create ~base_hash ~worker = {diff_array= DynArray.create (); worker; target_hash= base_hash}
+  let create ~base_hash ~worker =
+    { diff_array= DynArray.create ()
+    ; worker
+    ; target_hash= base_hash }
 
   let check_for_overflow t =
     if DynArray.length t.diff_array > Capacity.max then

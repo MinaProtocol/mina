@@ -1,0 +1,10 @@
+- medium term persistence recovery
+  - graceful shutdown including persistence sync flushing and completion
+- long term persistence recover
+  - inverted snarked ledger witness queue tracked by persistent root
+  - steps to recover
+    - recover snarked ledger at persistent frontier root by applying undos from queue
+    - build persistent frontier root staged ledger from persistent frontier root snarked ledger and root data
+    - apply diffs from persistent frontier path to persistent root to newly constructed staged ledger, moving persistent root as you go
+    - persist new staged ledger auxiliary information
+    - load full frontier from persistent frontier

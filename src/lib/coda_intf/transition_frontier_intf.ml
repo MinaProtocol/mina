@@ -330,8 +330,6 @@ module type Transition_frontier_base_intf = sig
 
   type verifier
 
-  type root_ledger
-
   type t [@@deriving eq]
 
   module Breadcrumb :
@@ -412,7 +410,7 @@ module type Transition_frontier_creatable_intf = sig
   val create :
        logger:Logger.t
     -> root_data:root_data
-    -> root_ledger:root_ledger
+    -> root_ledger:Ledger.Db.t
     -> base_hash:Hash.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> t
@@ -437,7 +435,15 @@ module type Transition_frontier_intf = sig
   module Persistent_frontier : sig
     type t
 
-    val create : logger:Logger.t -> directory:string -> t
+    val create : logger:Logger.t -> verifier:verifier -> directory:string -> t
+
+    module Instance : sig
+      type t
+
+      val reset : t -> root_data:root_data -> unit
+    end
+
+    val with_instance_exn : t -> f:(Instance.t -> 'a) -> 'a
   end
 
   type config =

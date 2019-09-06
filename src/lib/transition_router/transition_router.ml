@@ -23,6 +23,8 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
      and type verifier := Verifier.t
+     and type 'a transaction_snark_work_statement_table :=
+       'a Transaction_snark_work.Statement.Table.t
 
   module Transition_frontier_controller :
     Coda_intf.Transition_frontier_controller_intf
@@ -95,6 +97,7 @@ module Make (Inputs : Inputs_intf) = struct
   let peek_exn p = Broadcast_pipe.Reader.peek p |> Option.value_exn
 
   let run ~logger ~trust_system ~verifier ~network ~time_controller
+      ~consensus_local_state
       ~frontier_broadcast_pipe:(frontier_r, frontier_w)
       ~network_transition_reader ~proposer_transition_reader =
     let start_transition_frontier_controller ~verified_transition_writer
@@ -138,6 +141,7 @@ module Make (Inputs : Inputs_intf) = struct
       upon
         (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
            ~frontier:old_frontier
+           ~consensus_local_state
            ~transition_reader:bootstrap_controller_reader)
         (fun (new_frontier, collected_transitions) ->
           Strict_pipe.Writer.kill bootstrap_controller_writer ;

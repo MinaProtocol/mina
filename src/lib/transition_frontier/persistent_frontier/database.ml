@@ -1,6 +1,15 @@
+open Async_kernel
 open Core
 open Coda_base
 open Coda_state
+
+let rec deferred_list_result_iter ls ~f =
+  let open Deferred.Result.Let_syntax in
+  match ls with
+  | [] -> return ()
+  | h :: t ->
+      let%bind () = f h in
+      deferred_list_result_iter t ~f
 
 (* TODO: should debug assert garbage checks be added? *)
 module Make (Inputs : Inputs.With_base_frontier_intf)
@@ -98,6 +107,47 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
             (module Unit)
             ~to_gadt:(fun _ -> Frontier_hash)
             ~of_gadt:(fun Frontier_hash -> ())
+  end
+
+  module Error = struct
+    type not_found_member =
+      [ `Root
+      | `Best_tip
+      | `Frontier_hash
+      | `Root_transition
+      | `Best_tip_transition
+      | `Parent_transition
+      | `New_root_transition
+      | `Old_root_transition
+      | `Transition of State_hash.t
+      | `Arcs of State_hash.t ]
+
+    type not_found = [ `Not_found of not_found_member ]
+
+    type t = [ not_found | `Invalid_version ]
+
+    let not_found_message (`Not_found member) =
+      let member_name, member_id = match member with
+        | `Root -> "root", None
+        | `Best_tip -> "best tip", None
+        | `Frontier_hash -> "frontier hash", None
+        | `Root_transition -> "root transition", None
+        | `Best_tip_transition -> "best tip transition", None
+        | `Parent_transition -> "parent transition", None
+        | `New_root_transition -> "new root transition", None
+        | `Old_root_transition -> "old root transition", None
+        | `Transition hash -> "transition", Some hash
+        | `Arcs hash -> "arcs", Some hash
+      in
+      let additional_context =
+        Option.map member_id ~f:(fun id -> Printf.sprintf " (hash = %s)" (State_hash.to_bytes id))
+        |> Option.value ~default:""
+      in
+      Printf.sprintf "%s not found%s" member_name additional_context
+
+    let message = function
+      | `Invalid_version -> "invalid version"
+      | `Not_found _ as err -> not_found_message err
   end
 
   module Rocks = Rocksdb.Serializable.GADT.Make (Schema)
@@ -206,6 +256,12 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
         Batch.remove batch ~key:(Arcs node_hash))) ;
     old_root.hash
 
+  let get_transition t hash =
+    get t.db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
+
+  let get_arcs t hash =
+    get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
+
   let get_root t =
     get t.db ~key:Root ~error:(`Not_found `Root)
 
@@ -228,4 +284,12 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
   (* TODO: bundle together with other writes using batch? *)
   let set_frontier_hash t hash =
     set t.db ~key:Frontier_hash ~data:hash
+
+  let rec crawl_successors t hash ~init ~f =
+    let open Deferred.Result.Let_syntax in
+    let%bind successors = Deferred.return (get_arcs t hash) in
+    deferred_list_result_iter successors ~f:(fun succ_hash ->
+      let%bind transition = Deferred.return (get_transition t succ_hash) in
+      let%bind init' = Deferred.map (f init transition) ~f:(Result.map_error ~f:(fun err -> `Crawl_error err)) in
+      crawl_successors t succ_hash ~init:init' ~f)
 end

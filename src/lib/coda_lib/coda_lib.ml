@@ -402,6 +402,7 @@ module Make (Inputs : Intf.Inputs) = struct
               Transition_router.run ~logger:config.logger
                 ~trust_system:config.trust_system ~verifier:config.verifier
                 ~network:net ~time_controller:config.time_controller
+                ~consensus_local_state:config.consensus_local_state
                 ~frontier_broadcast_pipe:
                   (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
                 ~network_transition_reader:

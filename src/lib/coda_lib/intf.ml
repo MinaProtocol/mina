@@ -115,6 +115,8 @@ module type Inputs = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
      and type verifier := Verifier.t
+     and type 'a transaction_snark_work_statement_table :=
+       'a Transaction_snark_work.Statement.Table.t
 
   module Transaction_pool :
     Transaction_pool
@@ -143,7 +145,7 @@ module type Inputs = sig
   module Transition_router :
     Coda_intf.Transition_router_intf
     with type external_transition := External_transition.t
-     and type external_transition_verified := External_transition.Validated.t
+     and type external_transition_validated := External_transition.Validated.t
      and type transition_frontier := Transition_frontier.t
      and type transition_frontier_persistent_root := Transition_frontier.Persistent_root.t
      and type network := Net.t

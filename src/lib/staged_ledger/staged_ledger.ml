@@ -730,7 +730,7 @@ struct
 
   (* N.B.: we don't expose apply_diff_unverified
      in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
-  let apply_diff ~logger ~verifier t (sl_diff : Staged_ledger_diff.t) =
+  let apply_diff ~logger ~verifier ?(inplace = false) t (sl_diff : Staged_ledger_diff.t) =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2
@@ -752,8 +752,12 @@ struct
           (Error
              (Staged_ledger_error.Bad_prev_hash (curr_hash, sl_diff.prev_hash)))
     in
-    let new_mask = Inputs.Ledger.Mask.create () in
-    let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
+    let new_ledger =
+      if inplace then
+        t.ledger
+      else
+        Inputs.Ledger.register_mask t.ledger (Inputs.Ledger.Mask.create ())
+    in
     let scan_state' = Scan_state.copy t.scan_state in
     let pre_diff_info =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
@@ -816,8 +820,7 @@ struct
 
   let apply t witness ~logger = apply_diff t witness ~logger
 
-  let apply_diff_unchecked t
-      (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
+  let apply_diff_unchecked t (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
     let open Deferred.Or_error.Let_syntax in
     let new_mask = Inputs.Ledger.Mask.create () in
     let transactions, works, coinbases = Pre_diff_info.get_unchecked sl_diff in

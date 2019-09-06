@@ -107,6 +107,8 @@ module type Main_intf = sig
        and type staged_ledger_diff := Staged_ledger_diff.t
        and type staged_ledger := Staged_ledger.t
        and type verifier := Verifier.t
+       and type 'a transaction_snark_work_statement_table :=
+         'a Transaction_snark_work.Statement.Table.t
   end
 
   module Config : sig
@@ -121,8 +123,8 @@ module type Main_intf = sig
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; wallets_disk_location: string
-      ; ledger_db_location: string option
-      ; transition_frontier_location: string option
+      ; persistent_root_location: string
+      ; persistent_frontier_location: string
       ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller: Block_time.Controller.t
       ; receipt_chain_database: Receipt_chain_database.t

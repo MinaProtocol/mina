@@ -7,12 +7,6 @@ open Coda_state
 module Make (Inputs : Inputs.S) : sig
   open Inputs
 
-  module Root_ledger : sig
-    type t
-
-    val reset_to_genesis : t -> unit
-  end
-
   include Coda_intf.Transition_frontier_creatable_intf
     with type mostly_validated_external_transition :=
                 ( [`Time_received] * Truth.true_t
@@ -25,7 +19,8 @@ module Make (Inputs : Inputs.S) : sig
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type verifier := Verifier.t
-     and type root_ledger := Root_ledger.t
+
+  val set_hash_unsafe : t -> [`I_promise_this_is_safe of Hash.t] -> unit
 
   val hash : t -> Hash.t
 
@@ -38,8 +33,6 @@ end = struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
 
   let max_length = max_length
-
-  module Root_ledger = Root_ledger.Make (Inputs)
 
   module Breadcrumb = Breadcrumb.Make (Inputs)
 
@@ -95,7 +88,7 @@ end = struct
 
   (* Invariant: The path from the root to the tip inclusively, will be max_length *)
   type t =
-    { root_ledger: Root_ledger.t
+    { root_ledger: Ledger.Db.t
     ; mutable root: State_hash.t
     ; mutable best_tip: State_hash.t
     ; mutable hash: Hash.t
@@ -117,7 +110,7 @@ end = struct
     in
     assert (
       Frozen_ledger_hash.equal
-        (Root_ledger.merkle_root root_ledger)
+        (Frozen_ledger_hash.of_ledger_hash (Ledger.Db.merkle_root root_ledger))
         root_blockchain_state_ledger_hash) ;
     let root_breadcrumb = Breadcrumb.create root_data.transition root_data.staged_ledger in
     let root_node =
@@ -133,6 +126,8 @@ end = struct
     ; consensus_local_state }
 
   let consensus_local_state {consensus_local_state; _} = consensus_local_state
+
+  let set_hash_unsafe t (`I_promise_this_is_safe hash) = t.hash <- hash
 
   let hash t = t.hash
 
@@ -215,7 +210,7 @@ end = struct
   let root t = find_exn t t.root
 
   let shallow_copy_root_snarked_ledger {root_ledger; _} =
-    Ledger.of_database (Root_ledger.to_ledger_db root_ledger)
+    Ledger.of_database root_ledger
 
   let best_tip_path_length_exn {table; root; best_tip; _} =
     let open Option.Let_syntax in

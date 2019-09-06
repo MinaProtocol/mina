@@ -14,6 +14,8 @@ module type S = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
      and type verifier := Verifier.t
+     and type 'a transaction_snark_work_statement_table :=
+       'a Transaction_snark_work.Statement.Table.t
 
   module Unprocessed_transition_cache :
     Coda_intf.Unprocessed_transition_cache_intf

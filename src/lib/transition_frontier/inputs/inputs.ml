@@ -33,13 +33,7 @@ module type With_base_frontier_intf = sig
   include Coda_intf.Inputs_intf
 
   module Frontier : sig
-    module Root_ledger : sig
-      type t
-
-      val reset_to_genesis : t -> unit
-    end
-
-    include Coda_intf.Transition_frontier_base_intf
+    include Coda_intf.Transition_frontier_creatable_intf
       with type mostly_validated_external_transition :=
                   ( [`Time_received] * Truth.true_t
                   , [`Proof] * Truth.true_t
@@ -51,6 +45,11 @@ module type With_base_frontier_intf = sig
        and type staged_ledger := Staged_ledger.t
        and type staged_ledger_diff := Staged_ledger_diff.t
        and type verifier := Verifier.t
-       and type root_ledger := Root_ledger.t
+
+    val set_hash_unsafe : t -> [`I_promise_this_is_safe of Hash.t] -> unit
+
+    val hash : t -> Hash.t
+
+    val apply_diffs : t -> Diff.Full.E.t list -> unit
   end
 end

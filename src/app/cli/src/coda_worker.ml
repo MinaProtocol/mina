@@ -447,6 +447,8 @@ module T = struct
                  ~transaction_pool_disk_location:
                    (conf_dir ^/ "transaction_pool")
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                 ~persistent_root_location:(conf_dir ^/ "root")
+                 ~persistent_frontier_location:(conf_dir ^/ "frontier")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)

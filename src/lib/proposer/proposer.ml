@@ -24,6 +24,8 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type verifier := Verifier.t
+     and type 'a transaction_snark_work_statement_table :=
+       'a Transaction_snark_work.Statement.Table.t
 
   module Transaction_pool :
     Coda_lib.Intf.Transaction_pool_read

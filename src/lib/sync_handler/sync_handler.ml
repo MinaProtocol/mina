@@ -18,6 +18,8 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
      and type verifier := Verifier.t
+     and type 'a transaction_snark_work_statement_table :=
+       'a Transaction_snark_work.Statement.Table.t
 end
 
 module Make (Inputs : Inputs_intf) :

@@ -20,6 +20,8 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
      and type verifier := Verifier.t
+     and type 'a transaction_snark_work_statement_table :=
+       'a Transaction_snark_work.Statement.Table.t
 
   module Root_sync_ledger :
     Syncable_ledger.S
@@ -61,7 +63,6 @@ module Make (Inputs : Inputs_intf) : sig
     with type network := Network.t
      and type verifier := Verifier.t
      and type transition_frontier := Transition_frontier.t
-     and type transition_frontier_persistent_root := Transition_frontier.Persistent_root.t
      and type external_transition_with_initial_validation :=
                 External_transition.with_initial_validation
 
@@ -244,13 +245,13 @@ end = struct
         else Deferred.unit )
 
   let run ~logger ~trust_system ~verifier ~network ~frontier ~consensus_local_state
-      ~initial_root_transition ~transition_reader =
+      ~transition_reader =
     let initial_breadcrumb = Transition_frontier.root frontier in
     let persistent_root = Transition_frontier.persistent_root frontier in
     let persistent_frontier = Transition_frontier.persistent_frontier frontier in
     let initial_root_transition =
       External_transition.Validation.lower
-        initial_root_transition
+        (Transition_frontier.Breadcrumb.transition_with_hash initial_breadcrumb)
         ( (`Time_received, Truth.True)
         , (`Proof, Truth.True)
         , (`Frontier_dependencies, Truth.False)
@@ -265,10 +266,11 @@ end = struct
       ; current_root= initial_root_transition }
     in
     let transition_graph = Transition_cache.create () in
-    let ledger_db = Transition_frontier.root_snarked_ledger frontier in
+    let snarked_ledger = Transition_frontier.root_snarked_ledger frontier in
+    (* Synchonize the root ledger of the old transition frontier *)
     let%bind (hash, sender, expected_staged_ledger_hash) =
       let root_sync_ledger =
-        Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
+        Root_sync_ledger.create snarked_ledger ~logger:t.logger ~trust_system
       in
       sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
       |> don't_wait_for ;
@@ -281,9 +283,8 @@ end = struct
       Root_sync_ledger.destroy root_sync_ledger ;
       root_data
     in
-    assert (
-      Ledger.Db.(
-        Ledger_hash.equal (merkle_root ledger_db) (merkle_root synced_db)) ) ;
+    (* Retrieve staged ledger scan state and reconstruct the new root
+     * staged ledger *)
     match%bind
       let open Deferred.Or_error.Let_syntax in
       let%bind scan_state, expected_merkle_root, pending_coinbases =
@@ -304,7 +305,7 @@ end = struct
       in
       Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
         ~verifier ~scan_state
-        ~snarked_ledger:(Ledger.of_database synced_db)
+        ~snarked_ledger:(Ledger.of_database snarked_ledger)
         ~expected_merkle_root ~pending_coinbases
     with
     | Error err ->
@@ -319,7 +320,7 @@ end = struct
                     , [] ) ))
         in
         Error.raise err
-    | Ok root_staged_ledger ->
+    | Ok new_root_staged_ledger ->
         let%bind () =
           Trust_system.(
             record t.trust_system t.logger sender
@@ -340,16 +341,17 @@ end = struct
           |> External_transition.Validated.protocol_state
           |> Protocol_state.consensus_state
         in
+        (* Synchronize consensus local state if necessary. *)
         let%bind () =
           match
             Consensus.Hooks.required_local_state_sync ~consensus_state
-              ~local_state
+              ~local_state:consensus_local_state
           with
           | None ->
               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "local_state"
-                    , Consensus.Data.Local_state.to_yojson local_state )
+                    , Consensus.Data.Local_state.to_yojson consensus_local_state )
                   ; ( "consensus_state"
                     , Consensus.Data.Consensus_state.Value.to_yojson
                         consensus_state ) ]
@@ -359,7 +361,7 @@ end = struct
               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                 "Synchronizing consensus local state" ;
               match%map
-                Consensus.Hooks.sync_local_state ~local_state ~logger
+                Consensus.Hooks.sync_local_state ~local_state:consensus_local_state ~logger
                   ~trust_system
                   ~random_peers:(Network.random_peers t.network)
                   ~query_peer:
@@ -373,20 +375,23 @@ end = struct
               | Error e ->
                   Error.raise e )
         in
-        (* [new] TODO: does the persistent_root need to be updated with the new
-         * synced_db object? Should be the same reference, no? *)
-        let persistent_root =
-          Transition_frontier.Persistent_root.create
-            ~logger:t.logger
-            ~directory:persistent_frontier_directory
+        (* Close the old frontier and reload a new on from disk. *)
+        let new_root_data =
+          { Transition_frontier.transition= new_root
+          ; staged_ledger= new_root_staged_ledger }
         in
+        Transition_frontier.close frontier;
+        Transition_frontier.Persistent_frontier.(
+          with_instance_exn
+            (Transition_frontier.persistent_frontier frontier)
+            ~f:(Instance.reset ~root_data:new_root_data));
         let%map new_frontier =
-          Transition_frontier.(create
-            { logger= t.logger
+          Transition_frontier.load
+            { Transition_frontier.logger= t.logger
             ; verifier
-            ; consensus_local_state= local_state }
+            ; consensus_local_state }
             ~persistent_root
-            ~persistent_frontier )
+            ~persistent_frontier
 					>>| Fn.(compose Or_error.ok_exn (Result.map_error ~f:(const @@ Error.of_string "failed to initialize transition frontier after bootstrapping")))
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__

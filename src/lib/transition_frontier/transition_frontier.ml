@@ -34,8 +34,6 @@ module Make (Inputs : Inputs.S) :
 
   module Full_frontier = Full_frontier.Make (Inputs)
 
-  type root_ledger = Full_frontier.Root_ledger.t
-
   type root_identifier = Full_frontier.root_identifier =
     { state_hash: State_hash.t
     ; frontier_hash: Full_frontier.Hash.t }
@@ -48,7 +46,6 @@ module Make (Inputs : Inputs.S) :
   module Breadcrumb = Full_frontier.Breadcrumb
   module Diff = Full_frontier.Diff
   module Hash = Full_frontier.Hash
-  module Root_ledger = Full_frontier.Root_ledger
 
   module Inputs_with_full_frontier = struct
     include Inputs
@@ -70,25 +67,35 @@ module Make (Inputs : Inputs.S) :
     ; persistent_root: Persistent_root.t
     ; persistent_root_instance: Persistent_root.Instance.t
     ; persistent_frontier: Persistent_frontier.t
+    (* [new] TODO: !important -- this instance should only be owned by the sync process, as once the sync worker is an RPC worker, only that process can have an open connection the the database *)
     ; persistent_frontier_instance: Persistent_frontier.Instance.t
     ; persistent_frontier_sync: Persistent_frontier.Sync.t
     ; extensions: Extensions.t }
 
   (* TODO: re-add `Bootstrap_required support or redo signature *)
   let load config ~persistent_root:persistent_root_factory ~persistent_frontier:persistent_frontier_factory =
+    let open Deferred.Result.Let_syntax in
     (* TODO: #3053 *)
     (* let persistent_root = Persistent_root.create ~logger:config.logger ~directory:config.persistent_root_directory in *)
     let persistent_root = Persistent_root.create_instance_exn persistent_root_factory in
     let persistent_frontier = Persistent_frontier.create_instance_exn persistent_frontier_factory in
     let root_identifier = Persistent_root.Instance.load_root_identifier persistent_root in
-    ignore (
-      Persistent_frontier.Instance.fast_forward persistent_frontier root_identifier
-      |> Or_error.iter_error ~f:(fun err ->
-          Logger.fatal config.logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:[("target_root", Full_frontier.root_identifier_to_yojson root_identifier)]
-            "Unable to fast forward persistent frontier: %s"
-            (Error.to_string_hum err)));
-    Persistent_frontier.Instance.load_full_frontier persistent_frontier persistent_root ~consensus_local_state:config.consensus_local_state
+    let%bind () =
+      Deferred.return (
+        Persistent_frontier.Instance.fast_forward persistent_frontier root_identifier
+        |> Result.map_error ~f:(function
+          | `Bootstrap_required -> `Bootstrap_required
+          | `Failure msg ->
+              Logger.fatal config.logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("target_root", Full_frontier.root_identifier_to_yojson root_identifier)]
+                "Unable to fast forward persistent frontier: %s"
+                msg;
+              `Failure msg))
+    in
+    Persistent_frontier.Instance.load_full_frontier persistent_frontier
+      ~root_ledger:(Persistent_root.Instance.snarked_ledger persistent_root)
+      ~consensus_local_state:config.consensus_local_state
+
 
   (* [new] TODO *)
   let close {full_frontier=_TODO_1; persistent_root=_TODO_2; persistent_root_instance=_TODO_3; persistent_frontier=_TODO_4; persistent_frontier_instance=_TODO_5; persistent_frontier_sync=_TODO_6; extensions} =
@@ -299,8 +306,9 @@ module Make (Inputs : Inputs.S) :
   let best_tip_diff_pipe t =
     Extensions.Broadcast.Best_tip_diff.reader t.extensions.best_tip_diff
 
-  let wait_for_transition = failwith "TODO"
-  let shallow_copy_root_snarked_ledger = failwith "TODO"
+  let wait_for_transition t hash =
+    let open Extensions.Broadcast.Transition_registry in
+    Extensions.Transition_registry.register t.extensions.t.transition_registry
 
   let max_length = max_length
   let logger {full_frontier; _} = Full_frontier.logger full_frontier
@@ -325,6 +333,7 @@ module Make (Inputs : Inputs.S) :
   let common_ancestor {full_frontier; _} a b = Full_frontier.common_ancestor full_frontier a b
   let visualize ~filename {full_frontier; _} = Full_frontier.visualize ~filename full_frontier
   let visualize_to_string {full_frontier; _} = Full_frontier.visualize_to_string full_frontier
+  let shallow_copy_root_snarked_ledger {full_frontier; _} = Full_frontier.shallow_copy_root_snarked_ledger full_frontier
 
   (* [new] TODO: move root history specific functions somewhere else? *)
   let path_search t state_hash ~find ~f =

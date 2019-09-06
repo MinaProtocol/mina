@@ -1,0 +1,14 @@
+- audit persistent root state management (updates, resets)
++ hook up transition registry
+* add unit tests back in
+- diff buffer flush on interval
+- invert broadcastable extensions functor (include functor in definition, don't pass definition to functor)
+- transition frontier graceful shutdown
+- create reusable pattern for singleton factories
+- singleton factory instance reuse after destruction prevention
+- improved error handling in persistent frontier instance entrypoints
+- improved persistent frontier database batched requests
+- convert persistent frontier sync into an extension?
+- extensions full diffs
+- extensions refactor (multiple files)
+- dynamic extensions? (probably just open an issue for this)

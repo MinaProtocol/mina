@@ -340,7 +340,6 @@ let daemon logger =
        let trust_dir = conf_dir ^/ "trust" in
        let () = Snark_params.set_chunked_hashing true in
        let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-       let transition_frontier_location = conf_dir ^/ "transition_frontier" in
        let trust_system = Trust_system.create ~db_dir:trust_dir in
        trace_database_initialization "trust_system" __LOC__ trust_dir ;
        let time_controller =
@@ -403,9 +402,10 @@ let daemon logger =
               ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
               ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
               ~wallets_disk_location:(conf_dir ^/ "wallets")
-              ~ledger_db_location:(conf_dir ^/ "ledger_db")
+              ~persistent_root_location:(conf_dir ^/ "root")
+              ~persistent_frontier_location:(conf_dir ^/ "frontier")
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-              ~transition_frontier_location ~time_controller
+              ~time_controller
               ~initial_propose_keypairs ~monitor ~consensus_local_state
               ~transaction_database ~external_transition_database ())
        in
