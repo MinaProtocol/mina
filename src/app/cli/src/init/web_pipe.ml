@@ -15,9 +15,7 @@ module type Intf = sig
     option
 
   val validated_transitions :
-       t
-    -> (External_transition.Validated.t, State_hash.t) With_hash.t
-       Strict_pipe.Reader.t
+    t -> External_transition.Validated.t Strict_pipe.Reader.t
 end
 
 module Base58_check = Base58_check.Make (struct

@@ -202,6 +202,22 @@ module Validation = struct
     , (`Frontier_dependencies, Truth.False)
     , (`Staged_ledger_diff, Truth.False) )
 
+  type initial_valid =
+    ( [`Time_received] * unit Truth.true_t
+    , [`Proof] * unit Truth.true_t
+    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+    , [`Frontier_dependencies] * unit Truth.false_t
+    , [`Staged_ledger_diff] * unit Truth.false_t )
+    t
+
+  type almost_valid =
+    ( [`Time_received] * unit Truth.true_t
+    , [`Proof] * unit Truth.true_t
+    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+    , [`Frontier_dependencies] * unit Truth.true_t
+    , [`Staged_ledger_diff] * unit Truth.false_t )
+    t
+
   let wrap t = (t, fully_invalid)
 
   let extract_delta_transition_chain_witness = function
@@ -387,14 +403,6 @@ module Validation = struct
   end
 end
 
-type with_initial_validation =
-  ( [`Time_received] * unit Truth.true_t
-  , [`Proof] * unit Truth.true_t
-  , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
-  , [`Frontier_dependencies] * unit Truth.false_t
-  , [`Staged_ledger_diff] * unit Truth.false_t )
-  Validation.with_transition
-
 let skip_time_received_validation `This_transition_was_not_received_via_gossip
     (t, validation) =
   (t, Validation.Unsafe.set_valid_time_received validation)
@@ -459,6 +467,44 @@ let skip_frontier_dependencies_validation
 
 let skip_staged_ledger_diff_validation `This_is_unsafe (t, validation) =
   (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
+
+module With_validation = struct
+  let state_hash (t, _) = With_hash.hash t
+
+  let lift f (t, _) = With_hash.data t |> f
+
+  let protocol_state t = lift protocol_state t
+
+  let protocol_state_proof t = lift protocol_state_proof t
+
+  let blockchain_state t = lift blockchain_state t
+
+  let staged_ledger_diff t = lift staged_ledger_diff t
+
+  let consensus_state t = lift consensus_state t
+
+  let parent_hash t = lift parent_hash t
+
+  let proposer t = lift proposer t
+
+  let user_commands t = lift user_commands t
+
+  let payments t = lift payments t
+end
+
+module Initial_validated = struct
+  type t =
+    (external_transition, State_hash.t) With_hash.t * Validation.initial_valid
+
+  include With_validation
+end
+
+module Almost_validated = struct
+  type t =
+    (external_transition, State_hash.t) With_hash.t * Validation.almost_valid
+
+  include With_validation
+end
 
 module Validated = struct
   module Stable = struct
@@ -532,18 +578,6 @@ module Validated = struct
           With_hash.to_yojson to_yojson State_hash.to_yojson
             transition_with_hash
 
-        let lift f (t, _) = With_hash.data t |> f
-
-        let protocol_state = lift protocol_state
-
-        let protocol_state_proof = lift protocol_state_proof
-
-        let blockchain_state = lift blockchain_state
-
-        let staged_ledger_diff = lift staged_ledger_diff
-
-        let consensus_state = lift consensus_state
-
         let create_unsafe t =
           `I_swear_this_is_safe_see_my_comment
             ( Validation.wrap (With_hash.of_data t ~hash_data:state_hash)
@@ -556,15 +590,7 @@ module Validated = struct
                  `This_transition_belongs_to_a_detached_subtree
             |> skip_staged_ledger_diff_validation `This_is_unsafe )
 
-        let state_hash (t, _) = With_hash.hash t
-
-        let parent_hash = lift parent_hash
-
-        let proposer = lift proposer
-
-        let user_commands = lift user_commands
-
-        let payments = lift payments
+        include With_validation
       end
 
       include T
