@@ -11,6 +11,9 @@ val import_keypair :
   -> password:Secret_file.password
   -> Public_key.Compressed.t Deferred.t
 
+val import_keypair_terminal_stdin :
+  t -> Keypair.t -> Public_key.Compressed.t Deferred.t
+
 val generate_new :
   t -> password:Secret_file.password -> Public_key.Compressed.t Deferred.t
 

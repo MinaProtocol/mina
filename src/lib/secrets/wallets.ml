@@ -65,17 +65,23 @@ let load ~logger ~disk_location : t Deferred.t =
   in
   {cache; path}
 
-(** Generates a new private key file for the given keypair
-  * If no password is provided, an empty one is used *)
-let import_keypair t keypair ~password : Public_key.Compressed.t Deferred.t =
+let import_keypair_helper t keypair write_keypair =
   let compressed_pk = Public_key.compress keypair.Keypair.public_key in
   let privkey_path = get_path t compressed_pk in
-  let%bind () = Secret_keypair.write_exn keypair ~privkey_path ~password in
+  let%bind () = write_keypair privkey_path in
   let%map () = Unix.chmod privkey_path ~perm:0o600 in
   let pk = Public_key.compress keypair.public_key in
   Public_key.Compressed.Table.add_exn t.cache ~key:pk
     ~data:(Unlocked (get_privkey_filename compressed_pk, keypair)) ;
   pk
+
+let import_keypair t keypair ~password =
+  import_keypair_helper t keypair (fun privkey_path ->
+      Secret_keypair.write_exn keypair ~privkey_path ~password )
+
+let import_keypair_terminal_stdin t keypair =
+  import_keypair_helper t keypair (fun privkey_path ->
+      Secret_keypair.Terminal_stdin.write_exn keypair ~privkey_path )
 
 (** Generates a new private key file and a keypair *)
 let generate_new t ~password : Public_key.Compressed.t Deferred.t =
