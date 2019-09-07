@@ -2,6 +2,16 @@ open Discord;
 
 let client = Client.createClient();
 
+{
+  // Unlock all the keys
+
+  open Constants;
+  Coda.unlock(~publicKey=faucetKey, ~password=faucetPassword);
+  Coda.unlockOpt(~publicKey=echoKey, ~password=echoKey);
+  Coda.unlockOpt(~publicKey=echoKey2, ~password=echoKey2);
+  Coda.unlockOpt(~publicKey=repeaterKey, ~password=repeaterPassword);
+};
+
 let handleMessageHelper = msg =>
   switch (Array.to_list(Js.String.split(" ", Message.content(msg)))) {
   | ["$tiny"] => Message.reply(msg, Messages.greeting)

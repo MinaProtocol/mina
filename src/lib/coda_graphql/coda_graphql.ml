@@ -1212,7 +1212,7 @@ module Mutations = struct
         Result.return pk )
 
   let unlock_wallet =
-    io_field "unlock"
+    io_field "unlockWallet"
       ~doc:"Allow transactions to be sent from the unlocked account"
       ~typ:(non_null Types.Payload.unlock_wallet)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.unlock_wallet)]
@@ -1232,7 +1232,7 @@ module Mutations = struct
             Ok pk )
 
   let lock_wallet =
-    field "lock"
+    field "lockWallet"
       ~doc:"Lock an unlocked account to prevent transaction being sent from it"
       ~typ:
         (non_null Types.Payload.lock_wallet)
@@ -1428,6 +1428,8 @@ module Mutations = struct
 
   let commands =
     [ add_wallet
+    ; unlock_wallet
+    ; lock_wallet
     ; delete_wallet
     ; send_payment
     ; send_delegation
