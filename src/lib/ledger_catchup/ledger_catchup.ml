@@ -356,7 +356,7 @@ module Make (Inputs : Inputs.S) :
                   closed pipe" ;
                garbage_collect_subtrees ~logger ~subtrees:trees_of_breadcrumbs ;
                Coda_metrics.(
-                 Gauge.set Catchup.catchup_time_ms
+                 Gauge.set Transition_frontier_controller.catchup_time_ms
                    Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                Transition_frontier.decr_num_catchup_jobs frontier )
              else
@@ -365,7 +365,7 @@ module Make (Inputs : Inputs.S) :
                  (trees_of_breadcrumbs, `Ledger_catchup ivar) ;
                let%bind () = Ivar.read ivar in
                Coda_metrics.(
-                 Gauge.set Catchup.catchup_time_ms
+                 Gauge.set Transition_frontier_controller.catchup_time_ms
                    Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                Transition_frontier.decr_num_catchup_jobs frontier
          | Error e ->
@@ -376,7 +376,7 @@ module Make (Inputs : Inputs.S) :
                 data received. See error for details: $error" ;
              garbage_collect_subtrees ~logger ~subtrees ;
              Coda_metrics.(
-               Gauge.set Catchup.catchup_time_ms
+               Gauge.set Transition_frontier_controller.catchup_time_ms
                  Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
              Transition_frontier.decr_num_catchup_jobs frontier)
         |> don't_wait_for )

@@ -221,14 +221,6 @@ module Bootstrap = struct
     Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
 end
 
-module Catchup = struct
-  let subsystem = "Catchup"
-
-  let catchup_time_ms =
-    let help = "time elapsed while doing catchup" in
-    Gauge.v "catchup_time_ms" ~help ~namespace ~subsystem
-end
-
 (* TODO:
 module Transaction_pool = struct
   let subsystem = "Transaction_pool"
@@ -411,13 +403,18 @@ module Transition_frontier_controller = struct
     in
     Gauge.v "transitions_being_processed" ~help ~namespace ~subsystem
 
-  (* TODO:
   let transitions_in_catchup_scheduler =
-    Counter.v_label "transitions_in_catchup_scheduler" ~namespace ~subsystem
+    let help = "transitions stored inside catchup scheduler" in
+    Gauge.v "transitions_in_catchup_scheduler" ~help ~namespace ~subsystem
 
+  (*
   let transitions_downloaded_from_catchup =
     Counter.v_label "transitions_downloaded_from_catchup" ~namespace ~subsystem
   *)
+
+  let catchup_time_ms =
+    let help = "time elapsed while doing catchup" in
+    Gauge.v "catchup_time_ms" ~help ~namespace ~subsystem
 
   let breadcrumbs_built_by_processor : Counter.t =
     let help = "breadcrumbs built by the processor" in
