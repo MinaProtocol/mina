@@ -14,6 +14,24 @@ this module/the helper, and not misuse.
 Some errors can arise from calling certain functions before [configure] has been
 called. In general, anything that returns an [Or_error] can fail in this manner.
 
+A [Coda_net2.t] has the following lifecycle:
+
+- Fresh: the result of [Coda_net2.create]. This spawns the helper process but
+  does not connect to any network. Few operations can be done on fresh nets,
+  only [Keypair.random] for now.
+
+- Configured: after calling [Coda_net2.configure]. Configure creates the libp2p
+  objects and can start listening on network sockets. This doesn't join any DHT
+  or attempt peer connections. Configured networks can do everything but any
+  pubsub messages may have very limited reach without being in the DHT.
+
+- Active: after calling [Coda_net2.begin_advertising]. This joins the DHT,
+  announcing our existence to our peers and initiating local mDNS discovery.
+
+- Closed: after calling [Coda_net2.shutdown]. This flushes all the pending RPC
+
+TODO: consider encoding the network state in the types.
+
 A note about connection limits:
 
 In the original coda_net, connection limits were enforced synchronously on
@@ -46,7 +64,7 @@ module Keypair : sig
   val to_string : t -> string
 
   (** Undo [to_string t].
-  
+
     Only fails if the string has the wrong format, not if the embedded
     keypair data is corrupt. *)
   val of_string : string -> t Core.Or_error.t
@@ -271,7 +289,7 @@ val listening_addrs : net -> Multiaddr.t list Deferred.Or_error.t
   This can fail if the connection fails. *)
 val add_peer : net -> Multiaddr.t -> unit Deferred.Or_error.t
 
-(** Announce our existence on the DHT.
+(** Join the DHT and announce our existence.
 
   Call this after using [add_peer] to add any bootstrap peers. *)
 val begin_advertising : net -> unit Deferred.Or_error.t

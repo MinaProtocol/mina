@@ -603,12 +603,13 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   | None ->
                       Keypair.random net2
                 in
+                let peerid = Keypair.to_peerid me |> PeerID.to_string in
                 Logger.info config.logger
                   "libp2p peer ID this session is $peer_id" ~location:__LOC__
                   ~module_:__MODULE__
                   ~metadata:
                     [ ( "peer_id"
-                      , `String (Keypair.to_peerid me |> PeerID.to_string) ) ] ;
+                      , `String peerid ) ] ;
                 let disc_proto = "coda/0.0.1/discovery-port" in
                 let on_new_peer peerid =
                   (let%bind stream =
@@ -638,9 +639,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                     handle_protocol net2 ~on_handler_error:`Raise
                       ~protocol:disc_proto (fun stream ->
                         let _, w = Stream.pipes stream in
-                        Pipe.write w
+                        let pushback = Pipe.write w
                           ( Node_addrs_and_ports.to_peer config.addrs_and_ports
-                          |> Peer.to_yojson |> Yojson.Safe.to_string ) )
+                          |> Peer.to_yojson |> Yojson.Safe.to_string ) in Pipe.close w ; pushback )
                   in
                   (* TODO: chain ID as network ID. *)
                   let%map _ =

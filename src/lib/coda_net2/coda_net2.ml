@@ -470,7 +470,7 @@ module Helper = struct
     end
 
     module Discovered_peer = struct
-      type t = {peer_id: string; multiaddrs: string list} [@@deriving yojson]
+      type t = {upcall: string; peer_id: string; multiaddrs: string list} [@@deriving yojson]
     end
 
     let or_error (t : ('a, string) Result.t) =
@@ -1131,9 +1131,6 @@ let create ~logger ~conf_dir =
   | _ ->
       Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
-(* Temporarily commenting out while we figure out how to build libp2p_helper on CI
-       *
-       *
 let%test_module "coda network tests" =
   ( module struct
     let () = Backtrace.elide := false
@@ -1165,10 +1162,14 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~me:kp_a ~maddrs ~network_id ~on_new_peer:None >>| Or_error.ok_exn
-      and () = configure b ~me:kp_b ~maddrs ~network_id ~on_new_peer:None >>| Or_error.ok_exn in
+        configure a ~me:kp_a ~maddrs ~network_id ~on_new_peer:Fn.ignore >>| Or_error.ok_exn
+      and () = configure b ~me:kp_b ~maddrs ~network_id ~on_new_peer:Fn.ignore >>| Or_error.ok_exn in
+      let%bind a_advert = begin_advertising a
+           and b_advert = begin_advertising b in
+      Or_error.ok_exn a_advert ;
+      Or_error.ok_exn b_advert ;
       (* Give the helpers time to announce and discover each other on localhost *)
-      let%map () = after (Time.Span.of_sec 0.5) in
+      let%map () = after (Time.Span.of_sec 1.5) in
       let shutdown () =
         let%bind () = shutdown a in
         let%bind () = shutdown b in
@@ -1250,5 +1251,3 @@ let%test_module "coda network tests" =
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
   end )
-
-  *)

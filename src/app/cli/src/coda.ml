@@ -417,13 +417,9 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "rest-port"
              ~default:Port.default_rest rest_server_port
          in
-         ignore libp2p_port ;
-         (* FIXME HACK: make this configurable when we can pass the port in the CLI *)
          let libp2p_port =
-           (*
            or_from_config YJ.Util.to_int_option "libp2p-port"
-             ~default:Port.default_libp2p libp2p_port *)
-           Port.default_libp2p
+             ~default:Port.default_libp2p libp2p_port
          in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
