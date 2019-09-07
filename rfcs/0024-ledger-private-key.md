@@ -1,7 +1,7 @@
 ## Summary
 [summary]: #summary
 
-Ledger devices don't maintain any state/storage between use, and only give
+Ledger hardware wallets don't maintain any state/storage between use, and only give
 limited access to the seed which is used to derive private keys. This means we
 have to come up with a way to securely construct key pairs using private keys
 corresponding to different cryptographic primitives as our building blocks.
@@ -12,11 +12,10 @@ corresponding to different cryptographic primitives as our building blocks.
 Why are we doing this? What use cases does it support? What is the expected
 outcome?
 
-We need to do this because private keys cannot be stored on the Ledger device
-(the Ledger doesn't
-retain any state except its seed), and the system calls created to derive private keys
-from the seed take a curve ID as a parameter, and our curve isn't included in the list
-of curves with curve IDs and implementations.
+We need to do this because private keys cannot be stored on the Ledger hardware wallet
+(the Ledger hardware wallet doesn't retain any state except its seed), and the system 
+calls created to derive private keys from the seed take a curve ID as a parameter, 
+and our curve isn't included in the list of curves with curve IDs and implementations.
 
 No state/no storage of private keys means that we cannot just generate random
 bytes and use these to construct a private key, as then signing with the Ledger
@@ -39,7 +38,6 @@ Ledger uses:
   shown on the device at startup.
 - BIP 32 for HD key derivation (using the child key derivation function)
 - BIP 44 for HD account derivation (so e.g. btc and coda keys don't clash)
-
 
 The normal flow for generating a keypair is then something like:
 
@@ -73,7 +71,7 @@ cx_ecfp_generate_pair(CX_CURVE_256K1, publicKey, privateKey, 1);
 
 We need to construct functions that replace the normal use of
 `cx_ecfp_init_public_key`, `cx_ecfp_init_private_key`
-and `cx_ecfp_generate_pair` on the Ledger device.
+and `cx_ecfp_generate_pair` on the Ledger hardware wallet.
 
 The opcodes that you can use on the ledger are listed here:
 https://github.com/LedgerHQ/nanos-secure-sdk/blob/master/include/cx.h#L2063
@@ -110,7 +108,7 @@ checking if the resulting number is below the group order.
   - curve25519/friends have set bits and cofactor complications that we don't
     need to think about if we use secp256k1
 - The impact of not doing this would be that we would not be able to sign
-  meaningful transactions on a Ledger device.
+  meaningful transactions on a Ledger hardware wallet.
 
 ## Prior art
 [prior-art]: #prior-art
