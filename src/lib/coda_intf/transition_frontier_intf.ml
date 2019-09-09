@@ -274,13 +274,7 @@ module type Transition_frontier_breadcrumb_intf = sig
     -> verifier:Verifier.t
     -> trust_system:Trust_system.t
     -> parent:t
-    -> transition:( [`Time_received] * unit Truth.true_t
-                  , [`Proof] * unit Truth.true_t
-                  , [`Delta_transition_chain]
-                    * State_hash.t Non_empty_list.t Truth.true_t
-                  , [`Frontier_dependencies] * unit Truth.true_t
-                  , [`Staged_ledger_diff] * unit Truth.false_t )
-                  External_transition.Validation.with_transition
+    -> transition:External_transition.Almost_validated.t
     -> sender:Envelope.Sender.t option
     -> ( t
        , [ `Invalid_staged_ledger_diff of Error.t

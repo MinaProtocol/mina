@@ -26,7 +26,7 @@ module Make (Inputs : Inputs.S) = struct
     ; time_controller: Block_time.Controller.t
     ; catchup_job_writer:
         ( State_hash.t
-          * ( External_transition.with_initial_validation Envelope.Incoming.t
+          * ( External_transition.Initial_validated.t Envelope.Incoming.t
             , State_hash.t )
             Cached.t
             Rose_tree.t
@@ -41,7 +41,7 @@ module Make (Inputs : Inputs.S) = struct
               its corresponding value in the hash table would just be an empty
               list. *)
     ; collected_transitions:
-        ( External_transition.with_initial_validation Envelope.Incoming.t
+        ( External_transition.Initial_validated.t Envelope.Incoming.t
         , State_hash.t )
         Cached.t
         list
@@ -52,7 +52,7 @@ module Make (Inputs : Inputs.S) = struct
     ; parent_root_timeouts: unit Block_time.Timeout.t State_hash.Table.t
     ; breadcrumb_builder_supervisor:
         ( State_hash.t
-        * ( External_transition.with_initial_validation Envelope.Incoming.t
+        * ( External_transition.Initial_validated.t Envelope.Incoming.t
           , State_hash.t )
           Cached.t
           Rose_tree.t
@@ -62,7 +62,7 @@ module Make (Inputs : Inputs.S) = struct
   let create ~logger ~verifier ~trust_system ~frontier ~time_controller
       ~(catchup_job_writer :
          ( State_hash.t
-           * ( External_transition.with_initial_validation Envelope.Incoming.t
+           * ( External_transition.Initial_validated.t Envelope.Incoming.t
              , State_hash.t )
              Cached.t
              Rose_tree.t
