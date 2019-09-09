@@ -59,8 +59,16 @@ module Monadic2 (M : Monad.S2) :
 
   let map : 'a t -> f:('a -> ('b, 'e) M.t) -> ('b t, 'e) M.t =
    fun t ~f ->
-    sequence
-    @@ match t with `One a -> `One (f a) | `Two (a, b) -> `Two (f a, f b)
+    (* We could use sequence here, but this approach saves us computation in the
+       Result and option monads when the first component of a `Two fails. *)
+    match t with
+    | `One a ->
+        M.map ~f:(fun x -> `One x) (f a)
+    | `Two (a, b) ->
+        let open M.Let_syntax in
+        let%bind a' = f a in
+        let%map b' = f b in
+        `Two (a', b')
 
   let fold :
          'a t
