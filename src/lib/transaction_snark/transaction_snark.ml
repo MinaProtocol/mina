@@ -1001,7 +1001,7 @@ module Wrap (Vk : sig
 end) =
 struct
   open Tock
-  module Verifier = Tock.Groth_verifier
+  module Verifier = Tock.Verifier
 
   let merge_vk = Verifier.vk_of_backend_vk Vk.merge
 
