@@ -9,6 +9,8 @@ This section will walk you through the requirements needed to run a Coda protoco
 
 **Software**: macOS or Linux (currently supports Debian 9 and Ubuntu 18.04 LTS)
 
+Note: Windows is not officially supported at this time. However, community members succeeded in setting up nodes using Windows Subsystem for Linux. Click [here](https://forums.codaprotocol.com/t/unofficial-wsl-instructions/26) for instructions on using Windows, which are created by the community.
+
 **Hardware**: Sending and receiving coda does not require any special hardware, but participating as a node operator currently requires:
 
 - at least a 4-core processor
