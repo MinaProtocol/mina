@@ -132,6 +132,7 @@ module Schnorr
           with module Impl := Impl
            and type t = var
            and type unchecked := t
+           and type base_field := Impl.Field.Var.t
 
         val one : t
 
