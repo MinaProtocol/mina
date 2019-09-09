@@ -126,20 +126,22 @@ module Validation = struct
       module T = struct
         type ( 'time_received
              , 'proof
-             , 'delta_transition_chain
+             , 'delta_transition_chain_part1
              , 'frontier_dependencies
-             , 'staged_ledger_diff )
+             , 'staged_ledger_diff
+             , 'delta_transition_chain_part2 )
              t =
           'time_received
           * 'proof
-          * 'delta_transition_chain
+          * 'delta_transition_chain_part1
           * 'frontier_dependencies
           * 'staged_ledger_diff
+          * 'delta_transition_chain_part2
           constraint 'time_received = [`Time_received] * (unit, _) Truth.t
           constraint 'proof = [`Proof] * (unit, _) Truth.t
           constraint
-            'delta_transition_chain =
-            [`Delta_transition_chain]
+            'delta_transition_chain_part1 =
+            [`Delta_transition_chain_part1]
             * (State_hash.t Non_empty_list.t, _) Truth.t
           constraint
             'frontier_dependencies =
@@ -147,6 +149,9 @@ module Validation = struct
           constraint
             'staged_ledger_diff =
             [`Staged_ledger_diff] * (unit, _) Truth.t
+          constraint
+            'delta_transition_chain_part2 =
+            [`Delta_transition_chain_part2] * (unit, _) Truth.t
         [@@deriving version]
       end
 
@@ -158,45 +163,53 @@ module Validation = struct
 
   type ( 'time_received
        , 'proof
-       , 'delta_transition_chain
+       , 'delta_transition_chain_part1
        , 'frontier_dependencies
-       , 'staged_ledger_diff )
+       , 'staged_ledger_diff
+       , 'delta_transition_chain_part2 )
        t =
     ( 'time_received
     , 'proof
-    , 'delta_transition_chain
+    , 'delta_transition_chain_part1
     , 'frontier_dependencies
-    , 'staged_ledger_diff )
+    , 'staged_ledger_diff
+    , 'delta_transition_chain_part2 )
     Stable.Latest.t
 
   type fully_invalid =
     ( [`Time_received] * unit Truth.false_t
     , [`Proof] * unit Truth.false_t
-    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.false_t
+    , [`Delta_transition_chain_part1]
+      * State_hash.t Non_empty_list.t Truth.false_t
     , [`Frontier_dependencies] * unit Truth.false_t
-    , [`Staged_ledger_diff] * unit Truth.false_t )
+    , [`Staged_ledger_diff] * unit Truth.false_t
+    , [`Delta_transition_chain_part2] * unit Truth.false_t )
     t
 
   type fully_valid =
     ( [`Time_received] * unit Truth.true_t
     , [`Proof] * unit Truth.true_t
-    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+    , [`Delta_transition_chain_part1]
+      * State_hash.t Non_empty_list.t Truth.true_t
     , [`Frontier_dependencies] * unit Truth.true_t
-    , [`Staged_ledger_diff] * unit Truth.true_t )
+    , [`Staged_ledger_diff] * unit Truth.true_t
+    , [`Delta_transition_chain_part2] * unit Truth.true_t )
     t
 
   type ( 'time_received
        , 'proof
-       , 'delta_transition_chain
+       , 'delta_transition_chain_part1
        , 'frontier_dependencies
-       , 'staged_ledger_diff )
+       , 'staged_ledger_diff
+       , 'delta_transition_chain_part2 )
        with_transition =
     (external_transition, State_hash.t) With_hash.t
     * ( 'time_received
       , 'proof
-      , 'delta_transition_chain
+      , 'delta_transition_chain_part1
       , 'frontier_dependencies
-      , 'staged_ledger_diff )
+      , 'staged_ledger_diff
+      , 'delta_transition_chain_part2 )
       t
 
   let fully_invalid =
@@ -451,7 +464,7 @@ let validate_proof (t, validation) ~verifier =
   | Error e ->
       Error (`Verifier_error e)
 
-let validate_delta_transition_chain (t, validation) =
+let validate_delta_transition_chain_part1 (t, validation) =
   let transition = With_hash.data t in
   match
     Transition_chain_verifier.verify ~target_hash:(parent_hash transition)

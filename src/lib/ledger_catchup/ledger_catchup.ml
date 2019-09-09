@@ -65,7 +65,7 @@ module Make (Inputs : Inputs.S) :
              `This_transition_was_not_received_via_gossip
         |> External_transition.validate_proof ~verifier
         >>= Fn.compose Deferred.return
-              External_transition.validate_delta_transition_chain
+              External_transition.validate_delta_transition_chain_part1
       in
       let enveloped_initially_validated_transition =
         Envelope.Incoming.map enveloped_transition
