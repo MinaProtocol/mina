@@ -19,7 +19,6 @@ unit_test_profiles = [
 ]
 
 unit_test_profiles_medium_curves = [
-    'test_postake_snarkless_medium_curves_unit_test',
     'dev_medium_curves'
 ]
 
@@ -61,10 +60,7 @@ small_curves_tests = {
 medium_curves_tests = {
     'test_postake_medium_curves': simple_tests,
     'test_postake_snarkless_medium_curves': simple_tests,
-    'test_postake_split_snarkless_medium_curves': integration_tests,
     'test_postake_split_medium_curves': ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
-    'test_postake_delegation_medium_curves': ['coda-delegation-test'],
-    'test_postake_txns_medium_curves': ['coda-shared-state-test', 'coda-batch-payment-test'],
 }
 
 medium_curve_profiles_full = [
