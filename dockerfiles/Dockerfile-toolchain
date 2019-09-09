@@ -17,6 +17,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     pandoc \
     patchelf \
     python \
+    python-pip \
     perl \
     pkg-config \
     python-jinja2 \
@@ -25,6 +26,8 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libbz2-dev
 
 RUN sudo gem install deb-s3
+
+RUN sudo pip install sexpdata
 
 # Google Cloud tools
 RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
