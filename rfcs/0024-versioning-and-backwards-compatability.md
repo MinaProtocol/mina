@@ -142,14 +142,14 @@ end) = struct
   end
 end
 
-module V1_Make = F (A.Stable.V1)
+module V1_Make = Make (A.Stable.V1)
 ```
 
 If the type `A.t` is moved to a new version, and then later the type `B.t` was
 moved to another version, then we would introduce
 
 ```ocaml
-module V2_Make = F (A.Stable.V2)
+module V2_Make = Make (A.Stable.V2)
 ```
 
 and have `V1_Make.B.V1.t`, `V1_Make.B.V2.t`, `V2_Make.B.V1.t`, and
