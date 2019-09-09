@@ -46,8 +46,9 @@ let zip_exn : 'a t -> 'b t -> ('a * 'b) t =
   | _ ->
       failwith "One_or_two.zip_exn mismatched"
 
-module Monadic (M : Monad.S) : Intfs.Monadic with type 'a m := 'a M.t = struct
-  let sequence : 'a M.t t -> 'a t M.t = function
+module Monadic2 (M : Monad.S2) :
+  Intfs.Monadic2 with type ('a, 'e) m := ('a, 'e) M.t = struct
+  let sequence : ('a, 'e) M.t t -> ('a t, 'e) M.t = function
     | `One def ->
         M.map def ~f:(fun x -> `One x)
     | `Two (def1, def2) ->
@@ -56,13 +57,16 @@ module Monadic (M : Monad.S) : Intfs.Monadic with type 'a m := 'a M.t = struct
         let%map b = def2 in
         `Two (a, b)
 
-  let map : 'a t -> f:('a -> 'b M.t) -> 'b t M.t =
+  let map : 'a t -> f:('a -> ('b, 'e) M.t) -> ('b t, 'e) M.t =
    fun t ~f ->
     sequence
     @@ match t with `One a -> `One (f a) | `Two (a, b) -> `Two (f a, f b)
 
   let fold :
-      'a t -> init:'accum -> f:('accum -> 'a -> 'accum M.t) -> 'accum M.t =
+         'a t
+      -> init:'accum
+      -> f:('accum -> 'a -> ('accum, 'e) M.t)
+      -> ('accum, 'e) M.t =
    fun t ~init ~f ->
     match t with
     | `One a ->
@@ -71,6 +75,10 @@ module Monadic (M : Monad.S) : Intfs.Monadic with type 'a m := 'a M.t = struct
         M.bind (f init a) ~f:(fun x -> f x b)
 end
 
+module Monadic (M : Monad.S) : Intfs.Monadic with type 'a m := 'a M.t =
+  Monadic2 (Base__.Monad_intf.S_to_S2 (M))
+
+module Deferred_result = Monadic2 (Deferred.Result)
 module Ident = Monadic (Monad.Ident)
 module Deferred = Monadic (Deferred)
 module Option = Monadic (Option)

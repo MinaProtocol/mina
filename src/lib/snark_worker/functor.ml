@@ -32,30 +32,27 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let perform (s : Worker_state.t) public_key
       ({instances; fee} as spec : Work.Spec.t) =
-    List.fold_until instances ~init:([], [])
-      ~f:(fun (acc1, acc2) w ->
-        match
+    One_or_two.Or_error.map instances ~f:(fun w ->
+        let open Or_error.Let_syntax in
+        let%map proof, time =
           perform_single s
             ~message:(Coda_base.Sok_message.create ~fee ~prover:public_key)
             w
-        with
-        | Ok (res, time) ->
-            let tag =
-              match w with
-              | Snark_work_lib.Work.Single.Spec.Transition _ ->
-                  `Transition
-              | Merge _ ->
-                  `Merge
-            in
-            Continue (res :: acc1, (time, tag) :: acc2)
-        | Error e ->
-            Stop (Error e) )
-      ~finish:(fun (res, metrics) ->
-        Ok
-          { Snark_work_lib.Work.Result.proofs= List.rev res
-          ; metrics= List.rev metrics
-          ; spec
-          ; prover= public_key } )
+        in
+        ( proof
+        , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
+        ) )
+    |> Or_error.map ~f:(function
+         | `One (proof1, metrics1) ->
+             { Snark_work_lib.Work.Result.proofs= `One proof1
+             ; metrics= `One metrics1
+             ; spec
+             ; prover= public_key }
+         | `Two ((proof1, metrics1), (proof2, metrics2)) ->
+             { Snark_work_lib.Work.Result.proofs= `Two (proof1, proof2)
+             ; metrics= `Two (metrics1, metrics2)
+             ; spec
+             ; prover= public_key } )
 
   let dispatch rpc shutdown_on_disconnect query address =
     let%map res =
@@ -79,7 +76,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         res
 
   let emit_proof_metrics metrics logger =
-    List.iter metrics ~f:(fun (total, tag) ->
+    One_or_two.iter metrics ~f:(fun (total, tag) ->
         match tag with
         | `Merge ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
