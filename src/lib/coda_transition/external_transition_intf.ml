@@ -26,6 +26,8 @@ module type External_transition_common_intf = sig
   val user_commands : t -> User_command.t list
 
   val payments : t -> User_command.t list
+
+  val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
 end
 
 module type External_transition_base_intf = sig

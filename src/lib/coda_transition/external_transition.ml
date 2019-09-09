@@ -26,6 +26,9 @@ module Stable = struct
           ; ("staged_ledger_diff", `String "<opaque>")
           ; ("delta_transition_chain_proof", `String "<opaque>") ]
 
+      let delta_transition_chain_proof {delta_transition_chain_proof; _} =
+        delta_transition_chain_proof
+
       let consensus_state {protocol_state; _} =
         Protocol_state.consensus_state protocol_state
 
@@ -94,6 +97,7 @@ type external_transition = t
 Stable.Latest.
   ( protocol_state
   , protocol_state_proof
+  , delta_transition_chain_proof
   , blockchain_state
   , staged_ledger_diff
   , consensus_state
@@ -490,6 +494,8 @@ module With_validation = struct
   let user_commands t = lift user_commands t
 
   let payments t = lift payments t
+
+  let delta_transition_chain_proof t = lift delta_transition_chain_proof t
 end
 
 module Initial_validated = struct
@@ -618,6 +624,7 @@ module Validated = struct
     , t_of_sexp
     , create_unsafe
     , protocol_state
+    , delta_transition_chain_proof
     , protocol_state_proof
     , blockchain_state
     , staged_ledger_diff
