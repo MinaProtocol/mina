@@ -39,7 +39,7 @@ let write_exn {Keypair.private_key; public_key} ~(privkey_path : string)
       Writer.write_line pubkey_f pubkey_string ;
       Writer.close pubkey_f
   | Error e ->
-      error_raise e ~error_ctx:(sprintf !"Could not write to %s" privkey_path)
+      Privkey_error.raise e
 
 (** Reads a private key from [privkey_path] using [Secret_file] *)
 let read ~(privkey_path : string) ~(password : Secret_file.password) :
@@ -52,13 +52,13 @@ let read ~(privkey_path : string) ~(password : Secret_file.password) :
        try
          return (pk_bytes |> Bigstring.of_bytes |> Private_key.of_bigstring_exn)
        with exn ->
-         Privkey_error.curropted_privkey
+         Privkey_error.corrupted_privkey
            (Error.createf "Error parsing decrypted private key file: %s"
               (Exn.to_string exn))
      in
      try return (Keypair.of_private_key_exn sk)
      with exn ->
-       Privkey_error.curropted_privkey
+       Privkey_error.corrupted_privkey
          (Error.createf
             "Error computing public key from private, is your keyfile \
              corrupt? %s"

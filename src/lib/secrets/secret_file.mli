@@ -32,4 +32,4 @@ val write :
   -> mkdir:bool
   -> password:password
   -> plaintext:Bytes.t
-  -> unit Deferred.Or_error.t
+  -> (unit, Privkey_error.t) Deferred.Result.t

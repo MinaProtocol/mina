@@ -690,10 +690,7 @@ let wrap_key =
     let%bind privkey =
       Secrets.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
     in
-    let pk =
-      Private_key.of_base58_check_exn
-        (privkey |> Or_error.ok_exn |> Bytes.to_string)
-    in
+    let pk = Private_key.of_base58_check_exn (Bytes.to_string privkey) in
     let kp = Keypair.of_private_key_exn pk in
     Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path)
 

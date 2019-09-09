@@ -3,30 +3,35 @@ open Async
 
 type password = Bytes.t Async.Deferred.t Lazy.t
 
-let handle_open ~mkdir ~(f : string -> 'a Deferred.Or_error.t) path :
-    'a Deferred.Or_error.t =
+let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
   let open Unix.Error in
-  let open Deferred.Or_error.Let_syntax in
+  let open Deferred.Result.Let_syntax in
   let dn = Filename.dirname path in
   let%bind parent_exists =
     let open Deferred.Let_syntax in
     match%bind
       Monitor.try_with ~extract_exn:true (fun () ->
           let%bind stat = Unix.stat dn in
+          Deferred.return
+          @@
           if stat.kind <> `Directory then
-            Deferred.Or_error.errorf
-              "%s exists and it not a directory, can't store files there" dn
-          else Deferred.Or_error.return true )
+            Privkey_error.corrupted_privkey
+              (Error.createf
+                 "%s exists and it is not a directory, can't store files there"
+                 dn)
+          else Ok true )
     with
     | Ok x ->
         return x
     | Error (Unix.Unix_error (ENOENT, _, _)) ->
-        Deferred.Or_error.return false
+        Deferred.Result.return false
     | Error (Unix.Unix_error (e, _, _)) ->
-        Deferred.Or_error.errorf "could not stat %s: %s, not making keys\n" dn
-          (message e)
+        Deferred.return @@ Privkey_error.corrupted_privkey
+        @@ Error.createf
+             !"could not stat %s: %s, not making keys\n"
+             dn (message e)
     | Error e ->
-        Deferred.Or_error.of_exn e
+        Deferred.return @@ Privkey_error.corrupted_privkey (Error.of_exn e)
   in
   let%bind () =
     let open Deferred.Let_syntax in
@@ -35,39 +40,39 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.Or_error.t) path :
           if (not parent_exists) && mkdir then
             let%bind () = Unix.mkdir ~p:() dn in
             let%bind () = Unix.chmod dn ~perm:0o700 in
-            Deferred.Or_error.ok_unit
+            Deferred.Result.return ()
           else if not parent_exists then
-            Deferred.Or_error.errorf
-              "%s does not exist\nHint: mkdir -p %s; chmod 700 %s\n" dn dn dn
-          else Deferred.Or_error.ok_unit )
+            Deferred.return
+              (Error (Privkey_error.Parent_directory_does_not_exist dn))
+          else Deferred.Result.return () )
     with
     | Ok x ->
-        return x
+        Deferred.return x
     | Error (Unix.Unix_error ((EACCES as e), _, _)) ->
-        Deferred.Or_error.errorf "could not mkdir -p %s: %s\n" dn (message e)
+        Deferred.return @@ Privkey_error.corrupted_privkey
+        @@ Error.createf !"could not mkdir -p %s: %s\n" dn (message e)
     | Error e ->
         raise e
   in
+  let open Deferred.Let_syntax in
   match%bind
     Deferred.Or_error.try_with ~extract_exn:true (fun () -> f path)
   with
   | Ok x ->
-      Deferred.Or_error.return x
+      Deferred.Result.return x
   | Error e -> (
     match Error.to_exn e with
-    | Unix.Unix_error (e, _, _) ->
-        Deferred.Or_error.errorf "could not open %s: %s\n" path (message e)
+    | Unix.Unix_error (_, _, _) ->
+        Deferred.return (Error (Privkey_error.Cannot_open_file path))
     | e ->
-        Deferred.Or_error.of_exn e )
+        Deferred.return @@ Privkey_error.corrupted_privkey (Error.of_exn e) )
 
 let lift (t : 'a Deferred.t) : ('a, 'b) Deferred.Result.t = t >>| fun x -> Ok x
 
-let lift1 f x = lift (f x)
-
 let write ~path ~mkdir ~(password : Bytes.t Deferred.t Lazy.t) ~plaintext =
-  let open Deferred.Or_error.Let_syntax in
+  let open Deferred.Result.Let_syntax in
   let%bind privkey_f =
-    handle_open ~mkdir ~f:(fun path -> lift (Writer.open_file path)) path
+    handle_open ~mkdir ~f:(fun path -> Writer.open_file path) path
   in
   let%bind password = lift @@ Lazy.force password in
   let sb = Secret_box.encrypt ~plaintext ~password in
@@ -87,13 +92,8 @@ let read ~path ~(password : Bytes.t Deferred.t Lazy.t) =
     lift (Pipe.to_list (Reader.lines r))
     >>| fun ss -> String.concat ~sep:"\n" ss
   in
-  let%bind privkey_file =
-    to_corrupt_privkey
-    @@ handle_open ~mkdir:false ~f:(lift1 Reader.open_file) path
-  in
-  let%bind st =
-    to_corrupt_privkey @@ handle_open ~mkdir:false ~f:(lift1 Unix.stat) path
-  in
+  let%bind privkey_file = handle_open ~mkdir:false ~f:Reader.open_file path in
+  let%bind st = handle_open ~mkdir:false ~f:Unix.stat path in
   let file_error =
     if st.perm land 0o077 <> 0 then
       Some
@@ -104,9 +104,7 @@ let read ~path ~(password : Bytes.t Deferred.t Lazy.t) =
     else None
   in
   let dn = Filename.dirname path in
-  let%bind st =
-    to_corrupt_privkey @@ handle_open ~mkdir:false ~f:(lift1 Unix.stat) dn
-  in
+  let%bind st = handle_open ~mkdir:false ~f:Unix.stat dn in
   let dir_error =
     if st.perm land 0o777 <> 0o700 then
       Some
@@ -132,7 +130,7 @@ let read ~path ~(password : Bytes.t Deferred.t Lazy.t) =
         return sb
     | Error e ->
         Deferred.return
-          (Privkey_error.curropted_privkey
+          (Privkey_error.corrupted_privkey
              (Error.createf "couldn't parse %s: %s" path e))
   in
   let%bind password = lift (Lazy.force password) in

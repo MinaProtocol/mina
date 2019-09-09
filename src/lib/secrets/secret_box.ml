@@ -97,10 +97,10 @@ let decrypt ~(password : Bytes.t)
     ; pwdiff= mem_limit, ops_limit
     ; ciphertext } =
   if box_primitive <> Secret_box.primitive then
-    Privkey_error.curropted_privkey
+    Privkey_error.corrupted_privkey
       (Error.createf !"don't know how to handle a %s secret_box" box_primitive)
   else if pw_primitive <> Password_hash.primitive then
-    Privkey_error.curropted_privkey
+    Privkey_error.corrupted_privkey
       (Error.createf
          !"don't know how to handle a %s password_hash"
          pw_primitive)

@@ -7,7 +7,7 @@ open Signature_lib
 type t = {cache: Keypair.t Public_key.Compressed.Table.t; path: string}
 
 (* TODO: Don't just generate bad passwords *)
-let password = lazy (Deferred.Or_error.return (Bytes.of_string ""))
+let password = lazy (Deferred.return (Bytes.of_string ""))
 
 let get_path {path; _} public_key =
   let pubkey_str =
@@ -39,7 +39,7 @@ let load ~logger ~disk_location : t Deferred.t =
                 ~metadata:
                   [ ("file", `String file)
                   ; ("path", `String path)
-                  ; ("error", `String (Error.to_string_hum e)) ] ;
+                  ; ("error", `String (Privkey_error.to_string e)) ] ;
               None )
   in
   let%map () = Unix.chmod path ~perm:0o700 in
