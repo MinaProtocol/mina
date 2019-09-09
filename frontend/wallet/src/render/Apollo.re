@@ -9,7 +9,7 @@ external createRetryLink: retryOptions => ReasonApolloTypes.apolloLink =
 let client = {
   let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
 
-  let uri = "http://localhost:49370/graphql";
+  let uri = "http://localhost:3085/graphql";
   let codaLink =
     ApolloLinks.createHttpLink(~uri, ~fetch=Bindings.Fetch.fetch, ());
 
