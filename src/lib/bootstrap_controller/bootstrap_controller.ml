@@ -433,100 +433,122 @@ end = struct
                 ( Fulfilled_request
                 , Some ("Received valid scan state from peer", []) ))
         in
-        let new_root =
+        match
           t.current_root
           |> External_transition.skip_frontier_dependencies_validation
                `This_transition_belongs_to_a_detached_subtree
-          |> External_transition.skip_staged_ledger_diff_validation
-               `This_is_unsafe
-        in
-        let consensus_state =
-          new_root |> External_transition.Validated.consensus_state
-        in
-        let local_state = Transition_frontier.consensus_local_state frontier in
-        match%bind
-          match
-            Consensus.Hooks.required_local_state_sync ~consensus_state
-              ~local_state
-          with
-          | None ->
-              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:
-                  [ ( "local_state"
-                    , Consensus.Data.Local_state.to_yojson local_state )
-                  ; ( "consensus_state"
-                    , Consensus.Data.Consensus_state.Value.to_yojson
-                        consensus_state ) ]
-                "Not synchronizing consensus local state" ;
-              Deferred.return @@ Ok ()
-          | Some sync_jobs ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Synchronizing consensus local state" ;
-              Consensus.Hooks.sync_local_state ~local_state ~logger
-                ~trust_system
-                ~random_peers:(fun n ->
-                  List.append
-                    (Network.peers_by_ip t.network sender)
-                    (Network.random_peers t.network n) )
-                ~query_peer:
-                  { Network_peer.query=
-                      (fun peer f query ->
-                        Network.query_peer t.network peer f query ) }
-                sync_jobs
+          |> External_transition.validate_staged_ledger_hash
+               (`Staged_ledger_already_materialized
+                 (Staged_ledger.hash root_staged_ledger))
         with
-        | Error e ->
+        | Error `Staged_ledger_hash_mismatch ->
             Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:[("error", `String (Error.to_string_hum e))]
-              "Local state sync failed: $error. Retry bootstrap" ;
+              ~metadata:
+                [ ( "downloaded_staged_ledger_hash"
+                  , Staged_ledger_hash.to_yojson
+                    @@ Staged_ledger.hash root_staged_ledger )
+                ; ( "expected_staged_ledger_hash"
+                  , Staged_ledger_hash.to_yojson
+                    @@ Blockchain_state.staged_ledger_hash
+                    @@ External_transition.blockchain_state
+                         (With_hash.data (fst t.current_root)) ) ]
+              "Downloaded staged_ledger doesn't match with the root external \
+               transition. Retry bootstrap" ;
             Writer.close sync_ledger_writer ;
             run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
               ~transition_reader ~should_ask_best_tip
-        | Ok () ->
-            let%map new_frontier =
-              Transition_frontier.create ~logger ~root_transition:new_root
-                ~root_snarked_ledger:synced_db ~root_staged_ledger
-                ~consensus_local_state:local_state
+        | Ok new_root -> (
+            let consensus_state =
+              new_root |> External_transition.Validated.consensus_state
             in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              "Bootstrap state: complete." ;
-            let collected_transitions =
-              Transition_cache.data transition_graph
+            let local_state =
+              Transition_frontier.consensus_local_state frontier
             in
-            let logger =
-              Logger.extend logger
-                [ ( "context"
-                  , `String "Filter collected transitions in bootstrap" ) ]
-            in
-            let root_consensus_state =
-              Transition_frontier.(
-                Breadcrumb.consensus_state (root new_frontier))
-            in
-            let filtered_collected_transitions =
-              List.filter collected_transitions ~f:(fun incoming_transition ->
-                  let With_hash.{data= transition; _}, _ =
-                    Envelope.Incoming.data incoming_transition
-                  in
-                  `Take
-                  = Consensus.Hooks.select ~existing:root_consensus_state
-                      ~candidate:
-                        (External_transition.consensus_state transition)
-                      ~logger )
-            in
-            Logger.debug logger
-              "Sorting filtered transitions by consensus state" ~metadata:[]
-              ~location:__LOC__ ~module_:__MODULE__ ;
-            let sorted_filtered_collected_transitins =
-              List.sort filtered_collected_transitions
-                ~compare:
-                  (Comparable.lift
-                     ~f:(fun incoming_transition ->
-                       let With_hash.{data= transition; _}, _ =
-                         Envelope.Incoming.data incoming_transition
-                       in
-                       transition )
-                     External_transition.compare)
-            in
-            (new_frontier, sorted_filtered_collected_transitins) )
+            match%bind
+              match
+                Consensus.Hooks.required_local_state_sync ~consensus_state
+                  ~local_state
+              with
+              | None ->
+                  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:
+                      [ ( "local_state"
+                        , Consensus.Data.Local_state.to_yojson local_state )
+                      ; ( "consensus_state"
+                        , Consensus.Data.Consensus_state.Value.to_yojson
+                            consensus_state ) ]
+                    "Not synchronizing consensus local state" ;
+                  Deferred.return @@ Ok ()
+              | Some sync_jobs ->
+                  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                    "Synchronizing consensus local state" ;
+                  Consensus.Hooks.sync_local_state ~local_state ~logger
+                    ~trust_system
+                    ~random_peers:(fun n ->
+                      List.append
+                        (Network.peers_by_ip t.network sender)
+                        (Network.random_peers t.network n) )
+                    ~query_peer:
+                      { Network_peer.query=
+                          (fun peer f query ->
+                            Network.query_peer t.network peer f query ) }
+                    sync_jobs
+            with
+            | Error e ->
+                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:[("error", `String (Error.to_string_hum e))]
+                  "Local state sync failed: $error. Retry bootstrap" ;
+                Writer.close sync_ledger_writer ;
+                run ~logger ~trust_system ~verifier ~network ~frontier
+                  ~ledger_db ~transition_reader ~should_ask_best_tip
+            | Ok () ->
+                let%map new_frontier =
+                  Transition_frontier.create ~logger ~root_transition:new_root
+                    ~root_snarked_ledger:synced_db ~root_staged_ledger
+                    ~consensus_local_state:local_state
+                in
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  "Bootstrap state: complete." ;
+                let collected_transitions =
+                  Transition_cache.data transition_graph
+                in
+                let logger =
+                  Logger.extend logger
+                    [ ( "context"
+                      , `String "Filter collected transitions in bootstrap" )
+                    ]
+                in
+                let root_consensus_state =
+                  Transition_frontier.(
+                    Breadcrumb.consensus_state (root new_frontier))
+                in
+                let filtered_collected_transitions =
+                  List.filter collected_transitions
+                    ~f:(fun incoming_transition ->
+                      let With_hash.{data= transition; _}, _ =
+                        Envelope.Incoming.data incoming_transition
+                      in
+                      `Take
+                      = Consensus.Hooks.select ~existing:root_consensus_state
+                          ~candidate:
+                            (External_transition.consensus_state transition)
+                          ~logger )
+                in
+                Logger.debug logger
+                  "Sorting filtered transitions by consensus state"
+                  ~metadata:[] ~location:__LOC__ ~module_:__MODULE__ ;
+                let sorted_filtered_collected_transitins =
+                  List.sort filtered_collected_transitions
+                    ~compare:
+                      (Comparable.lift
+                         ~f:(fun incoming_transition ->
+                           let With_hash.{data= transition; _}, _ =
+                             Envelope.Incoming.data incoming_transition
+                           in
+                           transition )
+                         External_transition.compare)
+                in
+                (new_frontier, sorted_filtered_collected_transitins) ) )
 
   module For_tests = struct
     type nonrec t = t
