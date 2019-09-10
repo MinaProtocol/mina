@@ -197,14 +197,18 @@ module Runtime = struct
         register default info collector )
 end
 
-module Proving_time = struct
-  let subsystem = "Proving_time"
+module Cryptography = struct
+  let subsystem = "Cryptograph"
 
   let blockchain_proving_time_ms =
     let help =
       "time elapsed while proving most recently generated blockchain snark"
     in
     Gauge.v "blockchain_proving_time_ms" ~help ~namespace ~subsystem
+
+  let total_pedersen_hash_computed =
+    let help = "# of pedersen hash computed" in
+    Counter.v "total_pedersen_hash_computed" ~help ~namespace ~subsystem
 
   (* TODO:
   let transaction_proving_time_ms =
@@ -352,6 +356,10 @@ end
 
 module Transition_frontier = struct
   let subsystem = "Transition_frontier"
+
+  let slot_fill_rate : Gauge.t =
+    let help = "number of blocks / total slots since genesis" in
+    Gauge.v "slot_fill_rate" ~help ~namespace ~subsystem
 
   let active_breadcrumbs : Gauge.t =
     let help = "current # of breadcrumbs in the transition frontier" in
