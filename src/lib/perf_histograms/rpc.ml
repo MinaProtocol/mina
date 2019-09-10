@@ -10,12 +10,6 @@ let decorate_dispatch ~name (dispatch : ('q, 'r) Intf.dispatch) :
   Perf_histograms0.add_span
     ~name:(sprintf "rpc_dispatch_%s" name)
     (Time.diff (Time.now ()) start) ;
-  (*
-  Coda_metrics.(
-    Gauge.set
-      (Network.rpc_latency_ms ~name)
-      Core.Time.(Span.to_ms @@ diff (now ()) start)) ;
-*)
   r
 
 let deocorate_impl ~name (impl : ('q, 'r, 'state) Intf.impl) :

@@ -241,12 +241,6 @@ module Network = struct
   let gossip_messages_received : Counter.t =
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
-
-  (*
-  let rpc_latency_ms ~name : Gauge.t =
-    let help = "time elapsed while doing rpc calls in ms" in
-    Gauge.v name ~help ~namespace ~subsystem
-*)
 end
 
 module Snark_work = struct
@@ -408,11 +402,6 @@ module Transition_frontier_controller = struct
   let transitions_in_catchup_scheduler =
     let help = "transitions stored inside catchup scheduler" in
     Gauge.v "transitions_in_catchup_scheduler" ~help ~namespace ~subsystem
-
-  (*
-  let transitions_downloaded_from_catchup =
-    Counter.v_label "transitions_downloaded_from_catchup" ~namespace ~subsystem
-  *)
 
   let catchup_time_ms =
     let help = "time elapsed while doing catchup" in
