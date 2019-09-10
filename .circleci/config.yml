@@ -656,11 +656,6 @@ workflows:
             - test--test_postake_split_snarkless
             - test--test_postake_three_proposers
             - test--test_postake_txns
-            #TODO delete after these run successfully
-            - test-unit--dev_medium_curves
-            - test--test_postake_medium_curves
-            - test--test_postake_snarkless_medium_curves
-            - test--test_postake_split_medium_curves
     daily:
         triggers:
           - schedule:

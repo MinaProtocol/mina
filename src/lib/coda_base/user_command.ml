@@ -193,7 +193,6 @@ module Gen = struct
               let amount_to_spend =
                 if spend_all then balance
                 else Currency.Amount.of_int (Currency.Amount.to_int balance / 2)
-                (*Why are we doing this? we need more money in the case there are more user commands*)
               in
               Quickcheck_lib.gen_division_currency amount_to_spend
                 command_splits'.(i) )
@@ -207,7 +206,7 @@ module Gen = struct
             Array.for_all splits ~f:(fun split ->
                 List.for_all split ~f:(fun amt ->
                     if Currency.Amount.(amt < of_int 2) then
-                      (*gen_division_currency splits it the same way everytime leading to an infinite loop*)
+                      (*gen_division_currency splits it the same way everytime this condition is true leading to an infinite loop?*)
                       failwith
                         "Insufficient account balance to create user command" ;
                     true ) ) )

@@ -403,13 +403,6 @@ workflows:
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
-            #TODO delete after these run successfully
-            {%- for profile in unit_test_profiles_medium_curves %}
-            - test-unit--{{profile}}
-            {%- endfor %}
-            {%- for profile in medium_curves_tests.keys() | sort %}
-            - test--{{profile}}
-            {%- endfor %}
     daily:
         triggers:
           - schedule:
