@@ -72,16 +72,17 @@ module T = struct
     if not (statement_eq (Ledger_proof.statement proof) statement) then
       Deferred.return false
     else
-      match%map Verifier.verify_transaction_snark verifier proof ~message with
+      match%bind Verifier.verify_transaction_snark verifier proof ~message with
       | Ok b ->
-          b
+          Deferred.return b
       | Error e ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ("statement", Transaction_snark.Statement.to_yojson statement)
               ; ("error", `String (Error.to_string_hum e)) ]
-            "Invalid transaction snark for statement $statement: $error" ;
-          false
+            "Verifier error when checking transaction snark for statement \
+             $statement: $error" ;
+          exit 21
 
   let verify ~logger ~verifier ~message job proof prover =
     let open Deferred.Let_syntax in

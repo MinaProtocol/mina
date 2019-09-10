@@ -31,12 +31,13 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
     in
     match error with
     | `Verifier_error err ->
+        (* This indicates a problem with the verifier, and not with the proof. *)
         let error_metadata = [("error", `String (Error.to_string_hum err))] in
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             (error_metadata @ [("state_hash", State_hash.to_yojson state_hash)])
           "Error while verifying blockchain proof for $state_hash: $error" ;
-        punish Sent_invalid_proof (Some ("verifier error", error_metadata))
+        exit 21
     | `Invalid_proof ->
         punish Sent_invalid_proof None
     | `Invalid_delta_transition_chain_proof ->
