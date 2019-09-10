@@ -1,15 +1,13 @@
 open Core_kernel
 open Coda_base
+open Coda_transition
 
 module Make (Inputs : Transition_frontier.Inputs_intf) :
   Intf.Transition_database_schema
-  with type external_transition_validated :=
-              Inputs.External_transition.Validated.t
-   and type scan_state := Inputs.Staged_ledger.Scan_state.t
+  with type external_transition_validated := External_transition.Validated.t
+   and type scan_state := Staged_ledger.Scan_state.t
    and type state_hash := State_hash.t
    and type pending_coinbases := Pending_coinbase.t = struct
-  open Inputs
-
   module Data = struct
     module Transition = struct
       (* TODO: version *)

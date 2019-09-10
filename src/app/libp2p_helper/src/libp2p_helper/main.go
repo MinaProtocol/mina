@@ -20,6 +20,7 @@ import (
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	b58 "github.com/mr-tron/base58/base58"
 	"github.com/multiformats/go-multiaddr"
@@ -64,6 +65,8 @@ const (
 	removeStreamHandler
 	addStreamHandler
 	listeningAddrs
+	addPeer
+	beginAdvertising
 )
 
 type envelope struct {
@@ -134,6 +137,12 @@ type configureMsg struct {
 	ListenOn  []string `json:"ifaces"`
 }
 
+type discoveredPeerUpcall struct {
+	ID     string   `json:"peer_id"`
+	Addrs  []string `json:"multiaddrs"`
+	Upcall string   `json:"upcall"`
+}
+
 func (m *configureMsg) run(app *app) (interface{}, error) {
 	privkBytes, err := b58.Decode(m.Privk)
 	if err != nil {
@@ -152,6 +161,19 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		maddrs[i] = res
 	}
 	helper, err := codanet.MakeHelper(app.Ctx, maddrs, m.Statedir, privk, m.NetworkID)
+	go func() {
+		for info := range helper.DiscoveredPeers {
+			addrStrings := make([]string, len(info.Addrs))
+			for i, a := range info.Addrs {
+				addrStrings[i] = a.String()
+			}
+			app.writeMsg(discoveredPeerUpcall{
+				ID:     peer.IDB58Encode(info.ID),
+				Addrs:  addrStrings,
+				Upcall: "discoveredPeer",
+			})
+		}
+	}()
 	if err != nil {
 		return nil, badHelper(err)
 	}
@@ -546,6 +568,52 @@ func (rs *removeStreamHandlerMsg) run(app *app) (interface{}, error) {
 	return "removeStreamHandler success", nil
 }
 
+type addPeerMsg struct {
+	Multiaddr string `json:"multiaddr"`
+}
+
+func (ap *addPeerMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+	multiaddr, err := multiaddr.NewMultiaddr(ap.Multiaddr)
+	if err != nil {
+		// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
+		// isn't supported by this version of libp2p.
+		// But more likely, it is an RPC error.
+		return nil, badRPC(err)
+	}
+	info, err := peer.AddrInfoFromP2pAddr(multiaddr)
+	if err != nil {
+		// TODO: this isn't necessarily an RPC error. Perhaps the contained peer ID
+		// isn't supported by this version of libp2p.
+		// But more likely, it is an RPC error.
+		return nil, badRPC(err)
+	}
+
+	// discovery should notice the connection event and do the dht thing
+	err = app.P2p.Host.Connect(app.Ctx, *info)
+
+	if err != nil {
+		return nil, badp2p(err)
+	}
+
+	return "addPeer success", nil
+}
+
+type beginAdvertisingMsg struct {
+}
+
+func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+
+	discovery.Advertise(app.Ctx, app.P2p.Discovery, app.P2p.Rendezvous)
+
+	return "beginAdvertising success", nil
+}
+
 var msgHandlers = map[methodIdx]func() action{
 	configure:           func() action { return &configureMsg{} },
 	listen:              func() action { return &listenMsg{} },
@@ -561,6 +629,8 @@ var msgHandlers = map[methodIdx]func() action{
 	removeStreamHandler: func() action { return &removeStreamHandlerMsg{} },
 	addStreamHandler:    func() action { return &addStreamHandlerMsg{} },
 	listeningAddrs:      func() action { return &listeningAddrsMsg{} },
+	addPeer:             func() action { return &addPeerMsg{} },
+	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
 }
 
 type errorResult struct {

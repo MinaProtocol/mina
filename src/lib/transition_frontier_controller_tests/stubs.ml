@@ -19,9 +19,6 @@ struct
     let verify _ _ = return true
   end
 
-  module Ledger_proof = Ledger_proof.Debug
-  module Verifier = Verifier.Dummy
-
   module Staged_ledger_aux_hash = struct
     include Staged_ledger_hash.Aux_hash.Stable.V1
 
@@ -34,60 +31,6 @@ struct
   module Ledger_proof_statement = Transaction_snark.Statement
   module Pending_coinbase_stack_state =
     Transaction_snark.Pending_coinbase_stack_state
-  module Transaction_snark_work = Transaction_snark_work.Make (Ledger_proof)
-  module Staged_ledger_diff = Staged_ledger_diff.Make (Transaction_snark_work)
-
-  module External_transition =
-    External_transition.Make (Ledger_proof) (Verifier)
-      (struct
-        include Staged_ledger_diff.Stable.V1
-
-        [%%define_locally
-        Staged_ledger_diff.(creator, user_commands)]
-      end)
-
-  module Internal_transition = Internal_transition.Make (Staged_ledger_diff)
-
-  module Staged_ledger_hash_binable = struct
-    include Staged_ledger_hash
-
-    let ( of_aux_ledger_and_coinbase_hash
-        , aux_hash
-        , ledger_hash
-        , pending_coinbase_hash ) =
-      Staged_ledger_hash.
-        ( of_aux_ledger_and_coinbase_hash
-        , aux_hash
-        , ledger_hash
-        , pending_coinbase_hash )
-  end
-
-  module Transaction = struct
-    include Transaction.Stable.Latest
-
-    let fee_excess, supply_increase = Transaction.(fee_excess, supply_increase)
-  end
-
-  module Staged_ledger = Staged_ledger.Make (struct
-    module User_command = User_command
-    module Ledger_proof_statement = Transaction_snark.Statement
-    module Proof = Proof
-    module Sok_message = Coda_base.Sok_message
-    module Ledger_proof = Ledger_proof
-    module Ledger_proof_verifier = Verifier
-    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Staged_ledger_hash = Staged_ledger_hash_binable
-    module Transaction_snark_work = Transaction_snark_work
-    module Transaction_validator = Transaction_validator
-    module Staged_ledger_diff = Staged_ledger_diff
-    module Account = Coda_base.Account
-    module Verifier = Verifier
-    module Proof_type = Transaction_snark.Proof_type
-    module Pending_coinbase_hash = Pending_coinbase.Hash
-    module Pending_coinbase_stack_state =
-      Transaction_snark.Pending_coinbase_stack_state
-    module Transaction_witness = Transaction_witness
-  end)
 
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
@@ -179,8 +122,10 @@ struct
           Transaction_snark_work.Checked.
             { fee= Fee.of_int 1
             ; proofs=
-                List.map stmts ~f:(fun stmt ->
-                    (stmt, Sok_message.Digest.default) )
+                List.map stmts ~f:(fun statement ->
+                    Ledger_proof.create ~statement
+                      ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
+                )
             ; prover }
       in
       let staged_ledger_diff =
@@ -192,9 +137,14 @@ struct
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
                , `Pending_coinbase_data _ ) =
-        Staged_ledger.apply_diff_unchecked parent_staged_ledger
-          staged_ledger_diff
-        |> Deferred.Or_error.ok_exn
+        match%bind
+          Staged_ledger.apply_diff_unchecked parent_staged_ledger
+            staged_ledger_diff
+        with
+        | Ok r ->
+            return r
+        | Error e ->
+            failwith (Staged_ledger.Staged_ledger_error.to_string e)
       in
       let previous_transition =
         Transition_frontier.Breadcrumb.validated_transition parent_breadcrumb
@@ -240,8 +190,9 @@ struct
             next_verified_external_transition) =
         External_transition.Validated.create_unsafe next_external_transition
       in
+      let%bind verifier = Verifier.create () in
       match%map
-        Transition_frontier.Breadcrumb.build ~logger ~trust_system ~verifier:()
+        Transition_frontier.Breadcrumb.build ~logger ~trust_system ~verifier
           ~parent:parent_breadcrumb
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
@@ -319,9 +270,10 @@ struct
     in
     let open Deferred.Let_syntax in
     let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
+    let%bind verifier = Verifier.create () in
     match%bind
       Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
-        ~verifier:() ~scan_state:root_transaction_snark_scan_state
+        ~verifier ~scan_state:root_transaction_snark_scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
         ~expected_merkle_root ~pending_coinbases:root_pending_coinbases
     with
@@ -551,6 +503,10 @@ struct
           ; logger: Logger.t
           ; trust_system: Trust_system.t
           ; max_concurrent_connections: int option
+          ; enable_libp2p: bool
+          ; disable_haskell: bool
+          ; libp2p_keypair: Coda_net2.Keypair.t option
+          ; libp2p_peers: Coda_net2.Multiaddr.t list
           ; log_gossip_heard: log_gossip_heard }
         [@@deriving make]
       end

@@ -23,4 +23,8 @@ module Haskell : sig
   val changes : t -> Peer.Event.t Linear_pipe.Reader.t
 
   val stop : t -> unit Deferred.t
+
+  module Hacky_glue : sig
+    val inject_event : t -> Peer.Event.t -> unit
+  end
 end

@@ -22,7 +22,9 @@ Coda is entirely open source, and the code is distributed under the terms of the
 
 ## Coda Grants
 
-There are also a limited set of grants for projects related to Coda's development.  Many of these focus on development, but more will be added in the areas of design and community development. Reach out on Discord for more info on the grant program.
+O(1) Labs provides grants for certain projects related to the development of Coda -- visit the [Coda Grants repo](https://github.com/CodaProtocol/coda-grants) to find out more details.
+
+Currently, the projects are mostly programming focused, but more will be added in the areas of design and community development. Reach out on Discord if you have any questions about the grant program.
 
 ## Reporting Issues
 

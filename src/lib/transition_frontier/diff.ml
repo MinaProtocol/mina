@@ -1,28 +1,14 @@
 open Core_kernel
 open Coda_base
+open Coda_transition
 
 module Make (Inputs : sig
   include Inputs.Inputs_intf
 
-  module Breadcrumb :
-    Coda_intf.Transition_frontier_breadcrumb_intf
-    with type mostly_validated_external_transition :=
-                ( [`Time_received] * unit Truth.true_t
-                , [`Proof] * unit Truth.true_t
-                , [`Delta_transition_chain]
-                  * State_hash.t Non_empty_list.t Truth.true_t
-                , [`Frontier_dependencies] * unit Truth.true_t
-                , [`Staged_ledger_diff] * unit Truth.false_t )
-                External_transition.Validation.with_transition
-     and type external_transition_validated := External_transition.Validated.t
-     and type staged_ledger := Staged_ledger.t
-     and type verifier := Verifier.t
+  module Breadcrumb : Coda_intf.Transition_frontier_breadcrumb_intf
 end) :
   Coda_intf.Transition_frontier_diff_intf
-  with type breadcrumb := Inputs.Breadcrumb.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t = struct
+  with type breadcrumb := Inputs.Breadcrumb.t = struct
   open Inputs
 
   (* TODO: Remove New_frontier. 
