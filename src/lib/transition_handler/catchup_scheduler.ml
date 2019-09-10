@@ -15,6 +15,7 @@ open Pipe_lib.Strict_pipe
 open Cache_lib
 open Otp_lib
 open Coda_base
+open Coda_transition
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
@@ -183,7 +184,7 @@ module Make (Inputs : Inputs.S) = struct
                 )
               ; ( "cached_transition"
                 , With_hash.data transition_with_hash
-                  |> Inputs.External_transition.to_yojson ) ]
+                  |> External_transition.to_yojson ) ]
             "Timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)

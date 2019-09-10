@@ -1,6 +1,6 @@
 let trust_system = Trust_system.null ()
 
-module Transaction_snark_work = Transaction_snark_work.Make (Ledger_proof.Debug)
+module Transaction_snark_work = Transaction_snark_work
 module Ledger_proof = Ledger_proof.Debug.Stable.V1
 
 module Transition_frontier = struct
