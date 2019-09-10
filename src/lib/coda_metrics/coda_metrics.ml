@@ -250,13 +250,17 @@ module Network = struct
 
   let rpc_table = Rpc_map.of_alist_exn []
 
-  let rpc_latency_ms ~name : Rpc_histogram.t =
+  let rpc_latency_ms ~name : Gauge.t =
     if Rpc_map.mem rpc_table name then Rpc_map.find_exn rpc_table name
     else
       let help = "time elapsed while doing rpc calls in ms" in
-      let rpc_histogram = Rpc_histogram.v name ~help ~namespace ~subsystem in
-      Rpc_map.add_exn rpc_table ~key:name ~data:rpc_histogram ;
-      rpc_histogram
+      let rpc_gauge = Gauge.v name ~help ~namespace ~subsystem in
+      Rpc_map.add_exn rpc_table ~key:name ~data:rpc_gauge ;
+      rpc_gauge
+
+  let rpc_latency_ms_summary : Rpc_histogram.t =
+    let help = "A histogram for all rpc call latencies" in
+    Rpc_histogram.v "rpc_latency_ms_summary" ~help ~namespace ~subsystem
 end
 
 module Snark_work = struct
@@ -422,6 +426,10 @@ module Transition_frontier_controller = struct
   let catchup_time_ms =
     let help = "time elapsed while doing catchup" in
     Gauge.v "catchup_time_ms" ~help ~namespace ~subsystem
+
+  let transitions_downloaded_from_catchup =
+    let help = "# of transitions downloaded by ledger_catchup" in
+    Gauge.v "transitions_downloaded_from_catchup" ~help ~namespace ~subsystem
 
   let breadcrumbs_built_by_processor : Counter.t =
     let help = "breadcrumbs built by the processor" in
