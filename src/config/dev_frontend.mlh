@@ -20,3 +20,5 @@
 [%%define mock_frontend_data true]
 
 [%%define new_cli false]
+
+[%%define daemon_expiry "never"]
