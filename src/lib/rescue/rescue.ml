@@ -1,5 +1,11 @@
 open Core_kernel
 
+(*
+   1 / 11
+   =
+38089537243562684911222013446582397389246099927230862792530457200932138920519187975508085239809399019470973610807689524839248234083267140972451128958905814696110378477590967674064016488951271336010850653690825603837076796509091
+*)
+
 module Chain = struct
   type move = Add of int * int | Sub of int * int [@@deriving sexp]
 
@@ -44,6 +50,15 @@ module Chain = struct
 end
 
 type params = {r: int}
+
+module type Params_intf = sig
+  module Impl : Snarky.Snark_intf.Run
+
+  open Impl
+
+  val to_the_alpha : Field.t -> Field.t
+  val alphath_root : Field.t -> Field.t
+end
 
 module Make (Run : Snarky.Snark_intf.Run) = struct
   open Run
