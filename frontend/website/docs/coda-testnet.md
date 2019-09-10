@@ -110,6 +110,31 @@ Coda has a GraphQL API! It's super experimental, and we are already in the proce
 
 You'll earn 500 pts[\*](#disclaimer) for sending us anything that we feel has achieved (a) and (b), as described above, and we'll award a BONUS of an additional 2000 pts[\*](#disclaimer) for the coolest use and 1000 pts[\*](#disclaimer) for second place! Good luck.
 
+**Challenge #20 (on-going): "Golden Hour"**
+
+This week's challenge is all about timing. We will have two "Golden Hours" every day:
+
+9AM-10AM PST (UTC-7)
+
+9PM-10PM PST (UTC-7)
+
+During a Golden Hour, you'll have two actions you can perform to complete the challenge:
+
+1) Send as many transactions as you can (measured as the # of transactions that made it into a block during Golden Hour).
+
+2) Win as many tokens from snark work as possible (measured as the total amount of coda earned through snark fees during Golden Hour).
+
+If this week, at least one of your transactions is included in a block during a Golden Hour, you will earn 250 pts[\*](#disclaimer).
+If you sell at least one snark work during a Golden Hour, you will earn another 250 pts[\*](#disclaimer).
+
+BONUS — At the end of the week:
+
+- First place in either category will win +1500 pts[\*](#disclaimer).
+- Second place in either category will win +1000 pts[\*](#disclaimer).
+- 3rd - 20th place in either category will win +500 pts[\*](#disclaimer).
+
+Note that only transactions that make it into a block and only snarks that are bought DURING the Golden Hours will count towards this challenge. You can participate in both categories, and win up to 3500 pts[\*](#disclaimer) for this challenge.
+
 
 ### Disclaimer
 
