@@ -241,6 +241,18 @@ module Network = struct
   let gossip_messages_received : Counter.t =
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
+
+  module Rpc_map = Hashtbl.Make (String)
+
+  let rpc_table = Rpc_map.of_alist_exn []
+
+  let rpc_latency_ms ~name : Gauge.t =
+    if Rpc_map.mem rpc_table name then Rpc_map.find_exn rpc_table name
+    else
+      let help = "time elapsed while doing rpc calls in ms" in
+      let rpc_gauge = Gauge.v name ~help ~namespace ~subsystem in
+      Rpc_map.add_exn rpc_table ~key:name ~data:rpc_gauge ;
+      rpc_gauge
 end
 
 module Snark_work = struct
