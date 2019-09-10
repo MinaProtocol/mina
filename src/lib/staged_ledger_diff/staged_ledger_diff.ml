@@ -83,13 +83,13 @@ module Ft = struct
   type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end
 
-module Pre_diff_with_at_most_two_coinbase = struct
+module Pre_diff_two = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t =
-          { completed_works: Transaction_snark_work.Stable.V1.t list
-          ; user_commands: User_command.Stable.V1.t list
+        type ('a, 'b) t =
+          { completed_works: 'a list
+          ; user_commands: 'b list
           ; coinbase: Ft.Stable.V1.t At_most_two.Stable.V1.t }
         [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
       end
@@ -100,20 +100,20 @@ module Pre_diff_with_at_most_two_coinbase = struct
     module Latest = V1
   end
 
-  type t = Stable.Latest.t =
-    { completed_works: Transaction_snark_work.Stable.V1.t list
-    ; user_commands: User_command.Stable.V1.t list
+  type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
+    { completed_works: 'a list
+    ; user_commands: 'b list
     ; coinbase: Ft.Stable.V1.t At_most_two.Stable.V1.t }
   [@@deriving sexp, to_yojson]
 end
 
-module Pre_diff_with_at_most_one_coinbase = struct
+module Pre_diff_one = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t =
-          { completed_works: Transaction_snark_work.Stable.V1.t list
-          ; user_commands: User_command.Stable.V1.t list
+        type ('a, 'b) t =
+          { completed_works: 'a list
+          ; user_commands: 'b list
           ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t }
         [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
       end
@@ -124,11 +124,51 @@ module Pre_diff_with_at_most_one_coinbase = struct
     module Latest = V1
   end
 
-  type t = Stable.Latest.t =
-    { completed_works: Transaction_snark_work.Stable.V1.t list
-    ; user_commands: User_command.Stable.V1.t list
+  type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
+    { completed_works: 'a list
+    ; user_commands: 'b list
     ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t }
   [@@deriving sexp, to_yojson]
+end
+
+module Pre_diff_with_at_most_two_coinbase = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t =
+          ( Transaction_snark_work.Stable.V1.t
+          , User_command.Stable.V1.t )
+          Pre_diff_two.Stable.V1.t
+        [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+end
+
+module Pre_diff_with_at_most_one_coinbase = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t =
+          ( Transaction_snark_work.Stable.V1.t
+          , User_command.Stable.V1.t )
+          Pre_diff_one.Stable.V1.t
+        [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end
 
 module Diff = struct
@@ -180,15 +220,15 @@ type t = Stable.Latest.t =
 
 module With_valid_signatures_and_proofs = struct
   type pre_diff_with_at_most_two_coinbase =
-    { completed_works: Transaction_snark_work.Checked.t list
-    ; user_commands: User_command.With_valid_signature.t list
-    ; coinbase: Ft.t At_most_two.t }
+    ( Transaction_snark_work.Checked.t
+    , User_command.With_valid_signature.t )
+    Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   type pre_diff_with_at_most_one_coinbase =
-    { completed_works: Transaction_snark_work.Checked.t list
-    ; user_commands: User_command.With_valid_signature.t list
-    ; coinbase: Ft.t At_most_one.t }
+    ( Transaction_snark_work.Checked.t
+    , User_command.With_valid_signature.t )
+    Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
   type diff =
@@ -206,6 +246,80 @@ end
 
 let forget_cw cw_list = List.map ~f:Transaction_snark_work.forget cw_list
 
+module With_valid_signatures = struct
+  type pre_diff_with_at_most_two_coinbase =
+    ( Transaction_snark_work.t
+    , User_command.With_valid_signature.t )
+    Pre_diff_two.t
+  [@@deriving sexp, to_yojson]
+
+  type pre_diff_with_at_most_one_coinbase =
+    ( Transaction_snark_work.t
+    , User_command.With_valid_signature.t )
+    Pre_diff_one.t
+  [@@deriving sexp, to_yojson]
+
+  type diff =
+    pre_diff_with_at_most_two_coinbase
+    * pre_diff_with_at_most_one_coinbase option
+  [@@deriving sexp, to_yojson]
+
+  type t = {diff: diff; creator: Public_key.Compressed.t}
+  [@@deriving sexp, to_yojson]
+end
+
+let validate_user_commands (t : t)
+    ~(check : User_command.t -> User_command.With_valid_signature.t option) :
+    (With_valid_signatures.t, User_command.t) result =
+  let open Result.Let_syntax in
+  let validate user_commands =
+    let%map user_commands' =
+      List.fold_until user_commands ~init:[]
+        ~f:(fun acc t ->
+          match check t with
+          | Some t ->
+              Continue (t :: acc)
+          | None ->
+              Stop (Error t) )
+        ~finish:(fun acc -> Ok acc)
+    in
+    List.rev user_commands'
+  in
+  let d1 = fst t.diff in
+  let%bind p1 =
+    let%map user_commands = validate d1.user_commands in
+    ( { completed_works= d1.completed_works
+      ; user_commands
+      ; coinbase= d1.coinbase }
+      : With_valid_signatures.pre_diff_with_at_most_two_coinbase )
+  in
+  let%map p2 =
+    Option.value_map ~default:(Ok None) (snd t.diff) ~f:(fun d2 ->
+        let%map user_commands = validate d2.user_commands in
+        Some
+          { Pre_diff_one.completed_works= d2.completed_works
+          ; user_commands
+          ; coinbase= d2.coinbase } )
+  in
+  ({creator= t.creator; diff= (p1, p2)} : With_valid_signatures.t)
+
+let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
+    With_valid_signatures.t =
+  let d1 = fst d.diff in
+  let p1 : With_valid_signatures.pre_diff_with_at_most_two_coinbase =
+    { completed_works= forget_cw d1.completed_works
+    ; user_commands= d1.user_commands
+    ; coinbase= d1.coinbase }
+  in
+  let p2 =
+    Option.map (snd d.diff) ~f:(fun d2 ->
+        ( { completed_works= forget_cw d2.completed_works
+          ; user_commands= d2.user_commands
+          ; coinbase= d2.coinbase }
+          : With_valid_signatures.pre_diff_with_at_most_one_coinbase ) )
+  in
+  {creator= d.creator; diff= (p1, p2)}
+
 let forget_pre_diff_with_at_most_two
     (pre_diff :
       With_valid_signatures_and_proofs.pre_diff_with_at_most_two_coinbase) :
@@ -217,8 +331,7 @@ let forget_pre_diff_with_at_most_two
 let forget_pre_diff_with_at_most_one
     (pre_diff :
       With_valid_signatures_and_proofs.pre_diff_with_at_most_one_coinbase) =
-  { Pre_diff_with_at_most_one_coinbase.completed_works=
-      forget_cw pre_diff.completed_works
+  { Pre_diff_one.completed_works= forget_cw pre_diff.completed_works
   ; user_commands= (pre_diff.user_commands :> User_command.t list)
   ; coinbase= pre_diff.coinbase }
 

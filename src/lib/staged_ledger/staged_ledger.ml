@@ -51,12 +51,6 @@ module T = struct
           Error.to_string_hum e
 
     let to_error = Fn.compose Error.of_string to_string
-
-    let to_or_error = function
-      | Ok s ->
-          Ok s
-      | Error e ->
-          Or_error.error_string (to_string e)
   end
 
   let to_staged_ledger_or_error = function
@@ -618,9 +612,7 @@ module T = struct
           (Staged_ledger_error.Pre_diff
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts"))
 
-  (* N.B.: we don't expose apply_diff_unverified
-     in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
-  let apply_diff ~logger ~verifier t (sl_diff : Staged_ledger_diff.t) =
+  let apply_diff ~logger t pre_diff_info =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2
@@ -633,16 +625,7 @@ module T = struct
     in
     let new_mask = Ledger.Mask.create () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
-    let pre_diff_info =
-      Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
-      @@ Pre_diff_info.get sl_diff
-    in
-    let%bind transactions, works, user_commands_count, coinbases =
-      Deferred.return pre_diff_info
-    in
-    Coda_metrics.(
-      Gauge.set Snark_work.completed_snark_work_last_block
-        (Float.of_int (List.length works))) ;
+    let transactions, works, user_commands_count, coinbases = pre_diff_info in
     let%bind is_new_stack, data, stack_update =
       update_coinbase_stack_and_get_data t.scan_state new_ledger
         t.pending_coinbase_collection transactions
@@ -668,7 +651,6 @@ module T = struct
                    slots required work_count)))
       else Deferred.return (Ok ())
     in
-    let%bind () = check_completed_works ~logger ~verifier t.scan_state works in
     let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
     let%bind res_opt, scan_state' =
       let r =
@@ -683,27 +665,14 @@ module T = struct
           in
           Logger.error logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
-              [ ("staged_ledger_diff", Staged_ledger_diff.to_yojson sl_diff)
-              ; ( "scan_state"
+              [ ( "scan_state"
                 , `String (Scan_state.snark_job_list_json t.scan_state) )
               ; ("data", data_json) ]
-            !"Unexpected error when applying the diff $staged_ledger_diff, \
-              data $data to the scan_state $scan_state: %s\n\
+            !"Unexpected error when applying diff data $data to the \
+              scan_state $scan_state: %s\n\
               %!"
             (Error.to_string_hum e) ) ;
       Deferred.return (to_staged_ledger_or_error r)
-    in
-    let () =
-      try
-        Coda_metrics.(
-          Gauge.set Snark_work.scan_state_snark_work
-            (Float.of_int
-               (List.length (Scan_state.all_work_pairs_exn scan_state'))))
-      with exn ->
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("error", `String (Exn.to_string exn))]
-          !"Error when getting all work pairs from scan state: $error" ;
-        Exn.reraise exn "Error when getting all work pairs from scan state"
     in
     let%bind updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
@@ -741,67 +710,44 @@ module T = struct
     , `Staged_ledger new_staged_ledger
     , `Pending_coinbase_data (is_new_stack, coinbase_amount) )
 
-  let apply t witness ~logger = apply_diff t witness ~logger
+  let apply t witness ~logger ~verifier =
+    let open Deferred.Result.Let_syntax in
+    let work = Staged_ledger_diff.completed_works witness in
+    Coda_metrics.(
+      Gauge.set Snark_work.completed_snark_work_last_block
+        (Float.of_int @@ List.length work)) ;
+    let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
+    let%bind prediff =
+      Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
+      @@ Pre_diff_info.get witness
+      |> Deferred.return
+    in
+    let%map res = apply_diff t prediff ~logger in
+    let _, _, `Staged_ledger new_staged_ledger, _ = res in
+    let () =
+      try
+        Coda_metrics.(
+          Gauge.set Snark_work.scan_state_snark_work
+            (Float.of_int
+               (List.length
+                  (Scan_state.all_work_pairs_exn new_staged_ledger.scan_state))))
+      with exn ->
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("error", `String (Exn.to_string exn))]
+          !"Error when getting all work pairs from scan state: $error" ;
+        Exn.reraise exn "Error when getting all work pairs from scan state"
+    in
+    res
 
   let apply_diff_unchecked t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
-    let open Deferred.Or_error.Let_syntax in
-    let new_mask = Ledger.Mask.create () in
-    let transactions, works, coinbases = Pre_diff_info.get_unchecked sl_diff in
-    let new_ledger = Ledger.register_mask t.ledger new_mask in
-    let%bind is_new_stack, data, updated_coinbase_stack =
-      let open Deferred.Let_syntax in
-      let%bind x =
-        update_coinbase_stack_and_get_data t.scan_state new_ledger
-          t.pending_coinbase_collection transactions
-      in
-      Staged_ledger_error.to_or_error x |> Deferred.return
+    let open Deferred.Result.Let_syntax in
+    let%bind prediff =
+      Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
+      @@ Pre_diff_info.get_unchecked sl_diff
+      |> Deferred.return
     in
-    let slots = List.length data in
-    let work_count = List.length works in
-    let required_pairs =
-      Scan_state.work_statements_for_new_diff t.scan_state
-    in
-    let%bind () =
-      let required = List.length required_pairs in
-      if
-        work_count < required
-        && List.length data
-           > Scan_state.free_space t.scan_state - required + work_count
-      then
-        Deferred.return
-          (Or_error.errorf
-             !"Insufficient number of transaction snark work (slots \
-               occupying: %d)  required %d, got %d"
-             slots required work_count)
-      else Deferred.return (Ok ())
-    in
-    let res_opt, scan_state' =
-      Or_error.ok_exn
-        (Scan_state.fill_work_and_enqueue_transactions t.scan_state data works)
-    in
-    let%bind coinbase_amount =
-      coinbase_for_blockchain_snark coinbases
-      |> Staged_ledger_error.to_or_error |> Deferred.return
-    in
-    let%map update_pending_coinbase_collection' =
-      update_pending_coinbase_collection t.pending_coinbase_collection
-        updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
-      |> Staged_ledger_error.to_or_error |> Deferred.return
-    in
-    Or_error.ok_exn
-      (verify_scan_state_after_apply
-         (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
-         scan_state') ;
-    let new_staged_ledger =
-      { scan_state= scan_state'
-      ; ledger= new_ledger
-      ; pending_coinbase_collection= update_pending_coinbase_collection' }
-    in
-    ( `Hash_after_applying (hash new_staged_ledger)
-    , `Ledger_proof res_opt
-    , `Staged_ledger new_staged_ledger
-    , `Pending_coinbase_data (is_new_stack, coinbase_amount) )
+    apply_diff t prediff ~logger:(Logger.null ())
 
   module Resources = struct
     module Discarded = struct
@@ -1171,7 +1117,7 @@ module T = struct
                 Zero
           in
           (* We have to reverse here because we only know they work in THIS order *)
-          { Staged_ledger_diff.With_valid_signatures_and_proofs.user_commands=
+          { Staged_ledger_diff.Pre_diff_one.user_commands=
               Sequence.to_list_rev res.user_commands_rev
           ; completed_works= Sequence.to_list_rev res.completed_work_rev
           ; coinbase= to_at_most_one res.coinbase } )
