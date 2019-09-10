@@ -242,7 +242,7 @@ end = struct
     let rec loop () =
       let sync_ledger_reader, sync_ledger_writer =
         create ~name:"sync ledger pipe"
-          (Buffered (`Capacity 50, `Overflow Crash))
+          (Buffered (`Capacity 70, `Overflow Crash))
       in
       transfer_while_writer_alive transition_reader sync_ledger_writer ~f:Fn.id
       |> don't_wait_for ;

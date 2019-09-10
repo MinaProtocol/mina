@@ -31,7 +31,7 @@ module Make (Inputs : Inputs_intf) = struct
   module Initial_validator = Initial_validator.Make (Inputs)
 
   let create_bufferred_pipe ?name () =
-    Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
+    Strict_pipe.create ?name (Buffered (`Capacity 70, `Overflow Crash))
 
   let is_transition_for_bootstrap ~logger ~frontier new_transition =
     let root = Transition_frontier.root frontier in
