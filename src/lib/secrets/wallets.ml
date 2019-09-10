@@ -45,7 +45,7 @@ let load ~logger ~disk_location : t Deferred.t =
     Deferred.List.filter_map files ~f:(fun file ->
         match String.chop_suffix file ~suffix:".pub" with
         | Some sk_filename -> (
-            let%map lines = Reader.file_lines file in
+            let%map lines = Reader.file_lines (path ^/ file) in
             match lines with
             | public_key :: _ ->
                 decode_public_key public_key file path logger
