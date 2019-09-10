@@ -137,9 +137,14 @@ struct
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
                , `Pending_coinbase_data _ ) =
-        Staged_ledger.apply_diff_unchecked parent_staged_ledger
-          staged_ledger_diff
-        |> Deferred.Or_error.ok_exn
+        match%bind
+          Staged_ledger.apply_diff_unchecked parent_staged_ledger
+            staged_ledger_diff
+        with
+        | Ok r ->
+            return r
+        | Error e ->
+            failwith (Staged_ledger.Staged_ledger_error.to_string e)
       in
       let previous_transition =
         Transition_frontier.Breadcrumb.validated_transition parent_breadcrumb
