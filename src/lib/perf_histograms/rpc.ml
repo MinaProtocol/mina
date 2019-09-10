@@ -11,7 +11,7 @@ let decorate_dispatch ~name (dispatch : ('q, 'r) Intf.dispatch) :
     ~name:(sprintf "rpc_dispatch_%s" name)
     (Time.diff (Time.now ()) start) ;
   Coda_metrics.(
-    Gauge.set
+    Network.Rpc_histogram.observe
       (Network.rpc_latency_ms ~name)
       Core.Time.(Span.to_ms @@ diff (now ()) start)) ;
   r
