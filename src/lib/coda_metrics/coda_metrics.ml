@@ -242,9 +242,11 @@ module Network = struct
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
+  (*
   let rpc_latency_ms ~name : Gauge.t =
     let help = "time elapsed while doing rpc calls in ms" in
     Gauge.v name ~help ~namespace ~subsystem
+*)
 end
 
 module Snark_work = struct
