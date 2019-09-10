@@ -159,7 +159,7 @@ struct
       in
       let next_blockchain_state =
         Blockchain_state.create_value
-          ~timestamp:(Block_time.now Block_time.Controller.basic)
+          ~timestamp:(Block_time.now Block_time.Controller.basic ~logger)
           ~snarked_ledger_hash:next_ledger_hash
           ~staged_ledger_hash:next_staged_ledger_hash
       in
