@@ -325,7 +325,7 @@ end = struct
   (* We conditionally ask other peers for their best tip. This is for testing
      eager bootstrapping and the regular functionalities of bootstrapping in
      isolation *)
-  let rec run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
+  let run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
       ~transition_reader ~should_ask_best_tip =
     let rec loop () =
       let sync_ledger_reader, sync_ledger_writer =
