@@ -72,7 +72,7 @@ module Make (Inputs : Inputs_intf) :
    and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
-  let run ~logger ~trust_system ~verifier ~network ~time_controller
+  let run ~config_dir ~logger ~trust_system ~verifier ~network ~time_controller
       ~collected_transitions ~frontier ~network_transition_reader
       ~proposer_transition_reader ~clear_reader =
     let valid_transition_pipe_capacity = 30 in
@@ -122,7 +122,7 @@ module Make (Inputs : Inputs_intf) :
       ~f:(Strict_pipe.Writer.write primary_transition_writer)
     |> don't_wait_for ;
     let clean_up_catchup_scheduler = Ivar.create () in
-    Transition_handler.Processor.run ~logger ~time_controller ~trust_system
+    Transition_handler.Processor.run ~config_dir ~logger ~time_controller ~trust_system
       ~verifier ~frontier ~primary_transition_reader
       ~proposer_transition_reader:proposer_transition_reader_copy
       ~clean_up_catchup_scheduler ~catchup_job_writer

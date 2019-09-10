@@ -42,9 +42,16 @@ end) :
   module Work = Transaction_snark_work.Statement
 
   module Snark_pool_refcount = struct
+    module Ext_table = Coda_metrics.Measured.Wrap_singleton_table
+      (Inputs.Transaction_snark_work.Statement.Table)
+      (struct
+        let name = "snark_pool_refcount_table_size"
+        let help = "TODO"
+      end)
+
     module Work = Inputs.Transaction_snark_work.Statement
 
-    type t = int Work.Table.t
+    type t = int Ext_table.t
 
     type view = int * int Work.Table.t
 
@@ -59,33 +66,33 @@ end) :
     (but not if the same elements exist with a different reference count) *)
     let add_breadcrumb_to_ref_table table breadcrumb : bool =
       List.fold ~init:false (get_work breadcrumb) ~f:(fun acc work ->
-          match Work.Table.find table work with
+          match Ext_table.find table work with
           | Some count ->
-              Work.Table.set table ~key:work ~data:(count + 1) ;
+              Ext_table.set table ~key:work ~data:(count + 1) ;
               acc
           | None ->
-              Work.Table.set table ~key:work ~data:1 ;
+              Ext_table.set table ~key:work ~data:1 ;
               true )
 
     (** Returns true if this update changed which elements are in the table
     (but not if the same elements exist with a different reference count) *)
     let remove_breadcrumb_from_ref_table table breadcrumb : bool =
       List.fold (get_work breadcrumb) ~init:false ~f:(fun acc work ->
-          match Work.Table.find table work with
+          match Ext_table.find table work with
           | Some 1 ->
-              Work.Table.remove table work ;
+              Ext_table.remove table work ;
               true
           | Some v ->
-              Work.Table.set table ~key:work ~data:(v - 1) ;
+              Ext_table.set table ~key:work ~data:(v - 1) ;
               acc
           | None ->
               failwith "Removed a breadcrumb we didn't know about" )
 
-    let create () = Work.Table.create ()
+    let create () = Ext_table.create ()
 
     let initial_view () = (0, Work.Table.create ())
 
-    let handle_diff t diff =
+    let handle_diff t diff : view option =
       let removed, added =
         match (diff : Diff.t) with
         | New_breadcrumb {added= breadcrumb; _} | New_frontier breadcrumb ->
@@ -105,9 +112,9 @@ end) :
                   acc + if remove_breadcrumb_from_ref_table t bc then 1 else 0
                   )
                 all_garbage
-            , added )
+            , added)
       in
-      if removed > 0 || added then Some (removed, t) else None
+      if removed > 0 || added then Some (removed, (t :> int Work.Table.t)) else None
   end
 
   module Root_history = struct
@@ -145,12 +152,19 @@ end) :
 
   (* TODO: guard against waiting for transitions that already exist in the frontier *)
   module Transition_registry = struct
-    type t = unit Ivar.t list State_hash.Table.t
+    module Table = Coda_metrics.Measured.Wrap_singleton_table
+      (State_hash.Table)
+      (struct
+        let name = "transition_registry_table_size"
+        let help = "TODO"
+      end)
 
-    let create () = State_hash.Table.create ()
+    type t = unit Ivar.t list Table.t
+
+    let create () = Table.create ()
 
     let notify t state_hash =
-      State_hash.Table.change t state_hash ~f:(function
+      Table.change t state_hash ~f:(function
         | Some ls ->
             List.iter ls ~f:(Fn.flip Ivar.fill ()) ;
             None
@@ -159,7 +173,7 @@ end) :
 
     let register t state_hash =
       Deferred.create (fun ivar ->
-          State_hash.Table.update t state_hash ~f:(function
+          Table.update t state_hash ~f:(function
             | Some ls ->
                 ivar :: ls
             | None ->

@@ -52,7 +52,8 @@ module Make (Inputs : Inputs_intf) : sig
   open Inputs
 
   val run :
-       logger:Logger.t
+       config_dir:string
+    -> logger:Logger.t
     -> trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> network:Network.t
@@ -78,7 +79,8 @@ end
 open Coda_transition
 
 val run :
-     logger:Logger.t
+     config_dir:string
+  -> logger:Logger.t
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
   -> network:Coda_networking.t

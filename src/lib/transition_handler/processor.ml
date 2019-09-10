@@ -6,7 +6,7 @@
  *  trees (via the catchup pipe).
  *)
 
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib.Strict_pipe
 open Coda_base
@@ -36,6 +36,8 @@ module Make (Inputs : Inputs.S) :
     , [`Frontier_dependencies] * unit Truth.false_t
     , [`Staged_ledger_diff] * unit Truth.false_t )
     External_transition.Validation.with_transition
+
+  let thing_i_did = ref None
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
   let catchup_timeout_duration =
@@ -83,6 +85,7 @@ module Make (Inputs : Inputs.S) :
       initially_validated_transition
     in
     let metadata = [("state_hash", State_hash.to_yojson transition_hash)] in
+    (* TODO: wtf is the deal with this map? *)
     Deferred.map ~f:(Fn.const ())
       (let open Deferred.Result.Let_syntax in
       let%bind mostly_validated_transition =
@@ -94,6 +97,7 @@ module Make (Inputs : Inputs.S) :
         | Ok t ->
             return (Ok t)
         | Error `Not_selected_over_frontier_root ->
+            thing_i_did := Some "rejected_transition";
             let%map () =
               Trust_system.record_envelope_sender trust_system logger sender
                 ( Trust_system.Actions.Gossiped_invalid_transition
@@ -104,6 +108,7 @@ module Make (Inputs : Inputs.S) :
             in
             Error ()
         | Error `Already_in_frontier ->
+            thing_i_did := Some "rejected_transition";
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
               "Refusing to process the transition with hash $state_hash \
                because is is already in the transition frontier" ;
@@ -119,6 +124,7 @@ module Make (Inputs : Inputs.S) :
               , (`Delta_transition_chain, Truth.True delta_state_hashes)
               , _
               , _ ) ->
+                thing_i_did := Some "put_transition_into_catchup_scheduler";
                 let timeout_duration =
                   Option.fold
                     (Transition_frontier.find frontier
@@ -152,6 +158,7 @@ module Make (Inputs : Inputs.S) :
           ~transform_result:(function
             | Error (`Invalid_staged_ledger_hash error)
             | Error (`Invalid_staged_ledger_diff error) ->
+                thing_i_did := Some "rejected_transition";
                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
                     ( metadata
@@ -162,6 +169,7 @@ module Make (Inputs : Inputs.S) :
             | Error (`Fatal_error exn) ->
                 raise exn
             | Ok breadcrumb ->
+                thing_i_did := Some "added_transition";
                 Deferred.return (Ok breadcrumb) )
       in
       Coda_metrics.(
@@ -171,7 +179,7 @@ module Make (Inputs : Inputs.S) :
         (add_and_finalize ~frontier ~catchup_scheduler
            ~processed_transition_writer ~only_if_present:false breadcrumb))
 
-  let run ~logger ~verifier ~trust_system ~time_controller ~frontier
+  let run ~config_dir ~logger ~verifier ~trust_system ~time_controller ~frontier
       ~(primary_transition_reader :
          ( external_transition_with_initial_validation Envelope.Incoming.t
          , State_hash.t )
@@ -214,6 +222,7 @@ module Make (Inputs : Inputs.S) :
       process_transition ~logger ~trust_system ~verifier ~frontier
         ~catchup_scheduler ~processed_transition_writer
     in
+    let metrics_log = Unix.(openfile ~perm:0o644 ~mode:[O_RDWR; O_CREAT; O_TRUNC] (config_dir ^/ "metrics.log")) in
     ignore
       (Reader.Merge.iter
          (* It is fine to skip the cache layer on propose transitions because it
@@ -233,35 +242,38 @@ module Make (Inputs : Inputs.S) :
                `Partially_valid_transition vt ) ]
          ~f:(fun msg ->
            let open Deferred.Let_syntax in
-           trace_recurring_task "transition_handler_processor" (fun () ->
+           thing_i_did := None;
+           let%map () = trace_recurring_task "transition_handler_processor" (fun () ->
                match msg with
-               | `Catchup_breadcrumbs
-                   (breadcrumb_subtrees, subsequent_callback_action) -> (
-                   ( match%map
-                       Deferred.Or_error.List.iter breadcrumb_subtrees
-                         ~f:(fun subtree ->
-                           Rose_tree.Deferred.Or_error.iter
-                             subtree
-                             (* It could be the case that by the time we try and
-                             * add the breadcrumb, it's no longer relevant when
-                             * we're catching up *)
-                             ~f:(add_and_finalize ~only_if_present:true) )
-                     with
-                   | Ok () ->
-                       ()
-                   | Error err ->
-                       Logger.error logger ~module_:__MODULE__
-                         ~location:__LOC__
-                         "Error, failed to attach all catchup breadcrumbs to \
-                          transition frontier: %s"
-                         (Error.to_string_hum err) )
-                   >>| fun () ->
+               | `Catchup_breadcrumbs (breadcrumb_subtrees, subsequent_callback_action) -> (
+                   thing_i_did := Some "handled_catchup_breadcrumbs";
+                   let%map () =
+                     match%map
+                         Deferred.Or_error.List.iter breadcrumb_subtrees
+                           ~f:(fun subtree ->
+                             Rose_tree.Deferred.Or_error.iter
+                               subtree
+                               (* It could be the case that by the time we try and
+                               * add the breadcrumb, it's no longer relevant when
+                               * we're catching up *)
+                               ~f:(add_and_finalize ~only_if_present:true) )
+                       with
+                     | Ok () ->
+                         ()
+                     | Error err ->
+                         Logger.error logger ~module_:__MODULE__
+                           ~location:__LOC__
+                           "Error, failed to attach all catchup breadcrumbs to \
+                            transition frontier: %s"
+                           (Error.to_string_hum err)
+                   in
                    match subsequent_callback_action with
                    | `Ledger_catchup decrement_signal ->
                        Ivar.fill decrement_signal ()
                    | `Catchup_scheduler ->
                        () )
                | `Proposed_breadcrumb breadcrumb ->
+                   thing_i_did := Some "added_proposed_breadcrumb";
                    let%map () =
                      match%map
                        add_and_finalize ~only_if_present:false breadcrumb
@@ -281,5 +293,13 @@ module Make (Inputs : Inputs.S) :
                        Transition_frontier_controller
                        .transitions_being_processed)
                | `Partially_valid_transition transition ->
-                   process_transition ~transition ) ))
+                   process_transition ~transition )
+         in
+         let str = Yojson.Safe.to_string
+           (`Assoc 
+             [ ("action", `String (Option.value ~default:"NONE" !thing_i_did))
+             ; ("metrics", (Coda_metrics.dump ())) ])
+         in
+         let len = String.length str in
+         assert (Unix.write metrics_log ~buf:(Bytes.of_string str) ~len = len)))
 end

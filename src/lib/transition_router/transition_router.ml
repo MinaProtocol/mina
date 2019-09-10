@@ -71,7 +71,7 @@ module Make (Inputs : Inputs_intf) = struct
     Transition_frontier.root frontier
     |> Transition_frontier.Breadcrumb.protocol_state
 
-  let start_transition_frontier_controller ~logger ~trust_system ~verifier
+  let start_transition_frontier_controller ~config_dir ~logger ~trust_system ~verifier
       ~network ~time_controller ~proposer_transition_reader
       ~verified_transition_writer ~clear_reader ~collected_transitions
       ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
@@ -85,7 +85,7 @@ module Make (Inputs : Inputs_intf) = struct
     transition_writer_ref := transition_frontier_controller_writer ;
     Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
     let new_verified_transition_reader =
-      Transition_frontier_controller.run ~logger ~trust_system ~verifier
+      Transition_frontier_controller.run ~config_dir ~logger ~trust_system ~verifier
         ~network ~time_controller ~collected_transitions ~frontier
         ~network_transition_reader:!transition_reader_ref
         ~proposer_transition_reader ~clear_reader
@@ -96,7 +96,7 @@ module Make (Inputs : Inputs_intf) = struct
            (Strict_pipe.Writer.write verified_transition_writer))
     |> don't_wait_for
 
-  let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
+  let start_bootstrap_controller ~config_dir ~logger ~trust_system ~verifier ~network
       ~time_controller ~proposer_transition_reader ~verified_transition_writer
       ~clear_reader ~transition_reader_ref ~transition_writer_ref ~ledger_db
       ~frontier_w frontier =
@@ -133,13 +133,13 @@ module Make (Inputs : Inputs_intf) = struct
          ~ledger_db ~frontier ~transition_reader:!transition_reader_ref)
       (fun (new_frontier, collected_transitions) ->
         Strict_pipe.Writer.kill !transition_writer_ref ;
-        start_transition_frontier_controller ~logger ~trust_system ~verifier
+        start_transition_frontier_controller ~config_dir ~logger ~trust_system ~verifier
           ~network ~time_controller ~proposer_transition_reader
           ~verified_transition_writer ~clear_reader ~collected_transitions
           ~transition_reader_ref ~transition_writer_ref ~frontier_w
           new_frontier )
 
-  let run ~logger ~trust_system ~verifier ~network ~time_controller
+  let run ~config_dir ~logger ~trust_system ~verifier ~network ~time_controller
       ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
       ~network_transition_reader ~proposer_transition_reader
       ~most_recent_valid_block:( most_recent_valid_block_reader
@@ -195,12 +195,12 @@ module Make (Inputs : Inputs_intf) = struct
         (* after waiting, we're at least at the genesis time, maybe a bit past it *)
         Consensus.Hooks.is_genesis @@ Coda_base.Block_time.now time_controller
     then
-      start_transition_frontier_controller ~logger ~trust_system ~verifier
+      start_transition_frontier_controller ~config_dir ~logger ~trust_system ~verifier
         ~network ~time_controller ~proposer_transition_reader
         ~verified_transition_writer ~clear_reader ~collected_transitions:[]
         ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier
     else
-      start_bootstrap_controller ~logger ~trust_system ~verifier ~network
+      start_bootstrap_controller ~config_dir ~logger ~trust_system ~verifier ~network
         ~time_controller ~proposer_transition_reader
         ~verified_transition_writer ~clear_reader ~transition_reader_ref
         ~transition_writer_ref ~ledger_db ~frontier_w frontier ;
@@ -247,7 +247,7 @@ module Make (Inputs : Inputs_intf) = struct
             then (
               Strict_pipe.Writer.kill !transition_writer_ref ;
               Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
-              start_bootstrap_controller ~logger ~trust_system ~verifier
+              start_bootstrap_controller ~config_dir ~logger ~trust_system ~verifier
                 ~network ~time_controller ~proposer_transition_reader
                 ~verified_transition_writer ~clear_reader
                 ~transition_reader_ref ~transition_writer_ref ~ledger_db

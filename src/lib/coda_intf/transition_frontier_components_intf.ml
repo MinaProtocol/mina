@@ -124,7 +124,8 @@ module type Transition_handler_processor_intf = sig
   type verifier
 
   val run :
-       logger:Logger.t
+       config_dir:string
+    -> logger:Logger.t
     -> verifier:verifier
     -> trust_system:Trust_system.t
     -> time_controller:Block_time.Controller.t
@@ -463,7 +464,8 @@ module type Transition_frontier_controller_intf = sig
   type verifier
 
   val run :
-       logger:Logger.t
+       config_dir:string
+    -> logger:Logger.t
     -> trust_system:Trust_system.t
     -> verifier:verifier
     -> network:network

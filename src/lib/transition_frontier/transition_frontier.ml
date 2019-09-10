@@ -26,6 +26,13 @@ module Make (Inputs : Inputs_intf) :
    and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
+  module Table = Coda_metrics.Measured.Wrap_singleton_table
+    (State_hash.Table)
+    (struct
+      let name = "transition_frontier_table_size"
+      let help = "Size of the Transition Frontier's internal hash table."
+    end)
+
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
@@ -255,7 +262,7 @@ module Make (Inputs : Inputs_intf) :
     ; mutable root: State_hash.t
     ; mutable best_tip: State_hash.t
     ; logger: Logger.t
-    ; table: Node.t State_hash.Table.t
+    ; table: Node.t Table.t
     ; consensus_local_state: Consensus.Data.Local_state.t
     ; extensions: Extensions.t
     ; extension_readers: Extensions.readers
@@ -308,7 +315,7 @@ module Make (Inputs : Inputs_intf) :
     let root_node =
       {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
     in
-    let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+    let table = Table.of_alist_exn [(root_hash, root_node)] in
     let extension_readers, extension_writers = Extensions.make_pipes () in
     let%bind num_catchup_jobs =
       let signal_reader, signal_writer = Broadcast_pipe.create `Normal in
@@ -373,15 +380,15 @@ module Make (Inputs : Inputs_intf) :
   let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
   let all_breadcrumbs t =
-    List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
+    List.map (Table.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
 
   let find t hash =
     let open Option.Let_syntax in
-    let%map node = Hashtbl.find t.table hash in
+    let%map node = Table.find t.table hash in
     node.breadcrumb
 
   let find_exn t hash =
-    let node = Hashtbl.find_exn t.table hash in
+    let node = Table.find_exn t.table hash in
     node.breadcrumb
 
   let find_in_root_history t hash =
@@ -440,18 +447,18 @@ module Make (Inputs : Inputs_intf) :
 
   let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
-  let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
+  let iter t ~f = Table.iter t.table ~f:(fun n -> f n.breadcrumb)
 
   let root t = find_exn t t.root
 
-  let root_length t = (Hashtbl.find_exn t.table t.root).length
+  let root_length t = (Table.find_exn t.table t.root).length
 
   let best_tip t = find_exn t t.best_tip
 
   let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
 
   let successor_hashes t hash =
-    let node = Hashtbl.find_exn t.table hash in
+    let node = Table.find_exn t.table hash in
     node.successor_hashes
 
   let rec successor_hashes_rec t hash =
@@ -470,7 +477,7 @@ module Make (Inputs : Inputs_intf) :
   (* Visualize the structure of the transition frontier or a particular node
    * within the frontier (for debugging purposes). *)
   module Visualizor = struct
-    let fold t ~f = Hashtbl.fold t.table ~f:(fun ~key:_ ~data -> f data)
+    let fold t ~f = Table.fold t.table ~f:(fun ~key:_ ~data -> f data)
 
     include Visualization.Make_ocamlgraph (Node)
 
@@ -479,7 +486,7 @@ module Make (Inputs : Inputs_intf) :
           let graph_with_node = add_vertex graph node in
           List.fold node.successor_hashes ~init:graph_with_node
             ~f:(fun acc_graph successor_state_hash ->
-              match State_hash.Table.find t.table successor_state_hash with
+              match Table.find t.table successor_state_hash with
               | Some child_node ->
                   add_edge acc_graph node child_node
               | None ->
@@ -515,7 +522,7 @@ module Make (Inputs : Inputs_intf) :
       failwith
         "invalid call to attach_to: hash parent_node <> parent_hash node" ;
     (* We only want to update the parent node if we don't have a dupe *)
-    Hashtbl.change t.table hash ~f:(function
+    Table.change t.table hash ~f:(function
       | Some x ->
           Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("state_hash", State_hash.to_yojson hash)]
@@ -523,7 +530,7 @@ module Make (Inputs : Inputs_intf) :
              which is already present; catchup scheduler bug?" ;
           Some x
       | None ->
-          Hashtbl.set t.table ~key:parent_hash
+          Table.set t.table ~key:parent_hash
             ~data:
               { parent_node with
                 successor_hashes= hash :: parent_node.successor_hashes } ;
@@ -534,7 +541,7 @@ module Make (Inputs : Inputs_intf) :
     let parent_hash = Breadcrumb.parent_hash breadcrumb in
     let parent_node =
       Option.value_exn
-        (Hashtbl.find t.table parent_hash)
+        (Table.find t.table parent_hash)
         ~error:
           (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
@@ -559,7 +566,7 @@ module Make (Inputs : Inputs_intf) :
    *  Modifications are in-place
   *)
   let move_root t (soon_to_be_root_node : Node.t) : Node.t =
-    let root_node = Hashtbl.find_exn t.table t.root in
+    let root_node = Table.find_exn t.table t.root in
     let root_breadcrumb = root_node.breadcrumb in
     let root = root_breadcrumb |> Breadcrumb.staged_ledger in
     let soon_to_be_root =
@@ -589,8 +596,8 @@ module Make (Inputs : Inputs_intf) :
     in
     Ledger.remove_and_reparent_exn soon_to_be_root_ledger
       soon_to_be_root_ledger ;
-    Hashtbl.remove t.table t.root ;
-    Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
+    Table.remove t.table t.root ;
+    Table.set t.table ~key:new_root_hash ~data:new_root_node ;
     t.root <- new_root_hash ;
     let num_finalized_staged_txns =
       Breadcrumb.user_commands new_root |> List.length |> Float.of_int
@@ -682,7 +689,7 @@ module Make (Inputs : Inputs_intf) :
   let add_breadcrumb_exn t breadcrumb =
     O1trace.measure "add_breadcrumb" (fun () ->
         let hash = Breadcrumb.state_hash breadcrumb in
-        let root_node = Hashtbl.find_exn t.table t.root in
+        let root_node = Table.find_exn t.table t.root in
         let old_best_tip = best_tip t in
         let local_state_was_synced_at_start =
           Consensus.Hooks.required_local_state_sync
@@ -695,7 +702,7 @@ module Make (Inputs : Inputs_intf) :
         let parent_hash = Breadcrumb.parent_hash breadcrumb in
         let parent_node =
           Option.value_exn
-            (Hashtbl.find t.table parent_hash)
+            (Table.find t.table parent_hash)
             ~error:
               (Error.of_exn
                  (Parent_not_found (`Parent parent_hash, `Target hash)))
@@ -713,10 +720,10 @@ module Make (Inputs : Inputs_intf) :
                            "debug_assert that child is preferred over parent"
                        ) ])
               = `Take ) ) ;
-        let node = Hashtbl.find_exn t.table hash in
+        let node = Table.find_exn t.table hash in
         (* 2 *)
         let distance_to_root = node.length - root_node.length in
-        let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
+        let best_tip_node = Table.find_exn t.table t.best_tip in
         (* 3 *)
         let best_tip_change =
           Consensus.Hooks.select
@@ -760,7 +767,7 @@ module Make (Inputs : Inputs_intf) :
                 ; ("max_length", `Int max_length) ] ;
             (* 4.I *)
             let heir_hash = List.hd_exn (hash_path t node.breadcrumb) in
-            let heir_node = Hashtbl.find_exn t.table heir_hash in
+            let heir_node = Table.find_exn t.table heir_hash in
             (* 4.II *)
             let bad_children_hashes =
               List.filter root_node.successor_hashes
@@ -772,21 +779,21 @@ module Make (Inputs : Inputs_intf) :
             in
             let garbage_breadcrumbs =
               List.map garbage_hashes ~f:(fun h ->
-                  Hashtbl.find_exn t.table h |> breadcrumb_of_node )
+                  Table.find_exn t.table h |> breadcrumb_of_node )
             in
             (* 4.III *)
             let unregister_sl_mask breadcrumb =
               let child = Breadcrumb.mask breadcrumb in
               let parent =
                 Breadcrumb.mask @@ breadcrumb_of_node
-                @@ Hashtbl.find_exn t.table
+                @@ Table.find_exn t.table
                 @@ Breadcrumb.parent_hash breadcrumb
               in
               ignore @@ Ledger.unregister_mask_exn parent child
             in
             let cleanup_bc bc =
               unregister_sl_mask bc ;
-              Hashtbl.remove t.table (Breadcrumb.state_hash bc)
+              Table.remove t.table (Breadcrumb.state_hash bc)
             in
             Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
@@ -833,7 +840,7 @@ module Make (Inputs : Inputs_intf) :
                   Consensus.Hooks.required_local_state_sync
                     ~consensus_state:
                       (Breadcrumb.consensus_state
-                         (Hashtbl.find_exn t.table t.best_tip).breadcrumb)
+                         (Table.find_exn t.table t.best_tip).breadcrumb)
                     ~local_state:t.consensus_local_state
                 with
                 | Some jobs ->
@@ -936,7 +943,7 @@ module Make (Inputs : Inputs_intf) :
 
   let add_breadcrumb_if_present_exn t breadcrumb =
     let parent_hash = Breadcrumb.parent_hash breadcrumb in
-    match Hashtbl.find t.table parent_hash with
+    match Table.find t.table parent_hash with
     | Some _ ->
         add_breadcrumb_exn t breadcrumb
     | None ->
@@ -952,8 +959,8 @@ module Make (Inputs : Inputs_intf) :
   let best_tip_path_length_exn {table; root; best_tip; _} =
     let open Option.Let_syntax in
     let result =
-      let%bind best_tip_node = Hashtbl.find table best_tip in
-      let%map root_node = Hashtbl.find table root in
+      let%bind best_tip_node = Table.find table best_tip in
+      let%map root_node = Table.find table root in
       best_tip_node.length - root_node.length
     in
     result |> Option.value_exn
@@ -962,7 +969,7 @@ module Make (Inputs : Inputs_intf) :
     Ledger.of_database root_snarked_ledger
 
   let wait_for_transition t target_hash =
-    if Hashtbl.mem t.table target_hash then Deferred.unit
+    if Table.mem t.table target_hash then Deferred.unit
     else
       let transition_registry = Extensions.transition_registry t.extensions in
       Extensions.Transition_registry.register transition_registry target_hash
@@ -973,7 +980,7 @@ module Make (Inputs : Inputs_intf) :
       let open Breadcrumb in
       let open Option.Let_syntax in
       let get_successor_nodes frontier breadcrumb =
-        let%map node = Hashtbl.find frontier.table @@ state_hash breadcrumb in
+        let%map node = Table.find frontier.table @@ state_hash breadcrumb in
         Node.successor_hashes node
       in
       equal breadcrumb1 breadcrumb2

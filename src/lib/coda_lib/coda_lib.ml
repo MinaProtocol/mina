@@ -697,7 +697,8 @@ let create (config : Config.t) =
             Broadcast_pipe.create genesis_transition
           in
           let valid_transitions =
-            Transition_router.run ~logger:config.logger
+            Transition_router.run ~config_dir:config.conf_dir
+              ~logger:config.logger
               ~trust_system:config.trust_system ~verifier ~network:net
               ~time_controller:config.time_controller
               ~frontier_broadcast_pipe:

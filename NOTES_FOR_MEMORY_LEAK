@@ -1,0 +1,44 @@
+# Status
+
+## The behavior
+
+The OCaml GC leaks memory on some nodes when running networks. Importantly, it does not occurr on all nodes, but it's not clear right now what it causes it specifically to occurr. It is not limited to just proposers or snark workers and is even seen on the seed which does nothing extra than the basic network communication.
+
+## Things I have ruled out
+
+- transition frontier hashtable
+- staged ledger (at least internally, could still be leaking via leaked breadcrumbs)
+- snark pool
+
+## The known leak
+
+There is one leak that is known right now, but is believed *not* to be the root cause of the main memory leak we are seeing on our testnets. The leak happens because when bootstrap occurs, the root mask of the transition frontier is never unattached from the snarked ledger database. This means that even though the transition frontier and the breadcrumbs are garbage collected, the staged ledger masks hang around. Some fixes for this have been discussed in the office -- see me (nathan) or corey for more info. This is believed not to be the main leak in question because the main leak causes a rapid, consistent, and monotonic increase to memory.
+
+## Things I would try next
+
+- testing various network topologies and instrumenting networking related code
+- instrumenting async deferreds (there could be a leak there)
+- instrumenting async pipes
+- putting memory functor over a lot of things an analyzing
+
+# Tools I have built
+
+## Memory Functor
+
+I've started a new pattern called the "memory functor" pattern, which you can find in `coda_metrics/measured.ml`. Right now there is only a functor for wrapping hashtables for which there should only ever be one copy of in the system at a time, but this pattern can be extended for many use cases. I woudl recommend continuing to expand and apply this pattern to find the memory leak.
+
+## Out of prometheus metrics logging
+
+In order to make debugging easier and not always require prometheus, the process currently writes json out to a metrics file on every block it processes in the transition frontier. An important note here is that metrics tracked this way are not tracked over time, but rather on each transition frontier processor.
+
+## jqplot.sh
+
+This shell script is a handy wrapper around performing a series of jq filters on some json data and then piping it to gnuplot. This is useful for processing the json metrics logs you get as output from a deamon right now. Usage is as follows: all arguments except the last are jq filters, each of which represents a single plot in the graph, and the last argument is the file to read the json data from.
+
+## filter_dec_sq.ml
+
+This is a very simple but convenient script for filtering over a stream of floats and only returning the numbers right after a decrease in the sequence. This is useful when making graphs from GC live words output. GC live words output always rises for a while and then drops after a GC cycle occurs. Thus, we are only interested in how much memory was left over after each GC cycle when determining the memory leak. This script just helps extract that information. Reads a new line deliminated sequence of numbers of stdin, and writes them back over stdout.
+
+## run.sh
+
+This shell script is a hacky script I put together for running networks locally with various configurations. It will execute a network, creating a tmux session to run all the nodes inside of, and also sets up a prometheus server which will scrape the nodes in the network. It's a rather ugly shell script, but it might be worth inheriting just for saving time. I have written up some basic notes on how it works.
