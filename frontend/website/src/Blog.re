@@ -28,12 +28,12 @@ let readMoreColor = c =>
 
 // Truncate HTML
 let rec truncate = (index, counter, html) =>
-  if (counter == 5) {
+  if (counter == 0) {
     Js.String.substring(~from=0, html, ~to_=index + 4);
   } else {
     let indexOf = Js.String.indexOfFrom("</p>", index, html);
     if (indexOf !== (-1)) {
-      truncate(indexOf + 1, counter + 1, html);
+      truncate(indexOf + 1, counter - 1, html);
     } else {
       html;
     };
@@ -145,7 +145,7 @@ let createPostFadedContents = html =>
                ])
              )
         }
-        dangerouslySetInnerHTML={"__html": truncate(0, 0, html)} //set to truncated html to save rendering time
+        dangerouslySetInnerHTML={"__html": truncate(0, 5, html)} //set to truncated html to save rendering time
       />
     </div>
   </div>;
