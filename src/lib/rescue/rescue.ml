@@ -1,6 +1,32 @@
 open Core_kernel
 
+(*
+   We refer below to this paper: https://eprint.iacr.org/2019/426.pdf.
+
+I arrived at this value for the number of rounds in the following way.
+As mentioned on page 34, the cost of performing the Grobner basis attack is estimated as
+
+( (n + d) choose d ) ^ omega
+where 
+
+- omega is some number which is known to be >= 2
+- n = 1 + m*N is the number of variables in the system of equations on page 3
+- d is a quantity which they estimate as ((alpha - 1)(m*N + 1) + 1) / 2
+- m is the state size, which we can choose
+- N is the number of rounds which we can choose
+
+In our case, `alpha = 11`, and I took `m = 3` which is optimal for binary Merkle trees.
+Evaluating the above formula with these values and `N = 11` and `omega = 2` yields an attack complexity
+of a little over 2^257, which if we take the same factor of 2 security margin as they use in the paper,
+gives us a security level of 257/2 ~= 128.
+
+NB: As you can see from the analysis this is really specialized to alpha = 11 and the number of rounds
+should be higher for smaller alpha.
+*)
+
 let rounds = 11
+
+let m = 3
 
 module Params = struct
   type 'a t = {mds: 'a array array; round_constants: 'a array array}
@@ -57,9 +83,10 @@ module Make (Inputs : Inputs.S) = struct
       (Array.map (to_blocks 2 [|z; z; z|]) ~f:(Array.map ~f:ignore))
       [|[|(); ()|]; [|(); ()|]|]
 
+  let r = m - 1
+
   let hash {Params.mds; round_constants} inputs =
-    let m = Array.length mds in
-    let r = m - 1 in
+    assert (Array.length mds = m) ;
     let perm = block_cipher ~rounds ~round_constants ~mds in
     let final_state =
       sponge perm (to_blocks r inputs) (Array.init m ~f:(fun _ -> Field.zero))
