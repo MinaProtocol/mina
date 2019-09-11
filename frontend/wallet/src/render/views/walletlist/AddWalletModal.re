@@ -1,22 +1,8 @@
-module Styles = {
-  open Css;
-
-  let container =
-    style([
-      margin(`auto),
-      width(`rem(22.)),
-      display(`flex),
-      flexDirection(`column),
-      alignItems(`center),
-      justifyContent(`center),
-    ]);
-};
-
 // TODO: Add validation that the wallet name isn't already in use
 [@react.component]
 let make = (~walletName, ~password, ~setModalState, ~onSubmit) => {
   <Modal title="Add Wallet" onRequestClose={() => setModalState(_ => None)}>
-    <div className=Styles.container>
+    <div className=Modal.Styles.default>
       <Alert
         kind=`Info
         message="You can change the name or delete the wallet later."

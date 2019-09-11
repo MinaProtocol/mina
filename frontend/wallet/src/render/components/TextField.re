@@ -161,17 +161,17 @@ let make =
       ~value,
       ~label,
       ~mono=false,
+      ~type_="text",
       ~button=React.null,
       ~placeholder=?,
       ~disabled=false,
-      ~type_=?,
     ) =>
   <label className=Styles.container>
     <span className=Styles.label> {React.string(label ++ ":")} </span>
     <Spacer width=0.5 />
     <input
       className={mono ? Styles.inputMono : Styles.input}
-      ?type_
+      type_
       onChange={e => onChange(ReactEvent.Form.target(e)##value)}
       value
       ?placeholder
