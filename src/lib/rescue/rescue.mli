@@ -22,5 +22,6 @@ module Make (Inputs : Inputs.S) : sig
 
   val digest : Field.t State.t -> Field.t
 
-  val hash : Field.t Params.t -> Field.t array -> Field.t
+  val hash :
+    ?init:Field.t State.t -> Field.t Params.t -> Field.t array -> Field.t
 end

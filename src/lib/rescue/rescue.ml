@@ -94,6 +94,6 @@ module Make (Inputs : Inputs.S) = struct
 
   let initial_state = Array.init m ~f:(fun _ -> Field.zero)
 
-  let hash ?(state = initial_state) params inputs =
-    update params ~state inputs |> digest
+  let hash ?(init = initial_state) params inputs =
+    update params ~state:init inputs |> digest
 end
