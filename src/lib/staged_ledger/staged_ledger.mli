@@ -102,10 +102,11 @@ val apply_diff_unchecked :
      t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
-     * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
-     * [`Staged_ledger of t]
-     * [`Pending_coinbase_data of bool * Currency.Amount.t] )
-     Deferred.Or_error.t
+       * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
+       * [`Staged_ledger of t]
+       * [`Pending_coinbase_data of bool * Currency.Amount.t]
+     , Staged_ledger_error.t )
+     Deferred.Result.t
 
 module For_tests : sig
   val materialized_snarked_ledger_hash :
