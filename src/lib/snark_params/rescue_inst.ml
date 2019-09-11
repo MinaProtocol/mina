@@ -82,7 +82,12 @@ module Checked = struct
 
   include Rescue.Make (Inputs)
 
-  let hash = hash (Rescue.Params.map ~f:Field.constant params)
+  let params =
+    Rescue.Params.map ~f:Crypto_params.Tick0.Field.Var.constant params
+
+  let update = update params
+
+  let hash ?init = hash ?init params
 end
 
 let%test_unit "iterativeness" =
