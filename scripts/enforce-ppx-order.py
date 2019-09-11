@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-# In dune files, whenever there's preprocessing, the static enforcement ppx appears before the versioning ppx, because the
-# former checks for occurrences of the latter, so we don't want it expanded away
+# In dune files, enforce order of ppx processing. The static check ppx must precede the register_version ppx, which
+# must precede the version ppx. Otherwise, a ppx may look for items that have been expanded away.
 
 import subprocess
 import string
@@ -22,13 +22,20 @@ ppx_static_checks = sexpdata.loads ('ppx_static_checks')
 ppx_register_version = sexpdata.loads ('ppx_register_version')
 ppx_versioning = sexpdata.loads ('ppx_coda')
 
-def ppx_not_found (dune,ppx) :
-    print ("In dune file " + dune + ", the preprocessing clause does not contain " + (sexpdata.dumps (ppx)))
-    exit (1)
+exit_code = 0
+
+def get_ppx_ndx (dune,ppxs,ppx) :
+    try :
+        ppxs.index (ppx)
+    except :
+        print ("In dune file " + dune + ", the preprocessing clause does not contain " + (sexpdata.dumps (ppx)))
+        global exit_code
+        exit_code = 1
 
 def bad_ppx_order (dune,ppx1,ppx2) :
     print ("In dune file " + dune + ", in the preprocessing clause, " + (sexpdata.dumps (ppx1)) + " does not precede " + (sexpdata.dumps (ppx2)))
-    exit (2)
+    global exit_code
+    exit_code = 1
 
 for dune in dunes :
     with open (dune) as fp :
@@ -46,35 +53,17 @@ for dune in dunes :
                         elif sexpdata.car (subclause) == pps :
                             # if there is preprocessing, static checks before versioning, and both must occur
                             ppxs = sexpdata.cdr (subclause)
-                            try :
-                                static_checks_ndx = ppxs.index (ppx_static_checks)
-                            except :
-                                ppx_not_found (dune,ppx_static_checks)
-                            try :
-                                register_version_ndx = ppxs.index (ppx_register_version)
-                            except :
-                                ppx_not_found (dune,ppx_register_version)
-                            try :
-                                versioning_ndx = ppxs.index (ppx_versioning)
-                            except :
-                                ppx_not_found (dune,ppx_versioning)
+                            static_checks_ndx = get_ppx_ndx (dune,ppxs,ppx_static_checks)
+                            register_version_ndx = get_ppx_ndx (dune,ppxs,ppx_register_version)
+                            versioning_ndx = get_ppx_ndx (dune,ppxs,ppx_versioning)
+                            if (static_checks_ndx == None or register_version_ndx == None or versioning_ndx == None) :
+                                continue
                             if not (static_checks_ndx < register_version_ndx) :
                                 bad_ppx_order (dune,ppx_static_checks,ppx_register_version)
                             if not (register_version_ndx < versioning_ndx) :
                                 bad_ppx_order (dune,ppx_register_version,ppx_versioning)
                         else :
                             print ("In dune file " + dune + ", in the library preprocessing clause, expected pps or no-preprocessing subclause in preprocess clause, got: " + str(subclause))
-                            exit (1)
+                            exit_code = 1
 
-                          
-
-                              
-                
-            
-            
-
-      
-      
-
-    
-
+exit (exit_code)
