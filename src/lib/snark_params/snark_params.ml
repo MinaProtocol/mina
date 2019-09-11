@@ -8,6 +8,7 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
+module Rescue = Rescue_inst
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -672,7 +673,7 @@ module Tick = struct
     let final_exponentiation = FE.final_exponentiation6
   end
 
-  module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
+  module Run = Crypto_params.Runners.Tick
 
   let m : Run.field Snarky.Snark.m = (module Run)
 
