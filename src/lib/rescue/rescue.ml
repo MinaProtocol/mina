@@ -17,8 +17,8 @@ module Make (Inputs : Inputs.S) = struct
   let add_block ~state block =
     Array.iteri block ~f:(fun i bi -> state.(i) <- Field.( + ) state.(i) bi)
 
-  let sponge perm inputs state =
-    Array.fold ~init:state inputs ~f:(fun state block ->
+  let sponge perm blocks state =
+    Array.fold ~init:state blocks ~f:(fun state block ->
         add_block ~state block ; perm state )
 
   let sbox0, sbox1 = (alphath_root, to_the_alpha)
@@ -42,7 +42,7 @@ module Make (Inputs : Inputs.S) = struct
         add_block ~state round_constants.(r + 1) ;
         state )
 
-  let chunk r a =
+  let to_blocks r a =
     let n = Array.length a in
     Array.init
       ((n + r - 1) / r)
@@ -51,10 +51,10 @@ module Make (Inputs : Inputs.S) = struct
             let k = (r * i) + j in
             if k < n then a.(k) else Field.zero ) )
 
-  let%test_unit "chunk" =
+  let%test_unit "block" =
     let z = Field.zero in
     [%test_eq: unit array array]
-      (Array.map (chunk 2 [|z; z; z|]) ~f:(Array.map ~f:ignore))
+      (Array.map (to_blocks 2 [|z; z; z|]) ~f:(Array.map ~f:ignore))
       [|[|(); ()|]; [|(); ()|]|]
 
   let hash {Params.mds; round_constants} inputs =
@@ -62,7 +62,7 @@ module Make (Inputs : Inputs.S) = struct
     let r = m - 1 in
     let perm = block_cipher ~rounds ~round_constants ~mds in
     let final_state =
-      sponge perm (chunk r inputs) (Array.init m ~f:(fun _ -> Field.zero))
+      sponge perm (to_blocks r inputs) (Array.init m ~f:(fun _ -> Field.zero))
     in
     final_state.(0)
 end
