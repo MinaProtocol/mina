@@ -104,13 +104,19 @@ module Diff : sig
     with type V1.t = t
 end
 
-type t = {diff: Diff.t; creator: Public_key.Compressed.t}
+type t =
+  { diff: Diff.t
+  ; creator: Public_key.Compressed.t
+  ; state_body_hash: State_body_hash.Stable.V1.t }
 [@@deriving sexp, to_yojson, fields]
 
 module Stable :
   sig
     module V1 : sig
-      type t = {diff: Diff.t; creator: Public_key.Compressed.t}
+      type t =
+        { diff: Diff.t
+        ; creator: Public_key.Compressed.t
+        ; state_body_hash: State_body_hash.Stable.V1.t }
       [@@deriving sexp, to_yojson, bin_io, version]
     end
 
