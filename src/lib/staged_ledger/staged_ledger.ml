@@ -1294,6 +1294,7 @@ let%test_module "test" =
       let diff =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
+          ~state_body_hash:State_body_hash.dummy
       in
       let diff' = Staged_ledger_diff.forget diff in
       let%bind verifier = Verifier.create () in

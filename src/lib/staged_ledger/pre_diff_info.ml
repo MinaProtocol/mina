@@ -272,7 +272,9 @@ let get' (t : With_valid_signatures.t) =
       t2.completed_works t.state_body_hash
   in
   let open Result.Let_syntax in
-  let%bind p1 = apply_pre_diff_with_at_most_two (fst t.diff) in
+  let%bind p1 =
+    apply_pre_diff_with_at_most_two (fst t.diff) t.state_body_hash
+  in
   let%map p2 =
     Option.value_map
       ~f:(fun d -> apply_pre_diff_with_at_most_one d)
