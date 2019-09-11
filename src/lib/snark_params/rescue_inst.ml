@@ -51,8 +51,11 @@ module Inputs = struct
 end
 
 include Rescue.Make (Inputs)
+module State = Rescue.State
 
-let hash = hash params
+let update ~state = update ~state params
+
+let hash ?init = hash ?init params
 
 module Checked = struct
   open Crypto_params.Runners.Tick
@@ -81,6 +84,18 @@ module Checked = struct
 
   let hash = hash (Rescue.Params.map ~f:Field.constant params)
 end
+
+let%test_unit "iterativeness" =
+  let open Crypto_params.Tick0 in
+  let x1 = Field.random () in
+  let x2 = Field.random () in
+  let x3 = Field.random () in
+  let x4 = Field.random () in
+  let s_full = update ~state:initial_state [|x1; x2; x3; x4|] in
+  let s_it =
+    update ~state:(update ~state:initial_state [|x1; x2|]) [|x3; x4|]
+  in
+  [%test_eq: Field.t array] s_full s_it
 
 let%test_unit "rescue" =
   let module T = Crypto_params.Tick0 in

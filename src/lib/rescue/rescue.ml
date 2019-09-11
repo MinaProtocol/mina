@@ -88,6 +88,7 @@ module Make (Inputs : Inputs.S) = struct
   let r = m - 1
 
   let update params ~state inputs =
+    let state = Array.copy state in
     sponge (block_cipher params) (to_blocks r inputs) ~state
 
   let digest state = state.(0)
