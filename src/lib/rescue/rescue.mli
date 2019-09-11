@@ -15,7 +15,10 @@ module Make (Inputs : Inputs.S) : sig
   open Inputs
 
   val update :
-    Field.t Params.t -> Field.t State.t -> Field.t array -> Field.t State.t
+       Field.t Params.t
+    -> state:Field.t State.t
+    -> Field.t array
+    -> Field.t State.t
 
   val digest : Field.t State.t -> Field.t
 
