@@ -4,7 +4,6 @@ open Core_kernel
    1 / 11
    =
 38089537243562684911222013446582397389246099927230862792530457200932138920519187975508085239809399019470973610807689524839248234083267140972451128958905814696110378477590967674064016488951271336010850653690825603837076796509091
-*)
 
 module Chain = struct
   type move = Add of int * int | Sub of int * int [@@deriving sexp]
@@ -48,30 +47,43 @@ module Chain = struct
            compare (List.length c1) (List.length c2) )
     |> value_exn
 end
+*)
 
-type params = {r: int}
+let rounds = 11
 
-module type Params_intf = sig
-  module Impl : Snarky.Snark_intf.Run
+module Params = struct
+  type 'a t = {mds: 'a array array; round_constants: 'a array array}
+  [@@deriving bin_io]
 
-  open Impl
+  let map {mds; round_constants} ~f =
+    let f = Array.map ~f:(Array.map ~f) in
+    {mds= f mds; round_constants= f round_constants}
 
-  val to_the_alpha : Field.t -> Field.t
-  val alphath_root : Field.t -> Field.t
+  let create ~m ~random_elt =
+    let arr rows cols =
+      Array.init rows ~f:(fun _ -> Array.init cols ~f:(fun _ -> random_elt ()))
+    in
+    {mds= arr m m; round_constants= arr ((2 * rounds) + 1) m}
 end
 
-module Make (Run : Snarky.Snark_intf.Run) = struct
-  open Run
+(*
 
-  module Block = struct
-    type t = Field.t array
+  let to_the_alpha x =
+    let open Field in
+    let zero = square in
+    let one a = square a * x in
+    let one' = x in
+    one' |> zero |> one |> one
 
-    let add = Array.map2_exn ~f:Field.( + )
-  end
+  let alphath_root x =
+    let open Field in
+    let y = exists typ in
+    let y10 = y |> square |> square |> ( * ) y |> square in
+    assert_r1cs y10 y x ; y
+*)
 
-  let split n arr =
-    let a = Array.slice arr in
-    (a 0 n, a n (Array.length arr))
+module Make (Inputs : Inputs.S) = struct
+  open Inputs
 
   (* A good choice of parameters:
    alpha = 11
@@ -87,43 +99,18 @@ module Make (Run : Snarky.Snark_intf.Run) = struct
   let add_block ~state block =
     Array.iteri block ~f:(fun i bi -> state.(i) <- Field.( + ) state.(i) bi)
 
-  let sponge perm inputs state ~output_length =
-    let state =
-      Array.fold ~init:state inputs ~f:(fun state block ->
-          add_block ~state block ; perm state )
-    in
-    Array.slice state 0 output_length
-
-  let alpha = 11
+  let sponge perm inputs state =
+    Array.fold ~init:state inputs ~f:(fun state block ->
+        add_block ~state block ; perm state )
 
   (* With alpha = 11 can get away with just 11 rounds. *)
 
   (* sage: (2*753) * (1 + 1.6666) / (10 * 3 * (2 * 5)) 
  *)
-  let security _num_rounds = ()
-
-  let to_the_alpha x =
-    let open Field in
-    let zero = square in
-    let one a = square a * x in
-    let one' = x in
-    one' |> zero |> one |> one
-
-  let alphath_root x =
-    let open Field in
-    let y = exists typ in
-    let y10 = y |> square |> square |> ( * ) y |> square in
-    assert_r1cs y10 y x ; y
 
   let sbox1 = to_the_alpha
 
   let sbox0 = alphath_root
-
-  let round_constants ~m =
-    let max_rounds = 100 in
-    let x = Field.constant (Field.Constant.random ()) in
-    let arr = Array.init m ~f:(fun _ -> x) in
-    Array.init max_rounds ~f:(fun _ -> arr)
 
   let for_ n ~init ~f =
     let rec go i acc = if Int.(i = n) then acc else go (i + 1) (f i acc) in
@@ -131,7 +118,7 @@ module Make (Run : Snarky.Snark_intf.Run) = struct
 
   let apply matrix v =
     let dotv row =
-      Array.reduce_exn (Array.map2_exn v row ~f:Field.scale) ~f:Field.( + )
+      Array.reduce_exn (Array.map2_exn v row ~f:Field.( * )) ~f:Field.( + )
     in
     Array.map matrix ~f:dotv
 
@@ -144,22 +131,11 @@ module Make (Run : Snarky.Snark_intf.Run) = struct
         add_block ~state round_constants.(r + 1) ;
         state )
 
-  let mds ~m =
-    let x = Field.Constant.random () in
-    let arr = Array.init m ~f:(fun _ -> x) in
-    Array.init m ~f:(fun _ -> arr)
-
-  let hash inputs =
-    let rounds = 11 in
-    let m = 3 in
-    let round_constants = round_constants ~m in
-    let perm = block_cipher ~rounds ~round_constants ~mds:(mds ~m) in
-    sponge perm inputs (Array.init m ~f:(fun _ -> Field.zero)) ~output_length:1
-
-  let () =
-    Run.constraint_count (fun () ->
-        let x = exists Field.typ in
-        let y = exists Field.typ in
-        hash [|[|x; y|]|] )
-    |> printf "%d\n%!"
+  let hash {Params.mds; round_constants} inputs =
+    let m = Array.length mds in
+    let perm = block_cipher ~rounds ~round_constants ~mds in
+    let final_state =
+      sponge perm inputs (Array.init m ~f:(fun _ -> Field.zero))
+    in
+    final_state.(0)
 end
