@@ -161,6 +161,7 @@ let make =
       ~value,
       ~label,
       ~mono=false,
+      ~type_="text",
       ~button=React.null,
       ~placeholder=?,
       ~disabled=false,
@@ -170,7 +171,7 @@ let make =
     <Spacer width=0.5 />
     <input
       className={mono ? Styles.inputMono : Styles.input}
-      type_="text"
+      type_
       onChange={e => onChange(ReactEvent.Form.target(e)##value)}
       value
       ?placeholder

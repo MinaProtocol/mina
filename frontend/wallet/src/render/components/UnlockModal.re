@@ -1,18 +1,18 @@
-// TODO: Add validation that the wallet name isn't already in use
-
 [@react.component]
-let make = (~walletName, ~setModalState, ~onSubmit) => {
-  <Modal title="Add Wallet" onRequestClose={() => setModalState(_ => None)}>
+let make = (~wallet, ~password, ~setModalState, ~onSubmit) => {
+  <Modal title="Unlock Wallet" onRequestClose={() => setModalState(_ => None)}>
     <div className=Modal.Styles.default>
-      <Alert
-        kind=`Info
-        message="You can change the name or delete the wallet later."
-      />
+      <p className=Theme.Text.Body.regular>
+        {React.string("Please enter password for ")}
+        <WalletName pubkey=wallet />
+        {React.string(".")}
+      </p>
       <Spacer height=1. />
       <TextField
-        label="Name"
+        label="Pass"
+        type_="password"
         onChange={value => setModalState(_ => Some(value))}
-        value=walletName
+        value=password
       />
       <Spacer height=1.5 />
       <div className=Css.(style([display(`flex)]))>
@@ -26,7 +26,7 @@ let make = (~walletName, ~setModalState, ~onSubmit) => {
           label="Create"
           style=Button.Green
           onClick={_ => {
-            onSubmit(walletName);
+            onSubmit(password);
             setModalState(_ => None);
           }}
         />
