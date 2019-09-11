@@ -3,15 +3,6 @@
   (public_name rescue)
   (preprocess (pps ppx_jane ppx_deriving.eq))
   (inline_tests)
-  ; (modules rescue)
   (libraries
     snarky
     core_kernel ))
-
-;(executable
-;(preprocess
-;  (pps ppx_jane))
-;  (name test)
-;  (modules test)
-;  (libraries  rescue snark_params snarky core_kernel)
-;  (modes native))
