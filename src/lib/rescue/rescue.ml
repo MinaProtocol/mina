@@ -9,12 +9,6 @@ module Params = struct
   let map {mds; round_constants} ~f =
     let f = Array.map ~f:(Array.map ~f) in
     {mds= f mds; round_constants= f round_constants}
-
-  let create ~m ~random_elt =
-    let arr rows cols =
-      Array.init rows ~f:(fun _ -> Array.init cols ~f:(fun _ -> random_elt ()))
-    in
-    {mds= arr m m; round_constants= arr ((2 * rounds) + 1) m}
 end
 
 module Make (Inputs : Inputs.S) = struct

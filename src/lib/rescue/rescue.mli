@@ -1,5 +1,6 @@
 module Params : sig
-  type 'a t [@@deriving bin_io]
+  type 'a t = {mds: 'a array array; round_constants: 'a array array}
+  [@@deriving bin_io]
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
