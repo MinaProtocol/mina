@@ -632,7 +632,7 @@ let daemon logger =
          let trust_system = Trust_system.create ~db_dir:trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let time_controller =
-           Block_time.Controller.create Block_time.Controller.basic
+           Block_time.Controller.create @@ Block_time.Controller.basic ~logger
          in
          let initial_propose_keypairs =
            propose_keypair |> Option.to_list |> Keypair.Set.of_list
