@@ -5,8 +5,19 @@ module Params : sig
   val map : 'a t -> f:('a -> 'b) -> 'b t
 end
 
+module State : sig
+  type 'a t = 'a array
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+end
+
 module Make (Inputs : Inputs.S) : sig
   open Inputs
+
+  val update :
+    Field.t Params.t -> Field.t State.t -> Field.t array -> Field.t State.t
+
+  val digest : Field.t State.t -> Field.t
 
   val hash : Field.t Params.t -> Field.t array -> Field.t
 end

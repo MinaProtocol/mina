@@ -37,6 +37,8 @@ module Params = struct
     {mds= f mds; round_constants= f round_constants}
 end
 
+module State = Array
+
 module Make (Inputs : Inputs.S) = struct
   open Inputs
 
@@ -59,7 +61,7 @@ module Make (Inputs : Inputs.S) = struct
     in
     Array.map matrix ~f:dotv
 
-  let block_cipher state ~rounds ~round_constants ~mds =
+  let block_cipher {Params.round_constants; mds} state =
     add_block ~state round_constants.(0) ;
     for_ (2 * rounds) ~init:state ~f:(fun r state ->
         let sbox = if Int.(r mod 2 = 0) then sbox0 else sbox1 in
@@ -85,11 +87,11 @@ module Make (Inputs : Inputs.S) = struct
 
   let r = m - 1
 
-  let hash {Params.mds; round_constants} inputs =
-    assert (Array.length mds = m) ;
-    let perm = block_cipher ~rounds ~round_constants ~mds in
-    let final_state =
-      sponge perm (to_blocks r inputs) (Array.init m ~f:(fun _ -> Field.zero))
-    in
-    final_state.(0)
+  let update params state inputs =
+    sponge (block_cipher params) (to_blocks r inputs) state
+
+  let digest state = state.(0)
+
+  let hash params inputs =
+    update params inputs (Array.init m ~f:(fun _ -> Field.zero)) |> digest
 end
