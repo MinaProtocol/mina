@@ -35,7 +35,7 @@ module Child_process = {
   [@bs.obj] external option: (~env: env=?, unit) => option = "";
 
   [@bs.module "child_process"]
-  external execSync: (string, option) => string = "execSync";
+  external execSync: (string, option) => Node_buffer.t = "execSync";
 };
 
 let load = path => {
@@ -51,7 +51,7 @@ let load = path => {
       ),
     );
   let content = Node.Fs.readFileAsUtf8Sync(path);
-  (html, content);
+  (Node_buffer.toString(html), content);
 };
 
 let suffix = ".markdown";
