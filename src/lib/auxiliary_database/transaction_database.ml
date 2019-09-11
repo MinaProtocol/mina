@@ -109,7 +109,7 @@ module For_tests = struct
     let time_gen =
       let time_now =
         Block_time.Time.to_span_since_epoch
-          (Block_time.Time.now Block_time.Time.Controller.basic)
+          (Block_time.Time.now @@ Block_time.Time.Controller.basic ~logger)
       in
       let time_max = Block_time.Time.Span.to_ms time_now in
       let time_min = Int64.(time_max - of_year 5) in

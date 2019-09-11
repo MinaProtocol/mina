@@ -29,7 +29,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let trust_system = Trust_system.null ()
 
-    let time_controller = Block_time.Controller.basic
+    let time_controller = Block_time.Controller.basic ~logger
 
     let timeout_duration = Block_time.Span.of_ms 200L
 
