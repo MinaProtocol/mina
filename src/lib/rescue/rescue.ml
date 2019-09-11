@@ -1,6 +1,32 @@
 open Core_kernel
 
+(*
+   We refer below to this paper: https://eprint.iacr.org/2019/426.pdf.
+
+I arrived at this value for the number of rounds in the following way.
+As mentioned on page 34, the cost of performing the Grobner basis attack is estimated as
+
+( (n + d) choose d ) ^ omega
+where 
+
+- omega is some number which is known to be >= 2
+- n = 1 + m*N is the number of variables in the system of equations on page 3
+- d is a quantity which they estimate as ((alpha - 1)(m*N + 1) + 1) / 2
+- m is the state size, which we can choose
+- N is the number of rounds which we can choose
+
+In our case, `alpha = 11`, and I took `m = 3` which is optimal for binary Merkle trees.
+Evaluating the above formula with these values and `N = 11` and `omega = 2` yields an attack complexity
+of a little over 2^257, which if we take the same factor of 2 security margin as they use in the paper,
+gives us a security level of 257/2 ~= 128.
+
+NB: As you can see from the analysis this is really specialized to alpha = 11 and the number of rounds
+should be higher for smaller alpha.
+*)
+
 let rounds = 11
+
+let m = 3
 
 module Params = struct
   type 'a t = {mds: 'a array array; round_constants: 'a array array}
@@ -11,14 +37,16 @@ module Params = struct
     {mds= f mds; round_constants= f round_constants}
 end
 
+module State = Array
+
 module Make (Inputs : Inputs.S) = struct
   open Inputs
 
   let add_block ~state block =
     Array.iteri block ~f:(fun i bi -> state.(i) <- Field.( + ) state.(i) bi)
 
-  let sponge perm inputs state =
-    Array.fold ~init:state inputs ~f:(fun state block ->
+  let sponge perm blocks state =
+    Array.fold ~init:state blocks ~f:(fun state block ->
         add_block ~state block ; perm state )
 
   let sbox0, sbox1 = (alphath_root, to_the_alpha)
@@ -33,7 +61,7 @@ module Make (Inputs : Inputs.S) = struct
     in
     Array.map matrix ~f:dotv
 
-  let block_cipher state ~rounds ~round_constants ~mds =
+  let block_cipher {Params.round_constants; mds} state =
     add_block ~state round_constants.(0) ;
     for_ (2 * rounds) ~init:state ~f:(fun r state ->
         let sbox = if Int.(r mod 2 = 0) then sbox0 else sbox1 in
@@ -42,7 +70,7 @@ module Make (Inputs : Inputs.S) = struct
         add_block ~state round_constants.(r + 1) ;
         state )
 
-  let chunk r a =
+  let to_blocks r a =
     let n = Array.length a in
     Array.init
       ((n + r - 1) / r)
@@ -51,18 +79,19 @@ module Make (Inputs : Inputs.S) = struct
             let k = (r * i) + j in
             if k < n then a.(k) else Field.zero ) )
 
-  let%test_unit "chunk" =
+  let%test_unit "block" =
     let z = Field.zero in
     [%test_eq: unit array array]
-      (Array.map (chunk 2 [|z; z; z|]) ~f:(Array.map ~f:ignore))
+      (Array.map (to_blocks 2 [|z; z; z|]) ~f:(Array.map ~f:ignore))
       [|[|(); ()|]; [|(); ()|]|]
 
-  let hash {Params.mds; round_constants} inputs =
-    let m = Array.length mds in
-    let r = m - 1 in
-    let perm = block_cipher ~rounds ~round_constants ~mds in
-    let final_state =
-      sponge perm (chunk r inputs) (Array.init m ~f:(fun _ -> Field.zero))
-    in
-    final_state.(0)
+  let r = m - 1
+
+  let update params state inputs =
+    sponge (block_cipher params) (to_blocks r inputs) state
+
+  let digest state = state.(0)
+
+  let hash params inputs =
+    update params inputs (Array.init m ~f:(fun _ -> Field.zero)) |> digest
 end
