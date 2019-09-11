@@ -7,8 +7,8 @@ let client = Client.createClient();
 
   open Constants;
   Coda.unlock(~publicKey=faucetKey, ~password=faucetPassword);
-  Coda.unlockOpt(~publicKey=echoKey, ~password=echoKey);
-  Coda.unlockOpt(~publicKey=echoKey2, ~password=echoKey2);
+  Coda.unlockOpt(~publicKey=echoKey, ~password=echoPassword);
+  Coda.unlockOpt(~publicKey=echoKey2, ~password=echoPassword2);
   Coda.unlockOpt(~publicKey=repeaterKey, ~password=repeaterPassword);
 };
 
