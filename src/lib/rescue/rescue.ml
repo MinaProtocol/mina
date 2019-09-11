@@ -93,5 +93,5 @@ module Make (Inputs : Inputs.S) = struct
   let digest state = state.(0)
 
   let hash params inputs =
-    update params inputs (Array.init m ~f:(fun _ -> Field.zero)) |> digest
+    update params (Array.init m ~f:(fun _ -> Field.zero)) inputs |> digest
 end
