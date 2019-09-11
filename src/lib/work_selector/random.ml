@@ -9,11 +9,11 @@ struct
     let unseen_jobs = Lib.all_works staged_ledger state ~logger in
     match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
     | [] ->
-        ([], state)
+        (None, state)
     | expensive_work ->
         let i = Random.int (List.length expensive_work) in
         let x = List.nth_exn expensive_work i in
-        (Lib.pair_to_list x, Lib.State.set state x)
+        (Some x, Lib.State.set state x)
 end
 
 let%test_module "test" =
