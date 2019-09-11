@@ -35,6 +35,9 @@ let chain_id =
      let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
      Blake2.to_hex b2)
 
+[%%inject
+"daemon_expiry", daemon_expiry]
+
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -264,6 +267,22 @@ let daemon logger =
          ~metadata:
            [ ("commit", `String Coda_version.commit_id)
            ; ("branch", `String Coda_version.branch) ] ;
+       if not @@ String.equal daemon_expiry "never" then (
+         Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+           "Daemon will expire at $exp"
+           ~metadata:[("exp", `String daemon_expiry)] ;
+         let tm =
+           (* same approach as in Consensus.Constants.genesis_state_timestamp *)
+           let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
+           Core.Time.of_string_gen
+             ~if_no_timezone:(`Use_this_one default_timezone) daemon_expiry
+         in
+         Clock.run_at tm
+           (fun () ->
+             Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+               "Daemon has expired, shutting down" ;
+             Core.exit 0 )
+           () ) ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Booting may take several seconds, please wait" ;
        let libp2p_keypair =
@@ -613,7 +632,7 @@ let daemon logger =
          let trust_system = Trust_system.create ~db_dir:trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let time_controller =
-           Block_time.Controller.create Block_time.Controller.basic
+           Block_time.Controller.create @@ Block_time.Controller.basic ~logger
          in
          let initial_propose_keypairs =
            propose_keypair |> Option.to_list |> Keypair.Set.of_list
