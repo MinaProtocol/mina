@@ -11,9 +11,6 @@ let protocol_state_body = salt protocol_state_body
 
 let account = salt account
 
-let merkle_tree =
-  Array.init Snark_params.ledger_depth ~f:(fun i -> salt (merkle_tree i))
-
 let proof_of_work = salt proof_of_work
 
 let merge_snark = salt merge_snark
@@ -32,10 +29,6 @@ let vrf_message = salt vrf_message
 
 let vrf_output = salt vrf_output
 
-let coinbase_merkle_tree =
-  Array.init Snark_params.pending_coinbase_depth ~f:(fun i ->
-      salt (coinbase_merkle_tree i) )
-
 let coinbase = salt coinbase
 
 let pending_coinbases = salt pending_coinbases
@@ -43,3 +36,32 @@ let pending_coinbases = salt pending_coinbases
 let coinbase_stack = salt coinbase_stack
 
 let checkpoint_list = salt checkpoint_list
+
+module Rescue = struct
+  let prefix_to_field (s : Hash_prefixes.t) =
+    let open Snark_params.Tick in
+    let s = (s :> string) in
+    assert (8 * String.length s < Field.size_in_bits) ;
+    Snark_params.Tick.Field.project
+      Fold_lib.Fold.(to_list (string_bits (s :> string)))
+
+  let salt (s : Hash_prefixes.t) =
+    Snark_params.Rescue.(update ~state:initial_state [|prefix_to_field s|])
+
+  let merkle_tree =
+    Array.init Snark_params.ledger_depth ~f:(fun i -> salt (merkle_tree i))
+
+  let%test_unit "rescue salt" =
+    let open Snark_params in
+    let open Tick in
+    let x = Field.random () in
+    let y = Field.random () in
+    [%test_eq: Field.t array]
+      (Rescue.update ~state:merkle_tree.(0) [|x; y|])
+      (Rescue.update ~state:Rescue.initial_state
+         [|prefix_to_field (Hash_prefixes.merkle_tree 0); Field.zero; x; y|])
+
+  let coinbase_merkle_tree =
+    Array.init Snark_params.pending_coinbase_depth ~f:(fun i ->
+        salt (coinbase_merkle_tree i) )
+end

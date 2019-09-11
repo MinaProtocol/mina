@@ -1,3 +1,9 @@
+module Rescue : sig
+  val merkle_tree : Snark_params.Tick.Field.t Rescue.State.t array
+
+  val coinbase_merkle_tree : Snark_params.Tick.Field.t Rescue.State.t array
+end
+
 open Snark_params
 
 val length_in_triples : int
@@ -9,10 +15,6 @@ val protocol_state_body : Tick.Pedersen.State.t
 val signature : Tick.Pedersen.State.t
 
 val account : Tick.Pedersen.State.t
-
-val merkle_tree : Tick.Pedersen.State.t array
-
-val coinbase_merkle_tree : Tick.Pedersen.State.t array
 
 val proof_of_work : Tick.Pedersen.State.t
 
