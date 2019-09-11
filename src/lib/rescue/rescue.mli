@@ -9,5 +9,5 @@ end
 module Make (Inputs : Inputs.S) : sig
   open Inputs
 
-  val hash : Field.t Params.t -> Field.t array array -> Field.t
+  val hash : Field.t Params.t -> Field.t array -> Field.t
 end
