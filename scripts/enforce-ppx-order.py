@@ -64,6 +64,7 @@ for dune in dunes :
                                 bad_ppx_order (dune,ppx_register_version,ppx_versioning)
                         else :
                             print ("In dune file " + dune + ", in the library preprocessing clause, expected pps or no-preprocessing subclause in preprocess clause, got: " + str(subclause))
+                            global exit_code
                             exit_code = 1
 
 exit (exit_code)
