@@ -171,35 +171,42 @@ module Gen = struct
     if Int.(n_commands = 0) then return []
     else
       let n_accounts = Array.length account_info in
-      (* How many commands will be issued from each account? *)
-      let%bind command_splits =
-        Quickcheck_lib.gen_division n_commands n_accounts
-      in
-      let command_splits' = Array.of_list command_splits in
-      (* List of payment senders in the final order. *)
-      let%bind command_senders =
-        Quickcheck_lib.shuffle
-        @@ List.concat_mapi command_splits ~f:(fun idx cmds ->
-               List.init cmds ~f:(Fn.const idx) )
-      in
-      (* within the accounts, how will the currency be split into separate
-         payments? *)
-      let%bind currency_splits =
-        Quickcheck_lib.init_gen_array
-          ~f:(fun i ->
-            let%bind spend_all = bool in
-            let balance = Tuple3.get2 account_info.(i) in
-            let amount_to_spend =
-              if spend_all then balance
-              else Currency.Amount.of_int (Currency.Amount.to_int balance / 2)
-            in
-            Quickcheck_lib.gen_division_currency amount_to_spend
-              command_splits'.(i) )
-          n_accounts
+      let%bind command_senders, currency_splits =
+        (* How many commands will be issued from each account? *)
+        (let%bind command_splits =
+           Quickcheck_lib.gen_division n_commands n_accounts
+         in
+         let command_splits' = Array.of_list command_splits in
+         (* List of payment senders in the final order. *)
+         let%bind command_senders =
+           Quickcheck_lib.shuffle
+           @@ List.concat_mapi command_splits ~f:(fun idx cmds ->
+                  List.init cmds ~f:(Fn.const idx) )
+         in
+         (* within the accounts, how will the currency be split into separate
+            payments? *)
+         let%bind currency_splits =
+           Quickcheck_lib.init_gen_array
+             ~f:(fun i ->
+               let%bind spend_all = bool in
+               let balance = Tuple3.get2 account_info.(i) in
+               let amount_to_spend =
+                 if spend_all then balance
+                 else
+                   Currency.Amount.of_int (Currency.Amount.to_int balance / 2)
+               in
+               Quickcheck_lib.gen_division_currency amount_to_spend
+                 command_splits'.(i) )
+             n_accounts
+         in
+         return (command_senders, currency_splits))
         |> (* We need to ensure each command has enough currency for a fee of 2
-             or more, so it'll be enough to buy the requisite transaction snarks.
-          *)
-           Quickcheck.Generator.filter ~f:(fun splits ->
+              or more, so it'll be enough to buy the requisite transaction
+              snarks. It's important that the backtracking from filter goes and
+              redraws command_splits as well as currency_splits, so we don't get
+              stuck in a situation where it's very unlikely for the predicate to
+              pass. *)
+           Quickcheck.Generator.filter ~f:(fun (_, splits) ->
                Array.for_all splits ~f:(fun split ->
                    List.for_all split ~f:(fun amt ->
                        Currency.Amount.(amt >= of_int 2) ) ) )
