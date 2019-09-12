@@ -4,7 +4,7 @@ date: 2019-09-11
 author: Christine Yip & Pranay Mohan
 ---
 
-We've arrived at the 8th week since Testnet [Beta] was launched. Last week, we saw about 40 testnet users participating in the 'Grab Bag' challenges and members becoming leaders in the growing community. Read on to check out the testnet findings of last week and the exciting things that the Codans have been building. Together, the community racked up more than 250,000 Testnet Points (check out the [leaderboard](https://codaprotocol.com/testnet.html)) and this week, we have a new challenge again! 
+We’ve arrived at the 8th week since Testnet [Beta] was launched. Last week, we saw about 40 testnet users participating in the ‘Grab Bag’ challenges and members becoming leaders in the growing community. Read on to check out the testnet findings of last week and the exciting things that the Codans have been building. Together, the community racked up more than 250,000 Testnet Points[\*](#disclaimer) (check out the [leaderboard](https://codaprotocol.com/testnet.html)) and this week, we have a new challenge again!
 
 ![](/static/blog/testnet-retro-7/twitter-card.jpg)
 
@@ -113,6 +113,7 @@ Major Contribution 1000 pts[\*](#disclaimer) : Ansonlau3 for translating the [te
 
 The entire team at O(1) Labs would like to express our sincere gratitude and appreciation to our growing and thriving community!
 
-<div id="disclaimer"></div>
+<p id="disclaimer">
 \**Testnet Points (abbreviated pts) are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.*
+</p>
 
