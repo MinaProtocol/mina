@@ -37,6 +37,9 @@ val fold_until :
   -> 'a t
   -> 'final
 
+module Deferred_result :
+  Intfs.Monadic2 with type ('a, 'e) m := ('a, 'e) Result.t Deferred.t
+
 module Deferred : Intfs.Monadic with type 'a m := 'a Deferred.t
 
 module Option : Intfs.Monadic with type 'a m := 'a option
