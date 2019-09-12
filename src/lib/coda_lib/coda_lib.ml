@@ -525,14 +525,16 @@ let create_genesis_frontier (config : Config.t) ~verifier =
   let genesis_protocol_state =
     With_hash.data (Lazy.force Genesis_protocol_state.t)
   in
+  let genesis_protocol_state_hash =
+    With_hash.hash (Lazy.force Genesis_protocol_state.t)
+  in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment first_transition) =
     External_transition.Validated.create_unsafe
       (External_transition.create ~protocol_state:genesis_protocol_state
          ~protocol_state_proof:Precomputed_values.base_proof
          ~staged_ledger_diff:empty_diff
-         ~delta_transition_chain_proof:
-           (Protocol_state.previous_state_hash genesis_protocol_state, []))
+         ~delta_transition_chain_proof:(genesis_protocol_state_hash, []))
   in
   let genesis_ledger = Lazy.force Genesis_ledger.t in
   let load () =

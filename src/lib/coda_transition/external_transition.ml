@@ -774,11 +774,36 @@ struct
     in
     (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
 
-  (*
   let validate_delta_transition_chain_part2 (t, validation) ~frontier =
+    let open Result.Let_syntax in
+    let global_slot =
+      t |> With_hash.data |> consensus_state
+      |> Consensus.Data.Consensus_state.global_slot
+    in
+    let boundary_hash =
+      t |> With_hash.data |> delta_transition_chain_proof |> fst
+    in
+    if State_hash.equal boundary_hash (With_hash.hash t) then
+      let out_of_boundary_hash = t |> With_hash.data |> parent_hash in
+      Option.fold (Transition_frontier.find frontier out_of_boundary_hash)
+        ~init:(Ok ()) ~f:(fun _ out_of_boundary_breadcrumb ->
+          let out_of_boundary_global_slot =
+            Transition_frontier.Breadcrumb.validated_transition
+              out_of_boundary_breadcrumb
+            |> Validated.consensus_state
+            |> Consensus.Data.Consensus_state.global_slot
+          in
+          Result.ok_if_true
+            ( out_of_boundary_global_slot + Consensus.Constants.delta
+            < global_slot )
+            ~error:`Invalid_delta_transition_chain_proof )
+    else Ok ()
+
+  (*
     let open Result.Let_syntax in
     let global_slot = External_transition.consensus_state t |> Consensus.Data.Consensus_state.global_slot in 
     let boundary_hash = External_transition.delta_transition_chain_proof t |> fst in 
+    if State_hash.equal boundary_hash (With_hash.hash t)
     let%bind boundary_transition =
       Result.of_option (Transition_frontier.find frontier boundary_hash)
         ~error:(`Invalid_delta_transition_chain_proof) 
