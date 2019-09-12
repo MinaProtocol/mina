@@ -416,6 +416,25 @@ module type S = sig
            | `Parent_missing_from_frontier
            | `Not_selected_over_frontier_root ] )
          Result.t
+
+    val validate_delta_transition_chain_part2 :
+         ( 'time_received
+         , 'proof
+         , 'delta_transition_chain_part1
+         , 'frontier_dependencies
+         , 'staged_ledger_diff
+         , [`Delta_transition_chain_part2] * unit Truth.false_t )
+         Validation.with_transition
+      -> frontier:Transition_frontier.t
+      -> ( ( 'time_received
+           , 'proof
+           , 'delta_transition_chain_part1
+           , 'frontier_dependencies
+           , 'staged_ledger_diff
+           , [`Delta_transition_chain_part2] * unit Truth.true_t )
+           Validation.with_transition
+         , [`Invalid_delta_transition_chain_proof] )
+         Result.t
   end
 
   val skip_frontier_dependencies_validation :
@@ -459,7 +478,7 @@ module type S = sig
          , 'delta_transition_chain_part1
          , 'frontier_dependencies
          , [`Staged_ledger_diff] * unit Truth.false_t
-         , 'delta_transitino_chain_part2 )
+         , 'delta_transition_chain_part2 )
          Validation.with_transition
       -> logger:Logger.t
       -> verifier:Verifier.t

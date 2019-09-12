@@ -448,6 +448,36 @@ module Validation = struct
           , delta_transition_chain_part2 )
       | _ ->
           failwith "why can't this be refuted?"
+
+    let set_valid_delta_transition_chain_part2 :
+           ( 'time_received
+           , 'proof
+           , 'delta_transition_chain_part1
+           , 'frontier_dependencies
+           , 'staged_ledger_diff
+           , [`Delta_transition_chain_part2] * unit Truth.false_t )
+           t
+        -> ( 'time_received
+           , 'proof
+           , 'delta_transition_chain_part1
+           , 'frontier_dependencies
+           , 'staged_ledger_diff
+           , [`Delta_transition_chain_part2] * unit Truth.true_t )
+           t = function
+      | ( time_received
+        , proof
+        , delta_transition_chain_part1
+        , frontier_dependencies
+        , staged_ledger_diff
+        , (`Delta_transition_chain_part2, Truth.False) ) ->
+          ( time_received
+          , proof
+          , delta_transition_chain_part1
+          , frontier_dependencies
+          , staged_ledger_diff
+          , (`Delta_transition_chain_part2, Truth.True ()) )
+      | _ ->
+          failwith "why can't this be refuted?"
   end
 end
 
@@ -515,6 +545,10 @@ let skip_frontier_dependencies_validation
 
 let skip_staged_ledger_diff_validation `This_is_unsafe (t, validation) =
   (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
+
+let skip_delta_transition_chain_validation_part2
+    `This_transition_was_not_received_via_gossip (t, validation) =
+  (t, Validation.Unsafe.set_valid_delta_transition_chain_part2 validation)
 
 module With_validation = struct
   let state_hash (t, _) = With_hash.hash t
@@ -641,7 +675,9 @@ module Validated = struct
                  `This_transition_was_not_received_via_gossip
             |> skip_frontier_dependencies_validation
                  `This_transition_belongs_to_a_detached_subtree
-            |> skip_staged_ledger_diff_validation `This_is_unsafe )
+            |> skip_staged_ledger_diff_validation `This_is_unsafe
+            |> skip_delta_transition_chain_validation_part2
+                 `This_transition_was_not_received_via_gossip )
 
         include With_validation
       end
@@ -737,6 +773,20 @@ struct
         ~error:`Parent_missing_from_frontier
     in
     (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
+
+  (*
+  let validate_delta_transition_chain_part2 (t, validation) ~frontier =
+    let open Result.Let_syntax in
+    let global_slot = External_transition.consensus_state t |> Consensus.Data.Consensus_state.global_slot in 
+    let boundary_hash = External_transition.delta_transition_chain_proof t |> fst in 
+    let%bind boundary_transition =
+      Result.of_option (Transition_frontier.find frontier boundary_hash)
+        ~error:(`Invalid_delta_transition_chain_proof) 
+    in 
+    let%bind out_of_scope_transition =
+      Result.of_option (Transition_frontier.find frontier @@ Transition_frontier.Breadcrumb.parent_hash boundary_transition)
+      ~error:(`Invalid_delta_transition_chain_proof)
+*)
 end
 
 module Staged_ledger_validation = struct
