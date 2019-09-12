@@ -1,11 +1,29 @@
 open Core
+module State = Array
+module Input = Input
 
 let params : _ Rescue.Params.t =
   let open Crypto_params.Rescue_params in
   {mds; round_constants}
 
+module Field = Crypto_params.Tick0.Field
+
+let pack_input ~project {Input.field_elements; bitstrings} =
+  let packed_bits =
+    let xs, final, len_final =
+      Array.fold bitstrings ~init:([], [], 0)
+        ~f:(fun (acc, curr, n) bitstring ->
+          let k = List.length bitstring in
+          let n' = k + n in
+          if n' >= Field.size_in_bits then (project curr :: acc, bitstring, k)
+          else (acc, bitstring @ curr, n') )
+    in
+    if len_final = 0 then xs else project final :: xs
+  in
+  Array.append field_elements (Array.of_list_rev packed_bits)
+
 module Inputs = struct
-  module Field = Crypto_params.Tick0.Field
+  module Field = Field
 
   let to_the_alpha x =
     let open Field in
@@ -50,8 +68,20 @@ module Inputs = struct
     [%test_eq: Field.t] (to_the_alpha root) x
 end
 
+module Digest = struct
+  open Crypto_params.Tick0.Field
+
+  type nonrec t = t
+
+  let to_bits ?length x =
+    match length with
+    | None ->
+        unpack x
+    | Some length ->
+        List.take (unpack x) length
+end
+
 include Rescue.Make (Inputs)
-module State = Rescue.State
 
 let update ~state = update ~state params
 
@@ -80,6 +110,15 @@ module Checked = struct
       assert_r1cs y10 y x ; y
   end
 
+  module Digest = struct
+    open Field
+
+    type nonrec t = t
+
+    let to_bits ?(length = Field.size_in_bits) x =
+      List.take (choose_preimage_var ~length:Field.size_in_bits x) length
+  end
+
   include Rescue.Make (Inputs)
 
   let params =
@@ -87,8 +126,13 @@ module Checked = struct
 
   let update = update params
 
-  let hash ?init = hash ?init params
+  let hash ?init =
+    hash ?init:(Option.map init ~f:(State.map ~f:Field.constant)) params
+
+  let pack_input = pack_input ~project:Field.project
 end
+
+let pack_input = pack_input ~project:Field.project
 
 let%test_unit "iterativeness" =
   let open Crypto_params.Tick0 in
