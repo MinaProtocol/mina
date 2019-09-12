@@ -214,40 +214,12 @@ module Data = struct
     module Slot = struct
       include (Slot : module type of Slot with module Checked := Slot.Checked)
 
-      (*
-      let after_lock_checkpoint (slot : t) =
-        let ck = Constants.(c * k |> UInt32.of_int) in
-        let open UInt32.Infix in
-        ck * UInt32.of_int 2 < slot
-      *)
-
       let in_seed_update_range (slot : t) =
         let ck = Constants.(c * k |> UInt32.of_int) in
         let open UInt32.Infix in
         (* TODO: < or <= ? *)
         slot < ck * UInt32.of_int 2
 
-      (*
-<<<<<<< HEAD
-      let in_seed_update_range_var (slot : Unpacked.var) =
-        let open Snark_params.Tick in
-        let uint32_msb x =
-          List.init 32 ~f:(fun i ->
-              UInt32.Infix.((x lsr Int.sub 31 i) land UInt32.one = UInt32.one)
-          )
-          |> Bitstring_lib.Bitstring.Msb_first.of_list
-        in
-        let ( < ) = Bitstring_checked.lt_value in
-        let ck = Constants.(c * k) |> UInt32.of_int in
-        let ck_times_2 = uint32_msb UInt32.(Infix.(of_int 2 * ck)) in
-        let slot_msb =
-          Bitstring_lib.Bitstring.Msb_first.of_lsb_first
-            (Unpacked.var_to_bits slot)
-        in
-        let%map slot_lt_ck_times_2 = slot_msb < ck_times_2 in
-        slot_lt_ck_times_2
-=======
-*)
       module Checked = struct
         include Slot.Checked
 
@@ -268,8 +240,7 @@ module Data = struct
           let%bind slot_msb =
             to_bits slot >>| Bitstring_lib.Bitstring.Msb_first.of_lsb_first
           in
-          let%map slot_lt_ck_times_2 = slot_msb < ck_times_2 in
-          slot_lt_ck_times_2
+          slot_msb < ck_times_2
       end
 
       let gen =
@@ -293,11 +264,6 @@ module Data = struct
       Coda_base.Block_time.add (start_time epoch)
         (Coda_base.Block_time.Span.of_ms
            Int64.Infix.(int64_of_uint32 slot * Constants.Slot.duration_ms))
-
-    (*
-    let slot_end_time (epoch : t) (slot : Slot.t) =
-      Time.add (slot_start_time epoch slot) Constants.Slot.duration
-    *)
 
     let epoch_and_slot_of_time_exn tm : t * Slot.t =
       let epoch = of_time_exn tm in
