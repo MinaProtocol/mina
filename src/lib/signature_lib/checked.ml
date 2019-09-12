@@ -3,7 +3,6 @@
 
 module Bignum_bigint = Bigint
 open Core_kernel
-open Tuple_lib
 open Snarky
 
 module type Message_intf = sig
@@ -19,10 +18,10 @@ module type Message_intf = sig
 
   type var
 
-  val hash : t -> nonce:bool Triple.t list -> curve_scalar
+  val hash : t -> nonce:bool list -> curve_scalar
 
   val hash_checked :
-    var -> nonce:boolean_var Triple.t list -> (curve_scalar_var, _) checked
+    var -> nonce:boolean_var list -> (curve_scalar_var, _) checked
 end
 
 module type S = sig
@@ -185,26 +184,20 @@ module Schnorr
   end =
     Curve
 
-  open Fold_lib
-
-  let to_triples x = Fold.to_list Fold.(group3 ~default:false (of_list x))
-
   let sign (d : Private_key.t) m =
-    let nonce = to_triples (Curve.Scalar.unpack d) in
+    let nonce = Curve.Scalar.unpack d in
     let k_prime = Message.hash m ~nonce in
     assert (not Curve.Scalar.(equal k_prime zero)) ;
     let r_pt = Curve.scale Curve.one k_prime in
     let rx, ry = Curve.to_affine_exn r_pt in
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
-    let nonce =
-      to_triples (compress r_pt @ compress (Curve.scale Curve.one d))
-    in
+    let nonce = compress r_pt @ compress (Curve.scale Curve.one d) in
     let e = Message.hash m ~nonce in
     let s = Curve.Scalar.(k + (e * d)) in
     (rx, s)
 
   let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
-    let nonce = to_triples (Field.unpack r @ compress pk) in
+    let nonce = Field.unpack r @ compress pk in
     let e = Message.hash m ~nonce in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
     let rx, ry = Curve.to_affine_exn r_pt in
@@ -228,9 +221,6 @@ module Schnorr
 
     let compress ((x, _) : Curve.var) = to_bits x
 
-    let to_triples x =
-      Fold.to_list Fold.(group3 ~default:Boolean.false_ (of_list x))
-
     let is_even y =
       let%map bs = Field.Checked.unpack_full y in
       Bitstring_lib.Bitstring.Lsb_first.to_list bs
@@ -246,7 +236,7 @@ module Schnorr
         (m : Message.var) =
       let%bind pk_bits = compress public_key in
       let%bind r_bits = to_bits r in
-      let nonce = to_triples (r_bits @ pk_bits) in
+      let nonce = r_bits @ pk_bits in
       let%bind e = Message.hash_checked m ~nonce in
       (* s * g - e * public_key *)
       let%bind e_pk =
@@ -283,26 +273,15 @@ module Message = struct
   type var = Tick.Field.Var.t
 
   let hash t ~nonce =
-    Random_oracle.digest_field
-      (Tick.Pedersen.digest_fold
-         (Tick.Pedersen.State.create ())
-         (Fold_lib.Fold.of_list
-            ( nonce
-            @ Bitstring_lib.Bitstring.pad_to_triple_list ~default:false
-                (Tick.Field.unpack t) )))
-    |> Random_oracle.Digest.to_bits |> Array.to_list |> Tock.Field.project
+    Random_oracle.hash [|Tick.Field.project nonce; t|]
+    |> Random_oracle.Digest.to_bits ~length:128
+    |> Tock.Field.project
 
   let hash_checked t ~nonce =
-    let open Tick.Checked.Let_syntax in
-    let%bind bits = Checked.choose_preimage_var ~length:size_in_bits t in
-    Tick.Pedersen.Checked.digest_triples
-      ~init:(Tick.Pedersen.State.create ())
-      ( nonce
-      @ Bitstring_lib.Bitstring.pad_to_triple_list ~default:Tick.Boolean.false_
-          bits )
-    >>= Random_oracle.Checked.digest_field
-    >>| Random_oracle.Digest.Checked.to_bits >>| Array.to_list
-    >>| Bitstring_lib.Bitstring.Lsb_first.of_list
+    Tick.make_checked (fun () ->
+        Random_oracle.Checked.hash [|Var.project nonce; t|]
+        |> Random_oracle.Checked.Digest.to_bits ~length:128
+        |> Bitstring_lib.Bitstring.Lsb_first.of_list )
 end
 
 module S = Schnorr (Tick) (Tick.Inner_curve) (Message)
