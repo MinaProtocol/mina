@@ -198,7 +198,7 @@ module Runtime = struct
 end
 
 module Cryptography = struct
-  let subsystem = "Cryptograph"
+  let subsystem = "Cryptography"
 
   let blockchain_proving_time_ms =
     let help =
@@ -206,8 +206,8 @@ module Cryptography = struct
     in
     Gauge.v "blockchain_proving_time_ms" ~help ~namespace ~subsystem
 
-  let total_pedersen_hash_computed =
-    let help = "# of pedersen hash computed" in
+  let total_pedersen_hashes_computed =
+    let help = "# of pedersen hashes computed" in
     Counter.v "total_pedersen_hash_computed" ~help ~namespace ~subsystem
 
   (* TODO:
