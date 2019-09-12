@@ -13,9 +13,8 @@ module Styles = {
 };
 
 // TODO: Add validation that the wallet name isn't already in use
-
 [@react.component]
-let make = (~walletName, ~setModalState, ~onSubmit) => {
+let make = (~walletName, ~password, ~setModalState, ~onSubmit) => {
   <Modal title="Add Wallet" onRequestClose={() => setModalState(_ => None)}>
     <div className=Styles.container>
       <Alert
@@ -25,8 +24,14 @@ let make = (~walletName, ~setModalState, ~onSubmit) => {
       <Spacer height=1. />
       <TextField
         label="Name"
-        onChange={value => setModalState(_ => Some(value))}
+        onChange={value => setModalState(_ => Some((value, password)))}
         value=walletName
+      />
+      <Spacer height=1.5 />
+      <TextField
+        label="Password"
+        onChange={value => setModalState(_ => Some((walletName, value)))}
+        value=password
       />
       <Spacer height=1.5 />
       <div className=Css.(style([display(`flex)]))>

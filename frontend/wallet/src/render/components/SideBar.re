@@ -57,7 +57,7 @@ let make = () => {
     <div className=Styles.footer>
       <a
         className=Styles.addWalletLink
-        onClick={_ => setModalState(_ => Some("My Wallet"))}>
+        onClick={_ => setModalState(_ => Some(("My Wallet", "")))}>
         {React.string("+ Add wallet")}
       </a>
     </div>
@@ -65,9 +65,10 @@ let make = () => {
       {(mutation, _) =>
          switch (modalState) {
          | None => React.null
-         | Some(newWalletName) =>
+         | Some((newWalletName, password)) =>
            <AddWalletModal
              walletName=newWalletName
+             password
              setModalState
              onSubmit={name => {
                let performMutation =
