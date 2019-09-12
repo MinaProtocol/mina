@@ -18,11 +18,8 @@ module Merkle_tree =
 
       let merge ~height h1 h2 =
         Tick.make_checked (fun () ->
-            Rescue.Checked.hash
-              ~init:
-                (Rescue.State.map
-                   Hash_prefix.Rescue.merkle_tree.(height)
-                   ~f:Field.Var.constant)
+            Random_oracle.Checked.hash
+              ~init:Hash_prefix.Random_oracle.merkle_tree.(height)
               [|h1; h2|] )
 
       let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
@@ -54,8 +51,8 @@ let to_string t = Base58_check.String_ops.to_string t
 let of_string s = Base58_check.String_ops.of_string s
 
 let merge ~height (h1 : t) (h2 : t) =
-  Rescue.hash
-    ~init:Hash_prefix.Rescue.merkle_tree.(height)
+  Random_oracle.hash
+    ~init:Hash_prefix.Random_oracle.merkle_tree.(height)
     [|(h1 :> field); (h2 :> field)|]
   |> of_hash
 

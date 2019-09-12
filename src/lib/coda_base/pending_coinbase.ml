@@ -200,8 +200,8 @@ module Hash_builder = struct
   include Data_hash_binable
 
   let merge ~height (h1 : t) (h2 : t) =
-    Rescue.hash
-      ~init:Hash_prefix.Rescue.coinbase_merkle_tree.(height)
+    Random_oracle.hash
+      ~init:Hash_prefix.Random_oracle.coinbase_merkle_tree.(height)
       [|(h1 :> field); (h2 :> field)|]
     |> of_hash
 
@@ -388,10 +388,8 @@ struct
 
           let merge ~height h1 h2 =
             Tick.make_checked (fun () ->
-                Rescue.Checked.hash
-                  ~init:
-                    (Rescue.State.map ~f:Field.Var.constant
-                       Hash_prefix.Rescue.coinbase_merkle_tree.(height))
+                Random_oracle.Checked.hash
+                  ~init:Hash_prefix.Random_oracle.coinbase_merkle_tree.(height)
                   [|h1; h2|] )
 
           let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
