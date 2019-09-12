@@ -1,8 +1,6 @@
 open Core_kernel
 open Coda_base
-open Bitstring_lib
 open Fold_lib
-open Snark_params
 open Snark_params.Tick
 
 module Poly = struct
@@ -138,33 +136,3 @@ let display Poly.{staged_ledger_hash; snarked_ledger_hash; timestamp} =
   ; timestamp=
       Time.to_string_trimmed ~zone:Time.Zone.utc (Block_time.to_time timestamp)
   }
-
-module Message = struct
-  open Tick
-
-  type t = Value.t
-
-  type nonrec var = var
-
-  let hash t ~nonce =
-    let d =
-      Pedersen.digest_fold Hash_prefix.signature
-        Fold.(fold t +> Fold.(of_list nonce))
-    in
-    List.take (Field.unpack d) Inner_curve.Scalar.length_in_bits
-    |> Inner_curve.Scalar.of_bits
-
-  let%snarkydef hash_checked t ~nonce =
-    let%bind trips = var_to_triples t in
-    let%bind hash =
-      Pedersen.Checked.digest_triples ~init:Hash_prefix.signature
-        (trips @ nonce)
-    in
-    let%map bs = Pedersen.Checked.Digest.choose_preimage hash in
-    Bitstring.Lsb_first.of_list
-      (List.take (bs :> Boolean.var list) Inner_curve.Scalar.length_in_bits)
-end
-
-module Signature =
-  Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve)
-    (Message)
