@@ -1830,7 +1830,6 @@ module Data = struct
             previous_consensus_state.curr_global_slot
         in
         let next = Global_window.of_global_slot consensus_transition in
-        (* Should use global window instead of this *)
         if Global_window.equal prev next then
           ( previous_consensus_state.min_window_length
           , Length.succ previous_consensus_state.curr_window_length )

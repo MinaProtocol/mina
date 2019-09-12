@@ -104,7 +104,8 @@
 /src/lib/snarky_group_map/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/snarky_log/ @rbkhmrcr @vanishreerao @mrmr1993 @imeckler
 /src/lib/snarky_pairing/ @rbkhmrcr @vanishreerao @mrmr1993 @imeckler
-/src/lib/snarky_taylor/ @bkase @cmr @mrmr1993 @mrmr1993 @imeckler
+/src/lib/snarky_taylor/ @bkase @cmr @mrmr1993 @imeckler
+/src/lib/snarky_integer/ @bkase @cmr @mrmr1993 @imeckler
 /src/lib/snarky_verifier/ @bkase @mrmr1993 @imeckler
 /src/lib/sparse_ledger_lib/ @bkase @imeckler @cmr
 /src/lib/staged_ledger/ @deepthiskumar @cmr
