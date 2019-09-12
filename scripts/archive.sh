@@ -1,5 +1,3 @@
-HASURA_PORT=9000
-
 if [ -z "$STORAGE_DIRECTORY" ]; then
   STORAGE_DIRECTORY=~/.coda-config/client_storage
 fi
@@ -32,7 +30,7 @@ start() {
     pg_ctl -o "-F -p $POSTGRES_PORT" start -D $STORAGE_DIRECTORY;
     docker run -p $HASURA_PORT:8080 \
         -e HASURA_GRAPHQL_DATABASE_URL=postgres://$ADMIN:@host.docker.internal:$POSTGRES_PORT/$DATABASE_NAME \
-        -e HASURA_GRAPHQL_ENABLE_CONSOLE=true \
+        -e HASURA_GRAPHQL_ENABLE_CONSOLE=false \
         hasura/graphql-engine:v1.0.0-beta.6
 }
 
