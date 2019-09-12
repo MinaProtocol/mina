@@ -177,7 +177,8 @@ module type Transition_frontier_extensions_intf = sig
     with type transition_frontier_diff := Diff.t
 
   module Work : sig
-    type t = Transaction_snark.Statement.t list [@@deriving sexp, yojson]
+    type t = Transaction_snark.Statement.t One_or_two.t
+    [@@deriving sexp, yojson]
 
     module Stable :
       sig
