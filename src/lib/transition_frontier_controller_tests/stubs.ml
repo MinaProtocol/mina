@@ -122,7 +122,7 @@ struct
           Transaction_snark_work.Checked.
             { fee= Fee.of_int 1
             ; proofs=
-                List.map stmts ~f:(fun statement ->
+                One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
                       ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
                 )

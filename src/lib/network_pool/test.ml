@@ -13,11 +13,13 @@ let%test_module "network pool test" =
       let pool_reader, _pool_writer = Linear_pipe.create () in
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create None in
       let work =
-        [ Quickcheck.random_value ~seed:(`Deterministic "network_pool_test")
-            Transaction_snark.Statement.gen ]
+        `One
+          (Quickcheck.random_value ~seed:(`Deterministic "network_pool_test")
+             Transaction_snark.Statement.gen)
       in
       let priced_proof =
-        { Priced_proof.proof= []
+        { Priced_proof.proof=
+            One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
         ; fee=
             { fee= Currency.Fee.of_int 0
             ; prover= Signature_lib.Public_key.Compressed.empty } }
@@ -51,7 +53,7 @@ let%test_module "network pool test" =
         Quickcheck.random_sequence ~seed:(`Deterministic "works")
           Transaction_snark.Statement.gen
         |> Fn.flip Sequence.take 10
-        |> Sequence.map ~f:List.return
+        |> Sequence.map ~f:(fun x -> `One x)
         |> Sequence.to_list
       in
       let verify_unsolved_work () =
@@ -61,7 +63,9 @@ let%test_module "network pool test" =
                 (Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
                    ( work
                    , Priced_proof.
-                       { proof= []
+                       { proof=
+                           One_or_two.map
+                             ~f:Ledger_proof.For_tests.mk_dummy_proof work
                        ; fee=
                            { fee= Currency.Fee.of_int 0
                            ; prover= Signature_lib.Public_key.Compressed.empty
