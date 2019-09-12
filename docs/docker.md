@@ -1,8 +1,8 @@
 ## Docker Instructions
 
-It is possible to run the Coda daemon inside a Docker container. This allows for resource and dependency isolation, and homoginization of infrastructure. 
+It is possible to run the Coda daemon inside a Docker container. This allows for resource and dependency isolation, and homogenization of infrastructure. 
 
-The Coda Protocol builds one main Docker Image `codaprotocol/coda-daemon` which contains the Coda Daemon and its dependencies. Image Tags follow the release cadance for the Coda Protocol and the goal is to keep them up to date with [Github Releases](https://github.com/CodaProtocol/coda/releases). 
+The Coda Protocol builds one main Docker Image `codaprotocol/coda-daemon` which contains the Coda Daemon and its dependencies. Image Tags follow the release cadence for the Coda Protocol and the goal is to keep them up to date with [Github Releases](https://github.com/CodaProtocol/coda/releases). 
 
 ### Quick Start 
 
@@ -29,7 +29,7 @@ docker run codaprotocol/coda-daemon:<version> daemon -help
 
 Currently, the implementation of the Kademlia DHT in use by the Coda Daemon is a tad tempermental, and requires consistent ports to be set on both the host and container.
 
-There is a bug issuere [here](https://github.com/CodaProtocol/coda/issues/2947) that details the issue. In the meantime, it is easiest to avoid any sort of bridge networking and run the Daemon container on the host network, especially if you'd like to use non-default ports. 
+There is a bug issue [here](https://github.com/CodaProtocol/coda/issues/2947) that details the problem. In the meantime, it is easiest to avoid any sort of bridge networking and run the Daemon container on the host network, especially if you'd like to use non-default ports. 
 
 Here is a minimal `docker-compose.yml` file that accomplishes this: 
 
