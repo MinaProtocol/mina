@@ -64,7 +64,8 @@ module Spec = struct
     module V1 = struct
       module T = struct
         type 'single t =
-          {instances: 'single list; fee: Currency.Fee.Stable.V1.t}
+          { instances: 'single One_or_two.Stable.V1.t
+          ; fee: Currency.Fee.Stable.V1.t }
         [@@deriving bin_io, fields, sexp, version]
       end
 
@@ -75,7 +76,7 @@ module Spec = struct
   end
 
   type 'single t = 'single Stable.Latest.t =
-    {instances: 'single list; fee: Currency.Fee.t}
+    {instances: 'single One_or_two.t; fee: Currency.Fee.t}
   [@@deriving fields, sexp]
 end
 
@@ -84,8 +85,10 @@ module Result = struct
     module V1 = struct
       module T = struct
         type ('spec, 'single) t =
-          { proofs: 'single list
-          ; metrics: (Core.Time.Stable.Span.V1.t * [`Transition | `Merge]) list
+          { proofs: 'single One_or_two.Stable.V1.t
+          ; metrics:
+              (Core.Time.Stable.Span.V1.t * [`Transition | `Merge])
+              One_or_two.Stable.V1.t
           ; spec: 'spec
           ; prover: Signature_lib.Public_key.Compressed.Stable.V1.t }
         [@@deriving bin_io, fields, version]
@@ -98,11 +101,9 @@ module Result = struct
   end
 
   type ('spec, 'single) t = ('spec, 'single) Stable.Latest.t =
-    { proofs: 'single list
-    ; metrics: (Time.Span.t * [`Transition | `Merge]) list
+    { proofs: 'single One_or_two.t
+    ; metrics: (Time.Span.t * [`Transition | `Merge]) One_or_two.t
     ; spec: 'spec
     ; prover: Signature_lib.Public_key.Compressed.t }
   [@@deriving fields]
 end
-
-let proofs_per_work = 2

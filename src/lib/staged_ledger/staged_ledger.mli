@@ -141,13 +141,9 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
 
 val all_work_pairs_exn :
      t
-  -> ( ( Transaction.t
-       , Transaction_witness.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Single.Spec.t
-     * ( Transaction.t
-       , Transaction_witness.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Single.Spec.t
-       option )
+  -> ( Transaction.t
+     , Transaction_witness.t
+     , Ledger_proof.t )
+     Snark_work_lib.Work.Single.Spec.t
+     One_or_two.t
      list
