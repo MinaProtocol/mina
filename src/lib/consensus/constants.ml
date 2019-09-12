@@ -30,7 +30,8 @@ let block_window_duration =
 [%%inject
 "delta", delta]
 
-let inactivity_secs = block_window_duration_ms * delta
+(* This is a bit of a hack, see #3232. *)
+let inactivity_ms = block_window_duration_ms * 8
 
 let slots_per_window = Unsigned.UInt32.of_int (c * k)
 

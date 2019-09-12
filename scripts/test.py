@@ -10,8 +10,7 @@ import time
 from itertools import chain
 
 build_artifact_profiles = [
-    'testnet_postake_medium_curves',
-    'testnet_postake_many_proposers_medium_curves'
+    'testnet_postake_medium_curves'
 ]
 
 unit_test_profiles = [
@@ -51,6 +50,7 @@ small_curves_tests = {
     'test_postake': simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap': ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
+    'test_postake_three_proposers': ['coda-txns-and-restart-non-proposers'],    
     'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5', 'coda-long-fork -num-proposers 5'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
@@ -85,12 +85,13 @@ required_blacklist = [
 extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
-    "ci/circleci: build-wallet",
+    # "ci/circleci: build-wallet",
 ]
 
 # these are full status check names. they will not be required to succeed.
 not_required_status_checks = [
     "ci/circleci: build-macos",
+    "ci/circleci: build-wallet",
 ]
 
 

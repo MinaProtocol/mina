@@ -5,6 +5,7 @@
 
 open Core_kernel
 open Coda_base
+open Coda_transition
 
 module Name = struct
   let t = __MODULE__
@@ -14,11 +15,8 @@ module Transmuter = struct
   module Make (Inputs : Inputs.S) :
     Cache_lib.Intf.Transmuter.S
     with type Source.t =
-                Inputs.External_transition.with_initial_validation
-                Envelope.Incoming.t
+                External_transition.with_initial_validation Envelope.Incoming.t
      and type Target.t = State_hash.t = struct
-    open Inputs
-
     module Source = struct
       type t = External_transition.with_initial_validation Envelope.Incoming.t
     end
@@ -50,7 +48,6 @@ module Make (Inputs : Inputs.S) :
   with module Cached := Cache_lib.Cached
    and module Cache := Cache_lib.Cache
    and type source =
-              Inputs.External_transition.with_initial_validation
-              Envelope.Incoming.t
+              External_transition.with_initial_validation Envelope.Incoming.t
    and type target = State_hash.t =
   Cache_lib.Transmuter_cache.Make (Transmuter.Make (Inputs)) (Registry) (Name)

@@ -32,7 +32,7 @@ module type Constants_intf = sig
    * block. In sig, it's exactly 1 as blocks should be produced every slot. *)
   val c : int
 
-  val inactivity_secs : int
+  val inactivity_ms : int
 
   (** Number of slots in one "window" which is a third of an epoch *)
   val slots_per_window : Unsigned.UInt32.t

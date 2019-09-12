@@ -43,10 +43,19 @@ module Time = struct
 
     let create offset = offset
 
-    let basic =
+    let basic ~logger =
       lazy
-        ( Core_kernel.Time.Span.of_int_sec @@ Int.of_string
-        @@ Unix.getenv "CODA_TIME_OFFSET" )
+        (let offset =
+           match Core.Sys.getenv "CODA_TIME_OFFSET" with
+           | Some tm ->
+               Int.of_string tm
+           | None ->
+               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                 "Environment variable CODA_TIME_OFFSET not found, using \
+                  default of 0" ;
+               0
+         in
+         Core_kernel.Time.Span.of_int_sec offset)
 
     [%%else]
 
@@ -54,7 +63,7 @@ module Time = struct
 
     let create () = ()
 
-    let basic = ()
+    let basic ~logger:_ = ()
 
     [%%endif]
   end

@@ -33,7 +33,7 @@ let dispatch_join_errors rpc query port =
     Or_error. *)
 let dispatch_with_message rpc query port ~success ~error
     ~(join_error : 'a Or_error.t -> 'b Or_error.t) =
-  let fail err = eprintf "%s\n%!" err ; exit 14 in
+  let fail err = eprintf "%s\n%!" err ; exit 18 in
   let%bind res = dispatch rpc query port in
   match join_error res with
   | Ok x ->
@@ -59,6 +59,10 @@ module Args = struct
 
   let zip4 arg1 arg2 arg3 arg4 =
     return (fun a b c d -> (a, b, c, d)) <*> arg1 <*> arg2 <*> arg3 <*> arg4
+
+  let zip5 arg1 arg2 arg3 arg4 arg5 =
+    return (fun a b c d e -> (a, b, c, d, e))
+    <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5
 end
 
 let or_error_str ~f_ok ~error = function
@@ -490,12 +494,21 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          transaction pool )"
       (optional txn_nonce)
   in
+  let memo_flag =
+    flag "memo"
+      ~doc:
+        (sprintf
+           "STRING Memo accompanying the transaction (up to %d characters)"
+           User_command_memo.max_input_length)
+      (optional string)
+  in
   let flag =
-    Args.zip4 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
+    Args.zip5 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
+      memo_flag
   in
   Command.async ~summary
     (Cli_lib.Background_daemon.init flag
-       ~f:(fun port (body, from_account, fee_opt, nonce_opt) ->
+       ~f:(fun port (body, from_account, fee_opt, nonce_opt, memo_opt) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp =
            Secrets.Keypair.Terminal_stdin.read_exn from_account
@@ -511,9 +524,12 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          let fee =
            Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
          in
+         let memo =
+           Option.value_map memo_opt ~default:User_command_memo.dummy
+             ~f:User_command_memo.create_from_string_exn
+         in
          let command =
-           Coda_commands.setup_user_command ~fee ~nonce
-             ~memo:User_command_memo.dummy ~sender_kp body
+           Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp body
          in
          dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
            ~success:(fun receipt_chain_hash ->
@@ -541,10 +557,96 @@ let send_payment =
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
 
+let cancel_transaction =
+  let txn_id_flag =
+    Command.Param.(
+      flag "id" ~doc:"ID Transaction ID to be cancelled" (required string))
+  in
+  let args = Args.zip2 Cli_lib.Flag.privkey_read_path txn_id_flag in
+  Command.async
+    ~summary:
+      "Cancel a transaction -- this submits a replacement transaction with a \
+       fee larger than the cancelled transaction."
+    (Cli_lib.Background_daemon.init args
+       ~f:(fun port (privkey_read_path, serialized_transaction) ->
+         match User_command.of_base58_check serialized_transaction with
+         | Ok user_command ->
+             let receiver =
+               match
+                 User_command.Payload.body (User_command.payload user_command)
+               with
+               | Payment payment ->
+                   payment.receiver
+               | Stake_delegation (Set_delegate {new_delegate}) ->
+                   new_delegate
+             in
+             let%bind sender_kp =
+               Secrets.Keypair.Terminal_stdin.read_exn privkey_read_path
+             in
+             let cancel_sender = User_command.sender user_command in
+             if
+               not
+                 (Public_key.Compressed.equal
+                    (Public_key.compress sender_kp.public_key)
+                    cancel_sender)
+             then (
+               eprintf
+                 "Provided key doesn't match transaction to be cancelled.\n\
+                  Wanted key for %s\n"
+                 (Public_key.Compressed.to_base58_check cancel_sender) ;
+               Deferred.don't_wait_for (exit 17) ) ;
+             let%bind inferred_nonce =
+               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
+                 sender_kp.public_key port
+             in
+             let cancelled_nonce = User_command.nonce user_command in
+             let cancel_fee =
+               let diff =
+                 Unsigned.UInt64.of_int
+                   Coda_numbers.Account_nonce.(
+                     to_int inferred_nonce - to_int cancelled_nonce)
+               in
+               let fee =
+                 Currency.Fee.to_uint64 (User_command.fee user_command)
+               in
+               let replace_fee =
+                 Currency.Fee.to_uint64 Network_pool.Indexed_pool.replace_fee
+               in
+               let open Unsigned.UInt64.Infix in
+               (* fee amount "inspired by" network_pool/indexed_pool.ml *)
+               Currency.Fee.of_uint64 (fee + (replace_fee * diff))
+             in
+             printf "Fee to cancel transaction is %s coda.\n"
+               (Currency.Fee.to_string cancel_fee) ;
+             let body =
+               User_command_payload.Body.Payment
+                 {receiver; amount= Currency.Amount.zero}
+             in
+             let command =
+               Coda_commands.setup_user_command ~fee:cancel_fee
+                 ~nonce:cancelled_nonce ~memo:User_command_memo.dummy
+                 ~sender_kp body
+             in
+             dispatch_with_message Daemon_rpcs.Send_user_command.rpc command
+               port
+               ~success:(fun receipt_chain_hash ->
+                 sprintf
+                   "Dispatched cancel transaction with ID %s\n\
+                    Receipt chain hash is now %s\n"
+                   (User_command.to_base58_check command)
+                   (Receipt.Chain_hash.to_string receipt_chain_hash) )
+               ~error:(fun e ->
+                 sprintf "Failed to cancel transaction: %s"
+                   (Error.to_string_hum e) )
+               ~join_error:Or_error.join
+         | Error _e ->
+             eprintf "could not deserialize user command\n" ;
+             exit 16 ))
+
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
     (Cli_lib.Background_daemon.init
-       Command.Param.(anon @@ ("txn" %: string))
+       Command.Param.(anon @@ ("txn-id" %: string))
        ~f:(fun port serialized_transaction ->
          match User_command.of_base58_check serialized_transaction with
          | Ok user_command ->
@@ -673,7 +775,7 @@ let constraint_system_digests =
 let snark_job_list =
   let open Deferred.Let_syntax in
   let open Command.Param in
-  Command.async ~summary:"List of snark jobs in JSON format"
+  Command.async ~summary:"List of snark jobs in the scan state in JSON format"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
          match%map
            dispatch_join_errors Daemon_rpcs.Snark_job_list.rpc () port
@@ -682,6 +784,26 @@ let snark_job_list =
              printf "%s" str
          | Error e ->
              print_rpc_error e ))
+
+let snark_pool_list =
+  let open Command.Param in
+  Command.async ~summary:"List of snark works in the snark pool in JSON format"
+    (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
+         Deferred.map
+           (Graphql_client.query (Graphql_client.Snark_pool.make ()) port)
+           ~f:(fun response ->
+             let lst =
+               [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
+                 (Array.to_list
+                    (Array.map
+                       ~f:(fun w ->
+                         { Cli_lib.Graphql_types.Completed_works.Work.work_ids=
+                             Array.to_list w#work_ids
+                         ; fee= Currency.Fee.of_uint64 w#fee
+                         ; prover= w#prover } )
+                       response#snarkPool))
+             in
+             print_string (Yojson.Safe.to_string lst) ) ))
 
 let start_tracing =
   let open Deferred.Let_syntax in
@@ -735,11 +857,10 @@ let set_snark_worker =
     (Cli_lib.Background_daemon.init ~rest:true public_key_flag
        ~f:(fun port optional_public_key ->
          let open Graphql_client in
-         let yojson_input =
-           [%to_yojson: Public_key.Compressed.t option] optional_public_key
-         in
          let graphql =
-           Set_snark_worker.make ~wallet:(Yojson.Safe.to_basic yojson_input) ()
+           Set_snark_worker.make
+             ~wallet:Encoders.(optional optional_public_key ~f:public_key)
+             ()
          in
          Deferred.map (query graphql port) ~f:(fun response ->
              ( match optional_public_key with
@@ -753,6 +874,23 @@ let set_snark_worker =
                (Option.value_map (response#setSnarkWorker)#lastSnarkWorker
                   ~default:"None" ~f:Public_key.Compressed.to_base58_check) )
      ))
+
+let set_snark_work_fee =
+  Command.async ~summary:"Set fee reward for doing transaction snark work"
+  @@ Cli_lib.Background_daemon.init ~rest:true
+       Command.Param.(anon @@ ("fee" %: Cli_lib.Arg_type.txn_fee))
+       ~f:(fun port fee ->
+         let open Graphql_client in
+         let graphql =
+           Set_snark_work_fee.make
+             ~fee:(Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
+             ()
+         in
+         Deferred.map (query graphql port) ~f:(fun response ->
+             printf
+               !"Updated snark work fee: %i\nOld snark work fee: %i\n"
+               (Currency.Fee.to_int fee)
+               (Unsigned.UInt64.to_int (response#setSnarkWorkFee)#lastFee) ) )
 
 (* A step towards `account import`, for now `unsafe-import` will suffice *)
 let unsafe_import =
@@ -810,6 +948,30 @@ let list_accounts =
                    (Unsigned.UInt64.to_string (w#balance)#total) )
                response#ownedWallets ) ))
 
+let generate_libp2p_keypair =
+  Command.async
+    ~summary:
+      "Generate a new libp2p keypair and print it out (this contains the \
+       secret key!)"
+    (Command.Param.return
+       ( handle_exception_nicely
+       @@ fun () ->
+       Deferred.ignore
+         (let open Deferred.Let_syntax in
+         let logger = Logger.create () in
+         (* Using the helper only for keypair generation requires no state. *)
+         match%map Coda_net2.create ~logger ~conf_dir:"/dev/null" with
+         | Ok net ->
+             let%bind me = Coda_net2.Keypair.random net in
+             let%map () = Coda_net2.shutdown net in
+             printf "libp2p keypair: %s" (Coda_net2.Keypair.to_string me) ;
+             exit 0
+         | Error e ->
+             Logger.fatal logger "failed to generate libp2p keypair: $err"
+               ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:[("err", `String (Error.to_string_hum e))] ;
+             exit 20) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -865,8 +1027,10 @@ let command =
     ; ("send-payment", send_payment)
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
+    ; ("cancel-transaction", cancel_transaction)
     ; ("set-staking", set_staking)
     ; ("set-snark-worker", set_snark_worker)
+    ; ("set-snark-work-fee", set_snark_work_fee)
     ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
     ; ("stop-daemon", stop_daemon)
@@ -888,5 +1052,7 @@ let advanced =
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
+    ; ("snark-pool-list", snark_pool_list)
     ; ("unsafe-import", unsafe_import)
+    ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("visualization", Visualization.command_group) ]

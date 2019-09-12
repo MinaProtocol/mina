@@ -2,10 +2,58 @@ let extraHeaders = () =>
   <>
     <script src="https://apis.google.com/js/api.js" />
     <script src={Links.Cdn.url("/static/js/leaderboard.js")} />
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/marked/0.7.0/marked.min.js"
+      integrity="sha256-0Ed5s/n37LIeAWApZmZUhY9icm932KvYkTVdJzUBiI4="
+      crossOrigin="anonymous"
+    />
   </>;
 
 module Styles = {
   open Css;
+
+  let markdownStyles =
+    style([
+      selector(
+        "a",
+        [
+          hover([color(Style.Colors.hyperlinkHover)]),
+          cursor(`pointer),
+          ...Style.Link.basicStyles,
+        ],
+      ),
+      selector(
+        "h4",
+        Style.H4.wideStyles
+        @ [textAlign(`left), fontSize(`rem(1.)), fontWeight(`light)],
+      ),
+      selector(
+        "code",
+        [Style.Typeface.pragmataPro, color(Style.Colors.midnight)],
+      ),
+      selector(
+        "p > code, li > code",
+        [
+          boxSizing(`borderBox),
+          padding2(~v=`px(2), ~h=`px(6)),
+          backgroundColor(Style.Colors.slateAlpha(0.05)),
+          borderRadius(`px(4)),
+        ],
+      ),
+    ]);
+
+  let page =
+    style([
+      selector(
+        "hr",
+        [
+          height(px(4)),
+          borderTop(px(1), `dashed, Style.Colors.marine),
+          borderLeft(`zero, solid, transparent),
+          borderBottom(px(1), `dashed, Style.Colors.marine),
+        ],
+      ),
+    ]);
 
   let header =
     style([
@@ -23,6 +71,8 @@ module Styles = {
       display(`flex),
       flexDirection(`columnReverse),
       justifyContent(`center),
+      width(`percent(100.)),
+      marginBottom(`rem(1.5)),
       media(Style.MediaQuery.somewhatLarge, [flexDirection(`row)]),
     ]);
 
@@ -46,15 +96,6 @@ module Styles = {
       ),
       selector("div span:last-child", [opacity(0.5)]),
       selector("div span:nth-child(odd)", [justifySelf(`flexEnd)]),
-      selector(
-        "hr",
-        [
-          height(px(4)),
-          borderTop(px(1), `dashed, Style.Colors.marine),
-          borderLeft(`zero, solid, transparent),
-          borderBottom(px(1), `dashed, Style.Colors.marine),
-        ],
-      ),
       selector(
         "#leaderboard-loading",
         [
@@ -89,7 +130,7 @@ module Styles = {
       ...Style.Body.basicStyles,
     ]);
 
-  let leaderboardLink =
+  let headerLink =
     merge([
       Style.Link.basic,
       Style.H3.basic,
@@ -108,146 +149,202 @@ module Styles = {
 
   let weekHeader =
     merge([Style.H2.basic, style([padding2(~v=`rem(1.), ~h=`zero)])]);
+
+  let dashboardHeader =
+    merge([
+      header,
+      style([marginTop(rem(1.5)), marginBottom(rem(2.25))]),
+    ]);
+
+  let dashboard =
+    style([
+      width(`percent(100.)),
+      height(`rem(30.)),
+      border(`px(0), `solid, white),
+      borderRadius(px(3)),
+    ]);
+
+  let expandButton =
+    merge([
+      Style.Link.basic,
+      style([
+        backgroundColor(Style.Colors.hyperlink),
+        color(white),
+        marginLeft(`auto),
+        marginRight(`auto),
+        marginBottom(`rem(1.5)),
+        width(`rem(10.)),
+        height(`rem(2.5)),
+        display(`block),
+        cursor(`pointer),
+        borderRadius(`px(4)),
+        padding2(~v=`rem(0.25), ~h=`rem(3.)),
+        fontWeight(`semiBold),
+        lineHeight(`rem(2.5)),
+        hover([backgroundColor(Style.Colors.hyperlinkHover), color(white)]),
+      ]),
+    ]);
+
+  let gradientSection =
+    style([
+      position(`relative),
+      height(`rem(45.)),
+      overflow(`hidden),
+      display(`flex),
+      flexWrap(`wrap),
+      marginLeft(`auto),
+      marginRight(`auto),
+      justifyContent(`center),
+      after([
+        contentRule(""),
+        position(`absolute),
+        bottom(`px(-1)),
+        left(`zero),
+        height(`rem(8.)),
+        width(`percent(100.)),
+        pointerEvents(`none),
+        backgroundImage(
+          `linearGradient((
+            `deg(0),
+            [(0, Style.Colors.white), (100, Style.Colors.whiteAlpha(0.))],
+          )),
+        ),
+      ]),
+    ]);
 };
 
-let component = ReasonReact.statelessComponent("Testnet");
-let make = _children => {
-  ...component,
-  render: _self => {
-    <div>
+module Section = {
+  [@react.component]
+  let make = (~name, ~children) => {
+    let checkboxName = name ++ "-checkbox";
+    let labelName = name ++ "-label";
+    <div className=Css.(style([display(`flex), flexDirection(`column)]))>
+      <input
+        type_="checkbox"
+        id=checkboxName
+        className=Css.(
+          style([
+            display(`none),
+            selector(
+              ":checked + div",
+              [height(`auto), after([display(`none)])],
+            ),
+            selector(":checked ~ #" ++ labelName, [display(`none)]),
+          ])
+        )
+      />
+      <div className=Styles.gradientSection> children </div>
+      <label id=labelName className=Styles.expandButton htmlFor=checkboxName>
+        {React.string("Expand " ++ name)}
+        <div
+          className=Css.(
+            style([
+              position(`relative),
+              bottom(`rem(2.6)),
+              left(`rem(9.6)),
+            ])
+          )>
+          {React.string({js| ↓|js})}
+        </div>
+      </label>
+      <RunScript>
+        {Printf.sprintf(
+           {|document.getElementById("%s").checked = false;|},
+           checkboxName,
+         )}
+      </RunScript>
+    </div>;
+  };
+};
+
+[@react.component]
+let make = () => {
+  <div className=Styles.page>
+    <Section name="Leaderboard">
       <div className=Styles.header>
         <h1 className=Style.H1.hero>
-          {ReasonReact.string("Testnet Leaderboard")}
+          {React.string("Testnet Leaderboard")}
         </h1>
         <a
           href="https://docs.google.com/spreadsheets/d/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/edit#gid=0"
           target="_blank"
-          className=Styles.leaderboardLink>
-          {ReasonReact.string({j|View Full Leaderboard\u00A0→|j})}
+          className=Styles.headerLink>
+          {React.string({j|View Full Leaderboard\u00A0→|j})}
         </a>
       </div>
       <div className=Styles.content>
         <div id="testnet-leaderboard" className=Styles.leaderboard>
           <div className=Styles.headerRow>
-            <span> {ReasonReact.string("Rank")} </span>
-            <span> {ReasonReact.string("Username")} </span>
+            <span> {React.string("Rank")} </span>
+            <span> {React.string("Username")} </span>
             <span id="leaderboard-current-week" />
-            <span> {ReasonReact.string("Total")} </span>
+            <span> {React.string("Total")} </span>
           </div>
           <hr />
-          <div id="leaderboard-loading">
-            {ReasonReact.string("Loading...")}
-          </div>
+          <div id="leaderboard-loading"> {React.string("Loading...")} </div>
         </div>
         <div className=Styles.copy>
           <p>
             <h4 className=Styles.sidebarHeader>
-              {ReasonReact.string("Testnet Points")}
+              {React.string("Testnet Points")}
             </h4>
           </p>
           <p>
-            {ReasonReact.string(
+            {React.string(
                "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
              )}
           </p>
           <p>
             <h4 className=Styles.sidebarHeader>
-              {ReasonReact.string("Community")}
+              {React.string("Community")}
             </h4>
           </p>
           <p>
             <a className=Style.Link.basic href="/docs">
-              {ReasonReact.string("Testnet Docs")}
+              {React.string("Testnet Docs")}
             </a>
             <br />
             <a
               className=Style.Link.basic
               href="https://bit.ly/CodaDiscord"
               target="_blank">
-              {ReasonReact.string("Discord")}
+              {React.string("Discord")}
             </a>
             <br />
             <a
               className=Style.Link.basic
               href="https://forums.codaprotocol.com"
               target="_blank">
-              {ReasonReact.string("Coda Forums")}
+              {React.string("Coda Forums")}
             </a>
           </p>
           <p>
-            <h2 className=Styles.weekHeader>
-              {ReasonReact.string("Week 5")}
-            </h2>
+            <h2 id="challenges-current-week" className=Styles.weekHeader />
           </p>
-          <p>
-            <h4 className=Styles.sidebarHeader>
-              {ReasonReact.string("Challenge #12: 'CLI FYI'")}
-            </h4>
-          </p>
-          <p>
-            {ReasonReact.string(
-               "Submit a product improvement or feature you'd like to see in the Coda command line interface (CLI). Post a new thread on the Discourse ",
+          <p> <div id="challenges-list" className=Styles.markdownStyles /> </p>
+          <p id="disclaimer" className=Css.(style([fontStyle(`italic)]))>
+            {React.string(
+               "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
              )}
-            <a
-              className=Style.Link.basic
-              href="http://forums.codaprotocol.com"
-              target="_blank">
-              {ReasonReact.string("forums")}
-            </a>
-            {ReasonReact.string(
-               " in the 'Product' category and add this to the title: '[CLI Feature]'. The community can vote on it by 'hearting' the post, and comment / discuss details in the thread. Add your Discord username to be counted for pts*.",
-             )}
-          </p>
-          <p>
-            {ReasonReact.string(
-               "Every feasible feature suggested will get 500 pts*. Top 5 features will win a bonus - and the community gets to vote for top 5. Bonus: 2500, 2000, 1500, 1000, 500 pts* respectively. Feasible feature means well scoped ideas that Coda could technically implement -- eg. The block producing CLI command should tell you % likelihood of winning a block and the time until the next slot you can produce blocks for. No guarantees that suggested features will be implemented. But if you submit a PR implementing one, you could win a massive bonus of 5000 pts*!",
-             )}
-          </p>
-          <p>
-            <h4 className=Styles.sidebarHeader>
-              {ReasonReact.string("Challenge #13: 'My two codas'")}
-            </h4>
-          </p>
-          <p>
-            {ReasonReact.string(
-               "Earn 400 pts* for giving your feedback by filling out this ",
-             )}
-            <a
-              className=Style.Link.basic
-              href="http://bit.ly/CommunityRetro"
-              target="_blank">
-              {ReasonReact.string("survey")}
-            </a>
-            {ReasonReact.string(".")}
-          </p>
-          <p>
-            <h4 className=Styles.sidebarHeader>
-              {ReasonReact.string("Challenge #14: 'Leonardo da Coda'")}
-            </h4>
-          </p>
-          <p>
-            {ReasonReact.string(
-               "Bring out your most creative self to create Coda-related GIFs and emoji's! Post your GIF or emoji on the ",
-             )}
-            <a
-              className=Style.Link.basic
-              href="https://forums.codaprotocol.com/t/community-art-contest-gifs/109"
-              target="_blank">
-              {ReasonReact.string("forums")}
-            </a>
-            {ReasonReact.string(
-               ". You can have unlimited number of entries so cut yourself loose! The community can vote on the best entries by 'hearting' your post, so do not forget to 'heart' your favorite entries! Top 3 entries will receive bonus points: 300 pts* for the best GIF and emoji, 200 pts* for the second place and 100 pts* for the third place.",
-             )}
-          </p>
-          <p>
-            <em>
-              {ReasonReact.string(
-                 "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
-               )}
-            </em>
           </p>
         </div>
       </div>
-    </div>;
-  },
+    </Section>
+    <hr />
+    <div>
+      <div className=Styles.dashboardHeader>
+        <h1 className=Style.H1.hero> {React.string("Network Dashboard")} </h1>
+        <a
+          href="https://o1testnet.grafana.net/d/mO5fAWHWk/testnet-stats?orgId=1"
+          target="_blank"
+          className=Styles.headerLink>
+          {React.string({j|View Full Dashboard\u00A0→|j})}
+        </a>
+      </div>
+      <iframe
+        src="https://o1testnet.grafana.net/d-solo/PeI0mtKWk/live-dashboard-for-website?orgId=1&panelId=2"
+        className=Styles.dashboard
+      />
+    </div>
+  </div>;
 };

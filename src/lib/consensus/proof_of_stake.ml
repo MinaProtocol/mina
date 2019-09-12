@@ -43,13 +43,13 @@ let compute_delegatee_table keys ~iter_accounts =
   let outer_table = Public_key.Compressed.Table.create () in
   iter_accounts (fun i (acct : Account.t) ->
       if Public_key.Compressed.Set.mem keys acct.delegate then
-        Public_key.Compressed.Table.change outer_table acct.delegate
-          ~f:(fun maybe_table ->
-            let table =
-              Option.value maybe_table ~default:(Account.Index.Table.create ())
-            in
-            Account.Index.Table.add_exn table ~key:i ~data:acct.balance ;
-            Some table ) ) ;
+        Public_key.Compressed.Table.update outer_table acct.delegate
+          ~f:(function
+          | None ->
+              Account.Index.Table.of_alist_exn [(i, acct.balance)]
+          | Some table ->
+              Account.Index.Table.add_exn table ~key:i ~data:acct.balance ;
+              table ) ) ;
   (* TODO: this metric tracking currently assumes that the
    * result of compute_delegatee_table is called with the
    * full set of proposer keypairs every time the set
@@ -2418,7 +2418,7 @@ module Hooks = struct
     in
     if slot_diff < 0L then Error `Too_early
     else if slot_diff >= of_int Constants.delta then
-      Error (`Too_late slot_diff)
+      Error (`Too_late (sub slot_diff (of_int Constants.delta)))
     else Ok ()
 
   let received_at_valid_time (consensus_state : Consensus_state.Value.t)
@@ -2591,11 +2591,16 @@ module Hooks = struct
         | Ok epoch_data ->
             epoch_data
         | Error () ->
-            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              "System time is out of sync with protocol state time" ;
-            failwith
-              "System time is out of sync with protocol state time; please \
-               setup NTP if you haven't)"
+            Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+              "An empty epoch is detected! This could be caused by the \
+               following reasons: system time is out of sync with protocol \
+               state time; or internet connection is down or unstable; or the \
+               testnet has crashed. If it is the first case, please setup \
+               NTP. If it is the second case, please check the internet \
+               connection. If it is the last case, in our current version of \
+               testnet this is unrecoverable, but we will fix it in future \
+               versions once the planned change to consensus is finished." ;
+            exit 99
       in
       let total_stake = epoch_data.ledger.total_currency in
       let epoch_snapshot =

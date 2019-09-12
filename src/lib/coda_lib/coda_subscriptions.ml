@@ -30,17 +30,17 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
            let reader, writer = Pipe.create () in
            (wallet, (reader, writer)) )
   in
-  Strict_pipe.Reader.iter new_blocks
-    ~f:(fun ({With_hash.data= _; hash} as new_block_with_hash) ->
+  Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
+      let hash = new_block |> fst |> With_hash.hash in
       let filtered_external_transition_result =
         if is_storing_all then
-          Filtered_external_transition.of_transition `All new_block_with_hash
+          Filtered_external_transition.of_transition `All new_block
         else
           Filtered_external_transition.of_transition
             (`Some
               ( Public_key.Compressed.Set.of_list
               @@ Hashtbl.keys subscribed_block_users ))
-            new_block_with_hash
+            new_block
       in
       match filtered_external_transition_result with
       | Ok filtered_external_transition ->

@@ -13,17 +13,13 @@ open Coda_base
 open Coda_state
 open Cache_lib
 open O1trace
+open Coda_transition
 
 module Make (Inputs : Inputs.S) :
   Coda_intf.Transition_handler_processor_intf
-  with type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t
-   and type transition_frontier := Inputs.Transition_frontier.t
+  with type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
-              Inputs.Transition_frontier.Breadcrumb.t
-   and type verifier := Inputs.Verifier.t = struct
+              Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
   module Catchup_scheduler = Catchup_scheduler.Make (Inputs)
   module Transition_frontier_validation =
@@ -56,7 +52,7 @@ module Make (Inputs : Inputs.S) :
       else Cached.invalidate_with_success cached_breadcrumb
     in
     let transition =
-      Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
+      Transition_frontier.Breadcrumb.validated_transition breadcrumb
     in
     let add_breadcrumb =
       if only_if_present then Transition_frontier.add_breadcrumb_if_present_exn
@@ -65,7 +61,7 @@ module Make (Inputs : Inputs.S) :
     let%map () = add_breadcrumb frontier breadcrumb in
     Writer.write processed_transition_writer transition ;
     Catchup_scheduler.notify catchup_scheduler
-      ~hash:(With_hash.hash transition)
+      ~hash:(External_transition.Validated.state_hash transition)
 
   let process_transition ~logger ~trust_system ~verifier ~frontier
       ~catchup_scheduler ~processed_transition_writer

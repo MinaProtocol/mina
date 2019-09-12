@@ -2,6 +2,7 @@ open Core
 open Async
 open Coda_base
 open Coda_state
+open Coda_transition
 
 let num_breadcrumb_to_add = 3
 
@@ -18,6 +19,10 @@ let%test_module "Sync_handler" =
     let logger = Logger.null ()
 
     let trust_system = Trust_system.null ()
+
+    let f_with_verifier ~f ~logger =
+      let%map verifier = Verifier.create () in
+      f ~logger ~verifier
 
     let%test "sync with ledgers from another peer via glue_sync_ledger" =
       Backtrace.elide := false ;
@@ -65,8 +70,8 @@ let%test_module "Sync_handler" =
                   failwith "target of sync_ledger should not change" ) )
 
     let to_external_transition breadcrumb =
-      Transition_frontier.Breadcrumb.external_transition breadcrumb
-      |> External_transition.Validated.forget_validation
+      Transition_frontier.Breadcrumb.validated_transition breadcrumb
+      |> External_transition.Validation.forget_validation
 
     let%test "a node should be able to give a valid proof of their root" =
       let logger = Logger.null () in
@@ -88,7 +93,7 @@ let%test_module "Sync_handler" =
           let seen_transition =
             Transition_frontier.(
               all_breadcrumbs frontier |> List.permute |> List.hd_exn
-              |> Breadcrumb.transition_with_hash |> With_hash.data)
+              |> Breadcrumb.validated_transition)
           in
           let observed_state =
             External_transition.Validated.protocol_state seen_transition
@@ -98,11 +103,12 @@ let%test_module "Sync_handler" =
             Option.value_exn ~message:"Could not produce an ancestor proof"
               (Sync_handler.Root.prove ~logger ~frontier observed_state)
           in
+          let%bind verify =
+            f_with_verifier ~f:Sync_handler.Root.verify ~logger
+          in
           let%map `Root (root_transition, _), `Best_tip (best_tip_transition, _)
               =
-            Sync_handler.Root.verify ~logger ~verifier:() observed_state
-              root_with_proof
-            |> Deferred.Or_error.ok_exn
+            verify observed_state root_with_proof |> Deferred.Or_error.ok_exn
           in
           External_transition.(
             equal
@@ -123,8 +129,8 @@ let%test_module "Sync_handler" =
             create_root_frontier ~logger Genesis_ledger.accounts
           in
           let root_breadcrumb = Transition_frontier.root frontier in
-          let {With_hash.data= root_transition; _} =
-            Transition_frontier.Breadcrumb.transition_with_hash root_breadcrumb
+          let root_transition =
+            Transition_frontier.Breadcrumb.validated_transition root_breadcrumb
           in
           let%bind () =
             build_frontier_randomly frontier
@@ -141,9 +147,12 @@ let%test_module "Sync_handler" =
               (Sync_handler.Bootstrappable_best_tip.prove ~logger ~frontier
                  root_consensus_state)
           in
+          let%bind verify =
+            f_with_verifier ~f:Sync_handler.Bootstrappable_best_tip.verify
+              ~logger
+          in
           let%map verification_result =
-            Sync_handler.Bootstrappable_best_tip.verify ~verifier:() ~logger
-              root_consensus_state peer_best_tip_with_witness
+            verify root_consensus_state peer_best_tip_with_witness
           in
           Result.is_ok verification_result )
   end )

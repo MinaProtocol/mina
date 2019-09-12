@@ -5,8 +5,9 @@ type t =
   { external_ip: Unix.Inet_addr.t
   ; bind_ip: Unix.Inet_addr.t
   ; discovery_port: int
-  ; communication_port: int
-  ; client_port: int }
+  ; client_port: int
+  ; libp2p_port: int
+  ; communication_port: int }
 [@@deriving bin_io]
 
 let to_peer : t -> Peer.t = function

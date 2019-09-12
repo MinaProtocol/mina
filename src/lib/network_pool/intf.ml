@@ -93,6 +93,8 @@ module type Snark_resource_pool_intf = sig
 
   type transition_frontier
 
+  type work_info
+
   include
     Resource_pool_base_intf
     with type transition_frontier := transition_frontier
@@ -102,11 +104,16 @@ module type Snark_resource_pool_intf = sig
   val add_snark :
        t
     -> work:work
-    -> proof:ledger_proof list
+    -> proof:ledger_proof One_or_two.t
     -> fee:Fee_with_prover.t
     -> [`Rebroadcast | `Don't_rebroadcast]
 
-  val request_proof : t -> work -> ledger_proof list Priced_proof.t option
+  val request_proof :
+    t -> work -> ledger_proof One_or_two.t Priced_proof.t option
+
+  val snark_pool_json : t -> Yojson.Safe.json
+
+  val all_completed_work : t -> work_info list
 end
 
 (** A [Snark_pool_diff_intf] is the resource pool diff for
@@ -121,16 +128,19 @@ module type Snark_pool_diff_intf = sig
   module Stable : sig
     module V1 : sig
       type t =
-        | Add_solved_work of work * ledger_proof list Priced_proof.Stable.V1.t
-      [@@deriving sexp, yojson, bin_io, version]
+        | Add_solved_work of
+            work * ledger_proof One_or_two.Stable.V1.t Priced_proof.Stable.V1.t
+      [@@deriving sexp, to_yojson, bin_io, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   val summary : t -> string
+
+  val compact_json : t -> Yojson.Safe.json
 
   val apply : resource_pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
 end

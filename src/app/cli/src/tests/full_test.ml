@@ -115,7 +115,7 @@ let run_test () : unit Deferred.t =
         Auxiliary_database.External_transition_database.create ~logger
           external_transition_database_dir
       in
-      let time_controller = Block_time.Controller.(create basic) in
+      let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let consensus_local_state =
         Consensus.Data.Local_state.create
           (Public_key.Compressed.Set.singleton
@@ -124,6 +124,7 @@ let run_test () : unit Deferred.t =
       let discovery_port = 8001 in
       let communication_port = 8000 in
       let client_port = 8123 in
+      let libp2p_port = 8002 in
       let net_config =
         Coda_networking.Config.
           { logger
@@ -142,9 +143,18 @@ let run_test () : unit Deferred.t =
                   ; bind_ip= Unix.Inet_addr.localhost
                   ; discovery_port
                   ; communication_port
+                  ; libp2p_port
                   ; client_port }
               ; trust_system
-              ; max_concurrent_connections= Some 10 } }
+              ; enable_libp2p= false
+              ; disable_haskell= false
+              ; libp2p_keypair= None
+              ; libp2p_peers= []
+              ; max_concurrent_connections= Some 10
+              ; log_gossip_heard=
+                  { snark_pool_diff= false
+                  ; transaction_pool_diff= false
+                  ; new_state= false } } }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
@@ -234,11 +244,16 @@ let run_test () : unit Deferred.t =
                 ( Coda_commands.get_nonce coda (pk_of_sk sender_sk)
                 |> Participating_state.active_exn )
             in
+            let memo =
+              User_command_memo.create_from_string_exn
+                "A memo created in full-test"
+            in
             let payload : User_command.Payload.t =
-              User_command.Payload.create ~fee ~nonce
-                ~memo:User_command_memo.dummy
+              User_command.Payload.create ~fee ~nonce ~memo
                 ~body:(Payment {receiver= receiver_pk; amount})
             in
+            (* verify memo is in the payload *)
+            assert (User_command_memo.equal memo payload.common.memo) ;
             User_command.sign (Keypair.of_private_key_exn sender_sk) payload )
       in
       let assert_ok x = assert (Or_error.is_ok x) in
