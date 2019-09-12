@@ -1,0 +1,26 @@
+version: '3.6'
+services:
+  postgres: 
+    image: postgres:12
+    environment: 
+      POSTGRES_PASSWORD: codarules
+      POSTGRES_USER: admin
+      POSTGRES_DB: archiver
+      POSTGRES_PORT: 9999
+    volumes:
+    - db_data:/var/lib/postgresql/data
+    ports: 
+    - "5432:9999"
+  graphql-engine: 
+    image: hasura/graphql-engine:v1.0.0-beta.6
+    environment: 
+      HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@postgres:9999/archiver
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
+    ports: 
+    - "8080:8080"
+    depends_on:
+    - "postgres"
+    restart: always
+volumes:
+  db_data:
