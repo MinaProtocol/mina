@@ -83,7 +83,7 @@ module Styles = {
       ),
       selector(
         "strong",
-        [fontWeight(`num(600)), color(Style.Colors.metallicBlue)],
+        [fontWeight(`num(600)), color(Style.Colors.saville)],
       ),
       selector(
         ".admonition",

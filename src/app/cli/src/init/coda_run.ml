@@ -306,7 +306,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                 , `String
                     (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" work.spec) )
               ] ;
-          List.iter work.metrics ~f:(fun (total, tag) ->
+          One_or_two.iter work.metrics ~f:(fun (total, tag) ->
               match tag with
               | `Merge ->
                   Perf_histograms.add_span ~name:"snark_worker_merge_time"
@@ -465,7 +465,7 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
 You might be trying to connect to a different network version, or need to troubleshoot your configuration. See https://codaprotocol.com/docs/troubleshooting/ for details.
 
 %!|err}
-      | exn ->
+      | _ ->
           handle_crash exn ~conf_dir ~top_logger coda_ref ) ;
       Stdlib.exit 1 ) ;
   Async_unix.Signal.(

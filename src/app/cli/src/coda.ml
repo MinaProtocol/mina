@@ -35,6 +35,9 @@ let chain_id =
      let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
      Blake2.to_hex b2)
 
+[%%inject
+"daemon_expiry", daemon_expiry]
+
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -170,9 +173,28 @@ let daemon logger =
          (optional bool)
      and no_bans =
        let module Expiration = struct
-         [%%expires_after "20190907"]
+         [%%expires_after "20190914"]
        end in
        flag "no-bans" no_arg ~doc:"don't ban peers (**TEMPORARY FOR TESTNET**)"
+     and enable_libp2p =
+       flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
+     and libp2p_port =
+       flag "libp2p-port" (optional int)
+         ~doc:"Port to use for libp2p (default: 28675)"
+     and disable_haskell =
+       flag "disable-old-discovery" no_arg
+         ~doc:"Disable the old discovery mechanism"
+     and libp2p_keypair =
+       flag "libp2p-keypair" (optional string)
+         ~doc:
+           "Keypair (generated from `coda advanced generate-libp2p-keypair`) \
+            to use with libp2p (default: generate new keypair)"
+     and libp2p_peers_raw =
+       flag "libp2p-peer"
+         ~doc:
+           "/ip4/HOST/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
+            libp2p discovery"
+         (listed string)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -245,8 +267,35 @@ let daemon logger =
          ~metadata:
            [ ("commit", `String Coda_version.commit_id)
            ; ("branch", `String Coda_version.branch) ] ;
+       if not @@ String.equal daemon_expiry "never" then (
+         Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+           "Daemon will expire at $exp"
+           ~metadata:[("exp", `String daemon_expiry)] ;
+         let tm =
+           (* same approach as in Consensus.Constants.genesis_state_timestamp *)
+           let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
+           Core.Time.of_string_gen
+             ~if_no_timezone:(`Use_this_one default_timezone) daemon_expiry
+         in
+         Clock.run_at tm
+           (fun () ->
+             Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+               "Daemon has expired, shutting down" ;
+             Core.exit 0 )
+           () ) ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Booting may take several seconds, please wait" ;
+       let libp2p_keypair =
+         Option.map libp2p_keypair ~f:(fun s ->
+             match Coda_net2.Keypair.of_string s with
+             | Ok kp ->
+                 kp
+             | Error e ->
+                 Logger.fatal logger "failed to parse -libp2p-keypair: $err"
+                   ~module_:__MODULE__ ~location:__LOC__
+                   ~metadata:[("err", `String (Error.to_string_hum e))] ;
+                 Core.exit 19 )
+       in
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
         * a version mismatch *)
@@ -387,6 +436,14 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "rest-port"
              ~default:Port.default_rest rest_server_port
          in
+         ignore libp2p_port ;
+         (* FIXME HACK: make this configurable when we can pass the port in the CLI *)
+         let libp2p_port =
+           (*
+           or_from_config YJ.Util.to_int_option "libp2p-port"
+             ~default:Port.default_libp2p libp2p_port *)
+           Port.default_libp2p
+         in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
@@ -496,7 +553,8 @@ let daemon logger =
            ; bind_ip
            ; discovery_port
            ; communication_port= external_port
-           ; client_port }
+           ; client_port
+           ; libp2p_port }
          in
          let wallets_disk_location = conf_dir ^/ "wallets" in
          (* HACK: Until we can properly change propose keys at runtime we'll
@@ -574,7 +632,7 @@ let daemon logger =
          let trust_system = Trust_system.create ~db_dir:trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let time_controller =
-           Block_time.Controller.create Block_time.Controller.basic
+           Block_time.Controller.create @@ Block_time.Controller.basic ~logger
          in
          let initial_propose_keypairs =
            propose_keypair |> Option.to_list |> Keypair.Set.of_list
@@ -602,8 +660,13 @@ let daemon logger =
                ; initial_peers= initial_peers_cleaned
                ; addrs_and_ports
                ; trust_system
-               ; max_concurrent_connections
-               ; log_gossip_heard } }
+               ; log_gossip_heard
+               ; enable_libp2p
+               ; disable_haskell
+               ; libp2p_keypair
+               ; libp2p_peers=
+                   List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+               ; max_concurrent_connections } }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
@@ -810,6 +873,7 @@ let coda_commands logger =
         ; (module Coda_bootstrap_test)
         ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
+        ; (module Coda_txns_and_restart_non_proposers)
         ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)

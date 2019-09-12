@@ -33,7 +33,7 @@ let dispatch_join_errors rpc query port =
     Or_error. *)
 let dispatch_with_message rpc query port ~success ~error
     ~(join_error : 'a Or_error.t -> 'b Or_error.t) =
-  let fail err = eprintf "%s\n%!" err ; exit 14 in
+  let fail err = eprintf "%s\n%!" err ; exit 18 in
   let%bind res = dispatch rpc query port in
   match join_error res with
   | Ok x ->
@@ -558,13 +558,17 @@ let send_payment =
     ~error:"Failed to send payment"
 
 let cancel_transaction =
+  let txn_id_flag =
+    Command.Param.(
+      flag "id" ~doc:"ID Transaction ID to be cancelled" (required string))
+  in
+  let args = Args.zip2 Cli_lib.Flag.privkey_read_path txn_id_flag in
   Command.async
     ~summary:
       "Cancel a transaction -- this submits a replacement transaction with a \
        fee larger than the cancelled transaction."
-    (Cli_lib.Background_daemon.init ~rest:true
-       Command.Param.(anon @@ ("txn-id" %: string))
-       ~f:(fun port serialized_transaction ->
+    (Cli_lib.Background_daemon.init args
+       ~f:(fun port (privkey_read_path, serialized_transaction) ->
          match User_command.of_base58_check serialized_transaction with
          | Ok user_command ->
              let receiver =
@@ -576,30 +580,31 @@ let cancel_transaction =
                | Stake_delegation (Set_delegate {new_delegate}) ->
                    new_delegate
              in
-             let nonce_query =
-               let open Graphql_client.Encoders in
-               Graphql_client.Get_inferred_nonce.make
-                 ~public_key:(public_key (User_command.sender user_command))
-                 ()
+             let%bind sender_kp =
+               Secrets.Keypair.Terminal_stdin.read_exn privkey_read_path
              in
-             let open Deferred.Let_syntax in
-             let%bind nonce_response = Graphql_client.query nonce_query port in
-             let maybe_inferred_nonce =
-               let open Option.Let_syntax in
-               let%bind wallet = nonce_response#wallet in
-               let%map nonce = wallet#inferredNonce in
-               int_of_string nonce
+             let cancel_sender = User_command.sender user_command in
+             if
+               not
+                 (Public_key.Compressed.equal
+                    (Public_key.compress sender_kp.public_key)
+                    cancel_sender)
+             then (
+               eprintf
+                 "Provided key doesn't match transaction to be cancelled.\n\
+                  Wanted key for %s\n"
+                 (Public_key.Compressed.to_base58_check cancel_sender) ;
+               Deferred.don't_wait_for (exit 17) ) ;
+             let%bind inferred_nonce =
+               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
+                 sender_kp.public_key port
              in
-             let cancelled_nonce =
-               Coda_numbers.Account_nonce.to_int
-                 (User_command.nonce user_command)
-             in
-             let inferred_nonce =
-               Option.value maybe_inferred_nonce ~default:cancelled_nonce
-             in
+             let cancelled_nonce = User_command.nonce user_command in
              let cancel_fee =
                let diff =
-                 Unsigned.UInt64.of_int (inferred_nonce - cancelled_nonce + 1)
+                 Unsigned.UInt64.of_int
+                   Coda_numbers.Account_nonce.(
+                     to_int inferred_nonce - to_int cancelled_nonce)
                in
                let fee =
                  Currency.Fee.to_uint64 (User_command.fee user_command)
@@ -609,28 +614,33 @@ let cancel_transaction =
                in
                let open Unsigned.UInt64.Infix in
                (* fee amount "inspired by" network_pool/indexed_pool.ml *)
-               fee + (replace_fee * diff)
+               Currency.Fee.of_uint64 (fee + (replace_fee * diff))
              in
              printf "Fee to cancel transaction is %s coda.\n"
-               (Unsigned.UInt64.to_string cancel_fee) ;
-             let cancel_query =
-               let open Graphql_client.Encoders in
-               Graphql_client.Cancel_user_command.make
-                 ~from:(public_key (User_command.sender user_command))
-                 ~to_:(public_key receiver) ~fee:(uint64 cancel_fee)
-                 ~nonce:
-                   (uint32
-                      (Coda_numbers.Account_nonce.to_uint32
-                         (User_command.nonce user_command)))
-                 ()
+               (Currency.Fee.to_string cancel_fee) ;
+             let body =
+               User_command_payload.Body.Payment
+                 {receiver; amount= Currency.Amount.zero}
              in
-             let%map cancel_response =
-               Graphql_client.query cancel_query port
+             let command =
+               Coda_commands.setup_user_command ~fee:cancel_fee
+                 ~nonce:cancelled_nonce ~memo:User_command_memo.dummy
+                 ~sender_kp body
              in
-             printf "Cancelled transaction! Cancel ID: %s\n"
-               ((cancel_response#sendPayment)#payment)#id
+             dispatch_with_message Daemon_rpcs.Send_user_command.rpc command
+               port
+               ~success:(fun receipt_chain_hash ->
+                 sprintf
+                   "Dispatched cancel transaction with ID %s\n\
+                    Receipt chain hash is now %s\n"
+                   (User_command.to_base58_check command)
+                   (Receipt.Chain_hash.to_string receipt_chain_hash) )
+               ~error:(fun e ->
+                 sprintf "Failed to cancel transaction: %s"
+                   (Error.to_string_hum e) )
+               ~join_error:Or_error.join
          | Error _e ->
-             eprintf "Could not deserialize user command\n" ;
+             eprintf "could not deserialize user command\n" ;
              exit 16 ))
 
 let get_transaction_status =
@@ -938,6 +948,30 @@ let list_accounts =
                    (Unsigned.UInt64.to_string (w#balance)#total) )
                response#ownedWallets ) ))
 
+let generate_libp2p_keypair =
+  Command.async
+    ~summary:
+      "Generate a new libp2p keypair and print it out (this contains the \
+       secret key!)"
+    (Command.Param.return
+       ( handle_exception_nicely
+       @@ fun () ->
+       Deferred.ignore
+         (let open Deferred.Let_syntax in
+         let logger = Logger.create () in
+         (* Using the helper only for keypair generation requires no state. *)
+         match%map Coda_net2.create ~logger ~conf_dir:"/dev/null" with
+         | Ok net ->
+             let%bind me = Coda_net2.Keypair.random net in
+             let%map () = Coda_net2.shutdown net in
+             printf "libp2p keypair: %s" (Coda_net2.Keypair.to_string me) ;
+             exit 0
+         | Error e ->
+             Logger.fatal logger "failed to generate libp2p keypair: $err"
+               ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:[("err", `String (Error.to_string_hum e))] ;
+             exit 20) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1020,4 +1054,5 @@ let advanced =
     ; ("snark-job-list", snark_job_list)
     ; ("snark-pool-list", snark_pool_list)
     ; ("unsafe-import", unsafe_import)
+    ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("visualization", Visualization.command_group) ]

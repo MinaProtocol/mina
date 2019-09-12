@@ -23,6 +23,8 @@ var (
 		"removeStreamHandler": removeStreamHandler,
 		"addStreamHandler":    addStreamHandler,
 		"listeningAddrs":      listeningAddrs,
+		"addPeer":             addPeer,
+		"beginAdvertising":    beginAdvertising,
 	}
 
 	_methodIdxValueToName = map[methodIdx]string{
@@ -40,6 +42,8 @@ var (
 		removeStreamHandler: "removeStreamHandler",
 		addStreamHandler:    "addStreamHandler",
 		listeningAddrs:      "listeningAddrs",
+		addPeer:             "addPeer",
+		beginAdvertising:    "beginAdvertising",
 	}
 )
 
@@ -61,6 +65,8 @@ func init() {
 			interface{}(removeStreamHandler).(fmt.Stringer).String(): removeStreamHandler,
 			interface{}(addStreamHandler).(fmt.Stringer).String():    addStreamHandler,
 			interface{}(listeningAddrs).(fmt.Stringer).String():      listeningAddrs,
+			interface{}(addPeer).(fmt.Stringer).String():             addPeer,
+			interface{}(beginAdvertising).(fmt.Stringer).String():    beginAdvertising,
 		}
 	}
 }

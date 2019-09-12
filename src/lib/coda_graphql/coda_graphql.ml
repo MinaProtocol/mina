@@ -347,7 +347,7 @@ module Types = struct
             ~typ:(non_null @@ list @@ non_null int)
             ~args:Arg.[]
             ~resolve:(fun _ {Transaction_snark_work.Info.work_ids; _} ->
-              work_ids ) ] )
+              One_or_two.to_list work_ids ) ] )
 
   let blockchain_state =
     obj "BlockchainState" ~fields:(fun _ ->
