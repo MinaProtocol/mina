@@ -8,7 +8,6 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
-module Rescue = Rescue_inst
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
