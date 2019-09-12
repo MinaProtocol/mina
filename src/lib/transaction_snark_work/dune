@@ -1,5 +1,5 @@
 (library
   (name transaction_snark_work)
   (public_name transaction_snark_work)
-  (libraries core_kernel coda_base transaction_snark ledger_proof)
+  (libraries core_kernel coda_base ledger_proof one_or_two transaction_snark)
   (preprocess (pps ppx_jane ppx_coda ppx_deriving_yojson)))

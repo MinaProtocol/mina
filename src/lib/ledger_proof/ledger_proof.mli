@@ -19,3 +19,7 @@ include S with type t = Prod.t
 include S with type t = Debug.t
 
 [%%endif]
+
+module For_tests : sig
+  val mk_dummy_proof : Transaction_snark.Statement.t -> t
+end

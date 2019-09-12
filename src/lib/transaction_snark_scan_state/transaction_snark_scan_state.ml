@@ -271,7 +271,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
       , Sok_message.create ~fee ~prover )
 
 let total_proofs (works : Transaction_snark_work.t list) =
-  List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
+  List.sum (module Int) works ~f:(fun w -> One_or_two.length w.proofs)
 
 (*************exposed functions*****************)
 
@@ -453,10 +453,6 @@ module Staged_undos = struct
           ~f:(fun u -> Ledger.undo ledger u) )
 end
 
-module Bundle = struct
-  type 'a t = 'a list
-end
-
 let statement_of_job : job -> Transaction_snark.Statement.t option = function
   | Base {statement; _} ->
       Some statement
@@ -557,43 +553,36 @@ let snark_job_list_json t =
 let all_work_statements t : Transaction_snark_work.Statement.t list =
   let work_seqs = all_jobs t in
   List.concat_map work_seqs ~f:(fun work_seq ->
-      List.chunks_of
+      One_or_two.group_list
         (List.map work_seq ~f:(fun job ->
              match statement_of_job job with
              | None ->
                  assert false
              | Some stmt ->
-                 stmt ))
-        ~length:Transaction_snark_work.proofs_length )
+                 stmt )) )
 
 let required_work_pairs t ~slots =
   let work_list = Parallel_scan.jobs_for_slots t ~slots in
-  List.concat_map work_list ~f:(fun works ->
-      List.chunks_of works ~length:Transaction_snark_work.proofs_length )
+  List.concat_map work_list ~f:(fun works -> One_or_two.group_list works)
 
 let k_work_pairs_for_new_diff t ~k =
   let work_list = Parallel_scan.jobs_for_next_update t in
   List.(
-    take
-      (concat_map work_list ~f:(fun works ->
-           chunks_of works ~length:Transaction_snark_work.proofs_length ))
-      k)
+    take (concat_map work_list ~f:(fun works -> One_or_two.group_list works)) k)
 
 (*Always the same pairing of jobs*)
 let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
   let work_list = Parallel_scan.jobs_for_next_update t in
   List.concat_map work_list ~f:(fun work_seq ->
-      List.chunks_of
+      One_or_two.group_list
         (List.map work_seq ~f:(fun job ->
              match statement_of_job job with
              | None ->
                  assert false
              | Some stmt ->
-                 stmt ))
-        ~length:Transaction_snark_work.proofs_length )
+                 stmt )) )
 
 let all_work_pairs_exn t =
-  let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0) in
   let all_jobs = all_jobs t in
   let module A = Available_job in
   let single_spec (job : job) =
@@ -613,25 +602,9 @@ let all_work_pairs_exn t =
         in
         Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
   in
-  let all_jobs_paired jobs =
-    let pairs = chunks_of jobs ~n:2 in
-    List.map pairs ~f:(fun js ->
-        match js with
-        | [j] ->
-            (j, None)
-        | [j1; j2] ->
-            (j1, Some j2)
-        | _ ->
-            failwith "error pairing jobs" )
-  in
-  let job_pair_to_work_spec_pair = function
-    | j, Some j' ->
-        (single_spec j, Some (single_spec j'))
-    | j, None ->
-        (single_spec j, None)
-  in
   List.concat_map all_jobs ~f:(fun jobs ->
-      List.map (all_jobs_paired jobs) ~f:job_pair_to_work_spec_pair )
+      List.map (One_or_two.group_list jobs) ~f:(One_or_two.map ~f:single_spec)
+  )
 
 let fill_work_and_enqueue_transactions t transactions work =
   let open Or_error.Let_syntax in
@@ -646,7 +619,8 @@ let fill_work_and_enqueue_transactions t transactions work =
     map2_or_error next_jobs
       (List.concat_map works
          ~f:(fun {Transaction_snark_work.fee; proofs; prover} ->
-           List.map proofs ~f:(fun proof -> (fee, proof, prover)) ))
+           One_or_two.map proofs ~f:(fun proof -> (fee, proof, prover))
+           |> One_or_two.to_list ))
       ~f:completed_work_to_scanable_work
   in
   let old_proof = Parallel_scan.last_emitted_value t in
