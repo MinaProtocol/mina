@@ -50,7 +50,7 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
         Deferred.return x
     | Error (Unix.Unix_error ((EACCES as e), _, _)) ->
         Deferred.return @@ Privkey_error.corrupted_privkey
-        @@ Error.createf !"could not mkdir -p %s: %s\n" dn (message e)
+        @@ Error.createf "could not mkdir -p %s: %s\n" dn (message e)
     | Error e ->
         raise e
   in
