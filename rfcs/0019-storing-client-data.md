@@ -192,7 +192,7 @@ Table public_keys {
 }
 
 Table blocks {
-  int [pk]
+  id int [pk]
   state_hash string [not null]
   coinbase int [not null]
   creator string [not null]
@@ -225,11 +225,11 @@ Table user_commands {
   id int [pk]
   hash string [not null, unique]
   type user_command_type [not null]
-  nonce int64 [not null]
+  nonce bit(64) [not null]
   sender int [not null, ref: > public_keys.id]
   receiver int [not null, ref: > public_keys.id]
-  amount int64 [not null]
-  fee int64 [not null]
+  amount bit(64) [not null]
+  fee bit(64) [not null]
   memo string [not null]
   first_seen bit(64)
   transaction_pool_membership bool [not null]
@@ -248,7 +248,7 @@ Table user_commands {
 Table fee_transfers {
   id int [pk]
   hash string [not null, unique]
-  fee int64 [not null]
+  fee bit(64) [not null]
   receiver int [not null, ref: > public_keys.id]
   first_seen bit(64)
   Indexes {
@@ -269,7 +269,7 @@ Table receipt_chain_hashes {
 
 Table block_to_user_commands {
   block_id int [not null, ref: > blocks.id]
-  transaction_id int [not null, ref: > user_commands.id, ref: > fee_transfers.id]
+  transaction_id int [not null, ref: > user_commands.id]
   receipt_chain_id int [ref: > receipt_chain_hashes.id]
   sender int [not null, ref: > public_keys.id]
   receiver int [not null, ref: > public_keys.id]
@@ -284,10 +284,10 @@ Table block_to_user_commands {
 
 Table block_to_fee_transfers {
   block_id int [not null, ref: > blocks.id]
-  transaction_id int [not null, ref: > user_commands.id, ref: > fee_transfers.id]=
+  transaction_id int [not null, ref: > fee_transfers.id]
   receiver int [not null, ref: > public_keys.id]
   Indexes {
-    state_hash [name:"block_to_fee_transfer.block"]
+    block_id [name:"block_to_fee_transfer.block"]
     transaction_id [name: "block_to_fee_transfer.transaction"]
     receiver [name: "block_to_user_command.receiver"]
   }
@@ -304,9 +304,9 @@ Table snark_job {
 }
 
 Table block_to_snark_job {
-  block_id int [ref: > block.id]
-  snark_job_id int64 [ref: > snark_job.id]
-  Index {
+  block_id int [ref: > blocks.id]
+  snark_job_id bit(64) [ref: > snark_job.id]
+  Indexes {
     block_id
     snark_job_id
   }
