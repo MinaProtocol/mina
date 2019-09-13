@@ -14,13 +14,12 @@ with it in your enviroment, install the switch:
   opam switch create 4.07.1+spacetime # or the current OCaml version for building Coda 
   eval $(opam env)
 ```
-
-Then follow the instructions for "Building outside docker" given in README-dev.md. Building
-some OPAM packages with Spacetime requires a large amount of stack space, so you
+Building some OPAM packages with Spacetime requires a large amount of stack space, so you
 may need to increase the available stack provided by your shell. For bash:
 ```
   ulimit -s unlimited
 ```
+Then follow the instructions for "Building outside docker" given in README-dev.md. 
 
 ## Running for Spacetime
 
