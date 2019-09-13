@@ -30,8 +30,14 @@ start() {
     pg_ctl -o "-F -p $POSTGRES_PORT" start -D $STORAGE_DIRECTORY;
     docker run -p $HASURA_PORT:8080 \
         -e HASURA_GRAPHQL_DATABASE_URL=postgres://$ADMIN:@host.docker.internal:$POSTGRES_PORT/$DATABASE_NAME \
-        -e HASURA_GRAPHQL_ENABLE_CONSOLE=false \
-        hasura/graphql-engine:v1.0.0-beta.6
+        -e HASURA_GRAPHQL_ENABLE_CONSOLE=true \
+        hasura/graphql-engine:v1.0.0-beta.6 &
+    sleep 4
+    
+    # Makes a table queryable through graphql
+    curl -d'{"type":"replace_metadata", "args":'$(cat scripts/metadata.json)'}' http://localhost:8080/v1/query;
+    # Generates the graphql query types for OCaml
+    python scripts/introspection_query.py --port $HASURA_PORT --uri /v1/graphql > src/app/archive/archive_graphql_schema.json
 }
 
 stop () {
