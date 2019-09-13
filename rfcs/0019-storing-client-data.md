@@ -271,13 +271,9 @@ Table block_to_user_commands {
   block_id int [not null, ref: > blocks.id]
   transaction_id int [not null, ref: > user_commands.id]
   receipt_chain_id int [ref: > receipt_chain_hashes.id]
-  sender int [not null, ref: > public_keys.id]
-  receiver int [not null, ref: > public_keys.id]
   Indexes {
     block_id [name:"block_to_user_command.block"]
     transaction_id [name: "block_to_user_command.transaction"]
-    receiver [name: "block_to_user_command.receiver"]
-    sender [name: "block_to_user_command.sender"]
   }
   // Rows are uniquely identified by `state_hash` and `transaction_id`
 }
@@ -285,7 +281,6 @@ Table block_to_user_commands {
 Table block_to_fee_transfers {
   block_id int [not null, ref: > blocks.id]
   transaction_id int [not null, ref: > fee_transfers.id]
-  receiver int [not null, ref: > public_keys.id]
   Indexes {
     block_id [name:"block_to_fee_transfer.block"]
     transaction_id [name: "block_to_fee_transfer.transaction"]
@@ -321,8 +316,6 @@ Below is an image of the relationships of the schemas:
 Here is a link of an interactive version of the schema: https://dbdiagram.io/d/5d30b14cced98361d6dccbc8
 
 The `work_id` of snark job is represented concisely as three fields (`work_id`, `has_one_job`, `has_two_job`). Since snark jobs has at most two snark jobs, we can use the boolean bit `has_one_job` and `has_two_job` to represent the number of jobs that snark job has. Then, concatenating the hashes of the snark jobs to compute the `work_id`. If the snark job does not exist, the hash is defaulted to `0`.
-
-Notice that all the possible joins we have to run through the `block_to_transactions` table. We added an index to `sender` and `receiver` because a lot of common queries involving blocks and transactions involve a `sender` and `receiver` of a transaction.
 
 Additionally, notice that `block` has the indexes `(block_length, epoch, slot)` and `time_received` for paginating blocks fast. Likewise, `user_commands` have the indexes on both (`sender`, `first_seen`) and (`receiver`, `first_seen`) to make paginating on `user_commands` fast. If we would like to order transactions based on `block_compare`, we would have to do a join on the `block_to_transaction` table and then another join on the `block` table. We could have added extra fields, such as `block_length`, `epoch` and `slot`, to the `block_to_transaction` to have less joins. However, we believe that this would making inserts more expensive and it complicates the table more.
 
@@ -511,6 +504,7 @@ We can have a third-party archived node tell a client the consensus_state of the
 - Other alternatives are discussed in the previous commits of this [RFC](https://github.com/CodaProtocol/coda/pull/2901)
 - In an ideal world where we have an infinite amount of time, we would implement our own native graph database leverage the `transition_frontier` as an in-memory cache. Namely, we would have all the blocks in the `transition_frontier` to be in the in-memory cache along with nodes that have a 1 to 2 degree of seperation
 - Can we integrate the persistence system and the archival system in some way to make queries and stores more efficient?
+- For the wallet, for every account that we are interested in, it would be nice to have `Account_state` table. For each account that we are interested in at each block, we will store its balance and nonce. This will reduce the need of having the `transaction_pool_membership` field in `User_command` because we would be able to infer the status of a transaction from the nonce of each account at the best tip.
 
 # Prior Art
 
