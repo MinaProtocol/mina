@@ -315,9 +315,9 @@ Below is an image of the relationships of the schemas:
 
 Here is a link of an interactive version of the schema: https://dbdiagram.io/d/5d30b14cced98361d6dccbc8
 
-The `work_id` of snark job is represented concisely as three fields (`work_id`, `has_one_job`, `has_two_job`). Since snark jobs has at most two snark jobs, we can use the boolean bit `has_one_job` and `has_two_job` to represent the number of jobs that snark job has. Then, concatenating the hashes of the snark jobs to compute the `work_id`. If the snark job does not exist, the hash is defaulted to `0`.
+In this RFC, we are assuming that the datastructures for all Indexes and Multi-column Indexes are btrees. So Multi-column Indexes are technically sorted in lexigraphical order.
 
-Additionally, notice that `block` has the indexes `(block_length, epoch, slot)` and `time_received` for paginating blocks fast. Likewise, `user_commands` have the indexes on both (`sender`, `first_seen`) and (`receiver`, `first_seen`) to make paginating on `user_commands` fast. If we would like to order transactions based on `block_compare`, we would have to do a join on the `block_to_transaction` table and then another join on the `block` table. We could have added extra fields, such as `block_length`, `epoch` and `slot`, to the `block_to_transaction` to have less joins. However, we believe that this would making inserts more expensive and it complicates the table more.
+notice that `block` has the indexes `(block_length, epoch, slot)` and `time_received` for paginating blocks fast. Likewise, `user_commands` have the indexes on both (`sender`, `first_seen`) and (`receiver`, `first_seen`) to make paginating on `user_commands` fast. If we would like to order transactions based on `block_compare`, we would have to do a join on the `block_to_transaction` table and then another join on the `block` table. We could have added extra fields, such as `block_length`, `epoch` and `slot`, to the `block_to_transaction` to have less joins. However, we believe that this would making inserts more expensive and it complicates the table more.
 
 ### Deleting data
 
