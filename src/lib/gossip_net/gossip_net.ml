@@ -86,7 +86,8 @@ module type Config_intf = sig
     ; disable_haskell: bool
     ; libp2p_keypair: Coda_net2.Keypair.t option
     ; libp2p_peers: Coda_net2.Multiaddr.t list
-    ; log_gossip_heard: log_gossip_heard }
+    ; log_gossip_heard: log_gossip_heard
+    ; filter_layer: string option }
   [@@deriving make]
 end
 
@@ -193,7 +194,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; disable_haskell: bool
       ; libp2p_keypair: Coda_net2.Keypair.t option
       ; libp2p_peers: Coda_net2.Multiaddr.t list
-      ; log_gossip_heard: log_gossip_heard }
+      ; log_gossip_heard: log_gossip_heard
+      ; filter_layer: string option }
     [@@deriving make]
   end
 

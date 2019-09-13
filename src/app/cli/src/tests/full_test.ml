@@ -154,7 +154,8 @@ let run_test () : unit Deferred.t =
               ; log_gossip_heard=
                   { snark_pool_diff= false
                   ; transaction_pool_diff= false
-                  ; new_state= false } } }
+                  ; new_state= false }
+              ; filter_layer= None } }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;

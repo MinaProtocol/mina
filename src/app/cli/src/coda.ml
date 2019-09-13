@@ -167,6 +167,9 @@ let daemon logger =
      and libp2p_port =
        flag "libp2p-port" (optional int)
          ~doc:"Port to use for libp2p (default: 28675)"
+     and filter_layer =
+       flag "filter-layer" (optional string)
+         ~doc:"Filter layer for gossip messages"
      and disable_haskell =
        flag "disable-old-discovery" no_arg
          ~doc:"Disable the old discovery mechanism"
@@ -605,6 +608,7 @@ let daemon logger =
                ; addrs_and_ports
                ; trust_system
                ; log_gossip_heard
+               ; filter_layer
                ; enable_libp2p
                ; disable_haskell
                ; libp2p_keypair
