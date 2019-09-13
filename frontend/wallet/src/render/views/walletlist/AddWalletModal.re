@@ -27,9 +27,10 @@ let make = (~walletName, ~password, ~setModalState, ~onSubmit) => {
         onChange={value => setModalState(_ => Some((value, password)))}
         value=walletName
       />
-      <Spacer height=1.5 />
+      <Spacer height=0.5 />
       <TextField
         label="Password"
+        type_="password"
         onChange={value => setModalState(_ => Some((walletName, value)))}
         value=password
       />
