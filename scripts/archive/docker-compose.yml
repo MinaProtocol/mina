@@ -8,7 +8,7 @@ services:
       POSTGRES_DB: archiver
     volumes:
     - /var/lib/postgresql/data
-    - ../src/app/archive/create_schema.sql:/docker-entrypoint-initdb.d/create_schema.sql
+    - ../../src/app/archive/create_schema.sql:/docker-entrypoint-initdb.d/create_schema.sql
     ports: 
     - "5432:5432"
   graphql-engine: 
@@ -18,7 +18,7 @@ services:
       HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
       HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
     ports: 
-    - "8080:8080"
+    - "9000:8080"
     depends_on:
     - "postgres"
     restart: always
