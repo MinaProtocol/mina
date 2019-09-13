@@ -183,20 +183,30 @@ This architecture supports many SQL databases and it can even exclude a database
 For the objects discussed in the previous section, we can embed them as tables in one global SQL database. Below are the schemas of the tables:
 
 ```
-Table block {
-  state_hash string [pk]
+Table public_keys {
+  id int [pk]
+  value text [not null]
+  Indexes {
+    value [name: "public_key"]
+  }
+}
+
+Table blocks {
+  int [pk]
+  state_hash string [not null]
+  coinbase int [not null]
   creator string [not null]
   staged_ledger_hash string [not null]
   ledger_hash string [not null]
-  epoch int [not null]
-  slot int [not null]
+  global_slot int [not null] // encompasses (epoch, slot)
   ledger_proof_nonce int [not null]
   status int [not null]
   block_length int [not null]
-  block_time date [not null]
+  time_received bit(64) [not null]
   Indexes {
-    (block_length, epoch, slot) [name: "block_compare"]
-    block_time [name: "block_compare"]
+    state_hash [name: "state_hash"]
+    (block_length, global_slot) [name: "block_compare"]
+    time_received [name: "block_compare"]
   }
 }
 
@@ -206,76 +216,101 @@ Table block {
   // - failure: The block got removed from the transition frontier. Value=-2
   // - unknown: After becoming online and bootstrapping, we may not know what will happen to the block. Value=-3
 
+Enum user_command_type {
+  payment
+  delegation
+}
+
 Table user_commands {
-  id string [pk]
-  is_delegation bool [not null]
+  id int [pk]
+  hash string [not null, unique]
+  type user_command_type [not null]
   nonce int64 [not null]
-  sender string [not null]
-  receiver string [not null]
+  sender int [not null, ref: > public_keys.id]
+  receiver int [not null, ref: > public_keys.id]
   amount int64 [not null]
   fee int64 [not null]
   memo string [not null]
-  first_seen date
+  first_seen bit(64)
   transaction_pool_membership bool [not null]
   is_added_manually bool [not null]
   Indexes {
-    (status, sender) [name: "fast_pooled_user_command_sender"]
-    (status, receiver) [name: "fast_pooled_user_command_receiver"]
+    hash [name: "user_command_hash"]
+    sender [name: "user_command_sender"]
+    receiver [name: "user_command_receiver"]
+    (transaction_pool_membership, sender) [name: "fast_pooled_user_command_sender"]
+    (transaction_pool_membership, receiver) [name: "fast_pooled_user_command_receiver"]
     (sender, first_seen) [name: "fast_sender_pagination"]
     (receiver, first_seen) [name: "fast_receiver_pagination"]
   }
 }
 
 Table fee_transfers {
-  id string [pk]
+  id int [pk]
+  hash string [not null, unique]
   fee int64 [not null]
-  receiver string [not null]
-  first_seen date
-}
-
-Table block_to_transactions {
-  state_hash string [not null, ref: > block.state_hash]
-  transaction_id int [not null, ref: > user_commands.id, ref: > fee_transfers.id]
-  is_user_command bool
-  sender string
-  receiver string [not null]
+  receiver int [not null, ref: > public_keys.id]
+  first_seen bit(64)
   Indexes {
-    state_hash [name:"block"]
-    transaction_id [name: "transaction"]
-    (receiver) [name: "receiver"]
-    (sender) [name: "sender"]
-  }
-  // Rows are uniquely identified by `state_hash` and `transaction_id`
-}
-
-Table snark_job {
-  prover int
-  fee int
-  work_id int64 // the list of work_ids are coerced to a single int64 work_id because the list will hold at most two jobs. There will be two booleans representing the number of jobs are in the `snark_job`
-  has_one_job bool
-  has_two_jobs bool
-  Index {
-    (work_id, has_one_job, has_two_jobs)
-  }
-}
-
-Table block_to_snark_job {
-  state_hash string [ref: > block.state_hash]
-  work_id int64 [ref: > snark_job.work_id]
-  has_one_job bool
-  has_two_jobs bool
-  Index {
-    (work_id, has_one_job, has_two_jobs)
+    hash [name: "fee_transfers_hash"]
+    receiver [name:"fee_transfer_receiver"]
   }
 }
 
 Table receipt_chain_hashes {
-  hash string [pk]
+  id int [pk]
+  hash string [not null, unique]
   previous_hash string
   user_command_id string [not null, ref: > user_commands.id]
   Indexes {
     user_command_id
   }
+}
+
+Table block_to_user_commands {
+  block_id int [not null, ref: > blocks.id]
+  transaction_id int [not null, ref: > user_commands.id, ref: > fee_transfers.id]
+  receipt_chain_id int [ref: > receipt_chain_hashes.id]
+  sender int [not null, ref: > public_keys.id]
+  receiver int [not null, ref: > public_keys.id]
+  Indexes {
+    block_id [name:"block_to_user_command.block"]
+    transaction_id [name: "block_to_user_command.transaction"]
+    receiver [name: "block_to_user_command.receiver"]
+    sender [name: "block_to_user_command.sender"]
+  }
+  // Rows are uniquely identified by `state_hash` and `transaction_id`
+}
+
+Table block_to_fee_transfers {
+  block_id int [not null, ref: > blocks.id]
+  transaction_id int [not null, ref: > user_commands.id, ref: > fee_transfers.id]=
+  receiver int [not null, ref: > public_keys.id]
+  Indexes {
+    state_hash [name:"block_to_fee_transfer.block"]
+    transaction_id [name: "block_to_fee_transfer.transaction"]
+    receiver [name: "block_to_user_command.receiver"]
+  }
+  // Rows are uniquely identified by `state_hash` and `transaction_id`
+}
+
+Table snark_job {
+  id int [pk]
+  prover int [not null]
+  fee int [not null]
+  job1 int // if a job is null, that it means it does not exist
+  job2 int
+  // Rows are uniquely identified by `job1` and `job2`
+}
+
+Table block_to_snark_job {
+  block_id int [ref: > block.id]
+  snark_job_id int64 [ref: > snark_job.id]
+  Index {
+    block_id
+    snark_job_id
+  }
+  // Rows are uniquely identified by `block_id` and `snark_job_id`
 }
 ```
 
@@ -289,7 +324,7 @@ The `work_id` of snark job is represented concisely as three fields (`work_id`, 
 
 Notice that all the possible joins we have to run through the `block_to_transactions` table. We added an index to `sender` and `receiver` because a lot of common queries involving blocks and transactions involve a `sender` and `receiver` of a transaction.
 
-Additionally, notice that `block` has the indexes `(block_length, epoch, slot)` and `block_time` for paginating blocks fast. Likewise, `user_commands` have the indexes on both (`sender`, `first_seen`) and (`receiver`, `first_seen`) to make paginating on `user_commands` fast. If we would like to order transactions based on `block_compare`, we would have to do a join on the `block_to_transaction` table and then another join on the `block` table. We could have added extra fields, such as `block_length`, `epoch` and `slot`, to the `block_to_transaction` to have less joins. However, we believe that this would making inserts more expensive and it complicates the table more.
+Additionally, notice that `block` has the indexes `(block_length, epoch, slot)` and `time_received` for paginating blocks fast. Likewise, `user_commands` have the indexes on both (`sender`, `first_seen`) and (`receiver`, `first_seen`) to make paginating on `user_commands` fast. If we would like to order transactions based on `block_compare`, we would have to do a join on the `block_to_transaction` table and then another join on the `block` table. We could have added extra fields, such as `block_length`, `epoch` and `slot`, to the `block_to_transaction` to have less joins. However, we believe that this would making inserts more expensive and it complicates the table more.
 
 ### Deleting data
 
