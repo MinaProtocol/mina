@@ -753,34 +753,36 @@ module Make (Inputs : Inputs_intf) = struct
       Strict_pipe.create ~name:"filtered_gossips"
         (Buffered (`Capacity 50, `Overflow Crash))
     in
-    Option.fold config.gossip_net_params.filter_layer
-      ~init:
-        ( Strict_pipe.transfer received_gossips filtered_gossips_writer ~f:Fn.id
-        |> don't_wait_for )
-      ~f:(fun _ filter_program ->
-        don't_wait_for
-        @@ match%bind Process.create ~prog:filter_program ~args:[] () with
-           | Ok filter_process ->
-               Linear_pipe.transfer
-                 (received_gossips |> Strict_pipe.Reader.to_linear_pipe)
-                 (Process.stdin filter_process |> Writer.pipe)
-                 ~f:(fun gossip ->
-                   Envelope.Incoming.sexp_of_t Message.sexp_of_msg gossip
-                   |> Sexp.to_string )
-               |> don't_wait_for ;
-               Linear_pipe.transfer
-                 ( Process.stdout filter_process
-                 |> Reader.pipe |> Linear_pipe.wrap_reader )
-                 (Strict_pipe.Writer.to_linear_pipe filtered_gossips_writer)
-                 ~f:(fun gossip ->
-                   Sexp.of_string gossip
-                   |> Envelope.Incoming.t_of_sexp Message.msg_of_sexp )
-           | Error e ->
-               Logger.error config.logger ~module_:__MODULE__ ~location:__LOC__
-                 ~metadata:[("error", `String (Error.to_string_hum e))]
-                 "Failed to open filter program, see $error" ;
-               Strict_pipe.transfer received_gossips filtered_gossips_writer
-                 ~f:Fn.id ) ;
+    ( if Option.is_none config.gossip_net_params.filter_layer then
+      Strict_pipe.transfer received_gossips filtered_gossips_writer ~f:Fn.id
+      |> don't_wait_for
+    else
+      let filter_program =
+        Option.value_exn config.gossip_net_params.filter_layer
+      in
+      don't_wait_for
+      @@ match%bind Process.create ~prog:filter_program ~args:[] () with
+         | Ok filter_process ->
+             Linear_pipe.transfer
+               (received_gossips |> Strict_pipe.Reader.to_linear_pipe)
+               (Process.stdin filter_process |> Writer.pipe)
+               ~f:(fun gossip ->
+                 Envelope.Incoming.sexp_of_t Message.sexp_of_msg gossip
+                 |> Sexp.to_string )
+             |> don't_wait_for ;
+             Linear_pipe.transfer
+               ( Process.stdout filter_process
+               |> Reader.pipe |> Linear_pipe.wrap_reader )
+               (Strict_pipe.Writer.to_linear_pipe filtered_gossips_writer)
+               ~f:(fun gossip ->
+                 Sexp.of_string gossip
+                 |> Envelope.Incoming.t_of_sexp Message.msg_of_sexp )
+         | Error e ->
+             Logger.error config.logger ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:[("error", `String (Error.to_string_hum e))]
+               "Failed to open filter program, see $error" ;
+             Strict_pipe.transfer received_gossips filtered_gossips_writer
+               ~f:Fn.id ) ;
     let first_received_message = Ivar.create () in
     let states, snark_pool_diffs, transaction_pool_diffs =
       Strict_pipe.Reader.partition_map3 filtered_gossips_reader
