@@ -7,5 +7,5 @@ module Parser : sig
 end
 
 module Interpreter : sig
-  val matches : Ast.t -> Yojson.Safe.json -> bool
+  val matches : Ast.t -> Yojson.Safe.t -> bool
 end

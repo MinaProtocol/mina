@@ -6,14 +6,14 @@ module Sender = struct
 
   let equal sender1 sender2 = Int.equal (compare sender1 sender2) 0
 
-  let to_yojson t : Yojson.Safe.json =
+  let to_yojson t : Yojson.Safe.t =
     match t with
     | Local ->
         `String "Local"
     | Remote inet_addr ->
         `Assoc [("Remote", `String (Unix.Inet_addr.to_string inet_addr))]
 
-  let of_yojson (json : Yojson.Safe.json) : (t, string) Result.t =
+  let of_yojson (json : Yojson.Safe.t) : (t, string) Result.t =
     match json with
     | `String "Local" ->
         Ok Local

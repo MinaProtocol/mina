@@ -20,8 +20,9 @@ module Snarkette_tock = Snarkette.Mnt4753
 [%%show
 curve_size]
 
-[%%error
-"invalid value for \"curve_size\""]
+let _ =
+  Core.eprintf "invalid value for \"curve_size\"" ;
+  exit 1
 
 [%%endif]
 

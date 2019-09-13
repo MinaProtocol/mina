@@ -3,9 +3,9 @@
 # fixup local .merlin files after building in Docker
 
 # local OPAM switch
-OPAM_SWITCH=4.07.0
+OPAM_SWITCH=4.08.0
 # Nominal OCaml version in the Docker container
-OCAML_VERSION=4.07
+OCAML_VERSION=4.08
 
 for file in `find src -name .merlin`
 do

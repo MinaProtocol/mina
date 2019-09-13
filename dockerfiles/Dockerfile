@@ -1,6 +1,6 @@
 FROM codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
 
-ENV OPAM_DIR             "/home/opam/.opam/4.07"
+ENV OPAM_DIR             "/home/opam/.opam/4.08"
 ENV PATH                 "${OPAM_DIR}/bin:$PATH"
 ENV CAML_LD_LIBRARY_PATH "${OPAM_DIR}/lib/stublibs"
 ENV MANPATH              "${OPAM_DIR}/man:"

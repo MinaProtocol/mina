@@ -17,7 +17,7 @@ eval $(opam config env)
 opam update
 
 SWITCH_LIST=$(opam switch list -s)
-SWITCH='4.07.1'
+SWITCH='4.08.1'
 
 # Check to see if we have switch
 SWITCH_FOUND=false

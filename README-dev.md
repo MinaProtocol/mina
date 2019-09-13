@@ -82,7 +82,7 @@ of the repo.
 * If you use vim, add this snippet in your vimrc to use merlin. (REMEMBER to change the HOME directory to match yours)
 
 ```bash
-let s:ocamlmerlin="/Users/USERNAME/.opam/4.07/share/merlin"
+let s:ocamlmerlin="/Users/USERNAME/.opam/4.08/share/merlin"
 execute "set rtp+=".s:ocamlmerlin."/vim"
 execute "set rtp+=".s:ocamlmerlin."/vimbufsync"
 let g:syntastic_ocaml_checkers=['merlin']
@@ -199,6 +199,6 @@ Here, the offending path is `external/digestif/src-c/.diestif_c.objs`.
 
 Container Stages:
 
-* Stage 0: Initial Image [ocaml/opam2:debian-9-ocaml-4.07](https://hub.docker.com/r/ocaml/opam2/) (opam community image, ~880MB)
+* Stage 0: Initial Image [ocaml/opam2:debian-9-ocaml-4.08](https://hub.docker.com/r/ocaml/opam2/) (opam community image, ~880MB)
 * Stage 1: [coda toolchain](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile-toolchain) (built by us, stored on docker hub, ~2GB compressed)
 * Stage 2: [codabuilder](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile) (built with `make codabuilder`, used with `make build`, ~2GB compressed)

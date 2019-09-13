@@ -403,7 +403,8 @@ let validate_options valid options =
     Ppx_deriving.raise_errorf ~loc "Valid options to \"version\" are: %s"
       (String.concat ~sep:"," valid)
 
-let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
+let generate_let_bindings_for_type_decl_str ~options ~path type_decls :
+    Ppxlib.Ast.structure =
   ignore
     (validate_options
        ["wrapped"; "unnumbered"; "rpc"; "asserted"; "for_test"]
