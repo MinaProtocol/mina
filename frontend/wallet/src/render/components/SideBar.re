@@ -33,11 +33,10 @@ module Styles = {
     ]);
 };
 
-// TODO: Don't use an empty password
 module AddWallet = [%graphql
   {|
-    mutation addWallet {
-        addWallet(input: {password: ""}) {
+    mutation addWallet($password: String) {
+        addWallet(input: {password: $password}) {
           publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
         }
     }
@@ -71,9 +70,10 @@ let make = () => {
              password
              setModalState
              onSubmit={name => {
+               let variables = AddWallet.make(~password, ())##variables;
                let performMutation =
                  Task.liftPromise(() =>
-                   mutation(~refetchQueries=[|"getWallets"|], ())
+                   mutation(~variables, ~refetchQueries=[|"getWallets"|], ())
                  );
                Task.perform(
                  performMutation,
