@@ -33,7 +33,9 @@ variable `OCAML_SPACETIME_SNAPSHOT_DIR`.
 ## Viewing Spacetime profiles
 
 Spacetime generates a profile file for each process that you run, with the name `spacetime-<pid>`. 
-To view the data, install the OPAM package `prof_spacetime`.
+To view the data, install the OPAM package `prof_spacetime`:
+
+* opam install `prof_spacetime`
 
 You can view the profile data in a terminal, but it's probably more useful to view the profile
 as interactive graphs via Web browser. To speed up viewing, you should preprocess the 
