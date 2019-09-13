@@ -169,7 +169,7 @@ let replace_proposers keys pks =
     List.filter_map pks ~f:(fun pk ->
         let open Option.Let_syntax in
         let%map kps =
-          Coda_lib.wallets keys |> Secrets.Wallets.find ~needle:pk
+          Coda_lib.wallets keys |> Secrets.Wallets.find_unlocked ~needle:pk
         in
         (kps, pk) )
   in

@@ -67,7 +67,7 @@
 /src/lib/merkle_list_verifier/ @wu-s-john @cmr @psteckler @nholland94 @ghost-not-in-the-shell
 /src/lib/merkle_mask/ @nholland94 @psteckler
 /src/lib/module_version/ @psteckler @mrmr1993
-/src/lib/network_pool/ @enolan @nholland94
+/src/lib/network_pool/ @enolan @nholland94 @deepthiskumar
 /src/lib/non_zero_curve_point/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/o1trace/ @cmr @mrmr1993
 /src/lib/otp_lib/ @nholland94 @bkase

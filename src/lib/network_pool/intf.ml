@@ -104,11 +104,12 @@ module type Snark_resource_pool_intf = sig
   val add_snark :
        t
     -> work:work
-    -> proof:ledger_proof list
+    -> proof:ledger_proof One_or_two.t
     -> fee:Fee_with_prover.t
     -> [`Rebroadcast | `Don't_rebroadcast]
 
-  val request_proof : t -> work -> ledger_proof list Priced_proof.t option
+  val request_proof :
+    t -> work -> ledger_proof One_or_two.t Priced_proof.t option
 
   val snark_pool_json : t -> Yojson.Safe.json
 
@@ -127,7 +128,8 @@ module type Snark_pool_diff_intf = sig
   module Stable : sig
     module V1 : sig
       type t =
-        | Add_solved_work of work * ledger_proof list Priced_proof.Stable.V1.t
+        | Add_solved_work of
+            work * ledger_proof One_or_two.Stable.V1.t Priced_proof.Stable.V1.t
       [@@deriving sexp, to_yojson, bin_io, version]
     end
 

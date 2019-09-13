@@ -3,7 +3,7 @@
  (public_name snark_work_lib)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel currency signature_lib transaction_snark)
+ (libraries core_kernel currency one_or_two signature_lib transaction_snark)
  (preprocess
   (pps ppx_jane ppx_deriving_yojson bisect_ppx ppx_coda -- -conditional))
  (synopsis "Snark work types"))

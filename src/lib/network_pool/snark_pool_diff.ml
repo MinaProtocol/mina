@@ -36,7 +36,8 @@ end)
       module T = struct
         type t =
           | Add_solved_work of
-              Work.Stable.V1.t * Ledger_proof.t list Priced_proof.Stable.V1.t
+              Work.Stable.V1.t
+              * Ledger_proof.t One_or_two.Stable.V1.t Priced_proof.Stable.V1.t
         [@@deriving bin_io, sexp, to_yojson, version]
       end
 
@@ -59,7 +60,7 @@ end)
   (* bin_io omitted *)
   type t = Stable.Latest.t =
     | Add_solved_work of
-        Work.Stable.V1.t * Ledger_proof.t list Priced_proof.Stable.V1.t
+        Work.Stable.V1.t * Ledger_proof.t One_or_two.t Priced_proof.Stable.V1.t
   [@@deriving sexp, to_yojson]
 
   let compact_json = function

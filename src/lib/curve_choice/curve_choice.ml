@@ -56,3 +56,12 @@ module Tick_backend = struct
 end
 
 module Tick0 = Snarky.Snark.Make (Tick_backend)
+
+module Runners = struct
+  module Tick =
+    Snarky.Snark.Run.Make
+      (Tick_backend)
+      (struct
+        type t = unit
+      end)
+end
