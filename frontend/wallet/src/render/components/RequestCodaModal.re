@@ -3,14 +3,6 @@ open Tc;
 module Styles = {
   open Css;
 
-  let modalBody =
-    style([
-      display(`flex),
-      flexDirection(`column),
-      alignItems(`center),
-      justifyContent(`center),
-    ]);
-
   let bodyMargin = style([margin(`rem(1.0)), width(`percent(100.))]);
 
   let publicKey =
@@ -36,7 +28,7 @@ let make = (~wallets, ~setModalState) => {
     Bindings.Navigator.Clipboard.writeTextTask(PublicKey.toString(wallet))
     |> Task.perform(~f=() => setModalState(_ => false));
   <Modal title="Request Coda" onRequestClose={() => setModalState(_ => false)}>
-    <div className=Styles.modalBody>
+    <div className=Modal.Styles.default>
       <div className=Styles.bodyMargin>
         <Dropdown
           label="To"
