@@ -237,7 +237,7 @@ module Validation = struct
       * State_hash.t Non_empty_list.t Truth.true_t
     , [`Frontier_dependencies] * unit Truth.true_t
     , [`Staged_ledger_diff] * unit Truth.false_t
-    , [`Delta_transition_chain_part2] * unit Truth.false_t )
+    , [`Delta_transition_chain_part2] * unit Truth.true_t )
     t
 
   let wrap t = (t, fully_invalid)
@@ -270,6 +270,25 @@ module Validation = struct
           , (`Frontier_dependencies, Truth.False)
           , staged_ledger_diff
           , delta_transition_chain_part2 ) )
+    | _ ->
+        failwith "why can't this be refuted?"
+
+  let reset_delta_transition_chain_validation_part2
+      (transition_with_hash, validation) =
+    match validation with
+    | ( time_received
+      , proof
+      , delta_transition_chain_part1
+      , frontier_dependencies
+      , staged_ledger_diff
+      , (`Delta_transition_chain_part2, Truth.True ()) ) ->
+        ( transition_with_hash
+        , ( time_received
+          , proof
+          , delta_transition_chain_part1
+          , frontier_dependencies
+          , staged_ledger_diff
+          , (`Delta_transition_chain_part2, Truth.False) ) )
     | _ ->
         failwith "why can't this be refuted?"
 
@@ -776,6 +795,7 @@ struct
 
   let validate_delta_transition_chain_part2 (t, validation) ~frontier =
     let open Result.Let_syntax in
+    let open Int in
     let global_slot =
       t |> With_hash.data |> consensus_state
       |> Consensus.Data.Consensus_state.global_slot
@@ -785,19 +805,76 @@ struct
     in
     if State_hash.equal boundary_hash (With_hash.hash t) then
       let out_of_boundary_hash = t |> With_hash.data |> parent_hash in
-      Option.fold (Transition_frontier.find frontier out_of_boundary_hash)
-        ~init:(Ok ()) ~f:(fun _ out_of_boundary_breadcrumb ->
+      match
+        Transition_frontier.find frontier out_of_boundary_hash
+        |> Option.map ~f:Transition_frontier.Breadcrumb.validated_transition
+      with
+      | None ->
+          Ok
+            ( t
+            , Validation.Unsafe.set_valid_delta_transition_chain_part2
+                validation )
+      | Some out_of_boundary_transition ->
           let out_of_boundary_global_slot =
-            Transition_frontier.Breadcrumb.validated_transition
-              out_of_boundary_breadcrumb
-            |> Validated.consensus_state
+            out_of_boundary_transition |> Validated.consensus_state
             |> Consensus.Data.Consensus_state.global_slot
           in
-          Result.ok_if_true
-            ( out_of_boundary_global_slot + Consensus.Constants.delta
-            < global_slot )
-            ~error:`Invalid_delta_transition_chain_proof )
-    else Ok ()
+          let%map () =
+            Result.ok_if_true
+              ( out_of_boundary_global_slot
+              < global_slot - Consensus.Constants.delta )
+              ~error:`Invalid_delta_transition_chain_proof
+          in
+          ( t
+          , Validation.Unsafe.set_valid_delta_transition_chain_part2 validation
+          )
+    else
+      match
+        Transition_frontier.find frontier boundary_hash
+        |> Option.map ~f:Transition_frontier.Breadcrumb.validated_transition
+      with
+      | None ->
+          Ok
+            ( t
+            , Validation.Unsafe.set_valid_delta_transition_chain_part2
+                validation )
+      | Some boundary_transition -> (
+          let boundary_slot =
+            Validated.consensus_state boundary_transition
+            |> Consensus.Data.Consensus_state.global_slot
+          in
+          let%bind () =
+            Result.ok_if_true
+              (boundary_slot > global_slot - Consensus.Constants.delta)
+              ~error:`Invalid_delta_transition_chain_proof
+          in
+          let out_of_boundary_hash =
+            boundary_transition |> Validated.parent_hash
+          in
+          match
+            Transition_frontier.find frontier out_of_boundary_hash
+            |> Option.map
+                 ~f:Transition_frontier.Breadcrumb.validated_transition
+          with
+          | None ->
+              Ok
+                ( t
+                , Validation.Unsafe.set_valid_delta_transition_chain_part2
+                    validation )
+          | Some out_of_boundary_transition ->
+              let out_of_boundary_slot =
+                Validated.consensus_state out_of_boundary_transition
+                |> Consensus.Data.Consensus_state.global_slot
+              in
+              let%map () =
+                Result.ok_if_true
+                  ( out_of_boundary_slot
+                  < global_slot - Consensus.Constants.delta )
+                  ~error:`Invalid_delta_transition_chain_proof
+              in
+              ( t
+              , Validation.Unsafe.set_valid_delta_transition_chain_part2
+                  validation ) )
 
   (*
     let open Result.Let_syntax in

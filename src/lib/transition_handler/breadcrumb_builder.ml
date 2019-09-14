@@ -69,12 +69,19 @@ module Make (Inputs : Inputs.S) :
                     transition_with_initial_validation
                   in
                   let mostly_validated_transition =
+                    transition_with_initial_validation
                     (* TODO: handle this edge case more gracefully *)
                     (* since we are building a disconnected subtree of breadcrumbs,
                      * we skip this step in validation *)
-                    External_transition.skip_frontier_dependencies_validation
-                      `This_transition_belongs_to_a_detached_subtree
-                      transition_with_initial_validation
+                    |> External_transition
+                       .skip_frontier_dependencies_validation
+                         `This_transition_belongs_to_a_detached_subtree
+                    (* TODO: at this point we has no way to verify this *)
+                    (* since we are building a disconnected subtree of breadcrumbs,
+                     * we skip this step in validation *)
+                    |> External_transition
+                       .skip_delta_transition_chain_validation_part2
+                         `This_transition_was_not_received_via_gossip
                   in
                   let sender = Envelope.Incoming.sender enveloped_transition in
                   let parent = Cached.peek cached_parent in

@@ -120,6 +120,8 @@ let%test_module "Ledger catchup" =
               |> External_transition.Validation
                  .reset_frontier_dependencies_validation
               |> External_transition.Validation
+                 .reset_delta_transition_chain_validation_part2
+              |> External_transition.Validation
                  .reset_staged_ledger_diff_validation
             in
             Envelope.Incoming.wrap ~data:transition
@@ -152,6 +154,8 @@ let%test_module "Ledger catchup" =
               best_transition
               |> External_transition.Validation
                  .reset_frontier_dependencies_validation
+              |> External_transition.Validation
+                 .reset_delta_transition_chain_validation_part2
               |> External_transition.Validation
                  .reset_staged_ledger_diff_validation
             in
@@ -194,6 +198,8 @@ let%test_module "Ledger catchup" =
                best_transition
                |> External_transition.Validation
                   .reset_frontier_dependencies_validation
+               |> External_transition.Validation
+                  .reset_delta_transition_chain_validation_part2
                |> External_transition.Validation
                   .reset_staged_ledger_diff_validation
              in
@@ -243,6 +249,8 @@ let%test_module "Ledger catchup" =
                  |> External_transition.Validation
                     .reset_frontier_dependencies_validation
                  |> External_transition.Validation
+                    .reset_delta_transition_chain_validation_part2
+                 |> External_transition.Validation
                     .reset_staged_ledger_diff_validation
                in
                Envelope.Incoming.wrap ~data:transition
@@ -261,6 +269,8 @@ let%test_module "Ledger catchup" =
                  failing_transition
                  |> External_transition.Validation
                     .reset_frontier_dependencies_validation
+                 |> External_transition.Validation
+                    .reset_delta_transition_chain_validation_part2
                  |> External_transition.Validation
                     .reset_staged_ledger_diff_validation
                in
@@ -327,6 +337,8 @@ let%test_module "Ledger catchup" =
                   transition
                   |> External_transition.Validation
                      .reset_frontier_dependencies_validation
+                  |> External_transition.Validation
+                     .reset_delta_transition_chain_validation_part2
                   |> External_transition.Validation
                      .reset_staged_ledger_diff_validation
                 in

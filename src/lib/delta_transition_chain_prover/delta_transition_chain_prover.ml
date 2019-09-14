@@ -26,23 +26,21 @@ module Make (Inputs : Inputs_intf) = struct
     let get_previous ~context:(frontier, global_slot) transition =
       let parent_hash = External_transition.Validated.parent_hash transition in
       let open Option.Let_syntax in
-      let%bind breadcrumb =
+      let%bind parent_breadcrumb =
         Option.merge
           (Transition_frontier.find frontier parent_hash)
           (Transition_frontier.find_in_root_history frontier parent_hash)
           ~f:Fn.const
       in
-      let validated_transition =
-        Transition_frontier.Breadcrumb.validated_transition breadcrumb
-      in
-      let consensus_state =
-        External_transition.Validated.consensus_state validated_transition
+      let parent_transition =
+        Transition_frontier.Breadcrumb.validated_transition parent_breadcrumb
       in
       let parent_global_slot =
-        Consensus.Data.Consensus_state.global_slot consensus_state
+        External_transition.Validated.consensus_state parent_transition
+        |> Consensus.Data.Consensus_state.global_slot
       in
       if parent_global_slot < global_slot - Consensus.Constants.delta then None
-      else Some validated_transition
+      else Some parent_transition
   end)
 
   let prove ~frontier ~global_slot state_hash =

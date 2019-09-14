@@ -76,8 +76,11 @@ module Make (Inputs : Inputs.S) :
       let%bind mostly_validated_transition =
         let open Deferred.Let_syntax in
         match
+          let open Result.Monad_infix in
           Transition_frontier_validation.validate_frontier_dependencies ~logger
             ~frontier initially_validated_transition
+          >>= Transition_frontier_validation
+              .validate_delta_transition_chain_part2 ~frontier
         with
         | Ok t ->
             return (Ok t)
@@ -115,6 +118,13 @@ module Make (Inputs : Inputs.S) :
             Catchup_scheduler.watch catchup_scheduler ~timeout_duration
               ~cached_transition:cached_initially_validated_transition ;
             return (Error ())
+        | Error `Invalid_delta_transition_chain_proof ->
+            let%map () =
+              Trust_system.record_envelope_sender trust_system logger sender
+                ( Trust_system.Actions.Gossiped_invalid_transition
+                , Some ("invalid delta transition chain witness", []) )
+            in
+            Error ()
       in
       (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
       let parent_hash =

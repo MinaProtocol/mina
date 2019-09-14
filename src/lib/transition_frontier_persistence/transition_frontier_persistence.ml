@@ -162,10 +162,11 @@ module Make (Inputs : Intf.Main_inputs) = struct
           transition
       , ( (`Time_received, Truth.True ())
         , (`Proof, Truth.True ())
-        , ( `Delta_transition_chain
+        , ( `Delta_transition_chain_part1
           , Truth.True (Non_empty_list.singleton previous_state_hash) )
         , (`Frontier_dependencies, Truth.True ())
-        , (`Staged_ledger_diff, Truth.False) ) )
+        , (`Staged_ledger_diff, Truth.False)
+        , (`Delta_transition_chain_part2, Truth.True ()) ) )
     in
     let%bind child_breadcrumb =
       match%map

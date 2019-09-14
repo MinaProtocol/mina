@@ -84,6 +84,8 @@ let%test_module "Bootstrap Controller" =
                 |> External_transition.Validation
                    .reset_frontier_dependencies_validation
                 |> External_transition.Validation
+                   .reset_delta_transition_chain_validation_part2
+                |> External_transition.Validation
                    .reset_staged_ledger_diff_validation )
               breadcrumbs
           in

@@ -140,7 +140,7 @@ module type S = sig
         * State_hash.t Non_empty_list.t Truth.true_t
       , [`Frontier_dependencies] * unit Truth.true_t
       , [`Staged_ledger_diff] * unit Truth.false_t
-      , [`Delta_transition_chain_part2] * unit Truth.false_t )
+      , [`Delta_transition_chain_part2] * unit Truth.true_t )
       t
 
     type ( 'time_received
@@ -190,6 +190,22 @@ module type S = sig
          , [`Frontier_dependencies] * unit Truth.false_t
          , 'staged_ledger_diff
          , 'delta_transition_chain_part2 )
+         with_transition
+
+    val reset_delta_transition_chain_validation_part2 :
+         ( 'time_received
+         , 'proof
+         , 'delta_transition_chain_part1
+         , 'frontier_dependencies
+         , 'staged_ledger_diff
+         , [`Delta_transition_chain_part2] * unit Truth.true_t )
+         with_transition
+      -> ( 'time_received
+         , 'proof
+         , 'delta_transition_chain_part1
+         , 'frontier_dependencies
+         , 'staged_ledger_diff
+         , [`Delta_transition_chain_part2] * unit Truth.false_t )
          with_transition
 
     val reset_staged_ledger_diff_validation :
@@ -412,7 +428,7 @@ module type S = sig
            , 'staged_ledger_diff
            , 'delta_transition_chain_part2 )
            Validation.with_transition
-         , [ `Already_in_frontier
+         , [> `Already_in_frontier
            | `Parent_missing_from_frontier
            | `Not_selected_over_frontier_root ] )
          Result.t
@@ -433,7 +449,7 @@ module type S = sig
            , 'staged_ledger_diff
            , [`Delta_transition_chain_part2] * unit Truth.true_t )
            Validation.with_transition
-         , [`Invalid_delta_transition_chain_proof] )
+         , [> `Invalid_delta_transition_chain_proof] )
          Result.t
   end
 
