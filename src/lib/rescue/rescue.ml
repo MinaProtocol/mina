@@ -45,7 +45,7 @@ module Make (Inputs : Inputs.S) = struct
   let add_block ~state block =
     Array.iteri block ~f:(fun i bi -> state.(i) <- Field.( + ) state.(i) bi)
 
-  let sponge perm blocks state =
+  let sponge perm blocks ~state =
     Array.fold ~init:state blocks ~f:(fun state block ->
         add_block ~state block ; perm state )
 
@@ -87,11 +87,14 @@ module Make (Inputs : Inputs.S) = struct
 
   let r = m - 1
 
-  let update params state inputs =
-    sponge (block_cipher params) (to_blocks r inputs) state
+  let update params ~state inputs =
+    let state = Array.copy state in
+    sponge (block_cipher params) (to_blocks r inputs) ~state
 
   let digest state = state.(0)
 
-  let hash params inputs =
-    update params (Array.init m ~f:(fun _ -> Field.zero)) inputs |> digest
+  let initial_state = Array.init m ~f:(fun _ -> Field.zero)
+
+  let hash ?(init = initial_state) params inputs =
+    update params ~state:init inputs |> digest
 end
