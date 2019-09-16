@@ -37,8 +37,9 @@ module Make (Inputs : Inputs_intf) = struct
     Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
   let is_transition_for_bootstrap ~logger root_state new_transition =
-    let open External_transition in
-    let new_state = protocol_state new_transition in
+    let new_state =
+      External_transition.Initial_validated.protocol_state new_transition
+    in
     Consensus.Hooks.should_bootstrap
       ~existing:(Protocol_state.consensus_state root_state)
       ~candidate:(Protocol_state.consensus_state new_state)
@@ -197,28 +198,27 @@ module Make (Inputs : Inputs_intf) = struct
     Strict_pipe.Reader.iter valid_transition_reader
       ~f:(fun transition_with_time ->
         let `Transition enveloped_transition, _ = transition_with_time in
-        let transition =
-          Envelope.Incoming.data enveloped_transition |> fst |> With_hash.data
-        in
+        let transition = Envelope.Incoming.data enveloped_transition in
         let current_consensus_state =
           External_transition.consensus_state
             (Broadcast_pipe.Reader.peek most_recent_valid_block_reader)
         in
         if
           Consensus.Hooks.select ~existing:current_consensus_state
-            ~candidate:External_transition.(consensus_state transition)
+            ~candidate:
+              External_transition.Initial_validated.(
+                consensus_state transition)
             ~logger
           = `Take
         then
-          Broadcast_pipe.Writer.write most_recent_valid_block_writer transition
+          Broadcast_pipe.Writer.write most_recent_valid_block_writer
+            (External_transition.Validation.forget_validation transition)
         else Deferred.unit )
     |> don't_wait_for ;
     Strict_pipe.Reader.iter_without_pushback
       valid_protocol_state_transition_reader ~f:(fun transition_with_time ->
         let `Transition enveloped_transition, _ = transition_with_time in
-        let transition =
-          Envelope.Incoming.data enveloped_transition |> fst |> With_hash.data
-        in
+        let transition = Envelope.Incoming.data enveloped_transition in
         ( match Broadcast_pipe.Reader.peek frontier_r with
         | Some frontier ->
             if
