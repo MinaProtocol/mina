@@ -114,13 +114,17 @@ let modalButtons = (unvalidated, setModalState, onSubmit) => {
 let make = (~wallets, ~onSubmit) => {
   let (sendState, setModalState) = React.useState(_ => None);
   let activeWallet = Hooks.useActiveWallet();
+  
+  // Check if active wallet is locked 
+  
   let spacer = <Spacer height=0.5 />;
   ModalState.Unvalidated.(
     <>
       <Button
         label="Send"
         onClick={_ => setModalState(_ => Some(emptyModal(activeWallet)))}
-      />
+        icon=Icon.Lock >
+      </Button>
       {switch (sendState) {
        | None => React.null
        | Some(
