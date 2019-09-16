@@ -4,7 +4,7 @@ open Core_kernel
 module type S = sig
   type t
 
-  val create : unit -> t Deferred.t
+  val create : Logger.t -> t Deferred.t
 
   val verify_blockchain_snark :
     t -> Blockchain_snark.Blockchain.t -> bool Or_error.t Deferred.t

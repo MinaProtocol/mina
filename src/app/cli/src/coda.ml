@@ -157,11 +157,6 @@ let daemon logger =
            "true|false Log transaction-pool diff received from peers \
             (default: false)"
          (optional bool)
-     and no_bans =
-       let module Expiration = struct
-         [%%expires_after "20190914"]
-       end in
-       flag "no-bans" no_arg ~doc:"don't ban peers (**TEMPORARY FOR TESTNET**)"
      and enable_libp2p =
        flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
      and libp2p_port =
@@ -205,7 +200,6 @@ let daemon logger =
              | Ok ll ->
                  Deferred.return ll )
        in
-       if no_bans then Trust_system.disable_bans () ;
        let%bind conf_dir =
          if is_background then
            let home = Core.Sys.home_directory () in
@@ -638,6 +632,51 @@ let daemon logger =
            Auxiliary_database.External_transition_database.create ~logger
              external_transition_database_dir
          in
+         (* log terminated child processes *)
+         let rec terminated_child_loop () =
+           match
+             try Unix.wait_nohang `Any
+             with
+             | Unix.Unix_error (errno, _, _)
+             when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
+                  (* no child processes exist *)
+             ->
+               None
+           with
+           | None ->
+               (* no children have terminated, wait to check again *)
+               let%bind () = Async.after (Time.Span.of_min 1.) in
+               terminated_child_loop ()
+           | Some (child_pid, exit_or_signal) ->
+               let child_pid_metadata =
+                 [("child_pid", `Int (Pid.to_int child_pid))]
+               in
+               ( match exit_or_signal with
+               | Ok () ->
+                   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                     "Daemon child process $child_pid terminated with exit \
+                      code 0"
+                     ~metadata:child_pid_metadata
+               | Error err -> (
+                 match err with
+                 | `Signal signal ->
+                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                       "Daemon child process $child_pid terminated after \
+                        receiving signal $signal"
+                       ~metadata:
+                         ( ("signal", `String (Signal.to_string signal))
+                         :: child_pid_metadata )
+                 | `Exit_non_zero exit_code ->
+                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                       "Daemon child process $child_pid terminated with \
+                        nonzero exit code $exit_code"
+                       ~metadata:
+                         (("exit_code", `Int exit_code) :: child_pid_metadata)
+                 ) ) ;
+               (* check for other terminated children, without waiting *)
+               terminated_child_loop ()
+         in
+         Deferred.don't_wait_for @@ terminated_child_loop () ;
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~trust_system ~conf_dir ~net_config

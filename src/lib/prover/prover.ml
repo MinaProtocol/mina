@@ -233,13 +233,16 @@ end
 
 type t = {connection: Worker.Connection.t; process: Process.t}
 
-let create () =
+let create logger =
   let%map connection, process =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure:Error.raise ~shutdown_on:Disconnect
       ~connection_state_init_arg:() ()
   in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "Daemon started prover process with pid $prover_pid"
+    ~metadata:[("prover_pid", `Int (Process.pid process |> Pid.to_int))] ;
   File_system.dup_stdout process ;
   File_system.dup_stderr process ;
   {connection; process}

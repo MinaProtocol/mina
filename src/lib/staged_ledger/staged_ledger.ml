@@ -1289,7 +1289,7 @@ let%test_module "test" =
           ~get_completed_work:stmt_to_work
       in
       let diff' = Staged_ledger_diff.forget diff in
-      let%bind verifier = Verifier.create () in
+      let%bind verifier = Verifier.create logger in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
@@ -1766,7 +1766,7 @@ let%test_module "test" =
                         (Sequence.to_list cmds_this_iter :> User_command.t list)
                         work_done partitions
                     in
-                    let%bind verifier = Verifier.create () in
+                    let%bind verifier = Verifier.create logger in
                     let%bind apply_res = Sl.apply !sl diff ~logger ~verifier in
                     let checked', diff' =
                       match apply_res with

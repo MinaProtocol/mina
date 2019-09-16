@@ -13,7 +13,7 @@ module type S = sig
 
   type t
 
-  val create : unit -> t Deferred.t
+  val create : Logger.t -> t Deferred.t
 
   val initialized : t -> [`Initialized] Deferred.Or_error.t
 

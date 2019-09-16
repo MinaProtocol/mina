@@ -589,8 +589,8 @@ let create (config : Config.t) =
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace_task "coda" (fun () ->
-          let%bind prover = Prover.create () in
-          let%bind verifier = Verifier.create () in
+          let%bind prover = Prover.create config.logger in
+          let%bind verifier = Verifier.create config.logger in
           let snark_worker =
             Option.value_map
               config.snark_worker_config.initial_snark_worker_key
