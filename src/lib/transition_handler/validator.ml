@@ -15,7 +15,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
 
   let validate_transition ~logger ~frontier ~unprocessed_transition_cache
       (enveloped_transition :
-        External_transition.with_initial_validation Envelope.Incoming.t) =
+        External_transition.Initial_validated.t Envelope.Incoming.t) =
     let open Protocol_state in
     let open Result.Let_syntax in
     let {With_hash.hash= transition_hash; data= transition}, _ =
@@ -54,7 +54,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
 
   let run ~logger ~trust_system ~frontier ~transition_reader
       ~(valid_transition_writer :
-         ( ( External_transition.with_initial_validation Envelope.Incoming.t
+         ( ( External_transition.Initial_validated.t Envelope.Incoming.t
            , State_hash.t )
            Cached.t
          , crash buffered
