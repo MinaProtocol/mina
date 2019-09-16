@@ -455,7 +455,8 @@ module type S = sig
            , 'staged_ledger_diff
            , [`Delta_transition_chain_part2] * unit Truth.true_t )
            Validation.with_transition
-         , [> `Invalid_delta_transition_chain_proof] )
+         , [> `Missing_transitions_in_delta_transition_chain
+           | `Including_unnecessary_transitions_in_delta_transition_chain ] )
          Result.t
   end
 

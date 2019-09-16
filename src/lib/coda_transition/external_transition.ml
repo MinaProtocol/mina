@@ -837,28 +837,32 @@ struct
                 , Validation.Unsafe.set_valid_delta_transition_chain_part2
                     validation )
           | Some false ->
-              Error `Invalid_delta_transition_chain_proof )
+              Error `Missing_transitions_in_delta_transition_chain )
     | [hash1; hash2] -> (
-      match
         let open Option.Monad_infix in
-        Option.merge
-          ( Transition_frontier.find frontier hash1
+        match
+          Transition_frontier.find frontier hash1
           >>| Transition_frontier.Breadcrumb.global_slot
           >>| fun global_slot1 ->
-          global_slot1 < global_slot - Consensus.Constants.delta )
-          ( Transition_frontier.find frontier hash2
-          >>| Transition_frontier.Breadcrumb.global_slot
-          >>| fun global_slot2 ->
-          global_slot2 > global_slot - Consensus.Constants.delta )
-          ~f:( && )
-      with
-      | None | Some true ->
-          Ok
-            ( t
-            , Validation.Unsafe.set_valid_delta_transition_chain_part2
-                validation )
-      | Some false ->
-          Error `Invalid_delta_transition_chain_proof )
+          global_slot1 < global_slot - Consensus.Constants.delta
+        with
+        | None | Some true -> (
+          match
+            Transition_frontier.find frontier hash2
+            >>| Transition_frontier.Breadcrumb.global_slot
+            >>| fun global_slot2 ->
+            global_slot2 > global_slot - Consensus.Constants.delta
+          with
+          | None | Some true ->
+              Ok
+                ( t
+                , Validation.Unsafe.set_valid_delta_transition_chain_part2
+                    validation )
+          | Some false ->
+              Error
+                `Including_unnecessary_transitions_in_delta_transition_chain )
+        | Some false ->
+            Error `Missing_transitions_in_delta_transition_chain )
     | _ ->
         failwith "this is not possible"
 end

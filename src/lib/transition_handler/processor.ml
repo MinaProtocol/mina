@@ -118,11 +118,21 @@ module Make (Inputs : Inputs.S) :
             Catchup_scheduler.watch catchup_scheduler ~timeout_duration
               ~cached_transition:cached_initially_validated_transition ;
             return (Error ())
-        | Error `Invalid_delta_transition_chain_proof ->
+        | Error `Missing_transitions_in_delta_transition_chain ->
             let%map () =
               Trust_system.record_envelope_sender trust_system logger sender
                 ( Trust_system.Actions.Gossiped_invalid_transition
-                , Some ("invalid delta transition chain witness", []) )
+                , Some ("missing transitions in delta transition chain", []) )
+            in
+            Error ()
+        | Error `Including_unnecessary_transitions_in_delta_transition_chain ->
+            let%map () =
+              Trust_system.record_envelope_sender trust_system logger sender
+                ( Trust_system.Actions.Gossiped_invalid_transition
+                , Some
+                    ( "including unnecessary transitions in delta transition \
+                       chain"
+                    , [] ) )
             in
             Error ()
       in
