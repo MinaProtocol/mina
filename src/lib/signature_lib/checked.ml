@@ -6,7 +6,15 @@ open Core_kernel
 open Snarky
 
 module type Message_intf = sig
+  type field
+
+  type field_var
+
   type boolean_var
+
+  type curve
+
+  type curve_var
 
   type curve_scalar
 
@@ -18,10 +26,13 @@ module type Message_intf = sig
 
   type var
 
-  val hash : t -> nonce:bool list -> curve_scalar
+  val derive :
+    t -> private_key:curve_scalar -> public_key:curve -> curve_scalar
+
+  val hash : t -> public_key:curve -> r:field -> curve_scalar
 
   val hash_checked :
-    var -> nonce:boolean_var list -> (curve_scalar_var, _) checked
+    var -> public_key:curve_var -> r:field_var -> (curve_scalar_var, _) checked
 end
 
 module type S = sig
@@ -51,6 +62,10 @@ module type S = sig
      and type curve_scalar := curve_scalar
      and type curve_scalar_var := curve_scalar_var
      and type ('a, 'b) checked := ('a, 'b) Checked.t
+     and type curve := curve
+     and type curve_var := curve_var
+     and type field := Field.t
+     and type field_var := Field.Var.t
 
   module Signature : sig
     type t = field * curve_scalar [@@deriving sexp]
@@ -114,15 +129,13 @@ module Schnorr
 
           val negate : t -> t
 
-          val unpack : t -> bool list
-
           module Checked : sig
             val to_bits :
               var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
           end
         end
 
-        type t [@@deriving eq]
+        type t
 
         type var = Field.Var.t * Field.Var.t
 
@@ -134,8 +147,6 @@ module Schnorr
 
         val one : t
 
-        val zero : t
-
         val ( + ) : t -> t -> t
 
         val negate : t -> t
@@ -143,11 +154,17 @@ module Schnorr
         val scale : t -> Scalar.t -> t
 
         val to_affine_exn : t -> Field.t * Field.t
+
+        val to_affine : t -> (Field.t * Field.t) option
     end)
     (Message : Message_intf
                with type boolean_var := Impl.Boolean.var
                 and type curve_scalar_var := Curve.Scalar.var
                 and type curve_scalar := Curve.Scalar.t
+                and type curve := Curve.t
+                and type curve_var := Curve.var
+                and type field := Impl.Field.t
+                and type field_var := Impl.Field.Var.t
                 and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t) :
   S
   with module Impl := Impl
@@ -184,24 +201,28 @@ module Schnorr
   end =
     Curve
 
-  let sign (d : Private_key.t) m =
-    let nonce = Curve.Scalar.unpack d in
-    let k_prime = Message.hash m ~nonce in
+  let sign (d_prime : Private_key.t) m =
+    let public_key =
+      (* TODO: Don't recompute this. *) Curve.scale Curve.one d_prime
+    in
+    (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
+    let d = d_prime in
+    let k_prime = Message.derive m ~public_key ~private_key:d in
     assert (not Curve.Scalar.(equal k_prime zero)) ;
-    let r_pt = Curve.scale Curve.one k_prime in
-    let rx, ry = Curve.to_affine_exn r_pt in
+    let r, ry = Curve.(to_affine_exn (scale Curve.one k_prime)) in
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
-    let nonce = compress r_pt @ compress (Curve.scale Curve.one d) in
-    let e = Message.hash m ~nonce in
+    let e = Message.hash m ~public_key ~r in
     let s = Curve.Scalar.(k + (e * d)) in
-    (rx, s)
+    (r, s)
 
   let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
-    let nonce = Field.unpack r @ compress pk in
-    let e = Message.hash m ~nonce in
+    let e = Message.hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
-    let rx, ry = Curve.to_affine_exn r_pt in
-    (not Curve.(equal zero r_pt)) && is_even ry && Field.(equal rx r)
+    match Curve.to_affine r_pt with
+    | None ->
+        false
+    | Some (rx, ry) ->
+        is_even ry && Field.(equal rx r)
 
   [%%if
   call_logger]
@@ -234,10 +255,7 @@ module Schnorr
           (module Curve.Checked.Shifted.S with type t = s))
         ((r, s) : Signature.var) (public_key : Public_key.var)
         (m : Message.var) =
-      let%bind pk_bits = compress public_key in
-      let%bind r_bits = to_bits r in
-      let nonce = r_bits @ pk_bits in
-      let%bind e = Message.hash_checked m ~nonce in
+      let%bind e = Message.hash_checked m ~public_key ~r in
       (* s * g - e * public_key *)
       let%bind e_pk =
         Curve.Checked.scale shifted
@@ -272,15 +290,24 @@ module Message = struct
 
   type var = Tick.Field.Var.t
 
-  let hash t ~nonce =
-    Random_oracle.hash [|Tick.Field.project nonce; t|]
-    |> Random_oracle.Digest.to_bits ~length:128
+  let derive t ~private_key ~public_key =
+    let input =
+      let x, y = Tick.Inner_curve.to_affine_exn public_key in
+      { Random_oracle.Input.field_elements= [|t; x; y|]
+      ; bitstrings= [|Tock.Field.unpack private_key|] }
+    in
+    Tick.Field.unpack Random_oracle.(hash (pack_input input))
     |> Tock.Field.project
 
-  let hash_checked t ~nonce =
+  let hash t ~public_key ~r =
+    let x, y = Tick.Inner_curve.to_affine_exn public_key in
+    Tick.Field.unpack Random_oracle.(hash [|t; r; x; y|]) |> Tock.Field.project
+
+  let hash_checked t ~public_key ~r =
     Tick.make_checked (fun () ->
-        Random_oracle.Checked.hash [|Var.project nonce; t|]
-        |> Random_oracle.Checked.Digest.to_bits ~length:128
+        let x, y = public_key in
+        Random_oracle.Checked.hash [|t; r; x; y|]
+        |> Tick.Run.Field.choose_preimage_var ~length:Tick.Field.size_in_bits
         |> Bitstring_lib.Bitstring.Lsb_first.of_list )
 end
 
