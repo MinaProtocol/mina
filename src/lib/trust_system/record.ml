@@ -34,7 +34,7 @@ end) : S = struct
 
   let bans_disabled =
     let module Expiration = struct
-      [%%expires_after "20190914"]
+      [%%expires_after "20190921"]
     end in
     ref false
 

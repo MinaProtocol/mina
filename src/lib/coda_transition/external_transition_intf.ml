@@ -28,6 +28,8 @@ module type External_transition_common_intf = sig
   val payments : t -> User_command.t list
 
   val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
+
+  val global_slot : t -> int
 end
 
 module type External_transition_base_intf = sig
@@ -405,6 +407,8 @@ module type S = sig
       type t
 
       val validated_transition : t -> Validated.t
+
+      val global_slot : t -> int
     end
 
     val root : t -> Breadcrumb.t
@@ -436,7 +440,8 @@ module type S = sig
     val validate_delta_transition_chain_part2 :
          ( 'time_received
          , 'proof
-         , 'delta_transition_chain_part1
+         , [`Delta_transition_chain_part1]
+           * State_hash.t Non_empty_list.t Truth.true_t
          , 'frontier_dependencies
          , 'staged_ledger_diff
          , [`Delta_transition_chain_part2] * unit Truth.false_t )
@@ -444,7 +449,8 @@ module type S = sig
       -> frontier:Transition_frontier.t
       -> ( ( 'time_received
            , 'proof
-           , 'delta_transition_chain_part1
+           , [`Delta_transition_chain_part1]
+             * State_hash.t Non_empty_list.t Truth.true_t
            , 'frontier_dependencies
            , 'staged_ledger_diff
            , [`Delta_transition_chain_part2] * unit Truth.true_t )

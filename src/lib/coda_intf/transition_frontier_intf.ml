@@ -309,6 +309,8 @@ module type Transition_frontier_breadcrumb_intf = sig
   val display : t -> display
 
   val name : t -> string
+
+  val global_slot : t -> int
 end
 
 module type Transition_frontier_base_intf = sig

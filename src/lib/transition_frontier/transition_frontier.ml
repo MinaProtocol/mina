@@ -144,6 +144,8 @@ struct
 
     let payments = lift External_transition.Validated.payments
 
+    let global_slot = lift External_transition.Validated.global_slot
+
     let mask = Fn.compose Staged_ledger.ledger staged_ledger
 
     let equal breadcrumb1 breadcrumb2 =

@@ -32,15 +32,16 @@ module Make (Inputs : Inputs_intf) = struct
           (Transition_frontier.find_in_root_history frontier parent_hash)
           ~f:Fn.const
       in
-      let parent_transition =
-        Transition_frontier.Breadcrumb.validated_transition parent_breadcrumb
-      in
-      let parent_global_slot =
-        External_transition.Validated.consensus_state parent_transition
+      let current_global_slot =
+        External_transition.Validated.consensus_state transition
         |> Consensus.Data.Consensus_state.global_slot
       in
-      if parent_global_slot < global_slot - Consensus.Constants.delta then None
-      else Some parent_transition
+      if current_global_slot < global_slot - Consensus.Constants.delta then
+        None
+      else
+        Some
+          (Transition_frontier.Breadcrumb.validated_transition
+             parent_breadcrumb)
   end)
 
   let prove ~frontier ~global_slot state_hash =

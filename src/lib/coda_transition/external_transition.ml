@@ -32,6 +32,9 @@ module Stable = struct
       let consensus_state {protocol_state; _} =
         Protocol_state.consensus_state protocol_state
 
+      let global_slot t =
+        consensus_state t |> Consensus.Data.Consensus_state.global_slot
+
       let blockchain_state {protocol_state; _} =
         Protocol_state.blockchain_state protocol_state
 
@@ -106,7 +109,8 @@ Stable.Latest.
   , proposer
   , user_commands
   , payments
-  , to_yojson )]
+  , to_yojson
+  , global_slot )]
 
 include Comparable.Make (Stable.Latest)
 
@@ -593,6 +597,8 @@ module With_validation = struct
   let payments t = lift payments t
 
   let delta_transition_chain_proof t = lift delta_transition_chain_proof t
+
+  let global_slot t = lift global_slot t
 end
 
 module Initial_validated = struct
@@ -736,7 +742,8 @@ module Validated = struct
     , proposer
     , user_commands
     , payments
-    , to_yojson )]
+    , to_yojson
+    , global_slot )]
 
   include Comparable.Make (Stable.Latest)
 end
@@ -748,6 +755,8 @@ module Transition_frontier_validation (Transition_frontier : sig
     type t
 
     val validated_transition : t -> Validated.t
+
+    val global_slot : t -> int
   end
 
   val root : t -> Breadcrumb.t
@@ -794,101 +803,64 @@ struct
     (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
 
   let validate_delta_transition_chain_part2 (t, validation) ~frontier =
-    let open Result.Let_syntax in
     let open Int in
     let global_slot =
       t |> With_hash.data |> consensus_state
       |> Consensus.Data.Consensus_state.global_slot
     in
-    let boundary_hash =
-      t |> With_hash.data |> delta_transition_chain_proof |> fst
-    in
-    if State_hash.equal boundary_hash (With_hash.hash t) then
-      let out_of_boundary_hash = t |> With_hash.data |> parent_hash in
-      match
-        Transition_frontier.find frontier out_of_boundary_hash
-        |> Option.map ~f:Transition_frontier.Breadcrumb.validated_transition
-      with
-      | None ->
+    match
+      List.take
+        ( Validation.extract_delta_transition_chain_witness validation
+        |> Non_empty_list.to_list |> List.rev )
+        2
+    with
+    | [hash1] -> (
+        if
+          State_hash.equal hash1
+            (With_hash.hash (force Coda_state.Genesis_protocol_state.t))
+        then
           Ok
             ( t
             , Validation.Unsafe.set_valid_delta_transition_chain_part2
                 validation )
-      | Some out_of_boundary_transition ->
-          let out_of_boundary_global_slot =
-            out_of_boundary_transition |> Validated.consensus_state
-            |> Consensus.Data.Consensus_state.global_slot
-          in
-          let%map () =
-            Result.ok_if_true
-              ( out_of_boundary_global_slot
-              < global_slot - Consensus.Constants.delta )
-              ~error:`Invalid_delta_transition_chain_proof
-          in
-          ( t
-          , Validation.Unsafe.set_valid_delta_transition_chain_part2 validation
-          )
-    else
-      match
-        Transition_frontier.find frontier boundary_hash
-        |> Option.map ~f:Transition_frontier.Breadcrumb.validated_transition
-      with
-      | None ->
-          Ok
-            ( t
-            , Validation.Unsafe.set_valid_delta_transition_chain_part2
-                validation )
-      | Some boundary_transition -> (
-          let boundary_slot =
-            Validated.consensus_state boundary_transition
-            |> Consensus.Data.Consensus_state.global_slot
-          in
-          let%bind () =
-            Result.ok_if_true
-              (boundary_slot > global_slot - Consensus.Constants.delta)
-              ~error:`Invalid_delta_transition_chain_proof
-          in
-          let out_of_boundary_hash =
-            boundary_transition |> Validated.parent_hash
-          in
+        else
           match
-            Transition_frontier.find frontier out_of_boundary_hash
-            |> Option.map
-                 ~f:Transition_frontier.Breadcrumb.validated_transition
+            let open Option.Monad_infix in
+            Transition_frontier.find frontier hash1
+            >>| Transition_frontier.Breadcrumb.global_slot
+            >>| fun global_slot1 ->
+            global_slot1 < global_slot - Consensus.Constants.delta
           with
-          | None ->
+          | None | Some true ->
               Ok
                 ( t
                 , Validation.Unsafe.set_valid_delta_transition_chain_part2
                     validation )
-          | Some out_of_boundary_transition ->
-              let out_of_boundary_slot =
-                Validated.consensus_state out_of_boundary_transition
-                |> Consensus.Data.Consensus_state.global_slot
-              in
-              let%map () =
-                Result.ok_if_true
-                  ( out_of_boundary_slot
-                  < global_slot - Consensus.Constants.delta )
-                  ~error:`Invalid_delta_transition_chain_proof
-              in
-              ( t
-              , Validation.Unsafe.set_valid_delta_transition_chain_part2
-                  validation ) )
-
-  (*
-    let open Result.Let_syntax in
-    let global_slot = External_transition.consensus_state t |> Consensus.Data.Consensus_state.global_slot in 
-    let boundary_hash = External_transition.delta_transition_chain_proof t |> fst in 
-    if State_hash.equal boundary_hash (With_hash.hash t)
-    let%bind boundary_transition =
-      Result.of_option (Transition_frontier.find frontier boundary_hash)
-        ~error:(`Invalid_delta_transition_chain_proof) 
-    in 
-    let%bind out_of_scope_transition =
-      Result.of_option (Transition_frontier.find frontier @@ Transition_frontier.Breadcrumb.parent_hash boundary_transition)
-      ~error:(`Invalid_delta_transition_chain_proof)
-*)
+          | Some false ->
+              Error `Invalid_delta_transition_chain_proof )
+    | [hash1; hash2] -> (
+      match
+        let open Option.Monad_infix in
+        Option.merge
+          ( Transition_frontier.find frontier hash1
+          >>| Transition_frontier.Breadcrumb.global_slot
+          >>| fun global_slot1 ->
+          global_slot1 < global_slot - Consensus.Constants.delta )
+          ( Transition_frontier.find frontier hash2
+          >>| Transition_frontier.Breadcrumb.global_slot
+          >>| fun global_slot2 ->
+          global_slot2 > global_slot - Consensus.Constants.delta )
+          ~f:( && )
+      with
+      | None | Some true ->
+          Ok
+            ( t
+            , Validation.Unsafe.set_valid_delta_transition_chain_part2
+                validation )
+      | Some false ->
+          Error `Invalid_delta_transition_chain_proof )
+    | _ ->
+        failwith "this is not possible"
 end
 
 module Staged_ledger_validation = struct

@@ -159,7 +159,7 @@ let daemon logger =
          (optional bool)
      and no_bans =
        let module Expiration = struct
-         [%%expires_after "20190914"]
+         [%%expires_after "20190921"]
        end in
        flag "no-bans" no_arg ~doc:"don't ban peers (**TEMPORARY FOR TESTNET**)"
      and enable_libp2p =
