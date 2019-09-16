@@ -51,7 +51,7 @@ for dune in dunes :
                             # if no preprocessing, don't have to worry about order of ppxs
                             continue
                         elif sexpdata.car (subclause) == pps :
-                            # if there is preprocessing, static checks before versioning, and both must occur
+                            # if there is preprocessing, static checks before version registration before versioning, and all three must occur
                             ppxs = sexpdata.cdr (subclause)
                             static_checks_ndx = get_ppx_ndx (dune,ppxs,ppx_static_checks)
                             register_version_ndx = get_ppx_ndx (dune,ppxs,ppx_register_version)
