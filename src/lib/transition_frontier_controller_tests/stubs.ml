@@ -135,7 +135,7 @@ struct
           Transaction_snark_work.Checked.
             { fee= Fee.of_int 1
             ; proofs=
-                List.map stmts ~f:(fun statement ->
+                One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
                       ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
                 )
@@ -177,7 +177,7 @@ struct
       in
       let next_blockchain_state =
         Blockchain_state.create_value
-          ~timestamp:(Block_time.now Block_time.Controller.basic)
+          ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
           ~snarked_ledger_hash:next_ledger_hash
           ~staged_ledger_hash:next_staged_ledger_hash
       in

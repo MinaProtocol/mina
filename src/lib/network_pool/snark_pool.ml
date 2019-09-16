@@ -106,7 +106,8 @@ struct
       (* TODO : Version this type *)
       type t =
         { snark_table:
-            Ledger_proof.Stable.V1.t list Priced_proof.Stable.V1.t
+            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+            Priced_proof.Stable.V1.t
             Statement_table.t
         ; mutable ref_table: int Statement_table.t option }
       [@@deriving sexp, bin_io]
@@ -200,7 +201,7 @@ struct
           | Some _ ->
               true )
 
-      let add_snark t ~work ~proof ~fee =
+      let add_snark t ~work ~(proof : Ledger_proof.t One_or_two.t) ~fee =
         if work_is_referenced t work then
           let update_and_rebroadcast () =
             Hashtbl.set t.snark_table ~key:work ~data:{proof; fee} ;
@@ -264,7 +265,7 @@ struct
       (Envelope.Incoming.wrap
          ~data:
            (Resource_pool.Diff.Stable.V1.Add_solved_work
-              ( List.map res.spec.instances ~f:Single.Spec.statement
+              ( One_or_two.map res.spec.instances ~f:Single.Spec.statement
               , { proof= res.proofs
                 ; fee= {fee= res.spec.fee; prover= res.prover} } ))
          ~sender:Envelope.Sender.Local)
@@ -279,6 +280,13 @@ let%test_module "random set test" =
     let trust_system = Mocks.trust_system
 
     module Mock_snark_pool = Make (Mocks.Transition_frontier)
+    open Ledger_proof.For_tests
+
+    let add_dummy_proof resource_pool work fee =
+      ignore
+        (Mock_snark_pool.Resource_pool.add_snark resource_pool ~work
+           ~proof:(One_or_two.map work ~f:mk_dummy_proof)
+           ~fee)
 
     let gen =
       let open Quickcheck.Generator.Let_syntax in
@@ -296,9 +304,7 @@ let%test_module "random set test" =
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       List.iter sample_solved_work ~f:(fun (work, fee) ->
-          ignore
-            (Mock_snark_pool.Resource_pool.add_snark resource_pool ~work
-               ~proof:[] ~fee) ) ;
+          add_dummy_proof resource_pool work fee ) ;
       resource_pool
 
     let%test_unit "When two priced proofs of the same work are inserted into \
@@ -314,12 +320,8 @@ let%test_module "random set test" =
         (Quickcheck.Generator.tuple4 gen
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
            Fee_with_prover.gen) ~f:(fun (t, work, fee_1, fee_2) ->
-          ignore
-            (Mock_snark_pool.Resource_pool.add_snark t ~work ~proof:[]
-               ~fee:fee_1) ;
-          ignore
-            (Mock_snark_pool.Resource_pool.add_snark t ~work ~proof:[]
-               ~fee:fee_2) ;
+          add_dummy_proof t work fee_1 ;
+          add_dummy_proof t work fee_2 ;
           let fee_upper_bound = Currency.Fee.min fee_1.fee fee_2.fee in
           let {Priced_proof.fee= {fee; _}; _} =
             Option.value_exn
@@ -343,11 +345,10 @@ let%test_module "random set test" =
           Mock_snark_pool.Resource_pool.remove_solved_work t work ;
           let expensive_fee = max fee_1 fee_2
           and cheap_fee = min fee_1 fee_2 in
-          ignore
-            (Mock_snark_pool.Resource_pool.add_snark t ~work ~proof:[]
-               ~fee:cheap_fee) ;
+          add_dummy_proof t work cheap_fee ;
           assert (
-            Mock_snark_pool.Resource_pool.add_snark t ~work ~proof:[]
+            Mock_snark_pool.Resource_pool.add_snark t ~work
+              ~proof:(One_or_two.map work ~f:mk_dummy_proof)
               ~fee:expensive_fee
             = `Don't_rebroadcast ) ;
           assert (
@@ -358,8 +359,9 @@ let%test_module "random set test" =
                 .fee ) )
 
     let fake_work =
-      [ Quickcheck.random_value ~seed:(`Deterministic "worktest")
-          Transaction_snark.Statement.gen ]
+      `One
+        (Quickcheck.random_value ~seed:(`Deterministic "worktest")
+           Transaction_snark.Statement.gen)
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
@@ -373,7 +375,11 @@ let%test_module "random set test" =
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       let priced_proof =
-        { Priced_proof.proof= []
+        { Priced_proof.proof=
+            `One
+              (mk_dummy_proof
+                 (Quickcheck.random_value ~seed:(`Deterministic "test proof")
+                    Transaction_snark.Statement.gen))
         ; fee=
             { fee= Currency.Fee.of_int 0
             ; prover= Signature_lib.Public_key.Compressed.empty } }
@@ -405,7 +411,7 @@ let%test_module "random set test" =
         Quickcheck.random_sequence ~seed:(`Deterministic "works")
           Transaction_snark.Statement.gen
         |> Fn.flip Sequence.take 10
-        |> Sequence.map ~f:List.return
+        |> Sequence.map ~f:(fun x -> `One x)
         |> Sequence.to_list
       in
       let verify_unsolved_work () =
@@ -415,7 +421,7 @@ let%test_module "random set test" =
                 (Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
                    ( work
                    , Priced_proof.
-                       { proof= []
+                       { proof= One_or_two.map ~f:mk_dummy_proof work
                        ; fee=
                            { fee= Currency.Fee.of_int 0
                            ; prover= Signature_lib.Public_key.Compressed.empty

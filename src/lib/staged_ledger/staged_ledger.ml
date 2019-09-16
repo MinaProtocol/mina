@@ -411,20 +411,16 @@ module T = struct
       Scan_state.k_work_pairs_for_new_diff scan_state ~k:work_count
     in
     let check job_proofs prover message =
-      let open Deferred.Let_syntax in
-      Deferred.List.find_map job_proofs ~f:(fun (job, proof) ->
-          match%map verify ~logger ~verifier ~message job proof prover with
-          | Ok () ->
-              None
-          | Error e ->
-              Some e )
+      One_or_two.Deferred_result.map job_proofs ~f:(fun (job, proof) ->
+          verify ~logger ~verifier ~message job proof prover )
     in
     let open Deferred.Let_syntax in
     let%map result =
       Deferred.List.find_map (List.zip_exn job_pairs completed_works)
         ~f:(fun (jobs, work) ->
           let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-          check (List.zip_exn jobs work.proofs) work.prover message )
+          Deferred.map ~f:Result.error
+          @@ check (One_or_two.zip_exn jobs work.proofs) work.prover message )
     in
     Option.value_map result ~default:(Ok ()) ~f:(fun e -> Error e)
 
@@ -1229,7 +1225,7 @@ module T = struct
           | Some cw_checked ->
               Continue
                 ( Sequence.append seq (Sequence.singleton cw_checked)
-                , List.length cw_checked.proofs + count )
+                , One_or_two.length cw_checked.proofs + count )
           | None ->
               Stop (seq, count) )
         ~finish:Fn.id
@@ -1379,14 +1375,14 @@ let%test_module "test" =
         Transaction_snark_work.Statement.t -> Public_key.Compressed.t =
      fun stmts ->
       let prover_seed =
-        List.fold stmts ~init:"P" ~f:(fun p stmt ->
+        One_or_two.fold stmts ~init:"P" ~f:(fun p stmt ->
             p ^ Frozen_ledger_hash.to_bytes stmt.target )
       in
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen
 
-    let proofs stmts : Ledger_proof.t list =
-      List.map stmts ~f:(fun statement ->
+    let proofs stmts : Ledger_proof.t One_or_two.t =
+      One_or_two.map stmts ~f:(fun statement ->
           Ledger_proof.create ~statement ~sok_digest:Sok_message.Digest.default
             ~proof:Proof.dummy )
 
@@ -1864,13 +1860,9 @@ let%test_module "test" =
           (fun cmds_left _count_opt cmds_this_iter proofs_available_left ->
             let work_list : Transaction_snark_work.Statement.t list =
               let spec_list = Sl.all_work_pairs_exn !sl in
-              List.map spec_list ~f:(fun (s1, s2_opt) ->
-                  let stmt1 = Snark_work_lib.Work.Single.Spec.statement s1 in
-                  let stmt2 =
-                    Option.value_map s2_opt ~default:[] ~f:(fun s ->
-                        [Snark_work_lib.Work.Single.Spec.statement s] )
-                  in
-                  stmt1 :: stmt2 )
+              List.map spec_list ~f:(fun specs ->
+                  One_or_two.map specs
+                    ~f:Snark_work_lib.Work.Single.Spec.statement )
             in
             let proofs_available_this_iter =
               List.hd_exn proofs_available_left
