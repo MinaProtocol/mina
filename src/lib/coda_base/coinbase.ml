@@ -12,7 +12,8 @@ module Stable = struct
     end
 
     include T
-    include Module_version.Registration.Make_latest_version (T)
+    module Registered = Module_version.Registration.Make_latest_version (T)
+    include Registered
 
     let is_valid {proposer= _; amount; fee_transfer} =
       match fee_transfer with
@@ -22,8 +23,12 @@ module Stable = struct
           Currency.Amount.(of_fee fee <= amount)
 
     (* check validity when deserializing *)
-    include Binable.Of_binable
-              (T)
+    include Binable.Of_binable (struct
+                (* use shadowed bin_io functions *)
+                type nonrec t = t
+
+                include Registered
+              end)
               (struct
                 type nonrec t = t
 
