@@ -377,14 +377,15 @@ end = struct
         in
         (* Close the old frontier and reload a new on from disk. *)
         let new_root_data =
-          { Transition_frontier.transition= new_root
+          { Transition_frontier.Root_data.transition= new_root
           ; staged_ledger= new_root_staged_ledger }
         in
-        Transition_frontier.close frontier;
-        Transition_frontier.Persistent_frontier.(
-          with_instance_exn
+        let%bind () = Transition_frontier.close frontier in
+        let%bind () =
+          Transition_frontier.Persistent_frontier.reset_database_exn
             (Transition_frontier.persistent_frontier frontier)
-            ~f:(Instance.reset ~root_data:new_root_data));
+            ~root_data:new_root_data
+        in
         let%map new_frontier =
           Transition_frontier.load
             { Transition_frontier.logger= t.logger

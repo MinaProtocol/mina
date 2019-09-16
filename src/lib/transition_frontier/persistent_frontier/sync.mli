@@ -8,7 +8,7 @@ module Make : functor (Inputs : Intf.Inputs_with_db_intf) -> sig
   val create :
        logger:Logger.t
     -> base_hash:Frontier.Hash.t
-    -> persistent_frontier:Db.t
+    -> db:Db.t
     -> t
 
   val notify :

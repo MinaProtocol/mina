@@ -11,22 +11,20 @@ module type Transition_frontier_extension_intf = sig
   (** Internal state of the extension. *)
   type t
 
-  (** Data needed for setting up the extension*)
-  type input
+  type breadcrumb
+
+  type transition_frontier
 
   type transition_frontier_diff
 
   (** The view type we're emitting. *)
   type view
 
-  val create : input -> t
-
-  (** The first view that is ever available. *)
-  val initial_view : unit -> view
+  val create : breadcrumb -> t * view
 
   (** Handle a transition frontier diff, and return the new version of the
         computed view, if it's updated. *)
-  val handle_diff : t -> transition_frontier_diff -> view Option.t
+  val handle_diffs : t -> transition_frontier -> transition_frontier_diff list -> view option
 end
 
 module type Transition_frontier_diff_intf = sig
@@ -59,11 +57,21 @@ module type Transition_frontier_diff_intf = sig
     | Full : breadcrumb -> full node_representation
     | Lite : (external_transition_validated, State_hash.t) With_hash.t -> lite node_representation
 
-  type minimal_root_data = 
-    { hash: State_hash.Stable.V1.t
-    ; scan_state: scan_state
-    ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-  [@@deriving bin_io]
+  module Minimal_root_data : sig
+    module Stable : sig
+      module V1 : sig
+        type t = 
+          { hash: State_hash.Stable.V1.t
+          ; scan_state: scan_state
+          ; pending_coinbase: Pending_coinbase.Stable.V1.t }
+        [@@deriving bin_io, version]
+      end
+
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t
+  end
 
   (** A root transition is a representation of the
    *  change that occurs in a transition frontier when the
@@ -71,10 +79,20 @@ module type Transition_frontier_diff_intf = sig
    *  root, as well as pointers to all the nodes which are removed
    *  by transitioning the root.
    *)
-  type root_transition =
-    { new_root: minimal_root_data
-    ; garbage: State_hash.t list }
-  [@@deriving bin_io]
+  module Root_transition : sig
+    module Stable : sig
+      module V1 : sig
+        type t =
+          { new_root: Minimal_root_data.Stable.V1.t
+          ; garbage: State_hash.Stable.V1.t list }
+        [@@deriving bin_io, version]
+      end
+
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t
+  end
 
   (** A transition frontier diff represents a single item
    *  of mutation that can be or has been performed on
@@ -92,13 +110,14 @@ module type Transition_frontier_diff_intf = sig
    *  parameter for that diff.
    *)
   type ('repr, 'mutant) t =
+    | New_node : 'repr node_representation -> ('repr, unit) t
     (** A diff representing new nodes which are added to
      *  the transition frontier. This has no mutant as adding
      *  a node merely depends on its parent being in the
      *  transition frontier already. If the parent wasn't
      *  already in the transition frontier, attempting to
      *  process this diff would generate an error instead. *)
-    | New_node : 'repr node_representation -> ('repr, unit) t
+    | Root_transitioned : Root_transition.t -> (_, State_hash.t) t
     (** A diff representing that the transition frontier root
      *  has been moved forward. The diff contains the state hash
      *  of the new root, as well as state hashes of all nodes that
@@ -109,28 +128,19 @@ module type Transition_frontier_diff_intf = sig
      *  old root. This ensures that all transition frontiers agreed
      *  on the old roots value at the time of processing this diff.
      *)
-    | Root_transitioned : root_transition -> (_, State_hash.t) t
+    | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
     (** A diff representing that there is a new best tip in
      *  the transition frontier. The mutant for this diff is
      *  the state hash of the old best tip. This ensures that
      *  all transition frontiers agreed on the old best tip
      *  pointer at the time of processing this diff.
      *)
-    | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
 
   type ('repr, 'mutant) diff = ('repr, 'mutant) t
 
   val key_to_yojson : ('repr, 'mutant) t -> Yojson.Safe.json
 
   val to_lite : (full, 'mutant) t -> (lite, 'mutant) t
-
-  module Full : sig
-    type 'mutant t = (full, 'mutant) diff
-
-    module E : sig
-      type t = E : (full, 'mutant) diff -> t
-    end
-  end
 
   module Lite : sig
     type 'mutant t = (lite, 'mutant) diff
@@ -140,12 +150,31 @@ module type Transition_frontier_diff_intf = sig
       [@@deriving bin_io]
     end
   end
+
+  module Full : sig
+    type 'mutant t = (full, 'mutant) diff
+
+    module E : sig
+      type t = E : (full, 'mutant) diff -> t
+
+      val to_lite : t -> Lite.E.t
+    end
+  end
 end
 
 module type Transition_frontier_incremental_hash_intf = sig
   type 'mutant lite_diff
 
-  type t [@@deriving eq, bin_io, yojson]
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving bin_io, yojson, version]
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t
+  [@@deriving eq]
 
   type transition = { source: t; target: t }
 
@@ -154,22 +183,6 @@ module type Transition_frontier_incremental_hash_intf = sig
   val to_string : t -> string
 
   val merge_diff : t -> 'mutant lite_diff -> 'mutant -> t
-end
-
-module type Extension = sig
-  type t
-
-  type breadcrumb
-
-  type base_transition_frontier
-
-  type diff
-
-  type view
-
-  val create : breadcrumb -> t * view
-
-  val handle_diffs : t -> base_transition_frontier -> diff list -> view option
 end
 
 module type Broadcast_extension_intf = sig
@@ -190,12 +203,12 @@ module type Broadcast_extension_intf = sig
   val update : t -> base_transition_frontier -> diff list -> unit Deferred.t
 end
 
-module type Extensions = sig
+module type Transition_frontier_extensions_intf = sig
   type breadcrumb
 
-  type base_transition_frontier
+  type transition_frontier
 
-  type diff
+  type transition_frontier_diff
 
   (* [new] TODO: add this back?
   module Snark_pool_refcount : sig
@@ -239,16 +252,11 @@ module type Extensions = sig
   end
   *)
 
-  module Identity : sig
-    type view = diff list
-
-    include
-      Extension
-      with type view := view
-       and type breadcrumb := breadcrumb
-       and type base_transition_frontier := base_transition_frontier
-       and type diff := diff
-  end
+  module Identity : Transition_frontier_extension_intf
+    with type view = transition_frontier_diff list
+     and type breadcrumb := breadcrumb
+     and type transition_frontier := transition_frontier
+     and type transition_frontier_diff := transition_frontier_diff
 end
 
 (** The type of the view onto the changes to the current best tip. This type
@@ -348,14 +356,30 @@ module type Transition_frontier_base_intf = sig
   module Hash : Transition_frontier_incremental_hash_intf
     with type 'mutant lite_diff := 'mutant Diff.Lite.t
 
-  type root_identifier =
-    { state_hash: State_hash.t
-    ; frontier_hash: Hash.t }
-  [@@deriving yojson]
+  module Root_identifier : sig
+    module Stable : sig
+      module V1 : sig
+        type t =
+          { state_hash: State_hash.t
+          ; frontier_hash: Hash.t }
+        [@@deriving bin_io, yojson]
+      end
 
-  type root_data =
-    { transition: (external_transition_validated, State_hash.t) With_hash.t
-    ; staged_ledger: staged_ledger }
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t =
+      { state_hash: State_hash.t
+      ; frontier_hash: Hash.t }
+  end
+
+  module Root_data : sig
+    type t =
+      { transition: (external_transition_validated, State_hash.t) With_hash.t
+      ; staged_ledger: staged_ledger }
+
+    val minimize : t -> Diff.Minimal_root_data.t
+  end
 
   val find_exn : t -> State_hash.t -> Breadcrumb.t
 
@@ -409,7 +433,7 @@ module type Transition_frontier_creatable_intf = sig
 
   val create :
        logger:Logger.t
-    -> root_data:root_data
+    -> root_data:Root_data.t
     -> root_ledger:Ledger.Db.t
     -> base_hash:Hash.t
     -> consensus_local_state:Consensus.Data.Local_state.t
@@ -423,7 +447,7 @@ module type Transition_frontier_intf = sig
   module Persistent_root : sig
     type t
 
-    val create : directory:string -> t
+    val create : logger:Logger.t -> directory:string -> t
 
     module Instance : sig
       type t
@@ -439,11 +463,11 @@ module type Transition_frontier_intf = sig
 
     module Instance : sig
       type t
-
-      val reset : t -> root_data:root_data -> unit
     end
 
-    val with_instance_exn : t -> f:(Instance.t -> 'a) -> 'a
+    val with_instance_exn : t -> f:(Instance.t -> 'a) -> 'a Deferred.t
+
+    val reset_database_exn : t -> root_data:Root_data.t -> unit Deferred.t
   end
 
   type config =
@@ -452,10 +476,11 @@ module type Transition_frontier_intf = sig
     ; consensus_local_state: Consensus.Data.Local_state.t }
 
   val load :
-       config
+       ?retry_with_fresh_db:bool
+    -> config
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> (t, [`Bootstrap_required]) Deferred.Result.t
+    -> (t, [> `Failure of string | `Bootstrap_required | `Persistent_frontier_malformed]) Deferred.Result.t
 
   (** Adds a breadcrumb to the transition_frontier. It will first compute diffs
       corresponding to the add breadcrumb mutation. Then, these diffs will be
@@ -479,11 +504,11 @@ module type Transition_frontier_intf = sig
   val root_snarked_ledger : t -> Ledger.Db.t
 
   module Extensions :
-    Extensions
+    Transition_frontier_extensions_intf
     with type breadcrumb := Breadcrumb.t
-     and type base_transition_frontier := t
+     and type transition_frontier := t
      (* [new] TODO: extensions should probably take in full diffs, not lite ones *)
-     and type diff := Diff.Lite.E.t
+     and type transition_frontier_diff := Diff.Lite.E.t
 
   val snark_pool_refcount_pipe :
        t
@@ -509,7 +534,7 @@ module type Transition_frontier_intf = sig
     -> State_hash.t
     -> Breadcrumb.t option
 
-  val close : t -> unit
+  val close : t -> unit Deferred.t
 
   module For_tests : sig
     val root_snarked_ledger : t -> Ledger.Db.t

@@ -15,8 +15,8 @@ module Make (Inputs : Intf.Inputs_with_db_intf) = struct
 
   (* NB: the persistent frontier must remain open as
    * long as the synchronization is using it *)
-  let create ~logger ~base_hash ~persistent_frontier =
-    let worker = Worker.create {db= persistent_frontier; logger} in
+  let create ~logger ~base_hash ~db =
+    let worker = Worker.create {db; logger} in
     let buffer = Diff_buffer.create ~base_hash ~worker in
     {worker; buffer}
 

@@ -63,15 +63,13 @@ module type Db_intf = sig
 
   val close : t -> unit
 
-  val clear : t -> unit
-
   val check :
        t
     -> ( unit
        , [> `Not_initialized
+         | `Invalid_version
          | `Corrupt of
-             [> `Invalid_version
-             | `Not_found of
+             [> `Not_found of
                  [> `Best_tip
                  | `Best_tip_transition
                  | `Frontier_hash
@@ -84,9 +82,6 @@ module type Db_intf = sig
     -> root_data:root_data
     -> base_hash:frontier_hash
     -> unit
-
-  (* is this just a clear + initialize? *)
-  val reset : t -> root_data:root_data -> unit
 
   val add :
        t
@@ -149,8 +144,8 @@ module type Inputs_with_db_intf = sig
   module Db : Db_intf
     with type external_transition_validated := External_transition.Validated.t
      and type scan_state := Staged_ledger.Scan_state.t
-     and type minimal_root_data := Frontier.Diff.minimal_root_data
-     and type root_data := Frontier.root_data
+     and type minimal_root_data := Frontier.Diff.Minimal_root_data.t
+     and type root_data := Frontier.Root_data.t
      and type frontier_hash := Frontier.Hash.t
 end
 

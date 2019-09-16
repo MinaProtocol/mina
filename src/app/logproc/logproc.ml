@@ -57,9 +57,7 @@ let format_msg ~interpolation_config ~timezone msg =
 
 let yojson_from_string_result str =
   try Ok (Yojson.Safe.from_string str)
-  with exn ->
-    print_string "exn!" ;
-    Error (Exn.to_string exn)
+  with exn -> Error (Exn.to_string exn)
 
 let process_line ~timezone ~interpolation_config ~filter line =
   let open Result.Let_syntax in
@@ -68,8 +66,8 @@ let process_line ~timezone ~interpolation_config ~filter line =
     let%map msg = Logger.Message.of_yojson json in
     (json, msg)
   with
-  | Error err ->
-      printf !"ERROR PROCESSING LINE: %s:%s\n%!" err line
+  | Error _ ->
+      printf !"!!! %s\n%!" line
   | Ok (json, msg) ->
       if Filter.Interpreter.matches filter json then
         format_msg ~timezone ~interpolation_config msg

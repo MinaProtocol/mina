@@ -1,31 +1,57 @@
 open Core_kernel
 open Coda_base
 open Signature_lib
+open Module_version
 
-module Make (Inputs : Inputs.With_diff_intf) : Coda_intf.Transition_frontier_incremental_hash_intf with type 'mutant lite_diff := 'mutant Inputs.Diff.Lite.t = struct
+module Make
+    (Inputs : Inputs.With_diff_intf)
+  : Coda_intf.Transition_frontier_incremental_hash_intf
+      with type 'mutant lite_diff := 'mutant Inputs.Diff.Lite.t = struct
   open Inputs
 
   open Digestif.SHA256
 
-  type nonrec t = t
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Digestif.SHA256.t [@@deriving version {asserted}]
 
-  let to_yojson hash = [%derive.to_yojson: string] (to_raw_string hash)
-  let of_yojson json =
-    let open Result.Let_syntax in
-    let%bind str = [%derive.of_yojson: string] json in
-    match of_raw_string_opt str with
-    | Some hash -> Ok hash
-    | None -> Error "invalid raw hash"
+        let to_yojson hash = [%derive.to_yojson: string] (to_raw_string hash)
+        let of_yojson json =
+          let open Result.Let_syntax in
+          let%bind str = [%derive.of_yojson: string] json in
+          match of_raw_string_opt str with
+          | Some hash -> Ok hash
+          | None -> Error "invalid raw hash"
+
+        include Binable.Of_stringable (struct	
+         type nonrec t = t	
+
+          let of_string = of_hex
+
+          let to_string = to_hex
+        end)
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "transition_frontier_hash"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  include Stable.Latest
 
   type transition = { source: t; target: t }
-
-  include Binable.Of_stringable (struct	
-   type nonrec t = t	
-
-    let of_string = of_hex	
-
-    let to_string = to_hex	
-  end)	
 
   let equal t1 t2 = equal t1 t2	
 
@@ -70,11 +96,15 @@ module Make (Inputs : Inputs.With_diff_intf) : Coda_intf.Transition_frontier_inc
       (Int.to_string @@ Bool.to_int (Breadcrumb.just_emitted_a_proof breadcrumb))
   *)
 
-  let merge_pending_coinbase _ _ = failwith "TODO"
+  let merge_pending_coinbase acc pending_coinbase =
+    let root_hash = Pending_coinbase.merkle_root pending_coinbase in
+    merge_string acc (Pending_coinbase.Hash.to_bytes root_hash)
 
-  let merge_scan_state _ _ = failwith "TODO"
+  let merge_scan_state acc scan_state =
+    let hash = Staged_ledger.Scan_state.hash scan_state in
+    merge_string acc (Staged_ledger_hash.Aux_hash.to_bytes hash)
 
-  let merge_root_data acc {Diff.hash; scan_state; pending_coinbase} =
+  let merge_root_data acc {Diff.Minimal_root_data.Stable.V1.hash; scan_state; pending_coinbase} =
     merge_pending_coinbase
       (merge_scan_state
         (merge_state_hash acc hash)

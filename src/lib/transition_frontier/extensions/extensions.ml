@@ -31,7 +31,11 @@ end) = struct
   module type Broadcast_extension_intf = sig
     type t
 
+    type original
+
     type view
+
+    val original : t -> original
 
     val create : Breadcrumb.t -> t Deferred.t
 
@@ -50,13 +54,17 @@ end) = struct
   end
 
   module Make_broadcastable (Ext : Base_ext_intf) :
-    Broadcast_extension_intf with type view = Ext.view = struct
+    Broadcast_extension_intf with type view = Ext.view and type original = Ext.t = struct
     type t =
       { t: Ext.t
       ; writer: Ext.view Broadcast_pipe.Writer.t
       ; reader: Ext.view Broadcast_pipe.Reader.t }
 
+    type original = Ext.t
+
     type view = Ext.view
+
+    let original t = t.t
 
     let peek {reader; _} = Broadcast_pipe.Reader.peek reader
 
@@ -421,13 +429,13 @@ end) = struct
       ~identity:(close_extension (module Identity))
 
   let notify (t : t) ~frontier ~diffs =
+    let open Broadcast in
     let run_updates_and_setup_broadcast_jobs (type t)
         (module Broadcast : Broadcast_extension_intf with type t = t) field =
       let extension = Field.get field t in
       Broadcast.update_and_create_broadcast_job extension frontier
         diffs
     in
-    let open Broadcast in
     let jobs =
       Fields.to_list
         ~root_history:
@@ -440,5 +448,5 @@ end) = struct
           (run_updates_and_setup_broadcast_jobs (module Transition_registry))
         ~identity:(run_updates_and_setup_broadcast_jobs (module Identity))
     in
-    fun () -> Deferred.List.iter ~how:`Parallel jobs ~f:(fun job -> job ())
+    Deferred.List.iter ~how:`Parallel jobs ~f:(fun job -> job ())
 end

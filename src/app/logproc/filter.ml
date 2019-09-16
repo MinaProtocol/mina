@@ -69,6 +69,8 @@ module Parser = struct
 
   let is_numeric = function '0' .. '9' -> true | _ -> false
 
+  let is_text = function '!' | '#' .. '~' -> true | _ -> false
+
   let parens = (char '(', char ')')
 
   let brackets = (char '[', char ']')
@@ -79,6 +81,8 @@ module Parser = struct
   let alpha_char = satisfy is_alpha
 
   let numeric_char = satisfy is_numeric
+
+  let text_char = satisfy is_text
 
   let pad b p = b *> p <* b
 
@@ -109,8 +113,7 @@ module Parser = struct
     >>| fun c -> String.of_char_list ['\\'; c]
 
   let text_component =
-    let text_char = alpha_char <|> numeric_char >>| String.of_char in
-    char '\\' *> text_escape <|> text_char
+    char '\\' *> text_escape <|> (text_char >>| String.of_char)
 
   let text = many text_component >>| String.concat ~sep:"" <?> "text"
 

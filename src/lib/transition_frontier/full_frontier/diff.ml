@@ -1,5 +1,6 @@
 open Core_kernel
 open Coda_base
+open Module_version
 
 module Make (Inputs : Inputs.With_breadcrumb_intf) :
   Coda_intf.Transition_frontier_diff_intf
@@ -15,20 +16,68 @@ module Make (Inputs : Inputs.With_breadcrumb_intf) :
     | Full : Breadcrumb.t -> full node_representation
     | Lite : (External_transition.Validated.t, State_hash.t) With_hash.t -> lite node_representation
 
-  type minimal_root_data = 
-    { hash: State_hash.Stable.V1.t
-    ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
-    ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-  [@@deriving bin_io]
+  module Minimal_root_data = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = 
+            { hash: State_hash.Stable.V1.t
+            ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
+            ; pending_coinbase: Pending_coinbase.Stable.V1.t }
+          [@@deriving bin_io, version]
+        end
 
-  type root_transition =
-    { new_root: minimal_root_data
-    ; garbage: State_hash.Stable.V1.t list }
-  [@@deriving bin_io]
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "transition_frontier_minimal_root_data"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    include Stable.Latest
+  end
+
+  module Root_transition = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t =
+            { new_root: Minimal_root_data.Stable.V1.t
+            ; garbage: State_hash.Stable.V1.t list }
+          [@@deriving bin_io, version]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "transition_frontier_root_transition"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    include Stable.Latest
+  end
 
   type ('repr, 'mutant) t =
     | New_node : 'repr_type node_representation -> ('repr_type, unit) t
-    | Root_transitioned : root_transition -> (_, State_hash.t) t
+    | Root_transitioned : Root_transition.t -> (_, State_hash.t) t
     | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
 
   type ('repr, 'mutant) diff = ('repr, 'mutant) t
@@ -66,14 +115,6 @@ module Make (Inputs : Inputs.With_breadcrumb_intf) :
     | Root_transitioned r -> Root_transitioned r
     | Best_tip_changed b -> Best_tip_changed b
 
-  module Full = struct
-    type 'mutant t = (full, 'mutant) diff
-
-    module E = struct
-      type t = E : (full, 'mutant) diff -> t
-    end
-  end
-
   module Lite = struct
     type 'mutant t = (lite, 'mutant) diff
 
@@ -81,7 +122,7 @@ module Make (Inputs : Inputs.With_breadcrumb_intf) :
       module T_binable = struct
         type t =
           | New_node of (External_transition.Validated.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
-          | Root_transitioned of root_transition
+          | Root_transitioned of Root_transition.t
           | Best_tip_changed of State_hash.Stable.V1.t
         [@@deriving bin_io]
       end
@@ -102,6 +143,16 @@ module Make (Inputs : Inputs.With_breadcrumb_intf) :
 
       include T
       include Binable.Of_binable (T_binable) (T)
+    end
+  end
+
+  module Full = struct
+    type 'mutant t = (full, 'mutant) diff
+
+    module E = struct
+      type t = E : (full, 'mutant) diff -> t
+
+      let to_lite (E diff) = Lite.E.E (to_lite diff)
     end
   end
 end

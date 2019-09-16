@@ -170,13 +170,13 @@ module Make (Inputs : Inputs_intf) = struct
             ( peek_exn frontier_r
             , transition_frontier_controller_reader
             , transition_frontier_controller_writer ))
-        ~f:(function
-          | `Transition_frontier_controller (frontier, _, _) ->
-              don't_wait_for
-                (Broadcast_pipe.Writer.write frontier_w (Some frontier))
-          | `Bootstrap_controller (_, _) ->
-              Transition_frontier.close (peek_exn frontier_r) ;
-              don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) )
+        ~f:(fun state ->
+          don't_wait_for (
+            match state with
+            | `Transition_frontier_controller (frontier, _, _) ->
+                Broadcast_pipe.Writer.write frontier_w (Some frontier)
+            | `Bootstrap_controller (_, _) ->
+                Broadcast_pipe.Writer.write frontier_w None ))
     in
     let ( valid_protocol_state_transition_reader
         , valid_protocol_state_transition_writer ) =

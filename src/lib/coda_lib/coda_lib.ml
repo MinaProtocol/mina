@@ -326,23 +326,24 @@ module Make (Inputs : Intf.Inputs) = struct
             let net_ivar = Ivar.create () in
             (* TODO: (#3053) push transition frontier ownership down into transition router
              * (then persistent root can be owned by transition frontier only) *)
-            let%bind transition_frontier_result =
+            let%bind transition_frontier =
               Transition_frontier.load
                 { Transition_frontier.logger= config.logger
                 ; verifier= config.verifier
                 ; consensus_local_state= config.consensus_local_state }
                 ~persistent_root:(
                   Transition_frontier.Persistent_root.create
+                    ~logger:config.logger
                     ~directory:config.persistent_root_location)
                 ~persistent_frontier:(
                   Transition_frontier.Persistent_frontier.create
                     ~logger:config.logger
+                    ~verifier:config.verifier
                     ~directory:config.persistent_frontier_location)
-            in
-            let transition_frontier =
-              transition_frontier_result
-              |> Result.map_error ~f:(Fn.const (Error.of_string "TMP: failed to initialize transition frontier"))
-              |> Or_error.ok_exn
+              >>| Fn.compose Result.ok_or_failwith (Result.map_error ~f:(function
+                | `Persistent_frontier_malformed -> "persistent frontier unexpectedly malformed -- this should not happen with retry enabled"
+                | `Bootstrap_required -> "TODO: bootstrap required"
+                | `Failure err -> "failed to initialize transition frontier: " ^ err))
             in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)

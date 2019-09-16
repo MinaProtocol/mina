@@ -56,6 +56,7 @@ module Make (Inputs : Inputs_intf) :
       | Some name ->
           name
     in
+    Unix.mkdir_p directory;
     let kvdb = Kvdb.create ~directory in
     {uuid; kvdb}
 

@@ -16,8 +16,8 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
   : Intf.Db_intf
       with type external_transition_validated := Inputs.External_transition.Validated.t
        and type scan_state := Inputs.Staged_ledger.Scan_state.t
-       and type minimal_root_data := Inputs.Frontier.Diff.minimal_root_data
-       and type root_data := Inputs.Frontier.root_data
+       and type minimal_root_data := Inputs.Frontier.Diff.Minimal_root_data.Stable.Latest.t
+       and type root_data := Inputs.Frontier.Root_data.t
        and type frontier_hash := Inputs.Frontier.Hash.t = struct
   open Inputs
   open Result.Let_syntax
@@ -29,13 +29,29 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
   let version = 1
 
   module Schema = struct
+    module Keys = struct
+      module String = String
+
+      module Prefixed_state_hash = struct
+        type t = string * State_hash.Stable.V1.t [@@deriving bin_io]
+      end
+    end
+
     type _ t =
       | Db_version : int t
       | Transition : State_hash.Stable.V1.t -> External_transition.Validated.Stable.V1.t t
       | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
-      | Root : Frontier.Diff.minimal_root_data t
+      | Root : Frontier.Diff.Minimal_root_data.Stable.V1.t t
       | Best_tip : State_hash.Stable.V1.t t
       | Frontier_hash : Frontier.Hash.t t
+
+    let to_string : type a. a t -> string = function
+      | Db_version -> "Db_version"
+      | Transition _ -> "Transition _"
+      | Arcs _ -> "Arcs _"
+      | Root -> "Root"
+      | Best_tip -> "Best_tip"
+      | Frontier_hash -> "Frontier_hash"
 
     let binable_data_type (type a) : a t -> a Bin_prot.Type_class.t = function
       | Db_version ->
@@ -45,11 +61,11 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
       | Arcs _ ->
           [%bin_type_class: State_hash.Stable.V1.t list]
       | Root ->
-          [%bin_type_class: Frontier.Diff.minimal_root_data]
+          [%bin_type_class: Frontier.Diff.Minimal_root_data.Stable.V1.t]
       | Best_tip ->
           [%bin_type_class: State_hash.Stable.V1.t]
       | Frontier_hash ->
-          [%bin_type_class: Frontier.Hash.t]
+          [%bin_type_class: Frontier.Hash.Stable.V1.t]
 
     (* HACK: a simple way to derive Bin_prot.Type_class.t for each case of a GADT *)
     let gadt_input_type_class (type data a) :
@@ -79,34 +95,34 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
         a t -> a t Bin_prot.Type_class.t = function
       | Db_version ->
           gadt_input_type_class
-            (module Unit)
+            (module Keys.String)
             ~to_gadt:(fun _ -> Db_version)
-            ~of_gadt:(fun Db_version -> ())
+            ~of_gadt:(fun Db_version -> "db_version")
       | Transition _ ->
           gadt_input_type_class
-            (module State_hash.Stable.V1)
-            ~to_gadt:(fun transition -> Transition transition)
-            ~of_gadt:(fun (Transition transition) -> transition)
+            (module Keys.Prefixed_state_hash)
+            ~to_gadt:(fun (_, hash) -> Transition hash)
+            ~of_gadt:(fun (Transition hash) -> ("transition", hash))
       | Arcs _ ->
           gadt_input_type_class
-            (module State_hash.Stable.V1)
-            ~to_gadt:(fun arcs -> Arcs arcs)
-            ~of_gadt:(fun (Arcs arcs) -> arcs)
+            (module Keys.Prefixed_state_hash)
+            ~to_gadt:(fun (_, hash) -> Arcs hash)
+            ~of_gadt:(fun (Arcs hash) -> ("arcs", hash))
       | Root ->
           gadt_input_type_class
-            (module Unit)
+            (module Keys.String)
             ~to_gadt:(fun _ -> Root)
-            ~of_gadt:(fun Root -> ())
+            ~of_gadt:(fun Root -> "root")
       | Best_tip ->
           gadt_input_type_class
-            (module Unit)
+            (module Keys.String)
             ~to_gadt:(fun _ -> Best_tip)
-            ~of_gadt:(fun Best_tip -> ())
+            ~of_gadt:(fun Best_tip -> "best_tip")
       | Frontier_hash ->
           gadt_input_type_class
-            (module Unit)
+            (module Keys.String)
             ~to_gadt:(fun _ -> Frontier_hash)
-            ~of_gadt:(fun Frontier_hash -> ())
+            ~of_gadt:(fun Frontier_hash -> "frontier_hash")
   end
 
   module Error = struct
@@ -155,7 +171,7 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
   type t =
     { directory: string
     ; logger: Logger.t
-    ; mutable db: Rocks.t }
+    ; db: Rocks.t }
 
   let create ~logger ~directory =
     (if not (Result.is_ok (Unix.access directory [`Exists])) then
@@ -163,12 +179,6 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
     {directory; logger; db= Rocks.create ~directory}
 
   let close t = Rocks.close t.db
-
-  (* TODO: is this safe? do we need to sync io first? *)
-  let clear t =
-    close t;
-    Unix.remove t.directory;
-    t.db <- Rocks.create ~directory:t.directory
 
   open Schema
   open Rocks
@@ -195,24 +205,23 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
         let%bind _ = get t.db ~key:Frontier_hash ~error:(`Corrupt (`Not_found `Frontier_hash)) in
         let%bind _ = get t.db ~key:(Transition root.hash) ~error:(`Corrupt (`Not_found `Root_transition)) in
         let%map _ = get t.db ~key:(Transition best_tip) ~error:(`Corrupt (`Not_found `Best_tip_transition)) in
+        (* [new] TODO: crawl from root and validate tree structure is not malformed *)
         ()
-    | _ -> Error (`Corrupt `Invalid_version)
-
-  let minimize_root_data _ = failwith "EZ TODO"
+    | _ -> Error `Invalid_version
 
   let initialize t ~root_data ~base_hash =
-    let open Frontier in
+    let open Frontier.Root_data in
     let open With_hash in
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:[("root_state_hash", State_hash.to_yojson root_data.transition.hash)]
+      "Initializing persistent frontier database with $minimal_root_data";
     Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version;
       Batch.set batch ~key:(Transition root_data.transition.hash) ~data:root_data.transition.data;
-      Batch.set batch ~key:Root ~data:(minimize_root_data root_data);
+      Batch.set batch ~key:(Arcs root_data.transition.hash) ~data:[];
+      Batch.set batch ~key:Root ~data:(minimize root_data);
       Batch.set batch ~key:Best_tip ~data:root_data.transition.hash;
       Batch.set batch ~key:Frontier_hash ~data:base_hash)
-
-  let reset _ ~root_data:_ =
-    (* dump the db and reinitialize *)
-    failwith "TODO"
 
   let add t ~transition =
     let parent_hash =
@@ -240,7 +249,7 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
       ~data:(node_hash :: parent_arcs))
 
   let move_root t ~new_root ~garbage =
-    let open Frontier.Diff in
+    let open Frontier.Diff.Minimal_root_data.Stable.V1 in
     let%bind () = Result.ok_if_true (mem t.db ~key:(Transition new_root.hash)) ~error:(`Not_found `New_root_transition) in
     let%map old_root = get t.db ~key:Root ~error:(`Not_found `Old_root_transition) in
     (* TODO: Result compatible rocksdb batch transaction *)

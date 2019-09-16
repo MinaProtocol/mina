@@ -2,22 +2,28 @@ open Async_kernel
 open Core_kernel
 open Coda_base
 open Coda_state
-open Signature_lib
 open Module_version
-
-module type Staged_ledger_diff_intf = sig
-  type t [@@deriving bin_io, sexp, version]
-
-  val creator : t -> Public_key.Compressed.t
-
-  val user_commands : t -> User_command.t list
-end
 
 module Make
     (Ledger_proof : Coda_intf.Ledger_proof_intf)
     (Verifier : Coda_intf.Verifier_intf
                 with type ledger_proof := Ledger_proof.t)
-    (Staged_ledger_diff : Staged_ledger_diff_intf) :
+    (Transaction_snark_work : sig 
+      module Stable : sig
+        module V1 : sig
+          type t [@@deriving bin_io, sexp, version]
+        end
+      end
+
+      type t = Stable.V1.t
+
+      module Checked : sig
+        type t [@@deriving sexp]
+      end
+    end)
+    (Staged_ledger_diff : Coda_intf.Staged_ledger_diff_intf
+      with type transaction_snark_work := Transaction_snark_work.t
+       and type transaction_snark_work_checked := Transaction_snark_work.Checked.t) :
   Coda_intf.External_transition_intf
   with type ledger_proof := Ledger_proof.t
    and type verifier := Verifier.t
@@ -28,7 +34,7 @@ module Make
         type t =
           { protocol_state: Protocol_state.Value.Stable.V1.t
           ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-          ; staged_ledger_diff: Staged_ledger_diff.t }
+          ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
         [@@deriving sexp, fields, bin_io, version]
 
         type external_transition = t
@@ -104,35 +110,6 @@ module Make
 
   let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff =
     {protocol_state; protocol_state_proof; staged_ledger_diff}
-
-  let genesis =
-    failwith "TODO: update functor inputs to make this compile"
-    (*
-    let genesis_protocol_state = With_hash.data Genesis_protocol_state.t in
-    (* the genesis transition is assumed to be valid *)
-    let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
-    let empty_diff =
-      { Staged_ledger_diff.diff=
-          ( { completed_works= []
-            ; user_commands= []
-            ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-          , None )
-      ; prev_hash=
-          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-            (Staged_ledger_hash.Aux_hash.of_bytes "")
-            (Ledger.merkle_root Genesis_ledger.t)
-            pending_coinbases
-      ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
-      }
-    in
-    let (`I_swear_this_is_safe_see_my_comment transition) =
-      External_transition.Validated.create_unsafe
-        (External_transition.create ~protocol_state:genesis_protocol_state
-           ~protocol_state_proof:Genesis.proof
-           ~staged_ledger_diff:empty_diff)
-    in
-    transition
-    *)
 
   let timestamp {protocol_state; _} =
     Protocol_state.blockchain_state protocol_state
@@ -489,12 +466,32 @@ module Make
                   (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
               , `Staged_ledger transitioned_staged_ledger ) )
   end
+
+  let genesis =
+    let genesis_protocol_state = With_hash.data Genesis_protocol_state.t in
+    let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
+    let empty_diff =
+      { Staged_ledger_diff.diff=
+          ( { completed_works= []
+            ; user_commands= []
+            ; coinbase= Staged_ledger_diff.At_most_two.Zero }
+          , None )
+      ; prev_hash=
+          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+            (Staged_ledger_hash.Aux_hash.of_bytes "")
+            (Ledger.merkle_root Genesis_ledger.t)
+            pending_coinbases
+      ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
+      }
+    in
+    (* the genesis transition is assumed to be valid *)
+    let (`I_swear_this_is_safe_see_my_comment transition) =
+      Validated.create_unsafe
+        (create ~protocol_state:genesis_protocol_state
+           ~protocol_state_proof:Precomputed_values.base_proof
+           ~staged_ledger_diff:empty_diff)
+    in
+    With_hash.of_data transition ~hash_data:(Fn.compose Protocol_state.hash protocol_state)
 end
 
-include Make (Ledger_proof) (Verifier)
-          (struct
-            include Staged_ledger_diff.Stable.V1
-
-            [%%define_locally
-            Staged_ledger_diff.(creator, user_commands)]
-          end)
+include Make (Ledger_proof) (Verifier) (Transaction_snark_work) (Staged_ledger_diff)

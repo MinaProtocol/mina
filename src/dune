@@ -1,45 +1,7 @@
-(* -*- tuareg -*- *)
+(include dune.flags.inc)
 
-let rec all_but_last = function
-  | [] -> raise (Invalid_argument "all_but_last: empty list")
-  | [x] -> []
-  | h :: t -> h :: all_but_last t
-
-let file_extension filename =
-  try List.hd (List.rev (String.split_on_char '.' filename)) with _ -> ""
-
-let chop_file_extension filename =
-  try String.concat "." (all_but_last (String.split_on_char '.' filename)) with _ -> filename
-
-let get_directory_contents ~blacklist_exts dirname =
-  assert (Sys.is_directory dirname);
-  Sys.readdir dirname
-  |> Array.to_list
-  |> List.filter (fun name ->
-      not (List.exists ((=) (file_extension name)) blacklist_exts))
-
-let () =
-  let blacklist_exts = ["un~"] in
-  let profiles =
-    get_directory_contents ~blacklist_exts "config"
-    |> List.filter (fun name -> file_extension name = "mlh")
-    |> List.map chop_file_extension
-  in
-  let foreach ls ~f = List.map f ls |> String.concat "" in
-  let env_entry profile = "  ("^profile^" (flags (:standard -w @a-4-29-40-41-42-44-45-48-58-59-60)))\n" in
-
-
-  let dune_file = "\
-    (rule\n\
-   \  (targets config.mlh)\n\
-   \  (mode promote)\n\
-   \  (deps config/config.mlh)\n\
-   \  (action (copy config/config.mlh config.mlh)))\n\
-    (env\n"^foreach profiles ~f:env_entry^")"
-  in
-  (* uncomment for debugging
-    let ch = open_out "generated_dune_file" in
-    output_string ch dune_file;
-    close_out ch;
-  *)
-  Jbuild_plugin.V1.send dune_file
+(rule
+  (targets config.mlh)
+  (mode promote)
+  (deps config/config.mlh)
+  (action (copy config/config.mlh config.mlh)))

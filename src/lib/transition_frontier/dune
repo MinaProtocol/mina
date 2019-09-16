@@ -1,3 +1,5 @@
+(include ../../dune.flags.inc)
+
 (library
   (name transition_frontier)
   (public_name transition_frontier)

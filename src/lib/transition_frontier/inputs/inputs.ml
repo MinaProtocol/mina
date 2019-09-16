@@ -1,3 +1,5 @@
+open Async_kernel
+
 module type S = sig
   include Coda_intf.Inputs_intf
 
@@ -50,6 +52,23 @@ module type With_base_frontier_intf = sig
 
     val hash : t -> Hash.t
 
-    val apply_diffs : t -> Diff.Full.E.t list -> unit
+    val apply_diffs : t -> Diff.Full.E.t list -> [`New_root of Root_identifier.t option]
+  end
+end
+
+module type With_extensions_intf = sig
+  include With_base_frontier_intf
+
+  module Extensions : sig 
+    include Coda_intf.Transition_frontier_extensions_intf
+      with type breadcrumb := Frontier.Breadcrumb.t
+       and type transition_frontier := Frontier.t
+       and type transition_frontier_diff := Frontier.Diff.Lite.E.t
+
+    type t
+
+    val create : Frontier.Breadcrumb.t -> t Deferred.t
+
+    val notify : t -> frontier:Frontier.t -> diffs:Frontier.Diff.Lite.E.t list -> unit Deferred.t
   end
 end

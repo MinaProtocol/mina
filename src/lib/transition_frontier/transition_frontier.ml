@@ -34,14 +34,23 @@ module Make (Inputs : Inputs.S) :
 
   module Full_frontier = Full_frontier.Make (Inputs)
 
-  type root_identifier = Full_frontier.root_identifier =
-    { state_hash: State_hash.t
-    ; frontier_hash: Full_frontier.Hash.t }
-  [@@deriving yojson]
+  module Root_identifier = Full_frontier.Root_identifier
 
-  type root_data = Full_frontier.root_data =
-    { transition: (External_transition.Validated.t, State_hash.t) With_hash.t
-    ; staged_ledger: Staged_ledger.t }
+  module Root_data = Full_frontier.Root_data
+
+  let genesis_root_data ~logger ~verifier ~snarked_ledger =
+    let open Root_data in
+    let snarked_ledger_hash = Frozen_ledger_hash.of_ledger_hash (Ledger.Db.merkle_root snarked_ledger) in
+    let pending_coinbase_collection = Or_error.ok_exn (Pending_coinbase.create ()) in
+    let%map staged_ledger =
+      Staged_ledger.of_scan_state_and_ledger ~logger ~verifier
+        ~snarked_ledger_hash ~ledger:(Ledger.of_database snarked_ledger)
+        ~scan_state:(Staged_ledger.Scan_state.empty ())
+        ~pending_coinbase_collection
+      >>| Or_error.ok_exn
+    in
+    { transition= External_transition.genesis
+    ; staged_ledger }
 
   module Breadcrumb = Full_frontier.Breadcrumb
   module Diff = Full_frontier.Diff
@@ -52,9 +61,15 @@ module Make (Inputs : Inputs.S) :
     module Frontier = Full_frontier
   end
 
-  module Persistent_root = Persistent_root.Make (Inputs_with_full_frontier)
-  module Persistent_frontier = Persistent_frontier.Make (Inputs_with_full_frontier)
   module Extensions = Extensions.Make (Inputs_with_full_frontier)
+  module Persistent_root = Persistent_root.Make (Inputs_with_full_frontier)
+
+  module Inputs_with_extensions = struct
+    include Inputs_with_full_frontier
+    module Extensions = Extensions
+  end
+
+  module Persistent_frontier = Persistent_frontier.Make (Inputs_with_extensions)
 
   type config =
     { logger: Logger.t
@@ -69,38 +84,130 @@ module Make (Inputs : Inputs.S) :
     ; persistent_frontier: Persistent_frontier.t
     (* [new] TODO: !important -- this instance should only be owned by the sync process, as once the sync worker is an RPC worker, only that process can have an open connection the the database *)
     ; persistent_frontier_instance: Persistent_frontier.Instance.t
-    ; persistent_frontier_sync: Persistent_frontier.Sync.t
     ; extensions: Extensions.t }
 
-  (* TODO: re-add `Bootstrap_required support or redo signature *)
-  let load config ~persistent_root:persistent_root_factory ~persistent_frontier:persistent_frontier_factory =
+  let load_from_persistence_and_start config ~persistent_root ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance =
     let open Deferred.Result.Let_syntax in
-    (* TODO: #3053 *)
-    (* let persistent_root = Persistent_root.create ~logger:config.logger ~directory:config.persistent_root_directory in *)
-    let persistent_root = Persistent_root.create_instance_exn persistent_root_factory in
-    let persistent_frontier = Persistent_frontier.create_instance_exn persistent_frontier_factory in
-    let root_identifier = Persistent_root.Instance.load_root_identifier persistent_root in
+    let root_identifier =
+      match Persistent_root.Instance.load_root_identifier persistent_root_instance with
+      | Some root_identifier -> root_identifier
+      | None ->
+          failwith "not persistent root identifier found (should have been written already)"
+    in
     let%bind () =
       Deferred.return (
-        Persistent_frontier.Instance.fast_forward persistent_frontier root_identifier
+        Persistent_frontier.Instance.fast_forward persistent_frontier_instance root_identifier
         |> Result.map_error ~f:(function
+          | `Sync_cannot_be_running -> `Failure "sync job is already running on persistent frontier"
           | `Bootstrap_required -> `Bootstrap_required
           | `Failure msg ->
               Logger.fatal config.logger ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:[("target_root", Full_frontier.root_identifier_to_yojson root_identifier)]
+                ~metadata:[("target_root", Full_frontier.Root_identifier.Stable.Latest.to_yojson root_identifier)]
                 "Unable to fast forward persistent frontier: %s"
                 msg;
               `Failure msg))
     in
-    Persistent_frontier.Instance.load_full_frontier persistent_frontier
-      ~root_ledger:(Persistent_root.Instance.snarked_ledger persistent_root)
-      ~consensus_local_state:config.consensus_local_state
+    let%bind full_frontier, extensions =
+      Deferred.map
+        (Persistent_frontier.Instance.load_full_frontier persistent_frontier_instance
+          ~root_ledger:(Persistent_root.Instance.snarked_ledger persistent_root_instance)
+          ~consensus_local_state:config.consensus_local_state)
+        ~f:(Result.map_error ~f:(function
+          | `Sync_cannot_be_running -> `Failure "sync job is already running on persistent frontier"
+          | `Failure _ as err -> err))
+    in
+    let%map () =
+      Deferred.return (
+        Persistent_frontier.Instance.start_sync persistent_frontier_instance
+        |> Result.map_error ~f:(function
+          | `Sync_cannot_be_running -> `Failure "sync job is already running on persistent frontier"
+          | `Not_found _ as err -> `Failure (Persistent_frontier.Db.Error.not_found_message err)))
+    in
+    { full_frontier
+    ; persistent_root
+    ; persistent_root_instance
+    ; persistent_frontier
+    ; persistent_frontier_instance
+    ; extensions }
 
+  (* TODO: re-add `Bootstrap_required support or redo signature *)
+  let rec load :
+       ?retry_with_fresh_db:bool
+    -> config
+    -> persistent_root:Persistent_root.t
+    -> persistent_frontier:Persistent_frontier.t
+    -> ( t,
+         [>`Bootstrap_required
+         | `Persistent_frontier_malformed
+         | `Failure of string ] )
+        Deferred.Result.t =
+    fun ?(retry_with_fresh_db = true) config ~persistent_root ~persistent_frontier ->
+      let open Deferred.Let_syntax in
+      (* TODO: #3053 *)
+      (* let persistent_root = Persistent_root.create ~logger:config.logger ~directory:config.persistent_root_directory in *)
+      let continue ~persistent_root_instance ~persistent_frontier_instance =
+        load_from_persistence_and_start config
+          ~persistent_root ~persistent_root_instance
+          ~persistent_frontier ~persistent_frontier_instance
+      in
+      let persistent_root_instance = Persistent_root.create_instance_exn persistent_root in
+      let persistent_frontier_instance = Persistent_frontier.create_instance_exn persistent_frontier in
+      let reset_and_continue () =
+        let%bind root_data =
+          genesis_root_data
+            ~logger:config.logger
+            ~verifier:config.verifier
+            ~snarked_ledger:(Persistent_root.Instance.snarked_ledger persistent_root_instance)
+        in
+        let%bind () = Persistent_frontier.Instance.destroy persistent_frontier_instance in
+        let%bind () = Persistent_frontier.reset_database_exn persistent_frontier ~root_data in
+        Persistent_root.Instance.destroy persistent_root_instance;
+        let%bind () = Persistent_root.reset_to_genesis_exn persistent_root in
+        continue
+          ~persistent_root_instance:(Persistent_root.create_instance_exn persistent_root)
+          ~persistent_frontier_instance:(Persistent_frontier.create_instance_exn persistent_frontier)
+      in
+      match Persistent_frontier.Instance.check_database persistent_frontier_instance with
+      | Error `Not_initialized ->
+          (* [new] TODO: this case can be optimized to not create the
+           * database twice through rocks -- currently on clean bootup,
+           * this code path will reinitialize the rocksdb twice *)
+          Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+            "persistent frontier database does not exist";
+          reset_and_continue ()
+      | Error `Invalid_version ->
+          Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+            "persistent frontier database out of date";
+          reset_and_continue ()
+      | Error (`Corrupt err) ->
+          Logger.error config.logger ~module_:__MODULE__ ~location:__LOC__
+            "Persistent frontier database is corrupt: %s"
+            (Persistent_frontier.Db.Error.message err);
+          if retry_with_fresh_db then (
+            (* should retry be on by default? this could be unnecessarily destructive *)
+            Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+              "destroying old persistent frontier database ";
+            let%bind () = Persistent_frontier.Instance.destroy persistent_frontier_instance in
+            Persistent_root.Instance.destroy persistent_root_instance;
+            let%bind () = Persistent_frontier.destroy_database_exn persistent_frontier in
+            load config ~persistent_root ~persistent_frontier ~retry_with_fresh_db:false
+            >>| Result.map_error ~f:(function
+              | `Persistent_frontier_malformed -> `Failure "failed to destroy and create new persistent frontier database"
+              | err -> err))
+          else
+            return (Error `Persistent_frontier_malformed)
+      | Ok () ->
+          continue ~persistent_root_instance ~persistent_frontier_instance
 
-  (* [new] TODO *)
-  let close {full_frontier=_TODO_1; persistent_root=_TODO_2; persistent_root_instance=_TODO_3; persistent_frontier=_TODO_4; persistent_frontier_instance=_TODO_5; persistent_frontier_sync=_TODO_6; extensions} =
-    (* Full_frontier.close full_frontier; *)
-    (* Persistent_frontier.Sync.close persistent_frontier_sync; *)
+  let close
+      { full_frontier=_
+      ; persistent_root=_
+      ; persistent_root_instance
+      ; persistent_frontier=_
+      ; persistent_frontier_instance
+      ; extensions } =
+    let%map () = Persistent_frontier.Instance.destroy persistent_frontier_instance in
+    Persistent_root.Instance.destroy persistent_root_instance;
     Extensions.close extensions;
     failwith "TODO"
 
@@ -110,191 +217,23 @@ module Make (Inputs : Inputs.S) :
   let root_snarked_ledger {persistent_root_instance; _} =
     Persistent_root.Instance.snarked_ledger persistent_root_instance
 
-  (*
-  let create_genesis_root_data config =
-    let open Full_frontier in
-    let scan_state = Staged_ledger.Scan_state.empty () in
-    let pending_coinbases = Or_error.ok_exn (Pending_coinbase.create ()) in
-    let%map staged_ledger_or_error =
-      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-        ~logger:config.logger
-        ~verifier:config.verifier
-        ~scan_state
-        ~snarked_ledger:Genesis_ledger.t
-        ~expected_merkle_root:(Ledger.merkle_root Genesis_ledger.t)
-        ~pending_coinbases
-    in
-    { transition= External_transition.genesis
-    ; staged_ledger= Or_error.ok_exn staged_ledger_or_error }
-  *)
-
-  (*
-  let create_clean config ~persistent_root =
-    let persistent_frontier = Persistent_frontier.create ~logger:config.logger ~directory:config.persistent_frontier_directory in
-    let%bind root_data = create_genesis_root_data config in
-    (* TODO: I don't think this is necessary... *)
-    (* Persistent_root.reset_to_genesis root_ledger; *)
-    Persistent_frontier.clear persistent_frontier ~root_data;
-    (* let full_frontier = Full_frontier.create ~logger:config.logger ~root_data ~root_ledger ~consensus_local_state:config.consensus_local_state in *)
-    let full_frontier = Persistent_frontier.load_full_frontier persistent_frontier in
-    let%bind persistent_frontier_sync = Persistent_frontier.Sync.create ~logger:config.logger persistent_frontier in
-    let%map extensions = Extensions.create (Full_frontier.get_root full_frontier) in
-    {full_frontier; persistent_frontier_sync; extensions}
-
-  (* TODO: move logic *)
-  (*
-  let sync_persistence_and_load config ~root_ledger ~persistent_frontier =
-    if
-      Frozen_ledger_hash.equal
-        (Persistent_frontier.get_root pers_frontier).snarked_ledger_hash
-        (Root_ledger.merkle_root root_ledger)
-    then (
-      (* TODO: log error *)
-      assert (
-        Frontier_hash.equal
-          (Persistent_frontier.get_frontier_hash pers_frontier)
-          (Root_ledger.get_frontier_hash root_ledger));
-      load config ~root_ledger ~persistent_frontier:pers_frontier)
-    else (
-      match Persistent_frontier.fast_forward_root pers_frontier ~target_root:(Root_ledger.get_root_state_hash root_ledger) with
-      | Error (`Failure err) ->
-          (* TODO: recover *)
-          failwiths (Error.sexp_of_t err)
-      | Error `Target_not_found ->
-          failwith "TODO"
-      | Ok () ->
-          load config ~root_ledger ~persistent_frontier:pers_frontier)
-  *)
-
-  type persistent_load_error =
-    [ `Not_initialized
-    | `Corrupt of
-        [ `Invalid_version
-        | `Not_found of
-            [ `Best_tip
-            | `Best_tip_transition
-            | `Frontier_hash
-            | `Root
-            | `Root_transition ] ]
-    | `Target_not_found
-    | `Invalid_frontier_hash
-    | `Fatal of Error.t ]
-
-  (* TODO: audit default/initialization of metadata from persistent root *)
-  let attempt_persistent_load config ~persistent_root =
-    let open Deferred.Let_syntax in
-    let log_recoverable_error msg =
-      Logger.warn config.logger
-        ~module_:__MODULE__ ~location:__LOC__
-        "failed to load transition frontier from disk: persistent frontier %s"
-        msg
-    in
-    let log_fatal_error err =
-      Logger.fatal config.logger
-        ~module_:__MODULE__ ~location:__LOC__
-        !"error while attempting to load transition frontier from disk: %{sexp: Error.t}"
-        err;
-      Error.raise err
-    in
-    let%bind persistent_root_state_hash = Persistent_root.load_state_hash persistent_root in
-    let%bind persistent_root_frontier_hash = Persistent_root.load_frontier_hash persistent_root in
-    let persistent_frontier = Persistent_frontier.create ~logger:config.logger ~directory:config.persistent_frontier_directory in
-    let open Deferred.Result.Let_syntax in
-    (* check persistent frontier and load full frontier if possible *)
-    let%bind full_frontier =
-      match
-        let open Result.Let_syntax in
-        let%bind () = (Persistent_frontier.check persistent_frontier :> (unit, persistent_load_error) Result.t) in
-        (* TODO: do we even care about this check? *)
-        let%bind persistent_frontier_root_hash = ((Persistent_frontier.get_root_hash persistent_frontier |> Result.map_error ~f:(fun x -> `Corrupt x)) :> (State_hash.t, persistent_load_error) Result.t) in
-        if State_hash.equal persistent_root_state_hash persistent_frontier_root_hash then
-          let%bind persistent_frontier_hash = ((Persistent_frontier.get_frontier_hash persistent_frontier |> Result.map_error ~f:(fun x -> `Corrupt x)) :> (Full_frontier.Hash.t, persistent_load_error) Result.t) in
-          (Result.ok_if_true
-            (Hash.equal persistent_root_frontier_hash persistent_frontier_hash)
-            ~error:`Invalid_frontier_hash
-          :> (unit, persistent_load_error) Result.t)
-        else
-          let%map () = (Persistent_frontier.fast_forward_root persistent_frontier ~target_root:persistent_root_state_hash :> (unit, persistent_load_error) Result.t) in
-          Persistent_frontier.set_frontier_hash persistent_frontier persistent_root_frontier_hash
-      with
-      | Error `Not_initialized ->
-          let open Deferred.Let_syntax in
-          (* if the persistent frontier is no initialized, but we are at genesis, initialize with genesis *)
-          log_recoverable_error "not initialized";
-          if State_hash.equal persistent_root_state_hash (With_hash.hash Genesis_protocol_state.t) then (
-            let%bind root_data = create_genesis_root_data config in
-            Persistent_frontier.initialize persistent_frontier ~base_hash:persistent_root_frontier_hash ~root_data;
-            Persistent_frontier.load_full_frontier persistent_frontier)
-          else
-            Deferred.return (Error `Bootstrap_required)
-      | Error (`Corrupt _) ->
-          (* TODO: report specific error *)
-          log_recoverable_error "is corrupt";
-          Persistent_frontier.clear persistent_root;
-          Deferred.return (Error `Bootstrap_required)
-      | Error `Target_not_found ->
-          log_recoverable_error "is too out of date with persistent root";
-          Persistent_frontier.clear persistent_root;
-          Deferred.return (Error `Bootstrap_required)
-      | Error `Invalid_frontier_hash ->
-          log_recoverable_error "hash did not match persistent root's expected frontier hash";
-          Persistent_frontier.clear persistent_root;
-          Deferred.return (Error `Bootstrap_required)
-      | Error (`Fatal err) ->
-          log_fatal_error err
-          (* Deferred.return (Error (`Fatal err))*)
-      | Ok () ->
-          Deferred.return (Persistent_frontier.load_full_frontier persistent_frontier)
-    in
-    let open Deferred.Let_syntax in
-    let%bind persistent_frontier_sync = Persistent_frontier.Sync.create ~logger:config.logger persistent_frontier in
-    let%map extensions = Extensions.create (Full_frontier.get_root full_frontier) in
-    Ok {full_frontier; extensions; persistent_frontier_sync}
-
-  (* TODO: extension reorg
-  let create config =
-    let {persistent_root; persistent_frontier; full_frontier} = initialize_state config in
-    let root_history = Root_history.create () in
-    let extensions = Extensions.create
-      [ Persistent_root.extension persistent_root
-      ; Persistent_frontier.extension persistent_frontier
-      ; root_history
-      ; snark_pool_refcount
-      ; best_tip_diff
-      ; transition_registry
-      ; identity ]
-    in
-  *)
-
-  let create config =
-    let persistent_root = Persistent_root.create ~logger:config.logger ~directory:config.persistent_root_directory in
-    if%bind Persistent_root.at_genesis persistent_root then
-      let%map t = create_clean config ~persistent_root in
-      Ok t
-    else
-      attempt_persistent_load config ~persistent_root
-  *)
-
-  (*
-  let create_clean
-    ~persistent_root:persistent_root_factory
-    ~persistent_frontier:persistent_frontier_factory
-    ~root_transition
-    ~root_snarked_ledger =
-    Persistent_root.reset persistent_root_factory ~root_snarked_ledger;
-    Persistent_frontier.reset persistent_frontier_factory ~frontier_hash ~root_transition ~root_staged_ledger
-  *)
-
   let add_breadcrumb_exn t breadcrumb =
     let open Deferred.Let_syntax in
     let old_hash = (Full_frontier.hash t.full_frontier) in
-    let%bind diffs = Deferred.return @@ Full_frontier.calculate_diffs t.full_frontier breadcrumb in
-    let%bind () = Deferred.return @@ Full_frontier.apply_diffs t.full_frontier diffs in
+    let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
+    let (`New_root new_root_identifier) = Full_frontier.apply_diffs t.full_frontier diffs in
+    Option.iter new_root_identifier ~f:(Persistent_root.Instance.set_root_identifier t.persistent_root_instance);
     let diffs = List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff)) in 
-    Persistent_frontier.Sync.notify t.persistent_frontier_sync
-      ~diffs
-      ~hash_transition:{source= old_hash; target= Full_frontier.hash t.full_frontier};
-    Extensions.notify t.extensions ~frontier:t.full_frontier ~diffs ()
+    let%bind sync_result =
+      Persistent_frontier.Instance.notify_sync t.persistent_frontier_instance
+        ~diffs
+        ~hash_transition:{source= old_hash; target= Full_frontier.hash t.full_frontier};
+    in
+    sync_result
+    |> Result.map_error ~f:(fun `Sync_must_be_running ->
+        Failure "cannot add breadcrumb because persistent frontier sync job is not running -- this indicates that transition frontier initialization has not been performed correctly")
+    |> Result.ok_exn;
+    Extensions.notify t.extensions ~frontier:t.full_frontier ~diffs
 
   let snark_pool_refcount_pipe t =
     Extensions.Broadcast.Snark_pool_refcount.reader t.extensions.snark_pool_refcount
@@ -307,8 +246,9 @@ module Make (Inputs : Inputs.S) :
     Extensions.Broadcast.Best_tip_diff.reader t.extensions.best_tip_diff
 
   let wait_for_transition t hash =
-    let open Extensions.Broadcast.Transition_registry in
-    Extensions.Transition_registry.register t.extensions.t.transition_registry
+    let open Extensions in
+    let registry = Broadcast.Transition_registry.original t.extensions.transition_registry in
+    Transition_registry.register registry hash
 
   let max_length = max_length
   let logger {full_frontier; _} = Full_frontier.logger full_frontier
@@ -382,7 +322,8 @@ module Make (Inputs : Inputs.S) :
     Extensions.Root_history.View.lookup root_history hash
 
   module For_tests = struct
-    let identity_pipe _ = failwith "TODO"
+    (* [new] TODO: !important -- patch identity pipe out, this is a very nasty abstraction leak *)
+    let identity_pipe t = Extensions.Broadcast.Identity.reader t.extensions.identity
     let apply_diff _ = failwith "TODO"
     let root_history_is_empty _ = failwith "TODO"
     let root_history_mem _ = failwith "TODO"

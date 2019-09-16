@@ -128,7 +128,7 @@ module Make (Inputs : Inputs.S) :
 
   let take_while_map_result_rev ~f list =
     let open Deferred.Or_error.Let_syntax in
-    let%map result, initial_state_hash =
+    let%map result, initial_state_hash_opt =
       Deferred.Or_error.List.fold list ~init:([], None)
         ~f:(fun (acc, initial_state_hash) elem ->
           let open Deferred.Let_syntax in
@@ -145,7 +145,7 @@ module Make (Inputs : Inputs.S) :
             | Ok (Either.Second transition) ->
                 Deferred.Or_error.return (transition :: acc, None) )
     in
-    (result, Option.value_exn initial_state_hash)
+    (result, initial_state_hash_opt)
 
   let verified_transitions_to_yojson subtrees_of_transitions =
     let rose_tree_hash =
@@ -196,7 +196,10 @@ module Make (Inputs : Inputs.S) :
                                 , [] ) )) ;
                     Deferred.return (Error (Error.of_string "")) )
                 in
-                let%bind verified_transitions, initial_state_hash =
+                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:[("count", `Int (Non_empty_list.length rev_queried_transitions))]
+                    !"Queried $count external transitions from the network";
+                let%bind verified_transitions, initial_state_hash_opt =
                   take_while_map_result_rev
                     Non_empty_list.(to_list rev_queried_transitions)
                     ~f:(fun transition ->
@@ -207,15 +210,18 @@ module Make (Inputs : Inputs.S) :
                                External_transition.protocol_state)
                           transition
                       in
-                      Logger.info logger
-                        !"External_transition received from the network: \
-                          %{sexp:State_hash.t}"
-                        transition_with_hash.hash ~module_:__MODULE__
-                        ~location:__LOC__ ;
+                      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                        ~metadata:[("state_hash", State_hash.to_yojson transition_with_hash.hash)]
+                        !"Verifying external transition received from network: $state_hash";
                       verify_transition ~logger ~trust_system ~verifier
                         ~frontier ~unprocessed_transition_cache
                         (Envelope.Incoming.wrap ~data:transition_with_hash
                            ~sender:(Envelope.Sender.Remote peer.host)) )
+                in
+                let%bind initial_state_hash =
+                  Deferred.return (
+                    Option.map initial_state_hash_opt ~f:Or_error.return
+                    |> Option.value ~default:(Error (Error.of_string "transitions queried during catchup did not have a known ancestor")))
                 in
                 let split_last xs =
                   let init = List.take xs (List.length xs - 1) in
@@ -269,37 +275,39 @@ module Make (Inputs : Inputs.S) :
          Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
     Strict_pipe.Reader.iter_without_pushback catchup_job_reader
       ~f:(fun (hash, subtrees) ->
-        ( match%bind
+        (* create a unique id for each catchup job logging *)
+        let logger = Logger.extend logger [("catchup_job_id", `String (Uuid.to_string_hum (Uuid_unix.create ())))] in
+        don't_wait_for (
+          match%bind
             get_transitions_and_compute_breadcrumbs ~logger ~trust_system
               ~verifier ~network ~frontier ~num_peers:8
               ~unprocessed_transition_cache ~target_forest:(hash, subtrees)
           with
-        | Ok trees ->
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              "about to write to the catchup breadcrumbs pipe" ;
-            if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+          | Ok trees ->
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                "catchup breadcrumbs pipe was closed; attempt to write to \
-                 closed pipe" ;
-              Deferred.unit )
-            else
-              ( Logger.trace logger !"Writing subtree to pipe"
-                  ~metadata:[("subtree", verified_transitions_to_yojson trees)]
-                  ~location:__LOC__ ~module_:__MODULE__ ;
-                Strict_pipe.Writer.write catchup_breadcrumbs_writer trees )
-              |> Deferred.return
-        | Error e ->
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"All peers either sent us bad data, didn't have the info, or \
-                our transition frontier moved too fast: %s"
-              (Error.to_string_hum e) ;
-            List.iter subtrees ~f:(fun subtree ->
-                Rose_tree.iter subtree ~f:(fun cached_transition ->
-                    Cached.invalidate_with_failure cached_transition |> ignore
-                ) ) ;
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              "garbage collected failed cached transitions" ;
-            Deferred.unit )
-        |> don't_wait_for )
+                "about to write to the catchup breadcrumbs pipe" ;
+              if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                  "catchup breadcrumbs pipe was closed; attempt to write to \
+                   closed pipe" ;
+                Deferred.unit )
+              else
+                ( Logger.trace logger !"Writing subtree to pipe"
+                    ~metadata:[("subtree", verified_transitions_to_yojson trees)]
+                    ~location:__LOC__ ~module_:__MODULE__ ;
+                  Strict_pipe.Writer.write catchup_breadcrumbs_writer trees )
+                |> Deferred.return
+          | Error e ->
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                !"All peers either sent us bad data, didn't have the info, or \
+                  our transition frontier moved too fast: %s"
+                (Error.to_string_hum e) ;
+              List.iter subtrees ~f:(fun subtree ->
+                  Rose_tree.iter subtree ~f:(fun cached_transition ->
+                      Cached.invalidate_with_failure cached_transition |> ignore
+                  ) ) ;
+              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                "garbage collected failed cached transitions" ;
+              Deferred.unit ))
     |> don't_wait_for
 end

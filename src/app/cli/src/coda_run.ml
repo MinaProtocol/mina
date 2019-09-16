@@ -74,7 +74,10 @@ struct
         let proof = Lite_compat.proof proof in
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-  let log_shutdown ~conf_dir t =
+  let log_shutdown ~conf_dir:_ _t =
+    (* [new] TODO: !important add visualization logging back in *)
+    ()
+    (*
     let logger =
       Logger.extend
         (Program.top_level_logger t)
@@ -92,6 +95,7 @@ struct
     | `Bootstrapping ->
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
           (Visualization_message.bootstrap "transition frontier")
+    *)
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
