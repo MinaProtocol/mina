@@ -2,6 +2,7 @@ open Core
 include Curve_choice
 module Pedersen_params = Pedersen_params
 module Pedersen_chunk_table = Pedersen_chunk_table
+module Rescue_params = Rescue_params
 
 module Tick_pedersen = Chunked_pedersen_lib.Pedersen.Make (struct
   open Tick0
