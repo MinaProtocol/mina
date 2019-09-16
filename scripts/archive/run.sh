@@ -3,7 +3,7 @@ if [ -z "$STORAGE_DIRECTORY" ]; then
 fi
 
 if [ -z "$POSTGRES_PORT" ]; then
-  POSTGRES_PORT=1337
+  POSTGRES_PORT=5432
 fi
 
 if [ -z "$DATABASE_NAME" ]; then
@@ -35,7 +35,7 @@ start() {
     sleep 4
     
     # Makes a table queryable through graphql
-    curl -d'{"type":"replace_metadata", "args":'$(cat scripts/metadata.json)'}' http://localhost:8080/v1/query;
+    curl -d'{"type":"replace_metadata", "args":'$(cat scripts/metadata.json)'}' http://localhost:$HASURA_PORT/v1/query;
     # Generates the graphql query types for OCaml
     python scripts/introspection_query.py --port $HASURA_PORT --uri /v1/graphql > src/app/archive/archive_graphql_schema.json
 }
