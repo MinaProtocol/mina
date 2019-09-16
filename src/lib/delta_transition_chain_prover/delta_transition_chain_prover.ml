@@ -36,7 +36,7 @@ module Make (Inputs : Inputs_intf) = struct
         External_transition.Validated.consensus_state transition
         |> Consensus.Data.Consensus_state.global_slot
       in
-      if current_global_slot < global_slot - Consensus.Constants.delta then
+      if current_global_slot <= global_slot - Consensus.Constants.delta then
         None
       else
         Some

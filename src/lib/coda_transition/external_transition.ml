@@ -829,7 +829,7 @@ struct
             Transition_frontier.find frontier hash1
             >>| Transition_frontier.Breadcrumb.global_slot
             >>| fun global_slot1 ->
-            global_slot1 < global_slot - Consensus.Constants.delta
+            global_slot1 <= global_slot - Consensus.Constants.delta
           with
           | None | Some true ->
               Ok
@@ -844,7 +844,7 @@ struct
           Transition_frontier.find frontier hash1
           >>| Transition_frontier.Breadcrumb.global_slot
           >>| fun global_slot1 ->
-          global_slot1 < global_slot - Consensus.Constants.delta
+          global_slot1 <= global_slot - Consensus.Constants.delta
         with
         | None | Some true -> (
           match
