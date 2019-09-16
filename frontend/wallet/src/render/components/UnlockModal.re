@@ -23,7 +23,7 @@ let make = (~wallet, ~password, ~setModalState, ~onSubmit) => {
         />
         <Spacer width=1. />
         <Button
-          label="Create"
+          label="Unlock"
           style=Button.Green
           onClick={_ => {
             onSubmit(password);
