@@ -802,7 +802,7 @@ struct
     in
     (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
 
-  let validate_delta_transition_chain_part2 (t, validation) ~frontier =
+  let validate_delta_transition_chain_part2 (t, validation) ~frontier ~logger =
     let open Int in
     let global_slot =
       t |> With_hash.data |> consensus_state
@@ -837,6 +837,9 @@ struct
                 , Validation.Unsafe.set_valid_delta_transition_chain_part2
                     validation )
           | Some false ->
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                "only 1 transition in lcoal history, missing transitions in \
+                 local history" ;
               Error `Missing_transitions_in_delta_transition_chain )
     | [hash1; hash2] -> (
         let open Option.Monad_infix in
@@ -862,6 +865,9 @@ struct
               Error
                 `Including_unnecessary_transitions_in_delta_transition_chain )
         | Some false ->
+            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              "at least 2 transitions in local history, missing transitions \
+               in local history" ;
             Error `Missing_transitions_in_delta_transition_chain )
     | _ ->
         failwith "this is not possible"
