@@ -43,13 +43,6 @@ let daemon logger =
   let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir = Cli_lib.Flag.conf_dir
-     and unsafe_track_propose_key =
-       flag "unsafe-track-propose-key"
-         ~doc:
-           "Your private key will be copied to the internal wallets folder \
-            stripped of its password if it is given using the `propose-key` \
-            flag. (default: don't copy the private key)"
-         no_arg
      and propose_key =
        flag "propose-key"
          ~doc:
@@ -57,13 +50,6 @@ let daemon logger =
             provide both `propose-key` and `propose-public-key`. (default: \
             don't produce blocks)"
          (optional string)
-     and propose_public_key =
-       flag "propose-public-key"
-         ~doc:
-           "PUBLICKEY Public key for the associated private key that is being \
-            tracked by this daemon. You cannot provide both `propose-key` and \
-            `propose-public-key`. (default: don't produce blocks)"
-         (optional public_key_compressed)
      and initial_peers_raw =
        flag "peer"
          ~doc:
@@ -556,54 +542,12 @@ let daemon logger =
            ; client_port
            ; libp2p_port }
          in
-         let wallets_disk_location = conf_dir ^/ "wallets" in
-         (* HACK: Until we can properly change propose keys at runtime we'll
-          * suffer by accepting a propose_public_key flag and reloading the wallet
-          * db here to find the keypair for the pubkey *)
          let%bind propose_keypair =
-           match (propose_key, propose_public_key) with
-           | Some _, Some _ ->
-               eprintf
-                 "Error: You cannot provide both `propose-key` and \
-                  `propose-public-key`\n" ;
-               exit 11
-           | Some sk_file, None ->
-               let%bind keypair =
-                 Secrets.Keypair.Terminal_stdin.read_exn sk_file
-               in
-               let%map () =
-                 (* If we wish to track the propose key *)
-                 if unsafe_track_propose_key then
-                   let pk = Public_key.compress keypair.public_key in
-                   let%bind wallets =
-                     Secrets.Wallets.load ~logger
-                       ~disk_location:wallets_disk_location
-                   in
-                   (* Either we already are tracking it *)
-                   match Secrets.Wallets.find wallets ~needle:pk with
-                   | Some _ ->
-                       Deferred.unit
-                   | None ->
-                       (* Or we import it *)
-                       Secrets.Wallets.import_keypair wallets keypair
-                       >>| ignore
-                 else Deferred.unit
-               in
-               Some keypair
-           | None, Some wallet_pk -> (
-               match%bind
-                 Secrets.Wallets.load ~logger
-                   ~disk_location:wallets_disk_location
-                 >>| Secrets.Wallets.find ~needle:wallet_pk
-               with
-               | Some keypair ->
-                   Deferred.Option.return keypair
-               | None ->
-                   eprintf
-                     "Error: This public key was not found in the local \
-                      daemon's wallet database\n" ;
-                   exit 12 )
-           | None, None ->
+           match propose_key with
+           | Some sk_file ->
+               let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
+               Some kp
+           | None ->
                return None
          in
          let%bind client_whitelist =
