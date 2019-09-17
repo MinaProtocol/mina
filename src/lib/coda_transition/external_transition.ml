@@ -762,6 +762,8 @@ module Transition_frontier_validation (Transition_frontier : sig
   val root : t -> Breadcrumb.t
 
   val find : t -> State_hash.t -> Breadcrumb.t option
+
+  val find_in_root_history : t -> State_hash.t -> Breadcrumb.t option
 end) =
 struct
   let validate_frontier_dependencies (t, validation) ~logger ~frontier =
@@ -823,7 +825,10 @@ struct
       else
         match
           let%map boundary_transition =
-            Transition_frontier.find frontier boundary_hash
+            Option.merge
+              (Transition_frontier.find frontier boundary_hash)
+              (Transition_frontier.find_in_root_history boundary_hash)
+              ~f:Fn.const
           in
           let boundary_slot =
             Transition_frontier.Breadcrumb.global_slot boundary_transition
@@ -842,7 +847,10 @@ struct
           Non_empty_list.tail delta_transition_chain_witness |> List.hd
         in
         let%map oldest_transition =
-          Transition_frontier.find frontier oldest_hash
+          Option.merge
+            (Transition_frontier.find frontier oldest_hash)
+            (Transition_frontier.find_in_root_history frontier oldest_hash)
+            ~f:Fn.const
         in
         let oldest_slot =
           Transition_frontier.Breadcrumb.global_slot oldest_transition
