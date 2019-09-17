@@ -145,22 +145,6 @@ module type S = sig
       , [`Delta_transition_chain_part2] * unit Truth.true_t )
       t
 
-    type initial_valid =
-      ( [`Time_received] * unit Truth.true_t
-      , [`Proof] * unit Truth.true_t
-      , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
-      , [`Frontier_dependencies] * unit Truth.false_t
-      , [`Staged_ledger_diff] * unit Truth.false_t )
-      t
-
-    type almost_valid =
-      ( [`Time_received] * unit Truth.true_t
-      , [`Proof] * unit Truth.true_t
-      , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
-      , [`Frontier_dependencies] * unit Truth.true_t
-      , [`Staged_ledger_diff] * unit Truth.false_t )
-      t
-
     type ( 'time_received
          , 'proof
          , 'delta_transition_chain_part1
