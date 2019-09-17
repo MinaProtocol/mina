@@ -125,8 +125,8 @@ struct
             ; proofs=
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
-                      ~sok_digest:Sok_message.(digest @@ create ~prover ~fee)
-                      ~proof:Proof.dummy )
+                      ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
+                )
             ; prover }
       in
       let staged_ledger_diff =

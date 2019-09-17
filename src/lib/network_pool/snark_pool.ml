@@ -224,17 +224,6 @@ struct
               else `Don't_rebroadcast
         else `Don't_rebroadcast
 
-      let verify_proof ~(proof : Ledger_proof.t) ~statement ~message =
-        let statement_eq a b =
-          Int.(Transaction_snark.Statement.compare a b = 0)
-        in
-        if not (statement_eq (Ledger_proof.statement proof) statement) then
-          Deferred.return
-            (Or_error.error_string "Statement and proof do not match")
-        else
-          let%bind (verifier : Verifier.t) = Verifier.create () in
-          Verifier.verify_transaction_snark verifier proof ~message
-
       let verify_and_act t ~work ~sender =
         let statements, priced_proof = work in
         let open Deferred.Or_error.Let_syntax in
@@ -242,7 +231,7 @@ struct
         let trust_record =
           Trust_system.record_envelope_sender t.trust_system t.logger sender
         in
-        let log_and_punish statement e =
+        let log_and_punish ?(punish = true) statement e =
           let metadata =
             [ ("work_id", `Int (Transaction_snark.Statement.hash statement))
             ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
@@ -251,25 +240,38 @@ struct
           in
           Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
             "Error verifying transaction snark: $error" ;
-          trust_record
-            ( Trust_system.Actions.Sent_invalid_proof
-            , Some ("Error verifying transaction snark: $error", metadata) )
+          if punish then
+            trust_record
+              ( Trust_system.Actions.Sent_invalid_proof
+              , Some ("Error verifying transaction snark: $error", metadata) )
+          else Deferred.return ()
         in
         let message = Coda_base.Sok_message.create ~fee ~prover in
         let verify ~proof ~statement =
           let open Deferred.Let_syntax in
-          match%bind verify_proof ~proof ~statement ~message with
-          | Ok true ->
-              Deferred.Or_error.return ()
-          | Ok false ->
-              (*Invalid proof*)
-              let e = Error.of_string "Invalid proof" in
-              let%map () = log_and_punish statement e in
-              Error e
-          | Error e ->
-              (*Other errors but punish for sending erroneous work*)
-              let%map () = log_and_punish statement e in
-              Error e
+          let statement_eq a b =
+            Int.(Transaction_snark.Statement.compare a b = 0)
+          in
+          if not (statement_eq (Ledger_proof.statement proof) statement) then
+            let e = Error.of_string "Statement and proof do not match" in
+            let%map () = log_and_punish statement e in
+            Error e
+          else
+            let%bind verifier = Verifier.create () in
+            match%bind
+              Verifier.verify_transaction_snark verifier proof ~message
+            with
+            | Ok true ->
+                Deferred.Or_error.return ()
+            | Ok false ->
+                (*Invalid proof*)
+                let e = Error.of_string "Invalid proof" in
+                let%map () = log_and_punish statement e in
+                Error e
+            | Error e ->
+                (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                let%map () = log_and_punish ~punish:false statement e in
+                Error e
         in
         let%bind pairs = One_or_two.zip statements proofs |> Deferred.return in
         One_or_two.Deferred_result.fold ~init:() pairs
@@ -375,8 +377,13 @@ let%test_module "random set test" =
         in
         let%map solved_work = Quickcheck.Generator.list gen_entry in
         List.map solved_work ~f:(fun (work, fee) ->
-            (*Invalid because of the dummy sok in the proof here against the one created using prover and fee when verifying the proof*)
-            let invalid_sok_digest = Sok_message.Digest.default in
+            (*Invalid because of the invalid sok in the proof here against the one created using the correct prover and fee when verifying the proof*)
+            let invalid_sok_digest =
+              Sok_message.(
+                digest
+                @@ create ~prover:Signature_lib.Public_key.Compressed.empty
+                     ~fee:fee.fee)
+            in
             ( work
             , One_or_two.map work ~f:(fun statement ->
                   Ledger_proof.create ~statement ~sok_digest:invalid_sok_digest
