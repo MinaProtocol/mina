@@ -115,7 +115,7 @@ let run_test () : unit Deferred.t =
         Auxiliary_database.External_transition_database.create ~logger
           external_transition_database_dir
       in
-      let time_controller = Block_time.Controller.(create basic) in
+      let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let consensus_local_state =
         Consensus.Data.Local_state.create
           (Public_key.Compressed.Set.singleton

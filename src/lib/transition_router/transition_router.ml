@@ -203,17 +203,18 @@ module Make (Inputs : Inputs_intf) = struct
             ( best_tip_enveloped |> Envelope.Incoming.data |> fst
             |> With_hash.data )
         then (
+          Strict_pipe.Reader.clear !transition_reader_ref ;
           start_bootstrap_controller ~logger ~trust_system ~verifier ~network
             ~time_controller ~proposer_transition_reader
             ~verified_transition_writer ~clear_reader ~transition_reader_ref
             ~transition_writer_ref ~ledger_db ~frontier_w frontier ;
           Strict_pipe.Writer.write !transition_writer_ref best_tip_enveloped )
-        else
-          start_transition_frontier_controller ~logger ~trust_system ~verifier
-            ~network ~time_controller ~proposer_transition_reader
-            ~verified_transition_writer ~clear_reader
-            ~collected_transitions:[best_tip_enveloped] ~transition_reader_ref
-            ~transition_writer_ref ~frontier_w frontier
+        else Strict_pipe.Reader.clear !transition_reader_ref ;
+        start_transition_frontier_controller ~logger ~trust_system ~verifier
+          ~network ~time_controller ~proposer_transition_reader
+          ~verified_transition_writer ~clear_reader
+          ~collected_transitions:[best_tip_enveloped] ~transition_reader_ref
+          ~transition_writer_ref ~frontier_w frontier
     | None ->
         start_transition_frontier_controller ~logger ~trust_system ~verifier
           ~network ~time_controller ~proposer_transition_reader

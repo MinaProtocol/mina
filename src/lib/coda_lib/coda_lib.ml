@@ -487,13 +487,13 @@ let request_work t =
         None
   in
   let fee = snark_work_fee t in
-  let instances, seen_jobs =
+  let instances_opt, seen_jobs =
     Work_selection_method.work ~logger:t.config.logger ~fee
       ~snark_pool:(snark_pool t) sl (seen_jobs t)
   in
   set_seen_jobs t seen_jobs ;
-  if List.is_empty instances then None
-  else Some {Snark_work_lib.Work.Spec.instances; fee}
+  Option.map instances_opt ~f:(fun instances ->
+      {Snark_work_lib.Work.Spec.instances; fee} )
 
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
