@@ -32,8 +32,8 @@ end)
 
 let%test_module "Ledger catchup" =
   ( module struct
-    let run_ledger_catchup () =
-      let%map verifier = Verifier.create () in
+    let run_ledger_catchup logger =
+      let%map verifier = Verifier.create logger in
       Ledger_catchup.run ~verifier
 
     let assert_catchup_jobs_are_flushed transition_frontier =
@@ -68,7 +68,7 @@ let%test_module "Ledger catchup" =
       in
       Strict_pipe.Writer.write catchup_job_writer
         (parent_hash, [Rose_tree.T (cached_transition, [])]) ;
-      let%bind run = run_ledger_catchup () in
+      let%bind run = run_ledger_catchup logger in
       run ~logger ~trust_system ~network ~frontier:me
         ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;

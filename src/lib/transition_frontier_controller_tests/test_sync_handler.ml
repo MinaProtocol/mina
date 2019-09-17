@@ -21,7 +21,7 @@ let%test_module "Sync_handler" =
     let trust_system = Trust_system.null ()
 
     let f_with_verifier ~f ~logger =
-      let%map verifier = Verifier.create () in
+      let%map verifier = Verifier.create logger in
       f ~logger ~verifier
 
     let%test "sync with ledgers from another peer via glue_sync_ledger" =

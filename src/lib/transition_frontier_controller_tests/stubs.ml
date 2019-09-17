@@ -190,7 +190,7 @@ struct
             next_verified_external_transition) =
         External_transition.Validated.create_unsafe next_external_transition
       in
-      let%bind verifier = Verifier.create () in
+      let%bind verifier = Verifier.create logger in
       match%map
         Transition_frontier.Breadcrumb.build ~logger ~trust_system ~verifier
           ~parent:parent_breadcrumb
@@ -269,7 +269,7 @@ struct
     in
     let open Deferred.Let_syntax in
     let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
-    let%bind verifier = Verifier.create () in
+    let%bind verifier = Verifier.create logger in
     match%bind
       Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
         ~verifier ~scan_state:root_transaction_snark_scan_state

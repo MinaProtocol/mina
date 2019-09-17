@@ -184,7 +184,7 @@ let%test_module "Transition Frontier Persistence" =
         Transition_frontier_persistence.close_and_finish_copy
           frontier_persistence
       in
-      let%bind verifier = Verifier.create () in
+      let%bind verifier = Verifier.create logger in
       let%map deserialized_frontier =
         Transition_frontier_persistence.deserialize ~directory_name ~logger
           ~trust_system ~verifier ~root_snarked_ledger

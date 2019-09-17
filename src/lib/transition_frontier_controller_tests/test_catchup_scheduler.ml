@@ -64,7 +64,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       Rose_tree.T (root, children)
 
     let create_catchup_scheduler () =
-      let%map verifier = Verifier.create () in
+      let%map verifier = Verifier.create logger in
       Catchup_scheduler.create ~verifier
 
     let%test_unit "after the timeout expires, the missing node still doesn't \
