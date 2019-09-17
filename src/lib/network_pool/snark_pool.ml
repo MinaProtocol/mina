@@ -366,6 +366,49 @@ let%test_module "random set test" =
           add_dummy_proof resource_pool work fee ) ;
       resource_pool
 
+    let%test_unit "Invalid proofs are not accepted" =
+      let open Quickcheck.Generator.Let_syntax in
+      let invalid_work_gen =
+        let gen_entry =
+          Quickcheck.Generator.tuple2
+            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
+        in
+        let%map solved_work = Quickcheck.Generator.list gen_entry in
+        List.map solved_work ~f:(fun (work, fee) ->
+            (*Invalid because of the dummy sok in the proof here against the one created using prover and fee when verifying the proof*)
+            let invalid_sok_digest = Sok_message.Digest.default in
+            ( work
+            , One_or_two.map work ~f:(fun statement ->
+                  Ledger_proof.create ~statement ~sok_digest:invalid_sok_digest
+                    ~proof:Proof.dummy )
+            , fee ) )
+      in
+      let apply_diff pool work proof fee =
+        let diff =
+          Mock_snark_pool.Resource_pool.Diff.Stable.Latest.Add_solved_work
+            (work, {Priced_proof.Stable.Latest.proof; fee})
+        in
+        ignore
+          (Mock_snark_pool.Resource_pool.Diff.apply pool
+             (Envelope.Incoming.local diff))
+      in
+      Quickcheck.test
+        ~sexp_of:
+          [%sexp_of:
+            Mock_snark_pool.Resource_pool.t
+            * ( Transaction_snark_work.Statement.t
+              * Ledger_proof.t One_or_two.t
+              * Fee_with_prover.t )
+              list] (Quickcheck.Generator.tuple2 gen invalid_work_gen)
+        ~f:(fun (t, invalid_work_lst) ->
+          let completed_works =
+            Mock_snark_pool.Resource_pool.all_completed_work t
+          in
+          List.iter invalid_work_lst ~f:(fun (statements, proofs, fee) ->
+              apply_diff t statements proofs fee ) ;
+          [%test_eq: Transaction_snark_work.Info.t list] completed_works
+            (Mock_snark_pool.Resource_pool.all_completed_work t) )
+
     let%test_unit "When two priced proofs of the same work are inserted into \
                    the snark pool, the fee of the work is at most the minimum \
                    of those fees" =

@@ -86,7 +86,6 @@ end)
       | `Rebroadcast ->
           Ok data
     in
-    (*TODO: dont verify if Local*)
     match data with
     | Stable.V1.Add_solved_work (work, p) ->
         let%bind () =

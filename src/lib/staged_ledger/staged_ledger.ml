@@ -1381,16 +1381,19 @@ let%test_module "test" =
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen
 
-    let proofs stmts : Ledger_proof.t One_or_two.t =
+    let proofs stmts ~prover ~fee : Ledger_proof.t One_or_two.t =
+      let sok_digest = Sok_message.(digest @@ create ~prover ~fee) in
       One_or_two.map stmts ~f:(fun statement ->
-          Ledger_proof.create ~statement ~sok_digest:Sok_message.Digest.default
-            ~proof:Proof.dummy )
+          Ledger_proof.create ~statement ~sok_digest ~proof:Proof.dummy )
 
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =
       let prover = stmt_to_prover stmts in
       let fee = Fee.of_int 1 in
-      Some {Transaction_snark_work.Checked.fee; proofs= proofs stmts; prover}
+      Some
+        { Transaction_snark_work.Checked.fee
+        ; proofs= proofs stmts ~prover ~fee
+        ; prover }
 
     (* Fixed public key for when there is only one snark worker. *)
     let snark_worker_pk =
@@ -1400,7 +1403,10 @@ let%test_module "test" =
     let stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
       let fee = Fee.of_int 1 in
-      Some {fee; proofs= proofs stmts; prover= snark_worker_pk}
+      Some
+        { fee
+        ; proofs= proofs stmts ~prover:snark_worker_pk ~fee
+        ; prover= snark_worker_pk }
 
     let coinbase_fee_transfers_first_prediff = function
       | Staged_ledger_diff.At_most_two.Zero ->
@@ -1757,7 +1763,9 @@ let%test_module "test" =
                       List.map
                         ~f:(fun stmts ->
                           { Transaction_snark_work.Checked.fee= Fee.zero
-                          ; proofs= proofs stmts
+                          ; proofs=
+                              proofs stmts ~prover:snark_worker_pk
+                                ~fee:Fee.zero
                           ; prover= snark_worker_pk } )
                         work
                     in
@@ -1832,9 +1840,10 @@ let%test_module "test" =
           (List.find work_list ~f:(fun s ->
                Transaction_snark_work.Statement.compare s stmts = 0 ))
       then
+        let fee = Fee.of_int 1 in
         Some
-          { Transaction_snark_work.Checked.fee= Fee.of_int 1
-          ; proofs= proofs stmts
+          { Transaction_snark_work.Checked.fee
+          ; proofs= proofs stmts ~prover ~fee
           ; prover }
       else None
 
