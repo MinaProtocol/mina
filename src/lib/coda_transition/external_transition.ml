@@ -827,7 +827,7 @@ struct
           let%map boundary_transition =
             Option.merge
               (Transition_frontier.find frontier boundary_hash)
-              (Transition_frontier.find_in_root_history boundary_hash)
+              (Transition_frontier.find_in_root_history frontier boundary_hash)
               ~f:Fn.const
           in
           let boundary_slot =
