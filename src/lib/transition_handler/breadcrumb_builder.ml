@@ -34,7 +34,9 @@ module Make (Inputs : Inputs.S) :
                          Rose_tree.to_yojson
                            (fun enveloped_transitions ->
                              Cached.peek enveloped_transitions
-                             |> Envelope.Incoming.data |> fst |> With_hash.hash
+                             |> Envelope.Incoming.data
+                             |> External_transition.Initial_validated
+                                .state_hash
                              |> fun hash ->
                              `String
                                (Coda_base.State_hash.to_base58_check hash) )
