@@ -2,7 +2,12 @@ open Core
 open Async
 open Signature_lib
 
-let query query_obj port =
+let query_or_error
+    (query_obj :
+      < parse: Yojson.Basic.json -> 'response
+      ; query: string
+      ; variables: Yojson.Basic.json
+      ; .. >) port : 'response Deferred.Or_error.t =
   let uri_string = "http://localhost:" ^ string_of_int port ^ "/graphql" in
   let variables_string = Yojson.Basic.to_string query_obj#variables in
   let body_string =
@@ -25,9 +30,12 @@ let query query_obj port =
     |> Yojson.Basic.Util.member "data"
     |> query_obj#parse
   in
-  match%bind Deferred.Or_error.try_with ~extract_exn:true get_result with
-  | Ok e ->
-      return e
+  Deferred.Or_error.try_with ~extract_exn:true get_result
+
+let query query_obj port =
+  match%bind query_or_error query_obj port with
+  | Ok r ->
+      Deferred.return r
   | Error e ->
       eprintf
         "Error connecting to daemon. You might need to start it, or specify a \
@@ -43,8 +51,7 @@ module Encoders = struct
 
   let uint32 value = `String (Unsigned.UInt32.to_string value)
 
-  let public_key public_key =
-    Yojson.Safe.to_basic @@ Public_key.Compressed.to_yojson public_key
+  let public_key value = `String (Public_key.Compressed.to_base58_check value)
 end
 
 module Decoders = struct
@@ -60,17 +67,52 @@ module Decoders = struct
     Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
 end
 
-module Get_wallet =
+module Get_wallets =
 [%graphql
 {|
-query getWallet {
+query {
   ownedWallets {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    locked
     balance {
       total @bsDecoder(fn: "Decoders.uint64")
     }
   }
 }
+|}]
+
+module Add_wallet =
+[%graphql
+{|
+mutation ($password: String) {
+  addWallet(input: {password: $password}) {
+    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+  }
+}
+|}]
+
+module Unlock_wallet =
+[%graphql
+{|
+mutation ($password: String, $public_key: PublicKey) {
+  unlockWallet(input: {password: $password, publicKey: $public_key }) {
+    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+  }
+}
+|}]
+
+module Lock_wallet =
+[%graphql
+{|
+mutation ($public_key: PublicKey) {
+  lockWallet(input: {publicKey: $public_key }) {
+    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+  }
+}
+|}]
+
+module Reload_wallets = [%graphql {|
+mutation { reloadWallets { success } }
 |}]
 
 module Snark_pool =

@@ -4,19 +4,8 @@ open Coda_base
 open Coda_state
 open Signature_lib
 
-module type External_transition_base_intf = sig
-  (* TODO: delegate forget here *)
-  type t [@@deriving sexp, compare, to_yojson]
-
-  include Comparable.S with type t := t
-
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t [@@deriving sexp, eq, bin_io, to_yojson, version]
-    end
-
-    module Latest = V1
-  end
+module type External_transition_common_intf = sig
+  type t
 
   val protocol_state : t -> Protocol_state.Value.t
 
@@ -37,6 +26,24 @@ module type External_transition_base_intf = sig
   val user_commands : t -> User_command.t list
 
   val payments : t -> User_command.t list
+
+  val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
+end
+
+module type External_transition_base_intf = sig
+  type t [@@deriving sexp, compare, to_yojson]
+
+  include Comparable.S with type t := t
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving sexp, eq, bin_io, to_yojson, version]
+    end
+
+    module Latest = V1
+  end
+
+  include External_transition_common_intf with type t := t
 end
 
 module type S = sig
@@ -103,6 +110,22 @@ module type S = sig
       , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
       , [`Frontier_dependencies] * unit Truth.true_t
       , [`Staged_ledger_diff] * unit Truth.true_t )
+      t
+
+    type initial_valid =
+      ( [`Time_received] * unit Truth.true_t
+      , [`Proof] * unit Truth.true_t
+      , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+      , [`Frontier_dependencies] * unit Truth.false_t
+      , [`Staged_ledger_diff] * unit Truth.false_t )
+      t
+
+    type almost_valid =
+      ( [`Time_received] * unit Truth.true_t
+      , [`Proof] * unit Truth.true_t
+      , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+      , [`Frontier_dependencies] * unit Truth.true_t
+      , [`Staged_ledger_diff] * unit Truth.false_t )
       t
 
     type ( 'time_received
@@ -173,13 +196,20 @@ module type S = sig
       -> external_transition
   end
 
-  type with_initial_validation =
-    ( [`Time_received] * unit Truth.true_t
-    , [`Proof] * unit Truth.true_t
-    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
-    , [`Frontier_dependencies] * unit Truth.false_t
-    , [`Staged_ledger_diff] * unit Truth.false_t )
-    Validation.with_transition
+  module Initial_validated : sig
+    type t =
+      (external_transition, State_hash.t) With_hash.t
+      * Validation.initial_valid
+
+    include External_transition_common_intf with type t := t
+  end
+
+  module Almost_validated : sig
+    type t =
+      (external_transition, State_hash.t) With_hash.t * Validation.almost_valid
+
+    include External_transition_common_intf with type t := t
+  end
 
   module Validated : sig
     type t =
