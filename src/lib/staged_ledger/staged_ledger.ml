@@ -73,7 +73,8 @@ module T = struct
           Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ("statement", Transaction_snark.Statement.to_yojson statement)
-              ; ("error", `String (Error.to_string_hum e)) ]
+              ; ("error", `String (Error.to_string_hum e))
+              ; ("sok", Sok_message.to_yojson message) ]
             "Invalid transaction snark for statement $statement: $error" ;
           false
 
