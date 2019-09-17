@@ -201,8 +201,7 @@ let%test_module "Bootstrap Controller" =
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions :
-          External_transition.with_initial_validation Envelope.Incoming.t list)
-        =
+          External_transition.Initial_validated.t Envelope.Incoming.t list) =
       let root =
         With_hash.data @@ fst
         @@ Transition_frontier.Breadcrumb.validated_transition root
@@ -256,7 +255,7 @@ let%test_module "Bootstrap Controller" =
           in
           let%map ( new_frontier
                   , (sorted_external_transitions :
-                      External_transition.with_initial_validation
+                      External_transition.Initial_validated.t
                       Envelope.Incoming.t
                       list) ) =
             run ~network ~frontier:syncing_frontier ~ledger_db
@@ -294,7 +293,7 @@ let%test_module "Bootstrap Controller" =
           in
           let%map ( new_frontier
                   , (sorted_transitions :
-                      External_transition.with_initial_validation
+                      External_transition.Initial_validated.t
                       Envelope.Incoming.t
                       list) ) =
             run ~network ~frontier:syncing_frontier ~ledger_db
@@ -338,7 +337,7 @@ let%test_module "Bootstrap Controller" =
           in
           let%map ( new_frontier
                   , (sorted_external_transitions :
-                      External_transition.with_initial_validation
+                      External_transition.Initial_validated.t
                       Envelope.Incoming.t
                       list) ) =
             run ~network ~frontier:me ~ledger_db ~transition_reader
@@ -399,7 +398,7 @@ let%test_module "Bootstrap Controller" =
           in
           let%map ( new_frontier
                   , (sorted_external_transitions :
-                      External_transition.with_initial_validation
+                      External_transition.Initial_validated.t
                       Envelope.Incoming.t
                       list) ) =
             run ~network ~frontier:me ~ledger_db ~transition_reader

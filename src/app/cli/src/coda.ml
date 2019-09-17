@@ -157,11 +157,6 @@ let daemon logger =
            "true|false Log transaction-pool diff received from peers \
             (default: false)"
          (optional bool)
-     and no_bans =
-       let module Expiration = struct
-         [%%expires_after "20190914"]
-       end in
-       flag "no-bans" no_arg ~doc:"don't ban peers (**TEMPORARY FOR TESTNET**)"
      and enable_libp2p =
        flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
      and libp2p_port =
@@ -205,7 +200,6 @@ let daemon logger =
              | Ok ll ->
                  Deferred.return ll )
        in
-       if no_bans then Trust_system.disable_bans () ;
        let%bind conf_dir =
          if is_background then
            let home = Core.Sys.home_directory () in
@@ -351,7 +345,7 @@ let daemon logger =
          (let bytes_per_word = Sys.word_size / 8 in
           let rec loop () =
             let stat = Gc.stat () in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "OCaml memory statistics"
               ~metadata:
                 [ ("heap_size", `Int (stat.heap_words * bytes_per_word))

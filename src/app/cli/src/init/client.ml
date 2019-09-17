@@ -939,59 +939,170 @@ let unsafe_import =
                (Public_key.compress public_key)))
 
 let import_key =
+  (* We'll do this entirely without talking to the daemon for now, though in the future this may change *)
+  let privkey_path = Cli_lib.Flag.privkey_read_path in
+  let conf_dir = Cli_lib.Flag.conf_dir in
+  let flags = Args.zip2 privkey_path conf_dir in
   Command.async
     ~summary:
       "Import a password protected private key to be tracked by the daemon."
-    (let open Command.Let_syntax in
-    (* We'll do this entirely without talking to the daemon for now, though in the future this may change *)
-    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path
-    and conf_dir = Cli_lib.Flag.conf_dir in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let%bind home = Sys.home_directory () in
-      let conf_dir =
-        Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
-      in
-      let wallets_disk_location = conf_dir ^/ "wallets" in
-      let%bind ({Keypair.public_key; _} as keypair) =
-        Secrets.Keypair.Terminal_stdin.read_exn privkey_path
-      in
-      let pk = Public_key.compress public_key in
-      let%bind wallets =
-        Secrets.Wallets.load ~logger:(Logger.create ())
-          ~disk_location:wallets_disk_location
-      in
-      (* Either we already are tracking it *)
-      match Secrets.Wallets.check_locked wallets ~needle:pk with
-      | Some _ ->
-          printf
-            !"Key already present, no need to import : %s\n"
-            (Public_key.Compressed.to_base58_check
-               (Public_key.compress public_key)) ;
-          Deferred.unit
-      | None ->
-          (* Or we import it *)
-          let%map _ =
-            Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
-          in
-          printf
-            !"Key imported successfully : %s\n"
-            (Public_key.Compressed.to_base58_check
-               (Public_key.compress public_key)))
+    (Cli_lib.Background_daemon.init ~rest:true flags
+       ~f:(fun port (privkey_path, conf_dir) ->
+         let open Deferred.Let_syntax in
+         let%bind home = Sys.home_directory () in
+         let conf_dir =
+           Option.value
+             ~default:(home ^/ Cli_lib.Default.conf_dir_name)
+             conf_dir
+         in
+         let wallets_disk_location = conf_dir ^/ "wallets" in
+         let%bind ({Keypair.public_key; _} as keypair) =
+           Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+         in
+         let pk = Public_key.compress public_key in
+         let%bind wallets =
+           Secrets.Wallets.load ~logger:(Logger.create ())
+             ~disk_location:wallets_disk_location
+         in
+         (* Either we already are tracking it *)
+         match Secrets.Wallets.check_locked wallets ~needle:pk with
+         | Some _ ->
+             printf
+               !"Key already present, no need to import : %s\n"
+               (Public_key.Compressed.to_base58_check
+                  (Public_key.compress public_key)) ;
+             Deferred.unit
+         | None ->
+             (* Or we import it *)
+             let%bind _ =
+               Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
+             in
+             let%map _response =
+               Graphql_client.query_or_error
+                 (Graphql_client.Reload_wallets.make ())
+                 port
+             in
+             printf
+               !"\n👝 Imported account!\nPublic key: %s\n"
+               (Public_key.Compressed.to_base58_check
+                  (Public_key.compress public_key)) ))
 
 let list_accounts =
   let open Command.Param in
   Command.async ~summary:"List all owned accounts"
     (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
-         Deferred.map
-           (Graphql_client.query (Graphql_client.Get_wallet.make ()) port)
-           ~f:(fun response ->
-             Array.iteri
-               ~f:(fun i w ->
-                 printf "Wallet #%d:\n  Public key: %s\n  Balance: %s\n" (i + 1)
+         let%map response =
+           Graphql_client.query (Graphql_client.Get_wallets.make ()) port
+         in
+         match response#ownedWallets with
+         | [||] ->
+             printf
+               "😢 You have no wallets!\n\
+                You can make a new one using `coda accounts create`\n"
+         | wallets ->
+             Array.iteri wallets ~f:(fun i w ->
+                 printf
+                   "Wallet #%d:\n\
+                   \  Public key: %s\n\
+                   \  Balance: %s\n\
+                   \  Locked: %b\n"
+                   (i + 1)
                    (Public_key.Compressed.to_base58_check w#public_key)
-                   (Unsigned.UInt64.to_string (w#balance)#total) )
-               response#ownedWallets ) ))
+                   (Unsigned.UInt64.to_string (w#balance)#total)
+                   (Option.value ~default:true w#locked) ) ))
+
+let create_account =
+  let open Command.Param in
+  Command.async ~summary:"Create new account"
+    (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
+         let%bind password =
+           Secrets.Keypair.prompt_password "Password for new account: "
+         in
+         match password with
+         | Ok password_bytes ->
+             let%map response =
+               Graphql_client.query
+                 (Graphql_client.Add_wallet.make
+                    ~password:(Bytes.to_string password_bytes)
+                    ())
+                 port
+             in
+             let pk_string =
+               Public_key.Compressed.to_base58_check
+                 (response#addWallet)#public_key
+             in
+             printf "\n👝 Added new account!\nPublic key: %s\n" pk_string
+         | Error e ->
+             Deferred.return
+               (printf "❌ Error adding new account: %s"
+                  (Error.to_string_hum e)) ))
+
+let unlock_account =
+  let open Command.Param in
+  let public_key =
+    flag "public-key" ~doc:"KEY Public key of account to be unlocked"
+      (required string)
+  in
+  Command.async ~summary:"Unlock a tracked account"
+    (Cli_lib.Background_daemon.init ~rest:true public_key
+       ~f:(fun port pk_str ->
+         let args =
+           let open Deferred.Or_error.Let_syntax in
+           let%bind pk =
+             Deferred.return (Public_key.Compressed.of_base58_check pk_str)
+           in
+           let%map password =
+             Secrets.Password.read "Password to unlock account: "
+           in
+           (pk, password)
+         in
+         match%bind args with
+         | Ok (pk, password_bytes) ->
+             let%map response =
+               Graphql_client.query
+                 (Graphql_client.Unlock_wallet.make
+                    ~public_key:(Graphql_client.Encoders.public_key pk)
+                    ~password:(Bytes.to_string password_bytes)
+                    ())
+                 port
+             in
+             let pk_string =
+               Public_key.Compressed.to_base58_check
+                 (response#unlockWallet)#public_key
+             in
+             printf "\n🔓 Unlocked account!\nPublic key: %s\n" pk_string
+         | Error e ->
+             Deferred.return
+               (printf "❌ Error unlocking account: %s"
+                  (Error.to_string_hum e)) ))
+
+let lock_account =
+  let open Command.Param in
+  let public_key =
+    flag "public-key" ~doc:"KEY Public key of account to be locked"
+      (required string)
+  in
+  Command.async ~summary:"Lock a tracked account"
+    (Cli_lib.Background_daemon.init ~rest:true public_key
+       ~f:(fun port pk_str ->
+         match Public_key.Compressed.of_base58_check pk_str with
+         | Ok pk ->
+             let%map response =
+               Graphql_client.query
+                 (Graphql_client.Lock_wallet.make
+                    ~public_key:(Graphql_client.Encoders.public_key pk)
+                    ())
+                 port
+             in
+             let pk_string =
+               Public_key.Compressed.to_base58_check
+                 (response#lockWallet)#public_key
+             in
+             printf "🔒 Locked account!\nPublic key: %s\n" pk_string
+         | Error e ->
+             Deferred.return
+               (printf "❌ Error locking account: %s" (Error.to_string_hum e))
+     ))
 
 let generate_libp2p_keypair =
   Command.async
@@ -1063,7 +1174,12 @@ end
 
 let accounts =
   Command.group ~summary:"Client commands concerning account management"
-    ~preserve_subcommand_order:() [("list", list_accounts)]
+    ~preserve_subcommand_order:()
+    [ ("list", list_accounts)
+    ; ("create", create_account)
+    ; ("import", import_key)
+    ; ("unlock", unlock_account)
+    ; ("lock", lock_account) ]
 
 let command =
   Command.group ~summary:"Lightweight client commands"
