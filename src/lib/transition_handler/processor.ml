@@ -80,7 +80,7 @@ module Make (Inputs : Inputs.S) :
           Transition_frontier_validation.validate_frontier_dependencies ~logger
             ~frontier initially_validated_transition
           >>= Transition_frontier_validation
-              .validate_delta_transition_chain_part2 ~frontier ~logger
+              .validate_delta_transition_chain_part2 ~frontier
         with
         | Ok t ->
             return (Ok t)

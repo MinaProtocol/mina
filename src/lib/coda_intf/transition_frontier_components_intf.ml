@@ -314,8 +314,7 @@ module type Transition_chain_prover_intf = sig
   type transition_frontier
 
   val prove :
-       ?length:int
-    -> frontier:transition_frontier
+       frontier:transition_frontier
     -> State_hash.t
     -> (State_hash.t * State_body_hash.t list) option
 end

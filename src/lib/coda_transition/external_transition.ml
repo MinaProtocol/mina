@@ -802,75 +802,60 @@ struct
     in
     (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
 
-  let validate_delta_transition_chain_part2 (t, validation) ~frontier ~logger =
+  let validate_delta_transition_chain_part2 (t, validation) ~frontier =
     let open Int in
+    let open Result.Let_syntax in
     let global_slot =
       t |> With_hash.data |> consensus_state
       |> Consensus.Data.Consensus_state.global_slot
     in
-    match
-      List.take
-        ( Validation.extract_delta_transition_chain_witness validation
-        |> Non_empty_list.to_list |> List.rev )
-        2
-    with
-    | [hash1] -> (
-        if
-          State_hash.equal hash1
-            (With_hash.hash (force Coda_state.Genesis_protocol_state.t))
-        then
-          Ok
-            ( t
-            , Validation.Unsafe.set_valid_delta_transition_chain_part2
-                validation )
-        else
-          match
-            let open Option.Monad_infix in
-            Transition_frontier.find frontier hash1
-            >>| Transition_frontier.Breadcrumb.global_slot
-            >>| fun global_slot1 ->
-            global_slot1 <= global_slot - Consensus.Constants.delta
-          with
-          | None | Some true ->
-              Ok
-                ( t
-                , Validation.Unsafe.set_valid_delta_transition_chain_part2
-                    validation )
-          | Some false ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                "only 1 transition in lcoal history, missing transitions in \
-                 local history" ;
-              Error `Missing_transitions_in_delta_transition_chain )
-    | [hash1; hash2] -> (
-        let open Option.Monad_infix in
+    let delta_transition_chain_witness =
+      Validation.extract_delta_transition_chain_witness validation
+      |> Non_empty_list.rev
+    in
+    let%bind () =
+      let open Option.Let_syntax in
+      let boundary_hash = Non_empty_list.head delta_transition_chain_witness in
+      if
+        State_hash.equal boundary_hash
+          (With_hash.hash (force Genesis_protocol_state.t))
+      then Ok ()
+      else
         match
-          Transition_frontier.find frontier hash1
-          >>| Transition_frontier.Breadcrumb.global_slot
-          >>| fun global_slot1 ->
-          global_slot1 <= global_slot - Consensus.Constants.delta
+          let%map boundary_transition =
+            Transition_frontier.find frontier boundary_hash
+          in
+          let boundary_slot =
+            Transition_frontier.Breadcrumb.global_slot boundary_transition
+          in
+          boundary_slot <= global_slot - Consensus.Constants.delta
         with
-        | None | Some true -> (
-          match
-            Transition_frontier.find frontier hash2
-            >>| Transition_frontier.Breadcrumb.global_slot
-            >>| fun global_slot2 ->
-            global_slot2 > global_slot - Consensus.Constants.delta
-          with
-          | None | Some true ->
-              Ok
-                ( t
-                , Validation.Unsafe.set_valid_delta_transition_chain_part2
-                    validation )
-          | Some false ->
-              Error
-                `Including_unnecessary_transitions_in_delta_transition_chain )
+        | None | Some true ->
+            Ok ()
         | Some false ->
-            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              "at least 2 transitions in local history, missing transitions \
-               in local history" ;
-            Error `Missing_transitions_in_delta_transition_chain )
-    | _ ->
-        failwith "this is not possible"
+            Error `Missing_transitions_in_delta_transition_chain
+    in
+    let%bind () =
+      let open Option.Let_syntax in
+      match
+        let%bind oldest_hash =
+          Non_empty_list.tail delta_transition_chain_witness |> List.hd
+        in
+        let%map oldest_transition =
+          Transition_frontier.find frontier oldest_hash
+        in
+        let oldest_slot =
+          Transition_frontier.Breadcrumb.global_slot oldest_transition
+        in
+        oldest_slot > global_slot - Consensus.Constants.delta
+      with
+      | None | Some true ->
+          Ok ()
+      | Some false ->
+          Error `Including_unnecessary_transitions_in_delta_transition_chain
+    in
+    return
+    @@ (t, Validation.Unsafe.set_valid_delta_transition_chain_part2 validation)
 end
 
 module Staged_ledger_validation = struct

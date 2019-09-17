@@ -39,7 +39,7 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.Breadcrumb.validated_transition breadcrumb
   end)
 
-  let prove ?length ~frontier state_hash =
+  let prove ~frontier state_hash =
     let open Option.Let_syntax in
     let%map requested_breadcrumb =
       Option.merge
@@ -51,7 +51,7 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.Breadcrumb.validated_transition requested_breadcrumb
     in
     let first_transition, merkle_list =
-      Merkle_list.prove ?length ~context:frontier requested_transition
+      Merkle_list.prove ~context:frontier requested_transition
     in
     (External_transition.Validated.state_hash first_transition, merkle_list)
 end

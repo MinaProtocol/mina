@@ -447,7 +447,6 @@ module type S = sig
          , [`Delta_transition_chain_part2] * unit Truth.false_t )
          Validation.with_transition
       -> frontier:Transition_frontier.t
-      -> logger:Logger.t
       -> ( ( 'time_received
            , 'proof
            , [`Delta_transition_chain_part1]

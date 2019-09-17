@@ -15,8 +15,7 @@ end
 module Make_intf (Input : Inputs_intf) = struct
   module type S = sig
     val prove :
-         ?length:int
-      -> context:Input.context
+         context:Input.context
       -> Input.value
       -> Input.value * Input.proof_elem list
   end
@@ -25,17 +24,13 @@ end
 module Make (Input : Inputs_intf) : Make_intf(Input).S = struct
   open Input
 
-  let prove ?length ~context last =
-    let rec find_path ~length value =
-      if length = Some 0 then (value, [])
-      else
-        Option.value_map (get_previous ~context value) ~default:(value, [])
-          ~f:(fun parent ->
-            let first, proofs =
-              find_path ~length:(Option.map length ~f:pred) parent
-            in
-            (first, to_proof_elem value :: proofs) )
+  let prove ~context last =
+    let rec find_path value =
+      Option.value_map (get_previous ~context value) ~default:(value, [])
+        ~f:(fun parent ->
+          let first, proofs = find_path parent in
+          (first, to_proof_elem value :: proofs) )
     in
-    let first, proofs = find_path ~length last in
+    let first, proofs = find_path last in
     (first, List.rev proofs)
 end
