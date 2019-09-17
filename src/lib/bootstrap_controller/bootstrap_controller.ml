@@ -66,14 +66,13 @@ module Make (Inputs : Inputs_intf) : sig
       -> frontier:Transition_frontier.t
       -> ledger_db:Ledger.Db.t
       -> transition_reader:( [< `Transition of
-                                External_transition.with_initial_validation
+                                External_transition.Initial_validated.t
                                 Envelope.Incoming.t ]
                            * [< `Time_received of Block_time.t] )
                            Pipe_lib.Strict_pipe.Reader.t
       -> should_ask_best_tip:bool
       -> ( Transition_frontier.t
-         * External_transition.with_initial_validation Envelope.Incoming.t list
-         )
+         * External_transition.Initial_validated.t Envelope.Incoming.t list )
          Deferred.t
 
     module Transition_cache :
@@ -87,7 +86,7 @@ module Make (Inputs : Inputs_intf) : sig
                           Root_sync_ledger.t
       -> transition_graph:Transition_cache.t
       -> sync_ledger_reader:( [< `Transition of
-                                 External_transition.with_initial_validation
+                                 External_transition.Initial_validated.t
                                  Envelope.Incoming.t ]
                             * [< `Time_received of 'a] )
                             Pipe_lib.Strict_pipe.Reader.t
@@ -100,8 +99,8 @@ end = struct
     { logger: Logger.t
     ; trust_system: Trust_system.t
     ; verifier: Verifier.t
-    ; mutable best_seen_transition: External_transition.with_initial_validation
-    ; mutable current_root: External_transition.with_initial_validation
+    ; mutable best_seen_transition: External_transition.Initial_validated.t
+    ; mutable current_root: External_transition.Initial_validated.t
     ; network: Network.t }
 
   module Transition_cache = Transition_cache.Make (Inputs)
@@ -114,9 +113,8 @@ end = struct
              [ ( "selection_context"
                , `String "Bootstrap_controller.worth_getting_root" ) ])
         ~existing:
-          ( t.best_seen_transition |> fst |> With_hash.data
-          |> External_transition.protocol_state
-          |> Protocol_state.consensus_state )
+          ( t.best_seen_transition
+          |> External_transition.Initial_validated.consensus_state )
         ~candidate
 
   let received_bad_proof t sender_host e =
@@ -147,8 +145,7 @@ end = struct
     t.best_seen_transition <- peer_best_tip ;
     t.current_root <- peer_root ;
     let blockchain_state =
-      t.current_root |> fst |> With_hash.data
-      |> External_transition.protocol_state |> Protocol_state.blockchain_state
+      t.current_root |> External_transition.Initial_validated.blockchain_state
     in
     let expected_staged_ledger_hash =
       blockchain_state |> Blockchain_state.staged_ledger_hash
@@ -162,7 +159,7 @@ end = struct
       Root_sync_ledger.new_goal root_sync_ledger
         (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
         ~data:
-          ( With_hash.hash (fst t.current_root)
+          ( External_transition.Initial_validated.state_hash t.current_root
           , sender
           , expected_staged_ledger_hash )
         ~equal:(fun (hash1, _, _) (hash2, _, _) -> State_hash.equal hash1 hash2)
@@ -210,13 +207,10 @@ end = struct
     Reader.iter sync_ledger_reader
       ~f:(fun (`Transition incoming_transition, `Time_received _) ->
         let ({With_hash.data= transition; hash}, _)
-              : External_transition.with_initial_validation =
+              : External_transition.Initial_validated.t =
           Envelope.Incoming.data incoming_transition
         in
-        let protocol_state = External_transition.protocol_state transition in
-        let previous_state_hash =
-          Protocol_state.previous_state_hash protocol_state
-        in
+        let previous_state_hash = External_transition.parent_hash transition in
         let sender =
           match Envelope.Incoming.sender incoming_transition with
           | Envelope.Sender.Local ->
@@ -327,243 +321,248 @@ end = struct
      isolation *)
   let run ~logger ~trust_system ~verifier ~network ~frontier
       ~consensus_local_state ~transition_reader ~should_ask_best_tip =
-    let sync_ledger_reader, sync_ledger_writer =
-      create ~name:"sync ledger pipe"
-        (Buffered (`Capacity 50, `Overflow Crash))
-    in
-    transfer_while_writer_alive transition_reader sync_ledger_writer ~f:Fn.id
-    |> don't_wait_for ;
-    let initial_breadcrumb = Transition_frontier.root frontier in
-    let initial_transition =
-      Transition_frontier.Breadcrumb.validated_transition initial_breadcrumb
-    in
-    let persistent_root = Transition_frontier.persistent_root frontier in
-    let persistent_frontier =
-      Transition_frontier.persistent_frontier frontier
-    in
-    let initial_root_transition =
-      initial_transition
-      |> External_transition.Validation.reset_frontier_dependencies_validation
-      |> External_transition.Validation.reset_staged_ledger_diff_validation
-    in
-    let t =
-      { network
-      ; logger
-      ; trust_system
-      ; verifier
-      ; best_seen_transition= initial_root_transition
-      ; current_root= initial_root_transition }
-    in
-    let transition_graph = Transition_cache.create () in
-    let snarked_ledger = Transition_frontier.root_snarked_ledger frontier in
-    (* Synchonize the root ledger of the old transition frontier *)
-    let%bind hash, sender, expected_staged_ledger_hash =
-      let root_sync_ledger =
-        Root_sync_ledger.create snarked_ledger ~logger:t.logger ~trust_system
+    let rec loop () =
+      let sync_ledger_reader, sync_ledger_writer =
+        create ~name:"sync ledger pipe"
+          (Buffered (`Capacity 50, `Overflow Crash))
       in
+      transfer_while_writer_alive transition_reader sync_ledger_writer ~f:Fn.id
+      |> don't_wait_for ;
+      let persistent_frontier =
+        Transition_frontier.persistent_frontier frontier
+      in
+      let persistent_root = Transition_frontier.persistent_root frontier in
+      let initial_breadcrumb = Transition_frontier.root frontier in
+      let initial_transition =
+        Transition_frontier.Breadcrumb.validated_transition initial_breadcrumb
+      in
+      let initial_root_transition =
+        initial_transition
+        |> External_transition.Validation
+           .reset_frontier_dependencies_validation
+        |> External_transition.Validation.reset_staged_ledger_diff_validation
+      in
+      let t =
+        { network
+        ; logger
+        ; trust_system
+        ; verifier
+        ; best_seen_transition= initial_root_transition
+        ; current_root= initial_root_transition }
+      in
+      let transition_graph = Transition_cache.create () in
       let%bind () =
         if should_ask_best_tip then
           download_best_tip ~root_sync_ledger ~transition_graph t
             initial_root_transition
         else Deferred.unit
       in
-      sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
-      |> don't_wait_for ;
-      (* We ignore the resulting ledger returned here since it will always
-       * be the same as the ledger we started with because we are syncing
-       * a db ledger. *)
-      let%map _, root_data = Root_sync_ledger.valid_tree root_sync_ledger in
-      Root_sync_ledger.destroy root_sync_ledger ;
-      root_data
-    in
-    (* Retrieve staged ledger scan state and reconstruct the new root
-     * staged ledger *)
-    match%bind
-      let open Deferred.Or_error.Let_syntax in
-      let%bind scan_state, expected_merkle_root, pending_coinbases =
-        Network.get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
-          sender hash
-      in
-      let received_staged_ledger_hash =
-        Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-          (Staged_ledger.Scan_state.hash scan_state)
-          expected_merkle_root pending_coinbases
-      in
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:
-          [ ( "expected_staged_ledger_hash"
-            , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
-          ; ( "received_staged_ledger_hash"
-            , Staged_ledger_hash.to_yojson received_staged_ledger_hash ) ]
-        "Comparing $expected_staged_ledger_hash to $received_staged_ledger_hash" ;
-      let%bind () =
-        Staged_ledger_hash.equal expected_staged_ledger_hash
-          received_staged_ledger_hash
-        |> Result.ok_if_true
-             ~error:(Error.of_string "received faulty scan state from peer")
-        |> Deferred.return
-      in
-      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
-        ~verifier ~scan_state
-        ~snarked_ledger:(Ledger.of_database snarked_ledger)
-        ~expected_merkle_root ~pending_coinbases
-    with
-    | Error e ->
-        let%bind () =
-          Trust_system.(
-            record t.trust_system t.logger sender
-              Actions.
-                ( Violated_protocol
-                , Some
-                    ( "Can't find scan state from the peer or received faulty \
-                       scan state from the peer."
-                    , [] ) ))
+      let snarked_ledger = Transition_frontier.root_snarked_ledger frontier in
+      let%bind hash, sender, expected_staged_ledger_hash =
+        let root_sync_ledger =
+          Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
         in
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        don't_wait_for
+          (sync_ledger t ~root_sync_ledger ~transition_graph
+             ~sync_ledger_reader) ;
+        (* We ignore the resulting ledger returned here since it will always
+         * be the same as the ledger we started with because we are syncing
+         * a db ledger. *)
+        let%map _, root_data = Root_sync_ledger.valid_tree root_sync_ledger in
+        Root_sync_ledger.destroy root_sync_ledger ;
+        root_data
+      in
+      (* Retrieve staged ledger scan state and reconstruct the new root
+       * staged ledger *)
+      match%bind
+        let open Deferred.Or_error.Let_syntax in
+        let%bind scan_state, expected_merkle_root, pending_coinbases =
+          Network.get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
+            sender hash
+        in
+        let received_staged_ledger_hash =
+          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+            (Staged_ledger.Scan_state.hash scan_state)
+            expected_merkle_root pending_coinbases
+        in
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
-            [ ("error", `String (Error.to_string_hum e))
-            ; ("state_hash", State_hash.to_yojson hash)
-            ; ( "expected_staged_ledger_hash"
-              , Staged_ledger_hash.to_yojson expected_staged_ledger_hash ) ]
-          "Failed to find scan state for the transition with hash $state_hash \
-           from the peer or received faulty scan state: $error. Retry \
-           bootstrap" ;
-        Writer.close sync_ledger_writer ;
-        run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
-          ~transition_reader ~should_ask_best_tip
-    | Ok root_staged_ledger -> (
+            [ ( "expected_staged_ledger_hash"
+              , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
+            ; ( "received_staged_ledger_hash"
+              , Staged_ledger_hash.to_yojson received_staged_ledger_hash ) ]
+          "Comparing $expected_staged_ledger_hash to \
+           $received_staged_ledger_hash" ;
         let%bind () =
-          Trust_system.(
-            record t.trust_system t.logger sender
-              Actions.
-                ( Fulfilled_request
-                , Some ("Received valid scan state from peer", []) ))
+          Staged_ledger_hash.equal expected_staged_ledger_hash
+            received_staged_ledger_hash
+          |> Result.ok_if_true
+               ~error:(Error.of_string "received faulty scan state from peer")
+          |> Deferred.return
         in
-        let new_root =
-          let root_transition =
-            External_transition.Validation.forget_validation t.current_root
+        Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
+          ~logger ~verifier ~scan_state
+          ~snarked_ledger:(Ledger.of_database snarked_ledger)
+          ~expected_merkle_root ~pending_coinbases
+      with
+      | Error e ->
+          let%bind () =
+            Trust_system.(
+              record t.trust_system t.logger sender
+                Actions.
+                  ( Violated_protocol
+                  , Some
+                      ( "Can't find scan state from the peer or received \
+                         faulty scan state from the peer."
+                      , [] ) ))
           in
-          (* TODO: review the correctness of this action #2480 *)
-          let (`I_swear_this_is_safe_see_my_comment validated_root_transition)
-              =
-            External_transition.Validated.create_unsafe root_transition
+          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("error", `String (Error.to_string_hum e))
+              ; ("state_hash", State_hash.to_yojson hash)
+              ; ( "expected_staged_ledger_hash"
+                , Staged_ledger_hash.to_yojson expected_staged_ledger_hash ) ]
+            "Failed to find scan state for the transition with hash \
+             $state_hash from the peer or received faulty scan state: $error. \
+             Retry bootstrap" ;
+          Writer.close sync_ledger_writer ;
+          loop ()
+      | Ok new_root_staged_ledger -> (
+          let%bind () =
+            Trust_system.(
+              record t.trust_system t.logger sender
+                Actions.
+                  ( Fulfilled_request
+                  , Some ("Received valid scan state from peer", []) ))
           in
-          validated_root_transition
-        in
-        let consensus_state =
-          new_root |> External_transition.Validated.consensus_state
-        in
-        (* Synchronize consensus local state if necessary. *)
-        match%bind
-          match
-            Consensus.Hooks.required_local_state_sync ~consensus_state
-              ~local_state:consensus_local_state
+          let new_root =
+            let root_transition =
+              External_transition.Validation.forget_validation t.current_root
+            in
+            (* TODO: review the correctness of this action #2480 *)
+            let (`I_swear_this_is_safe_see_my_comment
+                  validated_root_transition) =
+              External_transition.Validated.create_unsafe root_transition
+            in
+            validated_root_transition
+          in
+          let consensus_state =
+            new_root |> External_transition.Validated.consensus_state
+          in
+          (* Synchronize consensus local state if necessary *)
+          match%bind
+            match
+              Consensus.Hooks.required_local_state_sync ~consensus_state
+                ~local_state:consensus_local_state
+            with
+            | None ->
+                Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ( "local_state"
+                      , Consensus.Data.Local_state.to_yojson local_state )
+                    ; ( "consensus_state"
+                      , Consensus.Data.Consensus_state.Value.to_yojson
+                          consensus_state ) ]
+                  "Not synchronizing consensus local state" ;
+                Deferred.return @@ Ok ()
+            | Some sync_jobs ->
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  "Synchronizing consensus local state" ;
+                Consensus.Hooks.sync_local_state
+                  ~local_state:consensus_local_state ~logger ~trust_system
+                  ~random_peers:(fun n ->
+                    List.append
+                      (Network.peers_by_ip t.network sender)
+                      (Network.random_peers t.network n) )
+                  ~query_peer:
+                    { Network_peer.query=
+                        (fun peer f query ->
+                          Network.query_peer t.network peer f query ) }
+                  sync_jobs
           with
-          | None ->
-              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:
-                  [ ( "local_state"
-                    , Consensus.Data.Local_state.to_yojson
-                        consensus_local_state )
-                  ; ( "consensus_state"
-                    , Consensus.Data.Consensus_state.Value.to_yojson
-                        consensus_state ) ]
-                "Not synchronizing consensus local state" ;
-              Deferred.return @@ Ok ()
-          | Some sync_jobs ->
+          | Error e ->
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("error", `String (Error.to_string_hum e))]
+                "Local state sync failed: $error. Retry bootstrap" ;
+              Writer.close sync_ledger_writer ;
+              loop ()
+          | Ok () ->
+              (* Close the old frontier and reload a new on from disk. *)
+              let new_root_data =
+                { Transition_frontier.Root_data.transition= new_root
+                ; staged_ledger= new_root_staged_ledger }
+              in
+              let%bind () = Transition_frontier.close frontier in
+              let%bind () =
+                Transition_frontier.Persistent_frontier.reset_database_exn
+                  (Transition_frontier.persistent_frontier frontier)
+                  ~root_data:new_root_data
+              in
+              let%map new_frontier =
+                Transition_frontier.create ~logger ~root_transition:new_root
+                  ~root_snarked_ledger:synced_db ~root_staged_ledger
+                  ~consensus_local_state:local_state Transition_frontier.load
+                  { Transition_frontier.logger= t.logger
+                  ; verifier
+                  ; consensus_local_state }
+                  ~persistent_root ~persistent_frontier
+                >>| Fn.(
+                      compose Or_error.ok_exn
+                        (Result.map_error
+                           ~f:
+                             ( const
+                             @@ Error.of_string
+                                  "failed to initialize transition frontier \
+                                   after bootstrapping" )))
+              in
               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Synchronizing consensus local state" ;
-              Consensus.Hooks.sync_local_state
-                ~local_state:consensus_local_state ~logger ~trust_system
-                ~random_peers:(fun n ->
-                  List.append
-                    (Network.peers_by_ip t.network sender)
-                    (Network.random_peers t.network n) )
-                ~query_peer:
-                  { Network_peer.query=
-                      (fun peer f query ->
-                        Network.query_peer t.network peer f query ) }
-                sync_jobs
-        with
-        | Error e ->
-            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "local_state"
-                  , Consensus.Data.Local_state.to_yojson consensus_local_state
-                  )
-                ; ( "consensus_state"
-                  , Consensus.Data.Consensus_state.Value.to_yojson
-                      consensus_state )
-                ; ("error", `String (Error.to_string_hum e)) ]
-              "Local state sync failed: $error. Retry bootstrap" ;
-            Writer.close sync_ledger_writer ;
-            run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
-              ~transition_reader ~should_ask_best_tip
-        | Ok () ->
-            (* Close the old frontier and reload a new on from disk. *)
-            let new_root_data =
-              { Transition_frontier.Root_data.transition= new_root
-              ; staged_ledger= new_root_staged_ledger }
-            in
-            let%bind () = Transition_frontier.close frontier in
-            let%bind () =
-              Transition_frontier.Persistent_frontier.reset_database_exn
-                (Transition_frontier.persistent_frontier frontier)
-                ~root_data:new_root_data
-            in
-            let%map new_frontier =
-              Transition_frontier.load
-                {Transition_frontier.logger; verifier; consensus_local_state}
-                ~persistent_root ~persistent_froontier
-              >>| Fn.(
-                    compose Or_error.ok_exn
-                      (Result.map_error
-                         ~f:
-                           ( const
-                           @@ Error.of_string
-                                "failed to initialize transition frontier \
-                                 after bootstrapping" )))
-            in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              "Bootstrap state: complete." ;
-            let collected_transitions =
-              Transition_cache.data transition_graph
-            in
-            let logger =
-              Logger.extend logger
-                [ ( "context"
-                  , `String "Filter collected transitions in bootstrap" ) ]
-            in
-            let root_consensus_state =
-              Transition_frontier.(
-                Breadcrumb.consensus_state (root new_frontier))
-            in
-            let filtered_collected_transitions =
-              List.filter collected_transitions ~f:(fun incoming_transition ->
-                  let With_hash.{data= transition; _}, _ =
-                    Envelope.Incoming.data incoming_transition
-                  in
-                  `Take
-                  = Consensus.Hooks.select ~existing:root_consensus_state
-                      ~candidate:
-                        (External_transition.consensus_state transition)
-                      ~logger )
-            in
-            Logger.debug logger
-              "Sorting filtered transitions by consensus state" ~metadata:[]
-              ~location:__LOC__ ~module_:__MODULE__ ;
-            let sorted_filtered_collected_transitins =
-              List.sort filtered_collected_transitions
-                ~compare:
-                  (Comparable.lift
-                     ~f:(fun incoming_transition ->
-                       let With_hash.{data= transition; _}, _ =
-                         Envelope.Incoming.data incoming_transition
-                       in
-                       transition )
-                     External_transition.compare)
-            in
-            (new_frontier, sorted_filtered_collected_transitins) )
+                "Bootstrap state: complete." ;
+              let collected_transitions =
+                Transition_cache.data transition_graph
+              in
+              let logger =
+                Logger.extend logger
+                  [ ( "context"
+                    , `String "Filter collected transitions in bootstrap" ) ]
+              in
+              let root_consensus_state =
+                Transition_frontier.(
+                  Breadcrumb.consensus_state (root new_frontier))
+              in
+              let filtered_collected_transitions =
+                List.filter collected_transitions
+                  ~f:(fun incoming_transition ->
+                    let With_hash.{data= transition; _}, _ =
+                      Envelope.Incoming.data incoming_transition
+                    in
+                    `Take
+                    = Consensus.Hooks.select ~existing:root_consensus_state
+                        ~candidate:
+                          (External_transition.consensus_state transition)
+                        ~logger )
+              in
+              Logger.debug logger
+                "Sorting filtered transitions by consensus state" ~metadata:[]
+                ~location:__LOC__ ~module_:__MODULE__ ;
+              let sorted_filtered_collected_transitins =
+                List.sort filtered_collected_transitions
+                  ~compare:
+                    (Comparable.lift
+                       ~f:(fun incoming_transition ->
+                         let With_hash.{data= transition; _}, _ =
+                           Envelope.Incoming.data incoming_transition
+                         in
+                         transition )
+                       External_transition.compare)
+              in
+              (new_frontier, sorted_filtered_collected_transitins) )
+    in
+    let start_time = Core.Time.now () in
+    let%map result = loop () in
+    Coda_metrics.(
+      Gauge.set Bootstrap.bootstrap_time_ms
+        Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+    result
 
   module For_tests = struct
     type nonrec t = t

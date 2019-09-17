@@ -311,7 +311,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                 , `String
                     (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" work.spec) )
               ] ;
-          List.iter work.metrics ~f:(fun (total, tag) ->
+          One_or_two.iter work.metrics ~f:(fun (total, tag) ->
               match tag with
               | `Merge ->
                   Perf_histograms.add_span ~name:"snark_worker_merge_time"

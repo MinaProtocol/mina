@@ -434,7 +434,7 @@ module T = struct
           trace_database_initialization "external_transition_database" __LOC__
             external_transition_database_dir ;
           let time_controller =
-            Block_time.Controller.create Block_time.Controller.basic
+            Block_time.Controller.create (Block_time.Controller.basic ~logger)
           in
           let propose_keypair =
             Option.map proposer ~f:(fun i ->

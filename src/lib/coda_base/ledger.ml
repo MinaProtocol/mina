@@ -159,7 +159,8 @@ module Ledger_inner = struct
       result
     with exn ->
       let (_ : Mask.t) =
-        Maskable.unregister_mask_exn base_ledger masked_ledger
+        Maskable.unregister_mask_exn ~grandchildren:`Recursive base_ledger
+          masked_ledger
       in
       raise exn
 

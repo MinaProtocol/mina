@@ -16,8 +16,7 @@ module With_unprocessed_transition_cache = struct
       with module Cached := Cache_lib.Cached
        and module Cache := Cache_lib.Cache
        and type source =
-                  External_transition.with_initial_validation
-                  Envelope.Incoming.t
+                  External_transition.Initial_validated.t Envelope.Incoming.t
        and type target = State_hash.t
   end
 end
