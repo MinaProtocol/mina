@@ -45,8 +45,6 @@ struct
 
   module Record_inst = Record.Make (Now)
 
-  let disable_bans = Record_inst.disable_bans
-
   let create ~db_dir =
     let reader, writer = Strict_pipe.create Strict_pipe.Synchronous in
     { db= Some (Db.create ~directory:db_dir)
@@ -120,15 +118,7 @@ struct
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:([("peer", Peer_id.to_yojson peer)] @ action_metadata)
         "%s trust for peer $peer due to action %s. New trust is %f." verb
-        action_fmt simple_new.trust ;
-      if
-        Record_inst.get_bans_disabled ()
-        && simple_old.trust >. -1. && simple_new.trust <=. -1.
-      then
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Bans are disabled; otherwise, peer $peer would be banned (maybe \
-           already banned)"
-          ~metadata:[("peer", Peer_id.to_yojson peer)]
+        action_fmt simple_new.trust
     in
     let%map () =
       match (simple_old.banned, simple_new.banned) with

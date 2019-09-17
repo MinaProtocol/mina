@@ -79,9 +79,6 @@ module Make (Action : Action_intf) : sig
   (** Shut down. *)
   val close : t -> unit
 
-  (** TEMPORARY TESTNET HACK *)
-  val disable_bans : unit -> unit
-
   module For_tests : sig
     (** Get a pipe of the actions being recorded. Close it when you're done to
         avoid a memory leak. *)
