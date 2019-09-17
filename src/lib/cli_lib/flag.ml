@@ -34,7 +34,7 @@ let port =
     (Command.Param.optional Arg_type.int16)
 
 let rest_port =
-  Command.Param.flag "--rest-port"
+  Command.Param.flag "rest-port"
     ~doc:
       (Printf.sprintf "PORT Client to daemon rest server (default: %d)"
          Port.default_rest)
