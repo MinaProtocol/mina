@@ -5,6 +5,8 @@ type t
 
 val load : logger:Logger.t -> disk_location:string -> t Deferred.t
 
+val reload : logger:Logger.t -> t -> unit Deferred.t
+
 val import_keypair :
      t
   -> Keypair.t

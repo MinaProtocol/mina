@@ -25,14 +25,6 @@ module Make (Inputs : Inputs.S) :
   module Transition_frontier_validation =
     External_transition.Transition_frontier_validation (Transition_frontier)
 
-  type external_transition_with_initial_validation =
-    ( [`Time_received] * unit Truth.true_t
-    , [`Proof] * unit Truth.true_t
-    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
-    , [`Frontier_dependencies] * unit Truth.false_t
-    , [`Staged_ledger_diff] * unit Truth.false_t )
-    External_transition.Validation.with_transition
-
   (* TODO: calculate a sensible value from postake consensus arguments *)
   let catchup_timeout_duration =
     Block_time.Span.of_ms
@@ -169,7 +161,7 @@ module Make (Inputs : Inputs.S) :
 
   let run ~logger ~verifier ~trust_system ~time_controller ~frontier
       ~(primary_transition_reader :
-         ( external_transition_with_initial_validation Envelope.Incoming.t
+         ( External_transition.Initial_validated.t Envelope.Incoming.t
          , State_hash.t )
          Cached.t
          Reader.t)
@@ -177,7 +169,7 @@ module Make (Inputs : Inputs.S) :
       ~(clean_up_catchup_scheduler : unit Ivar.t)
       ~(catchup_job_writer :
          ( State_hash.t
-           * ( external_transition_with_initial_validation Envelope.Incoming.t
+           * ( External_transition.Initial_validated.t Envelope.Incoming.t
              , State_hash.t )
              Cached.t
              Rose_tree.t
