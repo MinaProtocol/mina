@@ -449,6 +449,7 @@ module Types = struct
           , Receipt.Chain_hash.t option
           , State_hash.t option )
           Account.Poly.t
+      ; locked: bool option
       ; is_actively_staking: bool
       ; path: string }
 
@@ -521,7 +522,13 @@ module Types = struct
           ; field "privateKeyPath" ~typ:(non_null string)
               ~doc:"Path of the private key file for this account"
               ~args:Arg.[]
-              ~resolve:(fun _ {path; _} -> path) ] )
+              ~resolve:(fun _ {path; _} -> path)
+          ; field "locked" ~typ:bool
+              ~doc:
+                "True if locked, false if unlocked, null if the account isn't \
+                 tracked by the queried daemon"
+              ~args:Arg.[]
+              ~resolve:(fun _ {locked; _} -> locked) ] )
   end
 
   let snark_worker =
@@ -562,6 +569,13 @@ module Types = struct
       obj "DeleteWalletPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
               ~doc:"Public key of the deleted wallet"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
+    let reload_wallets =
+      obj "ReloadWalletsPayload" ~fields:(fun _ ->
+          [ field "success" ~typ:(non_null bool)
+              ~doc:"True when the reload was successful"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
@@ -1258,6 +1272,17 @@ module Mutations = struct
         in
         public_key )
 
+  let reload_wallets =
+    io_field "reloadWallets" ~doc:"Reload wallet information from disk"
+      ~typ:(non_null Types.Payload.reload_wallets)
+      ~args:Arg.[]
+      ~resolve:(fun {ctx= coda; _} () ->
+        let%map _ =
+          Secrets.Wallets.reload ~logger:(Logger.create ())
+            (Coda_lib.wallets coda)
+        in
+        Ok true )
+
   let reset_trust_status =
     io_field "resetTrustStatus"
       ~doc:"Reset trust status for a given IP address"
@@ -1431,6 +1456,7 @@ module Mutations = struct
     ; unlock_wallet
     ; lock_wallet
     ; delete_wallet
+    ; reload_wallets
     ; send_payment
     ; send_delegation
     ; add_payment_receipt
@@ -1508,6 +1534,7 @@ module Queries = struct
         wallets |> Secrets.Wallets.pks
         |> List.map ~f:(fun pk ->
                { Types.Wallet.account= Partial_account.of_pk coda pk
+               ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
                ; is_actively_staking=
                    Public_key.Compressed.Set.mem propose_public_keys pk
                ; path= Secrets.Wallets.get_path wallets pk } ) )
@@ -1521,11 +1548,13 @@ module Queries = struct
               ~typ:(non_null Types.Input.public_key_arg) ]
       ~resolve:(fun {ctx= coda; _} () pk ->
         let propose_public_keys = Coda_lib.propose_public_keys coda in
+        let wallets = Coda_lib.wallets coda in
         Some
           { Types.Wallet.account= Partial_account.of_pk coda pk
+          ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
           ; is_actively_staking=
               Public_key.Compressed.Set.mem propose_public_keys pk
-          ; path= Secrets.Wallets.get_path (Coda_lib.wallets coda) pk } )
+          ; path= Secrets.Wallets.get_path wallets pk } )
 
   let transaction_status =
     result_field "transactionStatus" ~doc:"Get the status of a transaction"
