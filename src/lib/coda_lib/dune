@@ -1,13 +1,14 @@
 (library
  (name coda_lib)
  (public_name coda_lib)
- (flags :standard -short-paths -warn-error -27-58)
  (library_flags -linkall)
  (inline_tests)
  (libraries core coda_intf envelope pipe_lib logger async async_extra
   kademlia unix_timestamp debug_assert o1trace consensus
-  incremental secrets
-  auxiliary_database work_selector otp_lib)
+  transition_frontier_persistence incremental secrets
+  auxiliary_database work_selector coda_networking proposer
+  sync_handler root_prover transition_router otp_lib snark_worker
+  participating_state transaction_status)
  (preprocess
   (pps ppx_jane ppx_deriving.eq ppx_deriving.make bisect_ppx -- -conditional))
  (synopsis "Coda gut layer"))

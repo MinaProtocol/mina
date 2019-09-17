@@ -83,7 +83,7 @@ let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
 let user_commands {transactions= {Transactions.user_commands; _}; _} =
   user_commands
 
-let of_transition ~tracked_participants {With_hash.data= external_transition; _}
+let of_transition tracked_participants {With_hash.data= external_transition; _}
     =
   let open External_transition.Validated in
   let creator = proposer external_transition in
@@ -104,26 +104,40 @@ let of_transition ~tracked_participants {With_hash.data= external_transition; _}
         { Transactions.user_commands= []
         ; fee_transfers= []
         ; coinbase= Currency.Amount.zero } ~f:(fun acc_transactions -> function
-      | User_command checked_user_command ->
+      | User_command checked_user_command -> (
           let user_command = User_command.forget_check checked_user_command in
-          if
+          let should_include_transaction user_command participants =
             List.exists
               (User_command.accounts_accessed user_command)
-              ~f:(Public_key.Compressed.Set.mem tracked_participants)
-          then
-            { acc_transactions with
-              user_commands= user_command :: acc_transactions.user_commands }
-          else acc_transactions
+              ~f:(Public_key.Compressed.Set.mem participants)
+          in
+          match tracked_participants with
+          | `Some interested_participants
+            when not
+                   (should_include_transaction user_command
+                      interested_participants) ->
+              acc_transactions
+          | _ ->
+              { acc_transactions with
+                user_commands= user_command :: acc_transactions.user_commands
+              } )
       | Fee_transfer fee_transfer ->
-          let fee_transfers =
-            List.filter ~f:(fun (pk, _) ->
-                Public_key.Compressed.Set.mem tracked_participants pk )
-            @@
+          let fee_transfer_list =
             match fee_transfer with
             | One fee_transfer1 ->
                 [fee_transfer1]
             | Two (fee_transfer1, fee_transfer2) ->
                 [fee_transfer1; fee_transfer2]
+          in
+          let fee_transfers =
+            match tracked_participants with
+            | `All ->
+                fee_transfer_list
+            | `Some interested_participants ->
+                List.filter
+                  ~f:(fun (pk, _) ->
+                    Public_key.Compressed.Set.mem interested_participants pk )
+                  fee_transfer_list
           in
           { acc_transactions with
             fee_transfers= fee_transfers @ acc_transactions.fee_transfers }

@@ -13,7 +13,8 @@ module type S = sig
                 , [`Staged_ledger_diff] * Truth.false_t )
                 External_transition.Validation.with_transition
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type 'a transaction_snark_work_statement_table := 'a Transaction_snark_work.Statement.Table.t
+     and type 'a transaction_snark_work_statement_table :=
+                'a Transaction_snark_work.Statement.Table.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
      and type verifier := Verifier.t

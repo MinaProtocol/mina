@@ -6,7 +6,7 @@ module Stable = struct
     module T = struct
       type t =
         {pending_coinbases: Pending_coinbase.Stable.V1.t; is_new_stack: bool}
-      [@@deriving bin_io, sexp, version]
+      [@@deriving bin_io, sexp, to_yojson, version]
     end
 
     include T
@@ -27,4 +27,4 @@ end
 
 type t = Stable.Latest.t =
   {pending_coinbases: Pending_coinbase.Stable.V1.t; is_new_stack: bool}
-[@@deriving sexp]
+[@@deriving to_yojson, sexp]

@@ -1,0 +1,26 @@
+service: sendgrid-subscription
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+
+  region: us-east-2
+
+# you can define service wide environment variables here
+#  environment:
+#    variable1: value1
+
+functions:
+  sendConfirmation:
+    handler: handler.sendConfirmation
+    events:
+      - http:
+          path: subscribe
+          method: post
+  confirmEmail:
+    handler: handler.confirmEmail
+    events:
+      - http:
+          path: confirm
+          method: get
+

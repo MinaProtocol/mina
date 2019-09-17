@@ -141,7 +141,8 @@ end
 module Checked = struct
   let%snarkydef is_base_hash h =
     Field.Checked.equal
-      (Field.Var.constant (Genesis_protocol_state.t.hash :> Field.t))
+      (Field.Var.constant
+         ((Lazy.force Genesis_protocol_state.t).hash :> Field.t))
       (State_hash.var_to_hash_packed h)
 
   let%snarkydef hash (t : Protocol_state.var) =

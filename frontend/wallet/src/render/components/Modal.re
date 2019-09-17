@@ -77,5 +77,6 @@ let make = (~isRed=false, ~onRequestClose, ~title, ~children) =>
     className=Styles.content
     overlayClassName=Styles.overlay>
     <h1 className={Styles.title(isRed)}> {React.string(title)} </h1>
+    <Spacer height=1. />
     children
   </Binding>;

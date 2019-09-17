@@ -10,12 +10,9 @@ type t = AddressBookContextType.t;
 include ContextProvider.Make(AddressBookContextType);
 
 let createContext = () => {
-  let localStorageKeyName = "addressbook";
-
   let (settings, setAddressBook) =
     React.useState(() =>
-      localStorageKeyName
-      |> Bindings.LocalStorage.getItem
+      Bindings.LocalStorage.getItem(`AddressBook)
       |> Js.Nullable.toOption
       |> Option.map(~f=AddressBook.fromJsonString)
       |> Option.withDefault(~default=AddressBook.empty)
@@ -27,8 +24,8 @@ let createContext = () => {
       setAddressBook(settings => {
         let newAddressBook = createNewAddressBook(settings);
         Bindings.LocalStorage.setItem(
-          localStorageKeyName,
-          AddressBook.toJsonString(newAddressBook),
+          ~key=`AddressBook,
+          ~value=AddressBook.toJsonString(newAddressBook),
         );
         newAddressBook;
       }),

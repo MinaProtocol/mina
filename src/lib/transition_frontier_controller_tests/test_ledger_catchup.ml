@@ -27,6 +27,7 @@ module Ledger_catchup = Ledger_catchup.Make (struct
     Transition_handler.Unprocessed_transition_cache
   module Transition_handler_validator = Transition_handler.Validator
   module Breadcrumb_builder = Transition_handler.Breadcrumb_builder
+  module Transition_chain_witness = Transition_chain_witness
 end)
 
 let%test_module "Ledger catchup" =
@@ -112,7 +113,7 @@ let%test_module "Ledger catchup" =
 
     let%test "peers can provide transitions with length between max_length to \
               2 * max_length" =
-      let logger = Logger.null () in
+      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       Thread_safe.block_on_async_exn (fun () ->
           let num_breadcrumbs =

@@ -1,11 +1,18 @@
 module Styles = {
   open Css;
 
+  let fadeIn =
+    keyframes([
+      (0, [opacity(0.)]),
+      (50, [opacity(0.)]),
+      (100, [opacity(1.)]),
+    ]);
+
   let bg =
     style([
       transition(~duration=200, "background"),
-      background(`url("light-bg-texture.svg")),
-      backgroundSize(`cover),
+      background(`url("bg-texture.png")),
+      backgroundColor(`hex("f4f4f4")),
     ]);
 
   let window =
@@ -17,6 +24,7 @@ module Styles = {
         width(pct(100.)),
         height(vh(100.)),
         overflow(`hidden),
+        animation(fadeIn, ~duration=750, ~iterationCount=`count(1)),
       ]),
       bg,
     ]);

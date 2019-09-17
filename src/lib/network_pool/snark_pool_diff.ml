@@ -2,27 +2,6 @@ open Core_kernel
 open Async_kernel
 open Module_version
 
-module Diff = struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type ('work, 'proof) t =
-          | Add_solved_work of
-              'work * 'proof Snark_pool.Priced_proof.Stable.V1.t
-        [@@deriving bin_io, sexp, yojson, version]
-      end
-
-      include T
-    end
-
-    module Latest = V1
-  end
-
-  type ('work, 'proof) t = ('work, 'proof) Stable.Latest.t =
-    | Add_solved_work of 'work * 'proof Snark_pool.Priced_proof.Stable.V1.t
-  [@@deriving sexp, yojson]
-end
-
 module Make (Ledger_proof : sig
   type t [@@deriving bin_io, sexp, yojson, version]
 end) (Work : sig
@@ -37,15 +16,20 @@ end) (Work : sig
     with type V1.t = t
 end)
 (Transition_frontier : T)
-(Pool : Snark_pool.S
+(Pool : Intf.Snark_resource_pool_intf
         with type work := Work.t
          and type transition_frontier := Transition_frontier.t
-         and type ledger_proof := Ledger_proof.t) =
-struct
+         and type ledger_proof := Ledger_proof.t) :
+  Intf.Snark_pool_diff_intf
+  with type ledger_proof := Ledger_proof.t
+   and type work := Work.t
+   and type resource_pool := Pool.t = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = (Work.Stable.V1.t, Ledger_proof.t list) Diff.Stable.V1.t
+        type t =
+          | Add_solved_work of
+              Work.Stable.V1.t * Ledger_proof.t list Priced_proof.Stable.V1.t
         [@@deriving bin_io, sexp, yojson, version]
       end
 
@@ -69,7 +53,7 @@ struct
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
   let summary = function
-    | Diff.Add_solved_work (_, {proof= _; fee}) ->
+    | Stable.V1.Add_solved_work (_, {proof= _; fee}) ->
         Printf.sprintf
           !"Snark_pool_diff add with fee %{sexp: Coda_base.Fee_with_prover.t}"
           fee
@@ -84,11 +68,7 @@ struct
           Ok t
     in
     ( match t with
-    | Add_solved_work (work, {proof; fee}) ->
+    | Stable.V1.Add_solved_work (work, {proof; fee}) ->
         Pool.add_snark pool ~work ~proof ~fee )
     |> to_or_error |> Deferred.return
 end
-
-include Make (Ledger_proof.Stable.V1) (Transaction_snark_work.Statement)
-          (Transition_frontier)
-          (Snark_pool)

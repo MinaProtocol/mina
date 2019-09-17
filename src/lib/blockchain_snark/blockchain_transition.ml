@@ -29,7 +29,7 @@ module Keys = struct
 
     let dummy =
       { step= Dummy_values.Tick.Groth16.proving_key
-      ; wrap= Dummy_values.Tock.GrothMaller17.proving_key }
+      ; wrap= Dummy_values.Tock.Bowe_gabizon18.proving_key }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
@@ -69,7 +69,7 @@ module Keys = struct
 
     let dummy =
       { step= Dummy_values.Tick.Groth16.verification_key
-      ; wrap= Dummy_values.Tock.GrothMaller17.verification_key }
+      ; wrap= Dummy_values.Tock.Bowe_gabizon18.verification_key }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
@@ -213,6 +213,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
       Cached.Spec.create ~load ~name:"blockchain-snark step keys"
         ~autogen_path:Cache_dir.autogen_path
         ~manual_install_path:Cache_dir.manual_install_path
+        ~brew_install_path:Cache_dir.brew_install_path
         ~digest_input:
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
         ~create_env:Tick.Keypair.generate
@@ -241,6 +242,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
         Cached.Spec.create ~load ~name:"blockchain-snark wrap keys"
           ~autogen_path:Cache_dir.autogen_path
           ~manual_install_path:Cache_dir.manual_install_path
+          ~brew_install_path:Cache_dir.brew_install_path
           ~digest_input:
             (Fn.compose Md5.to_hex Tock.R1CS_constraint_system.digest)
           ~create_env:Tock.Keypair.generate

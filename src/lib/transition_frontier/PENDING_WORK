@@ -1,25 +1,37 @@
+# Features
+
+- reimplement ledger catchup sync status (#3006)
 + implement persistent transition frontier loading
 * implement short term fast forward hack
   - push transition frontier ownership down into transition router
   - bootstrap recovery
   - failure recovery (clean and retry once)
-- implement persistent frontier database reset
-- implement persistent frontier database destruction
-- fix visualization logging on crashes
-- remove identity pipe and extension
++ implement persistent frontier database reset
++ implement persistent frontier database destruction
 - audit persistent root state management (updates, resets)
 + audit persistent frontier sync vs instance resource management
-+ hook up transition registry
-- add unit tests back in
 - diff buffer flush on interval
-- better encapsulate transition frontier sub libraries using top level interfaces
-- invert broadcastable extensions functor (include functor in definition, don't pass definition to functor)
-- transition frontier graceful shutdown
-- create reusable pattern for singleton factories
+
+# Regressions
+
+- add unit tests back in
+- fix visualization logging on crashes
+
+# Refactors
+
+- defunctor transition frontier
 - singleton factory instance reuse after destruction prevention
-- improved error handling in persistent frontier instance entrypoints
-- improved persistent frontier database batched requests
+- remove identity pipe and extension
+- invert broadcastable extensions functor (include functor in definition, don't pass definition to functor)
+- create reusable pattern for singleton factories
+- better encapsulate transition frontier sub libraries using top level interfaces
++ improved error handling in persistent frontier instance entrypoints
 - convert persistent frontier sync into an extension?
-- extensions full diffs
 - extensions refactor (multiple files)
+
+# External
+
+- transition frontier graceful shutdown
+- improved persistent frontier database batched requests
+- extensions full diffs
 - dynamic extensions? (probably just open an issue for this)

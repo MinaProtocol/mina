@@ -187,7 +187,7 @@ module Make (Inputs : Inputs.S) = struct
               ; ( "cached_transition"
                 , With_hash.data transition_with_hash
                   |> Inputs.External_transition.to_yojson ) ]
-            "timed out waiting for the parent of $cached_transition after \
+            "Timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
           if Writer.is_closed t.catchup_job_writer then
@@ -216,10 +216,10 @@ module Make (Inputs : Inputs.S) = struct
               in
               State_hash.equal hash sibling_hash )
         then
-          Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+          Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("state_hash", State_hash.to_yojson hash)]
-            "Received request to watch transition for catchup that already \
-             was being watched: $state_hash"
+            "Received request to watch transition for catchup that already is \
+             being watched: $state_hash"
         else
           let (_ : Block_time.Span.t option) = cancel_timeout t hash in
           Hashtbl.set t.collected_transitions ~key:parent_hash

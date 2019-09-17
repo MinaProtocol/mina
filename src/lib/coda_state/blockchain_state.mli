@@ -67,9 +67,9 @@ val create_value :
 
 val length_in_triples : int
 
-val negative_one : Value.t
+val negative_one : Value.t Lazy.t
 
-val genesis : Value.t
+val genesis : Value.t Lazy.t
 
 val set_timestamp : ('a, 'b, 'c) Poly.t -> 'c -> ('a, 'b, 'c) Poly.t
 

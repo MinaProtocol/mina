@@ -20,7 +20,7 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
      and type verifier := Verifier.t
      and type 'a transaction_snark_work_statement_table :=
-       'a Transaction_snark_work.Statement.Table.t
+                'a Transaction_snark_work.Statement.Table.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -105,11 +105,11 @@ module Make (Inputs : Inputs_intf) :
       |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
     in
     let merkle_list = Merkle_list.prove ~context:frontier best_verified_tip in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
         [ ( "merkle_list"
           , `List (List.map ~f:State_body_hash.to_yojson merkle_list) ) ]
-      "Produced a merkle list of $merkle_list" ;
+      "Root prover produced a merkle list of $merkle_list" ;
     Some
       Proof_carrying_data.
         { data= root |> External_transition.Validated.forget_validation
@@ -159,7 +159,8 @@ module Make (Inputs : Inputs_intf) :
     in
     let%bind () =
       check_error ~message:"Peer gave an invalid proof of it's root"
-        (Merkle_list.verify ~init:root_hash merkle_list best_tip_hash)
+        ( Merkle_list.verify ~init:root_hash merkle_list best_tip_hash
+        |> Option.is_some )
     in
     let root_with_validation =
       External_transition.skip_time_received_validation
@@ -183,3 +184,8 @@ module Make (Inputs : Inputs_intf) :
     in
     (validated_root, validated_best_tip)
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+end)

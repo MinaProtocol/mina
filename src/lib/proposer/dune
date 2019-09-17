@@ -1,11 +1,13 @@
 (library
  (name proposer)
  (public_name proposer)
- (flags :standard -short-paths -warn-error -58)
  (library_flags -linkall)
  (inline_tests)
- (libraries core async coda_lib coda_base envelope coda_intf async_extra
-   unix_timestamp o1trace interruptible pipe_lib transaction_snark_scan_state otp_lib)
+ (libraries
+   async async_extra core coda_base coda_intf coda_state
+   coda_transition envelope interruptible o1trace pipe_lib
+   prover transaction_snark_scan_state transition_frontier
+   network_pool unix_timestamp otp_lib)
  (preprocess
   (pps ppx_jane bisect_ppx -- -conditional))
  (synopsis "Coda block proposer"))

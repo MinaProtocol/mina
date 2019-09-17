@@ -1,7 +1,6 @@
 (library
  (name sha256_lib)
  (public_name sha256_lib)
- (flags :standard -short-paths -warn-error -58)
  (library_flags -linkall)
  (inline_tests)
  (libraries core coda_digestif snark_params)

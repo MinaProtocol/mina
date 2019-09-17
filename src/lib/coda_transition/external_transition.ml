@@ -8,22 +8,24 @@ module Make
     (Ledger_proof : Coda_intf.Ledger_proof_intf)
     (Verifier : Coda_intf.Verifier_intf
                 with type ledger_proof := Ledger_proof.t)
-    (Transaction_snark_work : sig 
-      module Stable : sig
-        module V1 : sig
-          type t [@@deriving bin_io, sexp, version]
+                                                        (Transaction_snark_work : sig
+        module Stable : sig
+          module V1 : sig
+            type t [@@deriving bin_io, sexp, version]
+          end
         end
-      end
 
-      type t = Stable.V1.t
+        type t = Stable.V1.t
 
-      module Checked : sig
-        type t [@@deriving sexp]
-      end
+        module Checked : sig
+          type t [@@deriving sexp]
+        end
     end)
     (Staged_ledger_diff : Coda_intf.Staged_ledger_diff_intf
-      with type transaction_snark_work := Transaction_snark_work.t
-       and type transaction_snark_work_checked := Transaction_snark_work.Checked.t) :
+                          with type transaction_snark_work :=
+                                      Transaction_snark_work.t
+                           and type transaction_snark_work_checked :=
+                                      Transaction_snark_work.Checked.t) :
   Coda_intf.External_transition_intf
   with type ledger_proof := Ledger_proof.t
    and type verifier := Verifier.t
@@ -53,6 +55,8 @@ module Make
 
         let consensus_state {protocol_state; _} =
           Protocol_state.consensus_state protocol_state
+
+        let state_hash {protocol_state; _} = Protocol_state.hash protocol_state
 
         let parent_hash {protocol_state; _} =
           Protocol_state.previous_state_hash protocol_state
@@ -87,10 +91,12 @@ module Make
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  open Stable.Latest
-
   (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t =
+    { protocol_state: Protocol_state.Value.Stable.V1.t
+    ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+    ; staged_ledger_diff: Staged_ledger_diff.t }
+  [@@deriving sexp]
 
   type external_transition = t
 
@@ -100,6 +106,7 @@ module Make
     , protocol_state_proof
     , staged_ledger_diff
     , consensus_state
+    , state_hash
     , parent_hash
     , proposer
     , user_commands
@@ -438,7 +445,7 @@ module Make
               ~f:target_hash_of_ledger_proof
               ~default:
                 (Frozen_ledger_hash.of_ledger_hash
-                   (Ledger.merkle_root Genesis_ledger.t))
+                   (Ledger.merkle_root (Lazy.force Genesis_ledger.t)))
         | Some (proof, _) ->
             target_hash_of_ledger_proof proof
       in
@@ -491,7 +498,9 @@ module Make
            ~protocol_state_proof:Precomputed_values.base_proof
            ~staged_ledger_diff:empty_diff)
     in
-    With_hash.of_data transition ~hash_data:(Fn.compose Protocol_state.hash protocol_state)
+    With_hash.of_data transition
+      ~hash_data:(Fn.compose Protocol_state.hash protocol_state)
 end
 
-include Make (Ledger_proof) (Verifier) (Transaction_snark_work) (Staged_ledger_diff)
+include Make (Ledger_proof) (Verifier) (Transaction_snark_work)
+          (Staged_ledger_diff)

@@ -38,7 +38,7 @@ module Styles = {
 
   let deactivatedSettings =
     merge([
-      Link.Styles.link,
+      Link.Styles.greyLink,
       style([
         padding4(
           ~top=`rem(0.5),
@@ -46,6 +46,12 @@ module Styles = {
           ~bottom=`rem(0.5),
           ~left=`rem(0.5),
         ),
+        color(Theme.Colors.slateAlpha(0.5)),
+        hover([
+          backgroundColor(Theme.Colors.slateAlpha(0.15)),
+          borderRadius(`px(6)),
+          color(Theme.Colors.slate),
+        ]),
       ]),
     ]);
 
@@ -63,10 +69,7 @@ module Styles = {
 module SyncStatusQ = [%graphql
   {|
     query querySyncStatus {
-      syncState {
-        status
-        description
-      }
+      syncStatus
     }
   |}
 ];
@@ -76,12 +79,9 @@ module SyncStatusQuery = ReasonApollo.CreateQuery(SyncStatusQ);
 module SyncStatus = {
   module SubscriptionGQL = [%graphql
     {|
-    subscription syncStatus {
-      newSyncUpdate {
-        status
-        description
+      subscription syncStatus {
+        newSyncUpdate
       }
-    }
     |}
   ];
 
@@ -91,32 +91,34 @@ module SyncStatus = {
   let make =
       (
         ~result,
-        ~subscribeToMore:
-           (
-             ~document: ReasonApolloTypes.queryString,
-             ~variables: Js.Json.t=?,
-             ~updateQuery: ReasonApolloQuery.updateQuerySubscriptionT=?,
-             ~onError: ReasonApolloQuery.onErrorT=?,
-             unit
-           ) =>
-           unit,
+        ~subscribeToMore as
+          _:
+            (
+              ~document: ReasonApolloTypes.queryString,
+              ~variables: Js.Json.t=?,
+              ~updateQuery: ReasonApolloQuery.updateQuerySubscriptionT=?,
+              ~onError: ReasonApolloQuery.onErrorT=?,
+              unit
+            ) =>
+            unit,
       ) => {
-    let _ =
-      React.useEffect0(() => {
-        subscribeToMore(~document=Subscription.graphQLSubscriptionAST, ());
-        None;
-      });
+    // TODO: Replace/remove when we fix/replace the current subscriptions
+    /* let _ = */
+    /*   React.useEffect0(() => { */
+    /*     subscribeToMore(~document=Subscription.graphQLSubscriptionAST, ()); */
+    /*     None; */
+    /*   }); */
     switch ((result: SyncStatusQuery.response)) {
     | Loading => <Alert kind=`Warning message="Connecting" />
     | Error(_) => <Alert kind=`Danger message="Error" />
     | Data(response) =>
-      let update = response##syncState;
-      switch (update##status) {
-      | `STALE => <Alert kind=`Warning message="Stale" />
-      | `ERROR => <Alert kind=`Danger message="Unsynced" />
+      switch (response##syncStatus) {
+      | `OFFLINE => <Alert kind=`Danger message="Offline" />
       | `SYNCED => <Alert kind=`Success message="Synced" />
       | `BOOTSTRAP => <Alert kind=`Warning message="Syncing" />
-      };
+      | `CONNECTING => <Alert kind=`Warning message="Connecting" />
+      | `LISTENING => <Alert kind=`Warning message="Listening" />
+      }
     };
   };
 };
@@ -130,20 +132,6 @@ let make = () => {
     | _ => false
     };
   <header className=Styles.header>
-    <svg
-      className=Css.(
-        style([position(`absolute), top(`px(4)), left(`px(7))])
-      )
-      width="54"
-      fill="transparent"
-      stroke="#C4C4C4"
-      height="14"
-      viewBox="-1 -1 54 14"
-      xmlns="http://www.w3.org/2000/svg">
-      <circle cx="6" cy="6" r="6" />
-      <circle cx="26" cy="6" r="6" />
-      <circle cx="46" cy="6" r="6" />
-    </svg>
     <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
       <img src="CodaLogo.svg" alt="Coda logo" />
     </div>
@@ -155,16 +143,14 @@ let make = () => {
              subscribeToMore={response.subscribeToMore}
            />}
       </SyncStatusQuery>
-      <Spacer width=1.5 />
+      <Spacer width=0.75 />
       <a
         className={
           onSettingsPage
             ? Styles.activatedSettings : Styles.deactivatedSettings
         }
         onClick={_e =>
-          onSettingsPage
-            ? ReasonReact.Router.push("/")
-            : ReasonReact.Router.push("/settings")
+          ReasonReact.Router.push(onSettingsPage ? "/" : "/settings")
         }>
         <Icon kind=Icon.Settings />
         <Spacer width=0.25 />

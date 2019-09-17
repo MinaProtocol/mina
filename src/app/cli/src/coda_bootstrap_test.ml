@@ -1,8 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
-open Coda_base
 open Signature_lib
 
 let name = "coda-bootstrap-test"
@@ -20,7 +17,7 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Seq ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
   let previous_status = Sync_status.Hash_set.create () in
   let bootstrapping_node = 1 in
@@ -30,8 +27,8 @@ let main () =
    Pipe_lib.Linear_pipe.iter (Option.value_exn sync_status_pipe_opt)
      ~f:(fun sync_status ->
        Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-         !"Bootstrap node received status: %{sexp:Sync_status.t}"
-         sync_status ;
+         !"Bootstrap node received status: %s"
+         (Sync_status.to_string sync_status) ;
        Hash_set.add previous_status sync_status ;
        Deferred.unit ))
   |> don't_wait_for ;
@@ -46,6 +43,5 @@ let main () =
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
-  let open Command.Let_syntax in
   Command.async ~summary:"Test that triggers bootstrap once"
     (Command.Param.return main)

@@ -1,7 +1,55 @@
 module Cdn = {
-  let prefix = ref("");
+  module Crypto = {
+    type t;
+    [@bs.val] [@bs.module "crypto"] external createHash: string => t = "";
+    [@bs.send] external update: (t, string) => unit = "";
+    [@bs.send] external digest: (t, string) => string = "";
+  };
 
-  let url = s => prefix^ ++ s;
+  let prefix = ref(None);
+
+  let setPrefix = p => prefix := Some(p);
+
+  let prefix = () =>
+    switch (prefix^) {
+    | None =>
+      Js.Exn.raiseError(
+        "CDN Prefix unset -- Can't run Links.Cdn.url at the top level.",
+      )
+    | Some(prefix) => prefix
+    };
+
+  let cache = Hashtbl.create(20);
+
+  let localAssetPath = path =>
+    if (path.[0] == '/') {
+      "." ++ path;
+    } else {
+      prerr_endline({j|"Expected cdn path `$path` to begin with /"|j});
+      exit(1);
+    };
+
+  let getHashedPath = path => {
+    if (!Hashtbl.mem(cache, path)) {
+      let localPath = localAssetPath(path);
+      // Get file contents
+      let content = Node.Fs.readFileAsUtf8Sync(localPath);
+      // Generate hash of file
+      let hashGen = Crypto.createHash("sha256");
+      Crypto.update(hashGen, content);
+      let hash = Crypto.digest(hashGen, "hex");
+      let index = Js.String.lastIndexOf(".", path);
+      let newPath =
+        String.sub(path, 0, index)
+        ++ "-"
+        ++ hash
+        ++ String.sub(path, index, String.length(path) - index);
+      Hashtbl.add(cache, path, newPath);
+    };
+    Hashtbl.find(cache, path);
+  };
+
+  let url = path => prefix() ++ getHashedPath(path);
 };
 
 module Named = {
@@ -25,7 +73,7 @@ module Forms = {
   };
 
   let participateInConsensus = {
-    link: "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+want+to+help+run+the+Coda+network+by+participating+in+consensus",
+    link: "https://docs.google.com/forms/d/e/1FAIpQLScQRGW0-xGattPmr5oT-yRb9aCkPE6yIKXSfw1LRmNx1oh6AA/viewform?usp=sf_link",
     name: "mailinglist-participateinconsensus",
   };
 
@@ -45,6 +93,14 @@ module Static = {
     name: ("Read the Coda Whitepaper", "coda-whitepaper"),
     // Hardcoding to v2 as the pdf is no longer tracked in git
     link: "https://cdn.codaprotocol.com/v2/static/coda-whitepaper-05-10-2018-0.pdf",
+  };
+
+  let modifiedsnark = () => {
+    name: (
+      "Read about the zkSNARK construction we're using",
+      "modified-BG-snark",
+    ),
+    link: Cdn.url("/static/modified-BG-snark-05-03-2019-0.pdf"),
   };
 
   let snarkette = {
@@ -208,6 +264,7 @@ module Lists = {
       ThirdParty.coindeskStartupBlockchain,
       ThirdParty.codaMediumPost,
       ThirdParty.tokenDailyQA,
+      Static.modifiedsnark(),
     ]
     // top 5 above, rest below the fold
     @ List.map(

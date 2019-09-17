@@ -14,8 +14,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     module Single = struct
       module Spec = struct
         type t =
-          ( Transaction_snark.Statement.t
-          , Transaction.t
+          ( Transaction.t
           , Transaction_witness.t
           , Ledger_proof.t )
           Work.Single.Spec.t
@@ -78,12 +77,12 @@ module Make (Inputs : Intf.Inputs_intf) :
         match tag with
         | `Merge ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"Merge Proof Completed - %s%!"
-              (Time.Span.to_string total)
+              "Merge SNARK generated in $time"
+              ~metadata:[("time", `String (Time.Span.to_string_hum total))]
         | `Transition ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"Base Proof Completed - %s%!"
-              (Time.Span.to_string total) )
+              "Base SNARK generated in $time"
+              ~metadata:[("time", `String (Time.Span.to_string_hum total))] )
 
   let main daemon_address public_key shutdown_on_disconnect =
     let logger = Logger.create () in
@@ -114,8 +113,9 @@ module Make (Inputs : Intf.Inputs_intf) :
           go ()
       | Ok (Some work) -> (
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            !"Received work from %s%!"
-            (Host_and_port.to_string daemon_address) ;
+            "SNARK work received from $address. Starting proof generation"
+            ~metadata:
+              [("address", `String (Host_and_port.to_string daemon_address))] ;
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
           match perform state public_key work with
@@ -125,8 +125,10 @@ module Make (Inputs : Intf.Inputs_intf) :
               match%bind
                 emit_proof_metrics result.metrics logger ;
                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Submitted work to %s%!"
-                  (Host_and_port.to_string daemon_address) ;
+                  "Submitted completed SNARK work to $address"
+                  ~metadata:
+                    [ ( "address"
+                      , `String (Host_and_port.to_string daemon_address) ) ] ;
                 dispatch Rpcs.Submit_work.Latest.rpc shutdown_on_disconnect
                   result daemon_address
               with
@@ -159,7 +161,7 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let arguments ~public_key ~daemon_address ~shutdown_on_disconnect =
     [ "-public-key"
-    ; Public_key.Compressed.to_base64 public_key
+    ; Public_key.Compressed.to_base58_check public_key
     ; "-daemon-address"
     ; Host_and_port.to_string daemon_address
     ; "-shutdown-on-disconnect"

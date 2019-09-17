@@ -5,7 +5,8 @@ Consensus refers to the process by which the network determines which informatio
 
 A consensus mechanism controls many aspects in a protocol which is built on top of it. For the purpose of this discussion, we will separate the provisions of a consensus mechanism into two parts: the data (data structures made available and the interactions available with them) and hooks (specific top level hooks called by the protocol built on top of the consensus mechanism). Data structures provided by the consensus mechanism are kept abstract to the outside system interacting with them and are instead primarily consumed by the consensus mechanism's hooks.
 
-<sup>_NOTE: this document only covers the generalized consensus mechanism abstraction in Coda. For information on the implementation of Proof of Stake in Coda, [see the relevant documentation](proof\_of\_stake.md)._</sup>
+!!! note
+    This document only covers the generalized consensus mechanism abstraction in Coda. For information on the implementation of Proof of Stake in Coda, [see the relevant documentation](../proof-of-stake).
 
 ## Data
 

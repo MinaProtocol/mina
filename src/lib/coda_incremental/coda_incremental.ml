@@ -37,6 +37,14 @@ struct
         Var.set var value ; stabilize () ; Deferred.unit )
     |> don't_wait_for ;
     var
+
+  let of_ivar (ivar : unit Ivar.t) =
+    let var = Var.create `Empty in
+    don't_wait_for
+      (Deferred.map (Ivar.read ivar) ~f:(fun () ->
+           Var.set var `Filled ;
+           stabilize () )) ;
+    var
 end
 
 module New_transition =

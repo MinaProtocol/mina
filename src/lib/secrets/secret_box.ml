@@ -4,11 +4,15 @@ open Sodium
 module BytesWr = struct
   include Bytes
 
-  let to_yojson t = `String (Bytes.to_string t |> Base64.encode_string)
+  module Base58_check = Base58_check.Make (struct
+    let version_byte = Base58_check.Version_bytes.secret_box_byteswr
+  end)
+
+  let to_yojson t = `String (Bytes.to_string t |> Base58_check.encode)
 
   let of_yojson = function
     | `String s ->
-        Ok (Base64.decode_exn s |> Bytes.of_string)
+        Ok (Base58_check.decode_exn s |> Bytes.of_string)
     | _ ->
         Error "Bytes.of_yojson needs a string"
 end

@@ -7,12 +7,14 @@
     "build": "bsb -make-world && node ./lib/js/src/Render.js",
     "clean": "bsb -clean-world",
     "watch": "bsb -make-world -w",
-    "start": "npx reload -d site -p 8000",
-    "dev": "npx concurrently 'bsb -make-world -w' 'npx nodemon ./lib/js/src/Render.js' 'npx reload -d site -p 8000 -w site'",
+    "start": "serve -l 8000 site",
+    "dev": "npx concurrently 'bsb -make-world -w' 'npx nodemon ./lib/js/src/Render.js mkdocs.yml' 'serve -l 8000 site'",
     "reformat": "bsrefmt --in-place src/*.re",
+    "deploy": "./deploy-website.sh",
     "deploy-ci": "FIREBASE_TOKEN=\"$FIREBASE_TOKEN\" ./deploy-website.sh ci",
     "decrypt": "cd static/font && unzip PragmataPro.zip",
-    "decrypt-ci": "([ -z \"$PRAGMATA_ZIP_PASSWORD\" ] && cp static/font/IBMPlexMono-Medium-Latin1.woff static/font/Essential-PragmataPro-Regular.woff && cp static/font/IBMPlexMono-Medium-Latin1.woff2 static/font/Essential-PragmataPro-Regular.woff2 && cp static/font/IBMPlexMono-Medium-Latin1.woff static/font/PragmataPro-Bold.woff && cp static/font/IBMPlexMono-Medium-Latin1.woff2 static/font/PragmataPro-Bold.woff2  ) || (cd static/font && unzip -P \"$PRAGMATA_ZIP_PASSWORD\" PragmataPro.zip)"
+    "decrypt-ci": "([ -z \"$PRAGMATA_ZIP_PASSWORD\" ] && cp static/font/IBMPlexMono-Medium-Latin1.woff static/font/Essential-PragmataPro-Regular.woff && cp static/font/IBMPlexMono-Medium-Latin1.woff2 static/font/Essential-PragmataPro-Regular.woff2 && cp static/font/IBMPlexMono-Medium-Latin1.woff static/font/PragmataPro-Bold.woff && cp static/font/IBMPlexMono-Medium-Latin1.woff2 static/font/PragmataPro-Bold.woff2  ) || (cd static/font && unzip -P \"$PRAGMATA_ZIP_PASSWORD\" PragmataPro.zip)",
+    "graphql-docs": "graphdoc -s ../wallet/schema.graphql -o ./graphql-docs --force"
   },
   "dependencies": {
     "bs-css": "8.0.2",
@@ -22,10 +24,10 @@
     "rimraf": "^2.6.3"
   },
   "devDependencies": {
+    "@2fd/graphdoc": "^2.4.0",
     "bs-platform": "^5.0.0-dev.5",
     "concurrently": "^4.1.0",
-    "firebase-tools": "^6.5.0",
-    "reload": "^3.0.1"
+    "serve": "^11.1.0"
   },
   "nodemonConfig": {
     "ignore": [

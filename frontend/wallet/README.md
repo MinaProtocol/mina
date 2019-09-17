@@ -4,7 +4,7 @@ Coda is a new cryptocurrency protocol with a lightweight, constant sized blockch
 
 The Coda Wallet desktop app allows you to manage your wallets, send and receive transactions, and stake your Coda for coinbase rewards.
 
-We have a [Discord server]( https://discord.gg/ShKhA7J)! Please come by if you
+We have a [Discord server](https://bit.ly/CodaDiscord)! Please come by if you
 need help or have questions. You might also be interested in the [OCaml
 Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
 

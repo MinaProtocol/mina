@@ -8,39 +8,67 @@ if [[ $# -ne 1 ]]; then
 fi
 
 
-rm -rf lib/website
-mkdir -p lib/website
+rm -rf deploy
+mkdir -p deploy
 
 echo "*** Building"
 
-npm run build && node lib/js/src/Render.js prod
+yarn clean && yarn build $1
+yarn graphql-docs
+
+
+# Deploy cdn if prod
+# ==================
+
+if [[ "$1" == "prod" ]]; then
+  echo "Deploying to prod involves refreshing cdn assets."
+  read -p "This costs \$\$, are you sure? [y/N]" -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Canceled deployment"
+    exit 1
+  fi
+  BUCKET="s3://website-codaprotocol/website"
+  echo "*** Deploying to $BUCKET"
+  mkdir -p deploy/cdn
+  cp -r site/static deploy/cdn/static
+  pushd deploy/cdn > /dev/null
+  aws s3 sync . "$BUCKET"
+  popd > /dev/null
+fi
+
+# Deploy firebase
+# ===============
 
 # first copy the full site
-cp -r site/* lib/website
+cp -r site deploy/website
 
-# static main.bc.js and verifier_main.bc.js
-rm -rf lib/website/static
-mkdir -p lib/website/static
-cp site/static/main.bc.js lib/website/static
-cp site/static/verifier_main.bc.js lib/website/static
 
 CI=no
 if [[ "$1" == "staging" ]]; then
-  TARGET=coda-staging-84430
+  TARGET=proof-of-steak-7ab54
 elif [[ "$1" == "ci" ]]; then
   TARGET=coda-staging-84430
   CI=yes
 elif [[ "$1" == "prod" ]]; then
   TARGET=coda-203520
+
+  # remove cdn assets and move
+  # main.bc.js and verifier_main.bc.js to static
+  rm -rf deploy/website/static
+  mkdir -p deploy/website/static
+  cp static/main.bc.js deploy/website/static
+  cp static/verifier_main.bc.js deploy/website/static
 else
-  echo "Target must be one of: staging, prod"
+  echo "Target must be one of: staging, prod, ci"
   exit 1
 fi
 
-if [[ "$CI" != "yes" ]]; then
-  read -p "To $1, did you deploy to CDN first? And are you sure? This can break the live site: [y/N]" -n 1 -r
+if [[ "$CI" = "no" ]]; then
+  read -p "You are deploying to $1 ($TARGET). ARE YOU SURE? [y/N]" -n 1 -r
   echo
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Canceled deployment"
     exit 1
   fi
 fi
@@ -51,9 +79,9 @@ if [[ "$CI" == "yes" ]]; then
   if [[ -z "$FIREBASE_TOKEN" || "$FIREBASE_TOKEN" == "" ]]; then
     echo "Skipping deployment as you don't have the creds to see our token!"
   else
-    ./node_modules/firebase-tools/lib/bin/firebase.js --token "$FIREBASE_TOKEN" --project $TARGET deploy
+    npx firebase-tools --token "$FIREBASE_TOKEN" --project $TARGET deploy
   fi
 else
-  ./node_modules/firebase-tools/lib/bin/firebase.js --project $TARGET deploy
+  npx firebase-tools --project $TARGET deploy
 fi
 

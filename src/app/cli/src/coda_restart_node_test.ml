@@ -1,8 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
-open Coda_base
 open Signature_lib
 
 let name = "coda-restart-node-test"
@@ -20,7 +17,7 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Seq ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:1
@@ -29,6 +26,5 @@ let main () =
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
-  let open Command.Let_syntax in
   Command.async ~summary:"Test of stopping, waiting, then starting a node"
     (Command.Param.return main)

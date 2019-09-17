@@ -70,13 +70,7 @@ struct
   end
 
   module Staged_ledger = Staged_ledger.Make (struct
-    module Compressed_public_key = Signature_lib.Public_key.Compressed
     module User_command = User_command
-    module Fee_transfer = Coda_base.Fee_transfer
-    module Coinbase = Coda_base.Coinbase
-    module Transaction = Transaction
-    module Ledger_hash = Coda_base.Ledger_hash
-    module Frozen_ledger_hash = Coda_base.Frozen_ledger_hash
     module Ledger_proof_statement = Transaction_snark.Statement
     module Proof = Proof
     module Sok_message = Coda_base.Sok_message
@@ -84,25 +78,13 @@ struct
     module Ledger_proof_verifier = Verifier
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Staged_ledger_hash = Staged_ledger_hash_binable
-    module Transaction_snark_statement = Transaction_snark.Statement
     module Transaction_snark_work = Transaction_snark_work
     module Transaction_validator = Transaction_validator
     module Staged_ledger_diff = Staged_ledger_diff
     module Account = Coda_base.Account
-    module Ledger = Coda_base.Ledger
-    module Sparse_ledger = Coda_base.Sparse_ledger
     module Verifier = Verifier
     module Proof_type = Transaction_snark.Proof_type
-
-    module Pending_coinbase = struct
-      include Pending_coinbase.Stable.V1
-
-      include (
-        Pending_coinbase : module type of Pending_coinbase with type t := t )
-    end
-
     module Pending_coinbase_hash = Pending_coinbase.Hash
-    module Pending_coinbase_stack = Pending_coinbase.Stack
     module Pending_coinbase_stack_state =
       Transaction_snark.Pending_coinbase_stack_state
     module Transaction_witness = Transaction_witness
@@ -111,7 +93,7 @@ struct
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
      user if they at least one coin*)
-  let gen_payments accounts_with_secret_keys :
+  let gen_payments staged_ledger accounts_with_secret_keys :
       User_command.With_valid_signature.t Sequence.t =
     let public_keys =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
@@ -123,14 +105,22 @@ struct
         let%bind sender_sk = sender_sk in
         let sender_keypair = Keypair.of_private_key_exn sender_sk in
         let%bind receiver_pk = List.random_element public_keys in
+        let nonce =
+          let ledger = Staged_ledger.ledger staged_ledger in
+          let status, account_location =
+            Ledger.get_or_create_account_exn ledger sender_account.public_key
+              sender_account
+          in
+          assert (status = `Existed) ;
+          (Option.value_exn (Ledger.get ledger account_location)).nonce
+        in
         let send_amount = Currency.Amount.of_int 1 in
         let sender_account_amount =
           sender_account.Account.Poly.balance |> Currency.Balance.to_amount
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let payload : User_command.Payload.t =
-          User_command.Payload.create ~fee:Fee.zero
-            ~nonce:sender_account.Account.Poly.nonce
+          User_command.Payload.create ~fee:Fee.zero ~nonce
             ~memo:User_command_memo.dummy
             ~body:(Payment {receiver= receiver_pk; amount= send_amount})
         in
@@ -174,7 +164,9 @@ struct
       let parent_staged_ledger =
         Transition_frontier.Breadcrumb.staged_ledger parent_breadcrumb
       in
-      let transactions = gen_payments accounts_with_secret_keys in
+      let transactions =
+        gen_payments parent_staged_ledger accounts_with_secret_keys
+      in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
           ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2)
@@ -328,7 +320,6 @@ struct
             ; user_commands= []
             ; coinbase= Staged_ledger_diff.At_most_two.Zero }
           , None )
-      ; prev_hash= Staged_ledger_hash.genesis
       ; creator }
     in
     (* the genesis transition is assumed to be valid *)
@@ -369,7 +360,8 @@ struct
           Coda_base.Ledger.Db.create ~directory_name:ledger_dir ()
         in
         let root_snarked_ledger =
-          Ledger_transfer.transfer_accounts ~src:Genesis_ledger.t
+          Ledger_transfer.transfer_accounts
+            ~src:(Lazy.force Genesis_ledger.t)
             ~dest:ledger_db
         in
         let consensus_local_state =
@@ -378,7 +370,8 @@ struct
         let%bind frontier =
           create_frontier_from_genesis_protocol_state ~logger
             ~consensus_local_state
-            ~genesis_protocol_state_with_hash:Genesis_protocol_state.t
+            ~genesis_protocol_state_with_hash:
+              (Lazy.force Genesis_protocol_state.t)
             root_snarked_ledger
         in
         f frontier )
@@ -398,7 +391,7 @@ struct
         ~genesis_consensus_state:
           (Consensus.Data.Consensus_state.create_genesis
              ~negative_one_protocol_state_hash:
-               Protocol_state.(hash negative_one))
+               Protocol_state.(hash (Lazy.force negative_one)))
         ~genesis_ledger:(Ledger.of_database root_snarked_ledger)
     in
     create_frontier_from_genesis_protocol_state ~logger ~consensus_local_state
@@ -466,6 +459,14 @@ struct
     include Transition_frontier_inputs
     module Transition_frontier = Transition_frontier
   end)
+
+  module Transition_chain_witness = Transition_chain_witness.Make (struct
+    include Transition_frontier_inputs
+    module Transition_frontier = Transition_frontier
+  end)
+
+  module Transaction_pool =
+    Network_pool.Transaction_pool.Make (Staged_ledger) (Transition_frontier)
 
   module Breadcrumb_visualizations = struct
     module Graph =
@@ -547,18 +548,16 @@ struct
 
     let create_stub ~logger ~ip_table ~peers = {logger; ip_table; peers}
 
+    let peers_by_ip _ ip =
+      [Network_peer.Peer.{host= ip; discovery_port= 0; communication_port= 0}]
+
+    let first_message _ = Ivar.create ()
+
+    let first_connection _ = Ivar.create ()
+
     let random_peers {peers; _} num_peers =
       let peer_list = Hash_set.to_list peers in
       List.take (List.permute peer_list) num_peers
-
-    let catchup_transition {ip_table; _} peer state_hash =
-      Deferred.Result.return
-      @@
-      let open Option.Let_syntax in
-      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
-      Sync_handler.transition_catchup ~frontier state_hash
-
-    let mplus ma mb = if Option.is_some ma then ma else mb
 
     let query_peer {ip_table= _; _} _peer _f _r = failwith "..."
 
@@ -582,6 +581,37 @@ struct
            (let open Option.Let_syntax in
            let%bind frontier = Hashtbl.find ip_table inet_addr in
            Root_prover.prove ~logger ~frontier consensus_state)
+
+    let get_transition_chain_witness {ip_table; _} peer requested_state_hash =
+      return
+      @@ Result.of_option
+           ~error:
+             (Error.of_string "Peer doesn't have the requested transition")
+      @@
+      let open Option.Let_syntax in
+      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
+      Transition_chain_witness.prove ~frontier requested_state_hash
+
+    let get_transition_chain {ip_table; _} peer hashes =
+      return
+      @@ Result.of_option
+           ~error:
+             (Error.of_string
+                "Peer doesn't have the requested chain of transitions")
+      @@
+      let open Option.Let_syntax in
+      let%bind frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
+      Option.all
+      @@ List.map hashes ~f:(fun hash ->
+             Option.merge
+               (Transition_frontier.find frontier hash)
+               (Transition_frontier.find_in_root_history frontier hash)
+               ~f:Fn.const
+             |> Option.map ~f:(fun breadcrumb ->
+                    Transition_frontier.Breadcrumb.transition_with_hash
+                      breadcrumb
+                    |> With_hash.data
+                    |> External_transition.Validated.forget_validation ) )
 
     let glue_sync_ledger {ip_table; logger; _} query_reader response_writer :
         unit =

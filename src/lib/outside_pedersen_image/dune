@@ -1,7 +1,6 @@
 (library
   (name outside_pedersen_image)
   (public_name outside_pedersen_image)
-  (flags :standard -short-paths -warn-error -58)
   (libraries snark_params)
   (preprocess
     (pps ppx_jane ppxlib.metaquot)))

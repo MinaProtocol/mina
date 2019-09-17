@@ -17,7 +17,7 @@ let ip_service_result {uri; body_handler} =
 
 let find () =
   let handler acc elem =
-    match acc with None -> ip_service_result elem | Some x -> return acc
+    match acc with None -> ip_service_result elem | Some _ -> return acc
   in
   Deferred.List.fold services ~init:None ~f:handler
   >>| fun x ->

@@ -7,35 +7,25 @@
 //     before actions happen
 // (2) Other code depends on this property
 
-open Tc;
-
 type t =
-  | Send
-  | DeleteWallet // TODO: include wallet id in payload
-  | Home;
+  | Home
+  | Settings;
 
 module Decode = {
   let parse =
     fun
-    | "send" => Some(Send)
-    | "wallet/delete" => Some(DeleteWallet)
-    | "" => Some(Home)
+    | "/settings" => Some(Home)
+    | "/" => Some(Home)
     | _ => None;
 
-  let t = json =>
-    Json.Decode.string(json)
-    |> parse
-    |> Option.withDefault(
-         ~default=raise(Json.Decode.DecodeError("Path can't parse")),
-       );
+  let t = json => Json.Decode.string(json) |> parse;
 };
 
 module Encode = {
   let print =
     fun
-    | Send => "send"
-    | DeleteWallet => "wallet/delete"
-    | Home => "";
+    | Settings => "/settings"
+    | Home => "/";
 
   let t = t => Json.Encode.string(print(t));
 };

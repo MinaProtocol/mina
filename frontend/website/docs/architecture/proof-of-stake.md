@@ -1,0 +1,1 @@
+../../../../docs/proof-of-stake.md

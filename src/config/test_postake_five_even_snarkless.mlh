@@ -7,7 +7,7 @@
 [%%import "config/txpool_size.mlh"]
 [%%import "config/curve_size/small.mlh"]
 
-[%%define time_offsets false]
+[%%define time_offsets true]
 [%%define fake_hash true]
 
 [%%define genesis_ledger "test_five_even_stakes"]

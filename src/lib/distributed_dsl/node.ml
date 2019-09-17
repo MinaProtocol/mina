@@ -154,21 +154,21 @@ module type F = functor
       and module Timer := Timer
 
 module Make (State : sig
-  type t [@@deriving eq, sexp, yojson]
+  type t [@@deriving eq, sexp, to_yojson]
 end) (Message : sig
   type t
 end)
 (Peer : Peer_intf)
 (Timer : Timer_intf) (Message_label : sig
-    type label [@@deriving enum, sexp]
+    type label [@@deriving sexp]
 
     include Hashable.S with type t = label
 end) (Timer_label : sig
-  type label [@@deriving enum, sexp]
+  type label [@@deriving sexp]
 
   include Hashable.S with type t = label
 end) (Condition_label : sig
-  type label [@@deriving enum, sexp, yojson]
+  type label [@@deriving sexp, to_yojson]
 
   include Hashable.S with type t = label
 end)
@@ -269,8 +269,8 @@ struct
     in
     b
 
-  let make_node ~transport ~logger ~me ~messages ?parent ~initial_state ~timer
-      message_conditions handle_conditions =
+  let make_node ~transport ~logger ~me ~messages ?parent:_ ~initial_state
+      ~timer message_conditions handle_conditions =
     let logger = Logger.extend logger [("dsl_node", Peer.to_yojson me)] in
     let conditions = Condition_label.Table.create () in
     List.iter handle_conditions ~f:(fun (l, c, h) ->
@@ -335,7 +335,7 @@ struct
               "Making transition from $source to $destination at $peer label: \
                $label" ;
             t'
-        | _ :: _ :: xs as l ->
+        | _ :: _ :: _ as l ->
             failwithf "Multiple conditions matched current state: %s"
               ( List.map l ~f:(fun (label, _) -> label)
               |> List.sexp_of_t Condition_label.sexp_of_label
@@ -368,7 +368,7 @@ struct
                 %!"
               t.state t'.state t.ident label ;
             t'
-        | _ :: _ :: xs as l ->
+        | _ :: _ :: _ as l ->
             failwithf "Multiple conditions matched current state: %s"
               ( List.map l ~f:(fun (label, _) -> label)
               |> List.sexp_of_t Message_label.sexp_of_label
@@ -377,11 +377,11 @@ struct
     | false, None, None ->
         return (with_new_state t t.state)
 
-  let ident {ident} = ident
+  let ident {ident; _} = ident
 
-  let state {state} = state
+  let state {state; _} = state
 
-  let send {transport} = Transport.send transport
+  let send {transport; _} = Transport.send transport
 
   let send_exn t ~recipient msg =
     match%map send t ~recipient msg with

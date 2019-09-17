@@ -1,0 +1,8 @@
+(library
+ (name coda_version)
+ (public_name coda_version))
+
+(rule
+ (targets coda_version.ml)
+ (deps (:< gen.sh))
+ (action (run %{<} %{targets})))

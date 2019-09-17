@@ -27,18 +27,14 @@ let pedersen_params ~loc =
     List.init (Array.length arr) ~f:(fun i ->
         let g, _, _, _ = arr.(i) in
         estring
-          (Base64.encode_string
-             (Binable.to_string
-                (module Lite_curve_choice.Tock.G1)
-                (Lite_compat_algebra.g1 g))) )
+          (Binable.to_string
+             (module Lite_curve_choice.Tock.G1)
+             (Lite_compat_algebra.g1 g)) )
     |> E.pexp_array
   in
   [%expr
     Array.map
-      (fun s ->
-        Core_kernel.Binable.of_string
-          (module Lite_curve_choice.Tock.G1)
-          (Base64.decode_exn s) )
+      (Core_kernel.Binable.of_string (module Lite_curve_choice.Tock.G1))
       [%e arr_expr]]
 
 open Async
@@ -48,7 +44,9 @@ let main () =
     Format.formatter_of_out_channel (Out_channel.create "pedersen_params.ml")
   in
   let loc = Ppxlib.Location.none in
-  let structure = [%str let pedersen_params = [%e pedersen_params ~loc]] in
+  let structure =
+    [%str let pedersen_params = lazy [%e pedersen_params ~loc]]
+  in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0
 

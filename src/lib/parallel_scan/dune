@@ -1,7 +1,6 @@
 (library
  (name parallel_scan)
  (public_name parallel_scan)
- (flags :standard -short-paths -warn-error -58)
  (inline_tests)
  (library_flags -linkall)
  (libraries pipe_lib coda_digestif core async async_extra sgn)

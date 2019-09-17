@@ -55,7 +55,7 @@ let make = _ => {
     <A
       name="announcementbar"
       id="announcementbar--anchor"
-      href="/blog/snark-challenge.html"
+      href="/docs/getting-started/"
       className=Css.(
         style(
           Style.paddingX(`rem(1.25))
@@ -87,7 +87,7 @@ let make = _ => {
               ]),
             ])
           )>
-          {ReasonReact.string("SNARK Challenge")}
+          {ReasonReact.string("Testnet Beta is live")}
         </p>
       </div>
       <p

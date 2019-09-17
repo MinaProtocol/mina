@@ -1,1 +1,1 @@
-include Lite_params.Tock.Groth_maller.Proof
+include Crypto_params.Tock.Bowe_gabizon.Proof

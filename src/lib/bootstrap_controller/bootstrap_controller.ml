@@ -21,7 +21,7 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
      and type verifier := Verifier.t
      and type 'a transaction_snark_work_statement_table :=
-       'a Transaction_snark_work.Statement.Table.t
+                'a Transaction_snark_work.Statement.Table.t
 
   module Root_sync_ledger :
     Syncable_ledger.S
@@ -161,9 +161,10 @@ end = struct
       | Error e ->
           Deferred.return
           @@ Fn.const `Ignored
-          @@ Logger.error t.logger
-               !"Could not get the proof of root from the network: %s"
-               (Error.to_string_hum e)
+          @@ Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:[("error", `String (Error.to_string_hum e))]
+               !"Could not get the proof of the root transition from the \
+                 network: $error"
       | Ok peer_root_with_proof -> (
           match%bind
             Root_prover.verify ~logger:t.logger ~verifier:t.verifier
@@ -244,11 +245,13 @@ end = struct
           @@ on_transition t ~sender ~root_sync_ledger transition
         else Deferred.unit )
 
-  let run ~logger ~trust_system ~verifier ~network ~frontier ~consensus_local_state
-      ~transition_reader =
+  let run ~logger ~trust_system ~verifier ~network ~frontier
+      ~consensus_local_state ~transition_reader =
     let initial_breadcrumb = Transition_frontier.root frontier in
     let persistent_root = Transition_frontier.persistent_root frontier in
-    let persistent_frontier = Transition_frontier.persistent_frontier frontier in
+    let persistent_frontier =
+      Transition_frontier.persistent_frontier frontier
+    in
     let initial_root_transition =
       External_transition.Validation.lower
         (Transition_frontier.Breadcrumb.transition_with_hash initial_breadcrumb)
@@ -268,7 +271,7 @@ end = struct
     let transition_graph = Transition_cache.create () in
     let snarked_ledger = Transition_frontier.root_snarked_ledger frontier in
     (* Synchonize the root ledger of the old transition frontier *)
-    let%bind (hash, sender, expected_staged_ledger_hash) =
+    let%bind hash, sender, expected_staged_ledger_hash =
       let root_sync_ledger =
         Root_sync_ledger.create snarked_ledger ~logger:t.logger ~trust_system
       in
@@ -277,9 +280,7 @@ end = struct
       (* We ignore the resulting ledger returned here since it will always
        * be the same as the ledger we started with because we are syncing
        * a db ledger. *)
-      let%map _, root_data =
-        Root_sync_ledger.valid_tree root_sync_ledger
-      in
+      let%map _, root_data = Root_sync_ledger.valid_tree root_sync_ledger in
       Root_sync_ledger.destroy root_sync_ledger ;
       root_data
     in
@@ -308,7 +309,7 @@ end = struct
         ~snarked_ledger:(Ledger.of_database snarked_ledger)
         ~expected_merkle_root ~pending_coinbases
     with
-    | Error err ->
+    | Error e ->
         let%bind () =
           Trust_system.(
             record t.trust_system t.logger sender
@@ -319,8 +320,16 @@ end = struct
                        scan state from the peer."
                     , [] ) ))
         in
-        Error.raise err
-    | Ok new_root_staged_ledger ->
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ("error", `String (Error.to_string_hum e))
+            ; ("state_hash", State_hash.to_yojson hash) ]
+          "Failed to find scan state for the transition with hash $state_hash \
+           from the peer or received faulty scan state: $error. Retry \
+           bootstrap" ;
+        run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
+          ~transition_reader
+    | Ok root_staged_ledger ->
         let%bind () =
           Trust_system.(
             record t.trust_system t.logger sender
@@ -348,22 +357,26 @@ end = struct
               ~local_state:consensus_local_state
           with
           | None ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "local_state"
-                    , Consensus.Data.Local_state.to_yojson consensus_local_state )
+                    , Consensus.Data.Local_state.to_yojson
+                        consensus_local_state )
                   ; ( "consensus_state"
                     , Consensus.Data.Consensus_state.Value.to_yojson
                         consensus_state ) ]
                 "Not synchronizing consensus local state" ;
-              Deferred.unit
+              Deferred.return @@ Ok ()
           | Some sync_jobs -> (
               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                 "Synchronizing consensus local state" ;
               match%map
-                Consensus.Hooks.sync_local_state ~local_state:consensus_local_state ~logger
-                  ~trust_system
-                  ~random_peers:(Network.random_peers t.network)
+                Consensus.Hooks.sync_local_state
+                  ~local_state:consensus_local_state ~logger ~trust_system
+                  ~random_peers:(fun n ->
+                    List.append
+                      (Network.peers_by_ip t.network sender)
+                      (Network.random_peers t.network n) )
                   ~query_peer:
                     { Network_peer.query=
                         (fun peer f query ->
@@ -373,7 +386,11 @@ end = struct
               | Ok () ->
                   ()
               | Error e ->
-                  Error.raise e )
+                  Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:[("error", `String (Error.to_string_hum e))]
+                    "Local state sync failed: $error. Retry bootstrap" ;
+                  run ~logger ~trust_system ~verifier ~network ~frontier
+                    ~ledger_db ~transition_reader )
         in
         (* Close the old frontier and reload a new on from disk. *)
         let new_root_data =
@@ -391,9 +408,15 @@ end = struct
             { Transition_frontier.logger= t.logger
             ; verifier
             ; consensus_local_state }
-            ~persistent_root
-            ~persistent_frontier
-					>>| Fn.(compose Or_error.ok_exn (Result.map_error ~f:(const @@ Error.of_string "failed to initialize transition frontier after bootstrapping")))
+            ~persistent_root ~persistent_frontier
+          >>| Fn.(
+                compose Or_error.ok_exn
+                  (Result.map_error
+                     ~f:
+                       ( const
+                       @@ Error.of_string
+                            "failed to initialize transition frontier after \
+                             bootstrapping" )))
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Bootstrap state: complete." ;
@@ -430,3 +453,12 @@ end = struct
     let sync_ledger = sync_ledger
   end
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+  module Root_sync_ledger = Sync_ledger.Db
+  module Network = Coda_networking
+  module Sync_handler = Sync_handler
+  module Root_prover = Root_prover
+end)

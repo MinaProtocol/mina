@@ -2,7 +2,7 @@
   (name lite_precomputed_values)
   (public_name lite_precomputed_values)
   (preprocess (pps ppx_jane ppx_deriving.eq ppx_coda))
-  (libraries lite_base snarkette core_kernel base64))
+  (libraries lite_base snarkette core_kernel base58_check))
 
 (rule
   (targets lite_precomputed_values.ml)

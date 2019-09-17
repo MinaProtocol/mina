@@ -8,12 +8,13 @@ end)
 
 open Stubs
 module Transition_storage =
-  Transition_frontier_persistence.Transition_storage.Make (Stubs)
+  Transition_frontier_persistence.Components.Transition_storage.Make (Stubs)
 
 module Transition_frontier_persistence =
 Transition_frontier_persistence.Make (struct
   include Stubs
-  module Make_worker = Transition_frontier_persistence.Worker.Make_async
+  module Make_worker =
+    Transition_frontier_persistence.Components.Worker.Make_async
   module Transition_storage = Transition_storage
 end)
 
@@ -58,11 +59,13 @@ let%test_module "Transition Frontier Persistence" =
       |> Deferred.map ~f:(function
            | Ok value ->
                value
-           | Error e ->
+           | Error exn ->
                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-                 "Encountered an error: Visualizing transition frontier" ;
+                 "Exception when persisting transition frontier: $exn. \
+                  Creating frontier visualization"
+                 ~metadata:[("exn", `String (Exn.to_string exn))] ;
                Transition_frontier.visualize ~filename:"frontier.dot" frontier ;
-               raise e )
+               raise exn )
 
     let generate_breadcrumbs ~gen_root_breadcrumb_builder frontier size =
       gen_root_breadcrumb_builder ~logger ~trust_system ~size
@@ -89,7 +92,7 @@ let%test_module "Transition Frontier Persistence" =
       in
       Transition_frontier_persistence.with_database ~directory_name
         ~f:(fun transition_storage ->
-          check_transitions transition_storage breadcrumbs )
+          return @@ check_transitions transition_storage breadcrumbs )
 
     let test_linear_breadcrumbs =
       test_breadcrumbs ~gen_root_breadcrumb_builder:gen_linear_breadcrumbs
@@ -105,7 +108,7 @@ let%test_module "Transition Frontier Persistence" =
       Thread_safe.block_on_async_exn
       @@ fun () ->
       let directory_name = Uuid.to_string (Uuid_unix.create ()) in
-      let%map root, next_breadcrumb =
+      let%bind root, next_breadcrumb =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
             let create_breadcrumb =
               gen_breadcrumb ~logger ~trust_system
@@ -142,22 +145,28 @@ let%test_module "Transition Frontier Persistence" =
             (root, next_breadcrumb) )
       in
       Transition_frontier_persistence.with_database ~directory_name
-        ~f:(fun storage -> check_transitions storage [root; next_breadcrumb])
+        ~f:(fun storage ->
+          return @@ check_transitions storage [root; next_breadcrumb] )
 
     let%test_unit "Dump external transitions to disk" =
-      test_linear_breadcrumbs (max_length - 1)
+      Thread_safe.block_on_async_exn (fun () ->
+          test_linear_breadcrumbs (max_length - 1) )
 
     let%test_unit "Root changes multiple times" =
       Printexc.record_backtrace true ;
-      test_linear_breadcrumbs (2 * max_length)
+      Thread_safe.block_on_async_exn (fun () ->
+          test_linear_breadcrumbs (2 * max_length) )
 
     let%test_unit "Randomly generate a tree" =
-      test_tree_breadcrumbs (2 * max_length)
+      Thread_safe.block_on_async_exn (fun () ->
+          test_tree_breadcrumbs (2 * max_length) )
 
     let test_deserialization num_breadcrumbs frontier =
-      let directory_name = Some (Uuid.to_string (Uuid_unix.create ())) in
+      let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let frontier_reader, _ = Broadcast_pipe.create (Some frontier) in
-      let frontier_persistence = create_persistence ~directory_name in
+      let frontier_persistence =
+        create_persistence ~directory_name:(Some directory_name)
+      in
       let%bind breadcrumbs =
         generate_breadcrumbs ~gen_root_breadcrumb_builder:gen_tree_list
           frontier num_breadcrumbs
@@ -170,17 +179,14 @@ let%test_module "Transition Frontier Persistence" =
            frontier_reader frontier_persistence ;
       let%bind () = store_transitions frontier breadcrumbs in
       let%bind () =
-        Transition_frontier_persistence
-        .close_and_finish_copy_without_closing_worker frontier_persistence
+        Transition_frontier_persistence.close_and_finish_copy
+          frontier_persistence
       in
-      let%bind () = frontier_persistence.worker_thread in
       let%map deserialized_frontier =
-        Transition_frontier_persistence.read ~logger ~trust_system ~verifier:()
-          ~root_snarked_ledger
+        Transition_frontier_persistence.deserialize ~directory_name ~logger
+          ~trust_system ~verifier:() ~root_snarked_ledger
           ~consensus_local_state:
             (Transition_frontier.consensus_local_state frontier)
-          (Transition_frontier_persistence.Worker.For_tests.transition_storage
-             frontier_persistence.worker)
       in
       Transition_frontier.equal frontier deserialized_frontier
 

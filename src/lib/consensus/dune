@@ -1,7 +1,6 @@
 (library
   (name consensus)
   (public_name consensus)
-  (flags (:standard -short-paths -warn-error -32))
   (inline_tests)
   (library_flags (-linkall))
   (libraries
@@ -21,7 +20,8 @@
     non_zero_curve_point
     module_version
     yojson
-    staged_ledger_hash)
+    staged_ledger_hash
+    coda_metrics)
    (preprocessor_deps "../../config.mlh")
    (preprocess (pps ppx_base ppx_coda ppx_let ppx_assert ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv bisect_ppx -conditional))
    (synopsis "Consensus mechanisms"))

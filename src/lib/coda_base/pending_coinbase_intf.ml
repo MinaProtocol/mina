@@ -20,11 +20,11 @@ open Signature_lib
 open Currency
 
 module type S = sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, to_yojson]
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, version]
+      type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
     end
 
     module Latest = V1

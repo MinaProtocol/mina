@@ -57,6 +57,8 @@ module type External_transition_base_intf = sig
 
   val staged_ledger_diff : t -> staged_ledger_diff
 
+  val state_hash : t -> State_hash.t
+
   val parent_hash : t -> State_hash.t
 
   val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
@@ -76,8 +78,7 @@ module type External_transition_intf = sig
   include External_transition_base_intf
 
   module Validated : sig
-    type t
-    [@@deriving bin_io]
+    type t [@@deriving bin_io]
 
     val create_unsafe :
       external_transition -> [`I_swear_this_is_safe_see_my_comment of t]

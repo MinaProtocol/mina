@@ -96,6 +96,15 @@ let to_communications_host_and_port t =
     ~host:(Unix.Inet_addr.to_string t.host)
     ~port:t.communication_port
 
+let to_string {host; discovery_port; communication_port} =
+  sprintf
+    !"[host : %s, discovery_port : %s, communication_port : %s]"
+    (Unix.Inet_addr.to_string host)
+    (Int.to_string discovery_port)
+    (Int.to_string communication_port)
+
+let pretty_list peers = String.concat ~sep:"," @@ List.map peers ~f:to_string
+
 module Event = struct
   type t =
     | Connect of Stable.Latest.t list

@@ -35,11 +35,8 @@ include Single.Make({
             ~height=610,
             ~minWidth=800,
             ~minHeight=500,
-            ~frame=false,
-            ~transparent=true,
             ~resizeable=false,
-            ~title="Coda Wallet",
-            ~titleBarStyle=`CustomButtonsOnHover,
+            ~title="Coda",
             ~backgroundColor=Theme.Colors.bgColorElectronWindow,
             ~webPreferences=
               makeWebPreferences(
@@ -94,5 +91,5 @@ let deepLink = input => {
   // route handling is idempotent so doesn't matter if we also send the message
   // if window already exists
   send(w, `Deep_link(Route.print(input.path)));
-  ();
+  show(w);
 };

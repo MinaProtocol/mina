@@ -6,19 +6,22 @@ open Coda_state
 let rec deferred_list_result_iter ls ~f =
   let open Deferred.Result.Let_syntax in
   match ls with
-  | [] -> return ()
+  | [] ->
+      return ()
   | h :: t ->
       let%bind () = f h in
       deferred_list_result_iter t ~f
 
 (* TODO: should debug assert garbage checks be added? *)
-module Make (Inputs : Inputs.With_base_frontier_intf)
-  : Intf.Db_intf
-      with type external_transition_validated := Inputs.External_transition.Validated.t
-       and type scan_state := Inputs.Staged_ledger.Scan_state.t
-       and type minimal_root_data := Inputs.Frontier.Diff.Minimal_root_data.Stable.Latest.t
-       and type root_data := Inputs.Frontier.Root_data.t
-       and type frontier_hash := Inputs.Frontier.Hash.t = struct
+module Make (Inputs : Inputs.With_base_frontier_intf) :
+  Intf.Db_intf
+  with type external_transition_validated :=
+              Inputs.External_transition.Validated.t
+   and type scan_state := Inputs.Staged_ledger.Scan_state.t
+   and type minimal_root_data :=
+              Inputs.Frontier.Diff.Minimal_root_data.Stable.Latest.t
+   and type root_data := Inputs.Frontier.Root_data.t
+   and type frontier_hash := Inputs.Frontier.Hash.t = struct
   open Inputs
   open Result.Let_syntax
 
@@ -39,19 +42,27 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
 
     type _ t =
       | Db_version : int t
-      | Transition : State_hash.Stable.V1.t -> External_transition.Validated.Stable.V1.t t
+      | Transition :
+          State_hash.Stable.V1.t
+          -> External_transition.Validated.Stable.V1.t t
       | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
       | Root : Frontier.Diff.Minimal_root_data.Stable.V1.t t
       | Best_tip : State_hash.Stable.V1.t t
       | Frontier_hash : Frontier.Hash.t t
 
     let to_string : type a. a t -> string = function
-      | Db_version -> "Db_version"
-      | Transition _ -> "Transition _"
-      | Arcs _ -> "Arcs _"
-      | Root -> "Root"
-      | Best_tip -> "Best_tip"
-      | Frontier_hash -> "Frontier_hash"
+      | Db_version ->
+          "Db_version"
+      | Transition _ ->
+          "Transition _"
+      | Arcs _ ->
+          "Arcs _"
+      | Root ->
+          "Root"
+      | Best_tip ->
+          "Best_tip"
+      | Frontier_hash ->
+          "Frontier_hash"
 
     let binable_data_type (type a) : a t -> a Bin_prot.Type_class.t = function
       | Db_version ->
@@ -81,7 +92,8 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
       { shape
       ; writer=
           { size= Fn.compose size of_gadt
-          ; write= (fun buffer ~pos gadt -> write buffer ~pos (of_gadt gadt)) }
+          ; write= (fun buffer ~pos gadt -> write buffer ~pos (of_gadt gadt))
+          }
       ; reader=
           { read= (fun buffer ~pos_ref -> to_gadt (read buffer ~pos_ref))
           ; vtag_read=
@@ -138,44 +150,55 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
       | `Transition of State_hash.t
       | `Arcs of State_hash.t ]
 
-    type not_found = [ `Not_found of not_found_member ]
+    type not_found = [`Not_found of not_found_member]
 
-    type t = [ not_found | `Invalid_version ]
+    type t = [not_found | `Invalid_version]
 
     let not_found_message (`Not_found member) =
-      let member_name, member_id = match member with
-        | `Root -> "root", None
-        | `Best_tip -> "best tip", None
-        | `Frontier_hash -> "frontier hash", None
-        | `Root_transition -> "root transition", None
-        | `Best_tip_transition -> "best tip transition", None
-        | `Parent_transition -> "parent transition", None
-        | `New_root_transition -> "new root transition", None
-        | `Old_root_transition -> "old root transition", None
-        | `Transition hash -> "transition", Some hash
-        | `Arcs hash -> "arcs", Some hash
+      let member_name, member_id =
+        match member with
+        | `Root ->
+            ("root", None)
+        | `Best_tip ->
+            ("best tip", None)
+        | `Frontier_hash ->
+            ("frontier hash", None)
+        | `Root_transition ->
+            ("root transition", None)
+        | `Best_tip_transition ->
+            ("best tip transition", None)
+        | `Parent_transition ->
+            ("parent transition", None)
+        | `New_root_transition ->
+            ("new root transition", None)
+        | `Old_root_transition ->
+            ("old root transition", None)
+        | `Transition hash ->
+            ("transition", Some hash)
+        | `Arcs hash ->
+            ("arcs", Some hash)
       in
       let additional_context =
-        Option.map member_id ~f:(fun id -> Printf.sprintf " (hash = %s)" (State_hash.to_bytes id))
+        Option.map member_id ~f:(fun id ->
+            Printf.sprintf " (hash = %s)" (State_hash.to_bytes id) )
         |> Option.value ~default:""
       in
       Printf.sprintf "%s not found%s" member_name additional_context
 
     let message = function
-      | `Invalid_version -> "invalid version"
-      | `Not_found _ as err -> not_found_message err
+      | `Invalid_version ->
+          "invalid version"
+      | `Not_found _ as err ->
+          not_found_message err
   end
 
   module Rocks = Rocksdb.Serializable.GADT.Make (Schema)
 
-  type t =
-    { directory: string
-    ; logger: Logger.t
-    ; db: Rocks.t }
+  type t = {directory: string; logger: Logger.t; db: Rocks.t}
 
   let create ~logger ~directory =
-    (if not (Result.is_ok (Unix.access directory [`Exists])) then
-      Unix.mkdir ~perm:0o766 directory);
+    if not (Result.is_ok (Unix.access directory [`Exists])) then
+      Unix.mkdir ~perm:0o766 directory ;
     {directory; logger; db= Rocks.create ~directory}
 
   let close t = Rocks.close t.db
@@ -186,83 +209,95 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
   let mem db ~key = Option.is_some (get db ~key)
 
   let get_if_exists db ~default ~key =
-    match get db ~key with
-    | Some x -> x
-    | None   -> default
+    match get db ~key with Some x -> x | None -> default
 
   let get db ~key ~error =
-    match get db ~key with
-    | Some x -> Ok x
-    | None   -> Error error
+    match get db ~key with Some x -> Ok x | None -> Error error
 
   (* TODO: batch reads might be nice *)
   let check t =
     match get_if_exists t.db ~key:Db_version ~default:0 with
-    | 0 -> Error `Not_initialized
+    | 0 ->
+        Error `Not_initialized
     | v when v = version ->
-        let%bind root = get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root)) in
-        let%bind best_tip = get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip)) in
-        let%bind _ = get t.db ~key:Frontier_hash ~error:(`Corrupt (`Not_found `Frontier_hash)) in
-        let%bind _ = get t.db ~key:(Transition root.hash) ~error:(`Corrupt (`Not_found `Root_transition)) in
-        let%map _ = get t.db ~key:(Transition best_tip) ~error:(`Corrupt (`Not_found `Best_tip_transition)) in
+        let%bind root =
+          get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root))
+        in
+        let%bind best_tip =
+          get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
+        in
+        let%bind _ =
+          get t.db ~key:Frontier_hash
+            ~error:(`Corrupt (`Not_found `Frontier_hash))
+        in
+        let%bind _ =
+          get t.db ~key:(Transition root.hash)
+            ~error:(`Corrupt (`Not_found `Root_transition))
+        in
+        let%map _ =
+          get t.db ~key:(Transition best_tip)
+            ~error:(`Corrupt (`Not_found `Best_tip_transition))
+        in
         (* [new] TODO: crawl from root and validate tree structure is not malformed *)
         ()
-    | _ -> Error `Invalid_version
+    | _ ->
+        Error `Invalid_version
 
   let initialize t ~root_data ~base_hash =
     let open Frontier.Root_data in
     let open With_hash in
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("root_state_hash", State_hash.to_yojson root_data.transition.hash)]
-      "Initializing persistent frontier database with $minimal_root_data";
+      ~metadata:
+        [("root_state_hash", State_hash.to_yojson root_data.transition.hash)]
+      "Initializing persistent frontier database with $minimal_root_data" ;
     Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch ~key:Db_version ~data:version;
-      Batch.set batch ~key:(Transition root_data.transition.hash) ~data:root_data.transition.data;
-      Batch.set batch ~key:(Arcs root_data.transition.hash) ~data:[];
-      Batch.set batch ~key:Root ~data:(minimize root_data);
-      Batch.set batch ~key:Best_tip ~data:root_data.transition.hash;
-      Batch.set batch ~key:Frontier_hash ~data:base_hash)
+        Batch.set batch ~key:Db_version ~data:version ;
+        Batch.set batch ~key:(Transition root_data.transition.hash)
+          ~data:root_data.transition.data ;
+        Batch.set batch ~key:(Arcs root_data.transition.hash) ~data:[] ;
+        Batch.set batch ~key:Root ~data:(minimize root_data) ;
+        Batch.set batch ~key:Best_tip ~data:root_data.transition.hash ;
+        Batch.set batch ~key:Frontier_hash ~data:base_hash )
 
   let add t ~transition =
     let parent_hash =
-      With_hash.data transition
-      |> External_transition.Validated.protocol_state
+      With_hash.data transition |> External_transition.Validated.protocol_state
       |> Protocol_state.previous_state_hash
     in
     let node_hash = With_hash.hash transition in
     let transition = With_hash.data transition in
     let%map () =
-      Result.ok_if_true (mem t.db ~key:(Transition parent_hash))
+      Result.ok_if_true
+        (mem t.db ~key:(Transition parent_hash))
         ~error:(`Not_found `Parent_transition)
     in
-    let parent_arcs =
-      get_if_exists t.db
-        ~key:(Arcs parent_hash)
-        ~default:[]
-    in
+    let parent_arcs = get_if_exists t.db ~key:(Arcs parent_hash) ~default:[] in
     Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch
-        ~key:(Transition node_hash)
-        ~data:transition;
-      Batch.set batch
-        ~key:(Arcs parent_hash)
-      ~data:(node_hash :: parent_arcs))
+        Batch.set batch ~key:(Transition node_hash) ~data:transition ;
+        Batch.set batch ~key:(Arcs parent_hash) ~data:(node_hash :: parent_arcs)
+    )
 
   let move_root t ~new_root ~garbage =
     let open Frontier.Diff.Minimal_root_data.Stable.V1 in
-    let%bind () = Result.ok_if_true (mem t.db ~key:(Transition new_root.hash)) ~error:(`Not_found `New_root_transition) in
-    let%map old_root = get t.db ~key:Root ~error:(`Not_found `Old_root_transition) in
+    let%bind () =
+      Result.ok_if_true
+        (mem t.db ~key:(Transition new_root.hash))
+        ~error:(`Not_found `New_root_transition)
+    in
+    let%map old_root =
+      get t.db ~key:Root ~error:(`Not_found `Old_root_transition)
+    in
     (* TODO: Result compatible rocksdb batch transaction *)
     Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch ~key:Root ~data:new_root;
-      List.iter (old_root.hash :: garbage) ~f:(fun node_hash ->
-        (* because we are removing entire forks of the tree, there is
+        Batch.set batch ~key:Root ~data:new_root ;
+        List.iter (old_root.hash :: garbage) ~f:(fun node_hash ->
+            (* because we are removing entire forks of the tree, there is
          * no need to have extra logic to any remove arcs to the node
          * we are deleting since there we are deleting all of a node's
          * parents as well
          *)
-        Batch.remove batch ~key:(Transition node_hash);
-        Batch.remove batch ~key:(Arcs node_hash))) ;
+            Batch.remove batch ~key:(Transition node_hash) ;
+            Batch.remove batch ~key:(Arcs node_hash) ) ) ;
     old_root.hash
 
   let get_transition t hash =
@@ -271,34 +306,34 @@ module Make (Inputs : Inputs.With_base_frontier_intf)
   let get_arcs t hash =
     get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 
-  let get_root t =
-    get t.db ~key:Root ~error:(`Not_found `Root)
+  let get_root t = get t.db ~key:Root ~error:(`Not_found `Root)
 
   let get_root_hash t =
     let%map root = get_root t in
     root.hash
 
-  let get_best_tip t =
-    get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
+  let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 
   let set_best_tip t hash =
     let%map old_best_tip_hash = get_best_tip t in
     (* no need to batch because we only do one operation *)
-    set t.db ~key:Best_tip ~data:hash;
+    set t.db ~key:Best_tip ~data:hash ;
     old_best_tip_hash
 
   let get_frontier_hash t =
     get t.db ~key:Frontier_hash ~error:(`Not_found `Frontier_hash)
 
   (* TODO: bundle together with other writes using batch? *)
-  let set_frontier_hash t hash =
-    set t.db ~key:Frontier_hash ~data:hash
+  let set_frontier_hash t hash = set t.db ~key:Frontier_hash ~data:hash
 
   let rec crawl_successors t hash ~init ~f =
     let open Deferred.Result.Let_syntax in
     let%bind successors = Deferred.return (get_arcs t hash) in
     deferred_list_result_iter successors ~f:(fun succ_hash ->
-      let%bind transition = Deferred.return (get_transition t succ_hash) in
-      let%bind init' = Deferred.map (f init transition) ~f:(Result.map_error ~f:(fun err -> `Crawl_error err)) in
-      crawl_successors t succ_hash ~init:init' ~f)
+        let%bind transition = Deferred.return (get_transition t succ_hash) in
+        let%bind init' =
+          Deferred.map (f init transition)
+            ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
+        in
+        crawl_successors t succ_hash ~init:init' ~f )
 end

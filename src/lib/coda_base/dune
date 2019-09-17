@@ -1,7 +1,6 @@
 (library
  (name coda_base)
  (public_name coda_base)
- (flags :standard -short-paths -warn-error -35-32-9-27-34-58-39)
  (inline_tests)
  (library_flags -linkall)
  (libraries
@@ -10,7 +9,8 @@
     linked_tree
     hash_prefixes
     syncable_ledger
-    base64
+    base58_check
+    fold_lib
     signature_lib
     test_util
     random_oracle
@@ -41,7 +41,8 @@
     visualization
     coda_compile_config
     quickcheck_lib
-    sexp_diff_kernel)
+    sexp_diff_kernel
+    )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_snarky ppx_coda ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord

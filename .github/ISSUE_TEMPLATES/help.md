@@ -4,4 +4,4 @@ about: Please don't open an issue! Ask for help on Discord.
 ---
 
 Issue trackers aren't a good place to ask questions or for help. Instead,
-contact us on the [Coda Discord](https://discord.gg/ShKhA7J)!
+contact us on the [Coda Discord](https://bit.ly/CodaDiscord)!

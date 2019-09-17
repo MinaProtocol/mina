@@ -375,8 +375,6 @@ end
 module Make_unpacked
     (Impl : Snarky.Snark_intf.S) (M : sig
         val bit_length : int
-
-        val element_length : int
     end) =
 struct
   open Impl

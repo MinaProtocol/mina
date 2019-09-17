@@ -11,12 +11,9 @@ module Styles = {
     merge([
       Theme.Text.Body.regular,
       style([
-        userSelect(`none),
         display(`inlineFlex),
         alignItems(`center),
         justifyContent(`center),
-        height(`rem(3.)),
-        minWidth(`rem(10.)),
         padding2(~v=`zero, ~h=`rem(1.)),
         background(white),
         border(`px(0), `solid, white),
@@ -74,12 +71,21 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~label, ~onClick=?, ~style=Blue, ~disabled=false) =>
+let make =
+    (
+      ~label,
+      ~onClick=?,
+      ~style=Blue,
+      ~disabled=false,
+      ~width=10.5,
+      ~height=3.,
+    ) =>
   <button
     disabled
     ?onClick
     className={Css.merge([
       disabled ? Styles.disabled : "",
+      Css.style([Css.minWidth(`rem(width)), Css.height(`rem(height))]),
       switch (style) {
       | Blue => Styles.blue
       | Green => Styles.green

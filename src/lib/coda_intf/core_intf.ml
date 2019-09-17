@@ -82,11 +82,11 @@ end
 
 (* TODO: this is temporarily required due to staged ledger test stubs *)
 module type Transaction_snark_work_generalized_intf = sig
-  type compressed_public_key
+  type compressed_public_key [@@deriving to_yojson]
 
   type transaction_snark_statement
 
-  type ledger_proof
+  type ledger_proof [@@deriving to_yojson]
 
   module Statement : sig
     type t = transaction_snark_statement list [@@deriving yojson]
@@ -122,12 +122,14 @@ module type Transaction_snark_work_generalized_intf = sig
     { fee: Fee.Stable.V1.t
     ; proofs: ledger_proof list
     ; prover: compressed_public_key }
-  [@@deriving sexp]
+  [@@deriving sexp, to_yojson]
+
+  val fee : t -> Fee.Stable.V1.t
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, version]
+        type t [@@deriving sexp, bin_io, to_yojson, version]
       end
     end
     with type V1.t = t
@@ -137,7 +139,7 @@ module type Transaction_snark_work_generalized_intf = sig
   module Checked : sig
     type nonrec t = t =
       {fee: Fee.t; proofs: ledger_proof list; prover: compressed_public_key}
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     module Stable : module type of Stable
 

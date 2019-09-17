@@ -8,12 +8,13 @@ open Pipe_lib
 (* TODO: revisit existing extensions and split off into new files *)
 module Make (Inputs : sig
   include Inputs.With_base_frontier_intf
+
   val max_length : int
-end) = struct
+end) =
+struct
   (* Have to treat functor Frontier as Frontier *)
   (* Invariant: No mutations are allowed to the transition_frontier on the transactions *)
   open Inputs
-
   module Breadcrumb = Frontier.Breadcrumb
 
   module type Base_ext_intf = sig
@@ -46,15 +47,13 @@ end) = struct
     val reader : t -> view Broadcast_pipe.Reader.t
 
     val update_and_create_broadcast_job :
-         t
-      -> Frontier.t
-      -> Frontier.Diff.Lite.E.t list
-      -> unit
-      -> unit Deferred.t
+      t -> Frontier.t -> Frontier.Diff.Lite.E.t list -> unit -> unit Deferred.t
   end
 
   module Make_broadcastable (Ext : Base_ext_intf) :
-    Broadcast_extension_intf with type view = Ext.view and type original = Ext.t = struct
+    Broadcast_extension_intf
+    with type view = Ext.view
+     and type original = Ext.t = struct
     type t =
       { t: Ext.t
       ; writer: Ext.view Broadcast_pipe.Writer.t
@@ -103,13 +102,27 @@ end) = struct
 
       let mem {history; _} = Queue.mem history
 
+      let most_recent {history; _} =
+        let open Option.Let_syntax in
+        let%map state_hash, breadcrumb = Queue.dequeue_back_with_key history in
+        Queue.enqueue_back history state_hash breadcrumb |> ignore ;
+        breadcrumb
+
+      let oldest {history; _} =
+        let open Option.Let_syntax in
+        let%map state_hash, breadcrumb =
+          Queue.dequeue_front_with_key history
+        in
+        Queue.enqueue_front history state_hash breadcrumb |> ignore ;
+        breadcrumb
+
       let enqueue {history; capacity} breadcrumb =
         if Queue.length history >= capacity then
           Queue.dequeue_front_exn history |> ignore ;
-        Queue.enqueue_back history
-          (Breadcrumb.state_hash breadcrumb)
-          breadcrumb
-        |> ignore
+        ignore
+          (Queue.enqueue_back history
+             (Breadcrumb.state_hash breadcrumb)
+             breadcrumb)
 
       let is_empty {history; _} = Queue.is_empty history
     end
@@ -143,8 +156,7 @@ end) = struct
       let should_produce_view =
         List.exists diffs ~f:(function
           | Lite.E.E (Root_transitioned _) ->
-              T.enqueue root_history
-                (Frontier.root transition_frontier) ;
+              T.enqueue root_history (Frontier.root transition_frontier) ;
               true
           | Lite.E.E _ ->
               false )
@@ -210,20 +222,15 @@ end) = struct
 
     type view = int * int Work.Table.t
 
-    let get_work (breadcrumb : Breadcrumb.t) : Work.t Sequence.t =
-      let staged_ledger =
-        Breadcrumb.staged_ledger breadcrumb
-      in
+    let get_work (breadcrumb : Breadcrumb.t) : Work.t list =
+      let staged_ledger = Breadcrumb.staged_ledger breadcrumb in
       let scan_state = Staged_ledger.scan_state staged_ledger in
-      let work_to_do =
-        Staged_ledger.Scan_state.all_work_to_do scan_state
-      in
-      Or_error.ok_exn work_to_do
+      Staged_ledger.Scan_state.all_work_statements scan_state
 
     (** Returns true if this update changed which elements are in the table
         (but not if the same elements exist with a different reference count) *)
     let add_breadcrumb_to_ref_table table breadcrumb : bool =
-      Sequence.fold ~init:false (get_work breadcrumb) ~f:(fun acc work ->
+      List.fold ~init:false (get_work breadcrumb) ~f:(fun acc work ->
           match Work.Table.find table work with
           | Some count ->
               Work.Table.set table ~key:work ~data:(count + 1) ;
@@ -235,7 +242,7 @@ end) = struct
     (** Returns true if this update changed which elements are in the table
         (but not if the same elements exist with a different reference count) *)
     let remove_breadcrumb_from_ref_table table breadcrumb : bool =
-      Sequence.fold (get_work breadcrumb) ~init:false ~f:(fun acc work ->
+      List.fold (get_work breadcrumb) ~init:false ~f:(fun acc work ->
           match Work.Table.find table work with
           | Some 1 ->
               Work.Table.remove table work ;
@@ -261,13 +268,22 @@ end) = struct
           | Lite.E.E (New_node (Lite transition_with_hash)) ->
               (* TODO: extensions need full diffs *)
               { num_removed
-              ; is_added= is_added || add_breadcrumb_to_ref_table t (Frontier.find_exn frontier (With_hash.hash transition_with_hash))
-              }
+              ; is_added=
+                  is_added
+                  || add_breadcrumb_to_ref_table t
+                       (Frontier.find_exn frontier
+                          (With_hash.hash transition_with_hash)) }
           | Lite.E.E (Root_transitioned {new_root= _; garbage}) ->
               let extra_num_removed =
                 List.fold ~init:0
                   ~f:(fun acc hash ->
-                    acc + if remove_breadcrumb_from_ref_table t (Frontier.find_exn frontier hash) then 1 else 0 )
+                    acc
+                    +
+                    if
+                      remove_breadcrumb_from_ref_table t
+                        (Frontier.find_exn frontier hash)
+                    then 1
+                    else 0 )
                   garbage
               in
               {num_removed= num_removed + extra_num_removed; is_added}
@@ -275,7 +291,7 @@ end) = struct
               init
           | Lite.E.E (New_node (Full _)) ->
               (* cannot refute despite impossibility *)
-              failwith "impossible")
+              failwith "impossible" )
       in
       if num_removed > 0 || is_added then Some (num_removed, t) else None
   end
@@ -285,12 +301,14 @@ end) = struct
 
     type view =
       { new_user_commands: User_command.t list
-      ; removed_user_commands: User_command.t list }
+      ; removed_user_commands: User_command.t list
+      ; reorg_best_tip: bool }
 
     let create breadcrumb =
       ( ()
       , { new_user_commands= Breadcrumb.to_user_commands breadcrumb
-        ; removed_user_commands= [] } )
+        ; removed_user_commands= []
+        ; reorg_best_tip= false } )
 
     (* Get the breadcrumbs that are on bc1's path but not bc2's, and vice versa.
        Ordered oldest to newest. *)
@@ -302,7 +320,10 @@ end) = struct
       let path_from_to bc1 bc2 =
         let rec go cursor acc =
           if Breadcrumb.equal cursor bc1 then acc
-          else go (Frontier.find_exn t @@ Breadcrumb.parent_hash cursor) (cursor :: acc)
+          else
+            go
+              (Frontier.find_exn t @@ Breadcrumb.parent_hash cursor)
+              (cursor :: acc)
         in
         go bc2 []
       in
@@ -314,21 +335,25 @@ end) = struct
 
     let handle_diffs () transition_frontier diffs : view option =
       let open Frontier.Diff in
-      let old_best_tip =
-        Frontier.best_tip transition_frontier
-      in
+      let old_best_tip = Frontier.best_tip transition_frontier in
       let view, _, should_broadcast =
         List.fold diffs
           ~init:
-            ( {new_user_commands= []; removed_user_commands= []}
+            ( { new_user_commands= []
+              ; removed_user_commands= []
+              ; reorg_best_tip= false }
             , old_best_tip
             , false )
           ~f:
-            (fun ( ({new_user_commands; removed_user_commands} as acc)
+            (fun ( ( { new_user_commands
+                     ; removed_user_commands
+                     ; reorg_best_tip= _ } as acc )
                  , old_best_tip
                  , should_broadcast ) -> function
             | Lite.E.E (Best_tip_changed new_best_tip) ->
-                let new_best_tip_breadcrumb = Frontier.find_exn transition_frontier new_best_tip in
+                let new_best_tip_breadcrumb =
+                  Frontier.find_exn transition_frontier new_best_tip
+                in
                 let added_to_best_tip_path, removed_from_best_tip_path =
                   get_path_diff transition_frontier new_best_tip_breadcrumb
                     old_best_tip
@@ -359,15 +384,16 @@ end) = struct
                     ~f:Breadcrumb.to_user_commands
                   @ removed_user_commands
                 in
-                ( {new_user_commands; removed_user_commands}
+                let reorg_best_tip =
+                  not (List.is_empty removed_from_best_tip_path)
+                in
+                ( {new_user_commands; removed_user_commands; reorg_best_tip}
                 , new_best_tip_breadcrumb
-                , true )
-            | Lite.E.E (New_node (Lite _)) ->
+                , true ) | Lite.E.E (New_node (Lite _)) ->
                 (acc, old_best_tip, should_broadcast)
             | Lite.E.E (Root_transitioned _) ->
                 (acc, old_best_tip, should_broadcast)
-            | Lite.E.E (New_node (Full _)) ->
-                failwith "impossible" )
+            | Lite.E.E (New_node (Full _)) -> failwith "impossible" )
       in
       Option.some_if should_broadcast view
   end
@@ -433,8 +459,7 @@ end) = struct
     let run_updates_and_setup_broadcast_jobs (type t)
         (module Broadcast : Broadcast_extension_intf with type t = t) field =
       let extension = Field.get field t in
-      Broadcast.update_and_create_broadcast_job extension frontier
-        diffs
+      Broadcast.update_and_create_broadcast_job extension frontier diffs
     in
     let jobs =
       Fields.to_list

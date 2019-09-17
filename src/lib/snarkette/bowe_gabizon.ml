@@ -15,7 +15,7 @@ module type Backend_intf = sig
 
     val zero : t
 
-    val to_affine_coordinates : t -> Fq.t * Fq.t
+    val to_affine_exn : t -> Fq.t * Fq.t
 
     val is_well_formed : t -> bool
 
@@ -27,7 +27,7 @@ module type Backend_intf = sig
   module G2 : sig
     type t [@@deriving sexp, bin_io]
 
-    val to_affine_coordinates : t -> Fqe.t * Fqe.t
+    val to_affine_exn : t -> Fqe.t * Fqe.t
 
     val ( + ) : t -> t -> t
 
@@ -59,7 +59,7 @@ module Make (Backend : Backend_intf) = struct
   open Backend
 
   module Verification_key = struct
-    type t = {g_alpha_h_beta: Fq_target.t; h_delta: G2.t; query: G1.t array}
+    type t = {alpha_beta: Fq_target.t; delta: G2.t; query: G1.t array}
     [@@deriving bin_io, sexp]
 
     let map_to_two t ~f =
@@ -70,11 +70,11 @@ module Make (Backend : Backend_intf) = struct
       in
       (List.rev xs, List.rev ys)
 
-    let fold_bits {g_alpha_h_beta; h_delta; query} =
+    let fold_bits {alpha_beta; delta; query} =
       let g1s = Array.to_list query in
-      let g2s = [h_delta] in
-      let gts = [Fq_target.unitary_inverse g_alpha_h_beta] in
-      let g1_elts, g1_signs = map_to_two g1s ~f:G1.to_affine_coordinates in
+      let g2s = [delta] in
+      let gts = [Fq_target.unitary_inverse alpha_beta] in
+      let g1_elts, g1_signs = map_to_two g1s ~f:G1.to_affine_exn in
       let non_zero_base_coordinate a =
         let x = Fqe.project_to_base a in
         assert (not (Fq.equal x Fq.zero)) ;
@@ -82,15 +82,15 @@ module Make (Backend : Backend_intf) = struct
       in
       let g2_elts, g2_signs =
         map_to_two g2s ~f:(fun g ->
-            let x, y = G2.to_affine_coordinates g in
-            (Fqe.to_base_elements x, non_zero_base_coordinate y) )
+            let x, y = G2.to_affine_exn g in
+            (Fqe.to_list x, non_zero_base_coordinate y) )
       in
       let gt_elts, gt_signs =
         map_to_two gts ~f:(fun g ->
             (* g is unitary, so (a, b) satisfy a quadratic over Fqe and thus
              b is determined by a up to sign *)
             let a, b = g in
-            (Fqe.to_base_elements a, non_zero_base_coordinate b) )
+            (Fqe.to_list a, non_zero_base_coordinate b) )
       in
       let open Fold in
       let of_fq_list_list ls =
@@ -109,15 +109,13 @@ module Make (Backend : Backend_intf) = struct
 
     module Processed = struct
       type t =
-        { g_alpha_h_beta: Fq_target.t
-        ; h_delta_pc: Pairing.G2_precomputation.t
+        { alpha_beta: Fq_target.t
+        ; delta_pc: Pairing.G2_precomputation.t
         ; query: G1.t array }
       [@@deriving bin_io, sexp]
 
-      let create {g_alpha_h_beta; h_delta; query} =
-        { g_alpha_h_beta
-        ; h_delta_pc= Pairing.G2_precomputation.create h_delta
-        ; query }
+      let create {alpha_beta; delta; query} =
+        {alpha_beta; delta_pc= Pairing.G2_precomputation.create delta; query}
     end
   end
 
@@ -159,11 +157,11 @@ module Make (Backend : Backend_intf) = struct
     let delta_prime_pc = Pairing.G2_precomputation.create delta_prime in
     let test1 =
       let l = Pairing.unreduced_pairing a b in
-      let r1 = vk.g_alpha_h_beta in
+      let r1 = vk.alpha_beta in
       let r2 =
         Pairing.miller_loop
           (Pairing.G1_precomputation.create input_acc)
-          vk.h_delta_pc
+          vk.delta_pc
       in
       let r3 =
         Pairing.miller_loop (Pairing.G1_precomputation.create c) delta_prime_pc
@@ -183,7 +181,7 @@ module Make (Backend : Backend_intf) = struct
           delta_prime_pc
       in
       let r =
-        Pairing.miller_loop (Pairing.G1_precomputation.create z) vk.h_delta_pc
+        Pairing.miller_loop (Pairing.G1_precomputation.create z) vk.delta_pc
       in
       let test2 =
         Pairing.final_exponentiation Fq_target.(l * unitary_inverse r)

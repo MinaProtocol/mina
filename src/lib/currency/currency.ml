@@ -60,6 +60,8 @@ module type Basic = sig
 
   val var_to_number : var -> Number.t
 
+  val var_to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+
   val var_to_triples : var -> Boolean.var Triple.t list
 
   val equal_var : var -> var -> (Boolean.var, _) Checked.t

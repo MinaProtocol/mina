@@ -1,6 +1,8 @@
 open Coda_base
 open Coda_transition
 
+val refused_answer_query_string : string
+
 module type Base_inputs_intf = Coda_intf.Inputs_intf
 
 module type Inputs_intf = sig
@@ -53,5 +55,6 @@ include
   Coda_intf.Network_intf
   with type external_transition := External_transition.t
    and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-   and type snark_pool_diff = Network_pool.Snark_pool_diff.t
-   and type transaction_pool_diff = Transaction_pool.Diff.t
+   and type snark_pool_diff = Network_pool.Snark_pool.Resource_pool.Diff.t
+   and type transaction_pool_diff =
+              Network_pool.Transaction_pool.Resource_pool.Diff.t

@@ -48,7 +48,7 @@ module Make (Field : sig
 end) (Curve : sig
   type t [@@deriving sexp]
 
-  val to_affine_coordinates : t -> Field.t * Field.t
+  val to_affine_exn : t -> Field.t * Field.t
 
   val zero : t
 
@@ -112,7 +112,8 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       {t with acc; triples_consumed}
 
     let digest t =
-      let x, _y = Curve.to_affine_coordinates t.acc in
+      assert (t.triples_consumed > 0) ;
+      let x, _y = Curve.to_affine_exn t.acc in
       x
 
     let salt params s = update_fold (create params) (Fold.string_triples s)

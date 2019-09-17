@@ -1,15 +1,11 @@
 open Async_kernel
 
-module Make : functor (Inputs : Intf.Inputs_with_db_intf) -> sig
+module Make (Inputs : Intf.Inputs_with_db_intf) : sig
   open Inputs
 
   type t
 
-  val create :
-       logger:Logger.t
-    -> base_hash:Frontier.Hash.t
-    -> db:Db.t
-    -> t
+  val create : logger:Logger.t -> base_hash:Frontier.Hash.t -> db:Db.t -> t
 
   val notify :
        t
@@ -17,7 +13,5 @@ module Make : functor (Inputs : Intf.Inputs_with_db_intf) -> sig
     -> hash_transition:Frontier.Hash.transition
     -> unit
 
-  val close :
-       t
-    -> unit Deferred.t
+  val close : t -> unit Deferred.t
 end

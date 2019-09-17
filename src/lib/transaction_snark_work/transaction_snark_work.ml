@@ -5,10 +5,14 @@ open Currency
 open Signature_lib
 
 module Make (Ledger_proof : sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp, bin_io, to_yojson]
 end) :
   Coda_intf.Transaction_snark_work_intf
   with type ledger_proof := Ledger_proof.t = struct
+  let ledger_proof_to_yojson = Ledger_proof.to_yojson
+
+  let compressed_public_key_to_yojson = Public_key.Compressed.to_yojson
+
   let proofs_length = 2
 
   module Statement = struct
@@ -54,7 +58,7 @@ end) :
             { fee: Fee.Stable.V1.t
             ; proofs: Ledger_proof.t list
             ; prover: Public_key.Compressed.Stable.V1.t }
-          [@@deriving sexp, bin_io, version {asserted}]
+          [@@deriving sexp, to_yojson, bin_io, version {asserted}]
         end
 
         include T
@@ -76,7 +80,7 @@ end) :
     (* bin_io omitted *)
     type t = Stable.Latest.t =
       {fee: Fee.t; proofs: Ledger_proof.t list; prover: Public_key.Compressed.t}
-    [@@deriving sexp]
+    [@@deriving to_yojson, sexp]
   end
 
   include T
@@ -90,6 +94,8 @@ end) :
   end
 
   let forget = Fn.id
+
+  let fee {fee; _} = fee
 end
 
 include Make (Ledger_proof.Stable.V1)

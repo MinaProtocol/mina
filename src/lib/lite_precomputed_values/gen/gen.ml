@@ -18,15 +18,19 @@ let key_generation = false
 
 [%%endif]
 
+module Base58_check = Base58_check.Make (struct
+  let version_byte = Base58_check.Version_bytes.lite_precomputed
+end)
+
 let wrap_vk ~loc =
   let open Async in
   let%bind keys = Snark_keys.blockchain_verification () in
   let vk = keys.wrap in
   let vk = Lite_compat.verification_key vk in
-  let vk_base64 =
-    Base64.encode_string
+  let vk_base58 =
+    Base58_check.encode
       (Binable.to_string
-         (module Lite_params.Tock.Groth_maller.Verification_key)
+         (module Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key)
          vk)
   in
   let%map () =
@@ -35,7 +39,7 @@ let wrap_vk ~loc =
       let%bind () = Unix.mkdir ~p:() Cache_dir.autogen_path in
       Writer.save
         (Cache_dir.autogen_path ^/ "client_verification_key")
-        ~contents:vk_base64
+        ~contents:vk_base58
   in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
@@ -43,8 +47,8 @@ let wrap_vk ~loc =
   let open E in
   [%expr
     Core_kernel.Binable.of_string
-      (module Lite_params.Tock.Groth_maller.Verification_key)
-      (Base64.decode_exn [%e estring vk_base64])]
+      (module Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key)
+      (Base58_check.decode_exn [%e estring vk_base58])]
 
 let protocol_state (s : Protocol_state.Value.t) : Lite_base.Protocol_state.t =
   let consensus_state =
@@ -73,7 +77,9 @@ let genesis ~loc =
     let loc = loc
   end) in
   let open E in
-  let protocol_state = protocol_state Genesis_protocol_state.t.data in
+  let protocol_state =
+    protocol_state (Lazy.force Genesis_protocol_state.t).data
+  in
   let ledger =
     Sparse_ledger_lib.Sparse_ledger.of_hash ~depth:0
       protocol_state.body.blockchain_state.staged_ledger_hash.ledger_hash
@@ -83,10 +89,10 @@ let genesis ~loc =
   [%expr
     Core_kernel.Binable.of_string
       (module Lite_base.Lite_chain)
-      (Base64.decode_exn
+      (Base58_check.decode_exn
          [%e
            estring
-             (Base64.encode_string
+             (Base58_check.encode
                 (Binable.to_string (module Lite_base.Lite_chain) chain))])]
 
 open Async
@@ -100,6 +106,10 @@ let main () =
   let%bind wrap_vk_expr = wrap_vk ~loc in
   let structure =
     [%str
+      module Base58_check = Base58_check.Make (struct
+        let version_byte = Base58_check.Version_bytes.lite_precomputed
+      end)
+
       let wrap_vk = [%e wrap_vk_expr]
 
       let genesis_chain = [%e genesis ~loc]]

@@ -26,8 +26,17 @@ module Make (Inputs : Coda_intf.Inputs_intf) = struct
       (error : validation_error) =
     let open Trust_system.Actions in
     let punish action message =
+      let message' =
+        "external transition with state hash $hash"
+        ^ Option.value_map message ~default:"" ~f:(fun (txt, _) ->
+              sprintf ", %s" txt )
+      in
+      let metadata =
+        ("hash", State_hash.to_yojson state_hash)
+        :: Option.value_map message ~default:[] ~f:Tuple2.get2
+      in
       Trust_system.record_envelope_sender trust_system logger sender
-        (action, message)
+        (action, Some (message', metadata))
     in
     match error with
     | `Verifier_error err ->
@@ -129,11 +138,15 @@ module Make (Inputs : Coda_intf.Inputs_intf) = struct
       | Some hash ->
           if not (State_hash.equal hash protocol_state_hash) then
             Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              !"Duplicate proposer and slot: proposer = %{sexp: \
-                Public_key.Compressed.t}, slot = %i, previous protocol state \
-                hash = %s, current protocol state hash = %s"
-              proposer slot (State_hash.to_bytes hash)
-              (State_hash.to_bytes protocol_state_hash)
+              ~metadata:
+                [ ("block_producer", Public_key.Compressed.to_yojson proposer)
+                ; ("slot", `Int slot)
+                ; ("hash", State_hash.to_yojson hash)
+                ; ( "current_protocol_state_hash"
+                  , State_hash.to_yojson protocol_state_hash ) ]
+              "Duplicate producer and slot: producer = $block_producer, slot \
+               = $slot, previous protocol state hash = $hash, current \
+               protocol state hash = $current_protocol_state_hash"
   end
 
   let run ~logger ~trust_system ~verifier ~transition_reader
@@ -175,17 +188,8 @@ module Make (Inputs : Coda_intf.Inputs_intf) = struct
             |> Writer.write valid_transition_writer ;
             return ()
         | Error error ->
-            let%map () =
-              handle_validation_error ~logger ~trust_system ~sender
-                ~state_hash:(With_hash.hash transition_with_hash)
-                error
-            in
-            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ("peer", Envelope.Sender.to_yojson sender)
-                ; ( "transition"
-                  , External_transition.to_yojson
-                      (With_hash.data transition_with_hash) ) ]
-              !"Failed to validate transition from $peer" )
+            handle_validation_error ~logger ~trust_system ~sender
+              ~state_hash:(With_hash.hash transition_with_hash)
+              error )
     |> don't_wait_for
 end

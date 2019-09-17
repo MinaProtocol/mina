@@ -15,5 +15,10 @@ external showItemInFolder: string => unit = "";
 
 let showItemInFolder = showItemInFolder;
 
+let isFaker =
+  Js.Dict.get(Bindings.ChildProcess.Process.env, "GRAPHQL_BACKEND")
+  == Some("faker");
+
+[%bs.raw "window.isFaker = isFaker"];
 [%bs.raw "window.downloadKey = downloadKey"];
 [%bs.raw "window.showItemInFolder = showItemInFolder"];

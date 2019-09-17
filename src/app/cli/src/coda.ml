@@ -4,12 +4,9 @@
 open Core
 open Async
 open Coda_base
-open Blockchain_snark
 open Cli_lib
-open Coda_inputs
 open Signature_lib
 module YJ = Yojson.Safe
-module Git_sha = Daemon_rpcs.Types.Git_sha
 
 [%%if
 fake_hash]
@@ -22,14 +19,6 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
-let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
-
-module type Coda_intf = sig
-  type ledger_proof
-
-  module Make (Init : Init_intf) () : Main_intf
-end
-
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -37,19 +26,26 @@ let daemon logger =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional string)
+     and unsafe_track_propose_key =
+       flag "unsafe-track-propose-key"
+         ~doc:
+           "Your private key will be copied to the internal wallets folder \
+            stripped of its password if it is given using the `propose-key` \
+            flag. (default:don't copy the private key)"
+         no_arg
      and propose_key =
        flag "propose-key"
          ~doc:
-           "KEYFILE Private key file for the proposing transitions. You \
-            cannot provide both `propose-key` and `propose-public-key`. \
-            (default:don't propose)"
+           "KEYFILE Private key file for the block producer. You cannot \
+            provide both `propose-key` and `propose-public-key`. \
+            (default:don't produce blocks)"
          (optional string)
      and propose_public_key =
        flag "propose-public-key"
          ~doc:
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both `propose-key` and \
-            `propose-public-key`. (default: don't propose)"
+            `propose-public-key`. (default: don't produce blocks)"
          (optional public_key_compressed)
      and initial_peers_raw =
        flag "peer"
@@ -60,12 +56,12 @@ let daemon logger =
        flag "run-snark-worker"
          ~doc:"PUBLICKEY Run the SNARK worker with this public key"
          (optional public_key_compressed)
-     and work_selection_flag =
+     and work_selection_method_flag =
        flag "work-selection"
          ~doc:
            "seq|rand Choose work sequentially (seq) or randomly (rand) \
             (default: seq)"
-         (optional work_selection)
+         (optional work_selection_method)
      and external_port =
        flag "external-port"
          ~doc:
@@ -87,6 +83,12 @@ let daemon logger =
            "PORT local REST-server for daemon interaction (default no \
             rest-server)"
          (optional int16)
+     and metrics_server_port =
+       flag "metrics-port"
+         ~doc:
+           "PORT metrics server for scraping via Prometheus (default no \
+            metrics-server)"
+         (optional int16)
      and external_ip_opt =
        flag "external-ip"
          ~doc:
@@ -98,6 +100,14 @@ let daemon logger =
          (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
+     and is_archive_node =
+       flag "archive" no_arg ~doc:"Archive all blocks heard"
+     and log_json =
+       flag "log-json" no_arg
+         ~doc:"Print daemon log output as JSON (default: plain text)"
+     and log_level =
+       flag "log-level" (optional string)
+         ~doc:"Set daemon log level (default: Info)"
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
@@ -106,321 +116,486 @@ let daemon logger =
                snark proof (default: %d)"
               (Currency.Fee.to_int Cli_lib.Fee.default_snark_worker))
          (optional txn_fee)
-     and sexp_logging =
-       flag "sexp-logging" no_arg
-         ~doc:"Use S-expressions in log output, instead of JSON"
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
+     and insecure_rest_server =
+       flag "insecure-rest-server" no_arg
+         ~doc:
+           "Have REST server listen on all addresses, not just localhost \
+            (this is INSECURE, make sure your firewall is configured \
+            correctly!)"
      and limit_connections =
        flag "limit-concurrent-connections"
          ~doc:
            "true|false Limit the number of concurrent connections per IP \
             address (default:true)"
          (optional bool)
+     and no_bans =
+       let module Expiration = struct
+         [%%expires_after "20190907"]
+       end in
+       flag "no-bans" no_arg ~doc:"don't ban peers (**TEMPORARY FOR TESTNET**)"
      in
      fun () ->
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
          Option.value ~default:(home ^/ ".coda-config") conf_dir
        in
+       let%bind log_level =
+         match log_level with
+         | None ->
+             Deferred.return Logger.Level.Info
+         | Some log_level_str_with_case -> (
+             let open Logger in
+             let log_level_str = String.lowercase log_level_str_with_case in
+             match Level.of_string log_level_str with
+             | Error _ ->
+                 eprintf "Received unknown log-level %s. Expected one of: %s\n"
+                   log_level_str
+                   ( Level.all |> List.map ~f:Level.show
+                   |> List.map ~f:String.lowercase
+                   |> String.concat ~sep:", " ) ;
+                 exit 14
+             | Ok ll ->
+                 Deferred.return ll )
+       in
+       if no_bans then Trust_system.disable_bans () ;
        let%bind conf_dir =
-         if is_background then (
+         if is_background then
            let home = Core.Sys.home_directory () in
            let conf_dir = compute_conf_dir home in
+           Deferred.return conf_dir
+         else Sys.home_directory () >>| compute_conf_dir
+       in
+       let () =
+         match Core.Sys.file_exists conf_dir with
+         | `Yes ->
+             ()
+         | _ ->
+             Core.Unix.mkdir_p conf_dir
+       in
+       let () =
+         if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
              conf_dir ;
            Daemon.daemonize
              ~redirect_stdout:(`File_append (conf_dir ^/ "coda.log"))
              ~redirect_stderr:(`File_append (conf_dir ^/ "coda.log"))
-             () ;
-           Deferred.return conf_dir )
-         else Sys.home_directory () >>| compute_conf_dir
+             () )
+         else ()
        in
-       Parallel.init_master () ;
-       let%bind config =
-         match%map
-           Monitor.try_with_or_error ~extract_exn:true (fun () ->
-               let%bind r = Reader.open_file (conf_dir ^/ "daemon.json") in
-               let%map contents =
-                 Pipe.to_list (Reader.lines r)
-                 >>| fun ss -> String.concat ~sep:"\n" ss
-               in
-               YJ.from_string ~fname:"daemon.json" contents )
+       let stdout_log_processor =
+         if log_json then Logger.Processor.raw ()
+         else
+           Logger.Processor.pretty ~log_level
+             ~config:
+               { Logproc_lib.Interpolator.mode= Inline
+               ; max_interpolation_length= 50
+               ; pretty_print= true }
+       in
+       Logger.Consumer_registry.register ~id:"default"
+         ~processor:stdout_log_processor
+         ~transport:(Logger.Transport.stdout ()) ;
+       (* 512MB logrotate max size = 1GB max filesystem usage *)
+       let logrotate_max_size = 1024 * 1024 * 512 in
+       Logger.Consumer_registry.register ~id:"raw_persistent"
+         ~processor:(Logger.Processor.raw ())
+         ~transport:
+           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+              ~max_size:logrotate_max_size) ;
+       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+         "Coda daemon is booting up; built with commit $commit on branch \
+          $branch"
+         ~metadata:
+           [ ("commit", `String Coda_version.commit_id)
+           ; ("branch", `String Coda_version.branch) ] ;
+       (* Check if the config files are for the current version.
+        * WARNING: Deleting ALL the files in the config directory if there is
+        * a version mismatch *)
+       (* When persistence is added back, this needs to be revisited
+        * to handle persistence related files properly *)
+       let%bind () =
+         let del_files dir =
+           let rec all_files dirname basename =
+             let fullname = Filename.concat dirname basename in
+             match%bind Sys.is_directory fullname with
+             | `Yes ->
+                 let%map dirs, files =
+                   Sys.ls_dir fullname
+                   >>= Deferred.List.map ~f:(all_files fullname)
+                   >>| List.unzip
+                 in
+                 let dirs =
+                   if String.equal dirname conf_dir then List.concat dirs
+                   else List.append (List.concat dirs) [fullname]
+                 in
+                 (dirs, List.concat files)
+             | _ ->
+                 Deferred.return ([], [fullname])
+           in
+           let%bind dirs, files = all_files dir "" in
+           let%bind () =
+             Deferred.List.iter files ~f:(fun file -> Sys.remove file)
+           in
+           Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
+         in
+         let make_version ~wipe_dir =
+           let%bind () =
+             if wipe_dir then del_files conf_dir else Deferred.unit
+           in
+           let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
+           Writer.write_line wr Coda_version.commit_id ;
+           Writer.close wr
+         in
+         match%bind
+           Monitor.try_with_or_error (fun () ->
+               let%bind r = Reader.open_file (conf_dir ^/ "coda.version") in
+               match%map Pipe.to_list (Reader.lines r) with
+               | [] ->
+                   ""
+               | s ->
+                   List.hd_exn s )
          with
          | Ok c ->
-             Some c
+             if String.equal c Coda_version.commit_id then return ()
+             else (
+               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                 "Different version of Coda detected in config directory \
+                  $config_directory, removing existing configuration"
+                 ~metadata:[("config_directory", `String conf_dir)] ;
+               make_version ~wipe_dir:true )
          | Error e ->
              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-               "error reading daemon.json: %s" (Error.to_string_mach e) ;
-             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-               "failed to read daemon.json, not using it" ;
-             None
+               ~metadata:[("error", `String (Error.to_string_mach e))]
+               "Error reading coda.version: $error" ;
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               "Failed to read coda.version, cleaning up the config directory \
+                $config_directory"
+               ~metadata:[("config_directory", `String conf_dir)] ;
+             make_version ~wipe_dir:false
        in
-       let maybe_from_config (type a) (f : YJ.json -> a option)
-           (keyname : string) (actual_value : a option) : a option =
-         let open Option.Let_syntax in
-         let open YJ.Util in
-         match actual_value with
-         | Some v ->
-             Some v
-         | None ->
-             let%bind config = config in
-             let%bind json_val = to_option Fn.id (member keyname config) in
-             f json_val
-       in
-       let or_from_config map keyname actual_value ~default =
-         match maybe_from_config map keyname actual_value with
-         | Some x ->
-             x
-         | None ->
-             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-               "didn't find %s in the config file, using default" keyname ;
-             default
-       in
-       let external_port : int =
-         or_from_config YJ.Util.to_int_option "external-port"
-           ~default:Port.default_external external_port
-       in
-       let client_port =
-         or_from_config YJ.Util.to_int_option "client-port"
-           ~default:Port.default_client client_port
-       in
-       let snark_work_fee_flag =
-         let json_to_currency_fee_option json =
-           YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
-         in
-         or_from_config json_to_currency_fee_option "snark-worker-fee"
-           ~default:Cli_lib.Fee.default_snark_worker snark_work_fee
-       in
-       let max_concurrent_connections =
-         if
-           or_from_config YJ.Util.to_bool_option "max-concurrent-connections"
-             ~default:true limit_connections
-         then Some 10
-         else None
-       in
-       let rest_server_port =
-         maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
-       in
-       let work_selection =
-         or_from_config
-           (Fn.compose Option.return
-              (Fn.compose work_selection_val YJ.Util.to_string))
-           "work-selection" ~default:Cli_lib.Arg_type.Seq work_selection_flag
-       in
-       let initial_peers_raw =
-         List.concat
-           [ initial_peers_raw
-           ; List.map ~f:Host_and_port.of_string
-             @@ or_from_config
-                  (Fn.compose Option.some
-                     (YJ.Util.convert_each YJ.Util.to_string))
-                  "peers" None ~default:[] ]
-       in
-       let discovery_port = external_port + 1 in
-       let%bind () = Unix.mkdir ~p:() conf_dir in
-       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-       let%bind initial_peers_cleaned =
-         Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
-           initial_peers_raw ~f:(fun addr ->
-             let host = Host_and_port.host addr in
-             match%bind
-               Monitor.try_with_or_error (fun () ->
-                   Unix.Inet_addr.of_string_or_getbyname host )
-             with
-             | Ok inet_addr ->
-                 return
-                 @@ Some
-                      (Host_and_port.create
-                         ~host:(Unix.Inet_addr.to_string inet_addr)
-                         ~port:(Host_and_port.port addr))
-             | Error e ->
-                 Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                   "getaddr exception: %s" (Error.to_string_mach e) ;
-                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                   "failed to look up address for %s, skipping" host ;
-                 return None )
-       in
-       let%bind () =
-         if
-           List.length initial_peers_raw <> 0
-           && List.length initial_peers_cleaned = 0
-         then (
-           eprintf "Error: failed to connect to any peers\n" ;
-           exit 10 )
-         else Deferred.unit
-       in
-       let%bind external_ip =
-         match external_ip_opt with
-         | None ->
-             Find_ip.find ()
-         | Some ip ->
-             return @@ Unix.Inet_addr.of_string ip
-       in
-       let bind_ip =
-         Option.value bind_ip_opt ~default:"0.0.0.0"
-         |> Unix.Inet_addr.of_string
-       in
-       let addrs_and_ports : Kademlia.Node_addrs_and_ports.t =
-         { external_ip
-         ; bind_ip
-         ; discovery_port
-         ; communication_port= external_port }
-       in
-       let wallets_disk_location = conf_dir ^/ "wallets" in
-       (* HACK: Until we can properly change propose keys at runtime we'll
-        * suffer by accepting a propose_public_key flag and reloading the wallet
-        * db here to find the keypair for the pubkey *)
-       let%bind propose_keypair =
-         match (propose_key, propose_public_key) with
-         | Some _, Some _ ->
-             eprintf
-               "Error: You cannot provide both `propose-key` and \
-                `propose-public-key`" ;
-             exit 11
-         | Some sk_file, None ->
-             Secrets.Keypair.Terminal_stdin.read_exn sk_file >>| Option.some
-         | None, Some wallet_pk -> (
-             match%bind
-               Secrets.Wallets.load ~logger
-                 ~disk_location:wallets_disk_location
-               >>| Secrets.Wallets.find ~needle:wallet_pk
-             with
-             | Some keypair ->
-                 Deferred.Option.return keypair
-             | None ->
-                 eprintf
-                   "Error: This public key was not found in the local \
-                    daemon's wallet database" ;
-                 exit 12 )
-         | None, None ->
-             return None
-       in
-       let%bind client_whitelist =
-         Reader.load_sexp
-           (conf_dir ^/ "client_whitelist")
-           [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
-         >>| Or_error.ok
-       in
-       let module Config0 = struct
-         let logger = logger
-
-         let conf_dir = conf_dir
-
-         let lbc_tree_max_depth = `Finite 50
-
-         let propose_keypair = propose_keypair
-
-         let genesis_proof = Precomputed_values.base_proof
-
-         let commit_id = commit_id
-
-         let work_selection = work_selection
-
-         let max_concurrent_connections = max_concurrent_connections
-       end in
-       let%bind (module Init) = make_init (module Config0) in
-       let module M = Coda_inputs.Make_coda (Init) in
-       let module Run = Coda_run.Make (Config0) (M) in
-       Stream.iter
-         (Async.Scheduler.long_cycles
-            ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
-         ~f:(fun span ->
-           Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-             "long async cycle %s"
-             (Time_ns.Span.to_string span) ) ;
-       let run_snark_worker_action =
-         Option.value_map run_snark_worker_flag ~default:`Don't_run
-           ~f:(fun k -> `With_public_key k)
-       in
-       let trace_database_initialization typ location =
-         Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location
-           typ
-       in
-       let trust_dir = conf_dir ^/ "trust" in
-       let () = Snark_params.set_chunked_hashing true in
-       let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-       let trust_system = Trust_system.create ~db_dir:trust_dir in
-       trace_database_initialization "trust_system" __LOC__ trust_dir ;
-       let time_controller =
-         Block_time.Controller.create Block_time.Controller.basic
-       in
-       let initial_propose_keypairs =
-         Config0.propose_keypair |> Option.to_list |> Keypair.Set.of_list
-       in
-       let consensus_local_state =
-         Consensus.Data.Local_state.create
-           ( Option.map Config0.propose_keypair ~f:(fun keypair ->
-                 let open Keypair in
-                 Public_key.compress keypair.public_key )
-           |> Option.to_list |> Public_key.Compressed.Set.of_list )
-       in
-       let net_config =
-         { M.Inputs.Net.Config.logger
-         ; trust_system
-         ; time_controller
-         ; consensus_local_state
-         ; gossip_net_params=
-             { timeout= Time.Span.of_sec 3.
-             ; logger
-             ; target_peer_count= 8
-             ; conf_dir
-             ; initial_peers= initial_peers_cleaned
-             ; addrs_and_ports
-             ; trust_system
-             ; max_concurrent_connections } }
-       in
-       let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
-       let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
-       let receipt_chain_database =
-         Coda_base.Receipt_chain_database.create
-           ~directory:receipt_chain_dir_name
-       in
-       trace_database_initialization "receipt_chain_database" __LOC__
-         receipt_chain_dir_name ;
-       let transaction_database_dir = conf_dir ^/ "transaction" in
-       let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
-       let transaction_database =
-         Auxiliary_database.Transaction_database.create logger
-           transaction_database_dir
-       in
-       trace_database_initialization "transaction_database" __LOC__
-         transaction_database_dir ;
-       let external_transition_database_dir =
-         conf_dir ^/ "external_transition_database"
-       in
-       let%bind () = Async.Unix.mkdir ~p:() external_transition_database_dir in
-       let external_transition_database =
-         Auxiliary_database.External_transition_database.create logger
-           external_transition_database_dir
-       in
+       Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
-       let%bind coda =
-         Run.create
-           (Run.Config.make ~logger ~trust_system ~verifier:Init.verifier
-              ~net_config ?snark_worker_key:run_snark_worker_flag
-              ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
-              ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-              ~wallets_disk_location:(conf_dir ^/ "wallets")
-              ~persistent_root_location:(conf_dir ^/ "root")
-              ~persistent_frontier_location:(conf_dir ^/ "frontier")
-              ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-              ~time_controller
-              ~initial_propose_keypairs ~monitor ~consensus_local_state
-              ~transaction_database ~external_transition_database ())
+       let module Coda_initialization = struct
+         type ('a, 'b, 'c, 'd, 'e) t =
+           { coda: 'a
+           ; client_whitelist: 'b
+           ; rest_server_port: 'c
+           ; client_port: 'd
+           ; run_snark_worker_action: 'e }
+       end in
+       let coda_initialization_deferred () =
+         let%bind config =
+           match%map
+             Monitor.try_with_or_error ~extract_exn:true (fun () ->
+                 let%bind r = Reader.open_file (conf_dir ^/ "daemon.json") in
+                 let%map contents =
+                   Pipe.to_list (Reader.lines r)
+                   >>| fun ss -> String.concat ~sep:"\n" ss
+                 in
+                 YJ.from_string ~fname:"daemon.json" contents )
+           with
+           | Ok c ->
+               Some c
+           | Error e ->
+               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                 "Error reading daemon.json: $error"
+                 ~metadata:[("error", `String (Error.to_string_mach e))] ;
+               None
+         in
+         let maybe_from_config (type a) (f : YJ.json -> a option)
+             (keyname : string) (actual_value : a option) : a option =
+           let open Option.Let_syntax in
+           let open YJ.Util in
+           match actual_value with
+           | Some v ->
+               Some v
+           | None ->
+               let%bind config = config in
+               let%bind json_val = to_option Fn.id (member keyname config) in
+               f json_val
+         in
+         let or_from_config map keyname actual_value ~default =
+           match maybe_from_config map keyname actual_value with
+           | Some x ->
+               x
+           | None ->
+               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                 "Key '$key' not found in the config file, using default"
+                 ~metadata:[("key", `String keyname)] ;
+               default
+         in
+         let external_port : int =
+           or_from_config YJ.Util.to_int_option "external-port"
+             ~default:Port.default_external external_port
+         in
+         let client_port =
+           or_from_config YJ.Util.to_int_option "client-port"
+             ~default:Port.default_client client_port
+         in
+         let snark_work_fee_flag =
+           let json_to_currency_fee_option json =
+             YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
+           in
+           or_from_config json_to_currency_fee_option "snark-worker-fee"
+             ~default:Cli_lib.Fee.default_snark_worker snark_work_fee
+         in
+         let max_concurrent_connections =
+           if
+             or_from_config YJ.Util.to_bool_option "max-concurrent-connections"
+               ~default:true limit_connections
+           then Some 10
+           else None
+         in
+         let work_selection_method =
+           or_from_config
+             (Fn.compose Option.return
+                (Fn.compose work_selection_method_val YJ.Util.to_string))
+             "work-selection" ~default:Cli_lib.Arg_type.Sequence
+             work_selection_method_flag
+         in
+         let initial_peers_raw =
+           List.concat
+             [ initial_peers_raw
+             ; List.map ~f:Host_and_port.of_string
+               @@ or_from_config
+                    (Fn.compose Option.some
+                       (YJ.Util.convert_each YJ.Util.to_string))
+                    "peers" None ~default:[] ]
+         in
+         let discovery_port = external_port + 1 in
+         if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
+         let%bind initial_peers_cleaned =
+           Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
+             initial_peers_raw ~f:(fun addr ->
+               let host = Host_and_port.host addr in
+               match%bind
+                 Monitor.try_with_or_error (fun () ->
+                     Unix.Inet_addr.of_string_or_getbyname host )
+               with
+               | Ok inet_addr ->
+                   return
+                   @@ Some
+                        (Host_and_port.create
+                           ~host:(Unix.Inet_addr.to_string inet_addr)
+                           ~port:(Host_and_port.port addr))
+               | Error e ->
+                   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                     "Error on getaddr: $error"
+                     ~metadata:[("error", `String (Error.to_string_mach e))] ;
+                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     "Failed to get address for host $host, skipping"
+                     ~metadata:[("host", `String host)] ;
+                   return None )
+         in
+         let%bind () =
+           if
+             List.length initial_peers_raw <> 0
+             && List.length initial_peers_cleaned = 0
+           then (
+             eprintf "Error: failed to connect to any peers\n" ;
+             exit 10 )
+           else Deferred.unit
+         in
+         let%bind external_ip =
+           match external_ip_opt with
+           | None ->
+               Find_ip.find ()
+           | Some ip ->
+               return @@ Unix.Inet_addr.of_string ip
+         in
+         let bind_ip =
+           Option.value bind_ip_opt ~default:"0.0.0.0"
+           |> Unix.Inet_addr.of_string
+         in
+         let addrs_and_ports : Kademlia.Node_addrs_and_ports.t =
+           { external_ip
+           ; bind_ip
+           ; discovery_port
+           ; communication_port= external_port }
+         in
+         let wallets_disk_location = conf_dir ^/ "wallets" in
+         (* HACK: Until we can properly change propose keys at runtime we'll
+          * suffer by accepting a propose_public_key flag and reloading the wallet
+          * db here to find the keypair for the pubkey *)
+         let%bind propose_keypair =
+           match (propose_key, propose_public_key) with
+           | Some _, Some _ ->
+               eprintf
+                 "Error: You cannot provide both `propose-key` and \
+                  `propose-public-key`\n" ;
+               exit 11
+           | Some sk_file, None ->
+               let%bind keypair =
+                 Secrets.Keypair.Terminal_stdin.read_exn sk_file
+               in
+               let%map () =
+                 (* If we wish to track the propose key *)
+                 if unsafe_track_propose_key then
+                   let pk = Public_key.compress keypair.public_key in
+                   let%bind wallets =
+                     Secrets.Wallets.load ~logger
+                       ~disk_location:wallets_disk_location
+                   in
+                   (* Either we already are tracking it *)
+                   match Secrets.Wallets.find wallets ~needle:pk with
+                   | Some _ ->
+                       Deferred.unit
+                   | None ->
+                       (* Or we import it *)
+                       Secrets.Wallets.import_keypair wallets keypair
+                       >>| ignore
+                 else Deferred.unit
+               in
+               Some keypair
+           | None, Some wallet_pk -> (
+               match%bind
+                 Secrets.Wallets.load ~logger
+                   ~disk_location:wallets_disk_location
+                 >>| Secrets.Wallets.find ~needle:wallet_pk
+               with
+               | Some keypair ->
+                   Deferred.Option.return keypair
+               | None ->
+                   eprintf
+                     "Error: This public key was not found in the local \
+                      daemon's wallet database\n" ;
+                   exit 12 )
+           | None, None ->
+               return None
+         in
+         let%bind client_whitelist =
+           Reader.load_sexp
+             (conf_dir ^/ "client_whitelist")
+             [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
+           >>| Or_error.ok
+         in
+         Stream.iter
+           (Async.Scheduler.long_cycles
+              ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
+           ~f:(fun span ->
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               "Long async cycle: $span milliseconds"
+               ~metadata:[("span", `String (Time_ns.Span.to_string span))] ) ;
+         let run_snark_worker_action =
+           Option.value_map run_snark_worker_flag ~default:`Don't_run
+             ~f:(fun k -> `With_public_key k)
+         in
+         let trace_database_initialization typ location directory =
+           Logger.trace logger ~module_:__MODULE__ ~location
+             "Creating database of type $typ in directory $directory"
+             ~metadata:[("typ", `String typ); ("directory", `String directory)]
+         in
+         let trust_dir = conf_dir ^/ "trust" in
+         let () = Snark_params.set_chunked_hashing true in
+         let%bind () = Async.Unix.mkdir ~p:() trust_dir in
+         let trust_system = Trust_system.create ~db_dir:trust_dir in
+         trace_database_initialization "trust_system" __LOC__ trust_dir ;
+         let time_controller =
+           Block_time.Controller.create Block_time.Controller.basic
+         in
+         let initial_propose_keypairs =
+           propose_keypair |> Option.to_list |> Keypair.Set.of_list
+         in
+         let consensus_local_state =
+           Consensus.Data.Local_state.create
+             ( Option.map propose_keypair ~f:(fun keypair ->
+                   let open Keypair in
+                   Public_key.compress keypair.public_key )
+             |> Option.to_list |> Public_key.Compressed.Set.of_list )
+         in
+         trace_database_initialization "consensus local state" __LOC__
+           trust_dir ;
+         let net_config =
+           { Coda_networking.Config.logger
+           ; trust_system
+           ; time_controller
+           ; consensus_local_state
+           ; gossip_net_params=
+               { timeout= Time.Span.of_sec 3.
+               ; logger
+               ; target_peer_count= 8
+               ; conf_dir
+               ; initial_peers= initial_peers_cleaned
+               ; addrs_and_ports
+               ; trust_system
+               ; max_concurrent_connections } }
+         in
+         let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+         let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
+         let receipt_chain_database =
+           Coda_base.Receipt_chain_database.create
+             ~directory:receipt_chain_dir_name
+         in
+         trace_database_initialization "receipt_chain_database" __LOC__
+           receipt_chain_dir_name ;
+         let transaction_database_dir = conf_dir ^/ "transaction" in
+         let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
+         let transaction_database =
+           Auxiliary_database.Transaction_database.create ~logger
+             transaction_database_dir
+         in
+         trace_database_initialization "transaction_database" __LOC__
+           transaction_database_dir ;
+         let external_transition_database_dir =
+           conf_dir ^/ "external_transition_database"
+         in
+         let%bind () =
+           Async.Unix.mkdir ~p:() external_transition_database_dir
+         in
+         let external_transition_database =
+           Auxiliary_database.External_transition_database.create ~logger
+             external_transition_database_dir
+         in
+         let%map coda =
+           Coda_lib.create
+             (Coda_lib.Config.make ~logger ~trust_system ~conf_dir ~net_config
+                ~work_selection_method:
+                  (Cli_lib.Arg_type.work_selection_method_to_module
+                     work_selection_method)
+                ?snark_worker_key:run_snark_worker_flag
+                ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                ~wallets_disk_location:(conf_dir ^/ "wallets")
+                ~persistent_root_location:(conf_dir ^/ "root")
+                ~persistent_frontier_location:(conf_dir ^/ "frontier")
+                ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
+                ~time_controller ~initial_propose_keypairs ~monitor
+                ~consensus_local_state ~transaction_database
+                ~external_transition_database ~is_archive_node ())
+         in
+         { Coda_initialization.coda
+         ; client_whitelist
+         ; rest_server_port
+         ; client_port
+         ; run_snark_worker_action }
        in
-       Run.handle_shutdown ~monitor ~conf_dir coda ;
+       (* Breaks a dependency cycle with monitor initilization and coda *)
+       let coda_ref : Coda_lib.t option ref = ref None in
+       Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
+       let%bind { Coda_initialization.coda
+                ; client_whitelist
+                ; rest_server_port
+                ; client_port
+                ; run_snark_worker_action } =
+         coda_initialization_deferred ()
+       in
+       coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
-       M.start coda ;
+       Coda_lib.start coda ;
        let web_service = Web_pipe.get_service () in
-       Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;
-       Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-         ~client_port () ;
-       Run.run_snark_worker ~client_port run_snark_worker_action ;
+       Web_pipe.run_service coda web_service ~conf_dir ~logger ;
+       Coda_run.setup_local_server ?client_whitelist ?rest_server_port ~coda
+         ~insecure_rest_server ~client_port () ;
+       Coda_run.run_snark_worker ~client_port run_snark_worker_action ;
+       let%bind () =
+         Option.map metrics_server_port ~f:(fun port ->
+             Coda_metrics.server ~port ~logger >>| ignore )
+         |> Option.value ~default:Deferred.unit
+       in
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-         "Running coda services" ;
+         "Daemon ready. Clients can now connect" ;
        Async.never ())
 
 [%%if
@@ -435,22 +610,30 @@ let rec ensure_testnet_id_still_good logger =
       (fun () -> don't_wait_for @@ ensure_testnet_id_still_good logger)
       ()
   in
+  let soon_minutes = Int.of_float (60.0 *. recheck_soon) in
   match%bind
     Monitor.try_with_or_error (fun () ->
         Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
   with
   | Error e ->
       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        "exception while trying to fetch testnet_id, trying again in 6 minutes" ;
+        "Exception while trying to fetch testnet_id: $error. Trying again in \
+         $retry_minutes minutes"
+        ~metadata:
+          [ ("error", `String (Error.to_string_hum e))
+          ; ("retry_minutes", `Int soon_minutes) ] ;
       try_later recheck_soon ;
       Deferred.unit
   | Ok (resp, body) -> (
       if resp.status <> `OK then (
-        try_later recheck_soon ;
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          "HTTP response status %s while getting testnet id, checking again \
-           in 6 minutes."
-          (Cohttp.Code.string_of_status resp.status) ;
+          "HTTP response status $HTTP_status while getting testnet id, \
+           checking again in $retry_minutes minutes."
+          ~metadata:
+            [ ( "HTTP_status"
+              , `String (Cohttp.Code.string_of_status resp.status) )
+            ; ("retry_minutes", `Int soon_minutes) ] ;
+        try_later recheck_soon ;
         Deferred.unit )
       else
         let%bind body_string = Body.to_string body in
@@ -466,7 +649,7 @@ let rec ensure_testnet_id_still_good logger =
              (version %s) is no longer compatible. Please download the latest \
              Coda software!\n\
              Valid versions:\n\
-             %s"
+             %s\n"
             ( local_id |> Option.map ~f:str
             |> Option.value ~default:"[COMMIT_SHA1 not set]" )
             remote_ids ;
@@ -488,13 +671,29 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 
 [%%endif]
 
-let internal_commands = [(Snark_worker.Intf.command_name, Snark_worker.command)]
+let snark_hashes =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"List hashes of proving and verification keys"
+    [%map_open
+      let json = Cli_lib.Flag.json in
+      let print = Core.printf "%s\n%!" in
+      fun () ->
+        if json then
+          print
+            (Yojson.Safe.to_string
+               (Snark_keys.key_hashes_to_yojson Snark_keys.key_hashes))
+        else List.iter Snark_keys.key_hashes ~f:print]
+
+let internal_commands =
+  [ (Snark_worker.Intf.command_name, Snark_worker.command)
+  ; ("snark-hashes", snark_hashes) ]
 
 let coda_commands logger =
-  [ (Parallel.worker_command_name, Parallel.worker_command)
-  ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
-  ; ("daemon", daemon logger)
+  [ ("daemon", daemon logger)
   ; ("client", Client.command)
+  ; ("advanced", Client.advanced)
+  ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
+  ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
 
 [%%if
@@ -525,7 +724,8 @@ let coda_commands logger =
         ; (module Coda_long_fork)
         ; (module Coda_delegation_test)
         ; (module Full_test)
-        ; (module Transaction_snark_profiler) ]
+        ; (module Transaction_snark_profiler)
+        ; (module Coda_archive_node_test) ]
         : (module Integration_test) list )
   in
   coda_commands logger
@@ -533,11 +733,45 @@ let coda_commands logger =
 
 [%%endif]
 
+let print_version_help coda_exe version =
+  (* mimic Jane Street command help *)
+  let lines =
+    [ "print version information"
+    ; ""
+    ; sprintf "  %s %s" (Filename.basename coda_exe) version
+    ; ""
+    ; "=== flags ==="
+    ; ""
+    ; "  [-help]  print this help text and exit"
+    ; "           (alias: -?)" ]
+  in
+  List.iter lines ~f:(Core.printf "%s\n%!")
+
+let print_version_info () =
+  Core.printf "Commit %s on branch %s\n"
+    (String.sub Coda_version.commit_id ~pos:0 ~len:7)
+    Coda_version.branch
+
 let () =
   Random.self_init () ;
-  let logger = Logger.create () in
+  let logger = Logger.create ~initialize_default_consumer:false () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
-  Command.run (Command.group ~summary:"Coda" (coda_commands logger)) ;
+  (* intercept command-line processing for "version", because we don't
+     use the Jane Street scripts that generate their version information
+   *)
+  (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
+   let is_version_cmd = make_list_mem ["version"; "-version"] in
+   let is_help_flag = make_list_mem ["-help"; "-?"] in
+   match Sys.argv with
+   | [|_coda_exe; version|] when is_version_cmd version ->
+       print_version_info ()
+   | [|coda_exe; version; help|]
+     when is_version_cmd version && is_help_flag help ->
+       print_version_help coda_exe version
+   | _ ->
+       Command.run
+         (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
+            (coda_commands logger))) ;
   Core.exit 0

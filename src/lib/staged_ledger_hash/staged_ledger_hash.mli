@@ -22,7 +22,7 @@ val length_in_triples : int
 
 val fold : t -> bool Triple.t Fold.t
 
-val genesis : t
+val genesis : t Lazy.t
 
 module Stable : sig
   module V1 : sig

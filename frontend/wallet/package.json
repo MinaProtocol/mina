@@ -13,6 +13,7 @@
     "graphql_ppx": "^0.2.8",
     "node-fetch": "^2.5.0",
     "react-modal": "^3.8.1",
+    "react-waypoint": "^9.0.2",
     "reason-apollo": "^0.16.0",
     "reason-react": "^0.7.0",
     "tablecloth-bucklescript": "file:./tablecloth/bs"
@@ -26,6 +27,7 @@
   },
   "scripts": {
     "fake": "graphql-faker --port 8080 -- schema.graphql",
+    "real": "./_build/coda-daemon-macos/coda.exe daemon -config-dir $(mktemp -d -t coda_config) -rest-port 8080 &> /dev/tty",
     "fake-inspector": "graphql-faker --open -- schema.graphql",
     "pull-macos-binary": "curl https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip > coda-daemon-macos.zip && rm -rf _build/coda-daemon-macos/ && unzip coda-daemon-macos.zip",
     "build": "bsb -make-world",
@@ -34,10 +36,13 @@
     "pack": "fpack --development ./lib/js/src/render/Index.js",
     "query": "send-introspection-query http://localhost:8080/graphql",
     "query-fake": "concurrently --kill-others 'yarn run fake' 'sleep 5 && yarn run query' || true",
+    "query-real": "concurrently --kill-others 'yarn run real' 'sleep 15 && yarn run query' || true",
     "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei' -print)",
-    "test": "yarn run build && jest",
+    "test": "yarn run build && jest lib/js/",
     "dist": "yarn run build && yarn run pack && build",
-    "dev": "concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'"
+    "dev-real": "concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'",
+    "dev": "GRAPHQL_BACKEND=faker yarn dev-real",
+    "regen-sdl": "node generate-schema.js http://localhost:8080/graphql > schema.graphql"
   },
   "build": {
     "appId": "FOO.org.codaprotocol.prowallet",
@@ -54,8 +59,9 @@
       "package.json"
     ],
     "extraResources": [
-      "_build/",
-      "node_modules/graphql-faker",
+      "_build/**/*",
+      "node_modules/graphql-faker/**/*",
+      "node_modules/core-js/**/*",
       "bundle/**/*",
       "public/**/*"
     ],

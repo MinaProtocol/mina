@@ -14,6 +14,20 @@ module Constant = struct
   end
 end
 
+(** A [Registry] module will receive events whenever items
+ *  are removed from the cache, whether by invalidation
+ *  or garbage collection *)
+module Registry = struct
+  module type S = sig
+    type element
+
+    val element_added : element -> unit
+
+    val element_removed :
+      [`Consumed | `Unconsumed | `Failure] -> element -> unit
+  end
+end
+
 (** A [('t, 'cache_t) Cached.t] is a representation of a value
  *  stored in a cache, where ['t] is the type of the immediate
  *  value currently being stored, and ['cache_t] is the type
@@ -96,6 +110,8 @@ module Cache = struct
     val create :
          name:string
       -> logger:Logger.t
+      -> on_add:('elt -> unit)
+      -> on_remove:([`Consumed | `Unconsumed | `Failure] -> 'elt -> unit)
       -> (module Hashtbl.Key_plain with type t = 'elt)
       -> 'elt t
 
@@ -163,6 +179,7 @@ module Transmuter_cache = struct
 
     module Make
         (Transmuter : Transmuter.S)
+        (Registry : Registry.S with type element := Transmuter.Target.t)
         (Name : Constant.S with type t := string) :
       S
       with module Cached := Cached

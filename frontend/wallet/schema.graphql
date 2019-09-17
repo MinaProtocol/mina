@@ -1,288 +1,416 @@
-enum SyncStatus {
-  ERROR
-  BOOTSTRAP # Resyncing
-  STALE # You haven't seen any activity recently
-  SYNCED
+schema {
+  query: query
+  mutation: mutation
+  subscription: subscription
 }
 
-enum ChainReorganizationStatus {
-  CHANGED
+type AddPaymentReceipt {
+  payment: UserCommand!
 }
 
-type SyncUpdate {
-  status: SyncStatus!
-  estimatedPercentSynced: Float!
-  description: String @examples(values: ["Sync description"])
+input AddPaymentReceiptInput {
+  # Time that a payment gets added to another clients transaction database
+  # (stringified Unix time - number of milliseconds since January 1, 1970)
+  added_time: String!
+
+  # Serialized payment (base58-encoded janestreet/bin_prot serialization)
+  payment: String!
 }
 
-type SnarkWorker {
-  key: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: String! @fake(type: number)
+type AddWalletPayload {
+  # Public key of the newly-created wallet
+  publicKey: PublicKey!
 }
 
-type UserCommand {
-  id: String!
-  isDelegation: Boolean!
-  nonce: Int!
-  date: String! @fake(type: pastDate)
-  from: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]) 
-  to: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  amount: String! @fake(type: number)
-  fee: String! @fake(type: number)
-  memo: String @fake(type:hackerPhrase)
-}
+# A total balance annotated with the amount that is currently unknown with the invariant: unknown <= total
+type AnnotatedBalance {
+  # The amount of coda owned by the account
+  total: UInt64!
 
-type FeeTransfer {
-  recipient: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  amount: String! @fake(type: number)
-}
-
-type BlockchainState {
-  date: String! @fake(type: pastDate)
-  snarkedLedgerHash: String!
-  stagedLedgerHash: String!
-}
-
-type ProtocolState {
-  previousStateHash: String!
-  blockchainState: BlockchainState!
-}
-
-type Transactions {
-  userCommands: [UserCommand!]!
-  feeTransfer: [FeeTransfer!]!
-  coinbase: String! @fake(type: number)
+  # The amount of coda owned by the account whose origin is currently unknown
+  unknown: UInt64!
 }
 
 type Block {
-  creator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  # Public key of account that produced this block
+  creator: PublicKey!
+
+  # Base58Check-encoded hash of the state after this block
   stateHash: String!
   protocolState: ProtocolState!
   transactions: Transactions!
 }
 
-type BlockConfirmation {
-  stateHash: String!
-  numConfirmations: Int!
+type BlockchainState {
+  # date (stringified Unix time - number of milliseconds since January 1, 1970)
+  date: String!
+
+  # Base58Check-encoded hash of the snarked ledger
+  snarkedLedgerHash: String!
+
+  # Base58Check-encoded hash of the staged ledger
+  stagedLedgerHash: String!
 }
 
-type AnnotatedBalance {
-  total: String! @fake(type: number)
-  unknown: String! @fake(type: number)
-}
-
-type Wallet {
-  publicKey: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  nonce: String!
-  receiptChainHash: String!
-  delegate: String!
-  votingFor: String!
-  balance: AnnotatedBalance!
-  stakingActive: Boolean! # Actively staking. There is a lag between switching staking keys and them appearing here as you may be in the middle of a staking procedure with other keys.
-  privateKeyPath: String! @examples(values: ["/Users/o1labs/.coda_config/wallets/store/ASgu5t5hlbjC3DZYZ87tASbUX+mGXJUpp+uekWKwtxlJbHxGuedIAQAAAQ=="])
-}
-
-type NodeStatus {
-  network: String @examples(values: ["testnet"])
-}
-
-## Input types
-
-input AddWalletInput {
-  publicKey: String
-  privateKey: String
-}
-
-input DeleteWalletInput {
-  publicKey: String!
-}
-
-input AddPaymentReceiptInput {
-  receipt: String
-}
-
-input SetNetworkInput {
-  address: String
-}
-
-input SetSnarkWorkerInput {
-  worker: String!
-  fee: String!
-}
-
-input CreatePaymentInput {
-  from: String!,
-  to: String!,
-  amount: String!,
-  fee: String!,
-  memo: String
-}
-
-input CreateDelegationInput {
-  from: String!,
-  to: String,
-  fee: String!,
-  memo: String
-}
-
-input UserCommandFilterInput {
-  from: String,
-}
-
-input BlockFilterInput {
-  relatedTo: String!,
-}
-
-input SetStakingInput {
-  # Set to empty to stop staking
-  # Set to a non-empty list of public keys to start staking on these keys
-  wallets: [String!]!
-}
-
-## Payload types
-
-type CreatePaymentPayload {
-  payment: UserCommand
-}
-
-type CreateDelegationPayload {
-  delegation: UserCommand
-}
-
-type SetSnarkWorkerPayload {
-  worker: SnarkWorker
-}
-
-type SetNetworkPayload {
-  address: String
-}
-
-type AddPaymentReceiptPayload {
-  payment: UserCommand
-}
-
-type AddWalletPayload {
-  publicKey: String @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-}
-
-type DeleteWalletPayload {
-  publicKey: String @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-}
-
-type SetStakingPayload {
-  # Returns the last wallet public keys that were staking before
-  # or empty if there were none
-  lastStaking: [String!]!
-}
-
-# Pagination types
-
-type PageInfo {
-  hasPreviousPage: Boolean! @examples(values: [false])
-  hasNextPage: Boolean! @examples(values: [false])
-  firstCursor: String
-  lastCursor: String
-}
-
-type UserCommandEdge {
-  cursor: String!
-  node: UserCommand!
-}
-
-type UserCommandConnection {
-  edges: [UserCommandEdge!]!
-  nodes: [UserCommand!]!
-  pageInfo: PageInfo!
+# Connection as described by the Relay connections spec
+type BlockConnection {
+  edges: [BlockEdge!]!
+  nodes: [Block!]!
   totalCount: Int!
+  pageInfo: PageInfo!
 }
 
+# Connection Edge as described by the Relay connections spec
 type BlockEdge {
+  # Opaque pagination cursor for a block (base58-encoded janestreet/bin_prot serialization)
   cursor: String!
   node: Block!
 }
 
-type BlockConnection {
-  edges: [BlockEdge!]!
-  nodes: [Block!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
+input BlockFilterInput {
+  # A public key of a user who has their
+  #         transaction in the block, or produced the block
+  relatedTo: PublicKey!
 }
 
-type Query {
-  # List of wallets currently tracked by the node
-  ownedWallets: [Wallet!]!
-  
-  # Gets balance of key at a certain consensus state
-  # Note: `consensus` is optional as we will likely decide one
-  # state to be the "real" balance
-  balance(publicKey: String!): String!
-  
-  pooledUserCommands(
-    filter: UserCommandFilterInput,
-    first: Int,
-    after: String,
-    last: Int,
-    before: String): UserCommandConnection!
-  
-  blocks(
-    filter: BlockFilterInput!,
-    first: Int,
-    after: String,
-    last: Int,
-    before: String): BlockConnection!
-  
-  # Null if node isn't performing snark work
-  currentSnarkWorker: SnarkWorker
-
-  # Current sync status of the node
-  syncState: SyncUpdate!
-  
-  # version of the node (commit hash or version #)
-  version: String! @examples(values: ["aa8c3f93ec2bad4718c308914df9e47b586f8ecd"])
-  
-  # Network that the node is connected to
-  network: String @examples(values: ["testnet"])
-  status: NodeStatus
+type ConsensusConfiguration {
+  delta: Int!
+  k: Int!
+  c: Int!
+  cTimesK: Int!
+  slotsPerEpoch: Int!
+  slotDuration: Int!
+  epochDuration: Int!
+  acceptableNetworkDelay: Int!
 }
 
-type Mutation {
-  createPayment(input: CreatePaymentInput!): CreatePaymentPayload
+type DaemonStatus {
+  numAccounts: Int
+  blockchainLength: Int
+  uptimeSecs: Int!
+  ledgerMerkleRoot: String
+  stateHash: String
+  commitId: String!
+  confDir: String!
+  peers: [String!]!
+  userCommandsSent: Int!
+  runSnarkWorker: Boolean!
+  syncStatus: SyncStatus!
+  proposePubkeys: [PublicKey!]!
+  histograms: Histograms
+  consensusTimeBestTip: String
+  consensusTimeNow: String!
+  consensusMechanism: String!
+  consensusConfiguration: ConsensusConfiguration!
+}
 
-  createDelegation(input: CreateDelegationInput!): CreateDelegationPayload
-  
-  setSnarkWorker(input: SetSnarkWorkerInput!): SetSnarkWorkerPayload
-  
-  # Configure which network your node is connected to
-  setNetwork(input: SetNetworkInput!): SetNetworkPayload
-  
-  # Adds transaction to the node
-  addPaymentReceipt(input: AddPaymentReceiptInput!): AddPaymentReceiptPayload
-  
-  # Tell server to track a private key and all associated transactions
-  addWallet(input: AddWalletInput!): AddWalletPayload
-  
-  # Deletes private key associated with `key` and all related information
-  deleteWallet(input: DeleteWalletInput!): DeleteWalletPayload
+input DeleteWalletInput {
+  # Public key of account to be deleted
+  publicKey: PublicKey!
+}
 
+type DeleteWalletPayload {
+  # Public key of the deleted wallet
+  publicKey: PublicKey!
+}
+
+type FeeTransfer {
+  # Public key of fee transfer recipient
+  recipient: PublicKey!
+
+  # Amount that the recipient is paid in this fee transfer
+  fee: UInt64!
+}
+
+type Histogram {
+  values: [Int!]!
+  intervals: [Interval!]!
+  underflow: Int!
+  overflow: Int!
+}
+
+type Histograms {
+  rpcTimings: RpcTimings!
+  externalTransitionLatency: Histogram
+  acceptedTransitionLocalLatency: Histogram
+  acceptedTransitionRemoteLatency: Histogram
+  snarkWorkerTransitionTime: Histogram
+  snarkWorkerMergeTime: Histogram
+}
+
+type Interval {
+  start: String!
+  stop: String!
+}
+
+type mutation {
+  # Add a wallet - this will create a new keypair and store it in the daemon
+  addWallet: AddWalletPayload!
+
+  # Delete a wallet that you own based on its public key
+  deleteWallet(input: DeleteWalletInput!): DeleteWalletPayload!
+
+  # Send a payment
+  sendPayment(input: SendPaymentInput!): SendPaymentPayload!
+
+  # Change your delegate by sending a transaction
+  sendDelegation(input: SendDelegationInput!): SendDelegationPayload!
+
+  # Add payment into transaction database
+  addPaymentReceipt(input: AddPaymentReceiptInput!): AddPaymentReceipt
+
+  # Set keys you wish to stake with - silently fails if you pass keys not tracked in ownedWallets
   setStaking(input: SetStakingInput!): SetStakingPayload!
 }
 
-type Subscription {
-  # Subscribe to sync status of the node
-  newSyncUpdate: SyncUpdate!
-  
-  blockConfirmation: BlockConfirmation!
-  
-  # Subscribe to all blocks related to `key`
-  newBlock(key: String): Block!
-  
-  # Triggered whenever the best tip changes
-  # to another branch in the transition frontier
-  chainReorganization: ChainReorganizationStatus!
+# PageInfo object as described by the Relay connections spec
+type PageInfo {
+  hasPreviousPage: Boolean!
+  hasNextPage: Boolean!
+  firstCursor: String
+  lastCursor: String
 }
 
-schema {
-  query: Query
-  mutation: Mutation
-  subscription: Subscription
+type ProtocolState {
+  # Base58Check-encoded hash of the previous state
+  previousStateHash: String!
+
+  # State related to the succinct blockchain
+  blockchainState: BlockchainState!
+}
+
+# Base58Check-encoded public key string
+scalar PublicKey
+
+type query {
+  # Network sync status
+  syncStatus: SyncStatus!
+
+  # Get running daemon status
+  daemonStatus: DaemonStatus!
+
+  # The version of the node (git commit hash)
+  version: String
+
+  # Wallets for which the daemon knows the private key
+  ownedWallets: [Wallet!]!
+
+  # Find any wallet via a public key
+  wallet(
+    # Public key of wallet being retrieved
+    publicKey: PublicKey!
+  ): Wallet
+
+  # Get information about the current snark worker
+  currentSnarkWorker: SnarkWorker
+  blocks(
+    # Returns the elements in the list that come before the specified cursor
+    before: String
+
+    # Returns the last _n_ elements from the list
+    last: Int
+
+    # Returns the elements in the list that come after the specified cursor
+    after: String
+
+    # Returns the first _n_ elements from the list
+    first: Int
+    filter: BlockFilterInput!
+  ): BlockConnection!
+
+  # List of peers that the daemon first used to connect to the network
+  initialPeers: [String!]!
+
+  # Retrieve all the user commands sent by a public key
+  pooledUserCommands(
+    # Public key of sender of pooled user commands
+    publicKey: PublicKey!
+  ): [UserCommand!]!
+
+  # Get the status of a transaction
+  transactionStatus(
+    # Id of a UserCommand
+    payment: ID!
+  ): TransactionStatus!
+}
+
+type RpcPair {
+  dispatch: Histogram
+  impl: Histogram
+}
+
+type RpcTimings {
+  getStagedLedgerAux: RpcPair!
+  answerSyncLedgerQuery: RpcPair!
+  getAncestry: RpcPair!
+  transitionCatchup: RpcPair!
+}
+
+input SendDelegationInput {
+  # Desired nonce for delegating state
+  nonce: UInt32
+
+  # Short arbitrary message provided by the sender
+  memo: String
+
+  # Fee amount in order to send a stake delegation
+  fee: UInt64!
+
+  # Public key of sender of a stake delegation
+  to: PublicKey!
+
+  # Public key of recipient of a stake delegation
+  from: PublicKey!
+}
+
+type SendDelegationPayload {
+  # Delegation change that was sent
+  delegation: UserCommand!
+}
+
+input SendPaymentInput {
+  # Desired nonce for sending a payment
+  nonce: UInt32
+
+  # Short arbitrary message provided by the sender
+  memo: String
+
+  # Fee amount in order to send payment
+  fee: UInt64!
+
+  # Amount of coda to send to to receiver
+  amount: UInt64!
+
+  # Public key of sender of payment
+  to: PublicKey!
+
+  # Public key of recipient of payment
+  from: PublicKey!
+}
+
+type SendPaymentPayload {
+  # Payment that was sent
+  payment: UserCommand!
+}
+
+input SetStakingInput {
+  # Public keys of wallets you wish to stake - these must be wallets that are in ownedWallets
+  wallets: [PublicKey!]!
+}
+
+type SetStakingPayload {
+  # Returns the last wallet public keys that were staking before or empty if there were none
+  lastStaking: [PublicKey!]!
+}
+
+type SnarkWorker {
+  # Public key of current snark worker
+  key: PublicKey!
+
+  # Fee that snark worker is charging to generate a snark proof
+  fee: UInt64!
+}
+
+type subscription {
+  # Event that triggers when the network sync status changes
+  newSyncUpdate: SyncStatus!
+
+  # Event that triggers when a new block is created that either contains a
+  # transaction with the specified public key, or was produced by it
+  newBlock(
+    # Public key that is included in the block
+    publicKey: PublicKey!
+  ): Block!
+}
+
+# Sync status of daemon
+enum SyncStatus {
+  BOOTSTRAP
+  SYNCED
+  OFFLINE
+  CONNECTING
+  LISTENING
+}
+
+# Different types of transactions in a block
+type Transactions {
+  # List of user commands (payments and stake delegations) included in this block
+  userCommands: [UserCommand!]!
+
+  # List of fee transfers included in this block
+  feeTransfer: [FeeTransfer!]!
+
+  # Amount of coda granted to the producer of this block
+  coinbase: UInt64!
+}
+
+# Status of a transaction
+enum TransactionStatus {
+  # A transaction that is on the longest chain
+  INCLUDED
+
+  # A transaction either in the transition frontier or in transaction pool but is not on the longest chain
+  PENDING
+
+  # The transaction has either been snarked, reached finality through consensus or has been dropped
+  UNKNOWN
+}
+
+# String representing a uint32 number in base 10
+scalar UInt32
+
+# String representing a uint64 number in base 10
+scalar UInt64
+
+type UserCommand {
+  id: ID!
+
+  # If true, this represents a delegation of stake, otherwise it is a payment
+  isDelegation: Boolean!
+
+  # Nonce of the transaction
+  nonce: Int!
+
+  # Public key of the sender
+  from: PublicKey!
+
+  # Public key of the receiver
+  to: PublicKey!
+
+  # Amount that sender is sending to receiver - this is 0 for delegations
+  amount: UInt64!
+
+  # Fee that sender is willing to pay for making the transaction
+  fee: UInt64!
+
+  # Short arbitrary message provided by the sender
+  memo: String!
+}
+
+# An account record according to the daemon
+type Wallet {
+  # The public identity of a wallet
+  publicKey: PublicKey!
+
+  # The amount of coda owned by the account
+  balance: AnnotatedBalance!
+
+  # A natural number that increases with each transaction (stringified uint32)
+  nonce: String
+
+  # Top hash of the receipt chain merkle-list
+  receiptChainHash: String
+
+  # The public key to which you are delegating - if you are not delegating to anybody, this would return your public key
+  delegate: PublicKey
+
+  # The previous epoch lock hash of the chain which you are voting for
+  votingFor: String
+
+  # True if you are actively staking with this account - this may not yet have
+  # been updated if the staking key was changed recently
+  stakingActive: Boolean!
+
+  # Path of the private key file for this account
+  privateKeyPath: String!
 }

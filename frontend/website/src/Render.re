@@ -32,12 +32,9 @@ module Rimraf = {
   [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
 };
 
-Array.length(Sys.argv) > 2
-&& (Sys.argv[2] == "prod" || Sys.argv[2] == "staging")
-  ? {
-    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v4";
-  }
-  : ();
+Links.Cdn.setPrefix(
+  Config.isProd ? "https://cdn.codaprotocol.com/website" : "",
+);
 
 Style.Typeface.load();
 
@@ -109,20 +106,21 @@ module Router = {
 let jobOpenings = [|
   ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),
-  ("senior-frontend-engineer", "Senior Frontend Engineer (San Francisco)."),
-  ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
+  ("senior-designer", "Senior Designer (San Francisco)."),
   (
-    "director-of-business-development",
-    "Director of Business Development (San Francisco).",
+    "senior-frontend-engineer",
+    "Senior Product Engineer (Frontend) (San Francisco).",
   ),
+  ("frontend-engineer", "Product Engineer (Frontend) (San Francisco)."),
+  ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
 |];
 
 // GENERATE
 
 Rimraf.sync("site");
 
-let blogPage =
-  <Page page=`Blog name="blog" extraHeaders={Blog.extraHeaders()}>
+let blogPage = name =>
+  <Page page=`Blog name extraHeaders={Blog.extraHeaders()}>
     <Wrapped> <Blog posts /> </Wrapped>
   </Page>;
 
@@ -159,7 +157,7 @@ Router.(
                  </Page>,
                )
              )
-          |> Array.append([|File("index", blogPage)|]),
+          |> Array.append([|File("index", blogPage("index"))|]),
         ),
         Dir(
           "jobs",
@@ -171,7 +169,7 @@ Router.(
                    page=`Jobs
                    name
                    footerColor=Style.Colors.gandalf
-                   extraHeaders={Careers.extraHeaders()}>
+                   extraHeaders={CareerPost.extraHeaders()}>
                    <Wrapped>
                      <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
                    </Wrapped>
@@ -185,18 +183,7 @@ Router.(
             <Wrapped> <Careers jobOpenings /> </Wrapped>
           </Page>,
         ),
-        File(
-          "code",
-          <Page page=`Code name="code"> <Wrapped> <Code /> </Wrapped> </Page>,
-        ),
-        File(
-          "testnet",
-          <Page
-            page=`Testnet name="testnet" extraHeaders={Testnet.extraHeaders()}>
-            <Wrapped> <Testnet /> </Wrapped>
-          </Page>,
-        ),
-        File("blog", blogPage),
+        File("blog", blogPage("blog")),
         File(
           "privacy",
           <Page page=`Privacy name="privacy">
@@ -211,4 +198,71 @@ Router.(
     ),
   )
 );
-Fs.symlinkSync(Node.Process.cwd() ++ "/static", "./site/static");
+
+Rimraf.sync("docs-theme");
+Router.(
+  generateStatic(
+    Dir(
+      "docs-theme",
+      [|
+        File(
+          "main",
+          <Page page=`Docs name="/docs/main">
+            <Wrapped> <Docs /> </Wrapped>
+          </Page>,
+        ),
+      |],
+    ),
+  )
+);
+
+module MoreFs = {
+  type stat;
+  [@bs.val] [@bs.module "fs"] external lstatSync: string => stat = "";
+  [@bs.send] external isDirectory: stat => bool = "";
+
+  [@bs.val] [@bs.module "fs"]
+  external copyFileSync: (string, string) => unit = "";
+
+  [@bs.val] [@bs.module "fs"] external mkdirSync: string => unit = "";
+};
+
+let ignoreFiles = ["main.bc.js", "verifier_main.bc.js", ".DS_Store"];
+let rec copyFolder = path => {
+  MoreFs.mkdirSync("site/" ++ path);
+  Array.iter(
+    s => {
+      let path = Filename.concat(path, s);
+      let isDir = MoreFs.lstatSync(path) |> MoreFs.isDirectory;
+      if (isDir) {
+        copyFolder(path);
+      } else if (!List.mem(s, ignoreFiles)) {
+        MoreFs.copyFileSync(
+          path,
+          "./site" ++ Links.Cdn.getHashedPath("/" ++ path),
+        );
+      };
+    },
+    Node.Fs.readdirSync(path),
+  );
+};
+
+let moveToSite = path =>
+  MoreFs.copyFileSync(path, Filename.concat("./site", path));
+
+copyFolder("static");
+
+// Special-case the jsoo-compiled files for now
+// They can't be loaded from cdn so they get copied to the site separately
+if (!Config.isProd) {
+  moveToSite("static/main.bc.js");
+  moveToSite("static/verifier_main.bc.js");
+};
+
+// Run mkdocs to generate static docs site
+Markdown.Child_process.execSync(
+  "mkdocs build -d site/docs",
+  Markdown.Child_process.option(),
+);
+
+Fs.symlinkSync(Node.Process.cwd() ++ "/graphql-docs", "./site/docs/graphql");

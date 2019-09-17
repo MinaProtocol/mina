@@ -1,8 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
-open Coda_processes
 
 let name = "coda-peers-test"
 
@@ -15,12 +12,12 @@ let main () =
     Time.Span.of_ms
       (proposal_interval * Consensus.Constants.delta |> Float.of_int)
   in
-  let work_selection = Cli_lib.Arg_type.Seq in
+  let work_selection_method = Cli_lib.Arg_type.Sequence in
   Coda_processes.init () ;
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
       ~acceptable_delay ~snark_worker_public_keys:None
-      ~proposers:(Fn.const None) ~work_selection
+      ~proposers:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None
   in

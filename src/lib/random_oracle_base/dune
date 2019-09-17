@@ -9,6 +9,6 @@
     tuple_lib
     blake2
     coda_digestif
-    base64 
+    base58_check
     module_version
     ))

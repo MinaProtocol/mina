@@ -130,9 +130,14 @@ describe("Bindings", () =>
       "echo and get stdout",
       ~timeout=10,
       cb => {
-        let echoProcess = ChildProcess.spawn("echo", [|"hello"|]);
+        let echoProcess =
+          ChildProcess.spawn(
+            "echo",
+            [|"hello"|],
+            ChildProcess.spawnOptions(~stdio=ChildProcess.pipe, ()),
+          );
         let stdout = ChildProcess.Process.stdoutGet(echoProcess);
-        ChildProcess.ReadablePipe.on(stdout, "data", data =>
+        Stream.Readable.on(stdout, "data", data =>
           cb(expect(Node.Buffer.toString(data)) |> toEqual("hello\n"))
         );
       },
@@ -141,7 +146,12 @@ describe("Bindings", () =>
       "kill sleep and get exit code",
       ~timeout=10,
       cb => {
-        let pauseProcess = ChildProcess.spawn("sleep", [|"10"|]);
+        let pauseProcess =
+          ChildProcess.spawn(
+            "sleep",
+            [|"10"|],
+            ChildProcess.spawnOptions(~stdio=ChildProcess.ignore, ()),
+          );
         ChildProcess.Process.onExit(
           pauseProcess,
           fun
@@ -157,7 +167,11 @@ describe("Bindings", () =>
       ~timeout=10,
       cb => {
         let pauseProcess =
-          ChildProcess.spawn("this-program-doesn't-exist", [||]);
+          ChildProcess.spawn(
+            "this-program-doesn't-exist",
+            [||],
+            ChildProcess.spawnOptions(~stdio=ChildProcess.ignore, ()),
+          );
         ChildProcess.Process.onError(pauseProcess, _ => cb(pass));
       },
     );

@@ -81,9 +81,9 @@ module Make (Inputs : Inputs_intf) :
         (Buffered (`Capacity 30, `Overflow Crash))
     in
     let proposer_transition_reader_copy, proposer_transition_writer_copy =
-      Strict_pipe.create ~name:"proposer transition copy" Synchronous
+      Strict_pipe.create ~name:"block producer transition copy" Synchronous
     in
-    Strict_pipe.transfer proposer_transition_reader
+    Strict_pipe.transfer_while_writer_alive proposer_transition_reader
       proposer_transition_writer_copy ~f:Fn.id
     |> don't_wait_for ;
     let unprocessed_transition_cache =
@@ -124,3 +124,12 @@ module Make (Inputs : Inputs_intf) :
     |> don't_wait_for ;
     processed_transition_reader
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+  module Catchup = Ledger_catchup
+  module Network = Coda_networking
+  module Transition_handler = Transition_handler
+  module Sync_handler = Sync_handler
+end)

@@ -12,7 +12,7 @@ module Styles = {
       minWidth(`rem(5.)),
       opacity(0.7),
       visibility(hovered ? `hidden : `visible),
-      color(isActive ? Theme.Colors.marineAlpha(1.) : Theme.Colors.midnight),
+      color(isActive ? Theme.Colors.marine : Theme.Colors.midnight),
     ]);
 
   let hoverContainer =
@@ -71,7 +71,6 @@ let make = (~pubkey) => {
   let activeWallet = Hooks.useActiveWallet();
   let (addressBook, updateAddressBook) =
     React.useContext(AddressBookProvider.context);
-  let walletName = AddressBook.lookup(addressBook, pubkey);
   let isActive = activeWallet === Some(pubkey);
 
   let (hovered, setHovered) = React.useState(() => false);
@@ -110,16 +109,7 @@ let make = (~pubkey) => {
     onMouseLeave={_ => setHovered(_ => false)}>
     <Pill mode=pillMode>
       <span className={Styles.pillContents(hovered, isActive)}>
-        {switch (walletName) {
-         | Some(name) =>
-           <span className=Theme.Text.Body.regular>
-             {React.string(name)}
-           </span>
-         | None =>
-           <span className=Theme.Text.Body.mono>
-             {React.string(PublicKey.prettyPrint(pubkey))}
-           </span>
-         }}
+        <WalletName pubkey />
       </span>
     </Pill>
     {switch (hovered, editing) {
@@ -141,7 +131,10 @@ let make = (~pubkey) => {
            onKeyPress=handleEnter
            onBlur={_ => setEditing(_ => false)}
            onChange=handleNameChange
-           value={Option.withDefault(~default="", walletName)}
+           value={
+             AddressBook.lookup(addressBook, pubkey)
+             |> Option.withDefault(~default="")
+           }
          />
        </div>
      | (false, false) => React.string("")

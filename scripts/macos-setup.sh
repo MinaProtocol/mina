@@ -50,6 +50,9 @@ fi
 # Compile things
 if [[ $COMPILE_THINGS == "YES" ]]; then
   opam update
+  # This is dirty, keep the OCaml project version up to date!
+  opam switch create 4.07.1 || true 
+  opam switch 4.07.1
   # All our ocaml packages
   env TERM=xterm opam switch -y import src/opam.export
   eval $(opam config env)
@@ -64,6 +67,7 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   env TERM=xterm opam pin -y add src/external/ocaml-extlib
   env TERM=xterm opam pin -y add src/external/digestif
   env TERM=xterm opam pin -y add src/external/async_kernel
+  env TERM=xterm opam pin -y add src/external/coda_base58
   eval $(opam config env)
 
   # Kademlia

@@ -24,7 +24,9 @@ module type Basic = sig
   module Stable : sig
     module V1 : sig
       type nonrec t = t
-      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
+      [@@deriving bin_io, sexp, compare, hash, yojson, version]
+
+      val version_byte : char (* for base58_check *)
 
       include Hashable_binable with type t := t
 
@@ -83,10 +85,13 @@ struct
     module V1 = struct
       module T = struct
         type t = Pedersen.Digest.Stable.V1.t
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+        [@@deriving bin_io, sexp, compare, hash, yojson, version]
       end
 
       include T
+
+      let version_byte = Base58_check.Version_bytes.data_hash
+
       include Registration.Make_latest_version (T)
       include Hashable.Make_binable (T)
       include Comparable.Make (T)

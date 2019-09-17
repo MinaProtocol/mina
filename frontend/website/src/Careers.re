@@ -244,7 +244,7 @@ let make = (~jobOpenings, _) => {
                  )}
                 <A
                   name="careers-code"
-                  href="/code.html"
+                  href="https://github.com/CodaProtocol/coda"
                   className={
                     "fw5 no-underline nowrap "
                     ++ Css.(

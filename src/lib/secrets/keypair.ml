@@ -19,7 +19,7 @@ let write_exn {Keypair.private_key; public_key} ~(privkey_path : string)
     Private_key.to_bigstring private_key |> Bigstring.to_bytes
   in
   let pubkey_string =
-    Public_key.Compressed.to_base64 (Public_key.compress public_key)
+    Public_key.Compressed.to_base58_check (Public_key.compress public_key)
   in
   match%bind
     Secret_file.write ~path:privkey_path ~mkdir:true ~plaintext:privkey_bytes

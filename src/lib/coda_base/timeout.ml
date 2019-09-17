@@ -61,7 +61,7 @@ module Make (Time : Time_intf) : Timeout_intf(Time).S = struct
 
   let cancel _ {cancel; _} value = cancel value
 
-  let remaining_time {ctrl: _; deferred: _; cancel: _; start_time; span} =
+  let remaining_time {ctrl: _; start_time; span; _} =
     let current_time = Time.now ctrl in
     let time_elapsed = Time.diff current_time start_time in
     Time.Span.(span - time_elapsed)

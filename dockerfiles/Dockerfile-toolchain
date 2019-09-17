@@ -65,6 +65,10 @@ RUN sudo rm -rf /digestif/.git && cd /digestif && yes | opam pin add .
 ADD /src/external/async_kernel /async_kernel
 RUN sudo rm -rf /async_kernel/.git && cd /async_kernel && yes | opam pin add .
 
+# Source copy of mransan version of base58 (OPAM repo has two versions with different APIs)
+ADD /src/external/coda_base58 /coda_base58
+RUN sudo rm -rf /coda_base58/.git && cd /coda_base58 && yes | opam pin add .
+
 # Get coda-kademlia from packages repo
 RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
       echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \

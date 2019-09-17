@@ -60,16 +60,18 @@ let%test_unit "group-map test" =
       ~a:Tick_backend.Inner_curve.Coefficients.a
       ~b:Tick_backend.Inner_curve.Coefficients.b
   in
-  let module M = Snarky.Snark.Run.Make (Tick_backend) in
+  let module M = Snarky.Snark.Run.Make (Tick_backend) (Unit) in
   Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
-      let checked_output =
-        M.run_and_check (fun () ->
+      let (), checked_output =
+        M.run_and_check
+          (fun () ->
             let x, y =
               Snarky_group_map.Checked.to_group
                 (module M)
                 ~params (M.Field.constant t)
             in
             fun () -> M.As_prover.(read_var x, read_var y) )
+          ()
         |> Or_error.ok_exn
       in
       [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output
@@ -151,9 +153,9 @@ module Tock = struct
               (struct
                 type nonrec t = t
 
-                let to_sexpable = to_affine_coordinates
+                let to_sexpable = to_affine_exn
 
-                let of_sexpable = of_affine_coordinates
+                let of_sexpable = of_affine
               end)
 
     include Make_inner_curve_aux (Tock0) (Tick0)
@@ -227,7 +229,7 @@ module Tock = struct
                     (Coefficients)
 
           let one =
-            let x, y = Snarkette_tock.G2.(to_affine_coordinates one) in
+            let x, y = Snarkette_tock.G2.(to_affine_exn one) in
             {x= Fqe.conv x; y= Fqe.conv y; z= Fqe.Unchecked.one}
         end
 
@@ -281,7 +283,7 @@ module Tock = struct
                   end)
 
         let create_constant =
-          Fn.compose create_constant G2.Unchecked.to_affine_coordinates
+          Fn.compose create_constant G2.Unchecked.to_affine_exn
       end
     end
 
@@ -295,17 +297,19 @@ module Tock = struct
   module Proof = struct
     include Tock0.Proof
 
-    let dummy = Dummy_values.Tock.GrothMaller17.proof
+    let dummy = Dummy_values.Tock.Bowe_gabizon18.proof
   end
 
   module Groth_verifier = struct
     include Snarky_verifier.Groth.Make (Pairing)
 
-    let conv_fqe v = Field.Vector.(get v 0, get v 1)
+    let conv_fqe v =
+      let v = Tick_backend.Full.Fqe.to_vector v in
+      Field.Vector.(get v 0, get v 1)
 
     let conv_g2 p =
-      let x, y = Tock_backend.Inner_twisted_curve.to_affine_coordinates p in
-      Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
+      let x, y = Tock_backend.Inner_twisted_curve.to_affine_exn p in
+      Pairing.G2.Unchecked.of_affine (conv_fqe x, conv_fqe y)
 
     let conv_fqk p =
       let v = Tick_backend.Full.Fqk.to_elts p in
@@ -359,9 +363,9 @@ module Tick = struct
               (struct
                 type nonrec t = t
 
-                let to_sexpable = to_affine_coordinates
+                let to_sexpable = to_affine_exn
 
-                let of_sexpable = of_affine_coordinates
+                let of_sexpable = of_affine
               end)
 
     include Make_inner_curve_aux (Tick0) (Tock0)
@@ -396,7 +400,14 @@ module Tick = struct
 
     module Checked = struct
       include Snarky.Pedersen.Make (Tick0) (Inner_curve)
-                (Crypto_params.Pedersen_params)
+                (struct
+                  let params = Crypto_params.Pedersen_params.affine
+                end)
+
+      let hash_prefix (p : State.t) =
+        Section.create ~acc:(`Value p.acc)
+          ~support:
+            (Interval_union.of_interval (0, Hash_prefixes.length_in_triples))
 
       let hash_triples ts ~(init : State.t) =
         hash ts ~init:(init.triples_consumed, `Value init.acc)
@@ -415,8 +426,8 @@ module Tick = struct
         if phys_equal c1 Inner_curve.zero || phys_equal c2 Inner_curve.zero
         then phys_equal c1 c2
         else
-          let c1_x, c1_y = Inner_curve.to_affine_coordinates c1 in
-          let c2_x, c2_y = Inner_curve.to_affine_coordinates c2 in
+          let c1_x, c1_y = Inner_curve.to_affine_exn c1 in
+          let c2_x, c2_y = Inner_curve.to_affine_exn c2 in
           Field.equal c1_x c2_x && Field.equal c1_y c2_y
 
       let equal_states s1 s2 =
@@ -470,7 +481,17 @@ module Tick = struct
         let fold = gen_fold n in
         let result, unchunked_result = run_updates fold in
         assert (equal_states result unchunked_result)
+
+      let hash_unchunked n =
+        let fold = gen_fold n in
+        State.update_fold_unchunked initial_state fold
+
+      let hash_chunked n =
+        let fold = gen_fold n in
+        State.update_fold_chunked initial_state fold
     end
+
+    (* compare unchunked, chunked hashes *)
 
     let%test_unit "hash one triple" = For_tests.run_hash_test 1
 
@@ -485,6 +506,36 @@ module Tick = struct
 
     let%test_unit "hash large number of chunks plus 2" =
       For_tests.run_hash_test ((Chunked_triples.Chunk.size * 250) + 2)
+
+    (* benchmark unchunked, chunked hashes *)
+
+    let%bench "hash one triple unchunked" = For_tests.hash_unchunked 1
+
+    let%bench_fun "hash one triple chunked" =
+      (* make sure chunk table deserialized *)
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 1
+
+    let%bench "hash small number of triples unchunked" =
+      For_tests.hash_unchunked 25
+
+    let%bench_fun "hash small number of triples chunked" =
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 25
+
+    let%bench "hash large number of triples unchunked" =
+      For_tests.hash_unchunked 250
+
+    let%bench_fun "hash large number of triples chunked" =
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 250
+
+    let%bench "hash huge number of triples unchunked" =
+      For_tests.hash_unchunked 1000
+
+    let%bench_fun "hash huge number of triples chunked" =
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 1000
   end
 
   module Util = Snark_util.Make (Tick0)
@@ -550,7 +601,7 @@ module Tick = struct
                     end)
 
           let one =
-            let x, y = Snarkette_tick.G2.(to_affine_coordinates one) in
+            let x, y = Snarkette_tick.G2.(to_affine_exn one) in
             {z= Fqe.Unchecked.one; x= Fqe.conv x; y= Fqe.conv y}
         end
 
@@ -610,7 +661,7 @@ module Tick = struct
                   end)
 
         let create_constant =
-          Fn.compose create_constant G2.Unchecked.to_affine_coordinates
+          Fn.compose create_constant G2.Unchecked.to_affine_exn
       end
     end
 
@@ -621,14 +672,36 @@ module Tick = struct
     let final_exponentiation = FE.final_exponentiation6
   end
 
-  module Groth_maller_verifier = struct
-    include Snarky_verifier.Groth_maller.Make (Pairing)
+  module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
 
-    let conv_fqe v = Field.Vector.(get v 0, get v 1, get v 2)
+  module Verifier = struct
+    include Snarky_verifier.Bowe_gabizon.Make (struct
+      include Pairing
+
+      module H =
+        Snarky_bowe_gabizon_hash.Make (Run) (Tick0)
+          (struct
+            module Fqe = Pairing.Fqe
+
+            let init =
+              Pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string)
+
+            let pedersen x =
+              Pedersen.Checked.digest_triples ~init (Fold_lib.Fold.to_list x)
+
+            let params = Tock_backend.bg_params
+          end)
+
+      let hash = H.hash
+    end)
+
+    let conv_fqe v =
+      let v = Tock_backend.Full.Fqe.to_vector v in
+      Field.Vector.(get v 0, get v 1, get v 2)
 
     let conv_g2 p =
-      let x, y = Tick_backend.Inner_twisted_curve.to_affine_coordinates p in
-      Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
+      let x, y = Tick_backend.Inner_twisted_curve.to_affine_exn p in
+      Pairing.G2.Unchecked.of_affine (conv_fqe x, conv_fqe y)
 
     let conv_fqk (p : Tock_backend.Full.Fqk.t) =
       let v = Tock_backend.Full.Fqk.to_elts p in
@@ -638,54 +711,39 @@ module Tick = struct
       in
       (f 0, f 1)
 
-    let proof_of_backend_proof p =
-      let open Tock_backend.Full.GM_proof_accessors in
-      {Proof.a= a p; b= conv_g2 (b p); c= c p}
+    let proof_of_backend_proof
+        ({a; b; c; delta_prime; z} : Tock_backend.Proof.t) =
+      {Proof.a; b= conv_g2 b; c; delta_prime= conv_g2 delta_prime; z}
 
-    let vk_of_backend_vk (vk : Tock_backend.Full.GM.Verification_key.t) =
-      let open Tock_backend.Full.GM_verification_key_accessors in
+    let vk_of_backend_vk (vk : Tock_backend.Verification_key.t) =
+      let open Tock_backend.Verification_key in
       let open Inner_curve.Vector in
       let q = query vk in
-      let g_alpha = g_alpha vk in
-      let h_beta = conv_g2 (h_beta vk) in
       { Verification_key.query_base= get q 0
       ; query= List.init (length q - 1) ~f:(fun i -> get q (i + 1))
-      ; h= conv_g2 (h vk)
-      ; g_alpha
-      ; h_beta
-      ; g_gamma= g_gamma vk
-      ; h_gamma= conv_g2 (h_gamma vk)
-      ; g_alpha_h_beta= conv_fqk (g_alpha_h_beta vk) }
+      ; delta= conv_g2 (delta vk)
+      ; alpha_beta= conv_fqk (alpha_beta vk) }
 
     let constant_vk vk =
       let open Verification_key in
       { query_base= Inner_curve.Checked.constant vk.query_base
       ; query= List.map ~f:Inner_curve.Checked.constant vk.query
-      ; h= Pairing.G2.constant vk.h
-      ; g_alpha= Pairing.G1.constant vk.g_alpha
-      ; h_beta= Pairing.G2.constant vk.h_beta
-      ; g_gamma= Pairing.G1.constant vk.g_gamma
-      ; h_gamma= Pairing.G2.constant vk.h_gamma
-      ; g_alpha_h_beta= Pairing.Fqk.constant vk.g_alpha_h_beta }
+      ; delta= Pairing.G2.constant vk.delta
+      ; alpha_beta= Pairing.Fqk.constant vk.alpha_beta }
   end
 end
 
 let tock_vk_to_bool_list vk =
-  let vk = Tick.Groth_maller_verifier.vk_of_backend_vk vk in
-  let g1 = Tick.Inner_curve.to_affine_coordinates in
-  let g2 = Tick.Pairing.G2.Unchecked.to_affine_coordinates in
+  let vk = Tick.Verifier.vk_of_backend_vk vk in
+  let g1 = Tick.Inner_curve.to_affine_exn in
+  let g2 = Tick.Pairing.G2.Unchecked.to_affine_exn in
   let vk =
     { vk with
       query_base= g1 vk.query_base
     ; query= List.map vk.query ~f:g1
-    ; g_alpha= g1 vk.g_alpha
-    ; g_gamma= g1 vk.g_gamma
-    ; h= g2 vk.h
-    ; h_beta= g2 vk.h_beta
-    ; h_gamma= g2 vk.h_gamma }
+    ; delta= g2 vk.delta }
   in
-  Tick.Groth_maller_verifier.Verification_key.(
-    summary_unchecked (summary_input vk))
+  Tick.Verifier.Verification_key.(summary_unchecked (summary_input vk))
 
 let embed (x : Tick.Field.t) : Tock.Field.t =
   let n = Tick.Bigint.of_field x in
@@ -710,8 +768,17 @@ let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 [%%inject
 "scan_state_work_delay_factor", scan_state_work_delay_factor]
 
+[%%inject
+"scan_state_latency_factor", scan_state_latency_factor]
+
 let pending_coinbase_depth =
-  scan_state_transaction_capacity_log_2 + scan_state_work_delay_factor
+  let working_levels =
+    scan_state_transaction_capacity_log_2 + scan_state_work_delay_factor
+    - scan_state_latency_factor + 1
+  in
+  let root_nodes = Int.pow 2 scan_state_latency_factor in
+  let total_stacks = working_levels * root_nodes in
+  Int.ceil_log2 total_stacks
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

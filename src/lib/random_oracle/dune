@@ -8,5 +8,4 @@
     snarky
     snarky_blake2
     random_oracle_base
-    crypto_params
-    base64 ))
+    crypto_params))

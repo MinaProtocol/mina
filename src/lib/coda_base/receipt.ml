@@ -5,11 +5,15 @@ open Fold_lib
 module Chain_hash = struct
   include Data_hash.Make_full_size ()
 
+  module Base58_check = Base58_check.Make (struct
+    let version_byte = Base58_check.Version_bytes.receipt_chain_hash
+  end)
+
   let to_string t =
-    Binable.to_string (module Stable.Latest) t |> Base64.encode_string
+    Binable.to_string (module Stable.Latest) t |> Base58_check.encode
 
   let of_string s =
-    Base64.decode_exn s |> Binable.of_string (module Stable.Latest)
+    Base58_check.decode_exn s |> Binable.of_string (module Stable.Latest)
 
   include Codable.Make_of_string (struct
     type nonrec t = t

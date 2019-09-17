@@ -44,7 +44,7 @@ module Tick_backend = struct
     let point_near_x x =
       let rec go x = function
         | Some y ->
-            of_affine_coordinates (x, y)
+            of_affine (x, y)
         | None ->
             let x' = Field.(add one x) in
             go x' (find_y x')

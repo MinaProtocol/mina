@@ -4,14 +4,13 @@ open Async_kernel
 
 module Make (Inputs : Intf.Inputs_with_db_intf) = struct
   module Worker = Worker.Make (Inputs)
+
   module Diff_buffer = Diff_buffer.Make (struct
     include Inputs
     module Worker = Worker
   end)
 
-  type t =
-    { worker: Worker.t
-    ; buffer: Diff_buffer.t }
+  type t = {worker: Worker.t; buffer: Diff_buffer.t}
 
   (* NB: the persistent frontier must remain open as
    * long as the synchronization is using it *)

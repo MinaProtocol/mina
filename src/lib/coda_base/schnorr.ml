@@ -26,8 +26,6 @@ module Message = struct
       ( Random_oracle.digest_field d
       |> Random_oracle.Digest.to_bits |> Array.to_list )
 
-  let () = assert Insecure.signature_hash_function
-
   let%snarkydef hash_checked t ~nonce =
     let init =
       Pedersen.Checked.Section.create ~acc:(`Value Hash_prefix.signature.acc)
