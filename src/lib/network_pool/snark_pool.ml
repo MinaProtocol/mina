@@ -104,22 +104,21 @@ struct
   module Resource_pool = struct
     module T = struct
       (* TODO : Version this type *)
-      type t =
-        { snark_table:
-            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-            Priced_proof.Stable.V1.t
-            Statement_table.t
-        ; mutable ref_table: int Statement_table.t option }
+      type serializable =
+        Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+        Priced_proof.Stable.V1.t
+        Statement_table.t
       [@@deriving sexp, bin_io]
 
-      (* shadow generated bin_io code so that ref table is always None when written *)
+      type t =
+        { snark_table: serializable
+        ; mutable ref_table: int Statement_table.t option
+        ; logger: Logger.t sexp_opaque
+        ; trust_system: Trust_system.t sexp_opaque }
+      [@@deriving sexp]
 
-      let bin_write_t buf ~pos t =
-        let t_no_ref_tbl = {t with ref_table= None} in
-        bin_write_t buf ~pos t_no_ref_tbl
-
-      let bin_writer_t =
-        Bin_prot.Type_class.{size= bin_size_t; write= bin_write_t}
+      let of_serializable table ~logger ~trust_system : t =
+        {snark_table= table; ref_table= None; logger; trust_system}
 
       let removed_breadcrumb_wait = 10
 
@@ -181,8 +180,13 @@ struct
         in
         Deferred.don't_wait_for tf_deferred
 
-      let create ~logger:_ ~trust_system:_ ~frontier_broadcast_pipe =
-        let t = {snark_table= Statement_table.create (); ref_table= None} in
+      let create ~logger ~trust_system ~frontier_broadcast_pipe =
+        let t =
+          { snark_table= Statement_table.create ()
+          ; logger
+          ; trust_system
+          ; ref_table= None }
+        in
         listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
         t
 
@@ -219,6 +223,57 @@ struct
                 update_and_rebroadcast ()
               else `Don't_rebroadcast
         else `Don't_rebroadcast
+
+      let verify_proof ~(proof : Ledger_proof.t) ~statement ~message =
+        let statement_eq a b =
+          Int.(Transaction_snark.Statement.compare a b = 0)
+        in
+        if not (statement_eq (Ledger_proof.statement proof) statement) then
+          Deferred.return
+            (Or_error.error_string "Statement and proof do not match")
+        else
+          let%bind (verifier : Verifier.t) = Verifier.create () in
+          Verifier.verify_transaction_snark verifier proof ~message
+
+      let verify_and_act t ~work ~sender =
+        let statements, priced_proof = work in
+        let open Deferred.Or_error.Let_syntax in
+        let {Priced_proof.proof= proofs; fee= {prover; fee}} = priced_proof in
+        let trust_record =
+          Trust_system.record_envelope_sender t.trust_system t.logger sender
+        in
+        let log_and_punish statement e =
+          let metadata =
+            [ ("work_id", `Int (Transaction_snark.Statement.hash statement))
+            ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
+            ; ("fee", Currency.Fee.to_yojson fee)
+            ; ("error", `String (Error.to_string_hum e)) ]
+          in
+          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
+            "Error verifying transaction snark: $error" ;
+          trust_record
+            ( Trust_system.Actions.Sent_invalid_proof
+            , Some ("Error verifying transaction snark: $error", metadata) )
+        in
+        let message = Coda_base.Sok_message.create ~fee ~prover in
+        let verify ~proof ~statement =
+          let open Deferred.Let_syntax in
+          match%bind verify_proof ~proof ~statement ~message with
+          | Ok true ->
+              Deferred.Or_error.return ()
+          | Ok false ->
+              (*Invalid proof*)
+              let e = Error.of_string "Invalid proof" in
+              let%map () = log_and_punish statement e in
+              Error e
+          | Error e ->
+              (*Other errors but punish for sending erroneous work*)
+              let%map () = log_and_punish statement e in
+              Error e
+        in
+        let%bind pairs = One_or_two.zip statements proofs |> Deferred.return in
+        One_or_two.Deferred_result.fold ~init:() pairs
+          ~f:(fun _ (statement, proof) -> verify ~proof ~statement)
     end
 
     include T
@@ -245,9 +300,13 @@ struct
   let load ~logger ~trust_system ~disk_location ~incoming_diffs
       ~frontier_broadcast_pipe =
     match%map
-      Async.Reader.load_bin_prot disk_location Resource_pool.bin_reader_t
+      Async.Reader.load_bin_prot disk_location
+        Resource_pool.bin_reader_serializable
     with
-    | Ok pool ->
+    | Ok snark_table ->
+        let pool =
+          Resource_pool.of_serializable snark_table ~logger ~trust_system
+        in
         let network_pool =
           of_resource_pool_and_diffs pool ~logger ~incoming_diffs
         in

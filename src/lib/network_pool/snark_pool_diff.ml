@@ -78,15 +78,21 @@ end)
 
   let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :
       t Or_error.t Deferred.t =
-    let t = Envelope.Incoming.data t in
+    let open Deferred.Or_error.Let_syntax in
+    let data = Envelope.Incoming.data t in
     let to_or_error = function
       | `Don't_rebroadcast ->
           Or_error.error_string "Worse fee or already in pool"
       | `Rebroadcast ->
-          Ok t
+          Ok data
     in
-    ( match t with
-    | Stable.V1.Add_solved_work (work, {proof; fee}) ->
-        Pool.add_snark pool ~work ~proof ~fee )
-    |> to_or_error |> Deferred.return
+    (*TODO: dont verify if Local*)
+    match data with
+    | Stable.V1.Add_solved_work (work, p) ->
+        let%bind () =
+          Pool.verify_and_act pool ~work:(work, p)
+            ~sender:(Envelope.Incoming.sender t)
+        in
+        let {Priced_proof.proof; fee} = p in
+        Pool.add_snark pool ~work ~proof ~fee |> to_or_error |> Deferred.return
 end
