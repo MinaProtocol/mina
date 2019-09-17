@@ -53,14 +53,13 @@ module type S = sig
 end
 
 module Make
-    (N : Nat_intf.S)
-    (Fq : Fields.Fp_intf with type nat := N.t)
+    (Fq : Fields.Fp_intf)
     (Fq_twist : Fields.Extension_intf with type base = Fq.t) (Fq_target : sig
         include Fields.Degree_2_extension_intf with type base = Fq_twist.t
 
         val frobenius : t -> int -> t
 
-        val cyclotomic_exp : t -> N.t -> t
+        val cyclotomic_exp : t -> Fq.Nat.t -> t
     end)
     (G1 : Simple_elliptic_curve_intf with type base := Fq.t) (G2 : sig
         include Simple_elliptic_curve_intf with type base := Fq_twist.t
@@ -71,15 +70,15 @@ module Make
     end) (Info : sig
       val twist : Fq_twist.t
 
-      val loop_count : N.t
+      val loop_count : Fq.Nat.t
 
       val is_loop_count_neg : bool
 
-      val final_exponent_last_chunk_w1 : N.t
+      val final_exponent_last_chunk_w1 : Fq.Nat.t
 
       val final_exponent_last_chunk_is_w0_neg : bool
 
-      val final_exponent_last_chunk_abs_of_w0 : N.t
+      val final_exponent_last_chunk_abs_of_w0 : Fq.Nat.t
     end) :
   S with module G1 := G1 and module G2 := G2 and module Fq_target := Fq_target =
 struct
@@ -107,7 +106,7 @@ struct
     type t = {c_L1: Fq_twist.t; c_RZ: Fq_twist.t} [@@deriving bin_io, sexp]
   end
 
-  let loop_count_size_in_bits = N.num_bits Info.loop_count
+  let loop_count_size_in_bits = Fq.Nat.num_bits Info.loop_count
 
   module G2_precomputation = struct
     type t_ =
@@ -181,7 +180,7 @@ struct
       let rec go found_one r dbl_coeffs add_coeffs i =
         if i < 0 then (r, dbl_coeffs, add_coeffs)
         else
-          let bit = N.test_bit Info.loop_count i in
+          let bit = Fq.Nat.test_bit Info.loop_count i in
           if not found_one then
             go (found_one || bit) r dbl_coeffs add_coeffs (i - 1)
           else
@@ -235,7 +234,7 @@ struct
     let dbl_idx_r = ref 0 in
     let add_idx_r = ref 0 in
     for i = loop_count_size_in_bits - 1 downto 0 do
-      let bit = N.test_bit Info.loop_count i in
+      let bit = Fq.Nat.test_bit Info.loop_count i in
       if not !found_one then found_one := !found_one || bit
       else
         let dbl_idx = !dbl_idx_r in

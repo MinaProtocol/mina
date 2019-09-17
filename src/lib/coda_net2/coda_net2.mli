@@ -42,7 +42,14 @@ module Keypair : sig
   (** Securely generate a new keypair. *)
   val random : net -> t Deferred.t
 
+  (** Formats this keypair to a ;-separated list of public key, secret key, and peer_id. *)
   val to_string : t -> string
+
+  (** Undo [to_string t].
+  
+    Only fails if the string has the wrong format, not if the embedded
+    keypair data is corrupt. *)
+  val of_string : string -> t Core.Or_error.t
 
   val to_peerid : t -> peer_id
 end
@@ -137,7 +144,8 @@ val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
   *
   * Listens on each address in [maddrs].
   *
-  * This will only connect to peers that share the same [network_id].
+  * This will only connect to peers that share the same [network_id]. [on_new_peer], if present,
+  * will be called for each peer we discover.
   *
   * This fails if initializing libp2p fails for any reason.
 *)
@@ -146,6 +154,7 @@ val configure :
   -> me:Keypair.t
   -> maddrs:Multiaddr.t list
   -> network_id:string
+  -> on_new_peer:(PeerID.t -> unit)
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.
@@ -256,6 +265,16 @@ val listen_on : net -> Multiaddr.t -> Multiaddr.t list Deferred.Or_error.t
   on an address.
 *)
 val listening_addrs : net -> Multiaddr.t list Deferred.Or_error.t
+
+(** Connect to a peer, ensuring it enters our peerbook and DHT.
+
+  This can fail if the connection fails. *)
+val add_peer : net -> Multiaddr.t -> unit Deferred.Or_error.t
+
+(** Announce our existence on the DHT.
+
+  Call this after using [add_peer] to add any bootstrap peers. *)
+val begin_advertising : net -> unit Deferred.Or_error.t
 
 (** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
 val shutdown : net -> unit Deferred.t

@@ -3,6 +3,7 @@ open Coda_base
 open Coda_state
 open Async_kernel
 open Pipe_lib
+open Coda_transition
 module Intf = Intf
 
 module Components = struct

@@ -1,0 +1,7 @@
+(library
+  (name rescue)
+  (public_name rescue)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (inline_tests)
+  (libraries
+    core_kernel ))

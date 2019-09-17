@@ -431,7 +431,7 @@ module T = struct
           trace_database_initialization "external_transition_database" __LOC__
             external_transition_database_dir ;
           let time_controller =
-            Block_time.Controller.create Block_time.Controller.basic
+            Block_time.Controller.create (Block_time.Controller.basic ~logger)
           in
           let propose_keypair =
             Option.map proposer ~f:(fun i ->
@@ -465,6 +465,10 @@ module T = struct
                 ; addrs_and_ports
                 ; logger
                 ; trust_system
+                ; enable_libp2p= false
+                ; disable_haskell= false
+                ; libp2p_keypair= None
+                ; libp2p_peers= []
                 ; max_concurrent_connections
                 ; log_gossip_heard=
                     { snark_pool_diff= false
