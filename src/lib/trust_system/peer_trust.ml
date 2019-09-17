@@ -35,9 +35,9 @@ struct
           (* This is an option to allow using a fake trust system in tests. This is
        ugly, but the alternative is functoring half of Coda over the trust
        system. *)
-    ; bans_reader: Peer_id.t Strict_pipe.Reader.t
+    ; bans_reader: (Peer_id.t * Time.t) Strict_pipe.Reader.t
     ; bans_writer:
-        ( Peer_id.t
+        ( Peer_id.t * Time.t
         , Strict_pipe.synchronous
         , unit Deferred.t )
         Strict_pipe.Writer.t
@@ -144,7 +144,7 @@ struct
             "Banning peer $peer until $expiration because it %s" action_fmt ;
           if Option.is_some db then (
             Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
-            Strict_pipe.Writer.write bans_writer peer )
+            Strict_pipe.Writer.write bans_writer (peer, expiration) )
           else Deferred.unit
       | Banned_until _, Unbanned ->
           Coda_metrics.Gauge.dec_one Coda_metrics.Trust_system.banned_peers ;
@@ -208,7 +208,8 @@ let%test_module "peer_trust" =
     let ban_pipe_out = ref []
 
     let assert_ban_pipe expected =
-      [%test_eq: int list] expected !ban_pipe_out ;
+      [%test_eq: int list] expected
+        (List.map !ban_pipe_out ~f:(fun (peer, _banned_until) -> peer)) ;
       ban_pipe_out := []
 
     let setup_mock_db () =

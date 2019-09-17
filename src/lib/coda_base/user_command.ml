@@ -37,8 +37,10 @@ module Stable = struct
         , Public_key.Stable.V1.t
         , Signature.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving bin_io, compare, sexp, hash, yojson, version]
+      [@@deriving compare, bin_io, sexp, hash, yojson, version]
     end
+
+    let description = "User command"
 
     let version_byte = Base58_check.Version_bytes.user_command
 
@@ -85,10 +87,7 @@ let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
 module For_tests = struct
   (* Pretend to sign a command. Much faster than actually signing. *)
   let fake_sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
-    { payload
-    ; sender= kp.public_key
-    ; signature= (Snark_params.Tock.Field.zero, Snark_params.Tock.Field.zero)
-    }
+    {payload; sender= kp.public_key; signature= Signature.dummy}
 end
 
 module Gen = struct

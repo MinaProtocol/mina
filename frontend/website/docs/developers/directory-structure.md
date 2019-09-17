@@ -33,7 +33,7 @@ files play:
             Static files like images, etc.
 
 - `rfcs/`    
-    This directory contains all accepted RFCs (or "requests for comments") made according to the [RFC process](CONTRIBUTING.md#RFCs).
+    This directory contains all accepted RFCs (or "requests for comments") made according to the [RFC process](https://github.com/CodaProtocol/coda/blob/master/CONTRIBUTING.md#rfcs).
 
 - `scripts/`
 

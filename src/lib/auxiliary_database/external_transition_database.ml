@@ -53,7 +53,7 @@ let create ~logger directory =
   let pagination = Pagination.create () in
   List.iter (Database.to_alist database) ~f:(fun (hash, (block_data, time)) ->
       add_user_blocks pagination ({With_hash.hash; data= block_data}, time) ) ;
-  {database; pagination= Pagination.create (); logger}
+  {database; pagination; logger}
 
 let add {database; pagination; logger}
     ( {With_hash.hash= state_hash; data= filtered_external_transition} as
@@ -73,6 +73,8 @@ let add {database; pagination; logger}
 let get_total_values {pagination; _} = Pagination.get_total_values pagination
 
 let get_values {pagination; _} = Pagination.get_values pagination
+
+let get_all_values {pagination; _} = Pagination.get_all_values pagination
 
 let get_earlier_values {pagination; _} =
   Pagination.get_earlier_values pagination

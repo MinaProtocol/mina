@@ -27,10 +27,9 @@
   },
   "scripts": {
     "fake": "graphql-faker --port 8080 -- schema.graphql",
-    "real": "./_build/coda-daemon-macos/coda.exe daemon -config-dir $(mktemp -d -t coda_config) -rest-port 8080 &> /dev/tty",
+    "real": "./_build/coda-daemon-macos/coda.exe daemon -rest-port 8080 &> /dev/tty",
     "fake-inspector": "graphql-faker --open -- schema.graphql",
-    "pull-macos-binary": "curl https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip > coda-daemon-macos.zip && rm -rf _build/coda-daemon-macos/ && unzip coda-daemon-macos.zip",
-    "build": "bsb -make-world",
+    "build": "yarn copy-schema && bsb -make-world",
     "build-ci": "yarn run query-fake && yarn run build",
     "clean": "bsb -clean-world",
     "pack": "fpack --development ./lib/js/src/render/Index.js",
@@ -40,8 +39,10 @@
     "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei' -print)",
     "test": "yarn run build && jest lib/js/",
     "dist": "yarn run build && yarn run pack && build",
-    "dev-real": "concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'",
-    "dev": "GRAPHQL_BACKEND=faker yarn dev-real",
+    "dev-real": "yarn run copy-schema && concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'",
+    "dev": "yarn gen-sdl && GRAPHQL_BACKEND=faker yarn dev-real",
+    "copy-schema": "cp ../../graphql_schema.json graphql_schema.json",
+    "gen-sdl": "node generate-schema.js ../../graphql_schema.json > schema.graphql",
     "regen-sdl": "node generate-schema.js http://localhost:8080/graphql > schema.graphql"
   },
   "build": {
@@ -90,6 +91,6 @@
       "target": "NSIS"
     }
   },
-  "author": "",
-  "license": "ISC"
+  "author": "codaprotocol",
+  "license": "Apache-2.0"
 }

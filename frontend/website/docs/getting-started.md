@@ -2,10 +2,8 @@
 
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
-Join the Coda server on [Discord](http://bit.ly/CodaDiscord) to connect with the community, get support, and learn about how you can participate in weekly challenges for [Testnet Points](/docs#testnet-points)[\*](#disclaimer). Check out the [Testnet Leaderboard](http://bit.ly/TestnetBetaLeaderboard) to see who is winning this week's challenges.
-
 !!! note
-    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for `v0.0.1-beta.1`.
+    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.5-beta`.
 
 ## Requirements
 
@@ -24,29 +22,39 @@ GPUs aren't currently required, but may be required for node operators when the 
 
 The newest binary releases can be found below. Instructions are provided for macOS and Linux below:
 
-!!! note
-    This is a large download, around 1GB, so the install might take some time.
+This is a large download, around 1GB, so the install might take some time.
+
+!!! warning
+    If you installed `coda` from a previous release, you'll need to upgrade it so that you won't get banned by the network for using an older client. See instructions below for upgrading both macOS and Linux builds.
 
 ### macOS
 
-Install using [brew](https://brew.sh).
+Install using [Homebrew](https://brew.sh).
 ```
 brew install codaprotocol/coda/coda
-``` 
-You can run `coda -help` to see if the works
+```
+
+If you already have `coda` installed from a previous release, run:
+```
+brew upgrade coda
+```
+
+You can run `coda -help` to check if the installation succeeded.
 
 ### Ubuntu 18.04 / Debian 9
 
-Add the Coda Debian repo and install.
+Add the Coda Debian repo and install:
 
 ```
-echo "deb [trusted=yes] http://packages.o1test.net unstable main" | sudo tee /etc/apt/sources.list.d/coda.list
+sudo apt-get remove coda-testnet-postake-medium-curves
+echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
-sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.1-release-beta-43cb0790
+sudo apt-get install -t release coda-testnet-postake-medium-curves
 ```
 
-You can `coda -help` to see if it works.
+If you already have `coda` installed from a previous release, running the above commands should automatically uninstall and reinstall the newest version. If you're installing Coda from scratch, you may see this error when you run the first command: `E: Unable to locate package coda-testnet-postake-medium-curves`. You can ignore this - it just means there wasn't a prior release installed.
 
+You can run `coda -help` to check if the installation succeeded.
 
 ### Windows
 
@@ -56,9 +64,11 @@ Windows is not yet supported. If you have any interest in developing Coda for Wi
 
 If you're running another Linux distro or a different version of macOS, you can [try building Coda from source code](https://github.com/CodaProtocol/coda/blob/master/README-dev.md#building-coda). Please note that other operating systems haven't been tested thoroughly, and may have issues. Feel free to share any logs and get troubleshooting help in the Discord channel.
 
-## Set up port forwarding
+## Set up port forwarding and any firewalls
 
-You must allow inbound traffic to the following ports through your **external** IP address.
+If you are running a firewall, you should allow traffic on TCP port 8302 and UDP port 8303. Additionally, unless the `-external-ip YOUR_IP` flag is provided, the daemon will use HTTPS (443) and HTTP (80) to try and determine its own IP address.
+
+You may need to configure your router's port forwarding to allow inbound traffic to the following ports through your **external** IP address.
 
 - `TCP` port `8302`
 - `UDP` port `8303`
@@ -67,8 +77,4 @@ For walk-through instructions see [this guide](/docs/troubleshooting/#port-forwa
 ## Next
 
 Now that you've installed Coda and configured your network, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!
-
-<span id="disclaimer">
-\*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
-</span>
 

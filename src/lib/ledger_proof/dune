@@ -1,6 +1,6 @@
 (library
   (name ledger_proof)
   (public_name ledger_proof)
-  (libraries core_kernel coda_base coda_intf transaction_snark)
+  (libraries core_kernel coda_base transaction_snark)
   (preprocessor_deps "../../config.mlh")
   (preprocess (pps ppx_jane ppx_coda ppx_deriving_yojson)))

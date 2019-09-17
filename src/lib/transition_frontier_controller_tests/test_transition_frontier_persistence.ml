@@ -1,6 +1,7 @@
 (* open Async
 open Core
 open Pipe_lib
+open Coda_transition
 
 module Stubs = Stubs.Make (struct
   let max_length = 4
@@ -26,12 +27,13 @@ let%test_module "Transition Frontier Persistence" =
 
     let check_transitions transition_storage written_breadcrumbs =
       List.iter written_breadcrumbs ~f:(fun breadcrumb ->
-          let {With_hash.hash; data= expected_transition} =
-            Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
+          let expected_transition =
+            Transition_frontier.Breadcrumb.validated_transition breadcrumb
           in
           let queried_transition, _ =
             Transition_storage.get ~logger transition_storage
-              (Transition_storage.Schema.Transition hash)
+              (Transition_storage.Schema.Transition
+                 (External_transition.Validated.state_hash expected_transition))
           in
           [%test_eq: External_transition.Validated.t] expected_transition
             queried_transition )
@@ -128,7 +130,7 @@ let%test_module "Transition Frontier Persistence" =
                  (New_frontier
                     Transition_frontier.Diff.Mutant.Root.Poly.
                       { root=
-                          Transition_frontier.Breadcrumb.transition_with_hash
+                          Transition_frontier.Breadcrumb.validated_transition
                             root
                       ; scan_state= Staged_ledger.scan_state staged_ledger
                       ; pending_coinbase=
@@ -139,7 +141,7 @@ let%test_module "Transition Frontier Persistence" =
               Transition_frontier.Diff.Hash.empty
               (E
                  (Add_transition
-                    (Transition_frontier.Breadcrumb.transition_with_hash
+                    (Transition_frontier.Breadcrumb.validated_transition
                        next_breadcrumb)))
             |> ignore ;
             (root, next_breadcrumb) )
@@ -182,9 +184,10 @@ let%test_module "Transition Frontier Persistence" =
         Transition_frontier_persistence.close_and_finish_copy
           frontier_persistence
       in
+      let%bind verifier = Verifier.create () in
       let%map deserialized_frontier =
         Transition_frontier_persistence.deserialize ~directory_name ~logger
-          ~trust_system ~verifier:() ~root_snarked_ledger
+          ~trust_system ~verifier ~root_snarked_ledger
           ~consensus_local_state:
             (Transition_frontier.consensus_local_state frontier)
       in

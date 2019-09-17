@@ -25,6 +25,10 @@ module type S = sig
   val changes : t -> Peer.Event.t Linear_pipe.Reader.t
 
   val stop : t -> unit Deferred.t
+
+  module Hacky_glue : sig
+    val inject_event : t -> Peer.Event.t -> unit
+  end
 end
 
 module type Process_intf = sig
@@ -123,17 +127,20 @@ module Haskell_process = struct
   type t =
     { failure_response: [`Die | `Ignore] ref
     ; process: Process.t
+    ; mutable already_waited: bool
     ; lock_path: string }
 
-  let kill {failure_response; process; lock_path} =
+  let kill {failure_response; process; lock_path; already_waited} =
     failure_response := `Ignore ;
-    let%bind _ =
-      Process.run_exn ~prog:"kill"
-        ~args:[Pid.to_string (Process.pid process)]
-        ()
-    in
-    let%bind _ = Process.wait process in
-    Sys.remove lock_path
+    if not already_waited then
+      let%bind _ =
+        Process.run_exn ~prog:"kill"
+          ~args:[Pid.to_string (Process.pid process)]
+          ()
+      in
+      let%bind _ = Process.wait process in
+      Sys.remove lock_path
+    else Deferred.unit
 
   let cli_format : Unix.Inet_addr.t -> int -> string =
    fun host discovery_port ->
@@ -162,7 +169,9 @@ module Haskell_process = struct
         { external_ip= ip1
         ; bind_ip= ip1
         ; discovery_port= 8000
-        ; communication_port= 8001 }
+        ; communication_port= 8001
+        ; client_port= 3000
+        ; libp2p_port= 8002 }
     in
     let me_discovery = Host_and_port.create ~host:"1.1.1.1" ~port:8000 in
     let other = Host_and_port.create ~host:"1.1.1.2" ~port:8000 in
@@ -215,22 +224,28 @@ module Haskell_process = struct
                    None ) ])
           ~f:(fun prog -> Process.create ~prog ~args ())
         |> Deferred.Or_error.map ~f:(fun process ->
-               {failure_response= ref `Die; process; lock_path} )
+               { failure_response= ref `Die
+               ; process
+               ; lock_path
+               ; already_waited= false } )
       with
       | Ok p ->
           (* If the Kademlia process dies, kill the parent daemon process. Fix
          * for #550 *)
-          Deferred.upon (Process.wait p.process) (fun code ->
+          Deferred.bind (Process.wait p.process) ~f:(fun code ->
+              p.already_waited <- true ;
               match (!(p.failure_response), code) with
               | `Ignore, _ | _, Ok () ->
-                  ()
+                  return ()
               | `Die, (Error _ as e) ->
                   Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
                     "Kademlia process died: $exit_or_signal"
                     ~metadata:
                       [ ( "exit_or_signal"
                         , `String (Unix.Exit_or_signal.to_string_hum e) ) ] ;
-                  raise Child_died ) ;
+                  let%map () = Sys.remove lock_path in
+                  raise Child_died )
+          |> don't_wait_for ;
           Ok p
       | Error e ->
           Or_error.error_string
@@ -265,7 +280,7 @@ module Haskell_process = struct
     with
     | `Yes ->
         let%bind t = run_kademlia () in
-        let {failure_response= _; process; lock_path} = t in
+        let {failure_response= _; process; lock_path; already_waited= _} = t in
         let%map () =
           write_lock_file lock_path (Process.pid process)
           |> Deferred.map ~f:Or_error.return
@@ -275,7 +290,8 @@ module Haskell_process = struct
              (Reader.pipe (Process.stderr process))
              ~f:(fun str ->
                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                 "Kademlia stderr output: %s" str )) ;
+                 ~metadata:[("str", `String str)]
+                 "Kademlia stderr output: $str" )) ;
         t
     | _ ->
         Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
@@ -329,7 +345,7 @@ module Make
   module For_tests : sig
     val node :
          Node_addrs_and_ports.t
-      -> Host_and_port.t sexp_list
+      -> Host_and_port.t list
       -> string
       -> Trust_system.t
       -> t Deferred.t
@@ -362,8 +378,7 @@ end = struct
       )
     in
     List.iter unbanned_lives ~f:(fun (peer, kkey) ->
-        let _ = Peer.Table.add ~key:peer ~data:kkey t.peers in
-        () ) ;
+        Peer.Table.set ~key:peer ~data:kkey t.peers ) ;
     if List.length unbanned_lives > 0 then
       Linear_pipe.write t.changes_writer
         (Peer.Event.Connect (List.map unbanned_lives ~f:fst))
@@ -461,6 +476,11 @@ end = struct
 
   let stop t = P.kill t.p
 
+  module Hacky_glue = struct
+    let inject_event t e =
+      Linear_pipe.write t.changes_writer e |> don't_wait_for
+  end
+
   module For_tests = struct
     let node node_addrs_and_ports (peers : Host_and_port.t list) conf_dir
         trust_system =
@@ -510,7 +530,9 @@ let%test_module "Tests" =
                 { external_ip= Unix.Inet_addr.localhost
                 ; bind_ip= Unix.Inet_addr.localhost
                 ; discovery_port= 3001
-                ; communication_port= 3000 }
+                ; communication_port= 3000
+                ; client_port= 2000
+                ; libp2p_port= 3002 }
               ~logger:(Logger.null ())
               ~conf_dir:(Filename.temp_dir_name ^/ "membership-test")
           with
@@ -619,11 +641,14 @@ let%test_module "Tests" =
       fold_membership (module M) ~init:false ~f:(fun b _e -> b || true)
 
     let node_addrs_and_ports_of_int i =
+      let base = 3005 + (i * 3) in
       Node_addrs_and_ports.
         { external_ip= Unix.Inet_addr.localhost
         ; bind_ip= Unix.Inet_addr.localhost
-        ; discovery_port= 3006 + i
-        ; communication_port= 3005 + i }
+        ; communication_port= base
+        ; discovery_port= base + 1
+        ; libp2p_port= base + 2
+        ; client_port= 1000 + i }
 
     let conf_dir = Filename.temp_dir_name ^/ ".kademlia-test-"
 

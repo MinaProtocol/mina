@@ -4,23 +4,14 @@ open Pipe_lib.Strict_pipe
 open Coda_base
 open Coda_state
 open Signature_lib
+open Coda_transition
 
-module Make (Inputs : Coda_intf.Inputs_intf) = struct
-  open Inputs
-
+module Make (Inputs : Transition_frontier.Inputs_intf) = struct
   type validation_error =
     [ `Invalid_time_received of [`Too_early | `Too_late of int64]
     | `Invalid_proof
+    | `Invalid_delta_transition_chain_proof
     | `Verifier_error of Error.t ]
-
-  type ('time_received_valid, 'proof_valid) validation_result =
-    ( ( [`Time_received] * 'time_received_valid
-      , [`Proof] * 'proof_valid
-      , [`Frontier_dependencies] * Truth.false_t
-      , [`Staged_ledger_diff] * Truth.false_t )
-      External_transition.Validation.with_transition
-    , validation_error )
-    Deferred.Result.t
 
   let handle_validation_error ~logger ~trust_system ~sender ~state_hash
       (error : validation_error) =
@@ -48,6 +39,8 @@ module Make (Inputs : Coda_intf.Inputs_intf) = struct
         punish Sent_invalid_proof (Some ("verifier error", error_metadata))
     | `Invalid_proof ->
         punish Sent_invalid_proof None
+    | `Invalid_delta_transition_chain_proof ->
+        punish Sent_invalid_transition_chain_merkle_proof None
     | `Invalid_time_received `Too_early ->
         punish Gossiped_future_transition None
     | `Invalid_time_received (`Too_late slot_diff) ->
@@ -125,8 +118,8 @@ module Make (Inputs : Coda_intf.Inputs_intf) = struct
       let consensus_state =
         External_transition.consensus_state external_transition
       in
-      let epoch = curr_epoch consensus_state in
-      let slot = curr_slot consensus_state in
+      let epoch = curr_epoch consensus_state |> Unsigned.UInt32.to_int in
+      let slot = curr_slot consensus_state |> Unsigned.UInt32.to_int in
       let proposer = External_transition.proposer external_transition in
       let proposal = Proposals.{epoch; slot; proposer} in
       (* try table GC *)
@@ -168,18 +161,13 @@ module Make (Inputs : Coda_intf.Inputs_intf) = struct
           transition_with_hash ;
         let sender = Envelope.Incoming.sender transition_env in
         match%bind
-          let open Deferred.Result.Let_syntax in
-          let transition =
-            External_transition.Validation.wrap transition_with_hash
-          in
-          let%bind transition =
-            ( Deferred.return
-                (External_transition.validate_time_received transition
-                   ~time_received)
-              :> (Truth.true_t, Truth.false_t) validation_result )
-          in
-          ( External_transition.validate_proof transition ~verifier
-            :> (Truth.true_t, Truth.true_t) validation_result )
+          let open Deferred.Result.Monad_infix in
+          External_transition.(
+            Validation.wrap transition_with_hash
+            |> Fn.compose Deferred.return
+                 (validate_time_received ~time_received)
+            >>= validate_proof ~verifier
+            >>= Fn.compose Deferred.return validate_delta_transition_chain)
         with
         | Ok verified_transition ->
             ( `Transition

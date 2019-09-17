@@ -674,6 +674,10 @@ module Tick = struct
 
   module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
 
+  let m : Run.field Snarky.Snark.m = (module Run)
+
+  let make_checked c = with_state (As_prover.return ()) (Run.make_checked c)
+
   module Verifier = struct
     include Snarky_verifier.Bowe_gabizon.Make (struct
       include Pairing
@@ -766,19 +770,14 @@ let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 "scan_state_transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
 
 [%%inject
-"scan_state_work_delay_factor", scan_state_work_delay_factor]
+"scan_state_work_delay", scan_state_work_delay]
 
-[%%inject
-"scan_state_latency_factor", scan_state_latency_factor]
-
+(*Log of maximum number of trees in the parallel scan state*)
 let pending_coinbase_depth =
-  let working_levels =
-    scan_state_transaction_capacity_log_2 + scan_state_work_delay_factor
-    - scan_state_latency_factor + 1
-  in
-  let root_nodes = Int.pow 2 scan_state_latency_factor in
-  let total_stacks = working_levels * root_nodes in
-  Int.ceil_log2 total_stacks
+  Int.ceil_log2
+    ( (scan_state_transaction_capacity_log_2 + 1)
+      * (scan_state_work_delay + 1)
+    + 1 )
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

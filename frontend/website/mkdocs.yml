@@ -3,18 +3,20 @@ theme:
   name: null
   custom_dir: 'docs-theme/'
 repo_url: https://github.com/codaprotocol/coda/
-edit_uri: edit/master/frontend/website/docs/
+edit_uri: edit/develop/frontend/website/docs/
 nav:
   - Overview: index.md
+  - Coda Testnet: coda-testnet.md
   - Getting Started: getting-started.md
   - My First Transaction: my-first-transaction.md
   - Become a Node Operator: node-operator.md
   - Contributing to Coda: contributing.md
   - Developers:
     - Developers Overview: developers/index.md
+    - Codebase Overview: developers/codebase-overview.md
     - Repository Structure: developers/directory-structure.md
-    - Style Guide: developers/style-guide.md
     - Code Reviews: developers/code-reviews.md
+    - Style Guide: developers/style-guide.md
     - GraphQL API: developers/graphql-api.md
   - Coda Protocol Architecture:
     - Coda Overview: architecture/index.md
@@ -23,9 +25,9 @@ nav:
     - Proof of Stake: architecture/proof-of-stake.md
   - CLI Reference: cli-reference.md
   - Troubleshooting: troubleshooting.md
+  - FAQ: faq.md
   - Glossary: glossary.md
 markdown_extensions:
   - toc:
       permalink: a
   - admonition
-  # - codehilite

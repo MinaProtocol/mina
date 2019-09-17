@@ -15,6 +15,7 @@ open Pipe_lib.Strict_pipe
 open Cache_lib
 open Otp_lib
 open Coda_base
+open Coda_transition
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
@@ -72,6 +73,7 @@ module Make (Inputs : Inputs.S) = struct
       ~(catchup_breadcrumbs_writer :
          ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
            list
+           * [`Ledger_catchup of unit Ivar.t | `Catchup_scheduler]
          , crash buffered
          , unit )
          Writer.t) ~clean_up_signal =
@@ -96,7 +98,8 @@ module Make (Inputs : Inputs.S) = struct
               transition_branches
           with
           | Ok trees_of_breadcrumbs ->
-              Writer.write catchup_breadcrumbs_writer trees_of_breadcrumbs
+              Writer.write catchup_breadcrumbs_writer
+                (trees_of_breadcrumbs, `Catchup_scheduler)
           | Error err ->
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                 !"Error during buildup breadcrumbs inside catchup_scheduler: %s"
@@ -186,7 +189,7 @@ module Make (Inputs : Inputs.S) = struct
                 )
               ; ( "cached_transition"
                 , With_hash.data transition_with_hash
-                  |> Inputs.External_transition.to_yojson ) ]
+                  |> External_transition.to_yojson ) ]
             "Timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
@@ -205,7 +208,9 @@ module Make (Inputs : Inputs.S) = struct
         Hashtbl.add t.parent_root_timeouts ~key:parent_hash
           ~data:
             (make_timeout
-               (Option.value remaining_time ~default:timeout_duration))
+               (Option.fold remaining_time ~init:timeout_duration
+                  ~f:(fun _ remaining_time ->
+                    Block_time.Span.min remaining_time timeout_duration )))
         |> ignore
     | Some cached_sibling_transitions ->
         if

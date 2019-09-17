@@ -6,7 +6,7 @@
 ### General
 [ocaml-general]: #ocaml-general
 
-Our style guidelines are an extension of a couple of existing style guidelines. The first is ocamlformat, and it acts as the source of truth for most of our coding style. In fact, ocamlformat is a blocker on CI, so your code must be formated by it's guidelines in order to be merged into master. Ocamlformat does not handle all important cases of style, however, as it is only defining and enforcing how code should be spaced out and indented. For anything which ocamlformat does not cover, the [janestreet styleguide](https://opensource.janestreet.com/standards/) should be referenced. This styleguide we define here is intended to be an extension of the janestreet styleguide, with more attention to detail in concern to a few specific constructs we use regularly throughout our codebase.
+Our style guidelines are an extension of a couple of existing style guidelines. The first is ocamlformat, and it acts as the source of truth for most of our coding style. In fact, ocamlformat is a blocker on CI, so your code must be formated by it's guidelines in order to be merged into master. Ocamlformat does not handle all important cases of style, however, as it is only defining and enforcing how code should be spaced out and indented. For anything which ocamlformat does not cover, the [Jane Street styleguide](https://opensource.janestreet.com/standards/) should be referenced. This styleguide we define here is intended to be an extension of the janestreet styleguide, with more attention to detail in concern to a few specific constructs we use regularly throughout our codebase.
 
 ### Mli Files
 [ocaml-mli]: #ocaml-mli
@@ -202,9 +202,9 @@ let%test_unit =
 <a name="functors"></a>
 ### Functors
 
-We are in the process of migrating to using module signature equalities -- see [the above section](#functor-signature-equalities) and [the rfc for rationale](../rfcs/0004-style-guidelines.md), but we still have a lot of code using type substitutions (`with type foo := bar`).
+We are in the process of migrating to using module signature equalities -- see [the above section](#functor-signature-equalities) and [the rfc for rationale](https://github.com/CodaProtocol/coda/blob/master/rfcs/0004-style-guidelines.md), but we still have a lot of code using type substitutions (`with type foo := bar`).
 
-In [signature_lib/checked.ml](../src/lib/signature_lib/checked.ml) we have an example of a definition using type substitutions. First we define the resulting module type of the functor, keeping all types we'll be functoring in abstract.
+In [signature_lib/checked.ml](https://github.com/CodaProtocol/coda/blob/master/src/lib/signature_lib/checked.ml) we have an example of a definition using type substitutions. First we define the resulting module type of the functor, keeping all types we'll be functoring in abstract.
 
 ```ocaml
 module type S = sig
@@ -238,7 +238,7 @@ end
 
 This is also the first time we see custom SNARK circuit logic. A pattern we've been using is to scope all operations that you'd want to run inside a SNARK under a submodule `module Checked`.
 
-For example, inside [sgn.mli](../src/lib/sgn/sgn.mli) we see:
+For example, inside [sgn.mli](https://github.com/CodaProtocol/coda/blob/master/src/lib/sgn/sgn.mli) we see:
 
 ```ocaml
 (* ... *)

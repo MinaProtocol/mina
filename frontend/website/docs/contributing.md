@@ -12,6 +12,8 @@ The Coda public testnet beta is live. **Technical skill is not required**, and w
 
 Specifically, we need help in the form of reporting bugs, validating economic assumptions, testing out node infrastructure, and general participation in consensus and compressing the blockchain. Please join the [Discord server](https://bit.ly/CodaDiscord) and checkout the #testnet-general and #testnet-beta channel to get involved. You can also [sign up for the mailing list here](http://bit.ly/TestnetForm) and we'll keep you posted with updates!
 
+Head over to the [testnet landing page](/docs/coda-testnet/) to see how to participate in weekly challenges and get on the testnet leaderboard.
+
 ## Developers
 
 See the [Developers](../developers/) section for details on how to contribute code to the Coda protocol.
@@ -20,7 +22,9 @@ Coda is entirely open source, and the code is distributed under the terms of the
 
 ## Coda Grants
 
-There are also a limited set of grants for projects related to Coda's development.  Many of these focus on development, but more will be added in the areas of design and community development. Reach out on Discord for more info on the grant program.
+O(1) Labs provides grants for certain projects related to the development of Coda -- visit the [Coda Grants repo](https://github.com/CodaProtocol/coda-grants) to find out more details.
+
+Currently, the projects are mostly programming focused, but more will be added in the areas of design and community development. Reach out on Discord if you have any questions about the grant program.
 
 ## Reporting Issues
 

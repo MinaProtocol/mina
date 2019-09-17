@@ -5,6 +5,12 @@ open Signature_lib
 
 (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
 
+module Snark_worker_config = struct
+  type t =
+    { initial_snark_worker_key: Public_key.Compressed.t option
+    ; shutdown_on_disconnect: bool }
+end
+
 (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
 type t =
   { conf_dir: string
@@ -13,7 +19,8 @@ type t =
   ; monitor: Monitor.t option
   ; initial_propose_keypairs: Keypair.Set.t
   ; work_selection_method: (module Work_selector.Selection_method_intf)
-  ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
+  ; snark_worker_config: Snark_worker_config.t
+  ; work_reassignment_wait: int
   ; net_config: Coda_networking.Config.t
   ; snark_pool_disk_location: string
   ; wallets_disk_location: string

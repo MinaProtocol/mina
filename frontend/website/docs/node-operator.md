@@ -8,13 +8,17 @@ Now that we've set up our Coda node and sent our first transaction, let's turn o
 
 ## Participating in Consensus
 
-The Coda network is secured by [Proof-of-Stake consensus](/glossary/#proof-of-stake). With this model of consensus, you don't need to have complex equipment like in Bitcoin mining. By simply having coda in our wallet, we can choose to either stake it ourselves, or delegate it to another node. Let's first see how to stake coda ourselves:
+The Coda network is secured by [Proof-of-Stake consensus](/docs/glossary/#proof-of-stake). With this model of consensus, you don't need to have complex equipment like in Bitcoin mining. By simply having coda in our wallet, we can choose to either stake it ourselves, or delegate it to another node. Let's first see how to stake coda ourselves:
 
 ### Staking coda
 
-Since we have some funds in our wallet from [the previous step](/my-first-transaction), we can configure that wallet to stake its coda by issuing the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`):
+<!-- Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can configure that wallet to stake its coda by issuing the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`): -->
 
-    coda client set-staking -privkey-path keys/my-wallet
+<!-- coda client set-staking -privkey-path keys/my-wallet -->
+
+Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can now start the daemon with the `-propose-key` flag to begin staking coda. Let's stop our current daemon process, and restart it with the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`):
+
+    coda daemon -peer something-snarky.o1test.net:8303 -propose-key keys/my-wallet
 
 !!! note
     You can provide a list of key files to turn on staking for multiple wallets at the same time
@@ -59,7 +63,7 @@ Delegating coda is an alternative option to staking it directly, with the benefi
 To delegate your stake, instead of running your own staking node, run this command:
 
     coda client delegate-stake \
-        -delegate <public-key> \
+        -delegate <delegate-public-key> \
         -privkey-path <file> \
         -fee <fee>
 
@@ -86,8 +90,8 @@ However, this isn't data encoding or compression in the traditional sense - rath
 When you [start the daemon](/docs/my-first-transaction/#start-up-a-node), set these extra arguments to also start a snark-worker:
 
     coda daemon \
-        -peer hello-coda.o1test.net:8303 \
-        -run-snark-worker <public-key> \
+        -peer something-snarky.o1test.net:8303 \
+        -run-snark-worker $CODA_PK \
         -snark-worker-fee <fee>
 
 As a snark-worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.

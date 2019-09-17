@@ -9,6 +9,8 @@ open Coda_base
 open Coda_numbers
 open Signature_lib
 
+val replace_fee : Currency.Fee.t
+
 (** Transaction pool. This is a purely functional data structure. *)
 type t [@@deriving sexp_of]
 

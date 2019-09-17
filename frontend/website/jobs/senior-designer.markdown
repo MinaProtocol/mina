@@ -17,16 +17,16 @@ The Vignelli Canon and Ten Principles of Good Design inspire our design approach
 - Willingness to work primarily with Figma
 - Willingness to work on-site in a San Francisco based office
 
-## Responsibilites
+## Responsibilities
 
 - Designing native and web experiences for desktop and mobile, for a variety of devices and operating systems
+- Working in concert with the marketing team to create engaging campaigns and well crafted visual assets for a variety of platforms and mediums
 - Wireframing
 - Prototyping
 - User testing
 - Deploying and maintaining design libraries
 - Extending and improving our websites and documentation
 - Illustrating and animating, if capable
-- Creating marketing assets when required
 
 ## About us
 

@@ -58,7 +58,7 @@ module Types = struct
         { get_staged_ledger_aux: Perf_histograms.Report.t option Rpc_pair.t
         ; answer_sync_ledger_query: Perf_histograms.Report.t option Rpc_pair.t
         ; get_ancestry: Perf_histograms.Report.t option Rpc_pair.t
-        ; get_transition_chain_witness:
+        ; get_transition_chain_proof:
             Perf_histograms.Report.t option Rpc_pair.t
         ; get_transition_chain: Perf_histograms.Report.t option Rpc_pair.t }
       [@@deriving to_yojson, bin_io, fields]
@@ -87,8 +87,8 @@ module Types = struct
             ~answer_sync_ledger_query:(fun acc x ->
               add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc )
             ~get_ancestry:(fun acc x -> add_rpcs ~name:"Get Ancestry" (f x) acc)
-            ~get_transition_chain_witness:(fun acc x ->
-              add_rpcs ~name:"Get transition chain witness" (f x) acc )
+            ~get_transition_chain_proof:(fun acc x ->
+              add_rpcs ~name:"Get transition chain proof" (f x) acc )
             ~get_transition_chain:(fun acc x ->
               add_rpcs ~name:"Get transition chain" (f x) acc )
           |> List.rev
@@ -185,46 +185,48 @@ module Types = struct
             in
             Printf.sprintf "%d%s" len list_str )
 
-      let num_accounts = int_option_entry "Global Number of Accounts"
+      let num_accounts = int_option_entry "Global number of accounts"
 
-      let blockchain_length = int_option_entry "Block Height"
+      let blockchain_length = int_option_entry "Block height"
 
-      let highest_block_length_received = int_entry "Max Observed Block Length"
+      let highest_block_length_received = int_entry "Max observed block length"
 
       let uptime_secs =
-        map_entry "Local Uptime" ~f:(fun secs ->
+        map_entry "Local uptime" ~f:(fun secs ->
             Time.Span.to_string (Time.Span.of_int_sec secs) )
 
-      let ledger_merkle_root = string_option_entry "Ledger Merkle Root"
+      let ledger_merkle_root = string_option_entry "Ledger Merkle root"
 
-      let staged_ledger_hash = string_option_entry "Staged-ledger Hash"
+      let staged_ledger_hash = string_option_entry "Staged-ledger hash"
 
-      let state_hash = string_option_entry "Staged Hash"
+      let state_hash = string_option_entry "Staged hash"
 
-      let commit_id = string_entry "GIT SHA-1"
+      let commit_id = string_entry "Git SHA-1"
 
-      let conf_dir = string_entry "Configuration Directory"
+      let conf_dir = string_entry "Configuration directory"
 
       let peers = list_entry "Peers" ~to_string:Fn.id
 
-      let user_commands_sent = int_entry "User_commands Sent"
+      let user_commands_sent = int_entry "User_commands sent"
 
-      let run_snark_worker = bool_entry "Snark Worker Running"
+      let snark_worker =
+        map_entry "SNARK worker" ~f:(Option.value ~default:"None")
 
-      let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
+      let snark_work_fee = int_entry "SNARK work fee"
+
+      let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
       let propose_pubkeys =
-        list_entry "Block Producers Running"
-          ~to_string:Public_key.Compressed.to_string
+        list_entry "Block producers running" ~to_string:Fn.id
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
       let consensus_time_best_tip =
-        string_option_entry "Best Tip Consensus Time"
+        string_option_entry "Best tip consensus time"
 
-      let consensus_time_now = string_entry "Consensus Time Now"
+      let consensus_time_now = string_entry "Consensus time now"
 
-      let consensus_mechanism = string_entry "Consensus Mechanism"
+      let consensus_mechanism = string_entry "Consensus mechanism"
 
       let consensus_configuration =
         let ms_to_string i =
@@ -245,7 +247,7 @@ module Types = struct
           |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
           |> digest_entries ~title:""
         in
-        map_entry "Consensus Configuration" ~f:render
+        map_entry "Consensus configuration" ~f:render
     end
 
     type t =
@@ -259,9 +261,10 @@ module Types = struct
       ; conf_dir: string
       ; peers: string list
       ; user_commands_sent: int
-      ; run_snark_worker: bool
+      ; snark_worker: string option
+      ; snark_work_fee: int
       ; sync_status: Sync_status.Stable.V1.t
-      ; propose_pubkeys: Public_key.Compressed.Stable.V1.t list
+      ; propose_pubkeys: string list
       ; histograms: Histograms.t option
       ; consensus_time_best_tip: string option
       ; consensus_time_now: string
@@ -279,13 +282,14 @@ module Types = struct
       Fields.to_list ~sync_status ~num_accounts ~blockchain_length
         ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
         ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent
-        ~run_snark_worker ~propose_pubkeys ~histograms ~consensus_time_best_tip
+        ~snark_worker ~propose_pubkeys ~histograms ~consensus_time_best_tip
         ~consensus_time_now ~consensus_mechanism ~consensus_configuration
+        ~snark_work_fee
       |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =
       let title =
-        "Coda Daemon Status\n-----------------------------------\n"
+        "Coda daemon status\n-----------------------------------\n"
       in
       digest_entries ~title (entries t)
   end
@@ -320,7 +324,7 @@ end
 module Send_user_commands = struct
   type query = User_command.Stable.Latest.t list [@@deriving bin_io]
 
-  type response = unit [@@deriving bin_io]
+  type response = unit Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -330,7 +334,7 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = Staged_ledger_hash.Stable.Latest.t [@@deriving bin_io]
+  type query = Staged_ledger_hash.Stable.Latest.t option [@@deriving bin_io]
 
   type response = Account.Stable.Latest.t list Or_error.t [@@deriving bin_io]
 
@@ -343,9 +347,10 @@ end
 module Get_balance = struct
   type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Currency.Balance.Stable.Latest.t option [@@deriving bin_io]
+  type error = string [@@deriving bin_io]
 
-  type error = unit [@@deriving bin_io]
+  type response = Currency.Balance.Stable.Latest.t option Or_error.t
+  [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_balance" ~version:0 ~bin_query ~bin_response
@@ -420,7 +425,8 @@ end
 module Get_inferred_nonce = struct
   type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.Nonce.Stable.Latest.t option [@@deriving bin_io]
+  type response = Account.Nonce.Stable.Latest.t option Or_error.t
+  [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -432,7 +438,8 @@ end
 module Get_nonce = struct
   type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.Nonce.Stable.Latest.t option [@@deriving bin_io]
+  type response = Account.Nonce.Stable.Latest.t option Or_error.t
+  [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -463,22 +470,23 @@ module Clear_hist_status = struct
       ~bin_response
 end
 
-module Get_public_keys_with_balances = struct
+module Get_public_keys_with_details = struct
   type query = unit [@@deriving bin_io]
 
-  type response = (string * int) list [@@deriving bin_io, sexp]
+  type response = (string * int * int) list Or_error.t
+  [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_public_keys_with_balances" ~version:0 ~bin_query
+    Rpc.Rpc.create ~name:"Get_public_keys_with_details" ~version:0 ~bin_query
       ~bin_response
 end
 
 module Get_public_keys = struct
   type query = unit [@@deriving bin_io]
 
-  type response = string list [@@deriving bin_io, sexp]
+  type response = string list Or_error.t [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
 
@@ -500,12 +508,23 @@ end
 module Snark_job_list = struct
   type query = unit [@@deriving bin_io]
 
-  type response = string [@@deriving bin_io]
+  type response = string Or_error.t [@@deriving bin_io]
 
   type error = unit
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Snark_job_list" ~version:0 ~bin_query ~bin_response
+end
+
+module Snark_pool_list = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = string [@@deriving bin_io]
+
+  type error = unit
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Snark_pool_list" ~version:0 ~bin_query ~bin_response
 end
 
 module Start_tracing = struct

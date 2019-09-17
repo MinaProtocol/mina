@@ -13,13 +13,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   module Job_status = struct
     type t = Assigned of Time.t
 
-    let max_age = Time.Span.of_min 2.
-
-    let is_old t ~now =
-      match t with
-      | Assigned at_time ->
-          let delta = Time.diff now at_time in
-          Time.Span.( > ) delta max_age
+    let is_old (Assigned at_time) ~now ~reassignment_wait =
+      let max_age = Time.Span.of_ms (Float.of_int reassignment_wait) in
+      let delta = Time.diff now at_time in
+      Time.Span.( > ) delta max_age
   end
 
   module State = struct
@@ -27,24 +24,34 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       module T = struct
         type t =
           Transaction_snark.Statement.t * Transaction_snark.Statement.t option
-        [@@deriving compare, sexp]
+        [@@deriving compare, sexp, to_yojson]
       end
 
       include T
       include Comparable.Make (T)
     end
 
-    type t = Job_status.t Seen_key.Map.t
+    type t = {jobs_seen: Job_status.t Seen_key.Map.t; reassignment_wait: int}
 
-    let init = Seen_key.Map.empty
+    let init ~reassignment_wait =
+      {jobs_seen= Seen_key.Map.empty; reassignment_wait}
 
-    let remove_old_assignments t =
+    let remove_old_assignments {jobs_seen; reassignment_wait} ~logger =
       let now = Time.now () in
-      Map.filter t ~f:(fun status -> not (Job_status.is_old status ~now))
+      Map.filteri jobs_seen ~f:(fun ~key:work ~data:status ->
+          if Job_status.is_old status ~now ~reassignment_wait then (
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:[("work", Seen_key.to_yojson work)]
+              "Waited too long to get work for $work. Ready to be reassigned" ;
+            Coda_metrics.(Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
+            false )
+          else true )
 
     let set t x =
-      Map.set t ~key:(statement_pair x)
-        ~data:(Job_status.Assigned (Time.now ()))
+      { t with
+        jobs_seen=
+          Map.set t.jobs_seen ~key:(statement_pair x)
+            ~data:(Job_status.Assigned (Time.now ())) }
   end
 
   let pair_to_list = function j, Some j' -> [j; j'] | j, None -> [j]
@@ -79,8 +86,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       ~f:
         (Fn.compose (does_not_have_better_fee ~snark_pool ~fee) statement_pair)
 
-  let all_works (staged_ledger : Inputs.Staged_ledger.t) (state : State.t) =
-    let state = State.remove_old_assignments state in
+  let all_works ~logger (staged_ledger : Inputs.Staged_ledger.t)
+      (state : State.t) =
+    let state = State.remove_old_assignments state ~logger in
     let all_jobs = Inputs.Staged_ledger.all_work_pairs_exn staged_ledger in
     let unseen_jobs =
       List.filter all_jobs ~f:(fun js ->

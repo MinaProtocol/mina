@@ -2,7 +2,9 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib
 open Coda_base
+open Coda_incremental
 open Coda_state
+open Coda_transition
 
 (** An extension to the transition frontier that provides a view onto the data
     other components can use. These are exposed through the broadcast pipes
@@ -274,28 +276,23 @@ module type Transition_frontier_breadcrumb_intf = sig
     ; parent: string }
   [@@deriving yojson]
 
-  type staged_ledger
-
-  type mostly_validated_external_transition
-
-  type external_transition_validated
-
-  type verifier
-
-  val create :
-       (external_transition_validated, State_hash.t) With_hash.t
-    -> staged_ledger
-    -> t
+  val create : External_transition.Validated.t -> Staged_ledger.t -> t
 
   (** The copied breadcrumb delegates to [Staged_ledger.copy], the other fields are already immutable *)
   val copy : t -> t
 
   val build :
        logger:Logger.t
-    -> verifier:verifier
+    -> verifier:Verifier.t
     -> trust_system:Trust_system.t
     -> parent:t
-    -> transition:mostly_validated_external_transition
+    -> transition:( [`Time_received] * unit Truth.true_t
+                  , [`Proof] * unit Truth.true_t
+                  , [`Delta_transition_chain]
+                    * State_hash.t Non_empty_list.t Truth.true_t
+                  , [`Frontier_dependencies] * unit Truth.true_t
+                  , [`Staged_ledger_diff] * unit Truth.false_t )
+                  External_transition.Validation.with_transition
     -> sender:Envelope.Sender.t option
     -> ( t
        , [ `Invalid_staged_ledger_diff of Error.t
@@ -304,16 +301,15 @@ module type Transition_frontier_breadcrumb_intf = sig
        Result.t
        Deferred.t
 
-  val transition_with_hash :
-    t -> (external_transition_validated, State_hash.t) With_hash.t
+  val validated_transition : t -> External_transition.Validated.t
 
-  val staged_ledger : t -> staged_ledger
+  val staged_ledger : t -> Staged_ledger.t
 
   val just_emitted_a_proof : t -> bool
 
   val hash : t -> int
 
-  val external_transition : t -> external_transition_validated
+  val protocol_state : t -> Coda_state.Protocol_state.Value.t
 
   val state_hash : t -> State_hash.t
 
@@ -323,33 +319,27 @@ module type Transition_frontier_breadcrumb_intf = sig
 
   val display : t -> display
 
-  val name : t -> string
+  val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
-  val to_user_commands : t -> User_command.t list
+  val state_hash : t -> State_hash.t
+
+  val parent_hash : t -> State_hash.t
+
+  val proposer : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+
+  val payments : t -> User_command.t list
+
+  val display : t -> display
+
+  val name : t -> string
 end
 
 module type Transition_frontier_base_intf = sig
-  type mostly_validated_external_transition
-
-  type external_transition_validated
-
-  type transaction_snark_scan_state
-
-  type staged_ledger
-
-  type staged_ledger_diff
-
-  type verifier
-
   type t [@@deriving eq]
 
-  module Breadcrumb :
-    Transition_frontier_breadcrumb_intf
-    with type mostly_validated_external_transition :=
-                mostly_validated_external_transition
-     and type external_transition_validated := external_transition_validated
-     and type staged_ledger := staged_ledger
-     and type verifier := verifier
+  module Breadcrumb : Transition_frontier_breadcrumb_intf
 
   module Diff :
     Transition_frontier_diff_intf

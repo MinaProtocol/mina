@@ -32,7 +32,10 @@ module type Constants_intf = sig
    * block. In sig, it's exactly 1 as blocks should be produced every slot. *)
   val c : int
 
-  val inactivity_secs : int
+  val inactivity_ms : int
+
+  (** Number of slots in one epoch *)
+  val slots_per_epoch : Unsigned.UInt32.t
 end
 
 module type Blockchain_state_intf = sig
@@ -391,9 +394,9 @@ module type S = sig
 
       val network_delay : Configuration.t -> int
 
-      val curr_epoch : Value.t -> int
+      val curr_epoch : Value.t -> Epoch.t
 
-      val curr_slot : Value.t -> int
+      val curr_slot : Value.t -> Slot.t
     end
 
     module Proposal_data : sig

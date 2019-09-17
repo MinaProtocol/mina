@@ -232,9 +232,7 @@ let%test_module "Root_history and Transition_frontier" =
           in
           Option.is_none
             ( breadcrumbs_path frontier
-            @@ ( Transition_frontier.Breadcrumb.transition_with_hash
-                   last_breadcrumb
-               |> With_hash.hash ) ) )
+            @@ Transition_frontier.Breadcrumb.state_hash last_breadcrumb ) )
 
     let%test "Query transition only from transition_frontier if the \
               root_history is empty" =
@@ -256,9 +254,7 @@ let%test_module "Root_history and Transition_frontier" =
           let random_breadcrumb = List.(nth_exn breadcrumbs random_index) in
           let queried_breadcrumbs =
             breadcrumbs_path frontier
-            @@ ( Transition_frontier.Breadcrumb.transition_with_hash
-                   random_breadcrumb
-               |> With_hash.hash )
+            @@ Transition_frontier.Breadcrumb.state_hash random_breadcrumb
             |> Option.value_exn |> Non_empty_list.to_list
           in
           assert (Transition_frontier.For_tests.root_history_is_empty frontier) ;
@@ -286,9 +282,7 @@ let%test_module "Root_history and Transition_frontier" =
             root :: List.take breadcrumbs (query_index + 1)
           in
           let query_hash =
-            Transition_frontier.Breadcrumb.transition_with_hash
-              query_breadcrumb
-            |> With_hash.hash
+            Transition_frontier.Breadcrumb.state_hash query_breadcrumb
           in
           assert (
             Transition_frontier.For_tests.root_history_mem frontier query_hash
@@ -324,10 +318,7 @@ let%test_module "Root_history and Transition_frontier" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
-          let root_hash =
-            Transition_frontier.Breadcrumb.transition_with_hash root
-            |> With_hash.hash
-          in
+          let root_hash = Transition_frontier.Breadcrumb.state_hash root in
           let size = (3 * max_length) + 1 in
           let%map () =
             build_frontier_randomly frontier
@@ -363,10 +354,9 @@ let%test_module "Root_history and Transition_frontier" =
             Quickcheck.random_value (Int.gen_incl 0 (max_length - 1))
           in
           let random_breadcrumb_hash =
-            Transition_frontier.Breadcrumb.transition_with_hash
+            Transition_frontier.Breadcrumb.state_hash
               (List.nth_exn transition_frontier_breadcrumbs
                  random_breadcrumb_index)
-            |> With_hash.hash
           in
           let expected_breadcrumb_trail =
             (root :: root_history_breadcrumbs)

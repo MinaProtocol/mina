@@ -107,7 +107,10 @@ let () =
   let interpolation_config =
     let interpolation_mode =
       let open Interpolator in
-      let doc = "Set how interpolation of messages will be performed" in
+      let doc =
+        "Set how interpolation of messages will be performed (valid options \
+         are \"hidden\", \"inline\" and  \"after\")"
+      in
       Arg.(
         value
         & opt
@@ -139,11 +142,25 @@ let () =
       $ interpolation_mode $ max_interpolation_length $ pretty_print)
   in
   let timezone =
-    let doc = "Timezone to display timestamps in." in
+    let doc =
+      "Timezone to display timestamps in. Defaults to the system's timezone."
+    in
     Arg.(value & opt string "" & info ["z"; "zone"] ~docv:"TIMEZONE" ~doc)
   in
   let filter =
-    let doc = "Filter displayed log lines." in
+    let doc =
+      "Filter displayed log lines. The filter language has similar syntax to \
+       javascript, with a few notable differences. Similar to \"jq\", doing \
+       an anymous access like \"[\"a\"]\" or \".a\" will refer to that key on \
+       the javascript object being processed, which in the context of \
+       logproc, is the json log entry itself. Basic literals (such as strings \
+       and integers) are supported, as is structural equality (\"==\") and \
+       boolean operations (\"!\", \"&&\", \"||\"). There is also support for \
+       the \"in\" operator for checking existence in arrays (works like \
+       javascript, not like jq). Regexes can also be expressed \
+       (\"/some_regex/\") and can be matched on using a special \"match\" \
+       operator. See examples for more information."
+    in
     Arg.(value & opt string "" & info ["f"; "filter"] ~docv:"FILTER" ~doc)
   in
   let main_term =
@@ -151,8 +168,34 @@ let () =
   in
   let main_info =
     let doc = "Process coda log statements from standard input" in
-    let man = [`P "this is a test of the man page"] in
-    Term.info ~version:"%%VERSION%%" ~doc ~exits:Term.default_exits ~man
-      "logproc"
+    let man =
+      [ `S Manpage.s_description
+      ; `P
+          "Logproc processes coda logs from stdin and is capable of filtering \
+           and reformating logs in a user friendly fashion. A javascript-like \
+           filter language is included for defining boolean predicates on log \
+           statements. Logproc will also attempt to interpolate logging \
+           strings."
+      ; `S Manpage.s_examples
+      ; `I ("pretty print logs with default interpolation:", {|logproc|})
+      ; `I ("pretty print logs and show all metadata:", {|logproc -i after|})
+      ; `I
+          ( "filter logs in specific levels:"
+          , {|logproc -f '.level in ["Warn", "Error", "Faulty_peer"]|} )
+      ; `I
+          ( "filter all logs from Gossip_net:"
+          , {|logproc -f '.source.module == "Gossip_net"'|} )
+      ; `I
+          ( "filter all logs from a specific pid:"
+          , {|logproc -f '.metadata.pid == 1337'|} )
+      ; `I
+          ( "filter all logs matching a regex:"
+          , {|logproc -f '.message match /[Vv]rf/'|} )
+      ; `I
+          ( "a complex filter:"
+          , {|logproc -f '.message match /broadcast/ && .metadata.peer.host == "182.9.63.3" || .metadata.peer.discover_port == 8302|}
+          ) ]
+    in
+    Term.info ~version:"0.1" ~doc ~exits:Term.default_exits ~man "logproc"
   in
   Term.(exit @@ eval (main_term, main_info))

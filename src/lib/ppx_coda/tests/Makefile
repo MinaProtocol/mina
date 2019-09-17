@@ -69,3 +69,9 @@ negative-tests :
 	@ echo -n "Versioned types with unversioned type with type parameters, should fail..."
 	@ ! dune build versioned_bad_type_parameters.cma ${REDIRECT}
 	@ echo "OK"
+	@ echo -n "Versioned types with GADT type with unversioned inputs, should fail..."
+	@ ! dune build versioned_bad_gadt.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Versioned types with GADT type with unversioned results, should fail..."
+	@ ! dune build versioned_bad_gadt_results.cma ${REDIRECT}
+	@ echo "OK"
