@@ -205,7 +205,7 @@ Table blocks {
   Indexes {
     state_hash [name: "state_hash"]
     (block_length, global_slot) [name: "block_compare"]
-    time_received [name: "block_compare"]
+    block_time [name: "block_compare"]
   }
 }
 
@@ -279,7 +279,6 @@ Table block_to_fee_transfers {
   Indexes {
     block_id [name:"block_to_fee_transfer.block"]
     transaction_id [name: "block_to_fee_transfer.transaction"]
-    receiver [name: "block_to_user_command.receiver"]
   }
   // Rows are uniquely identified by `state_hash` and `transaction_id`
 }
