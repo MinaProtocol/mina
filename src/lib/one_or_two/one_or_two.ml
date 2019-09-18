@@ -36,15 +36,18 @@ let group_sequence : 'a Sequence.t -> 'a t Sequence.t =
 let group_list : 'a list -> 'a t list =
  fun xs -> xs |> Sequence.of_list |> group_sequence |> Sequence.to_list
 
-let zip_exn : 'a t -> 'b t -> ('a * 'b) t =
+let zip : 'a t -> 'b t -> ('a * 'b) t Or_error.t =
  fun a b ->
   match (a, b) with
   | `One a1, `One b1 ->
-      `One (a1, b1)
+      Ok (`One (a1, b1))
   | `Two (a1, a2), `Two (b1, b2) ->
-      `Two ((a1, b1), (a2, b2))
+      Ok (`Two ((a1, b1), (a2, b2)))
   | _ ->
-      failwith "One_or_two.zip_exn mismatched"
+      Or_error.error_string "One_or_two.zip mismatched"
+
+let zip_exn : 'a t -> 'b t -> ('a * 'b) t =
+ fun a b -> Or_error.ok_exn @@ zip a b
 
 module Monadic2 (M : Monad.S2) :
   Intfs.Monadic2 with type ('a, 'e) m := ('a, 'e) M.t = struct
