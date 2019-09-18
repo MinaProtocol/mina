@@ -71,22 +71,36 @@ end)
           ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover) ]
 
   let summary = function
-    | Stable.V1.Add_solved_work (_, {proof= _; fee}) ->
+    | Stable.V1.Add_solved_work (work, {proof= _; fee}) ->
         Printf.sprintf
-          !"Snark_pool_diff add with fee %{sexp: Coda_base.Fee_with_prover.t}"
-          fee
+          !"Snark_pool_diff for work %s added with fee-prover %s"
+          (Yojson.Safe.to_string @@ Work.compact_json work)
+          (Yojson.Safe.to_string @@ Coda_base.Fee_with_prover.to_yojson fee)
 
   let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :
       t Or_error.t Deferred.t =
-    let t = Envelope.Incoming.data t in
+    let open Deferred.Or_error.Let_syntax in
+    let data = Envelope.Incoming.data t in
     let to_or_error = function
       | `Don't_rebroadcast ->
           Or_error.error_string "Worse fee or already in pool"
       | `Rebroadcast ->
-          Ok t
+          Ok data
     in
-    ( match t with
-    | Stable.V1.Add_solved_work (work, {proof; fee}) ->
-        Pool.add_snark pool ~work ~proof ~fee )
-    |> to_or_error |> Deferred.return
+    match data with
+    | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) ->
+        let%bind () =
+          let check () =
+            Pool.verify_and_act pool ~work:(work, p)
+              ~sender:(Envelope.Incoming.sender t)
+          in
+          match Pool.request_proof pool work with
+          | None ->
+              check ()
+          | Some {fee= {fee= prev; _}; _} ->
+              if Currency.Fee.( <= ) prev fee.fee then
+                Deferred.Or_error.return ()
+              else check ()
+        in
+        Pool.add_snark pool ~work ~proof ~fee |> to_or_error |> Deferred.return
 end
