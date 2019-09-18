@@ -116,7 +116,7 @@ end
 type t = Worker.Connection.t
 
 (* TODO: investigate why conf_dir wasn't being used *)
-let create logger =
+let create ~logger ~pids =
   let on_failure err =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Verifier process failed with error $err"
@@ -130,7 +130,7 @@ let create logger =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Daemon started verifier process with pid $verifier_pid"
     ~metadata:[("verifier_pid", `Int (Process.pid process |> Pid.to_int))] ;
-  Child_processes.Termination.register_process process ;
+  Child_processes.Termination.register_process pids process ;
   File_system.dup_stdout process ;
   File_system.dup_stderr process ;
   connection

@@ -778,8 +778,8 @@ module T = struct
       ; logger: Logger.t }
 
     let coinbase_ft (cw : Transaction_snark_work.t) =
-      (* Here we could not add the fee transfer if the prover=self but 
-      retaining it to preserve that information in the 
+      (* Here we could not add the fee transfer if the prover=self but
+      retaining it to preserve that information in the
       staged_ledger_diff. It will be checked in apply_diff before adding*)
       Option.some_if (cw.fee > Fee.zero) (cw.prover, cw.fee)
 
@@ -1056,7 +1056,7 @@ module T = struct
   end
 
   let worked_more (resources : Resources.t) =
-    (*Is the work constraint satisfied even after discarding a work bundle? 
+    (*Is the work constraint satisfied even after discarding a work bundle?
        We reach here after having more than enough work*)
     let more_work t =
       let slots = Resources.slots_occupied t in
@@ -1282,14 +1282,14 @@ let%test_module "test" =
         Public_key.Compressed.gen
 
     (* Functor for testing with different instantiated staged ledger modules. *)
-    let create_and_apply sl logger txns stmt_to_work =
+    let create_and_apply sl logger pids txns stmt_to_work =
       let open Deferred.Let_syntax in
       let diff =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
       let diff' = Staged_ledger_diff.forget diff in
-      let%bind verifier = Verifier.create logger in
+      let%bind verifier = Verifier.create ~logger ~pids in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
@@ -1527,11 +1527,12 @@ let%test_module "test" =
      fun init_state cmds cmd_iters sl ?(expected_proof_count = 0) test_mask
          provers stmt_to_work ->
       let logger = Logger.null () in
+      let pids = Child_processes.Termination.create_pid_set () in
       let%map total_ledger_proofs =
         iter_cmds_acc cmds cmd_iters 0
           (fun cmds_left count_opt cmds_this_iter proof_count ->
             let%bind ledger_proof, diff =
-              create_and_apply sl logger cmds_this_iter stmt_to_work
+              create_and_apply sl logger pids cmds_this_iter stmt_to_work
             in
             let proof_count' =
               proof_count + if Option.is_some ledger_proof then 1 else 0
@@ -1563,7 +1564,7 @@ let%test_module "test" =
               (init_pks init_state) ;
             return (diff, proof_count') )
       in
-      (*Should have enough blocks to generate at least expected_proof_count 
+      (*Should have enough blocks to generate at least expected_proof_count
       proofs*)
       assert (total_ledger_proofs >= expected_proof_count)
 
@@ -1607,7 +1608,7 @@ let%test_module "test" =
       in
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    (*Same as gen_at_capacity except that the number of iterations[iters] is 
+    (*Same as gen_at_capacity except that the number of iterations[iters] is
     the function of [extra_block_count] and is same for all generated values*)
     let gen_at_capacity_fixed_blocks extra_block_count :
         ( Ledger.init_state
@@ -1743,6 +1744,7 @@ let%test_module "test" =
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               let logger = Logger.null () in
+              let pids = Child_processes.Termination.create_pid_set () in
               let%map checked =
                 iter_cmds_acc cmds iters true
                   (fun _cmds_left _count_opt cmds_this_iter checked ->
@@ -1766,7 +1768,7 @@ let%test_module "test" =
                         (Sequence.to_list cmds_this_iter :> User_command.t list)
                         work_done partitions
                     in
-                    let%bind verifier = Verifier.create logger in
+                    let%bind verifier = Verifier.create ~logger ~pids in
                     let%bind apply_res = Sl.apply !sl diff ~logger ~verifier in
                     let checked', diff' =
                       match apply_res with
@@ -1792,12 +1794,13 @@ let%test_module "test" =
 
     let%test_unit "Snarked ledger" =
       let logger = Logger.null () in
+      let pids = Child_processes.Termination.create_pid_set () in
       Quickcheck.test (gen_below_capacity ()) ~trials:20
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               iter_cmds cmds iters (fun _cmds_left _count_opt cmds_this_iter ->
                   let%map proof_opt, diff =
-                    create_and_apply sl logger cmds_this_iter
+                    create_and_apply sl logger pids cmds_this_iter
                       stmt_to_work_random_prover
                   in
                   ( match proof_opt with
@@ -1851,6 +1854,7 @@ let%test_module "test" =
         -> unit Deferred.t =
      fun init_state cmds cmd_iters proofs_available sl test_mask provers ->
       let logger = Logger.null () in
+      let pids = Child_processes.Termination.create_pid_set () in
       let%map proofs_available_left =
         iter_cmds_acc cmds cmd_iters proofs_available
           (fun cmds_left _count_opt cmds_this_iter proofs_available_left ->
@@ -1864,7 +1868,7 @@ let%test_module "test" =
               List.hd_exn proofs_available_left
             in
             let%map proof, diff =
-              create_and_apply sl logger cmds_this_iter
+              create_and_apply sl logger pids cmds_this_iter
                 (stmt_to_work_restricted
                    (List.take work_list proofs_available_this_iter)
                    provers)

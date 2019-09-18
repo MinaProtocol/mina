@@ -233,7 +233,7 @@ end
 
 type t = {connection: Worker.Connection.t; process: Process.t}
 
-let create logger =
+let create ~logger ~pids =
   let on_failure err =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Prover process failed with error $err"
@@ -248,7 +248,7 @@ let create logger =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Daemon started prover process with pid $prover_pid"
     ~metadata:[("prover_pid", `Int (Process.pid process |> Pid.to_int))] ;
-  Child_processes.Termination.register_process process ;
+  Child_processes.Termination.register_process pids process ;
   File_system.dup_stdout process ;
   File_system.dup_stderr process ;
   {connection; process}

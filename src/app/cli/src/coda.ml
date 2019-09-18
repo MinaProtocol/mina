@@ -633,6 +633,7 @@ let daemon logger =
              external_transition_database_dir
          in
          (* log terminated child processes *)
+         let pids = Child_processes.Termination.create_pid_set () in
          let rec terminated_child_loop () =
            match
              try Unix.wait_nohang `Any
@@ -674,15 +675,16 @@ let daemon logger =
                          (("exit_code", `Int exit_code) :: child_pid_metadata)
                  ) ) ;
                (* terminate daemon if children registered *)
-               Child_processes.Termination.check_terminated_pid child_pid
-                 logger ;
+               Child_processes.Termination.check_terminated_child pids
+                 child_pid logger ;
                (* check for other terminated children, without waiting *)
                terminated_child_loop ()
          in
          Deferred.don't_wait_for @@ terminated_child_loop () ;
          let%map coda =
            Coda_lib.create
-             (Coda_lib.Config.make ~logger ~trust_system ~conf_dir ~net_config
+             (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+                ~net_config
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
