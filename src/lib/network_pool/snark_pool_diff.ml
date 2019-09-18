@@ -98,7 +98,7 @@ end)
           | None ->
               check ()
           | Some {fee= {fee= prev; _}; _} ->
-              if Currency.Fee.( < ) prev fee.fee then
+              if Currency.Fee.( <= ) prev fee.fee then
                 Deferred.Or_error.return ()
               else check ()
         in
