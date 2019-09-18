@@ -123,8 +123,6 @@ module User_command = struct
       {fee; hash; memo; nonce; receiver; sender; typ; amount; first_seen} =
     let open Option in
     object
-      method id = None
-
       method hash = some hash
 
       method blocks_user_commands = None
