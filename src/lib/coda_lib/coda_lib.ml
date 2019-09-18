@@ -103,48 +103,13 @@ module Snark_worker = struct
       | Ok () ->
           Logger.info logger "Snark worker process died" ~module_:__MODULE__
             ~location:__LOC__ ;
+          Ivar.fill kill_ivar () ;
           Deferred.unit
       | Error (`Exit_non_zero non_zero_error) ->
           Logger.fatal logger
             !"Snark worker process died with a nonzero error %i"
             non_zero_error ~module_:__MODULE__ ~location:__LOC__ ;
           raise (Snark_worker_error non_zero_error)
-      | Error (`Signal signal) when Signal.equal signal Signal.term ->
-          Logger.info logger
-            !"Snark worker received term signal. Expecting it to fully \
-              terminate"
-            ~module_:__MODULE__ ~location:__LOC__ ;
-          let wait_graceful_exit =
-            match%bind Process.wait snark_worker_process with
-            | Ok () ->
-                Logger.info logger
-                  !"Snark worker process fully died after receiving term \
-                    signal."
-                  ~module_:__MODULE__ ~location:__LOC__ ;
-                Ivar.fill kill_ivar () ;
-                Deferred.unit
-            | Error error -> (
-                Logger.info logger
-                  !"Snark worker process died unexpectedly after getting the \
-                    term signal. Aborting the daemon"
-                  ~module_:__MODULE__ ~location:__LOC__ ;
-                match error with
-                | `Exit_non_zero non_zero_error ->
-                    raise (Snark_worker_error non_zero_error)
-                | `Signal signal ->
-                    raise (Snark_worker_signal_interrupt signal) )
-          in
-          Deferred.any
-            [ wait_graceful_exit
-            ; (* If the snark worker process was not able to fully abort, then kill the daemon *)
-              ( after (Core.Time.Span.of_sec 20.0)
-              >>= fun () ->
-              if not @@ Deferred.is_determined wait_graceful_exit then
-                Logger.error logger
-                  !"Snark worker process didn't die gracefully in a short \
-                    amount of time"
-                  ~module_:__MODULE__ ~location:__LOC__ ;
-              Deferred.unit ) ]
       | Error (`Signal signal) ->
           Logger.info logger
             !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
