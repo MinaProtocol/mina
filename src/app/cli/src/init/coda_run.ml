@@ -314,8 +314,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
               | `Transition ->
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
                     total ) ;
-          Network_pool.Snark_pool.add_completed_work (Coda_lib.snark_pool coda)
-            work ) ]
+          Coda_lib.add_work coda work ) ]
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       trace_task "REST server" (fun () ->
