@@ -81,13 +81,13 @@ module Block = struct
     state_hash: string;
     creator: Public_key.Compressed.t; (* Can be retrieved from the staged_ledger_diffs *)
     protocol_state: Protocol_state.t;
-    status: consensus_status;
+    consensus_status: consensus_status;
     block_length: int
   }
 end
 ```
 
-The OCaml implementation of an `external_transition` is different from the presented `Block.t` type as it has the field `ledger_proof_nonce` and `status` to make it easy to compute the `transactionStatus` query, which will tell us if a transaction is snarked and its `consensus_status`. `consensus_status` for an block is variant type and is described below:
+The OCaml implementation of an `external_transition` is different from the presented `Block.t` type as it has the field `ledger_proof_nonce` and `consensus_status`. `consensus_status` for an block is a variant type and is described below:
 
 ```ocaml
 type consensus_status =
@@ -99,16 +99,15 @@ type consensus_status =
 
 Notice that `Pending [num_confirmation_blocks]` in `consensus_status` is the number of block confirmations for a block. This position has nothing to do with a block being snarked or not, so `Snarked` is not a constructor of this variant.
 
-With the blocks and `consensus_status`, we can compute the status of a transaction. The status of a transaction also depends on its membership in the transaction pool and if it was added manually.
+With the blocks and `consensus_status`, we can compute the status of a transaction.
 
-We will denote the status of a transaction as the type `transaction_status`. `transaction_status` is very similar to `consensus_status` with the additional variant of a transaction being `Scheduled`. Below is the variant of the type:
+We will denote the status of a transaction as the type `transaction_status`. `transaction_status` is very similar to `consensus_status`. Below is the variant of the type:
 
 ```ocaml
 type transaction_status =
-  | Failed (* The transaction is not in the `transaction_pool` and it has not been added_manually by the user but never gotten added to a block OR all of the transitions containing that transaction have the status Failed *)
+  | Failed (* All of the blocks containing that transaction have the status, Failed *)
   | Confirmed (* One of the blocks containing the transaction is confirmed *)
   | Pending of int (* The transaction is in the `transition_frontier` and all of transitions are in the pending state. The block confirmation number of this transaction is maximum of all block confirmation numbers of all the transitions *)
-  | Scheduled (* Transaction is added into the `transaction_pool` and has not left the pool. It's also not in the `transition_frontier`. *)
   | Unknown
 ```
 
@@ -184,7 +183,7 @@ For the objects discussed in the previous section, we can embed them as tables i
 
 ```
 Table public_keys {
-  id int [pk]
+  id serial [pk]
   value text [not null]
   Indexes {
     value [name: "public_key"]
@@ -192,7 +191,7 @@ Table public_keys {
 }
 
 Table blocks {
-  id int [pk]
+  id serial [pk]
   state_hash string [not null]
   coinbase int [not null]
   creator string [not null]
@@ -202,7 +201,7 @@ Table blocks {
   ledger_proof_nonce int [not null]
   status int [not null]
   block_length int [not null]
-  time_received bit(64) [not null]
+  block_time bit(64) [not null]
   Indexes {
     state_hash [name: "state_hash"]
     (block_length, global_slot) [name: "block_compare"]
@@ -222,7 +221,7 @@ Enum user_command_type {
 }
 
 Table user_commands {
-  id int [pk]
+  id serial [pk]
   hash string [not null, unique]
   type user_command_type [not null]
   nonce bit(64) [not null]
@@ -232,21 +231,17 @@ Table user_commands {
   fee bit(64) [not null]
   memo string [not null]
   first_seen bit(64)
-  transaction_pool_membership bool [not null]
-  is_added_manually bool [not null]
   Indexes {
     hash [name: "user_command_hash"]
     sender [name: "user_command_sender"]
     receiver [name: "user_command_receiver"]
-    (transaction_pool_membership, sender) [name: "fast_pooled_user_command_sender"]
-    (transaction_pool_membership, receiver) [name: "fast_pooled_user_command_receiver"]
     (sender, first_seen) [name: "fast_sender_pagination"]
     (receiver, first_seen) [name: "fast_receiver_pagination"]
   }
 }
 
 Table fee_transfers {
-  id int [pk]
+  id serial [pk]
   hash string [not null, unique]
   fee bit(64) [not null]
   receiver int [not null, ref: > public_keys.id]
@@ -258,7 +253,7 @@ Table fee_transfers {
 }
 
 Table receipt_chain_hashes {
-  id int [pk]
+  id serial [pk]
   hash string [not null, unique]
   previous_hash string
   user_command_id string [not null, ref: > user_commands.id]
@@ -290,7 +285,7 @@ Table block_to_fee_transfers {
 }
 
 Table snark_job {
-  id int [pk]
+  id serial [pk]
   prover int [not null]
   fee int [not null]
   job1 int // if a job is null, that it means it does not exist
@@ -300,7 +295,7 @@ Table snark_job {
 
 Table block_to_snark_job {
   block_id int [ref: > blocks.id]
-  snark_job_id bit(64) [ref: > snark_job.id]
+  snark_job_id int [ref: > snark_job.id]
   Indexes {
     block_id
     snark_job_id
@@ -317,7 +312,7 @@ Here is a link of an interactive version of the schema: https://dbdiagram.io/d/5
 
 In this RFC, we are assuming that the datastructures for all Indexes and Multi-column Indexes are btrees. So Multi-column Indexes are technically sorted in lexigraphical order.
 
-notice that `block` has the indexes `(block_length, epoch, slot)` and `time_received` for paginating blocks fast. Likewise, `user_commands` have the indexes on both (`sender`, `first_seen`) and (`receiver`, `first_seen`) to make paginating on `user_commands` fast. If we would like to order transactions based on `block_compare`, we would have to do a join on the `block_to_transaction` table and then another join on the `block` table. We could have added extra fields, such as `block_length`, `epoch` and `slot`, to the `block_to_transaction` to have less joins. However, we believe that this would making inserts more expensive and it complicates the table more.
+Notice that `block` has the indexes `(block_length, epoch, slot)` and `time_received` for paginating blocks fast. Likewise, `user_commands` have the indexes on both (`sender`, `first_seen`) and (`receiver`, `first_seen`) to make paginating on `user_commands` fast. If we would like to order transactions based on `block_compare`, we would have to do a join on the `block_to_transaction` table and then another join on the `block` table. We could have added extra fields, such as `block_length`, `epoch` and `slot`, to the `block_to_transaction` to have less joins. However, we believe that this would making inserts more expensive and it complicates the table more.
 
 ### Deleting data
 
@@ -327,13 +322,16 @@ For this general architecture (which encompaness many application, such as the s
 
 Since a node can go offline, it can miss gossipped objects. If this happens, a client would be interested in manually adding these objects into the client storage system. This storage system has the flexibility to do this.
 
-For adding arbitrary transactions, the client could simply add it to the `transactions` database with `is_manually_added=true`. We can also include the previous receipt chain hashes involving that transaction and use these components and add them to the `receipt_chain` database. The user can add arbitrary blocks along with their transactions into the `blocks_to_transactions` table, `block` and `transactions` database. When we add a block whose block length is greater than root length, the block will be added through the `transition_frontier_controller`. Namely, the block will be added to the `network_transition_writer` pipe in `Coda_networking.ml`.
+For adding arbitrary transactions, the client could add it to the `transactions` database or add it to the `transaction_pool`.
+When we add a transaction that is greater than the nonce of the sender on the best_tip of the `transition_frontier`, the daemon can process it and add it to the `transaction_pool`. Otherwise, it would be manually added to the database. When we have to manually add the transaction into the `transaction` database, we can also include the previous receipt chain hashes involving that transaction and use these components and add them to the `receipt_chain` database. The user can add arbitrary blocks along with their transactions into the `blocks_to_transactions` table, `block` and `transactions` database.
+
+When we add a block whose block length is greater than root length, the block will be added through the `transition_frontier_controller`. Namely, the block will be added to the `network_transition_writer` pipe in `Coda_networking.ml`.
 
 <a id="bootstrap"></a>
 
 ### Running Bootstrap
 
-If a client is offline for long time and they have to bootstrap, then they would not have a `transition_frontier`. Therefore, all the transitions in the `transition_frontier` would have their `consensus_status` be considered to `UNKNOWN`. Also, the transactions would not be in an `transaction_pool` anymore, so all the transaction's in `User_command.mem` would be `false`.
+If a client is offline for long time and they have to bootstrap, then they would not have a `transition_frontier`. Therefore, all the transitions in the `transition_frontier` would have their `consensus_status` be considered to `UNKNOWN`.
 
 ## Data Flow
 
@@ -345,7 +343,7 @@ Below is a diagram of how the components in this RFC will depend on each other:
 
 ### Archive Process
 
-To offload many database writes that has to be conducted by the daemon, we are going to delegate the writes to another process, which will be called the Archive Process. This means that some production versions of Coda, such as Codaslim, would not have the binary of this Archive Process. Whenever the `transition_frontier` and the `transaction_pool` makes an update, they will send the diff representing the update to the process. The archive process will receive the diffs from the daemon through GraphQL subscriptions. The diffs of the `transition_frontier` that the archive process will receive would be similar to `Transition_frontier` extension diffs. Currently, these diffs contain breadcrumbs and we cannot serialize breadcrumbs, so the diffs that clients will be receiving will be the following:
+To offload many database writes that the daemon conducts, we are going to delegate the writes to another process, which will be called the Archive Process. This means that some production versions of Coda, such as Codaslim, would not have the binary of this Archive Process. Whenever the `transition_frontier` and the `transaction_pool` makes an update, they will send the diff representing the update to the process. The archive process will receive the diffs from the daemon through GraphQL subscriptions. The diffs of the `transition_frontier` that the archive process will receive would be similar to `Transition_frontier` extension diffs. Currently, these diffs contain breadcrumbs and we cannot serialize breadcrumbs, so the diffs that clients will be receiving will be the following:
 
 ```ocaml
 module Transition_frontier_diff = struct
@@ -360,7 +358,7 @@ end
 
 Whenever a node is about to shutdown or has been offline time and is about to bootstrap, it will produce a diff containing the `state_hash` of all the blocks it has in its old `transition_frontier`. These blocks would be lost and their consensus state in the database would be labeled as UNKNOWN.
 
-The `transaction_pool` diffs will essentially have a set of transactions that got added and removed from the `transaction_pool` after an operation has been done onto it
+The `transaction_pool` diffs will essentially have a set of transactions that got added and removed from the `transaction_pool` after an operation has been done onto it.
 
 ```ocaml
 module Transaction_pool_diff = struct
@@ -368,9 +366,9 @@ module Transaction_pool_diff = struct
 end
 ```
 
-Whenever the daemon produces a new `Transition_frontier_diff`, it will batch the transactions into the buffer, `transition_frontier_diff_pipe`. The buffer will have a max size. Once the size of the buffer exceeds the max size, it will flush the diffs to the archive process. To make sure that the archive process applies the diff with a low amount of latency, the buffer will flush the diffs in a short interval (like every 5 seconds). There will be a similar buffering process for the `transaction_pool`. The `transaction_pool` diffs can be seen as a monoid and it would be trivial to concate them into one diff. This would send less memory to the archive process and ultimately reduce the amount of writes that have to hit to the databases.
+Whenever the daemon produces a new `Transition_frontier_diff`, it will batch the transactions into the buffer, `transition_frontier_diff_pipe`. The buffer will have a max size. Once the size of the buffer exceeds the max size, it will flush the diffs to the archive process. The diffs will be sent via a POST request that the archive process will receive. To make sure that the archive process applies the diff with a low amount of latency, the buffer will flush the diffs in a short interval (like every 5 seconds). There will be a similar buffering process for the `transaction_pool`. The `transaction_pool` diffs can be seen as a monoid and it would be trivial to concate them into one diff. This would send less memory to the archive process and ultimately reduce the amount of writes that have to hit to the databases.
 
-It is worth noting that the archive process writes to the databases using `Deferred.t`s. The archive process will write the diffs it receives in a sequential manner and will not context switch to another task. This will prevent any consistency issues.
+It is worth noting that the archive process writes to the databases using `Deferred.t`s. The archive process will write the diffs it receives in a sequential manner and will not context switch to another task. Additionally, it will be the only actor to make writes to the database. This will prevent any consistency issues.
 
 The archive process will then filter transactions in the `Transaction_pool_diff` and `Transition_frontier.Breadcrumb_added` based on what a client is interested in following. A client would have the flexibility to filter transactions in `Transaction_pool_diff` and `Transition_frontier.Breadcrumb_added` based on the senders and receivers that they are interested in following. The client also has the ability to filter snark jobs in blocks. The client can further filter proposers of a block.  The archive process will have this filter rule in memory as the following type:
 
@@ -392,81 +390,9 @@ type filter = {
 
 It will also compute the ids of each of these transactions, which are hashes.
 
-Below is psuedocode for persisting a transaction when the archive process receives a `Transaction_pool_diff` after it gets filtered:
+The archive process will persist a block along with its transactions whenever it receives filtered `Breadcrumb_added` diff. Additionally, it will compute the `receipt_chain_hash` of each interested `user_command` in the block using `Breadcrumb_added.sender_receipt_chains_from_parent_ledger`. This new computed `receipt_chain_hash` along with its parent `receipt_chain_hash` will be added to the `Receipt_chain_datbase`.
 
-```ocaml
-let write_transaction_with_no_commit sql txn ?first_seen_in_block ~is_manually_added ?transaction_pool_mem_status external_transition_opt =
-  match transaction_pool_mem_status with
-  | Some transaction_pool_mem_status ->
-    if Sql.mem sql['transaction'] txn then
-    Sql.update sql['transaction']
-      ~condition:(fun txn_in_database -> txn_in_database.id = txn.id)
-      ~key:"transaction_pool_membership" ~data:transaction_pool_mem_status;
-    Sql.update sql['transaction']
-      ~condition:(fun txn_in_database -> txn_in_database.id = txn.id)
-      ~key:"is_manually_added" ~data:is_manually_added
-    else
-    Sql.write sql['transaction'] txn transaction_pool_mem_status
-  | None ->
-    if not Sql.mem sql['transaction'] txn then
-      Sql.write sql['transaction']
-        txn (Option.value ~default:Unknown transaction_pool_mem_status)
-  
-  Option.iter external_transition_opt ~f:(fun {hash=state_hash; data=external_transition} ->
-    let block_length = external_transition.block_length in
-    let slot = external_transition.slot in
-    let epoch = external_transition.epoch in
-    let first_seen = Option.merge
-      (get_first_seen sql['transaction'] Transaction.hash_id(txn))
-      first_seen_in_block
-    in
-    Sql.write sql['block_to_transactions']
-      {transaction_id=Transaction.hash_id(txn); state_hash; sender= Some (txn.sender); receiver = txn.receiver; block_length = None; first_seen; block_length; slot; epoch; is_manually_added }
-  )
-
-let write_transaction sql txn ?first_seen_in_block ~is_manually_added ?transaction_pool_mem_status account_before_sending_txn =
-  write_transaction_with_no_commit sql ~first_seen_in_block ~is_manually_added ~transaction_pool_mem_status txn account_before_sending_txn None
-  Sql.commit sql
-```
-
-The archive process will persist a block along with its transactions whenever it receives filtered `Breadcrumb_added` diff. Additionally, it will compute the `receipt_chain_hash` of each interested `user_command` in the block using `Breadcrumb_added.sender_receipt_chains_from_parent_ledger`. This new computed `receipt_chain_hash` along with its parent `receipt_chain_hash` will be added to the `Receipt_chain_datbase` Below is psuedocode for persisting a block:
-
-```ocaml
-(* filtered transition only contains transitions that we are interested in following *)
-let write_block (~sender_receipt_chains_from_parent_ledger: Receipt_chain_hash.t Public_key.Compressed.Map.t) ~sql filtered_transition_with_hash previous_ledger date =
-  let {With_hash.data=filtered_transition; hash=state_hash} = filtered_transition_with_hash in
-  let transactions = Staged_ledger_diff.transactions @@  External_transition.staged_ledger_diff filtered_transition in
-  let saved_block = {
-    state_hash = State_hash.to_string state_hash;
-    creator = Staged_ledger_diff.proposer (External_transition.staged_ledger_diff)
-    status=Pending
-    ...
-  } in
-  Sql.write sql['receipt_chain'] saved_block;
-  List.iter transactions ~f:(fun transaction ->
-    (* Add receipt chain hashes*)
-    (match transaction with
-    | User_command user_command ->
-      let previous = Option.value_exn (Map.get sender_receipt_chains_from_parent_ledger transaction.sender) in
-      let receipt = Receipt.Chain.cons previous (User_command.payload transaction) in
-      Sql.write sql['receipt_chain'] {previous; user_command_id=Transaction.id transaction; receipt}
-    | _ -> ());
-    let previous_sender_account = Option.value_exn (Ledger.get_account ledger location) in
-    write_transaction_with_no_commit ~first_seen_in_block:date ~is_manually_added:false sql transaction previous_sender_account transition_with_hash
-  )
-  Sql.commit sql
-```
-
-When the archive process receives the `Root_transitioned` diff, it will mainly update the `consensus_status` of a block. Below is the psuedocode for it:
-
-```ocaml
-let update_status sql finalized_transition deleted_transitions =
-  Sql.update sql['block'] finalized_transition.hash Confirmed;
-  List.iter deleted_transitions ~f:(fun deleted_transition ->
-    Sql.update sql['block'] deleted_transition.hash Failed;
-  );
-  Sql.commit sql
-```
+When the archive process receives the `Root_transitioned` diff, it will mainly update the `consensus_status` of a block.
 
 We can also use `RPC_parallel` to ensure that the daemon will die if the archive process will die and vice versa.
 
@@ -476,15 +402,15 @@ When a client wants to make a query, it will communicate with another process, t
 
 We are confident that a large bottleneck for performance improvements in Coda would be the number of async tasks. As a result, we cannot afford to make a lot of queries to the dademon process. This means that the tasks be delegated to another process, namely the SQL server.
 
-The positive effect of having an API process is that it allows other developers to make modifications to queries without having to change the inner works of the daemon or the archive process. For example,this modification would enable users to query data using RPC serialization or Haxl rather than using GraphQL. This also gives us the opprotunity to use services such as Hasura that converts SQL schemas to Graphql schemas to make writing API commands very concise.
+The positive effect of having an API process is that it allows other developers to make modifications to queries without having to change the inner workings of the daemon or the archive process. For example, this modification would enable users to query data using RPC serialization or Haxl rather than using GraphQL. This also gives us the opprotunity to use services such as Hasura that converts SQL schemas to Graphql schemas to make writing API commands very concise.
 
 The API process will also make subscription to changes in the daemon and changes in the database. The various subscriptions will be discussed in a later part of this RFC.
 
 The following section will describe SQL queries to make complicated queries.
 
-## GraphQL commands
+## GraphQL Commands
 
-The notion document below discusses the GraphQL commands proposed in this new architecture. It succinctly discusses how it will evolve from the current GraphQL commands. It also discusses which components of the new architecture are involved in making these GraphQL queries. It also shows some sample code on complicated queries such as `transaction_status`. The advantage of this architecture is that there are no GraphQL queries that depend on both the daemon and the database simultaneously:
+The notion document below discusses the GraphQL commands proposed in this new architecture. It succinctly discusses how it will evolve from the current GraphQL commands. It also discusses which components of the new architecture are involved in making these GraphQL queries. It also shows some sample code on complicated queries such as `transaction_status`. The advantage of this architecture is that there are no GraphQL queries that depend on both the daemon and the database simultaneously:
 
 https://www.notion.so/codaprotocol/Proposed-Graphql-Commands-57a434c59bf24b649d8df7b10befa2a0
 
@@ -503,8 +429,8 @@ We can have a third-party archived node tell a client the consensus_state of the
 - The current implementation takes a lot of work and it is quite limited for a certain use case.
 - Other alternatives are discussed in the previous commits of this [RFC](https://github.com/CodaProtocol/coda/pull/2901)
 - In an ideal world where we have an infinite amount of time, we would implement our own native graph database leverage the `transition_frontier` as an in-memory cache. Namely, we would have all the blocks in the `transition_frontier` to be in the in-memory cache along with nodes that have a 1 to 2 degree of seperation
-- Can we integrate the persistence system and the archival system in some way to make queries and stores more efficient?
 - For the wallet, for every account that we are interested in, it would be nice to have `Account_state` table. For each account that we are interested in at each block, we will store its balance and nonce. This will reduce the need of having the `transaction_pool_membership` field in `User_command` because we would be able to infer the status of a transaction from the nonce of each account at the best tip.
+- We can also add an extra state in the `transaction_status` variant as `Scheduled`, which basically tells us if a transaction is in the transaction pool, but is not in any block. For this RFC, we will not be considering this state, namely because this state requires looking up both the database and the daemon's transaction pool. We would want to limit these interactions as much as possible and ultimately decrease the number of calls that we would have to make to the daemon. In previous commits, this RFC dicsusses how to compute the `Scheduled` status of a `transaction_status`. In some applications, such as the wallet, it maybe worth computing the state `Schedule`. We suspect that the computing the status for the wallet wouldn't burden the daemon too much since the user will not be tracking to many transaction. For other applications, such as a block explorer, it would be expensive.
 
 # Prior Art
 
@@ -517,3 +443,4 @@ Coinbase also uses MongoDB to store all of the data in a blockchain.
 - How can we extend this design so that a client has multiple devices (i.e. Desktop application, mobile, etc...).
 - What happens if the archive node dies, how would we appropriate deal with the diffs?
 - What happens if the database is full and writes stop? What are the appriopriate actions to do?
+- - Can we integrate the persistence system and the archival system in some way to make queries and stores more efficient?
