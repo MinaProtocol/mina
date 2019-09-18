@@ -39,7 +39,7 @@ let%test_module "transaction_status" =
     let create_pool ~frontier_broadcast_pipe =
       let incoming_diffs, _ = Linear_pipe.create () in
       let transaction_pool =
-        Transaction_pool.create ~logger ~trust_system ~incoming_diffs
+        Transaction_pool.create ~logger ~pids ~trust_system ~incoming_diffs
           ~frontier_broadcast_pipe
       in
       don't_wait_for
