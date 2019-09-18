@@ -113,6 +113,8 @@ module Time : sig
 
   val now : Controller.t -> t
 
+  val to_int64 : t -> Int64.t
+
   val to_string : t -> string
 
   val of_string_exn : string -> t

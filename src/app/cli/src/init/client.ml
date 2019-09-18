@@ -790,7 +790,7 @@ let snark_pool_list =
   Command.async ~summary:"List of snark works in the snark pool in JSON format"
     (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
          Deferred.map
-           (Graphql_client.query (Graphql_client.Snark_pool.make ()) port)
+           (Graphql_commands.query (Graphql_commands.Snark_pool.make ()) port)
            ~f:(fun response ->
              let lst =
                [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
@@ -856,10 +856,12 @@ let set_snark_worker =
     ~summary:"Set key you wish to snark work with or disable snark working"
     (Cli_lib.Background_daemon.init ~rest:true public_key_flag
        ~f:(fun port optional_public_key ->
-         let open Graphql_client in
+         let open Graphql_commands in
          let graphql =
            Set_snark_worker.make
-             ~wallet:Encoders.(optional optional_public_key ~f:public_key)
+             ~wallet:
+               Graphql_client_lib.Encoders.(
+                 optional optional_public_key ~f:public_key)
              ()
          in
          Deferred.map (query graphql port) ~f:(fun response ->
@@ -880,10 +882,12 @@ let set_snark_work_fee =
   @@ Cli_lib.Background_daemon.init ~rest:true
        Command.Param.(anon @@ ("fee" %: Cli_lib.Arg_type.txn_fee))
        ~f:(fun port fee ->
-         let open Graphql_client in
+         let open Graphql_commands in
          let graphql =
            Set_snark_work_fee.make
-             ~fee:(Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
+             ~fee:
+               ( Graphql_client_lib.Encoders.uint64
+               @@ Currency.Fee.to_uint64 fee )
              ()
          in
          Deferred.map (query graphql port) ~f:(fun response ->
@@ -984,7 +988,7 @@ let list_accounts =
   Command.async ~summary:"List all owned accounts"
     (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
          Deferred.map
-           (Graphql_client.query (Graphql_client.Get_wallet.make ()) port)
+           (Graphql_commands.query (Graphql_commands.Get_wallet.make ()) port)
            ~f:(fun response ->
              Array.iteri
                ~f:(fun i w ->

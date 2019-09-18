@@ -3,8 +3,6 @@
   (name archive)
   (public_name archive)
   (modes native)
-  (libraries core async coda_base)
-  (preprocessor_deps ../../config.mlh archive_graphql_schema.json)
-  (preprocess (pps ppx_jane graphql_ppx -- -schema archive_graphql_schema.json))
+  (libraries core async archive_lib)
+  (preprocess (pps ppx_jane))
   )
-

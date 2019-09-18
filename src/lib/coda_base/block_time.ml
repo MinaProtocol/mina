@@ -193,8 +193,9 @@ module Time = struct
     let bits = Span.Unpacked.var_to_bits var in
     Number.of_bits (bits :> Boolean.var list)
 
-  let to_string time =
-    to_span_since_epoch time |> Span.to_ms |> Int64.to_string
+  let to_int64 = Fn.compose Span.to_ms to_span_since_epoch
+
+  let to_string = Fn.compose Int64.to_string to_int64
 
   let of_string_exn string =
     Int64.of_string string |> Span.of_ms |> of_span_since_epoch

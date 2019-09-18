@@ -19,7 +19,7 @@ CREATE TABLE blocks (
   ledger_proof_nonce int NOT NULL,
   status int NOT NULL,
   block_length int NOT NULL,
-  block_time timestamp NOT NULL
+  block_time bit(64) NOT NULL
 );
 
 CREATE UNIQUE INDEX state_hash ON blocks (state_hash);
@@ -39,15 +39,15 @@ CREATE UNIQUE INDEX receipt_chain_hash_id ON receipt_chain_hashes (hash);
 
 CREATE TABLE user_commands (
   id serial PRIMARY KEY,
-  hash text,
-  type user_command_type NOT NULL,
-  nonce bigint NOT NULL,
+  hash text NOT NULL,
+  typ user_command_type NOT NULL,
+  nonce bit(32) NOT NULL,
   sender text NOT NULL,
   receiver text NOT NULL,
-  amount bigint NOT NULL,
-  fee bigint NOT NULL,
+  amount bit(64) NOT NULL,
+  fee bit(64) NOT NULL,
   memo text NOT NULL,
-  first_seen timestamp
+  first_seen bit(64)
 );
 
 CREATE UNIQUE INDEX user_command_hash ON user_commands (hash);
@@ -59,9 +59,9 @@ CREATE INDEX fast_user_command_receiver_pagination ON user_commands (receiver, f
 CREATE TABLE fee_transfers (
   id serial PRIMARY KEY,
   hash text,
-  fee bigint NOT NULL,
+  fee bit(64) NOT NULL,
   receiver text NOT NULL,
-  first_seen timestamp
+  first_seen bit(64)
 );
 
 CREATE UNIQUE INDEX fee_transfer_hash ON fee_transfers (hash);

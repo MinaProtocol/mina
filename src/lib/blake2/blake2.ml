@@ -2,11 +2,33 @@ open Core_kernel
 
 let digest_size_in_bits = 256
 
-let digest_size_in_bytes = 256 / 8
+let digest_size_in_bytes = digest_size_in_bits / 8
 
-include Digestif.Make_BLAKE2S (struct
+module T = Digestif.Make_BLAKE2S (struct
   let digest_size = digest_size_in_bytes
 end)
+
+include T
+
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t = T.t [@@deriving version {asserted; unnumbered}]
+
+      include Binable.Of_stringable (struct
+        type nonrec t = t
+
+        let of_string = of_raw_string
+
+        let to_string = to_raw_string
+      end)
+    end
+
+    include T
+  end
+
+  module Latest = V1
+end
 
 (* Little endian *)
 let bits_to_string bits =
