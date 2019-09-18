@@ -97,13 +97,17 @@ let decrypt ~(password : Bytes.t)
     ; pwdiff= mem_limit, ops_limit
     ; ciphertext } =
   if box_primitive <> Secret_box.primitive then
-    Privkey_error.corrupted_privkey
-      (Error.createf !"don't know how to handle a %s secret_box" box_primitive)
+    Error
+      (`Corrupted_privkey
+        (Error.createf
+           !"don't know how to handle a %s secret_box"
+           box_primitive))
   else if pw_primitive <> Password_hash.primitive then
-    Privkey_error.corrupted_privkey
-      (Error.createf
-         !"don't know how to handle a %s password_hash"
-         pw_primitive)
+    Error
+      (`Corrupted_privkey
+        (Error.createf
+           !"don't know how to handle a %s password_hash"
+           pw_primitive))
   else
     let nonce = Secret_box.Bytes.to_nonce nonce in
     let salt = Password_hash.Bytes.to_salt pwsalt in
@@ -112,7 +116,7 @@ let decrypt ~(password : Bytes.t)
     let key = Secret_box.derive_key diff pw salt in
     try Result.return @@ Secret_box.Bytes.secret_box_open key ciphertext nonce
     with Sodium.Verification_failure ->
-      Error Privkey_error.Incorrect_password_or_corrupted_privkey
+      Error `Incorrect_password_or_corrupted_privkey
 
 let%test_unit "successful roundtrip" =
   (* 4 trials because password hashing is slow *)

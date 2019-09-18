@@ -1015,24 +1015,17 @@ let create_account =
          let%bind password =
            Secrets.Keypair.prompt_password "Password for new account: "
          in
-         match password with
-         | Ok password_bytes ->
-             let%map response =
-               Graphql_client.query
-                 (Graphql_client.Add_wallet.make
-                    ~password:(Bytes.to_string password_bytes)
-                    ())
-                 port
-             in
-             let pk_string =
-               Public_key.Compressed.to_base58_check
-                 (response#addWallet)#public_key
-             in
-             printf "\n👝 Added new account!\nPublic key: %s\n" pk_string
-         | Error e ->
-             Deferred.return
-               (printf "❌ Error adding new account: %s"
-                  (Error.to_string_hum e)) ))
+         let%map response =
+           Graphql_client.query
+             (Graphql_client.Add_wallet.make
+                ~password:(Bytes.to_string password) ())
+             port
+         in
+         let pk_string =
+           Public_key.Compressed.to_base58_check
+             (response#addWallet)#public_key
+         in
+         printf "\n👝 Added new account!\nPublic key: %s\n" pk_string ))
 
 let unlock_account =
   let open Command.Param in
@@ -1049,7 +1042,8 @@ let unlock_account =
              Deferred.return (Public_key.Compressed.of_base58_check pk_str)
            in
            let%map password =
-             Secrets.Password.read "Password to unlock account: "
+             Deferred.map ~f:Or_error.return
+               (Secrets.Password.read "Password to unlock account: ")
            in
            (pk, password)
          in

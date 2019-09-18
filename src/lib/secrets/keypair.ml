@@ -93,7 +93,7 @@ module Terminal_stdin = struct
             match%bind read_file () with
             | Ok result ->
                 Deferred.Result.return result
-            | Error Privkey_error.Incorrect_password_or_corrupted_privkey ->
+            | Error `Incorrect_password_or_corrupted_privkey ->
                 eprintf "Wrong password! Please try again\n" ;
                 read_until_correct ()
             | Error exn ->

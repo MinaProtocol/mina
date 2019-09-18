@@ -42,8 +42,7 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
             let%bind () = Unix.chmod dn ~perm:0o700 in
             Deferred.Result.return ()
           else if not parent_exists then
-            Deferred.return
-              (Error (Privkey_error.Parent_directory_does_not_exist dn))
+            Deferred.return (Error (`Parent_directory_does_not_exist dn))
           else Deferred.Result.return () )
     with
     | Ok x ->
@@ -63,7 +62,7 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
   | Error e -> (
     match Error.to_exn e with
     | Unix.Unix_error (_, _, _) ->
-        Deferred.return (Error (Privkey_error.Cannot_open_file path))
+        Deferred.return (Error (`Cannot_open_file path))
     | e ->
         Deferred.return @@ Privkey_error.corrupted_privkey (Error.of_exn e) )
 
@@ -84,7 +83,7 @@ let write ~path ~mkdir ~(password : Bytes.t Deferred.t Lazy.t) ~plaintext =
   lift (Writer.close privkey_f)
 
 let to_corrupt_privkey =
-  Deferred.Result.map_error ~f:(fun e -> Privkey_error.Corrupted_privkey e)
+  Deferred.Result.map_error ~f:(fun e -> `Corrupted_privkey e)
 
 let read ~path ~(password : Bytes.t Deferred.t Lazy.t) =
   let open Deferred.Result.Let_syntax in
