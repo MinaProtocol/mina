@@ -19,8 +19,6 @@ let%test_module "transaction_status" =
 
     let logger = Logger.create ()
 
-    let pids = Child_processes.Termination.create_pid_set ()
-
     let trust_system = Trust_system.null ()
 
     let key_gen =
@@ -86,7 +84,7 @@ let%test_module "transaction_status" =
                    transition frontier" =
       single_async_test user_command_gen ~f:(fun user_command ->
           let%bind frontier =
-            create_root_frontier ~logger ~pids Genesis_ledger.accounts
+            create_root_frontier ~logger Genesis_ledger.accounts
           in
           let frontier_broadcast_pipe, _ =
             Broadcast_pipe.create (Some frontier)
@@ -114,7 +112,7 @@ let%test_module "transaction_status" =
       in
       single_async_test user_commands_generator ~f:(fun user_commands ->
           let%bind frontier =
-            create_root_frontier ~logger ~pids Genesis_ledger.accounts
+            create_root_frontier ~logger Genesis_ledger.accounts
           in
           let frontier_broadcast_pipe, _ =
             Broadcast_pipe.create (Some frontier)

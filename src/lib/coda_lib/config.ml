@@ -15,7 +15,6 @@ end
 type t =
   { conf_dir: string
   ; logger: Logger.t
-  ; pids: Child_processes.Termination.t
   ; trust_system: Trust_system.t
   ; monitor: Monitor.t option
   ; initial_propose_keypairs: Keypair.Set.t
