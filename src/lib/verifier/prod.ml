@@ -125,6 +125,7 @@ let create logger =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Daemon started verifier process with pid $verifier_pid"
     ~metadata:[("verifier_pid", `Int (Process.pid process |> Pid.to_int))] ;
+  Child_processes.Termination.register_process process ;
   File_system.dup_stdout process ;
   File_system.dup_stderr process ;
   connection

@@ -673,6 +673,9 @@ let daemon logger =
                        ~metadata:
                          (("exit_code", `Int exit_code) :: child_pid_metadata)
                  ) ) ;
+               (* terminate daemon if children registered *)
+               Child_processes.Termination.check_terminated_pid child_pid
+                 logger ;
                (* check for other terminated children, without waiting *)
                terminated_child_loop ()
          in
