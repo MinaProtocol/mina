@@ -219,6 +219,8 @@ struct
                 update_and_rebroadcast ()
               else `Don't_rebroadcast
         else `Don't_rebroadcast
+
+      let get_rebroadcastable _ ~is_expired:_ = []
     end
 
     include T

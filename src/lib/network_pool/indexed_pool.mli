@@ -72,7 +72,7 @@ val add_from_backtrack : t -> User_command.With_valid_signature.t -> t
 (** Check whether a command is in the pool *)
 val member : t -> User_command.With_valid_signature.t -> bool
 
-(* Get's all the user commands sent by a user with a particular public key *)
+(* Get all the user commands sent by a user with a particular public key *)
 val all_from_user :
   t -> Public_key.Compressed.t -> User_command.With_valid_signature.t list
 

@@ -28,7 +28,7 @@ end
 module type Resource_pool_diff_intf = sig
   type pool
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, to_yojson]
 
   val summary : t -> string
 
@@ -41,6 +41,16 @@ module type Resource_pool_intf = sig
   include Resource_pool_base_intf
 
   module Diff : Resource_pool_diff_intf with type pool := t
+
+  (** Locally generated items (user commands and snarks) should be periodically
+      rebroadcast, to ensure network unreliability doesn't mean they're never
+      included in a block. This function gets the locally generated items that
+      are currently rebroadcastable. [is_expired] is a function that returns
+      true if an item that was added at a given time should not be rebroadcast
+      anymore. If it does, the implementation should not return that item, and
+      remove it from the set of potentially-rebroadcastable item.
+  *)
+  val get_rebroadcastable : t -> is_expired:(Time.t -> bool) -> Diff.t list
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
