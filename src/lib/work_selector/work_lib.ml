@@ -31,14 +31,23 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
     let remove_old_assignments {jobs_seen; reassignment_wait} ~logger =
       let now = Time.now () in
-      Map.filteri jobs_seen ~f:(fun ~key:work ~data:status ->
-          if Job_status.is_old status ~now ~reassignment_wait then (
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:[("work", Seen_key.to_yojson work)]
-              "Waited too long to get work for $work. Ready to be reassigned" ;
-            Coda_metrics.(Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
-            false )
-          else true )
+      let jobs_seen =
+        Map.filteri jobs_seen ~f:(fun ~key:work ~data:status ->
+            if Job_status.is_old status ~now ~reassignment_wait then (
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("work", Seen_key.to_yojson work)]
+                "Waited too long to get work for $work. Ready to be reassigned" ;
+              Coda_metrics.(
+                Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
+              false )
+            else true )
+      in
+      {jobs_seen; reassignment_wait}
+
+    let remove t x =
+      { t with
+        jobs_seen=
+          Map.remove t.jobs_seen (One_or_two.map ~f:Work_spec.statement x) }
 
     let set t x =
       { t with
@@ -66,13 +75,13 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       ('a, 'b, 'c) Work_spec.t One_or_two.t list =
     List.filter jobs ~f:(does_not_have_better_fee ~snark_pool ~fee)
 
-  let all_works ~logger (staged_ledger : Inputs.Staged_ledger.t)
-      (state : State.t) =
-    let state = State.remove_old_assignments state ~logger in
+  let all_works (staged_ledger : Inputs.Staged_ledger.t) (state : State.t) =
     let all_jobs = Inputs.Staged_ledger.all_work_pairs_exn staged_ledger in
     let unseen_jobs =
       List.filter all_jobs ~f:(fun js ->
-          not @@ Map.mem state (One_or_two.map ~f:Work_spec.statement js) )
+          not
+          @@ Map.mem state.jobs_seen (One_or_two.map ~f:Work_spec.statement js)
+      )
     in
     unseen_jobs
 end
