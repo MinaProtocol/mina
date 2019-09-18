@@ -14,6 +14,7 @@ open Otp_lib
 module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 module Config = Config
 module Subscriptions = Coda_subscriptions
+module Snark_worker_lib = Snark_worker
 
 exception Snark_worker_error of int
 
@@ -494,6 +495,12 @@ let request_work t =
   set_seen_jobs t seen_jobs ;
   Option.map instances_opt ~f:(fun instances ->
       {Snark_work_lib.Work.Spec.instances; fee} )
+
+let add_work t (work : Snark_worker_lib.Work.Result.t) =
+  let (module Work_selection_method) = t.config.work_selection_method in
+  let spec = work.spec.instances in
+  set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
+  Network_pool.Snark_pool.add_completed_work (snark_pool t) work
 
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier

@@ -118,9 +118,10 @@ struct
       let get_completed_work stmts =
         let {Keypair.public_key; _} = Keypair.create () in
         let prover = Public_key.compress public_key in
+        let fee = Fee.of_int 1 in
         Some
           Transaction_snark_work.Checked.
-            { fee= Fee.of_int 1
+            { fee
             ; proofs=
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement

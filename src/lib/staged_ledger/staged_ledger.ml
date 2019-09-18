@@ -39,12 +39,13 @@ module T = struct
           Format.asprintf
             !"Pre_diff_info.Error error: %{sexp:Pre_diff_info.Error.t}"
             pre_diff_error
-      | Invalid_proof (p, s, prover) ->
+      | Invalid_proof (_p, s, prover) ->
           Format.asprintf
-            !"Verification failed for proof: %{sexp: Ledger_proof.t} \
-              Statement: %{sexp: Transaction_snark.Statement.t} Prover: \
-              %{sexp:Public_key.Compressed.t}\n"
-            p s prover
+            !"Verification failed for proof with statement: %{sexp: \
+              Transaction_snark.Statement.t} work_id: %i Prover:%s}\n"
+            s
+            (Transaction_snark.Statement.hash s)
+            (Yojson.Safe.to_string @@ Public_key.Compressed.to_yojson prover)
       | Insufficient_work str ->
           str
       | Unexpected e ->
@@ -62,20 +63,29 @@ module T = struct
   type job = Scan_state.Available_job.t [@@deriving sexp]
 
   let verify_proof ~logger ~verifier ~proof ~statement ~message =
+    let log_error err_str ~metadata =
+      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          ( [ ("statement", Transaction_snark.Statement.to_yojson statement)
+            ; ("error", `String err_str)
+            ; ("sok_message", Sok_message.to_yojson message) ]
+          @ metadata )
+        "Invalid transaction snark for statement $statement: $error" ;
+      Deferred.return false
+    in
     let statement_eq a b = Int.(Transaction_snark.Statement.compare a b = 0) in
     if not (statement_eq (Ledger_proof.statement proof) statement) then
-      Deferred.return false
+      log_error "Statement and proof do not match"
+        ~metadata:
+          [ ( "statement_from_proof"
+            , Transaction_snark.Statement.to_yojson
+                (Ledger_proof.statement proof) ) ]
     else
-      match%map Verifier.verify_transaction_snark verifier proof ~message with
+      match%bind Verifier.verify_transaction_snark verifier proof ~message with
       | Ok b ->
-          b
+          Deferred.return b
       | Error e ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:
-              [ ("statement", Transaction_snark.Statement.to_yojson statement)
-              ; ("error", `String (Error.to_string_hum e)) ]
-            "Invalid transaction snark for statement $statement: $error" ;
-          false
+          log_error (Error.to_string_hum e) ~metadata:[]
 
   let verify ~logger ~verifier ~message job proof prover =
     let open Deferred.Let_syntax in
@@ -1382,9 +1392,9 @@ let%test_module "test" =
         Public_key.Compressed.gen
 
     let proofs stmts : Ledger_proof.t One_or_two.t =
+      let sok_digest = Sok_message.Digest.default in
       One_or_two.map stmts ~f:(fun statement ->
-          Ledger_proof.create ~statement ~sok_digest:Sok_message.Digest.default
-            ~proof:Proof.dummy )
+          Ledger_proof.create ~statement ~sok_digest ~proof:Proof.dummy )
 
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =
@@ -1835,10 +1845,8 @@ let%test_module "test" =
           (List.find work_list ~f:(fun s ->
                Transaction_snark_work.Statement.compare s stmts = 0 ))
       then
-        Some
-          { Transaction_snark_work.Checked.fee= Fee.of_int 1
-          ; proofs= proofs stmts
-          ; prover }
+        let fee = Fee.of_int 1 in
+        Some {Transaction_snark_work.Checked.fee; proofs= proofs stmts; prover}
       else None
 
     (** Like test_simple but with a random number of completed jobs available.
