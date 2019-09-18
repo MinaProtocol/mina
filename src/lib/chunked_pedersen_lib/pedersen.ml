@@ -280,5 +280,7 @@ struct
 
   let hash_fold s fold = State.update_fold s fold
 
-  let digest_fold s fold = State.digest (hash_fold s fold)
+  let digest_fold s fold =
+    Coda_metrics.(Counter.inc_one Cryptography.total_pedersen_hashes_computed) ;
+    State.digest (hash_fold s fold)
 end
