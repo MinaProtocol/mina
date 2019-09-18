@@ -71,10 +71,11 @@ end)
           ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover) ]
 
   let summary = function
-    | Stable.V1.Add_solved_work (_, {proof= _; fee}) ->
+    | Stable.V1.Add_solved_work (work, {proof= _; fee}) ->
         Printf.sprintf
-          !"Snark_pool_diff add with fee %{sexp: Coda_base.Fee_with_prover.t}"
-          fee
+          !"Snark_pool_diff for work %s added with fee-prover %s"
+          (Yojson.Safe.to_string @@ Work.compact_json work)
+          (Yojson.Safe.to_string @@ Coda_base.Fee_with_prover.to_yojson fee)
 
   let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :
       t Or_error.t Deferred.t =
