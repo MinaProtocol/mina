@@ -135,7 +135,7 @@ let%test_module "wallets" =
   ( module struct
     let logger = Logger.create ()
 
-    let password = lazy (Deferred.Or_error.return (Bytes.of_string ""))
+    let password = lazy (Deferred.return (Bytes.of_string ""))
 
     module Set = Public_key.Compressed.Set
 

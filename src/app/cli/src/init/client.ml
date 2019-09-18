@@ -690,10 +690,7 @@ let wrap_key =
     let%bind privkey =
       Secrets.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
     in
-    let pk =
-      Private_key.of_base58_check_exn
-        (privkey |> Or_error.ok_exn |> Bytes.to_string)
-    in
+    let pk = Private_key.of_base58_check_exn (Bytes.to_string privkey) in
     let kp = Keypair.of_private_key_exn pk in
     Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path)
 
@@ -919,7 +916,7 @@ let unsafe_import =
         Secrets.Wallets.load ~logger:(Logger.create ())
           ~disk_location:wallets_disk_location
       in
-      let password = lazy (Deferred.Or_error.return (Bytes.create 0)) in
+      let password = lazy (Deferred.return (Bytes.create 0)) in
       (* Either we already are tracking it *)
       match Secrets.Wallets.check_locked wallets ~needle:pk with
       | Some _ ->
@@ -1018,24 +1015,17 @@ let create_account =
          let%bind password =
            Secrets.Keypair.prompt_password "Password for new account: "
          in
-         match password with
-         | Ok password_bytes ->
-             let%map response =
-               Graphql_client.query
-                 (Graphql_client.Add_wallet.make
-                    ~password:(Bytes.to_string password_bytes)
-                    ())
-                 port
-             in
-             let pk_string =
-               Public_key.Compressed.to_base58_check
-                 (response#addWallet)#public_key
-             in
-             printf "\n👝 Added new account!\nPublic key: %s\n" pk_string
-         | Error e ->
-             Deferred.return
-               (printf "❌ Error adding new account: %s"
-                  (Error.to_string_hum e)) ))
+         let%map response =
+           Graphql_client.query
+             (Graphql_client.Add_wallet.make
+                ~password:(Bytes.to_string password) ())
+             port
+         in
+         let pk_string =
+           Public_key.Compressed.to_base58_check
+             (response#addWallet)#public_key
+         in
+         printf "\n👝 Added new account!\nPublic key: %s\n" pk_string ))
 
 let unlock_account =
   let open Command.Param in
@@ -1052,7 +1042,8 @@ let unlock_account =
              Deferred.return (Public_key.Compressed.of_base58_check pk_str)
            in
            let%map password =
-             Secrets.Password.read "Password to unlock account: "
+             Deferred.map ~f:Or_error.return
+               (Secrets.Password.read "Password to unlock account: ")
            in
            (pk, password)
          in
