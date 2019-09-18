@@ -117,10 +117,15 @@ type t = Worker.Connection.t
 
 (* TODO: investigate why conf_dir wasn't being used *)
 let create logger =
+  let on_failure err =
+    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      "Verifier process failed with error $err"
+      ~metadata:[("err", `String (Error.to_string_hum err))] ;
+    Error.raise err
+  in
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure:Error.raise ~shutdown_on:Disconnect
-      ~connection_state_init_arg:() ()
+      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:() ()
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Daemon started verifier process with pid $verifier_pid"
