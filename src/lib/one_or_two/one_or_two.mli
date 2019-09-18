@@ -22,6 +22,8 @@ val group_sequence : 'a Sequence.t -> 'a t Sequence.t
 
 val group_list : 'a list -> 'a t list
 
+val zip : 'a t -> 'b t -> ('a * 'b) t Or_error.t
+
 val zip_exn : 'a t -> 'b t -> ('a * 'b) t
 
 val map : 'a t -> f:('a -> 'b) -> 'b t
