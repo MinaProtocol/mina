@@ -355,6 +355,17 @@ let make = () => {
        analyses."
       />
       <Member
+        name="Nacera Rodstein"
+        title="Operations Associate"
+        description="Nacera has had a career spanning startups, medium sized companies, and \
+              corporations. After earning her BS and MS from IAE in Lille, France, \
+              Nacera moved to San Francisco. Over the next decade, she worked with \
+              Bleacher Report (through growth from 10 to 60 employees and an \
+              acquisition by Turner), Mokum Solutions, Sephora, Venture Beat, AMSI, \
+              Oracle, and a software sales business which she helped start up and \
+              scale."
+      />
+      <Member
         name="Joel Krauska"
         title="Protocol Reliability Eng"
         description="Joel builds networks. He loves open source technologies, automation \
@@ -373,6 +384,15 @@ let make = () => {
        NICTA. He also worked on the initial implementation of Alacris, a \
        cryptocurrency solution layered on top of existing blockchains. He \
        holds a PhD in computer science from Northeastern University."
+      />
+      <Member
+        name="Harold Herbert"
+        title="Lead Designer"
+        description="Harold previously designed brands, products, and experiences at Hired, \
+             Flipboard, Zillow, and with a range of technology companies while \
+             running an independent design studio. He believes that all design is \
+             experience design. Regardless of the medium, the end goal is for the \
+             well-being of the user."
       />
       <Member
         name="Vanishree Rao"
@@ -439,26 +459,6 @@ let make = () => {
        accessible to people who aren't already taking advantage of them."
       />
       <Member
-        name="Nacera Rodstein"
-        title="Operations Associate"
-        description="Nacera has had a career spanning startups, medium sized companies, and \
-       corporations. After earning her BS and MS from IAE in Lille, France, \
-       Nacera moved to San Francisco. Over the next decade, she worked with \
-       Bleacher Report (through growth from 10 to 60 employees and an \
-       acquisition by Turner), Mokum Solutions, Sephora, Venture Beat, AMSI, \
-       Oracle, and a software sales business which she helped start up and \
-       scale."
-      />
-      <Member
-        name="Harold Herbert"
-        title="Lead Designer"
-        description="Harold previously designed brands, products, and experiences at Hired, \
-       Flipboard, Zillow, and with a range of technology companies while \
-       running an independent design studio. He believes that all design is \
-       experience design. Regardless of the medium, the end goal is for the \
-       well-being of the user."
-      />
-      <Member
         name="Carey Janecka"
         title="Product Engineer"
         description="Carey loves working on crazy ideas. He's designed and \
@@ -466,6 +466,31 @@ let make = () => {
         companies. Nothing gets him more excited than working on simple user \
         interfaces for complex systems. He's excited for the applications that \
         can be built on top of Coda and enabling others to build cool things."
+      />
+      <Member
+        name="Claire Kart"
+        title="Head of Marketing & Community"
+        description="Claire's career has focused on using technology to reimagine financial products \
+              and platforms and building community to increase transparency, engagement and opportunities \
+              for individuals. Prior to joining the team at O(1) Labs, she was at Ripple, where she \
+              led a number of strategic projects and served as the main liaison to the XRP community. \
+              Prior to that, Claire was an early employee at SoFi. As a member of the Marketing leadership \
+              team, she was involved in the day-to-day operations across all functions of the marketing team \
+              during four years of hyper growth, including leading their member engagement strategy. \
+              Earlier in her career, she designed and implemented a community-based micro grant \
+              program in rural India that has sponsored 300+ women from rural communities to attend \
+              university. Originally from rural Pennsylvania, Claire graduated with distinction from \
+              Dartmouth College (A.B.) and holds an MBA from the University of Texas at Austin."
+      />
+      <Member
+        name="Pranay Mohan"
+        title="Developer Relations"
+        description="Pranay is a frontiersman at heart, and joined the cryptocurrency \
+              space to play a role in the rethinking of financial systems. He is excited about \
+              changing the story of money to create a more equitable world. \
+              Pranay's interest lies in digesting complex technical concepts and delivering them to \
+              users as intuitive experiences. Prior to joining O(1) Labs, he built products at \
+              Snapchat and co-founded Software Engineering Daily."
       />
       <Member
         name="Conner Swann"
@@ -480,7 +505,7 @@ let make = () => {
           Northern Arizona University."
       />
       <Member
-        name={js|Emre Tekişalp|js}
+        name={js|Emre Tekişalp \u015F|js}
         title="Head of Business Development"
         description="Emre's career has focused on bringing new economic \
         opportunities to societies using the power of technology. Before O(1) \
@@ -490,32 +515,7 @@ let make = () => {
         devices group. Originally from Istanbul, Turkey, Emre has an MBA degree \
         from Columbia University."
       />
-      <Member 
-        name="Pranay Mohan"
-        title="Developer Relations"
-        description="Pranay is a frontiersman at heart, and joined the cryptocurrency \
-        space to play a role in the rethinking of financial systems. He is excited about \
-        changing the story of money to create a more equitable world with prosperity for all. \
-        Pranay’s interest lies in digesting complex technical concepts and delivering them to \
-        users as intuitive experiences. Prior to joining O(1) Labs, he built products at \
-        Snapchat and co-founded Software Engineering Daily."
-      />
-      <Member 
-        name="Claire Kart"
-        title="Head of Marketing & Community"
-        description="Claire’s career has focused on using technology to reimagine financial products \
-        and platforms and building community to increase transparency, engagement and opportunities \
-        for individuals. Prior to joining the team at O(1) Labs, she was at Ripple, where she \
-        led a number of strategic projects and served as the main liaison to the XRP community. \
-        Prior to that, Claire was an early employee at SoFi. As a member of the Marketing leadership \
-        team, she was involved in the day-to-day operations across all functions of the marketing team \
-        during four years of hyper growth, including leading their member engagement strategy. \
-        Earlier in her career, she designed and implemented a community-based micro grant \
-        program in rural India that has sponsored 300+ women from rural communities to attend \
-        university. Originally from rural Pennsylvania, Claire graduated with distinction from \
-        Dartmouth College (A.B.) and holds an MBA from the University of Texas at Austin."
-      />
-      <Member 
+      <Member
         name="Christine Yip"
         title="Community Manager"
         description="Christine is an early contributor in the community with broad \
@@ -525,7 +525,7 @@ let make = () => {
         using blockchain technology. She supports the community and Coda by combining their \
         efforts in achieving a decentralized future."
       />
-      <Member 
+      <Member
         name="Michelle Wong"
         title="Product Engineer"
         description="Michelle believes that great products are built upon \
