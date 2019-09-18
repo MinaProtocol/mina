@@ -699,7 +699,7 @@ let create (config : Config.t) =
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~logger:config.logger
-              ~trust_system:config.trust_system
+              ~pids:config.pids ~trust_system:config.trust_system
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
@@ -798,7 +798,7 @@ let create (config : Config.t) =
                  () )) ;
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~logger:config.logger
-              ~trust_system:config.trust_system
+              ~pids:config.pids ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
