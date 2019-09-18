@@ -298,6 +298,6 @@ let prove t ~prev_state ~prev_state_proof ~next_state
       pending_coinbase
   in
   Coda_metrics.(
-    Gauge.set Proving_time.blockchain_proving_time_ms
+    Gauge.set Cryptography.blockchain_proving_time_ms
       (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
   proof
