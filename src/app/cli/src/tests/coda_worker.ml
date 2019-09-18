@@ -397,6 +397,7 @@ module T = struct
             ; ("port", `Int addrs_and_ports.communication_port) ]
           ()
       in
+      let pids = Child_processes.Termination.create_pid_set () in
       let%bind () =
         Option.value_map trace_dir
           ~f:(fun d ->
@@ -491,7 +492,8 @@ module T = struct
           in
           let coda_deferred () =
             Coda_lib.create
-              (Coda_lib.Config.make ~logger ~trust_system ~conf_dir ~net_config
+              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+                 ~net_config
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)

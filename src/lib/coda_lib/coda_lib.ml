@@ -569,8 +569,12 @@ let create (config : Config.t) =
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace_task "coda" (fun () ->
-          let%bind prover = Prover.create () in
-          let%bind verifier = Verifier.create () in
+          let%bind prover =
+            Prover.create ~logger:config.logger ~pids:config.pids
+          in
+          let%bind verifier =
+            Verifier.create ~logger:config.logger ~pids:config.pids
+          in
           let snark_worker =
             Option.value_map
               config.snark_worker_config.initial_snark_worker_key
@@ -670,7 +674,7 @@ let create (config : Config.t) =
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~logger:config.logger
-              ~trust_system:config.trust_system
+              ~pids:config.pids ~trust_system:config.trust_system
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
@@ -769,7 +773,7 @@ let create (config : Config.t) =
                  () )) ;
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~logger:config.logger
-              ~trust_system:config.trust_system
+              ~pids:config.pids ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r

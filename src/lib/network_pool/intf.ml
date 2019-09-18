@@ -15,6 +15,7 @@ module type Resource_pool_base_intf = sig
 
   val create :
        logger:Logger.t
+    -> pids:Child_processes.Termination.t
     -> trust_system:Trust_system.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
@@ -62,6 +63,7 @@ module type Network_pool_base_intf = sig
 
   val create :
        logger:Logger.t
+    -> pids:Child_processes.Termination.t
     -> trust_system:Trust_system.t
     -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
                       Linear_pipe.Reader.t
@@ -102,7 +104,11 @@ module type Snark_resource_pool_intf = sig
   type serializable [@@deriving bin_io]
 
   val of_serializable :
-    serializable -> logger:Logger.t -> trust_system:Trust_system.t -> t
+       serializable
+    -> logger:Logger.t
+    -> pids:Child_processes.Termination.t
+    -> trust_system:Trust_system.t
+    -> t
 
   val add_snark :
        t
