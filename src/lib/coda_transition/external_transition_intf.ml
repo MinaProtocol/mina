@@ -215,6 +215,13 @@ module type S = sig
     type t =
       (external_transition, State_hash.t) With_hash.t * Validation.fully_valid
 
+    val erase :
+         t
+      -> ( Stable.Latest.t
+         , State_hash.Stable.Latest.t )
+         With_hash.Stable.Latest.t
+         * State_hash.Stable.Latest.t Non_empty_list.Stable.Latest.t
+
     val create_unsafe :
       external_transition -> [`I_swear_this_is_safe_see_my_comment of t]
 

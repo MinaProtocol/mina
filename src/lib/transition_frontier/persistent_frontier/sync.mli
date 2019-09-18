@@ -1,17 +1,14 @@
 open Async_kernel
+open Frontier_base
 
-module Make (Inputs : Intf.Inputs_with_db_intf) : sig
-  open Inputs
+type t
 
-  type t
+val create : logger:Logger.t -> base_hash:Frontier_hash.t -> db:Database.t -> t
 
-  val create : logger:Logger.t -> base_hash:Frontier.Hash.t -> db:Db.t -> t
+val notify :
+     t
+  -> diffs:Diff.Lite.E.t list
+  -> hash_transition:Frontier_hash.transition
+  -> unit
 
-  val notify :
-       t
-    -> diffs:Frontier.Diff.Lite.E.t list
-    -> hash_transition:Frontier.Hash.transition
-    -> unit
-
-  val close : t -> unit Deferred.t
-end
+val close : t -> unit Deferred.t

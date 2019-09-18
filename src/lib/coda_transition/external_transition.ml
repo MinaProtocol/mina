@@ -634,6 +634,7 @@ module Validated = struct
     , proposer
     , user_commands
     , payments
+    , erase
     , to_yojson )]
 
   include Comparable.Make (Stable.Latest)
