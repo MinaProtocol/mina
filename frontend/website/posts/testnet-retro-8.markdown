@@ -33,7 +33,7 @@ Users were very active during the golden hours, as evident by the metrics:
 
 While this figure is unimpressive in absolute standards, even when compared to Bitcoin's 7 TPS, this was a success given the conservative parameters we started the system with. As we progress out of beta phase of the testnet, we plan to slowly ramp up to double digit TPS, and then work our way to throughput that would truly allow for decentralization at scale.
 
-## Bugs to the rescue
+**Bugs to the rescue**
 
 So what happened this week that was unanticipated? Well, everything started great — the "Golden Hour" testnet launched on Tuesday afternoon, and had the first test of transactions and SNARK volume that evening at 9pm PST. Everything seemed to go fine, and transactions were making it into blocks. However, after the 9am golden hour the next day, blocks stopped being produced, and as a result, transactions were stalling. This issue persisted through the next two golden hours, disrupting users' ability to send transactions. At this point, we were already in debug mode, but were not able to identify the issue yet. The saving grace came when a block producer crashed due to another unrelated error, and upon reboot started producing blocks again! When we restarted all the O(1) Labs block producers, we noticed the same thing.
 
