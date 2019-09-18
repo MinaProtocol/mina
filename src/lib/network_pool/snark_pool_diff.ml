@@ -88,11 +88,19 @@ end)
           Ok data
     in
     match data with
-    | Stable.V1.Add_solved_work (work, p) ->
+    | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) ->
         let%bind () =
-          Pool.verify_and_act pool ~work:(work, p)
-            ~sender:(Envelope.Incoming.sender t)
+          let check () =
+            Pool.verify_and_act pool ~work:(work, p)
+              ~sender:(Envelope.Incoming.sender t)
+          in
+          match Pool.request_proof pool work with
+          | None ->
+              check ()
+          | Some {fee= {fee= prev; _}; _} ->
+              if Currency.Fee.( < ) prev fee.fee then
+                Deferred.Or_error.return ()
+              else check ()
         in
-        let {Priced_proof.proof; fee} = p in
         Pool.add_snark pool ~work ~proof ~fee |> to_or_error |> Deferred.return
 end
