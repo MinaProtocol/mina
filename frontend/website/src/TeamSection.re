@@ -468,7 +468,7 @@ let make = () => {
         can be built on top of Coda and enabling others to build cool things."
       />
       <Member
-        name="Connor Swann"
+        name="Conner Swann"
         title="Protocol Reliability Eng"
         description="Conner is an infrastructure enthusiast with extensive \
           experience operating distributed systems at scale. His journey \
@@ -489,6 +489,49 @@ let make = () => {
         grew 10x. Before Coinbase, Emre was a Product Manager at Intel's wearable \
         devices group. Originally from Istanbul, Turkey, Emre has an MBA degree \
         from Columbia University."
+      />
+      <Member 
+        name="Pranay Mohan"
+        title="Developer Relations"
+        description="Pranay is a frontiersman at heart, and joined the cryptocurrency \
+        space to play a role in the rethinking of financial systems. He is excited about \
+        changing the story of money to create a more equitable world with prosperity for all. \
+        Pranay’s interest lies in digesting complex technical concepts and delivering them to \
+        users as intuitive experiences. Prior to joining O(1) Labs, he built products at \
+        Snapchat and co-founded Software Engineering Daily."
+      />
+      <Member 
+        name="Claire Kart"
+        title="Head of Marketing & Community"
+        description="Claire’s career has focused on using technology to reimagine financial products \
+        and platforms and building community to increase transparency, engagement and opportunities \
+        for individuals. Prior to joining the team at O(1) Labs, she was at Ripple, where she \
+        led a number of strategic projects and served as the main liaison to the XRP community. \
+        Prior to that, Claire was an early employee at SoFi. As a member of the Marketing leadership \
+        team, she was involved in the day-to-day operations across all functions of the marketing team \
+        during four years of hyper growth, including leading their member engagement strategy. \
+        Earlier in her career, she designed and implemented a community-based micro grant \
+        program in rural India that has sponsored 300+ women from rural communities to attend \
+        university. Originally from rural Pennsylvania, Claire graduated with distinction from \
+        Dartmouth College (A.B.) and holds an MBA from the University of Texas at Austin."
+      />
+      <Member 
+        name="Christine Yip"
+        title="Community Manager"
+        description="Christine is an early contributor in the community with broad \
+        experience in multidisciplinary engineering teams. She previously worked for \
+        global firms in the US, The Netherlands, Czech Republic, and Hong Kong. \
+        She believes that we can take more ownership of our lives than ever before by \
+        using blockchain technology. She supports the community and Coda by combining their \
+        efforts in achieving a decentralized future."
+      />
+      <Member 
+        name="Michelle Wong"
+        title="Product Engineer"
+        description="Michelle believes that great products are built upon \
+        empathy for the user and iterative processes. She recently graduated \
+        from Smith College with a BA in Computer Science and is excited about \
+        developing products that contribute to the evolution of decentralized technology. "
       />
     </Section>
     <Section name="Advisors">
