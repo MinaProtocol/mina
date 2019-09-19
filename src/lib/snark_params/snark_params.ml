@@ -804,21 +804,3 @@ module Group_map = struct
         ~params:Tock_backend.bg_params
   end
 end
-(*
-let%bench_fun "pedersen" =
-  let open Tick in
-  let x = Field.random () |> Field.unpack in
-  fun () ->
-    Pedersen.digest_fold (Pedersen.State.create ())
-      Fold_lib.Fold.(group3 ~default:false (of_list x))
-
-let%bench_fun "rescue" =
-  let open Tick in
-  let x = Field.random () in
-  fun () -> Sponge.hash [|x|]
-
-let%bench_fun "poseidon" =
-  let open Tick in
-  let x = Field.random () in
-  fun () -> Sponge.Poseidon.hash Sponge.params [|x|]
-*)
