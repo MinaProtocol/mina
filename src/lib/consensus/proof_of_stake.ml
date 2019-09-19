@@ -2053,6 +2053,8 @@ module Data = struct
     let curr_epoch = curr_ Global_slot.epoch
 
     let curr_slot = curr_ Global_slot.slot
+
+    let global_slot (t : Value.t) = Global_slot.to_int t.curr_global_slot
   end
 
   module Prover_state = struct
