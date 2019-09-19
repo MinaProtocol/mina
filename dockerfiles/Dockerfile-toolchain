@@ -37,10 +37,17 @@ RUN sudo git clone https://github.com/facebook/rocksdb -b v5.17.2 /rocksdb
 # This builds and installs just the static lib for us
 RUN cd /rocksdb && sudo make static_lib PORTABLE=1 -j$(nproc) && sudo cp librocksdb.a /usr/local/lib/librocksdb_coda.a && sudo rm -rf /rocksdb && sudo strip -S /usr/local/lib/librocksdb_coda.a
 
+# Use OCaml spacetime build
+RUN opam switch create 4.07.1+spacetime
+RUN eval $(opam env)
+
 # Opam dependencies
 # Pull freshest repository
 RUN git -C /home/opam/opam-repository pull
 RUN opam update -y && opam upgrade -y
+
+# Hack to enable building CamlP4
+RUN ulimit -s unlimited
 
 # Install other OPAM packages
 ADD /src/opam.export .
@@ -82,3 +89,6 @@ RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
 # easier.
 RUN sudo ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+
+# Hack for future shells
+RUN echo ulimit -s unlimited >> ~/.bashrc
