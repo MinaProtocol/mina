@@ -11,7 +11,7 @@ CREATE TABLE public_keys (
 CREATE TABLE blocks (
   id serial PRIMARY KEY,
   state_hash text,
-  creator text NOT NULL,
+  creator int NOT NULL,
   staged_ledger_hash text NOT NULL,
   ledger_hash text NOT NULL,
   epoch int NOT NULL,
@@ -19,7 +19,8 @@ CREATE TABLE blocks (
   ledger_proof_nonce int NOT NULL,
   status int NOT NULL,
   block_length int NOT NULL,
-  block_time bit(64) NOT NULL
+  block_time bit(64) NOT NULL,
+  FOREIGN KEY (creator) REFERENCES public_keys (id)
 );
 
 CREATE UNIQUE INDEX state_hash ON blocks (state_hash);
@@ -42,12 +43,14 @@ CREATE TABLE user_commands (
   hash text NOT NULL,
   typ user_command_type NOT NULL,
   nonce bit(32) NOT NULL,
-  sender text NOT NULL,
-  receiver text NOT NULL,
+  sender int NOT NULL,
+  receiver int NOT NULL,
   amount bit(64) NOT NULL,
   fee bit(64) NOT NULL,
   memo text NOT NULL,
-  first_seen bit(64)
+  first_seen bit(64),
+  FOREIGN KEY (sender) REFERENCES public_keys (id),
+  FOREIGN KEY (receiver) REFERENCES public_keys (id)
 );
 
 CREATE UNIQUE INDEX user_command_hash ON user_commands (hash);
@@ -60,8 +63,9 @@ CREATE TABLE fee_transfers (
   id serial PRIMARY KEY,
   hash text,
   fee bit(64) NOT NULL,
-  receiver text NOT NULL,
-  first_seen bit(64)
+  receiver int NOT NULL,
+  first_seen bit(64),
+  FOREIGN KEY (receiver) REFERENCES public_keys (id)
 );
 
 CREATE UNIQUE INDEX fee_transfer_hash ON fee_transfers (hash);

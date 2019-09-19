@@ -98,7 +98,8 @@ query IntrospectionQuery {
 def print_schema(port, uri):
     conn = http.client.HTTPConnection("localhost", port)
     headers = {"Content-type": "application/json; charset=uft",
-               "Accept": "text/plain"}
+               "Accept": "text/plain",
+               "X-Hasura-Role": "user"}
 
     json_body = {
       'query': introspection_query,

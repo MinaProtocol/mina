@@ -9,7 +9,17 @@ module Transaction_pool_get_existing =
             first_seen
         }
     }
-    
+|}]
+
+module Public_keys_get_existing =
+[%graphql
+{|
+    query get_existing ($public_keys: [String!]!) {
+        public_keys(where: {hash: {_in: $public_keys}} ) {
+            id
+            value
+        }
+    }
 |}]
 
 module Transaction_pool_insert =
@@ -20,7 +30,6 @@ mutation transaction_insert(
 ) {
   insert_user_commands(objects: $user_commands,
   on_conflict: {constraint: user_commands_pkey, update_columns: first_seen}
-  
   ) {
     returning {
       hash

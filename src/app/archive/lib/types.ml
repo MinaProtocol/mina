@@ -1,6 +1,5 @@
 open Core
 open Coda_base
-open Signature_lib
 
 (** Library used to encode and decode types to a graphql format. 
     
@@ -68,19 +67,37 @@ module User_command_type = struct
         `String "delegation"
 end
 
+module Public_key = struct
+  type postgres = {value: string}
+
+  let to_graphql_obj public_key =
+    object
+      method value = Some public_key
+
+      method user_commands = None
+
+      method userCommandsByReceiver = None
+
+      method fee_transfers = None
+
+      method blocks = None
+    end
+end
+
 module User_command = struct
   type postgres =
     { fee: Bitstring.t
     ; hash: string
     ; memo: string
     ; nonce: Bitstring.t
-    ; receiver: string
-    ; sender: string
+    ; receiver: int
+    ; sender: int
     ; typ: [`Payment | `Delegation]
     ; amount: Bitstring.t
     ; first_seen: Bitstring.t option }
 
-  let serialize {With_hash.data= user_command; hash} first_seen =
+  let serialize {With_hash.data= user_command; hash} (`Receiver receiver_id)
+      (`Sender sender_id) first_seen =
     let payload = User_command.payload user_command in
     let body = payload.body in
     let open Bitstring in
@@ -101,23 +118,22 @@ module User_command = struct
     ; nonce=
         to_bitstring (module Coda_numbers.Account_nonce)
         @@ User_command_payload.nonce payload
-    ; sender=
-        Public_key.Compressed.to_base58_check @@ Public_key.compress
-        @@ user_command.sender
-    ; receiver=
-        ( Public_key.Compressed.to_base58_check
-        @@
-        match payload.body with
-        | Payment payment ->
-            payment.receiver
-        | Stake_delegation (Set_delegate delegation) ->
-            delegation.new_delegate )
+    ; sender= sender_id
+    ; receiver= receiver_id
     ; typ=
         ( match body with
         | Payment _ ->
             `Payment
         | Stake_delegation _ ->
             `Delegation ) }
+
+  let public_key_obj_rel_insert_input = failwith "Need to implement"
+
+  (* let public_keys_on_conflict = object
+    method constraint_ = `String "public_keys_pkey"
+
+
+  end *)
 
   let to_graphql_obj
       {fee; hash; memo; nonce; receiver; sender; typ; amount; first_seen} =
@@ -137,6 +153,8 @@ module User_command = struct
 
       method nonce = some @@ Bitstring.to_yojson nonce
 
+      method public_key = failwith "Need to implement"
+
       method sender = some sender
 
       method receiver = some receiver
@@ -144,10 +162,12 @@ module User_command = struct
       method typ = some @@ User_command_type.encode typ
     end
 
-  let encode user_command block_time =
+  let encode ~receiver ~sender user_command block_time =
     let user_command_with_hash =
       With_hash.of_data user_command
         ~hash_data:Transaction_hash.hash_user_command
     in
-    to_graphql_obj @@ serialize user_command_with_hash (Some block_time)
+    to_graphql_obj
+    @@ serialize user_command_with_hash (`Receiver receiver) (`Sender sender)
+         (Some block_time)
 end
