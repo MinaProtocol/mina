@@ -14,6 +14,8 @@ module type Operations = sig
   val add_block : state:Field.t array -> Field.t array -> unit
 
   val apply_matrix : Field.t array array -> Field.t array -> Field.t array
+
+  val copy : Field.t array -> Field.t array
 end
 
 module Inputs = struct
@@ -36,6 +38,8 @@ module type Permutation = sig
   module Field : Field
 
   val add_block : state:Field.t array -> Field.t array -> unit
+
+  val copy : Field.t array -> Field.t array
 
   val block_cipher : Field.t Params.t -> Field.t array -> Field.t array
 end

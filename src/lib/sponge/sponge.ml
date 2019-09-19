@@ -15,6 +15,8 @@ module Make_operations (Field : Intf.Field) = struct
       Array.reduce_exn (Array.map2_exn v row ~f:Field.( * )) ~f:Field.( + )
     in
     Array.map matrix ~f:dotv
+
+  let copy = Array.copy
 end
 
 let m = 3
@@ -47,10 +49,8 @@ should be higher for smaller alpha.
   let rounds = 11
 
   open Inputs
-  open Operations
+  include Operations
   module Field = Field
-
-  let add_block = add_block
 
   let sbox0, sbox1 = (alphath_root, to_the_alpha)
 
@@ -66,10 +66,8 @@ end
 
 module Poseidon (Inputs : Intf.Inputs.Common) = struct
   open Inputs
-  open Operations
+  include Operations
   module Field = Field
-
-  let add_block = add_block
 
   let rounds_full = 8
 
@@ -122,7 +120,7 @@ module Make (P : Intf.Permutation) = struct
   let r = m - 1
 
   let update params ~state inputs =
-    let state = Array.map state ~f:Field.(( + ) zero) in
+    let state = copy state in
     sponge (block_cipher params) (to_blocks r inputs) ~state
 
   let digest state = state.(0)

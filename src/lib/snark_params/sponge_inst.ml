@@ -33,6 +33,9 @@ module Inputs = struct
       Array.iteri block ~f:(fun i b ->
           let open Field in
           state.(i) += b )
+
+    (* TODO: Have an explicit function for making a copy of a field element. *)
+    let copy a = Array.map a ~f:(fun x -> Field.(x + zero))
   end
 
   let alphath_root =
