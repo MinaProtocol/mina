@@ -300,7 +300,7 @@ let make = () => {
       />
       <Member
         name="Brandon Kase"
-        title="Protocol Engineer"
+        title="Head of Product Engineering"
         description="Brandon Kase loves functional programming. He was first introduced to \
        it while pursuing his BS in computer science at Carnegie Mellon. He \
        has worked as a software engineer for Highlight (acquired by \
@@ -470,17 +470,17 @@ let make = () => {
       <Member
         name="Claire Kart"
         title="Head of Marketing & Community"
-        description="Claire's career has focused on using technology to reimagine financial products \
-              and platforms and building community to increase transparency, engagement and opportunities \
-              for individuals. Prior to joining the team at O(1) Labs, she was at Ripple, where she \
-              led a number of strategic projects and served as the main liaison to the XRP community. \
-              Prior to that, Claire was an early employee at SoFi. As a member of the Marketing leadership \
-              team, she was involved in the day-to-day operations across all functions of the marketing team \
-              during four years of hyper growth, including leading their member engagement strategy. \
-              Earlier in her career, she designed and implemented a community-based micro grant \
-              program in rural India that has sponsored 300+ women from rural communities to attend \
-              university. Originally from rural Pennsylvania, Claire graduated with distinction from \
-              Dartmouth College (A.B.) and holds an MBA from the University of Texas at Austin."
+        description="Claire's career has focused on using technology to reimagine financial \
+        services and building community to increase engagement and opportunities for individuals. \
+        Prior to joining the team at O(1) Labs, she was at Ripple, where she led a number of \
+        strategic projects and served as the main liaison to the XRP community. Prior to that, \
+        Claire was an early employee at SoFi, were she was involved in the day-to-day operations \
+        across all functions of the marketing team during four years of hyper growth, including \
+        leading their member engagement strategy. Earlier in her career, she designed and \
+        implemented a community-based micro grant program in rural India that has sponsored \
+        300+ women to attend university. Originally from rural Pennsylvania, Claire graduated \
+        with distinction from Dartmouth College (A.B.) and holds an MBA from the University \
+        of Texas at Austin."
       />
       <Member
         name="Pranay Mohan"
