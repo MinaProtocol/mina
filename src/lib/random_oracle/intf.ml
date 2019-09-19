@@ -21,7 +21,7 @@ module type S = sig
 
   val digest : field State.t -> Digest.t
 
-  val params : field Rescue.Params.t
+  val params : field Sponge.Params.t
 
   val hash : ?init:field_constant State.t -> field array -> Digest.t
 
