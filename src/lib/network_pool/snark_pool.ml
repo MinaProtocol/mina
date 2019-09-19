@@ -380,26 +380,33 @@ let%test_module "random set test" =
     let%test_unit "Invalid proofs are not accepted" =
       let open Quickcheck.Generator.Let_syntax in
       let invalid_work_gen =
-        let gen_entry =
-          Quickcheck.Generator.tuple2
-            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
+        let gen =
+          let gen_entry =
+            Quickcheck.Generator.tuple3
+              Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
+              Signature_lib.Public_key.Compressed.gen
+          in
+          let%map solved_work = Quickcheck.Generator.list gen_entry in
+          List.fold ~init:[] solved_work
+            ~f:(fun acc (work, fee, some_other_pk) ->
+              (*Making it invalid by forging*)
+              let invalid_sok_digest =
+                Sok_message.(
+                  digest @@ create ~prover:some_other_pk ~fee:fee.fee)
+              in
+              ( work
+              , One_or_two.map work ~f:(fun statement ->
+                    Ledger_proof.create ~statement
+                      ~sok_digest:invalid_sok_digest ~proof:Proof.dummy )
+              , fee
+              , some_other_pk )
+              :: acc )
         in
-        let%map solved_work = Quickcheck.Generator.list gen_entry in
-        List.map solved_work ~f:(fun (work, fee) ->
-            (*Invalid because of the invalid sok in the proof here against the
-            one created using the correct prover and fee when verifying the
-            proof*)
-            let invalid_sok_digest =
-              Sok_message.(
-                digest
-                @@ create ~prover:Signature_lib.Public_key.Compressed.empty
-                     ~fee:fee.fee)
-            in
-            ( work
-            , One_or_two.map work ~f:(fun statement ->
-                  Ledger_proof.create ~statement ~sok_digest:invalid_sok_digest
-                    ~proof:Proof.dummy )
-            , fee ) )
+        Quickcheck.Generator.filter gen ~f:(fun ls ->
+            List.for_all ls ~f:(fun (_, _, fee, mal_pk) ->
+                not
+                @@ Signature_lib.Public_key.Compressed.equal mal_pk fee.prover
+            ) )
       in
       Quickcheck.test
         ~sexp_of:
@@ -407,7 +414,8 @@ let%test_module "random set test" =
             Mock_snark_pool.Resource_pool.t
             * ( Transaction_snark_work.Statement.t
               * Ledger_proof.t One_or_two.t
-              * Fee_with_prover.t )
+              * Fee_with_prover.t
+              * Signature_lib.Public_key.Compressed.t )
               list] (Quickcheck.Generator.tuple2 gen invalid_work_gen)
         ~f:(fun (t, invalid_work_lst) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -417,7 +425,7 @@ let%test_module "random set test" =
               in
               let%map () =
                 Deferred.List.iter invalid_work_lst
-                  ~f:(fun (statements, proofs, fee) ->
+                  ~f:(fun (statements, proofs, fee, _) ->
                     let%map res =
                       apply_diff t statements ~proof:(fun _ -> proofs) fee
                     in

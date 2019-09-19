@@ -90,7 +90,7 @@ end)
     match data with
     | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (
         let check_and_add () =
-          let%bind _ =
+          let%bind () =
             Pool.verify_and_act pool ~work:(work, p)
               ~sender:(Envelope.Incoming.sender t)
           in
