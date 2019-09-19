@@ -110,21 +110,30 @@ let modalButtons = (unvalidated, setModalState, onSubmit) => {
   </div>;
 };
 
+module WalletLocked = [%graphql
+  {|
+    query ($publicKey: PublicKey!)  {
+      wallet(publicKey: $publicKey) {
+        locked
+      }
+    }
+  |}
+];
+
+module WalletQuery = ReasonApollo.CreateQuery(WalletLocked);
+
 [@react.component]
 let make = (~wallets, ~onSubmit) => {
   let (sendState, setModalState) = React.useState(_ => None);
   let activeWallet = Hooks.useActiveWallet();
-  
-  // Check if active wallet is locked 
-  
   let spacer = <Spacer height=0.5 />;
   ModalState.Unvalidated.(
     <>
       <Button
         label="Send"
         onClick={_ => setModalState(_ => Some(emptyModal(activeWallet)))}
-        icon=Icon.Lock >
-      </Button>
+        icon=Icon.Lock
+      />
       {switch (sendState) {
        | None => React.null
        | Some(
@@ -138,6 +147,7 @@ let make = (~wallets, ~onSubmit) => {
               | Some(err) => <Alert kind=`Danger message=err />
               }}
              spacer
+             // Disable dropdown, only show active Wallet
              <Dropdown
                label="From"
                value=fromStr
@@ -212,6 +222,7 @@ let make = (~wallets, ~onSubmit) => {
                 />
               }}
              <Spacer height=1.0 />
+             //Disable Modal button if no active wallet
              {modalButtons(fullState, setModalState, onSubmit)}
            </div>
          </Modal>

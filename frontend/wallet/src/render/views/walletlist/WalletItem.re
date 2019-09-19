@@ -49,7 +49,7 @@ let make = (~wallet: Wallet.t) => {
       PublicKey.equal(activeWallet, wallet.publicKey)
     )
     |> Option.withDefault(~default=false);
-  let (modalState, setModalState) = React.useState(() => None);
+  let (modalOpen, setModalState) = React.useState(() => false);
   <div
     className={
       switch (isActive) {
@@ -62,20 +62,18 @@ let make = (~wallet: Wallet.t) => {
       //   "/wallet/" ++ PublicKey.uriEncode(wallet.publicKey),
       // )
       ()}>
-    <div className=Styles.balance onClick={_ => setModalState(_ => Some(""))}>
+    <div className=Styles.balance onClick={_ => setModalState(_ => true)}>
       <WalletName pubkey={wallet.publicKey} />
       {ReasonReact.string(
          {js|■ |js} ++ Int64.to_string(wallet.balance##total),
        )}
     </div>
-    {switch (modalState) {
-     | None => React.null
-     | Some(password) =>
+    {switch (modalOpen) {
+     | false => React.null
+     | true =>
        <UnlockModal
-         password
-         setModalState
          wallet={wallet.publicKey}
-         onSubmit={_ => setModalState(_ => None)}
+         onClose={() => setModalState(_ => false)}
        />
      }}
   </div>;
