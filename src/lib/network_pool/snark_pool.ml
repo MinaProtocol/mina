@@ -209,22 +209,15 @@ struct
               true )
 
       let add_snark t ~work ~(proof : Ledger_proof.t One_or_two.t) ~fee =
-        if work_is_referenced t work then
-          let update_and_rebroadcast () =
-            Hashtbl.set t.snark_table ~key:work ~data:{proof; fee} ;
-            (*when snark work added to the pool*)
-            Coda_metrics.(
-              Gauge.set Snark_work.snark_pool_size
-                (Float.of_int @@ Hashtbl.length t.snark_table)) ;
-            `Rebroadcast
-          in
-          match Statement_table.find t.snark_table work with
-          | None ->
-              update_and_rebroadcast ()
-          | Some prev ->
-              if Currency.Fee.( < ) fee.fee prev.fee.fee then
-                update_and_rebroadcast ()
-              else `Don't_rebroadcast
+        if work_is_referenced t work then (
+          (*Note: fee against existing proofs and the new proofs are checked in
+          Diff.apply which calls this function*)
+          Hashtbl.set t.snark_table ~key:work ~data:{proof; fee} ;
+          (*when snark work is added to the pool*)
+          Coda_metrics.(
+            Gauge.set Snark_work.snark_pool_size
+              (Float.of_int @@ Hashtbl.length t.snark_table)) ;
+          `Rebroadcast )
         else `Don't_rebroadcast
 
       let verify_and_act t ~work ~sender =
@@ -349,11 +342,14 @@ let%test_module "random set test" =
     module Mock_snark_pool = Make (Mocks.Transition_frontier)
     open Ledger_proof.For_tests
 
-    let add_dummy_proof resource_pool work fee =
-      ignore
-        (Mock_snark_pool.Resource_pool.add_snark resource_pool ~work
-           ~proof:(One_or_two.map work ~f:mk_dummy_proof)
-           ~fee)
+    let apply_diff resource_pool work
+        ?(proof = One_or_two.map ~f:mk_dummy_proof) fee =
+      let diff =
+        Mock_snark_pool.Resource_pool.Diff.Stable.Latest.Add_solved_work
+          (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
+      in
+      Mock_snark_pool.Resource_pool.Diff.apply resource_pool
+        (Envelope.Incoming.local diff)
 
     let gen =
       let open Quickcheck.Generator.Let_syntax in
@@ -362,17 +358,23 @@ let%test_module "random set test" =
           Fee_with_prover.gen
       in
       let%map sample_solved_work = Quickcheck.Generator.list gen_entry in
-      let frontier_broadcast_pipe_r, _ =
-        Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
-      in
+      (*This has to be None because otherwise (if frontier_broadcast_pipe_r is
+      seeded with (0, empty-table)) add_snark function wouldn't add snarks in
+      the snark pool (see work_is_referenced) until the first diff (first block)
+      and there are no best tip diffs being fed into this pipe from the mock
+      transition frontier*)
+      let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create None in
       let resource_pool =
         Mock_snark_pool.Resource_pool.create ~logger:(Logger.null ())
           ~trust_system:(Trust_system.null ())
           ~pids:(Child_processes.Termination.create_pid_set ())
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
-      List.iter sample_solved_work ~f:(fun (work, fee) ->
-          add_dummy_proof resource_pool work fee ) ;
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let open Deferred.Let_syntax in
+          Deferred.List.iter sample_solved_work ~f:(fun (work, fee) ->
+              let%map _ = apply_diff resource_pool work fee in
+              () ) ) ;
       resource_pool
 
     let%test_unit "Invalid proofs are not accepted" =
@@ -384,7 +386,9 @@ let%test_module "random set test" =
         in
         let%map solved_work = Quickcheck.Generator.list gen_entry in
         List.map solved_work ~f:(fun (work, fee) ->
-            (*Invalid because of the invalid sok in the proof here against the one created using the correct prover and fee when verifying the proof*)
+            (*Invalid because of the invalid sok in the proof here against the
+            one created using the correct prover and fee when verifying the
+            proof*)
             let invalid_sok_digest =
               Sok_message.(
                 digest
@@ -397,15 +401,6 @@ let%test_module "random set test" =
                     ~proof:Proof.dummy )
             , fee ) )
       in
-      let apply_diff pool work proof fee =
-        let diff =
-          Mock_snark_pool.Resource_pool.Diff.Stable.Latest.Add_solved_work
-            (work, {Priced_proof.Stable.Latest.proof; fee})
-        in
-        ignore
-          (Mock_snark_pool.Resource_pool.Diff.apply pool
-             (Envelope.Incoming.local diff))
-      in
       Quickcheck.test
         ~sexp_of:
           [%sexp_of:
@@ -415,13 +410,22 @@ let%test_module "random set test" =
               * Fee_with_prover.t )
               list] (Quickcheck.Generator.tuple2 gen invalid_work_gen)
         ~f:(fun (t, invalid_work_lst) ->
-          let completed_works =
-            Mock_snark_pool.Resource_pool.all_completed_work t
-          in
-          List.iter invalid_work_lst ~f:(fun (statements, proofs, fee) ->
-              apply_diff t statements proofs fee ) ;
-          [%test_eq: Transaction_snark_work.Info.t list] completed_works
-            (Mock_snark_pool.Resource_pool.all_completed_work t) )
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let open Deferred.Let_syntax in
+              let completed_works =
+                Mock_snark_pool.Resource_pool.all_completed_work t
+              in
+              let%map () =
+                Deferred.List.iter invalid_work_lst
+                  ~f:(fun (statements, proofs, fee) ->
+                    let%map res =
+                      apply_diff t statements ~proof:(fun _ -> proofs) fee
+                    in
+                    assert (Or_error.is_error res) ;
+                    () )
+              in
+              [%test_eq: Transaction_snark_work.Info.t list] completed_works
+                (Mock_snark_pool.Resource_pool.all_completed_work t) ) )
 
     let%test_unit "When two priced proofs of the same work are inserted into \
                    the snark pool, the fee of the work is at most the minimum \
@@ -436,14 +440,15 @@ let%test_module "random set test" =
         (Quickcheck.Generator.tuple4 gen
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
            Fee_with_prover.gen) ~f:(fun (t, work, fee_1, fee_2) ->
-          add_dummy_proof t work fee_1 ;
-          add_dummy_proof t work fee_2 ;
-          let fee_upper_bound = Currency.Fee.min fee_1.fee fee_2.fee in
-          let {Priced_proof.fee= {fee; _}; _} =
-            Option.value_exn
-              (Mock_snark_pool.Resource_pool.request_proof t work)
-          in
-          assert (fee <= fee_upper_bound) )
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let%bind _ = apply_diff t work fee_1 in
+              let%map _ = apply_diff t work fee_2 in
+              let fee_upper_bound = Currency.Fee.min fee_1.fee fee_2.fee in
+              let {Priced_proof.fee= {fee; _}; _} =
+                Option.value_exn
+                  (Mock_snark_pool.Resource_pool.request_proof t work)
+              in
+              assert (fee <= fee_upper_bound) ) )
 
     let%test_unit "A priced proof of a work will replace an existing priced \
                    proof of the same work only if it's fee is smaller than \
@@ -458,21 +463,19 @@ let%test_module "random set test" =
         (Quickcheck.Generator.tuple4 gen
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
            Fee_with_prover.gen) ~f:(fun (t, work, fee_1, fee_2) ->
-          Mock_snark_pool.Resource_pool.remove_solved_work t work ;
-          let expensive_fee = max fee_1 fee_2
-          and cheap_fee = min fee_1 fee_2 in
-          add_dummy_proof t work cheap_fee ;
-          assert (
-            Mock_snark_pool.Resource_pool.add_snark t ~work
-              ~proof:(One_or_two.map work ~f:mk_dummy_proof)
-              ~fee:expensive_fee
-            = `Don't_rebroadcast ) ;
-          assert (
-            cheap_fee.fee
-            = (Option.value_exn
-                 (Mock_snark_pool.Resource_pool.request_proof t work))
-                .fee
-                .fee ) )
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              Mock_snark_pool.Resource_pool.remove_solved_work t work ;
+              let expensive_fee = max fee_1 fee_2
+              and cheap_fee = min fee_1 fee_2 in
+              let%bind _ = apply_diff t work cheap_fee in
+              let%map res = apply_diff t work expensive_fee in
+              assert (Or_error.is_error res) ;
+              assert (
+                cheap_fee.fee
+                = (Option.value_exn
+                     (Mock_snark_pool.Resource_pool.request_proof t work))
+                    .fee
+                    .fee ) ) )
 
     let fake_work =
       `One
