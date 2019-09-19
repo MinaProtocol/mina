@@ -397,6 +397,8 @@ module type S = sig
       val curr_epoch : Value.t -> Epoch.t
 
       val curr_slot : Value.t -> Slot.t
+
+      val global_slot : Value.t -> int
     end
 
     module Proposal_data : sig
