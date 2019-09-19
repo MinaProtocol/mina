@@ -95,8 +95,8 @@ let make =
       },
     ])}>
     {switch (icon) {
-      | Some(kind) => <Icon kind />
-      | None => React.null
-    }}
+     | Some(kind) => <Icon kind />
+     | None => React.null
+     }}
     {React.string(label)}
   </button>;
