@@ -1,30 +1,31 @@
 import hashlib
 
-MNT4r = 41898490967918953402344214791240637128170709919953949071783502921025352812571106773058893763790338921418070971888458477323173057491593855069696241854796396165721416325350064441470418137846398469611935719059908164220784476160001
-MNT4Fr = FiniteField(MNT4r)
 
-def random_value(prefix, i):
-    return MNT4Fr(int(hashlib.sha256('%s%d' % (prefix, i)).hexdigest(), 16))
+MNT4r_small = 475922286169261325753349249653048451545124878552823515553267735739164647307408490559963137
+MNT4r_medium = 41898490967918953402344214791240637128170709919953949071783502921025352812571106773058893763790338921418070971888458477323173057491593855069696241854796396165721416325350064441470418137846398469611935719059908164220784476160001
 
-m = 5
+def random_value(F, prefix, i):
+    return F(int(hashlib.sha256('%s%d' % (prefix, i)).hexdigest(), 16))
+
+m = 3
 rounds = 11
 
 prefix = 'CodaRescue'
 
-def round_constants():
+def round_constants(F):
     name = prefix + 'RoundConstants'
-    return [ [ random_value(name, r * m + i) for i in xrange(m) ]
+    return [ [ random_value(F, name, r * m + i) for i in xrange(m) ]
             for r in xrange(2 * rounds + 1) ]
 
 def matrix_str(rows):
     return '[|' + ';'.join('[|' + ';'.join('Field.of_string "{}"'.format(str(x)) for x in row) + '|]' for row in rows) + '|]'
 
-def mds():
+def mds(F):
     name = prefix + 'MDS'
     for attempt in xrange(100):
-        x_values = [random_value(name + 'x', attempt * m + i)
+        x_values = [random_value(F, name + 'x', attempt * m + i)
                     for i in xrange(m)]
-        y_values = [random_value(name + 'y', attempt * m + i)
+        y_values = [random_value(F, name + 'y', attempt * m + i)
                     for i in xrange(m)]
 # Make sure the values are distinct.
         assert len(set(x_values + y_values)) == 2 * m, \
@@ -47,7 +48,36 @@ def mds():
             # There are no eigenvalues in the field.
             return mds
 
+F_small= FiniteField(MNT4r_small)
+F_medium = FiniteField(MNT4r_medium)
+
+print ('''[%%import
+"../../config.mlh"]''')
+print ('''
+open Curve_choice.Tick0
+
+[%%if
+curve_size = 298]''')
+print ('let inv_alpha = "432656623790237568866681136048225865041022616866203195957516123399240588461280445963602851"')
 print ('let mds =')
-print (matrix_str(mds()))
+print (matrix_str(mds(F_small)))
 print ('let round_constants =')
-print (matrix_str(round_constants()))
+print (matrix_str(round_constants(F_small)))
+print ('''
+[%%elif
+curve_size = 753]''')
+print ('let inv_alpha = "38089537243562684911222013446582397389246099927230862792530457200932138920519187975508085239809399019470973610807689524839248234083267140972451128958905814696110378477590967674064016488951271336010850653690825603837076796509091"')
+print ('let mds =')
+print (matrix_str(mds(F_medium)))
+print ('let round_constants =')
+print (matrix_str(round_constants(F_medium)))
+print ('''
+[%%else]
+
+[%%show
+curve_size]
+
+[%%error
+"invalid value for \\"curve_size\\""]
+
+[%%endif]''')

@@ -314,8 +314,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
               | `Transition ->
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
                     total ) ;
-          Network_pool.Snark_pool.add_completed_work (Coda_lib.snark_pool coda)
-            work ) ]
+          Coda_lib.add_work coda work ) ]
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       trace_task "REST server" (fun () ->
@@ -348,6 +347,11 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                 let lift x = `Response x in
                 match Uri.path uri with
                 | "/graphql" ->
+                    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                      "Received graphql request. Uri: $uri"
+                      ~metadata:
+                        [ ("uri", `String (Uri.to_string uri))
+                        ; ("context", `String "rest_server") ] ;
                     graphql_callback () req body
                 | "/status" ->
                     status `None >>| lift
