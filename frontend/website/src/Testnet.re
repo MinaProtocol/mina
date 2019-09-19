@@ -135,7 +135,7 @@ module Styles = {
           Style.MediaQuery.notMobile,
           [
             width(`percent(100.)),
-            gridTemplateColumns([rem(1.), `auto, rem(6.), rem(2.5)]),
+            gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(2.5)]),
           ],
         ),
       ]),
@@ -361,14 +361,19 @@ let make = () => {
             </h4>
           </button>
         </a>
-        <button className=Styles.ctaButton>
-          <h2 className=Styles.ctaText>
-            {React.string({js|📬 Newsletter |js})}
-          </h2>
-          <h4 className=Style.Body.small>
-            {React.string("Sign up for the newsletter to get weekly updates")}
-          </h4>
-        </button>
+        <a
+          href="https://docs.google.com/forms/d/e/1FAIpQLScQRGW0-xGattPmr5oT-yRb9aCkPE6yIKXSfw1LRmNx1oh6AA/viewform">
+          <button className=Styles.ctaButton>
+            <h2 className=Styles.ctaText>
+              {React.string({js|📬 Newsletter |js})}
+            </h2>
+            <h4 className=Style.Body.small>
+              {React.string(
+                 "Sign up for the newsletter to get weekly updates",
+               )}
+            </h4>
+          </button>
+        </a>
       </div>
     </div>
     <hr />
