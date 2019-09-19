@@ -73,9 +73,9 @@ module Poseidon (Inputs : Intf.Inputs.Common) = struct
 
   let rounds_partial = 33
 
-  let () = assert (rounds_full mod 2 = 0)
+  let half_rounds_full = rounds_full / 2
 
-  let half_rounds_full = 3
+  let%test "rounds_full" = half_rounds_full * 2 = rounds_full
 
   let for_ n init ~f = for_ n ~init ~f
 
