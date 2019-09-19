@@ -1,6 +1,26 @@
 open Core_kernel
+module Params = Params
+module State = Array
 
-(*
+let for_ n ~init ~f =
+  let rec go i acc = if Int.(i = n) then acc else go (i + 1) (f i acc) in
+  go 0 init
+
+module Make_operations (Field : Intf.Field) = struct
+  let add_block ~state block =
+    Array.iteri block ~f:(fun i bi -> state.(i) <- Field.( + ) state.(i) bi)
+
+  let apply_matrix matrix v =
+    let dotv row =
+      Array.reduce_exn (Array.map2_exn v row ~f:Field.( * )) ~f:Field.( + )
+    in
+    Array.map matrix ~f:dotv
+end
+
+let m = 3
+
+module Rescue (Inputs : Intf.Inputs.Rescue) = struct
+  (*
    We refer below to this paper: https://eprint.iacr.org/2019/426.pdf.
 
 I arrived at this value for the number of rounds in the following way.
@@ -24,51 +44,65 @@ NB: As you can see from the analysis this is really specialized to alpha = 11 an
 should be higher for smaller alpha.
 *)
 
-let rounds = 11
+  let rounds = 11
 
-let m = 3
-
-module Params = struct
-  type 'a t = {mds: 'a array array; round_constants: 'a array array}
-  [@@deriving bin_io]
-
-  let map {mds; round_constants} ~f =
-    let f = Array.map ~f:(Array.map ~f) in
-    {mds= f mds; round_constants= f round_constants}
-end
-
-module State = Array
-
-module Make (Inputs : Inputs.S) = struct
   open Inputs
+  open Operations
+  module Field = Field
 
-  let add_block ~state block =
-    Array.iteri block ~f:(fun i bi -> state.(i) <- Field.( + ) state.(i) bi)
-
-  let sponge perm blocks ~state =
-    Array.fold ~init:state blocks ~f:(fun state block ->
-        add_block ~state block ; perm state )
+  let add_block = add_block
 
   let sbox0, sbox1 = (alphath_root, to_the_alpha)
-
-  let for_ n ~init ~f =
-    let rec go i acc = if Int.(i = n) then acc else go (i + 1) (f i acc) in
-    go 0 init
-
-  let apply matrix v =
-    let dotv row =
-      Array.reduce_exn (Array.map2_exn v row ~f:Field.( * )) ~f:Field.( + )
-    in
-    Array.map matrix ~f:dotv
 
   let block_cipher {Params.round_constants; mds} state =
     add_block ~state round_constants.(0) ;
     for_ (2 * rounds) ~init:state ~f:(fun r state ->
         let sbox = if Int.(r mod 2 = 0) then sbox0 else sbox1 in
         Array.map_inplace state ~f:sbox ;
-        let state = apply mds state in
+        let state = apply_matrix mds state in
         add_block ~state round_constants.(r + 1) ;
         state )
+end
+
+module Poseidon (Inputs : Intf.Inputs.Common) = struct
+  open Inputs
+  open Operations
+  module Field = Field
+
+  let add_block = add_block
+
+  let rounds_full = 8
+
+  let rounds_partial = 33
+
+  let () = assert (rounds_full mod 2 = 0)
+
+  let half_rounds_full = 3
+
+  let for_ n init ~f = for_ n ~init ~f
+
+  let block_cipher {Params.round_constants; mds} state =
+    let sbox = to_the_alpha in
+    let full_half start =
+      for_ half_rounds_full ~f:(fun r state ->
+          add_block ~state round_constants.(start + r) ;
+          Array.map_inplace state ~f:sbox ;
+          apply_matrix mds state )
+    in
+    full_half 0 state
+    |> for_ rounds_partial ~f:(fun r state ->
+           add_block ~state round_constants.(half_rounds_full + r) ;
+           state.(0) <- sbox state.(0) ;
+           apply_matrix mds state )
+    |> full_half (half_rounds_full + rounds_partial)
+end
+
+module Make (P : Intf.Permutation) = struct
+  open P
+
+  let sponge perm blocks ~state =
+    Array.fold ~init:state blocks ~f:(fun state block ->
+        add_block ~state block ; perm state )
 
   let to_blocks r a =
     let n = Array.length a in
@@ -88,7 +122,7 @@ module Make (Inputs : Inputs.S) = struct
   let r = m - 1
 
   let update params ~state inputs =
-    let state = Array.copy state in
+    let state = Array.map state ~f:Field.(( + ) zero) in
     sponge (block_cipher params) (to_blocks r inputs) ~state
 
   let digest state = state.(0)
