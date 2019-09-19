@@ -36,6 +36,8 @@ module Scan_state : sig
 
   val partition_if_overflowing : t -> Space_partition.t
 
+  val target_merkle_root : t -> Frozen_ledger_hash.t option
+
   val all_work_statements : t -> Transaction_snark_work.Statement.t list
 
   val work_statements_for_new_diff :

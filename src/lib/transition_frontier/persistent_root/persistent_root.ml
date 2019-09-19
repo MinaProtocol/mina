@@ -3,7 +3,6 @@ open Core
 open Coda_base
 open Coda_state
 open Frontier_base
-
 module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
 let with_file ?size filename access_level ~f =
@@ -74,12 +73,9 @@ module Instance = struct
     Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
         [ ( "root_identifier"
-          , Root_identifier.Stable.Latest.to_yojson
-              new_root_identifier ) ]
+          , Root_identifier.Stable.Latest.to_yojson new_root_identifier ) ]
       "Setting persistent root identifier" ;
-    let size =
-      Root_identifier.Stable.Latest.bin_size_t new_root_identifier
-    in
+    let size = Root_identifier.Stable.Latest.bin_size_t new_root_identifier in
     with_file (Locations.root_identifier t.factory.directory) `Write ~size
       ~f:(fun buf ->
         ignore
@@ -95,15 +91,13 @@ module Instance = struct
     | Ok () ->
         with_file file `Read ~f:(fun buf ->
             let root_identifier =
-              Root_identifier.Stable.Latest.bin_read_t buf
-                ~pos_ref:(ref 0)
+              Root_identifier.Stable.Latest.bin_read_t buf ~pos_ref:(ref 0)
             in
-            Logger.trace t.factory.logger ~module_:__MODULE__
-              ~location:__LOC__
+            Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
                 [ ( "root_identifier"
-                  , Root_identifier.Stable.Latest.to_yojson
-                      root_identifier ) ]
+                  , Root_identifier.Stable.Latest.to_yojson root_identifier )
+                ]
               "Loaded persistent root identifier" ;
             Some root_identifier )
 
@@ -142,6 +136,7 @@ let reset_to_genesis_exn t =
   in
   with_instance_exn t ~f:(fun instance ->
       ignore
-        (Ledger_transfer.transfer_accounts ~src:(Lazy.force Genesis_ledger.t)
+        (Ledger_transfer.transfer_accounts
+           ~src:(Lazy.force Genesis_ledger.t)
            ~dest:(Instance.snarked_ledger instance)) ;
       Instance.set_root_identifier instance genesis_root_identifier )

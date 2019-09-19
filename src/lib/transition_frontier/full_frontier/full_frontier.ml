@@ -6,9 +6,7 @@ open Frontier_base
 
 module Node = struct
   type t =
-    { breadcrumb: Breadcrumb.t
-    ; successor_hashes: State_hash.t list
-    ; length: int }
+    {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
   [@@deriving sexp, fields]
 
   type display =
@@ -45,11 +43,15 @@ type t =
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int }
 
-let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state ~max_length
-    =
+let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
+    ~max_length =
   let open Root_data in
-  let root_hash = External_transition.Validated.state_hash root_data.transition in
-  let root_protocol_state = External_transition.Validated.protocol_state root_data.transition in
+  let root_hash =
+    External_transition.Validated.state_hash root_data.transition
+  in
+  let root_protocol_state =
+    External_transition.Validated.protocol_state root_data.transition
+  in
   let root_blockchain_state =
     Protocol_state.blockchain_state root_protocol_state
   in
@@ -80,8 +82,8 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state ~ma
 let close _t =
   Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
   failwith
-    "TODO: detach root breadcrumb staged ledger ledger mask from root \
-     snarked ledger database"
+    "TODO: detach root breadcrumb staged ledger ledger mask from root snarked \
+     ledger database"
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -92,8 +94,6 @@ let hash t = t.hash
 let all_breadcrumbs t =
   List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
 
-let all_user_commands t = Breadcrumb.all_user_commands (all_breadcrumbs t)
-
 let find t hash =
   let open Option.Let_syntax in
   let%map node = Hashtbl.find t.table hash in
@@ -103,9 +103,15 @@ let find_exn t hash =
   let node = Hashtbl.find_exn t.table hash in
   node.breadcrumb
 
-let get_root t = find t t.root
+let root t = find_exn t t.root
 
-let get_root_exn t = find_exn t t.root
+let best_tip t = find_exn t t.best_tip
+
+let root_data t =
+  let open Root_data in
+  let root = root t in
+  { transition= Breadcrumb.validated_transition root
+  ; staged_ledger= Breadcrumb.staged_ledger root }
 
 let equal t1 t2 =
   let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in
@@ -129,11 +135,9 @@ let equal t1 t2 =
     (all_breadcrumbs t1 |> sort_breadcrumbs)
     (all_breadcrumbs t2 |> sort_breadcrumbs)
 
-let max_length {max_length;_} = max_length
+let max_length {max_length; _} = max_length
 
 let root_length t = (Hashtbl.find_exn t.table t.root).length
-
-let best_tip t = find_exn t t.best_tip
 
 let successor_hashes t hash =
   let node = Hashtbl.find_exn t.table hash in
@@ -183,8 +187,8 @@ let best_tip_path_length_exn {table; root; best_tip; _} =
   in
   result |> Option.value_exn
 
-let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
-    State_hash.t =
+let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) : State_hash.t
+    =
   let rec go ancestors1 ancestors2 b1 b2 =
     let sh1 = Breadcrumb.state_hash b1 in
     let sh2 = Breadcrumb.state_hash b2 in
@@ -198,8 +202,7 @@ let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
           breadcrumb
         else find_exn t (Breadcrumb.parent_hash breadcrumb)
       in
-      go ancestors1 ancestors2 (parent_unless_root b1)
-        (parent_unless_root b2)
+      go ancestors1 ancestors2 (parent_unless_root b1) (parent_unless_root b2)
   in
   go
     (Hash_set.create (module State_hash) ())
@@ -225,8 +228,7 @@ module Visualizor = struct
             | None ->
                 Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
-                    [ ( "state_hash"
-                      , State_hash.to_yojson successor_state_hash )
+                    [ ("state_hash", State_hash.to_yojson successor_state_hash)
                     ; ("error", `String "missing from frontier") ]
                   "Could not visualize state $state_hash: $error" ;
                 acc_graph ) )
@@ -253,16 +255,13 @@ let calculate_root_transition_diff t heir =
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
   let heir_siblings =
     List.filter (successors t root) ~f:(fun breadcrumb ->
-        not (State_hash.equal heir_hash (Breadcrumb.state_hash breadcrumb))
-    )
+        not (State_hash.equal heir_hash (Breadcrumb.state_hash breadcrumb)) )
   in
   let garbage_breadcrumbs =
     List.bind heir_siblings ~f:(fun sibling ->
         sibling :: successors_rec t sibling )
   in
-  let garbage_hashes =
-    List.map garbage_breadcrumbs ~f:Breadcrumb.state_hash
-  in
+  let garbage_hashes = List.map garbage_breadcrumbs ~f:Breadcrumb.state_hash in
   let new_root_data =
     { hash= heir_hash
     ; scan_state= Staged_ledger.scan_state heir_staged_ledger
@@ -316,8 +315,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
       let parent_hash = Breadcrumb.parent_hash breadcrumb in
       let parent_node = Hashtbl.find_exn t.table parent_hash in
       Hashtbl.add_exn t.table ~key:breadcrumb_hash
-        ~data:
-          {breadcrumb; successor_hashes= []; length= parent_node.length + 1} ;
+        ~data:{breadcrumb; successor_hashes= []; length= parent_node.length + 1} ;
       Hashtbl.set t.table ~key:parent_hash
         ~data:
           { parent_node with
@@ -380,10 +378,10 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
             let breadcrumb = Option.value_exn (find t garbage_hash) in
             let mask = Breadcrumb.mask breadcrumb in
             (* this should get garbage collected and should not require additional destruction *)
-            ignore (
-              Ledger.Maskable.unregister_mask_exn
-                (Ledger.Mask.Attached.get_parent mask)
-                mask);
+            ignore
+              (Ledger.Maskable.unregister_mask_exn
+                 (Ledger.Mask.Attached.get_parent mask)
+                 mask) ;
             Hashtbl.remove t.table garbage_hash ) ;
         Hashtbl.remove t.table t.root ;
         Ledger.commit m1 ;
@@ -394,18 +392,24 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
           ~expect:m1_hash_pre_commit (Ledger.merkle_root m1) ;
         [%test_result: Ledger_hash.t]
           ~message:
-            "Merkle root of old root's staged ledger mask is the same as \
-             the new root's staged ledger mask after committing"
+            "Merkle root of old root's staged ledger mask is the same as the \
+             new root's staged ledger mask after committing"
           ~expect:m1_hash_pre_commit (Ledger.merkle_root m0) ;
         (* reparent all the successors of m1 onto m0 *)
-        ignore (Ledger.Maskable.unregister_mask_exn (Ledger.Any_ledger.cast (module Ledger.Mask.Attached) m0) m1) ;
+        ignore
+          (Ledger.Maskable.unregister_mask_exn
+             (Ledger.Any_ledger.cast (module Ledger.Mask.Attached) m0)
+             m1) ;
         if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
-          let s = Ledger.(Any_ledger.cast (module Ledger) (of_database t.root_ledger)) in
+          let s =
+            Ledger.(
+              Any_ledger.cast (module Ledger) (of_database t.root_ledger))
+          in
           let mt = Ledger.Maskable.register_mask s (Ledger.Mask.create ()) in
           Non_empty_list.iter
             (Option.value_exn
-              (Staged_ledger.proof_txns
-                (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
+               (Staged_ledger.proof_txns
+                  (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
             ~f:(fun txn ->
               ignore (Or_error.ok_exn (Ledger.apply_transaction mt txn)) ) ;
           Ledger.commit mt ;
@@ -425,18 +429,16 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
       Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
       t.root <- new_root_hash ;
       Coda_metrics.(
-        let num_breadcrumbs_removed =
-          Int.to_float (1 + List.length garbage)
-        in
+        let num_breadcrumbs_removed = Int.to_float (1 + List.length garbage) in
         let num_finalized_staged_txns =
           Int.to_float
             (List.length (Breadcrumb.user_commands new_root_breadcrumb))
         in
         (* TODO: this metric collection super inefficient right now *)
-        let root_snarked_ledger_accounts =
-          Ledger.Db.to_list t.root_ledger
+        let root_snarked_ledger_accounts = Ledger.Db.to_list t.root_ledger in
+        let num_root_snarked_ledger_accounts =
+          Int.to_float (List.length root_snarked_ledger_accounts)
         in
-        let num_root_snarked_ledger_accounts = Int.to_float (List.length root_snarked_ledger_accounts) in
         let root_snarked_ledger_total_currency =
           Int.to_float
             (List.fold_left root_snarked_ledger_accounts ~init:0
@@ -488,16 +490,16 @@ let apply_diffs t diffs =
           (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
           if local_state_was_synced_at_start then (
             Logger.fatal t.logger
-              "after lock transition, the best tip consensus state is out \
-               of sync with the local state -- bug in either \
+              "after lock transition, the best tip consensus state is out of \
+               sync with the local state -- bug in either \
                required_local_state_sync or frontier_root_transition."
               ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
                 [ ( "sync_jobs"
                   , `List
                       ( Non_empty_list.to_list jobs
-                      |> List.map
-                           ~f:Consensus.Hooks.local_state_sync_to_yojson ) )
+                      |> List.map ~f:Consensus.Hooks.local_state_sync_to_yojson
+                      ) )
                 ; ( "local_state"
                   , Consensus.Data.Local_state.to_yojson
                       t.consensus_local_state )

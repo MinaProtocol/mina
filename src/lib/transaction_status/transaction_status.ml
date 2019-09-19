@@ -42,16 +42,16 @@ module type S = sig
 end
 
 module type Inputs_intf = sig
-  include Transition_frontier.Inputs_intf
-
-  module Transition_frontier : Coda_intf.Transition_frontier_intf
+  module Transition_frontier : module type of Transition_frontier
 
   module Transaction_pool :
     Network_pool.Transaction_pool.S
     with type transition_frontier := Transition_frontier.t
-     and type best_tip_diff := Transition_frontier.Diff.Best_tip_diff.view
+     and type best_tip_diff :=
+                Transition_frontier.Extensions.Best_tip_diff.view
 end
 
+(* TODO: this is extremely expensive as implemented and needs to be replaced with an extension *)
 module Make (Inputs : Inputs_intf) :
   S
   with type transition_frontier := Inputs.Transition_frontier.t
@@ -83,7 +83,9 @@ module Make (Inputs : Inputs_intf) :
             in
             if Set.mem best_tip_user_commands cmd then return State.Included ;
             let all_transactions =
-              Transition_frontier.all_user_commands transition_frontier
+              Transition_frontier.(
+                Breadcrumb.all_user_commands
+                  (Transition_frontier.all_breadcrumbs transition_frontier))
             in
             if Set.mem all_transactions cmd then return State.Pending ;
             if Transaction_pool.Resource_pool.member resource_pool check_cmd
@@ -92,7 +94,6 @@ module Make (Inputs : Inputs_intf) :
 end
 
 module Inputs = struct
-  include Transition_frontier.Inputs
   module Transition_frontier = Transition_frontier
   module Transaction_pool = Network_pool.Transaction_pool
 end

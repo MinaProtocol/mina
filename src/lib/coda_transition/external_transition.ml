@@ -640,6 +640,31 @@ module Validated = struct
   include Comparable.Make (Stable.Latest)
 end
 
+let genesis =
+  lazy
+    (let genesis_protocol_state =
+       With_hash.data @@ Lazy.force Genesis_protocol_state.t
+     in
+     let empty_diff =
+       { Staged_ledger_diff.diff=
+           ( { completed_works= []
+             ; user_commands= []
+             ; coinbase= Staged_ledger_diff.At_most_two.Zero }
+           , None )
+       ; creator=
+           Account.public_key (snd (List.hd_exn Genesis_ledger.accounts)) }
+     in
+     (* the genesis transition is assumed to be valid *)
+     let (`I_swear_this_is_safe_see_my_comment transition) =
+       Validated.create_unsafe
+         (create ~protocol_state:genesis_protocol_state
+            ~protocol_state_proof:Precomputed_values.base_proof
+            ~staged_ledger_diff:empty_diff
+            ~delta_transition_chain_proof:
+              (Protocol_state.previous_state_hash genesis_protocol_state, []))
+     in
+     transition)
+
 module Transition_frontier_validation (Transition_frontier : sig
   type t
 

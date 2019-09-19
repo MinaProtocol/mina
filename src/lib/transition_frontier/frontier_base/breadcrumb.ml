@@ -10,8 +10,7 @@ type t =
   ; just_emitted_a_proof: bool }
 [@@deriving sexp, fields]
 
-let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof}
-    =
+let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof} =
   `Assoc
     [ ( "validated_transition"
       , External_transition.Validated.to_yojson validated_transition )
@@ -30,8 +29,7 @@ let build ~logger ~verifier ~trust_system ~parent
       match%bind
         External_transition.Staged_ledger_validation
         .validate_staged_ledger_diff ~logger ~verifier
-          ~parent_staged_ledger:parent.staged_ledger
-          transition_with_validation
+          ~parent_staged_ledger:parent.staged_ledger transition_with_validation
       with
       | Ok
           ( `Just_emitted_a_proof just_emitted_a_proof
@@ -92,8 +90,7 @@ let build ~logger ~verifier ~trust_system ~parent
                       make_actions Sent_invalid_proof
                   | Pre_diff (Bad_signature _) ->
                       make_actions Sent_invalid_signature
-                  | Pre_diff _ | Non_zero_fee_excess _ | Insufficient_work _
-                    ->
+                  | Pre_diff _ | Non_zero_fee_excess _ | Insufficient_work _ ->
                       make_actions Gossiped_invalid_transition
                   | Unexpected _ ->
                       failwith

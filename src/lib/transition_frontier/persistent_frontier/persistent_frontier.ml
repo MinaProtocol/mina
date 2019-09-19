@@ -4,6 +4,7 @@ open Coda_base
 open Coda_state
 open Coda_transition
 open Frontier_base
+module Database = Database
 
 let construct_staged_ledger_at_root ~logger ~verifier ~root_ledger
     ~root_transition ~root =
@@ -13,15 +14,15 @@ let construct_staged_ledger_at_root ~logger ~verifier ~root_ledger
     |> Blockchain_state.snarked_ledger_hash
   in
   (* [new] TODO: !important -- make mask off root ledger and apply all scan state transactions to it *)
-  Staged_ledger.of_scan_state_and_ledger ~logger ~verifier
-    ~snarked_ledger_hash
+  Staged_ledger.of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash
     ~ledger:(Ledger.of_database root_ledger)
     ~scan_state:root.scan_state
     ~pending_coinbase_collection:root.pending_coinbase
 
 (* [new] TODO: create a reusable singleton factory abstraction *)
 module rec Instance_type : sig
-  type t = {db: Database.t; mutable sync: Sync.t option; factory: Factory_type.t}
+  type t =
+    {db: Database.t; mutable sync: Sync.t option; factory: Factory_type.t}
 end =
   Instance_type
 
@@ -41,7 +42,9 @@ module Instance = struct
   type t = Instance_type.t
 
   let create factory =
-    let db = Database.create ~logger:factory.logger ~directory:factory.directory in
+    let db =
+      Database.create ~logger:factory.logger ~directory:factory.directory
+    in
     {db; sync= None; factory}
 
   let assert_no_sync t =
@@ -101,7 +104,9 @@ module Instance = struct
     if State_hash.equal root.hash target_root.state_hash then
       (* If the target hash is already the root hash, no fast forward required, but we should check the frontier hash. *)
       let%bind frontier_hash =
-        lift_error (Database.get_frontier_hash t.db) "failed to get frontier hash"
+        lift_error
+          (Database.get_frontier_hash t.db)
+          "failed to get frontier hash"
       in
       (* TODO: gracefully recover from this state *)
       Result.ok_if_true
@@ -113,7 +118,8 @@ module Instance = struct
 
   let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length =
     let open Deferred.Result.Let_syntax in
-    let downgrade_transition transition : External_transition.Almost_validated.t =
+    let downgrade_transition transition :
+        External_transition.Almost_validated.t =
       let transition, _ = External_transition.Validated.erase transition in
       External_transition.Validation.wrap transition
       |> External_transition.skip_time_received_validation
@@ -121,7 +127,7 @@ module Instance = struct
       |> External_transition.skip_proof_validation
            `This_transition_was_generated_internally
       |> External_transition.skip_delta_transition_chain_validation
-          `This_transition_was_not_received_via_gossip
+           `This_transition_was_not_received_via_gossip
       (* TODO: add new variant for loaded from persistence *)
       |> External_transition.skip_frontier_dependencies_validation
            `This_transition_belongs_to_a_detached_subtree
@@ -163,30 +169,26 @@ module Instance = struct
     in
     (* initialize the new in memory frontier and extensions *)
     let frontier =
-      Full_frontier.create
-        ~logger:t.factory.logger
-        ~base_hash
+      Full_frontier.create ~logger:t.factory.logger ~base_hash
         ~root_data:
-          { transition= root_transition
-          ; staged_ledger= root_staged_ledger }
-        ~root_ledger
-        ~consensus_local_state
-        ~max_length
+          {transition= root_transition; staged_ledger= root_staged_ledger}
+        ~root_ledger ~consensus_local_state ~max_length
     in
     let%bind extensions =
-      Deferred.map (Extensions.create ~logger:t.factory.logger frontier) ~f:Result.return
+      Deferred.map
+        (Extensions.create ~logger:t.factory.logger frontier)
+        ~f:Result.return
     in
     let apply_diff diff =
       let (`New_root _) = Full_frontier.apply_diffs frontier [diff] in
-      Extensions.notify extensions ~frontier
-        ~diffs:[Diff.Full.E.to_lite diff]
+      Extensions.notify extensions ~frontier ~diffs:[Diff.Full.E.to_lite diff]
       |> Deferred.map ~f:Result.return
     in
     (* crawl through persistent frontier and load transitions into in memory frontier *)
     let%bind () =
       Deferred.map
-        (Database.crawl_successors t.db root.hash ~init:(Full_frontier.root frontier)
-           ~f:(fun parent transition ->
+        (Database.crawl_successors t.db root.hash
+           ~init:(Full_frontier.root frontier) ~f:(fun parent transition ->
              let%bind breadcrumb =
                Breadcrumb.build ~logger:t.factory.logger
                  ~verifier:t.factory.verifier
@@ -194,9 +196,7 @@ module Instance = struct
                  ~transition:(downgrade_transition transition)
                  ~sender:None
              in
-             let%map () =
-               apply_diff Diff.(E (New_node (Full breadcrumb)))
-             in
+             let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
              breadcrumb ))
         ~f:
           (Result.map_error ~f:(function
@@ -247,7 +247,11 @@ let reset_database_exn t ~root_data =
   let open Root_data in
   let open Deferred.Let_syntax in
   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:[("state_hash", State_hash.to_yojson (External_transition.Validated.state_hash root_data.transition))]
+    ~metadata:
+      [ ( "state_hash"
+        , State_hash.to_yojson
+            (External_transition.Validated.state_hash root_data.transition) )
+      ]
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in
   with_instance_exn t ~f:(fun instance ->

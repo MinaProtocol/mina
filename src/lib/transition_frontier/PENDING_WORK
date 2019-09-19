@@ -16,6 +16,7 @@
 
 - add unit tests back in
 - fix visualization logging on crashes
+- create O(1) `Staged_ledger.Scan_state.target_merkle_root` (for sync_handler RPCs)
 
 # Refactors
 

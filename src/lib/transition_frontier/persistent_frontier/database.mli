@@ -46,7 +46,8 @@ val check :
             | `Root_transition ] ] ] )
      Result.t
 
-val initialize : t -> root_data:Root_data.t -> base_hash:Frontier_hash.t -> unit
+val initialize :
+  t -> root_data:Root_data.t -> base_hash:Frontier_hash.t -> unit
 
 val add :
      t
@@ -71,9 +72,7 @@ val get_transition :
 val get_arcs :
      t
   -> State_hash.t
-  -> ( State_hash.t list
-     , [> `Not_found of [> `Arcs of State_hash.t]] )
-     Result.t
+  -> (State_hash.t list, [> `Not_found of [> `Arcs of State_hash.t]]) Result.t
 
 val get_root : t -> (Root_data.Minimal.t, [> `Not_found of [> `Root]]) Result.t
 
@@ -83,9 +82,7 @@ val get_best_tip :
   t -> (State_hash.t, [> `Not_found of [> `Best_tip]]) Result.t
 
 val set_best_tip :
-     t
-  -> State_hash.t
-  -> (State_hash.t, [> `Not_found of [> `Best_tip]]) Result.t
+  t -> State_hash.t -> (State_hash.t, [> `Not_found of [> `Best_tip]]) Result.t
 
 val get_frontier_hash :
   t -> (Frontier_hash.t, [> `Not_found of [> `Frontier_hash]]) Result.t

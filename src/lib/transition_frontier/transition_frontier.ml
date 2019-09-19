@@ -16,9 +16,28 @@ open Coda_transition
 *   reopening them. *)
 
 include Frontier_base
-
+module Hash = Frontier_hash
 module Full_frontier = Full_frontier
 module Extensions = Extensions
+module Persistent_root = Persistent_root
+module Persistent_frontier = Persistent_frontier
+
+let global_max_length = Consensus.Constants.k
+
+type config =
+  { logger: Logger.t
+  ; verifier: Verifier.t
+  ; consensus_local_state: Consensus.Data.Local_state.t }
+
+(* TODO: refactor persistent frontier sync into an extension *)
+type t =
+  { full_frontier: Full_frontier.t
+  ; persistent_root: Persistent_root.t
+  ; persistent_root_instance: Persistent_root.Instance.t
+  ; persistent_frontier: Persistent_frontier.t
+        (* [new] TODO: !important -- this instance should only be owned by the sync process, as once the sync worker is an RPC worker, only that process can have an open connection the the database *)
+  ; persistent_frontier_instance: Persistent_frontier.Instance.t
+  ; extensions: Extensions.t }
 
 let genesis_root_data ~logger ~verifier ~snarked_ledger =
   let open Root_data in
@@ -36,43 +55,9 @@ let genesis_root_data ~logger ~verifier ~snarked_ledger =
       ~pending_coinbase_collection
     >>| Or_error.ok_exn
   in
-  {transition= External_transition.genesis; staged_ledger}
+  {transition= Lazy.force External_transition.genesis; staged_ledger}
 
-module Breadcrumb = Full_frontier.Breadcrumb
-module Diff = Full_frontier.Diff
-module Hash = Full_frontier.Hash
-
-module Inputs_with_full_frontier = struct
-  include Inputs
-  module Frontier = Full_frontier
-end
-
-module Extensions = Extensions.Make (Inputs_with_full_frontier)
-module Persistent_root = Persistent_root.Make (Inputs_with_full_frontier)
-
-module Inputs_with_extensions = struct
-  include Inputs_with_full_frontier
-  module Extensions = Extensions
-end
-
-module Persistent_frontier = Persistent_frontier.Make (Inputs_with_extensions)
-
-type config =
-  { logger: Logger.t
-  ; verifier: Verifier.t
-  ; consensus_local_state: Consensus.Data.Local_state.t }
-
-(* TODO: refactor persistent frontier sync into an extension *)
-type t =
-  { full_frontier: Full_frontier.t
-  ; persistent_root: Persistent_root.t
-  ; persistent_root_instance: Persistent_root.Instance.t
-  ; persistent_frontier: Persistent_frontier.t
-        (* [new] TODO: !important -- this instance should only be owned by the sync process, as once the sync worker is an RPC worker, only that process can have an open connection the the database *)
-  ; persistent_frontier_instance: Persistent_frontier.Instance.t
-  ; extensions: Extensions.t }
-
-let load_from_persistence_and_start config ~persistent_root
+let load_from_persistence_and_start config ~max_length ~persistent_root
     ~persistent_root_instance ~persistent_frontier
     ~persistent_frontier_instance =
   let open Deferred.Result.Let_syntax in
@@ -89,27 +74,26 @@ let load_from_persistence_and_start config ~persistent_root
   in
   let%bind () =
     Deferred.return
-      ( Persistent_frontier.Instance.fast_forward
-          persistent_frontier_instance root_identifier
+      ( Persistent_frontier.Instance.fast_forward persistent_frontier_instance
+          root_identifier
       |> Result.map_error ~f:(function
            | `Sync_cannot_be_running ->
                `Failure "sync job is already running on persistent frontier"
            | `Bootstrap_required ->
                `Bootstrap_required
            | `Failure msg ->
-               Logger.fatal config.logger ~module_:__MODULE__
-                 ~location:__LOC__
+               Logger.fatal config.logger ~module_:__MODULE__ ~location:__LOC__
                  ~metadata:
                    [ ( "target_root"
-                     , Full_frontier.Root_identifier.Stable.Latest.to_yojson
-                         root_identifier ) ]
+                     , Root_identifier.Stable.Latest.to_yojson root_identifier
+                     ) ]
                  "Unable to fast forward persistent frontier: %s" msg ;
                `Failure msg ) )
   in
   let%bind full_frontier, extensions =
     Deferred.map
       (Persistent_frontier.Instance.load_full_frontier
-         persistent_frontier_instance
+         persistent_frontier_instance ~max_length
          ~root_ledger:
            (Persistent_root.Instance.snarked_ledger persistent_root_instance)
          ~consensus_local_state:config.consensus_local_state)
@@ -120,14 +104,15 @@ let load_from_persistence_and_start config ~persistent_root
           | `Failure _ as err ->
               err ))
   in
-  let%bind () =
+  let%map () =
     Deferred.return
       ( Persistent_frontier.Instance.start_sync persistent_frontier_instance
       |> Result.map_error ~f:(function
            | `Sync_cannot_be_running ->
                `Failure "sync job is already running on persistent frontier"
            | `Not_found _ as err ->
-               `Failure (Persistent_frontier.Db.Error.not_found_message err) )
+               `Failure
+                 (Persistent_frontier.Database.Error.not_found_message err) )
       )
   in
   { full_frontier
@@ -138,8 +123,9 @@ let load_from_persistence_and_start config ~persistent_root
   ; extensions }
 
 (* TODO: re-add `Bootstrap_required support or redo signature *)
-let rec load :
-       ?retry_with_fresh_db:bool
+let rec load_with_max_length :
+       max_length:int
+    -> ?retry_with_fresh_db:bool
     -> config
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
@@ -148,13 +134,13 @@ let rec load :
          | `Persistent_frontier_malformed
          | `Failure of string ] )
        Deferred.Result.t =
- fun ?(retry_with_fresh_db = true) config ~persistent_root
+ fun ~max_length ?(retry_with_fresh_db = true) config ~persistent_root
      ~persistent_frontier ->
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   (* let persistent_root = Persistent_root.create ~logger:config.logger ~directory:config.persistent_root_directory in *)
   let continue ~persistent_root_instance ~persistent_frontier_instance =
-    load_from_persistence_and_start config ~persistent_root
+    load_from_persistence_and_start config ~max_length ~persistent_root
       ~persistent_root_instance ~persistent_frontier
       ~persistent_frontier_instance
   in
@@ -201,7 +187,7 @@ let rec load :
   | Error (`Corrupt err) ->
       Logger.error config.logger ~module_:__MODULE__ ~location:__LOC__
         "Persistent frontier database is corrupt: %s"
-        (Persistent_frontier.Db.Error.message err) ;
+        (Persistent_frontier.Database.Error.message err) ;
       if retry_with_fresh_db then (
         (* should retry be on by default? this could be unnecessarily destructive *)
         Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -213,8 +199,8 @@ let rec load :
         let%bind () =
           Persistent_frontier.destroy_database_exn persistent_frontier
         in
-        load config ~persistent_root ~persistent_frontier
-          ~retry_with_fresh_db:false
+        load_with_max_length ~max_length config ~persistent_root
+          ~persistent_frontier ~retry_with_fresh_db:false
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -225,6 +211,8 @@ let rec load :
       else return (Error `Persistent_frontier_malformed)
   | Ok () ->
       continue ~persistent_root_instance ~persistent_frontier_instance
+
+let load = load_with_max_length ~max_length:global_max_length
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -246,6 +234,8 @@ let persistent_root {persistent_root; _} = persistent_root
 
 let persistent_frontier {persistent_frontier; _} = persistent_frontier
 
+let extensions {extensions; _} = extensions
+
 let root_snarked_ledger {persistent_root_instance; _} =
   Persistent_root.Instance.snarked_ledger persistent_root_instance
 
@@ -258,8 +248,7 @@ let add_breadcrumb_exn t breadcrumb =
   in
   Option.iter new_root_identifier
     ~f:
-      (Persistent_root.Instance.set_root_identifier
-         t.persistent_root_instance) ;
+      (Persistent_root.Instance.set_root_identifier t.persistent_root_instance) ;
   let diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
@@ -272,51 +261,76 @@ let add_breadcrumb_exn t breadcrumb =
   sync_result
   |> Result.map_error ~f:(fun `Sync_must_be_running ->
          Failure
-           "cannot add breadcrumb because persistent frontier sync job is \
-            not running -- this indicates that transition frontier \
-            initialization has not been performed correctly" )
+           "cannot add breadcrumb because persistent frontier sync job is not \
+            running -- this indicates that transition frontier initialization \
+            has not been performed correctly" )
   |> Result.ok_exn ;
   Extensions.notify t.extensions ~frontier:t.full_frontier ~diffs
 
-let snark_pool_refcount_pipe t =
-  Extensions.Broadcast.Snark_pool_refcount.reader
-    t.extensions.snark_pool_refcount
+(* proxy full frontier functions *)
+include struct
+  open Full_frontier
 
-type best_tip_diff = Extensions.Best_tip_diff.view =
-  { new_user_commands: User_command.t list
-  ; removed_user_commands: User_command.t list }
+  let proxy1 f {full_frontier; _} = f full_frontier
 
-let best_tip_diff_pipe t =
-  Extensions.Broadcast.Best_tip_diff.reader t.extensions.best_tip_diff
+  let proxy2 f {full_frontier= x; _} {full_frontier= y; _} = f x y
 
-let wait_for_transition t hash =
-  let open Extensions in
-  let registry =
-    Broadcast.Transition_registry.original t.extensions.transition_registry
-  in
-  Transition_registry.register registry hash
+  let max_length = proxy1 max_length
 
-let oldest_breadcrumb_in_history {full_frontier; _} =
-  let open Extensions in
-  let root_history =
-    Broadcast.Root_history.original t.extensions.root_history
-  in
-  Root_history.oldest root_history
+  let consensus_local_state = proxy1 consensus_local_state
 
-let max_length = max_length
+  let all_breadcrumbs = proxy1 all_breadcrumbs
 
-let all_user_commands t = Breadcrumb.all_user_commands (all_breadcrumbs t)
+  let visualize ~filename = proxy1 (visualize ~filename)
+
+  let visualize_to_string = proxy1 visualize_to_string
+
+  (* TODO: better name *)
+  let iter = proxy1 iter
+
+  let common_ancestor = proxy1 common_ancestor
+
+  (* reduce sucessors functions (probably remove hashes special case *)
+  let successors = proxy1 successors
+
+  let successors_rec = proxy1 successors_rec
+
+  let successor_hashes = proxy1 successor_hashes
+
+  let successor_hashes_rec = proxy1 successor_hashes_rec
+
+  (* TODO: remove? *)
+  let hash_path = proxy1 hash_path
+
+  let best_tip = proxy1 best_tip
+
+  let root = proxy1 root
+
+  let find = proxy1 find
+
+  (* TODO: find -> option externally, find_exn internally *)
+  let find_exn = proxy1 find_exn
+
+  (* TODO: is this an abstraction leak? *)
+  let root_length = proxy1 root_length
+
+  (* TODO: probably shouldn't be an `_exn` function *)
+  let best_tip_path = proxy1 best_tip_path
+
+  let best_tip_path_length_exn = proxy1 best_tip_path_length_exn
+
+  (* TODO: should this be nested under For_tests? should never be used in production *)
+  let equal = proxy2 equal
+
+  (* TODO: remove? what is this for? *)
+  let shallow_copy_root_snarked_ledger =
+    proxy1 shallow_copy_root_snarked_ledger
+
+  (* why can't this one be proxied? *)
+  let path_map {full_frontier; _} breadcrumb ~f =
+    path_map full_frontier breadcrumb ~f
+end
 
 module For_tests = struct
-  (* [new] TODO: !important -- patch identity pipe out, this is a very nasty abstraction leak *)
-  let identity_pipe t =
-    Extensions.Broadcast.Identity.reader t.extensions.identity
-
-  let apply_diff _ = failwith "TODO"
-
-  let root_history_is_empty _ = failwith "TODO"
-
-  let root_history_mem _ = failwith "TODO"
-
-  let root_snarked_ledger _ = failwith "TODO"
+  let load_with_max_length = load_with_max_length
 end

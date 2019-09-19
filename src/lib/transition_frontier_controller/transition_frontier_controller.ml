@@ -3,9 +3,7 @@ open Async_kernel
 open Pipe_lib
 
 module type Inputs_intf = sig
-  include Transition_frontier.Inputs_intf
-
-  module Transition_frontier : Coda_intf.Transition_frontier_intf
+  module Transition_frontier : module type of Transition_frontier
 
   module Sync_handler :
     Coda_intf.Sync_handler_intf
@@ -109,7 +107,6 @@ module Make (Inputs : Inputs_intf) :
 end
 
 include Make (struct
-  include Transition_frontier.Inputs
   module Transition_frontier = Transition_frontier
   module Catchup = Ledger_catchup
   module Network = Coda_networking

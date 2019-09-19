@@ -6,9 +6,7 @@ open Pipe_lib.Strict_pipe
 open Coda_transition
 
 module type Inputs_intf = sig
-  include Coda_intf.Inputs_intf
-
-  module Transition_frontier : Coda_intf.Transition_frontier_intf
+  module Transition_frontier : module type of Transition_frontier
 
   module Root_sync_ledger :
     Syncable_ledger.S
@@ -64,7 +62,7 @@ module Make (Inputs : Inputs_intf) : sig
       -> verifier:Verifier.t
       -> network:Network.t
       -> frontier:Transition_frontier.t
-      -> ledger_db:Ledger.Db.t
+      -> consensus_local_state:Consensus.Data.Local_state.t
       -> transition_reader:( [< `Transition of
                                 External_transition.Initial_validated.t
                                 Envelope.Incoming.t ]
@@ -74,9 +72,6 @@ module Make (Inputs : Inputs_intf) : sig
       -> ( Transition_frontier.t
          * External_transition.Initial_validated.t Envelope.Incoming.t list )
          Deferred.t
-
-    module Transition_cache :
-      Transition_cache.S with type state_hash := State_hash.t
 
     val sync_ledger :
          t
@@ -102,8 +97,6 @@ end = struct
     ; mutable best_seen_transition: External_transition.Initial_validated.t
     ; mutable current_root: External_transition.Initial_validated.t
     ; network: Network.t }
-
-  module Transition_cache = Transition_cache.Make (Inputs)
 
   let worth_getting_root t candidate =
     `Take
@@ -351,16 +344,16 @@ end = struct
         ; current_root= initial_root_transition }
       in
       let transition_graph = Transition_cache.create () in
-      let%bind () =
-        if should_ask_best_tip then
-          download_best_tip ~root_sync_ledger ~transition_graph t
-            initial_root_transition
-        else Deferred.unit
-      in
       let snarked_ledger = Transition_frontier.root_snarked_ledger frontier in
       let%bind hash, sender, expected_staged_ledger_hash =
         let root_sync_ledger =
-          Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
+          Root_sync_ledger.create snarked_ledger ~logger:t.logger ~trust_system
+        in
+        let%bind () =
+          if should_ask_best_tip then
+            download_best_tip ~root_sync_ledger ~transition_graph t
+              initial_root_transition
+          else Deferred.unit
         in
         don't_wait_for
           (sync_ledger t ~root_sync_ledger ~transition_graph
@@ -459,7 +452,8 @@ end = struct
                 Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
                     [ ( "local_state"
-                      , Consensus.Data.Local_state.to_yojson local_state )
+                      , Consensus.Data.Local_state.to_yojson
+                          consensus_local_state )
                     ; ( "consensus_state"
                       , Consensus.Data.Consensus_state.Value.to_yojson
                           consensus_state ) ]
@@ -499,9 +493,7 @@ end = struct
                   ~root_data:new_root_data
               in
               let%map new_frontier =
-                Transition_frontier.create ~logger ~root_transition:new_root
-                  ~root_snarked_ledger:synced_db ~root_staged_ledger
-                  ~consensus_local_state:local_state Transition_frontier.load
+                Transition_frontier.load
                   { Transition_frontier.logger= t.logger
                   ; verifier
                   ; consensus_local_state }
@@ -594,7 +586,6 @@ end = struct
 end
 
 include Make (struct
-  include Transition_frontier.Inputs
   module Transition_frontier = Transition_frontier
   module Root_sync_ledger = Sync_ledger.Db
   module Network = Coda_networking

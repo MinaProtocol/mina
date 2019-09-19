@@ -65,8 +65,11 @@ val client_port : t -> int
 val validated_transitions :
   t -> External_transition.Validated.t Strict_pipe.Reader.t
 
-val root_diff :
-  t -> Transition_frontier.Diff.Root_diff.view Strict_pipe.Reader.t
+type root_diff =
+  {user_commands: User_command.Stable.V1.t list; root_length: int}
+[@@deriving bin_io]
+
+val root_diff : t -> root_diff Strict_pipe.Reader.t
 
 val dump_tf : t -> string Or_error.t
 

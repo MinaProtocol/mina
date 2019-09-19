@@ -5,21 +5,15 @@ module type S = sig
 
   val find_exn : t -> State_hash.t -> Breadcrumb.t
 
-  val get_root : t -> Breadcrumb.t option
-
-  val get_root_exn : t -> Breadcrumb.t
-
   val max_length : t -> int
 
   val consensus_local_state : t -> Consensus.Data.Local_state.t
 
   val all_breadcrumbs : t -> Breadcrumb.t list
 
-  val all_user_commands : t -> User_command.Set.t
+  val root_length : t -> int
 
   val root : t -> Breadcrumb.t
-
-  val root_length : t -> int
 
   val best_tip : t -> Breadcrumb.t
 

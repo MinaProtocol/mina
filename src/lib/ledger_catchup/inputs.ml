@@ -1,7 +1,5 @@
 module type S = sig
-  include Coda_intf.Inputs_intf
-
-  module Transition_frontier : Coda_intf.Transition_frontier_intf
+  module Transition_frontier : module type of Transition_frontier
 
   module Unprocessed_transition_cache :
     Coda_intf.Unprocessed_transition_cache_intf

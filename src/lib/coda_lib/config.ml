@@ -24,8 +24,8 @@ type t =
   ; net_config: Coda_networking.Config.t
   ; snark_pool_disk_location: string
   ; wallets_disk_location: string
-  ; ledger_db_location: string option
-  ; transition_frontier_location: string option
+  ; persistent_root_location: string
+  ; persistent_frontier_location: string
   ; staged_ledger_transition_backup_capacity: int [@default 10]
   ; time_controller: Block_time.Controller.t
   ; receipt_chain_database: Receipt_chain_database.t

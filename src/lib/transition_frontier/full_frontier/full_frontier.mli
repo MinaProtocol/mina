@@ -14,6 +14,8 @@ val create :
 
 val close : t -> unit
 
+val root_data : t -> Root_data.t
+
 val set_hash_unsafe : t -> [`I_promise_this_is_safe of Frontier_hash.t] -> unit
 
 val hash : t -> Frontier_hash.t

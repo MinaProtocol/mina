@@ -125,8 +125,7 @@ module Worker = struct
         ()
     (* TODO: log the diff that failed *)
     | Error (`Apply_diff _) ->
-        failwith
-          "Failed to apply a diff to the persistent transition frontier"
+        failwith "Failed to apply a diff to the persistent transition frontier"
     | Error (`Not_found `Frontier_hash) ->
         failwith
           "Failed to find frontier hash in persistent transition frontier"

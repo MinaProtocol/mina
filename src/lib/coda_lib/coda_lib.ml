@@ -8,7 +8,6 @@ open Coda_transition
 open Pipe_lib
 open Strict_pipe
 open Signature_lib
-open Coda_state
 open O1trace
 open Otp_lib
 module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
@@ -334,13 +333,12 @@ let create_sync_status_observer ~logger
               Logger.info (Logger.create ()) ~module_:__MODULE__
                 ~location:__LOC__ "Coda daemon is now bootstrapping" ;
               `Bootstrap
-          | Some (_, catchup_signal) -> (
-            match catchup_signal with
-            | `Catchup ->
+          | Some (_, catchup_jobs) ->
+              if catchup_jobs > 0 then (
                 Logger.info (Logger.create ()) ~module_:__MODULE__
                   ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
-                `Catchup
-            | `Normal ->
+                `Catchup )
+              else (
                 Logger.info (Logger.create ()) ~module_:__MODULE__
                   ~location:__LOC__ "Coda daemon is now synced" ;
                 `Synced ) ) )
@@ -444,6 +442,15 @@ let staged_ledger_ledger_proof t =
 
 let validated_transitions t = t.pipes.validated_transitions_reader
 
+type root_diff =
+  {user_commands: User_command.Stable.V1.t list; root_length: int}
+[@@deriving bin_io]
+
+(* TODO: this is a bad pattern for two reasons:
+ *   - uses an abstraction leak to patch new functionality instead of making a new extension
+ *   - every call to this function will create a new, unique pipe with it's own thread for transfering
+ *     items from the identity extension with no route for termination
+ *)
 let root_diff t =
   let root_diff_reader, root_diff_writer =
     Strict_pipe.create ~name:"root diff"
@@ -455,7 +462,8 @@ let root_diff t =
           Deferred.unit
       | Some frontier ->
           Broadcast_pipe.Reader.iter
-            (Transition_frontier.For_tests.identity_pipe frontier)
+            Transition_frontier.(
+              Extensions.(get_view_pipe (extensions frontier) Identity))
             ~f:
               (Deferred.List.iter ~f:(function
                 | Transition_frontier.Diff.Lite.E.E (New_node _) ->
@@ -465,12 +473,12 @@ let root_diff t =
                 | Transition_frontier.Diff.Lite.E.E
                     (Root_transitioned {new_root; _}) ->
                     Strict_pipe.Writer.write root_diff_writer
-                      ( `User_commands
-                          (Transition_frontier.Breadcrumb.to_user_commands
-                             (Transition_frontier.find_exn frontier
-                                new_root.hash))
-                      , `New_length
-                          (Transition_frontier.root_length frontier + 1) ) ;
+                      { user_commands=
+                          Transition_frontier.Breadcrumb.user_commands
+                            (Transition_frontier.find_exn frontier
+                               new_root.hash)
+                      ; root_length=
+                          Transition_frontier.root_length frontier + 1 } ;
                     Deferred.unit )) )) ;
   root_diff_reader
 
@@ -524,120 +532,6 @@ let start t =
     ~transition_writer:t.pipes.proposer_transition_writer ;
   Snark_worker.start t
 
-let seen_jobs t = t.seen_jobs
-
-let add_block_subscriber t public_key =
-  Subscriptions.add_block_subscriber t.subscriptions public_key
-
-let add_payment_subscriber t public_key =
-  Subscriptions.add_payment_subscriber t.subscriptions public_key
-
-let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
-
-let transaction_pool t = t.transaction_pool
-
-let transaction_database t = t.transaction_database
-
-let external_transition_database t = t.external_transition_database
-
-let snark_pool t = t.snark_pool
-
-let peers t = Net.peers t.net
-
-let initial_peers t = Net.initial_peers t.net
-
-let snark_work_fee t = t.snark_work_fee
-
-let receipt_chain_database t = t.receipt_chain_database
-
-let top_level_logger t = t.logger
-
-let staged_ledger_ledger_proof t =
-  let open Option.Let_syntax in
-  let%bind sl = best_staged_ledger_opt t in
-  Staged_ledger.current_ledger_proof sl
-
-let validated_transitions t = t.validated_transitions
-
-let root_diff t =
-  let root_diff_reader, root_diff_writer =
-    Strict_pipe.create ~name:"root diff"
-      (Buffered (`Capacity 30, `Overflow Crash))
-  in
-  don't_wait_for
-    (Broadcast_pipe.Reader.iter t.transition_frontier ~f:(function
-      | None ->
-          Deferred.unit
-      | Some frontier ->
-          Broadcast_pipe.Reader.iter
-            (Transition_frontier.For_tests.identity_pipe frontier)
-            ~f:
-              (Deferred.List.iter ~f:(function
-                | Transition_frontier.Diff.Lite.E.E (New_node _) ->
-                    Deferred.unit
-                | Transition_frontier.Diff.Lite.E.E (Best_tip_changed _) ->
-                    Deferred.unit
-                | Transition_frontier.Diff.Lite.E.E
-                    (Root_transitioned {new_root; _}) ->
-                    Strict_pipe.Writer.write root_diff_writer
-                      ( `User_commands
-                          (Transition_frontier.Breadcrumb.to_user_commands
-                             (Transition_frontier.find_exn frontier
-                                new_root.hash))
-                      , `New_length
-                          (Transition_frontier.root_length frontier + 1) ) ;
-                    Deferred.unit )) )) ;
-  root_diff_reader
-
-let dump_tf t =
-  peek_frontier t.transition_frontier
-  |> Or_error.map ~f:Transition_frontier.visualize_to_string
-
-(** The [best_path coda] is the list of state hashes from the root to the best_tip in the transition frontier. It includes the root hash and the hash *)
-let best_path t =
-  let open Option.Let_syntax in
-  let%map tf = Broadcast_pipe.Reader.peek t.transition_frontier in
-  let bt = Transition_frontier.best_tip tf in
-  List.cons
-    Transition_frontier.(root tf |> Breadcrumb.state_hash)
-    (Transition_frontier.hash_path tf bt)
-
-module Config = struct
-  type t =
-    { logger: Logger.t
-    ; trust_system: Trust_system.t
-    ; verifier: Verifier.t
-    ; initial_propose_keypairs: Keypair.Set.t
-    ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
-    ; net_config: Net.Config.t
-    ; transaction_pool_disk_location: string
-    ; snark_pool_disk_location: string
-    ; wallets_disk_location: string
-    ; persistent_root_location: string
-    ; persistent_frontier_location: string
-    ; staged_ledger_transition_backup_capacity: int [@default 10]
-    ; time_controller: Block_time.Controller.t
-    ; receipt_chain_database: Coda_base.Receipt_chain_database.t
-    ; transaction_database: Transaction_database.t
-    ; external_transition_database: External_transition_database.t
-    ; snark_work_fee: Currency.Fee.t
-    ; monitor: Monitor.t option
-    ; consensus_local_state: Consensus.Data.Local_state.t
-          (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
-    }
-  [@@deriving make]
-end
-
-let start t =
-  Proposer.run ~logger:t.logger ~verifier:t.verifier
-    ~trust_system:t.trust_system ~transaction_pool:t.transaction_pool
-    ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
-    ~time_controller:t.time_controller
-    ~keypairs:(Agent.read_only t.propose_keypairs)
-    ~consensus_local_state:t.consensus_local_state
-    ~frontier_reader:t.transition_frontier
-    ~transition_writer:t.proposer_transition_writer
-
 let create (config : Config.t) =
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
@@ -658,13 +552,12 @@ let create (config : Config.t) =
           let proposer_transition_reader, proposer_transition_writer =
             Strict_pipe.create Synchronous
           in
-          let net_ivar = Ivar.create () in
           (* TODO: (#3053) push transition frontier ownership down into transition router
              * (then persistent root can be owned by transition frontier only) *)
           let%bind transition_frontier =
             Transition_frontier.load
               { Transition_frontier.logger= config.logger
-              ; verifier= config.verifier
+              ; verifier
               ; consensus_local_state= config.consensus_local_state }
               ~persistent_root:
                 (Transition_frontier.Persistent_root.create
@@ -672,7 +565,7 @@ let create (config : Config.t) =
                    ~directory:config.persistent_root_location)
               ~persistent_frontier:
                 (Transition_frontier.Persistent_frontier.create
-                   ~logger:config.logger ~verifier:config.verifier
+                   ~logger:config.logger ~verifier
                    ~directory:config.persistent_frontier_location)
             >>| Fn.compose Result.ok_or_failwith
                   (Result.map_error ~f:(function
@@ -683,6 +576,11 @@ let create (config : Config.t) =
                         "TODO: bootstrap required"
                     | `Failure err ->
                         "failed to initialize transition frontier: " ^ err ))
+          in
+          let first_transition =
+            Transition_frontier.root transition_frontier
+            |> Transition_frontier.Breadcrumb.validated_transition
+            |> External_transition.Validation.forget_validation
           in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create (Some transition_frontier)
@@ -698,7 +596,7 @@ let create (config : Config.t) =
             f ~frontier input
           in
           let%bind net =
-            Net.create config.net_config
+            Coda_networking.create config.net_config
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                 (fun query_env ->
                 let input = Envelope.Incoming.data query_env in
@@ -708,10 +606,17 @@ let create (config : Config.t) =
                 let%bind frontier =
                   Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                 in
-                let%map scan_state, expected_merkle_root, pending_coinbases =
+                let%map scan_state, pending_coinbases =
                   Sync_handler
                   .get_staged_ledger_aux_and_pending_coinbases_at_hash
                     ~frontier input
+                in
+                let expected_merkle_root =
+                  Option.value
+                    (Option.map
+                       (Staged_ledger.Scan_state.target_merkle_root scan_state)
+                       ~f:Frozen_ledger_hash.to_ledger_hash)
+                    ~default:(Ledger.merkle_root (Lazy.force Genesis_ledger.t))
                 in
                 let staged_ledger_hash =
                   Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
@@ -765,36 +670,30 @@ let create (config : Config.t) =
           in
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
-            Broadcast_pipe.create genesis_transition
+            Broadcast_pipe.create first_transition
           in
           let valid_transitions =
             Transition_router.run ~logger:config.logger
-              ~trust_system:config.trust_system ~verifier:config.verifier
-              ~network:net ~time_controller:config.time_controller
+              ~trust_system:config.trust_system ~verifier ~network:net
+              ~time_controller:config.time_controller
               ~consensus_local_state:config.consensus_local_state
               ~frontier_broadcast_pipe:
                 (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
               ~network_transition_reader:
                 (Strict_pipe.Reader.map external_transitions_reader
                    ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
-              ~proposer_transition_reader
+              ~proposer_transition_reader ~most_recent_valid_block
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
               , new_blocks ) =
             Strict_pipe.Reader.Fork.three valid_transitions
           in
-          let%bind transaction_pool =
-            Transaction_pool.load ~logger:config.logger
-              ~trust_system:config.trust_system
-              ~disk_location:config.transaction_pool_disk_location
-              ~incoming_diffs:(Net.transaction_pool_diffs net)
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-          in
           don't_wait_for
-            (Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
+            (Linear_pipe.iter
+               (Network_pool.Transaction_pool.broadcasts transaction_pool)
                ~f:(fun x ->
-                 Net.broadcast_transaction_pool_diff net x ;
+                 Coda_networking.broadcast_transaction_pool_diff net x ;
                  Deferred.unit )) ;
           don't_wait_for
             (Strict_pipe.Reader.iter_without_pushback
@@ -901,8 +800,8 @@ let create (config : Config.t) =
             transition_frontier_incr
             >>= function
             | Some transition_frontier ->
-                Transition_frontier.catchup_signal transition_frontier
-                |> of_broadcast_pipe |> Var.watch
+                of_broadcast_pipe Ledger_catchup.Catchup_jobs.reader
+                |> Var.watch
                 >>| fun catchup_signal ->
                 Some (transition_frontier, catchup_signal)
             | None ->

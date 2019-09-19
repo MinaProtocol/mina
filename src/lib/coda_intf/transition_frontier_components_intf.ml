@@ -14,6 +14,10 @@ module type Catchup_intf = sig
 
   type network
 
+  module Catchup_jobs : sig
+    val reader : int Broadcast_pipe.Reader.t
+  end
+
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
@@ -255,8 +259,7 @@ module type Sync_handler_intf = sig
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        frontier:transition_frontier
     -> State_hash.t
-    -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
-       Option.t
+    -> (Staged_ledger.Scan_state.t * Pending_coinbase.t) Option.t
 
   val get_transition_chain :
        frontier:transition_frontier
@@ -392,12 +395,6 @@ module type Initial_validator_intf = sig
 end
 
 module type Transition_router_intf = sig
-  type verifier
-
-  type external_transition
-
-  type external_transition_validated
-
   type transition_frontier
 
   type transition_frontier_persistent_root
@@ -409,7 +406,7 @@ module type Transition_router_intf = sig
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
-    -> verifier:verifier
+    -> verifier:Verifier.t
     -> network:network
     -> time_controller:Block_time.Controller.t
     -> consensus_local_state:Consensus.Data.Local_state.t
@@ -418,9 +415,12 @@ module type Transition_router_intf = sig
                                * transition_frontier option
                                  Pipe_lib.Broadcast_pipe.Writer.t
     -> network_transition_reader:( [ `Transition of
-                                     external_transition Envelope.Incoming.t ]
+                                     External_transition.t Envelope.Incoming.t
+                                   ]
                                  * [`Time_received of Block_time.t] )
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
+    -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
+                               * External_transition.t Broadcast_pipe.Writer.t
     -> External_transition.Validated.t Strict_pipe.Reader.t
 end

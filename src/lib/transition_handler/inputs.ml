@@ -2,9 +2,7 @@ open Coda_base
 open Coda_transition
 
 module type S = sig
-  include Coda_intf.Inputs_intf
-
-  module Transition_frontier : Coda_intf.Transition_frontier_intf
+  module Transition_frontier : module type of Transition_frontier
 end
 
 module With_unprocessed_transition_cache = struct

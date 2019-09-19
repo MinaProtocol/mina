@@ -235,6 +235,8 @@ module type S = sig
     -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
     -> t
 
+  val genesis : Validated.t Lazy.t
+
   val timestamp : t -> Block_time.t
 
   val skip_time_received_validation :

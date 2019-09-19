@@ -4,9 +4,7 @@ open Coda_base
 open Coda_transition
 
 module type Inputs_intf = sig
-  include Coda_intf.Inputs_intf
-
-  module Transition_frontier : Coda_intf.Transition_frontier_intf
+  module Transition_frontier : module type of Transition_frontier
 
   module Best_tip_prover :
     Coda_intf.Best_tip_prover_intf
@@ -17,6 +15,13 @@ module Make (Inputs : Inputs_intf) :
   Coda_intf.Sync_handler_intf
   with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
+
+  let find_in_root_history frontier state_hash =
+    let open Transition_frontier.Extensions in
+    let root_history =
+      get_extension (Transition_frontier.extensions frontier) Root_history
+    in
+    Root_history.lookup root_history state_hash
 
   let get_breadcrumb_ledgers frontier =
     List.map
@@ -57,35 +62,38 @@ module Make (Inputs : Inputs_intf) :
   let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier state_hash
       =
     let open Option.Let_syntax in
-    let%map breadcrumb =
+    let%map scan_state, pending_coinbases =
       Option.merge
-        (Transition_frontier.find frontier state_hash)
-        (Transition_frontier.find_in_root_history frontier state_hash)
+        (let%map breadcrumb = Transition_frontier.find frontier state_hash in
+         let staged_ledger =
+           Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+         in
+         let scan_state = Staged_ledger.scan_state staged_ledger in
+         let pending_coinbase =
+           Staged_ledger.pending_coinbase_collection staged_ledger
+         in
+         (scan_state, pending_coinbase))
+        (let%map {scan_state; pending_coinbase; _} =
+           find_in_root_history frontier state_hash
+         in
+         (scan_state, pending_coinbase))
         ~f:Fn.const
     in
-    let staged_ledger =
-      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-    in
-    let scan_state = Staged_ledger.scan_state staged_ledger in
-    let merkle_root =
-      Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
-    in
-    let pending_coinbases =
-      Staged_ledger.pending_coinbase_collection staged_ledger
-    in
-    (scan_state, merkle_root, pending_coinbases)
+    (scan_state, pending_coinbases)
 
   let get_transition_chain ~frontier hashes =
+    let open Option.Let_syntax in
     Option.all
     @@ List.map hashes ~f:(fun hash ->
-           Option.merge
-             (Transition_frontier.find frontier hash)
-             (Transition_frontier.find_in_root_history frontier hash)
-             ~f:Fn.const
-           |> Option.map ~f:(fun breadcrumb ->
-                  Transition_frontier.Breadcrumb.validated_transition
-                    breadcrumb
-                  |> External_transition.Validation.forget_validation ) )
+           let%map validated_transition =
+             Option.merge
+               Transition_frontier.(
+                 find frontier hash >>| Breadcrumb.validated_transition)
+               (find_in_root_history frontier hash >>| fun x -> x.transition)
+               ~f:Fn.const
+           in
+           External_transition.Validation.forget_validation
+             validated_transition )
 
   module Root = struct
     let prove ~logger ~frontier seen_consensus_state =
@@ -183,7 +191,6 @@ module Make (Inputs : Inputs_intf) :
 end
 
 include Make (struct
-  include Transition_frontier.Inputs
   module Transition_frontier = Transition_frontier
   module Best_tip_prover = Best_tip_prover
 end)
