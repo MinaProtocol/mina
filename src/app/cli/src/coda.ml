@@ -345,7 +345,7 @@ let daemon logger =
          (let bytes_per_word = Sys.word_size / 8 in
           let rec loop () =
             let stat = Gc.stat () in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "OCaml memory statistics"
               ~metadata:
                 [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
@@ -632,9 +632,59 @@ let daemon logger =
            Auxiliary_database.External_transition_database.create ~logger
              external_transition_database_dir
          in
+         (* log terminated child processes *)
+         let pids = Child_processes.Termination.create_pid_set () in
+         let rec terminated_child_loop () =
+           match
+             try Unix.wait_nohang `Any
+             with
+             | Unix.Unix_error (errno, _, _)
+             when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
+                  (* no child processes exist *)
+             ->
+               None
+           with
+           | None ->
+               (* no children have terminated, wait to check again *)
+               let%bind () = Async.after (Time.Span.of_min 1.) in
+               terminated_child_loop ()
+           | Some (child_pid, exit_or_signal) ->
+               let child_pid_metadata =
+                 [("child_pid", `Int (Pid.to_int child_pid))]
+               in
+               ( match exit_or_signal with
+               | Ok () ->
+                   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                     "Daemon child process $child_pid terminated with exit \
+                      code 0"
+                     ~metadata:child_pid_metadata
+               | Error err -> (
+                 match err with
+                 | `Signal signal ->
+                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                       "Daemon child process $child_pid terminated after \
+                        receiving signal $signal"
+                       ~metadata:
+                         ( ("signal", `String (Signal.to_string signal))
+                         :: child_pid_metadata )
+                 | `Exit_non_zero exit_code ->
+                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                       "Daemon child process $child_pid terminated with \
+                        nonzero exit code $exit_code"
+                       ~metadata:
+                         (("exit_code", `Int exit_code) :: child_pid_metadata)
+                 ) ) ;
+               (* terminate daemon if children registered *)
+               Child_processes.Termination.check_terminated_child pids
+                 child_pid logger ;
+               (* check for other terminated children, without waiting *)
+               terminated_child_loop ()
+         in
+         Deferred.don't_wait_for @@ terminated_child_loop () ;
          let%map coda =
            Coda_lib.create
-             (Coda_lib.Config.make ~logger ~trust_system ~conf_dir ~net_config
+             (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+                ~net_config
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)

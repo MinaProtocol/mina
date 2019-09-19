@@ -15,6 +15,7 @@ module type Resource_pool_base_intf = sig
 
   val create :
        logger:Logger.t
+    -> pids:Child_processes.Termination.t
     -> trust_system:Trust_system.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
@@ -62,6 +63,7 @@ module type Network_pool_base_intf = sig
 
   val create :
        logger:Logger.t
+    -> pids:Child_processes.Termination.t
     -> trust_system:Trust_system.t
     -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
                       Linear_pipe.Reader.t
@@ -99,7 +101,14 @@ module type Snark_resource_pool_intf = sig
     Resource_pool_base_intf
     with type transition_frontier := transition_frontier
 
-  val bin_writer_t : t Bin_prot.Writer.t
+  type serializable [@@deriving bin_io]
+
+  val of_serializable :
+       serializable
+    -> logger:Logger.t
+    -> pids:Child_processes.Termination.t
+    -> trust_system:Trust_system.t
+    -> t
 
   val add_snark :
        t
@@ -107,6 +116,12 @@ module type Snark_resource_pool_intf = sig
     -> proof:ledger_proof One_or_two.t
     -> fee:Fee_with_prover.t
     -> [`Rebroadcast | `Don't_rebroadcast]
+
+  val verify_and_act :
+       t
+    -> work:work * ledger_proof One_or_two.t Priced_proof.t
+    -> sender:Envelope.Sender.t
+    -> unit Deferred.Or_error.t
 
   val request_proof :
     t -> work -> ledger_proof One_or_two.t Priced_proof.t option
