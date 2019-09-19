@@ -105,7 +105,7 @@ module Digest = struct
         List.take (unpack x) length
 end
 
-include Sponge.Make(Sponge.Poseidon (Inputs))
+include Sponge.Make (Sponge.Poseidon (Inputs))
 
 let update ~state = update ~state params
 
@@ -133,7 +133,7 @@ module Checked = struct
       let y10 = y |> square |> square |> ( * ) y |> square in
       assert_r1cs y10 y x ; y
 
-    module Operations = Sponge.Make_operations(Field)
+    module Operations = Sponge.Make_operations (Field)
   end
 
   module Digest = struct
@@ -145,7 +145,7 @@ module Checked = struct
       List.take (choose_preimage_var ~length:Field.size_in_bits x) length
   end
 
-  include Sponge.Make (Sponge.Poseidon(Inputs))
+  include Sponge.Make (Sponge.Poseidon (Inputs))
 
   let params =
     Sponge.Params.map ~f:Crypto_params.Tick0.Field.Var.constant params
