@@ -1,6 +1,6 @@
 open Core
 
-let params : _ Rescue.Params.t =
+let params : _ Sponge.Params.t =
   let open Crypto_params.Rescue_params in
   {mds; round_constants}
 
@@ -9,10 +9,31 @@ module Inputs = struct
 
   let to_the_alpha x =
     let open Field in
-    let zero = square in
-    let one a = square a * x in
-    let one' = x in
-    one' |> zero |> one |> one
+    let res = x + zero in
+    res *= res ;
+    (* x^2 *)
+    res *= res ;
+    (* x^4 *)
+    res *= x ;
+    (* x^5 *)
+    res *= res ;
+    (* x^10 *)
+    res *= x ;
+    res
+
+  module Operations = struct
+    let apply_matrix rows v =
+      Array.map rows ~f:(fun row ->
+          let open Field in
+          let res = zero + zero in
+          Array.iteri row ~f:(fun i r -> res += (r * v.(i))) ;
+          res )
+
+    let add_block ~state block =
+      Array.iteri block ~f:(fun i b ->
+          let open Field in
+          state.(i) += b )
+  end
 
   let alphath_root =
     let inv_alpha =
@@ -50,8 +71,8 @@ module Inputs = struct
     [%test_eq: Field.t] (to_the_alpha root) x
 end
 
-include Rescue.Make (Inputs)
-module State = Rescue.State
+include Sponge.Make (Sponge.Rescue (Inputs))
+module State = Sponge.State
 
 let update ~state = update ~state params
 
@@ -78,11 +99,15 @@ module Checked = struct
       in
       let y10 = y |> square |> square |> ( * ) y |> square in
       assert_r1cs y10 y x ; y
+
+    let apply_matrix = None
+
+    module Operations = Sponge.Make_operations (Field)
   end
 
-  include Rescue.Make (Inputs)
+  include Sponge.Make (Sponge.Rescue (Inputs))
 
-  let hash = hash (Rescue.Params.map ~f:Field.constant params)
+  let hash = hash (Sponge.Params.map ~f:Field.constant params)
 end
 
 let%test_unit "iterativeness" =
@@ -109,3 +134,5 @@ let%test_unit "rescue" =
       )
     (fun (x, y) -> hash [|x; y|])
     (x, y)
+
+module Poseidon = Sponge.Make (Sponge.Poseidon (Inputs))
