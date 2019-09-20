@@ -53,17 +53,25 @@ end)
           (of_ms @@ Float.of_int Consensus.Constants.block_window_duration_ms)
           (of_min 5.))
     in
-    let is_expired time = Time.(add time (Time.Span.of_min 30.) > now ()) in
+    let is_expired time = Time.(add time (Time.Span.of_min 30.) < now ()) in
     let rec go () =
       let rebroadcastable =
         Resource_pool.get_rebroadcastable t.resource_pool ~is_expired
       in
-      Logger.debug logger ~location:__LOC__ ~module_:__MODULE__
-        "Preparing to rebroadcast locally generated resource pool diffs $diffs"
-        ~metadata:
-          [ ( "diffs"
-            , `List (List.map ~f:Resource_pool.Diff.to_yojson rebroadcastable)
-            ) ] ;
+      let log (log_func : 'a Logger.log_function) =
+        log_func logger ~location:__LOC__ ~module_:__MODULE__
+      in
+      if List.is_empty rebroadcastable then
+        log Logger.trace "Nothing to rebroadcast"
+      else
+        log Logger.debug
+          "Preparing to rebroadcast locally generated resource pool diffs \
+           $diffs"
+          ~metadata:
+            [ ( "diffs"
+              , `List
+                  (List.map ~f:Resource_pool.Diff.to_yojson rebroadcastable) )
+            ] ;
       let%bind () =
         Deferred.List.iter rebroadcastable
           ~f:(Linear_pipe.write t.write_broadcasts)
