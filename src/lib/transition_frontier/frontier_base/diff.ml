@@ -25,7 +25,7 @@ let name : type repr mutant. (repr, mutant) t -> string = function
   | Best_tip_changed _ ->
       "Best_tip_changed"
 
-let key_to_yojson (type repr mutant) (key : (repr, mutant) t) =
+let to_yojson (type repr mutant) (key : (repr, mutant) t) =
   let json_key =
     match key with
     | New_node (Full breadcrumb) ->
@@ -40,7 +40,7 @@ let key_to_yojson (type repr mutant) (key : (repr, mutant) t) =
     | Best_tip_changed breadcrumb ->
         State_hash.to_yojson breadcrumb
   in
-  `List [`String (name key); json_key]
+  `Assoc [(name key, json_key)]
 
 let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
   match diff with

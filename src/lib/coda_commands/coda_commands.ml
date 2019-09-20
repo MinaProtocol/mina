@@ -80,7 +80,15 @@ let schedule_user_command t (txn : User_command.t) account_opt =
 let get_account t (addr : Public_key.Compressed.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in
-  Ledger.location_of_key ledger addr |> Option.bind ~f:(Ledger.get ledger)
+  printf "$$$$$ best ledger!!!\n" ;
+  let open Option.Let_syntax in
+  let%bind loc = Ledger.location_of_key ledger addr in
+  let%map account = Ledger.get ledger loc in
+  printf "$$$$$ got account: (%s, %d, %d)\n"
+    (Public_key.Compressed.to_string account.public_key)
+    (Currency.Balance.to_int account.balance)
+    (Account_nonce.to_int account.nonce) ;
+  account
 
 let get_accounts t =
   let open Participating_state.Let_syntax in

@@ -78,7 +78,8 @@ module T = struct
                         (List.map ~f:Breadcrumb.to_yojson
                            removed_from_best_tip_path) ) ] ;
               let new_user_commands =
-                List.bind added_to_best_tip_path ~f:Breadcrumb.user_commands
+                Breadcrumb.user_commands new_best_tip_breadcrumb
+                @ List.bind added_to_best_tip_path ~f:Breadcrumb.user_commands
                 @ new_user_commands
               in
               let removed_user_commands =

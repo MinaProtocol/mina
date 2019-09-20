@@ -69,7 +69,7 @@ type ('repr, 'mutant) t =
 
 type ('repr, 'mutant) diff = ('repr, 'mutant) t
 
-val key_to_yojson : ('repr, 'mutant) t -> Yojson.Safe.json
+val to_yojson : ('repr, 'mutant) t -> Yojson.Safe.json
 
 val to_lite : (full, 'mutant) t -> (lite, 'mutant) t
 

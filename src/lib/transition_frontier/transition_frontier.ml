@@ -31,7 +31,8 @@ type config =
 
 (* TODO: refactor persistent frontier sync into an extension *)
 type t =
-  { full_frontier: Full_frontier.t
+  { config: config
+  ; full_frontier: Full_frontier.t
   ; persistent_root: Persistent_root.t
   ; persistent_root_instance: Persistent_root.Instance.t
   ; persistent_frontier: Persistent_frontier.t
@@ -115,7 +116,8 @@ let load_from_persistence_and_start config ~max_length ~persistent_root
                  (Persistent_frontier.Database.Error.not_found_message err) )
       )
   in
-  { full_frontier
+  { config
+  ; full_frontier
   ; persistent_root
   ; persistent_root_instance
   ; persistent_frontier
@@ -217,7 +219,8 @@ let load = load_with_max_length ~max_length:global_max_length
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
 let close
-    { full_frontier
+    { config= _
+    ; full_frontier
     ; persistent_root= _safe_to_ignore_1
     ; persistent_root_instance
     ; persistent_frontier= _safe_to_ignore_2
@@ -243,12 +246,39 @@ let add_breadcrumb_exn t breadcrumb =
   let open Deferred.Let_syntax in
   let old_hash = Full_frontier.hash t.full_frontier in
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
+  Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
+    ~metadata:
+      [ ( "best_tip_hash"
+        , State_hash.to_yojson
+            (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier)
+        )
+      ; ( "n"
+        , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
+        ) ]
+    "PRE: ($best_tip_hash, $n)" ;
+  Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
+    ~metadata:
+      [ ( "diffs"
+        , `List
+            (List.map diffs ~f:(fun (Diff.Full.E.E diff) -> Diff.to_yojson diff))
+        ) ]
+    "Applying diffs: $diffs" ;
   let (`New_root new_root_identifier) =
     Full_frontier.apply_diffs t.full_frontier diffs
   in
   Option.iter new_root_identifier
     ~f:
       (Persistent_root.Instance.set_root_identifier t.persistent_root_instance) ;
+  Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
+    ~metadata:
+      [ ( "best_tip_hash"
+        , State_hash.to_yojson
+            (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier)
+        )
+      ; ( "n"
+        , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
+        ) ]
+    "POST: ($best_tip_hash, $n)" ;
   let diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in

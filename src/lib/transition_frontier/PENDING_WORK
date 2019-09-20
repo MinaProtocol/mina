@@ -1,6 +1,6 @@
 # Features
 
-- reimplement ledger catchup sync status (#3006)
++ reimplement ledger catchup sync status (#3006)
 + implement persistent transition frontier loading
 * implement short term fast forward hack
   - push transition frontier ownership down into transition router
@@ -20,15 +20,16 @@
 
 # Refactors
 
-- defunctor transition frontier
++ defunctor transition frontier
+- defunctor transition frontier components
+- create reusable pattern for singleton factories
 - singleton factory instance reuse after destruction prevention
 - remove identity pipe and extension
-- invert broadcastable extensions functor (include functor in definition, don't pass definition to functor)
-- create reusable pattern for singleton factories
-- better encapsulate transition frontier sub libraries using top level interfaces
++ better encapsulate transition frontier sub libraries using top level interfaces
 + improved error handling in persistent frontier instance entrypoints
++ extensions refactor (multiple files)
++ invert broadcastable extensions functor (include functor in definition, don't pass definition to functor)
 - convert persistent frontier sync into an extension?
-- extensions refactor (multiple files)
 
 # External
 

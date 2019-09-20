@@ -147,6 +147,7 @@ struct
          they are still valid against the ledger of the best tip. The goal is that
          transactions are carried from losing forks to winning ones as much as
          possible. *)
+      printf "&&&&&&&&&&&&&&&& doing the thing!\n" ;
       let validation_ledger = get_best_tip_ledger_and_update t frontier in
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
