@@ -68,7 +68,7 @@ module For_tests = struct
 
   let of_year years = Int64.of_int (years * 365 * 24 * 60 * 60 * 1000)
 
-  let password = lazy (Deferred.Or_error.return (Bytes.of_string ""))
+  let password = lazy (Deferred.return (Bytes.of_string ""))
 
   let compress_key_pairs =
     List.map ~f:(fun {Keypair.public_key; _} -> Public_key.compress public_key)

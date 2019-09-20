@@ -64,6 +64,17 @@ module type Lib_intf = sig
   module State : sig
     include State_intf
 
+    val remove_old_assignments : t -> logger:Logger.t -> t
+
+    val remove :
+         t
+      -> ( Transaction.t
+         , Transaction_witness.t
+         , Ledger_proof.t )
+         Snark_work_lib.Work.Single.Spec.t
+         One_or_two.t
+      -> t
+
     val set :
          t
       -> ( Transaction.t
@@ -91,8 +102,7 @@ module type Lib_intf = sig
        list
 
   val all_works :
-       logger:Logger.t
-    -> Staged_ledger.t
+       Staged_ledger.t
     -> State.t
     -> ( Transaction.t
        , Transaction_witness.t
@@ -122,6 +132,8 @@ module type Selection_method_intf = sig
   type work
 
   module State : State_intf
+
+  val remove : State.t -> work One_or_two.t -> State.t
 
   val work :
        snark_pool:snark_pool
