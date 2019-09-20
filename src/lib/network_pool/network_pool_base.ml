@@ -73,10 +73,12 @@ end)
     in
     go ()
 
-  let create ~logger ~trust_system ~incoming_diffs ~frontier_broadcast_pipe =
+  let create ~logger ~pids ~trust_system ~incoming_diffs
+      ~frontier_broadcast_pipe =
     let t =
       of_resource_pool_and_diffs
-        (Resource_pool.create ~logger ~trust_system ~frontier_broadcast_pipe)
+        (Resource_pool.create ~logger ~trust_system ~pids
+           ~frontier_broadcast_pipe)
         ~logger ~incoming_diffs
     in
     don't_wait_for (rebroadcast_loop t logger) ;

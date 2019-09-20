@@ -308,7 +308,7 @@ struct
                   log_invalid () ) ;
       Deferred.unit
 
-    let create ~logger ~trust_system ~frontier_broadcast_pipe =
+    let create ~logger ~pids:_ ~trust_system ~frontier_broadcast_pipe =
       let t =
         { pool= Indexed_pool.empty
         ; locally_generated_uncommitted=
@@ -807,8 +807,9 @@ let%test_module _ =
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
       let trust_system = Trust_system.null () in
       let pool =
-        Test.Resource_pool.create ~logger:(Logger.null ()) ~trust_system
-          ~frontier_broadcast_pipe:tf_pipe_r
+        Test.Resource_pool.create ~logger:(Logger.null ())
+          ~pids:(Child_processes.Termination.create_pid_set ())
+          ~trust_system ~frontier_broadcast_pipe:tf_pipe_r
       in
       let%map () = Async.Scheduler.yield () in
       ( (fun txs ->
@@ -1001,6 +1002,7 @@ let%test_module _ =
           let frontier_pipe_r, frontier_pipe_w = Broadcast_pipe.create None in
           let pool =
             Test.Resource_pool.create ~logger:(Logger.null ())
+              ~pids:(Child_processes.Termination.create_pid_set ())
               ~trust_system:(Trust_system.null ())
               ~frontier_broadcast_pipe:frontier_pipe_r
           in

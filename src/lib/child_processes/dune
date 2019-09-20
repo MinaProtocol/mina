@@ -1,0 +1,4 @@
+(library
+  (name child_processes)
+  (public_name child_processes)
+  (libraries core_kernel async logger))

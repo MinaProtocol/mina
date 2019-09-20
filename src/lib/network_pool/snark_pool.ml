@@ -45,6 +45,7 @@ module type S = sig
 
   val load :
        logger:Logger.t
+    -> pids:Child_processes.Termination.t
     -> trust_system:Trust_system.t
     -> disk_location:string
     -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
@@ -124,11 +125,12 @@ struct
         { snark_tables: serializable
         ; mutable ref_table: int Statement_table.t option
         ; logger: Logger.t sexp_opaque
+        ; pids: Child_processes.Termination.t sexp_opaque
         ; trust_system: Trust_system.t sexp_opaque }
       [@@deriving sexp]
 
-      let of_serializable tables ~logger ~trust_system : t =
-        {snark_tables= tables; ref_table= None; logger; trust_system}
+      let of_serializable tables ~logger ~pids ~trust_system : t =
+        {snark_tables= tables; ref_table= None; logger; pids; trust_system}
 
       let removed_breadcrumb_wait = 10
 
@@ -205,12 +207,13 @@ struct
         in
         Deferred.don't_wait_for tf_deferred
 
-      let create ~logger ~trust_system ~frontier_broadcast_pipe =
+      let create ~logger ~pids ~trust_system ~frontier_broadcast_pipe =
         let t =
           { snark_tables=
               { all= Statement_table.create ()
               ; rebroadcastable= Statement_table.create () }
           ; logger
+          ; pids
           ; trust_system
           ; ref_table= None }
         in
@@ -289,7 +292,9 @@ struct
             let%map () = log_and_punish statement e in
             Error e
           else
-            let%bind verifier = Verifier.create () in
+            let%bind verifier =
+              Verifier.create ~logger:t.logger ~pids:t.pids
+            in
             match%bind
               Verifier.verify_transaction_snark verifier proof ~message
             with
@@ -352,7 +357,7 @@ struct
         Transaction_snark_work.Checked.create_unsafe
           {Transaction_snark_work.fee; proofs= proof; prover} )
 
-  let load ~logger ~trust_system ~disk_location ~incoming_diffs
+  let load ~logger ~pids ~trust_system ~disk_location ~incoming_diffs
       ~frontier_broadcast_pipe =
     match%map
       Async.Reader.load_bin_prot disk_location
@@ -360,7 +365,7 @@ struct
     with
     | Ok snark_table ->
         let pool =
-          Resource_pool.of_serializable snark_table ~logger ~trust_system
+          Resource_pool.of_serializable snark_table ~logger ~pids ~trust_system
         in
         let network_pool =
           of_resource_pool_and_diffs pool ~logger ~incoming_diffs
@@ -369,7 +374,8 @@ struct
           pool ;
         network_pool
     | Error _e ->
-        create ~logger ~trust_system ~incoming_diffs ~frontier_broadcast_pipe
+        create ~logger ~pids ~trust_system ~incoming_diffs
+          ~frontier_broadcast_pipe
 
   open Snark_work_lib.Work
 
@@ -415,6 +421,7 @@ let%test_module "random set test" =
       let resource_pool =
         Mock_snark_pool.Resource_pool.create ~logger:(Logger.null ())
           ~trust_system:(Trust_system.null ())
+          ~pids:(Child_processes.Termination.create_pid_set ())
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       List.iter sample_solved_work ~f:(fun (work, fee) ->
@@ -532,8 +539,9 @@ let%test_module "random set test" =
         Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
       in
       let network_pool =
-        Mock_snark_pool.create ~logger:(Logger.null ()) ~trust_system
-          ~incoming_diffs:pool_reader
+        Mock_snark_pool.create ~logger:(Logger.null ())
+          ~pids:(Child_processes.Termination.create_pid_set ())
+          ~trust_system ~incoming_diffs:pool_reader
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       let priced_proof =
@@ -594,8 +602,9 @@ let%test_module "random set test" =
           Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
         in
         let network_pool =
-          Mock_snark_pool.create ~logger:(Logger.null ()) ~trust_system
-            ~incoming_diffs:work_diffs
+          Mock_snark_pool.create ~logger:(Logger.null ())
+            ~pids:(Child_processes.Termination.create_pid_set ())
+            ~trust_system ~incoming_diffs:work_diffs
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         don't_wait_for
