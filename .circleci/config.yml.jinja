@@ -55,6 +55,20 @@ jobs:
                   name: Build bot
                   command: cd frontend/bot && yarn run build-ci
 
+    build-archive:
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Run Docker Development containers
+                  command: cd scripts/archive && docker-compose up -d
+            - run:
+                  name: Check Introspection Queries are produced correctly
+                  command: cd scripts/archive && ./check_introspection_queries.sh
+            - run:
+                  name: Build Archive Process
+                  command: dune build src/app/archive/archive.exe
+            
     lint:
         docker:
             - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
