@@ -56,6 +56,8 @@ jobs:
                   command: cd frontend/bot && yarn run build-ci
 
     build-archive:
+        docker:
+            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
