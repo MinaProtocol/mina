@@ -180,7 +180,7 @@ module Stable = struct
         ; fee_excess: Amount.Signed.Stable.V1.t
         ; sok_digest: Sok_message.Digest.Stable.V1.t
         ; proof: Proof.Stable.V1.t }
-      [@@deriving bin_io, equal, fields, sexp, version, yojson]
+      [@@deriving bin_io, fields, sexp, version, yojson]
     end
 
     include T
@@ -209,7 +209,7 @@ type t = Stable.Latest.t =
   ; fee_excess: Amount.Signed.Stable.V1.t
   ; sok_digest: Sok_message.Digest.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
-[@@deriving equal, fields, sexp, yojson]
+[@@deriving fields, sexp, yojson]
 
 let statement
     ({ source

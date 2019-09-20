@@ -77,7 +77,6 @@ end)
           (Yojson.Safe.to_string @@ Work.compact_json work)
           (Yojson.Safe.to_string @@ Coda_base.Fee_with_prover.to_yojson fee)
 
-  (* TODO if sender is self, track and rebroadcast periodically. *)
   let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :
       t Or_error.t Deferred.t =
     let open Deferred.Or_error.Let_syntax in
