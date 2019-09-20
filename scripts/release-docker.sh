@@ -13,7 +13,7 @@ VALID_SERVICES=('daemon' 'bot')
 
 function usage() {
   if [ -n "$1" ]; then
-    echo -e "${RED}👉  $1${CLEAR}\n";
+    echo -e "${RED}☞  $1${CLEAR}\n";
   fi
   echo "Usage: $0 [-s service-to-release] [-v service-version]"
   echo "  -s, --service             The Service being released to Dockerhub"
@@ -54,4 +54,4 @@ esac
 
 docker build $EXTRA $DOCKER_CONTEXT -t codaprotocol/$SERVICE:$VERSION -f $DOCKERFILE_PATH
 
-if [ -z "$NOUPLOAD" ]; then docker push codaprotocol/$SERVICE:$VERSION; fi;
+if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then docker push codaprotocol/$SERVICE:$VERSION; fi;
