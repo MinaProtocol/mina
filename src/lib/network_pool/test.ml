@@ -6,27 +6,28 @@ let%test_module "network pool test" =
   ( module struct
     let trust_system = Mocks.trust_system
 
-    module Mock_snark_pool =
-      Snark_pool.Make (Mocks.Ledger_proof) (Mocks.Transaction_snark_work)
-        (Mocks.Transition_frontier)
+    module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
       let pool_reader, _pool_writer = Linear_pipe.create () in
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create None in
       let work =
-        [ Quickcheck.random_value ~seed:(`Deterministic "network_pool_test")
-            Transaction_snark.Statement.gen ]
+        `One
+          (Quickcheck.random_value ~seed:(`Deterministic "network_pool_test")
+             Transaction_snark.Statement.gen)
       in
       let priced_proof =
-        { Priced_proof.proof= []
+        { Priced_proof.proof=
+            One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
         ; fee=
             { fee= Currency.Fee.of_int 0
             ; prover= Signature_lib.Public_key.Compressed.empty } }
       in
       let network_pool =
-        Mock_snark_pool.create ~logger:(Logger.null ()) ~trust_system
-          ~incoming_diffs:pool_reader
+        Mock_snark_pool.create ~logger:(Logger.null ())
+          ~pids:(Child_processes.Termination.create_pid_set ())
+          ~trust_system ~incoming_diffs:pool_reader
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -53,7 +54,7 @@ let%test_module "network pool test" =
         Quickcheck.random_sequence ~seed:(`Deterministic "works")
           Transaction_snark.Statement.gen
         |> Fn.flip Sequence.take 10
-        |> Sequence.map ~f:List.return
+        |> Sequence.map ~f:(fun x -> `One x)
         |> Sequence.to_list
       in
       let verify_unsolved_work () =
@@ -63,7 +64,9 @@ let%test_module "network pool test" =
                 (Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
                    ( work
                    , Priced_proof.
-                       { proof= []
+                       { proof=
+                           One_or_two.map
+                             ~f:Ledger_proof.For_tests.mk_dummy_proof work
                        ; fee=
                            { fee= Currency.Fee.of_int 0
                            ; prover= Signature_lib.Public_key.Compressed.empty
@@ -74,8 +77,9 @@ let%test_module "network pool test" =
           Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
         in
         let network_pool =
-          Mock_snark_pool.create ~logger:(Logger.null ()) ~trust_system
-            ~incoming_diffs:work_diffs
+          Mock_snark_pool.create ~logger:(Logger.null ())
+            ~pids:(Child_processes.Termination.create_pid_set ())
+            ~trust_system ~incoming_diffs:work_diffs
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         don't_wait_for

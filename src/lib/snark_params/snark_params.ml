@@ -8,6 +8,7 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
+module Sponge = Sponge_inst
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -672,7 +673,7 @@ module Tick = struct
     let final_exponentiation = FE.final_exponentiation6
   end
 
-  module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
+  module Run = Crypto_params.Runners.Tick
 
   let m : Run.field Snarky.Snark.m = (module Run)
 
@@ -792,3 +793,20 @@ let pending_coinbase_depth =
 let target_bit_length = Tick.Field.size_in_bits - 8
 
 module type Snark_intf = Snark_intf.S
+
+let%bench_fun "pedersen" =
+  let open Tick in
+  let x = Field.random () |> Field.unpack in
+  fun () ->
+    Pedersen.digest_fold (Pedersen.State.create ())
+      Fold_lib.Fold.(group3 ~default:false (of_list x))
+
+let%bench_fun "rescue" =
+  let open Tick in
+  let x = Field.random () in
+  fun () -> Sponge.hash [|x|]
+
+let%bench_fun "poseidon" =
+  let open Tick in
+  let x = Field.random () in
+  fun () -> Sponge.Poseidon.hash Sponge.params [|x|]

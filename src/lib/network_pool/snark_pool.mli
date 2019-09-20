@@ -45,6 +45,7 @@ module type S = sig
 
   val load :
        logger:Logger.t
+    -> pids:Child_processes.Termination.t
     -> trust_system:Trust_system.t
     -> disk_location:string
     -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
@@ -87,13 +88,9 @@ module type Transition_frontier_intf = sig
     t -> (int * int Extensions.Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
 end
 
-module Make (Ledger_proof : sig
-  type t [@@deriving bin_io, sexp, to_yojson, version]
-end)
-(Transaction_snark_work : Coda_intf.Transaction_snark_work_intf
-                          with type ledger_proof := Ledger_proof.t)
-(Transition_frontier : Transition_frontier_intf
-                       with type work := Transaction_snark_work.Statement.t) :
+module Make
+    (Transition_frontier : Transition_frontier_intf
+                           with type work := Transaction_snark_work.Statement.t) :
   S
   with type transaction_snark_statement := Transaction_snark.Statement.t
    and type transaction_snark_work_statement :=

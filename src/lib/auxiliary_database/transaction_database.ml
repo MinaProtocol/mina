@@ -68,6 +68,8 @@ module For_tests = struct
 
   let of_year years = Int64.of_int (years * 365 * 24 * 60 * 60 * 1000)
 
+  let password = lazy (Deferred.return (Bytes.of_string ""))
+
   let compress_key_pairs =
     List.map ~f:(fun {Keypair.public_key; _} -> Public_key.compress public_key)
 
@@ -77,8 +79,9 @@ module For_tests = struct
     let%bind wallets = Secrets.Wallets.load ~logger ~disk_location:directory in
     let%map local_wallet_keypairs =
       Deferred.List.init num_wallets ~f:(fun _ ->
-          let%map needle = Secrets.Wallets.generate_new wallets in
-          Option.value_exn (Secrets.Wallets.find wallets ~needle) )
+          let%map needle = Secrets.Wallets.generate_new wallets ~password in
+          let keypair = Secrets.Wallets.find_unlocked wallets ~needle in
+          Option.value_exn keypair )
     in
     let remote_user_keypairs =
       List.init num_foreign ~f:(fun _ -> Keypair.create ())
@@ -109,7 +112,7 @@ module For_tests = struct
     let time_gen =
       let time_now =
         Block_time.Time.to_span_since_epoch
-          (Block_time.Time.now Block_time.Time.Controller.basic)
+          (Block_time.Time.now @@ Block_time.Time.Controller.basic ~logger)
       in
       let time_max = Block_time.Time.Span.to_ms time_now in
       let time_min = Int64.(time_max - of_year 5) in

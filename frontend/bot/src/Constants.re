@@ -11,9 +11,14 @@ let getEnv = (~default, name) =>
 let getEnvOpt = name => Js.Dict.get(Node.Process.process##env, name);
 
 let echoKey = getEnvOpt("ECHO_PUBLICKEY");
+let echoPassword = getEnvOpt("ECHO_PASSWORD");
 let echoKey2 = getEnvOpt("ECHO_PUBLICKEY_2");
+let echoPassword2 = getEnvOpt("ECHO_PASSWORD_2");
 let repeaterKey = getEnvOpt("REPEATER_PUBLICKEY");
+let repeaterPassword = getEnvOpt("REPEATER_PASSWORD");
 let faucetKey = getEnvOrFail("FAUCET_PUBLICKEY");
+let faucetPassword = getEnvOrFail("FAUCET_PASSWORD");
+
 let discordApiKey = getEnvOrFail("DISCORD_API_KEY");
 
 let graphqlPort = getEnv(~default=string_of_int(0xc0d), "CODA_GRAPHQL_PORT");

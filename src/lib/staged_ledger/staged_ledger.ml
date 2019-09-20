@@ -11,30 +11,9 @@ open Signature_lib
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
-module Make_with_constants (Constants : sig
-  val transaction_capacity_log_2 : int
-
-  val work_delay : int
-end)
-(Inputs : Coda_intf.Tmp_test_stub_hack.For_staged_ledger_intf) :
-  Coda_intf.Staged_ledger_generalized_intf
-  with type diff := Inputs.Staged_ledger_diff.t
-   and type valid_diff :=
-              Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t
-   and type ledger_proof := Inputs.Ledger_proof.t
-   and type verifier := Inputs.Verifier.t
-   and type transaction_snark_work := Inputs.Transaction_snark_work.t
-   and type transaction_snark_work_statement :=
-              Inputs.Transaction_snark_work.Statement.t
-   and type transaction_snark_work_checked :=
-              Inputs.Transaction_snark_work.Checked.t
-   and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
-   and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
-   and type transaction_snark_statement := Transaction_snark.Statement.t =
-struct
-  open Inputs
-  module Scan_state = Transaction_snark_scan_state.Make (Inputs) (Constants)
-  module Pre_diff_info = Pre_diff_info.Make (Inputs)
+module T = struct
+  module Scan_state = Transaction_snark_scan_state
+  module Pre_diff_info = Pre_diff_info
 
   module Staged_ledger_error = struct
     type t =
@@ -60,24 +39,19 @@ struct
           Format.asprintf
             !"Pre_diff_info.Error error: %{sexp:Pre_diff_info.Error.t}"
             pre_diff_error
-      | Invalid_proof (p, s, prover) ->
+      | Invalid_proof (_p, s, prover) ->
           Format.asprintf
-            !"Verification failed for proof: %{sexp: Ledger_proof.t} \
-              Statement: %{sexp: Transaction_snark.Statement.t} Prover: \
-              %{sexp:Public_key.Compressed.t}\n"
-            p s prover
+            !"Verification failed for proof with statement: %{sexp: \
+              Transaction_snark.Statement.t} work_id: %i Prover:%s}\n"
+            s
+            (Transaction_snark.Statement.hash s)
+            (Yojson.Safe.to_string @@ Public_key.Compressed.to_yojson prover)
       | Insufficient_work str ->
           str
       | Unexpected e ->
           Error.to_string_hum e
 
     let to_error = Fn.compose Error.of_string to_string
-
-    let to_or_error = function
-      | Ok s ->
-          Ok s
-      | Error e ->
-          Or_error.error_string (to_string e)
   end
 
   let to_staged_ledger_or_error = function
@@ -89,22 +63,29 @@ struct
   type job = Scan_state.Available_job.t [@@deriving sexp]
 
   let verify_proof ~logger ~verifier ~proof ~statement ~message =
+    let log_error err_str ~metadata =
+      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          ( [ ("statement", Transaction_snark.Statement.to_yojson statement)
+            ; ("error", `String err_str)
+            ; ("sok_message", Sok_message.to_yojson message) ]
+          @ metadata )
+        "Invalid transaction snark for statement $statement: $error" ;
+      Deferred.return false
+    in
     let statement_eq a b = Int.(Transaction_snark.Statement.compare a b = 0) in
     if not (statement_eq (Ledger_proof.statement proof) statement) then
-      Deferred.return false
+      log_error "Statement and proof do not match"
+        ~metadata:
+          [ ( "statement_from_proof"
+            , Transaction_snark.Statement.to_yojson
+                (Ledger_proof.statement proof) ) ]
     else
-      match%map
-        Inputs.Verifier.verify_transaction_snark verifier proof ~message
-      with
+      match%bind Verifier.verify_transaction_snark verifier proof ~message with
       | Ok b ->
-          b
+          Deferred.return b
       | Error e ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:
-              [ ("statement", Transaction_snark.Statement.to_yojson statement)
-              ; ("error", `String (Error.to_string_hum e)) ]
-            "Invalid transaction snark for statement $statement: $error" ;
-          false
+          log_error (Error.to_string_hum e) ~metadata:[]
 
   let verify ~logger ~verifier ~message job proof prover =
     let open Deferred.Let_syntax in
@@ -440,20 +421,16 @@ struct
       Scan_state.k_work_pairs_for_new_diff scan_state ~k:work_count
     in
     let check job_proofs prover message =
-      let open Deferred.Let_syntax in
-      Deferred.List.find_map job_proofs ~f:(fun (job, proof) ->
-          match%map verify ~logger ~verifier ~message job proof prover with
-          | Ok () ->
-              None
-          | Error e ->
-              Some e )
+      One_or_two.Deferred_result.map job_proofs ~f:(fun (job, proof) ->
+          verify ~logger ~verifier ~message job proof prover )
     in
     let open Deferred.Let_syntax in
     let%map result =
       Deferred.List.find_map (List.zip_exn job_pairs completed_works)
         ~f:(fun (jobs, work) ->
           let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-          check (List.zip_exn jobs work.proofs) work.prover message )
+          Deferred.map ~f:Result.error
+          @@ check (One_or_two.zip_exn jobs work.proofs) work.prover message )
     in
     Option.value_map result ~default:(Ok ()) ~f:(fun e -> Error e)
 
@@ -641,9 +618,7 @@ struct
           (Staged_ledger_error.Pre_diff
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts"))
 
-  (* N.B.: we don't expose apply_diff_unverified
-     in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
-  let apply_diff ~logger ~verifier t (sl_diff : Staged_ledger_diff.t) =
+  let apply_diff ~logger t pre_diff_info =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2
@@ -656,16 +631,7 @@ struct
     in
     let new_mask = Ledger.Mask.create () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
-    let pre_diff_info =
-      Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
-      @@ Pre_diff_info.get sl_diff
-    in
-    let%bind transactions, works, user_commands_count, coinbases =
-      Deferred.return pre_diff_info
-    in
-    Coda_metrics.(
-      Gauge.set Snark_work.completed_snark_work_last_block
-        (Float.of_int (List.length works))) ;
+    let transactions, works, user_commands_count, coinbases = pre_diff_info in
     let%bind is_new_stack, data, stack_update =
       update_coinbase_stack_and_get_data t.scan_state new_ledger
         t.pending_coinbase_collection transactions
@@ -691,7 +657,6 @@ struct
                    slots required work_count)))
       else Deferred.return (Ok ())
     in
-    let%bind () = check_completed_works ~logger ~verifier t.scan_state works in
     let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
     let%bind res_opt, scan_state' =
       let r =
@@ -706,27 +671,14 @@ struct
           in
           Logger.error logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
-              [ ("staged_ledger_diff", Staged_ledger_diff.to_yojson sl_diff)
-              ; ( "scan_state"
+              [ ( "scan_state"
                 , `String (Scan_state.snark_job_list_json t.scan_state) )
               ; ("data", data_json) ]
-            !"Unexpected error when applying the diff $staged_ledger_diff, \
-              data $data to the scan_state $scan_state: %s\n\
+            !"Unexpected error when applying diff data $data to the \
+              scan_state $scan_state: %s\n\
               %!"
             (Error.to_string_hum e) ) ;
       Deferred.return (to_staged_ledger_or_error r)
-    in
-    let () =
-      try
-        Coda_metrics.(
-          Gauge.set Snark_work.scan_state_snark_work
-            (Float.of_int
-               (List.length (Scan_state.all_work_pairs_exn scan_state'))))
-      with exn ->
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("error", `String (Exn.to_string exn))]
-          !"Error when getting all work pairs from scan state: $error" ;
-        Exn.reraise exn "Error when getting all work pairs from scan state"
     in
     let%bind updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
@@ -764,67 +716,44 @@ struct
     , `Staged_ledger new_staged_ledger
     , `Pending_coinbase_data (is_new_stack, coinbase_amount) )
 
-  let apply t witness ~logger = apply_diff t witness ~logger
+  let apply t witness ~logger ~verifier =
+    let open Deferred.Result.Let_syntax in
+    let work = Staged_ledger_diff.completed_works witness in
+    Coda_metrics.(
+      Gauge.set Snark_work.completed_snark_work_last_block
+        (Float.of_int @@ List.length work)) ;
+    let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
+    let%bind prediff =
+      Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
+      @@ Pre_diff_info.get witness
+      |> Deferred.return
+    in
+    let%map res = apply_diff t prediff ~logger in
+    let _, _, `Staged_ledger new_staged_ledger, _ = res in
+    let () =
+      try
+        Coda_metrics.(
+          Gauge.set Snark_work.scan_state_snark_work
+            (Float.of_int
+               (List.length
+                  (Scan_state.all_work_pairs_exn new_staged_ledger.scan_state))))
+      with exn ->
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("error", `String (Exn.to_string exn))]
+          !"Error when getting all work pairs from scan state: $error" ;
+        Exn.reraise exn "Error when getting all work pairs from scan state"
+    in
+    res
 
   let apply_diff_unchecked t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
-    let open Deferred.Or_error.Let_syntax in
-    let new_mask = Ledger.Mask.create () in
-    let transactions, works, coinbases = Pre_diff_info.get_unchecked sl_diff in
-    let new_ledger = Ledger.register_mask t.ledger new_mask in
-    let%bind is_new_stack, data, updated_coinbase_stack =
-      let open Deferred.Let_syntax in
-      let%bind x =
-        update_coinbase_stack_and_get_data t.scan_state new_ledger
-          t.pending_coinbase_collection transactions
-      in
-      Staged_ledger_error.to_or_error x |> Deferred.return
+    let open Deferred.Result.Let_syntax in
+    let%bind prediff =
+      Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
+      @@ Pre_diff_info.get_unchecked sl_diff
+      |> Deferred.return
     in
-    let slots = List.length data in
-    let work_count = List.length works in
-    let required_pairs =
-      Scan_state.work_statements_for_new_diff t.scan_state
-    in
-    let%bind () =
-      let required = List.length required_pairs in
-      if
-        work_count < required
-        && List.length data
-           > Scan_state.free_space t.scan_state - required + work_count
-      then
-        Deferred.return
-          (Or_error.errorf
-             !"Insufficient number of transaction snark work (slots \
-               occupying: %d)  required %d, got %d"
-             slots required work_count)
-      else Deferred.return (Ok ())
-    in
-    let res_opt, scan_state' =
-      Or_error.ok_exn
-        (Scan_state.fill_work_and_enqueue_transactions t.scan_state data works)
-    in
-    let%bind coinbase_amount =
-      coinbase_for_blockchain_snark coinbases
-      |> Staged_ledger_error.to_or_error |> Deferred.return
-    in
-    let%map update_pending_coinbase_collection' =
-      update_pending_coinbase_collection t.pending_coinbase_collection
-        updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
-      |> Staged_ledger_error.to_or_error |> Deferred.return
-    in
-    Or_error.ok_exn
-      (verify_scan_state_after_apply
-         (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
-         scan_state') ;
-    let new_staged_ledger =
-      { scan_state= scan_state'
-      ; ledger= new_ledger
-      ; pending_coinbase_collection= update_pending_coinbase_collection' }
-    in
-    ( `Hash_after_applying (hash new_staged_ledger)
-    , `Ledger_proof res_opt
-    , `Staged_ledger new_staged_ledger
-    , `Pending_coinbase_data (is_new_stack, coinbase_amount) )
+    apply_diff t prediff ~logger:(Logger.null ())
 
   module Resources = struct
     module Discarded = struct
@@ -859,8 +788,8 @@ struct
       ; logger: Logger.t }
 
     let coinbase_ft (cw : Transaction_snark_work.t) =
-      (* Here we could not add the fee transfer if the prover=self but 
-      retaining it to preserve that information in the 
+      (* Here we could not add the fee transfer if the prover=self but
+      retaining it to preserve that information in the
       staged_ledger_diff. It will be checked in apply_diff before adding*)
       Option.some_if (cw.fee > Fee.zero) (cw.prover, cw.fee)
 
@@ -1137,7 +1066,7 @@ struct
   end
 
   let worked_more (resources : Resources.t) =
-    (*Is the work constraint satisfied even after discarding a work bundle? 
+    (*Is the work constraint satisfied even after discarding a work bundle?
        We reach here after having more than enough work*)
     let more_work t =
       let slots = Resources.slots_occupied t in
@@ -1194,7 +1123,7 @@ struct
                 Zero
           in
           (* We have to reverse here because we only know they work in THIS order *)
-          { Staged_ledger_diff.With_valid_signatures_and_proofs.user_commands=
+          { Staged_ledger_diff.Pre_diff_one.user_commands=
               Sequence.to_list_rev res.user_commands_rev
           ; completed_works= Sequence.to_list_rev res.completed_work_rev
           ; coinbase= to_at_most_one res.coinbase } )
@@ -1306,7 +1235,7 @@ struct
           | Some cw_checked ->
               Continue
                 ( Sequence.append seq (Sequence.singleton cw_checked)
-                , List.length cw_checked.proofs + count )
+                , One_or_two.length cw_checked.proofs + count )
           | None ->
               Stop (seq, count) )
         ~finish:Fn.id
@@ -1352,640 +1281,126 @@ struct
   end
 end
 
-module Make = Make_with_constants (Transaction_snark_scan_state.Constants)
-
-include Make (struct
-  open Coda_base
-  module Pending_coinbase_hash = Pending_coinbase.Hash
-  module Proof_type = Transaction_snark.Proof_type
-  module Proof = Proof
-  module Sok_message = Sok_message
-  module Ledger_proof = Ledger_proof
-  module Verifier = Verifier
-
-  module Staged_ledger_aux_hash = struct
-    include Staged_ledger_hash.Aux_hash.Stable.V1
-
-    [%%define_locally
-    Staged_ledger_hash.Aux_hash.(of_bytes)]
-  end
-
-  module Staged_ledger_hash = Staged_ledger_hash
-  module Transaction_snark_work = Transaction_snark_work
-  module Staged_ledger_diff = Staged_ledger_diff
-  module Account = Account
-  module Transaction_validator = Transaction_validator
-end)
+include T
 
 let%test_module "test" =
   ( module struct
-    module Test_input1 = struct
-      module Sok_message = struct
-        module Stable = struct
-          module V1 = struct
-            module T = struct
-              type t = unit
-              [@@deriving bin_io, sexp, yojson, version {unnumbered}]
-            end
-
-            include T
-          end
-
-          module Latest = V1
-        end
-
-        module Digest = struct
-          include Unit
-          module Checked = Unit
-        end
-
-        type t = Stable.Latest.t [@@deriving sexp, yojson]
-
-        let create ~fee:_ ~prover:_ = ()
-      end
-
-      module Proof_type = Transaction_snark.Proof_type
-      module Proof = Transaction_snark.Statement
-
-      module Ledger_proof = struct
-        (*A proof here is a statement *)
-        module Stable = struct
-          module V1 = Transaction_snark.Statement.Stable.V1
-          module Latest = V1
-        end
-
-        type t = Stable.Latest.t [@@deriving sexp, yojson]
-
-        type ledger_hash = Frozen_ledger_hash.t
-
-        let statement_target : Transaction_snark.Statement.t -> ledger_hash =
-         fun statement -> statement.target
-
-        let underlying_proof = Fn.id
-
-        let sok_digest _ = ()
-
-        let statement = Fn.id
-
-        let create ~(statement : t) ~sok_digest:_ ~proof:_ = statement
-      end
-
-      module Verifier = struct
-        type t = unit
-
-        let verify_transaction_snark () _proof ~message:_ =
-          Deferred.Or_error.return true
-      end
-
-      module Transaction_validator = struct
-        include Ledger
-        module Hashless_ledger = Ledger
-
-        let apply_transaction l txn =
-          apply_transaction l txn |> Result.map ~f:(Fn.const ())
-
-        let create t = copy t
-      end
-
-      module Staged_ledger_aux_hash = struct
-        include String
-
-        let of_bytes : string -> t = fun s -> s
-      end
-
-      module Staged_ledger_hash = struct
-        module Stable = struct
-          module V1 = struct
-            module T = struct
-              type t = string
-              [@@deriving
-                bin_io
-                , sexp
-                , to_yojson
-                , hash
-                , compare
-                , yojson
-                , version {unnumbered}]
-            end
-
-            include T
-            include Hashable.Make_binable (T)
-          end
-
-          module Latest = V1
-        end
-
-        type t = string [@@deriving sexp, to_yojson, eq, compare]
-
-        type ledger_hash = Ledger_hash.t
-
-        type staged_ledger_aux_hash = Staged_ledger_aux_hash.t
-
-        let of_aux_ledger_and_coinbase_hash :
-            staged_ledger_aux_hash -> ledger_hash -> Pending_coinbase.t -> t =
-         fun ah h hh ->
-          ah ^ Ledger_hash.to_bytes h
-          ^ Pending_coinbase.Hash.to_bytes (Pending_coinbase.merkle_root hh)
-      end
-
-      module Transaction_snark_work = struct
-        let proofs_length = 2
-
-        type proof = Ledger_proof.Stable.V1.t
-        [@@deriving sexp, bin_io, compare, yojson]
-
-        type statement = Transaction_snark.Statement.Stable.V1.t
-        [@@deriving sexp, bin_io, compare, hash, yojson]
-
-        type fee = Fee.Stable.V1.t
-        [@@deriving sexp, bin_io, compare, hash, yojson]
-
-        type public_key = Public_key.Compressed.Stable.V1.t
-        [@@deriving sexp, bin_io, compare, yojson]
-
-        let ledger_proof_to_yojson = proof_to_yojson
-
-        let compressed_public_key_to_yojson = public_key_to_yojson
-
-        module Statement = struct
-          module Stable = struct
-            module V1 = struct
-              module T = struct
-                type t = statement list
-                [@@deriving
-                  bin_io, compare, hash, sexp, version {for_test}, yojson]
-              end
-
-              include T
-              include Hashable.Make_binable (T)
-            end
-
-            module Latest = V1
-          end
-
-          type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
-          include Hashable.Make (Stable.Latest)
-
-          let gen =
-            Quickcheck.Generator.list_with_length proofs_length
-              Transaction_snark.Statement.gen
-
-          let compact_json : t -> Yojson.Safe.json =
-           fun t ->
-            `List
-              (List.map
-                 ~f:(fun s -> `Int (Transaction_snark.Statement.hash s))
-                 t)
-
-          let work_ids t = List.map t ~f:Transaction_snark.Statement.hash
-        end
-
-        module Info = struct
-          module Stable = struct
-            module V1 = struct
-              module T = struct
-                type t =
-                  { statements: Statement.Stable.V1.t
-                  ; work_ids: int list
-                  ; fee: Fee.Stable.V1.t
-                  ; prover: Public_key.Compressed.Stable.V1.t }
-                [@@deriving sexp, to_yojson, bin_io, version {for_test}]
-              end
-
-              include T
-            end
-
-            module Latest = V1
-          end
-
-          (* bin_io omitted *)
-          type t = Stable.Latest.t =
-            { statements: Statement.Stable.V1.t
-            ; work_ids: int list
-            ; fee: Fee.Stable.V1.t
-            ; prover: Public_key.Compressed.Stable.V1.t }
-          [@@deriving to_yojson, sexp]
-        end
-
-        module Stable = struct
-          module V1 = struct
-            module T = struct
-              type t = {fee: fee; proofs: proof list; prover: public_key}
-              [@@deriving sexp, bin_io, compare, yojson, version {for_test}]
-            end
-
-            include T
-          end
-
-          module Latest = V1
-        end
-
-        type t = Stable.Latest.t =
-          {fee: fee; proofs: proof list; prover: public_key}
-        [@@deriving sexp, to_yojson, compare]
-
-        let fee {fee; _} = fee
-
-        let info t =
-          let statements = List.map t.proofs ~f:Ledger_proof.statement in
-          { Info.statements
-          ; work_ids= List.map statements ~f:Transaction_snark.Statement.hash
-          ; fee= t.fee
-          ; prover= t.prover }
-
-        type unchecked = t
-
-        module Checked = struct
-          module Stable = Stable
-
-          type t = Stable.Latest.t =
-            {fee: fee; proofs: proof list; prover: public_key}
-          [@@deriving sexp, to_yojson, compare]
-
-          let create_unsafe = Fn.id
-        end
-
-        let forget : Checked.t -> t =
-         fun {Checked.fee= f; proofs= p; prover= pr} ->
-          {fee= f; proofs= p; prover= pr}
-      end
-
-      module Staged_ledger_diff = struct
-        type completed_work = Transaction_snark_work.Stable.V1.t
-        [@@deriving sexp, bin_io, compare, yojson]
-
-        type completed_work_checked =
-          Transaction_snark_work.Checked.Stable.V1.t
-        [@@deriving sexp, bin_io, compare, yojson]
-
-        type user_command = User_command.Stable.V1.t
-        [@@deriving sexp, bin_io, compare, yojson]
-
-        type fee_transfer_single = Fee_transfer.Single.Stable.V1.t
-        [@@deriving sexp, bin_io, yojson]
-
-        type user_command_with_valid_signature =
-          User_command.With_valid_signature.Stable.Latest.t
-        [@@deriving sexp, bin_io, compare, yojson]
-
-        type public_key = Public_key.Compressed.Stable.V1.t
-        [@@deriving sexp, bin_io, compare, yojson]
-
-        type staged_ledger_hash = Staged_ledger_hash.Stable.V1.t
-        [@@deriving sexp, bin_io, compare, yojson]
-
-        module At_most_two = struct
-          module Stable = struct
-            module V1 = struct
-              module T = struct
-                type 'a t =
-                  | Zero
-                  | One of 'a option
-                  | Two of ('a * 'a option) option
-                [@@deriving sexp, bin_io, yojson, version]
-              end
-
-              include T
-            end
-
-            module Latest = V1
-          end
-
-          type 'a t = 'a Stable.Latest.t =
-            | Zero
-            | One of 'a option
-            | Two of ('a * 'a option) option
-          [@@deriving sexp, yojson]
-
-          let increase t ws =
-            match (t, ws) with
-            | Zero, [] ->
-                Ok (One None)
-            | Zero, [a] ->
-                Ok (One (Some a))
-            | One _, [] ->
-                Ok (Two None)
-            | One _, [a] ->
-                Ok (Two (Some (a, None)))
-            | One _, [a; a'] ->
-                Ok (Two (Some (a', Some a)))
-            | _ ->
-                Or_error.error_string "Error incrementing coinbase parts"
-        end
-
-        module At_most_one = struct
-          module Stable = struct
-            module V1 = struct
-              module T = struct
-                type 'a t = Zero | One of 'a option
-                [@@deriving sexp, bin_io, yojson, version]
-              end
-
-              include T
-            end
-
-            module Latest = V1
-          end
-
-          type 'a t = 'a Stable.Latest.t = Zero | One of 'a option
-          [@@deriving sexp, yojson]
-
-          let increase t ws =
-            match (t, ws) with
-            | Zero, [] ->
-                Ok (One None)
-            | Zero, [a] ->
-                Ok (One (Some a))
-            | _ ->
-                Or_error.error_string "Error incrementing coinbase parts"
-        end
-
-        module Pre_diff_with_at_most_two_coinbase = struct
-          module Stable = struct
-            module V1 = struct
-              module T = struct
-                type t =
-                  { completed_works: completed_work list
-                  ; user_commands: user_command list
-                  ; coinbase: fee_transfer_single At_most_two.Stable.Latest.t
-                  }
-                [@@deriving sexp, bin_io, yojson, version {for_test}]
-              end
-
-              include T
-            end
-
-            module Latest = V1
-          end
-
-          type t = Stable.Latest.t =
-            { completed_works: completed_work list
-            ; user_commands: user_command list
-            ; coinbase: fee_transfer_single At_most_two.t }
-          [@@deriving sexp, yojson]
-        end
-
-        module Pre_diff_with_at_most_one_coinbase = struct
-          module Stable = struct
-            module V1 = struct
-              module T = struct
-                type t =
-                  { completed_works: completed_work list
-                  ; user_commands: user_command list
-                  ; coinbase: fee_transfer_single At_most_one.Stable.Latest.t
-                  }
-                [@@deriving sexp, bin_io, yojson, version {for_test}]
-              end
-
-              include T
-            end
-
-            module Latest = V1
-          end
-
-          type t = Stable.Latest.t =
-            { completed_works: completed_work list
-            ; user_commands: user_command list
-            ; coinbase: fee_transfer_single At_most_one.t }
-          [@@deriving sexp, yojson]
-        end
-
-        module Diff = struct
-          module Stable = struct
-            module V1 = struct
-              module T = struct
-                type t =
-                  Pre_diff_with_at_most_two_coinbase.Stable.V1.t
-                  * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
-                [@@deriving sexp, bin_io, yojson, version {unnumbered}]
-              end
-
-              include T
-            end
-
-            module Latest = V1
-          end
-
-          type t = Stable.Latest.t [@@deriving sexp, yojson]
-        end
-
-        module Stable = struct
-          module V1 = struct
-            module T = struct
-              type t = {diff: Diff.Stable.V1.t; creator: public_key}
-              [@@deriving sexp, to_yojson, bin_io, version {for_test}]
-            end
-
-            include T
-          end
-
-          module Latest = V1
-        end
-
-        type t = Stable.Latest.t = {diff: Diff.Stable.V1.t; creator: public_key}
-        [@@deriving sexp, yojson, fields]
-
-        module With_valid_signatures_and_proofs = struct
-          type pre_diff_with_at_most_two_coinbase =
-            { completed_works: completed_work_checked list
-            ; user_commands: user_command_with_valid_signature list
-            ; coinbase: fee_transfer_single At_most_two.t }
-          [@@deriving sexp, yojson]
-
-          type pre_diff_with_at_most_one_coinbase =
-            { completed_works: completed_work_checked list
-            ; user_commands: user_command_with_valid_signature list
-            ; coinbase: fee_transfer_single At_most_one.t }
-          [@@deriving sexp, yojson]
-
-          type diff =
-            pre_diff_with_at_most_two_coinbase
-            * pre_diff_with_at_most_one_coinbase option
-          [@@deriving sexp, yojson]
-
-          type t = {diff: diff; creator: public_key} [@@deriving sexp, yojson]
-
-          let user_commands t =
-            (fst t.diff).user_commands
-            @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
-                  d.user_commands )
-        end
-
-        let forget_cw cw_list =
-          List.map ~f:Transaction_snark_work.forget cw_list
-
-        let forget_pre_diff_with_at_most_two
-            (pre_diff :
-              With_valid_signatures_and_proofs
-              .pre_diff_with_at_most_two_coinbase) :
-            Pre_diff_with_at_most_two_coinbase.t =
-          { completed_works= forget_cw pre_diff.completed_works
-          ; user_commands= (pre_diff.user_commands :> user_command list)
-          ; coinbase= pre_diff.coinbase }
-
-        let forget_pre_diff_with_at_most_one
-            (pre_diff :
-              With_valid_signatures_and_proofs
-              .pre_diff_with_at_most_one_coinbase) :
-            Pre_diff_with_at_most_one_coinbase.t =
-          { completed_works= forget_cw pre_diff.completed_works
-          ; user_commands= (pre_diff.user_commands :> user_command list)
-          ; coinbase= pre_diff.coinbase }
-
-        let forget (t : With_valid_signatures_and_proofs.t) =
-          { diff=
-              ( forget_pre_diff_with_at_most_two (fst t.diff)
-              , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one )
-          ; creator= t.creator }
-
-        let user_commands (t : t) =
-          (fst t.diff).user_commands
-          @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
-                (d.user_commands :> user_command list) )
-
-        let completed_works _ = failwith "completed_work : Need to implement"
-
-        let coinbase _ = failwith "coinbase: Need to implement"
-      end
-    end
-
-    module type Staged_ledger_test_intf =
-      Coda_intf.Staged_ledger_generalized_intf
-      with type diff := Test_input1.Staged_ledger_diff.t
-       and type valid_diff :=
-                  Test_input1.Staged_ledger_diff
-                  .With_valid_signatures_and_proofs
-                  .t
-       and type ledger_proof := Test_input1.Ledger_proof.t
-       and type verifier := Test_input1.Verifier.t
-       and type transaction_snark_work := Test_input1.Transaction_snark_work.t
-       and type transaction_snark_work_statement :=
-                  Test_input1.Transaction_snark_work.Statement.t
-       and type transaction_snark_work_checked :=
-                  Test_input1.Transaction_snark_work.Checked.t
-       and type staged_ledger_hash := Test_input1.Staged_ledger_hash.t
-       and type staged_ledger_aux_hash := Test_input1.Staged_ledger_aux_hash.t
-       and type transaction_snark_statement := Transaction_snark.Statement.t
-
-    module Sl = Make (Test_input1)
-    open Test_input1
+    module Sl = T
 
     let self_pk =
       Quickcheck.random_value ~seed:(`Deterministic "self_pk")
         Public_key.Compressed.gen
 
     (* Functor for testing with different instantiated staged ledger modules. *)
-    module Make_test_utils (Sl : Staged_ledger_test_intf) = struct
-      let create_and_apply sl logger txns stmt_to_work =
-        let open Deferred.Let_syntax in
-        let diff =
-          Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
-            ~get_completed_work:stmt_to_work
-        in
-        let diff' = Staged_ledger_diff.forget diff in
-        let%map ( `Hash_after_applying hash
-                , `Ledger_proof ledger_proof
-                , `Staged_ledger sl'
-                , `Pending_coinbase_data _ ) =
-          match%map Sl.apply !sl diff' ~logger ~verifier:() with
-          | Ok x ->
-              x
-          | Error e ->
-              Error.raise (Sl.Staged_ledger_error.to_error e)
-        in
-        assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
-        sl := sl' ;
-        (ledger_proof, diff')
+    let create_and_apply sl logger pids txns stmt_to_work =
+      let open Deferred.Let_syntax in
+      let diff =
+        Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
+          ~get_completed_work:stmt_to_work
+      in
+      let diff' = Staged_ledger_diff.forget diff in
+      let%bind verifier = Verifier.create ~logger ~pids in
+      let%map ( `Hash_after_applying hash
+              , `Ledger_proof ledger_proof
+              , `Staged_ledger sl'
+              , `Pending_coinbase_data _ ) =
+        match%map Sl.apply !sl diff' ~logger ~verifier with
+        | Ok x ->
+            x
+        | Error e ->
+            Error.raise (Sl.Staged_ledger_error.to_error e)
+      in
+      assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
+      sl := sl' ;
+      (ledger_proof, diff')
 
-      (* Run the given function inside of the Deferred monad, with a staged
+    (* Run the given function inside of the Deferred monad, with a staged
          ledger and a separate test ledger, after applying the given
          init_state to both. In the below tests we apply the same commands to
          the staged and test ledgers, and verify they are in the same state.
       *)
-      let async_with_ledgers ledger_init_state
-          (f : Sl.t ref -> Ledger.Mask.Attached.t -> unit Deferred.t) =
-        Ledger.with_ephemeral_ledger ~f:(fun ledger ->
-            Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-            let casted = Ledger.Any_ledger.cast (module Ledger) ledger in
-            let test_mask =
-              Ledger.Maskable.register_mask casted (Ledger.Mask.create ())
-            in
-            let sl = ref @@ Sl.create_exn ~ledger in
-            Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
-            ignore @@ Ledger.Maskable.unregister_mask_exn casted test_mask )
+    let async_with_ledgers ledger_init_state
+        (f : Sl.t ref -> Ledger.Mask.Attached.t -> unit Deferred.t) =
+      Ledger.with_ephemeral_ledger ~f:(fun ledger ->
+          Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+          let casted = Ledger.Any_ledger.cast (module Ledger) ledger in
+          let test_mask =
+            Ledger.Maskable.register_mask casted (Ledger.Mask.create ())
+          in
+          let sl = ref @@ Sl.create_exn ~ledger in
+          Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
+          ignore @@ Ledger.Maskable.unregister_mask_exn casted test_mask )
 
-      (* Assert the given staged ledger is in the correct state after applying
+    (* Assert the given staged ledger is in the correct state after applying
          the first n user commands passed to the given base ledger. Checks the
          states of the proposer account and user accounts but ignores snark
          workers for simplicity. *)
-      let assert_ledger :
-             Ledger.t
-          -> Sl.t
-          -> User_command.With_valid_signature.t list
-          -> int
-          -> Public_key.Compressed.t list
-          -> unit =
-       fun test_ledger staged_ledger cmds_all cmds_used pks_to_check ->
-        let old_proposer_balance =
-          Option.value_map
-            (Option.bind
-               (Ledger.location_of_key test_ledger self_pk)
-               ~f:(Ledger.get test_ledger))
-            ~default:Currency.Balance.zero
-            ~f:(fun a -> a.balance)
-        in
-        let rec apply_cmds =
-          let open Or_error.Let_syntax in
-          function
-          | [] ->
-              return ()
-          | cmd :: cmds ->
-              let%bind _ = Ledger.apply_user_command test_ledger cmd in
-              apply_cmds cmds
-        in
-        Or_error.ok_exn @@ apply_cmds @@ List.take cmds_all cmds_used ;
-        let get_account_exn ledger pk =
-          Option.value_exn
-            (Option.bind
-               (Ledger.location_of_key ledger pk)
-               ~f:(Ledger.get ledger))
-        in
-        (* Check the user accounts in the updated staged ledger are as
+    let assert_ledger :
+           Ledger.t
+        -> Sl.t
+        -> User_command.With_valid_signature.t list
+        -> int
+        -> Public_key.Compressed.t list
+        -> unit =
+     fun test_ledger staged_ledger cmds_all cmds_used pks_to_check ->
+      let old_proposer_balance =
+        Option.value_map
+          (Option.bind
+             (Ledger.location_of_key test_ledger self_pk)
+             ~f:(Ledger.get test_ledger))
+          ~default:Currency.Balance.zero
+          ~f:(fun a -> a.balance)
+      in
+      let rec apply_cmds =
+        let open Or_error.Let_syntax in
+        function
+        | [] ->
+            return ()
+        | cmd :: cmds ->
+            let%bind _ = Ledger.apply_user_command test_ledger cmd in
+            apply_cmds cmds
+      in
+      Or_error.ok_exn @@ apply_cmds @@ List.take cmds_all cmds_used ;
+      let get_account_exn ledger pk =
+        Option.value_exn
+          (Option.bind
+             (Ledger.location_of_key ledger pk)
+             ~f:(Ledger.get ledger))
+      in
+      (* Check the user accounts in the updated staged ledger are as
            expected. *)
-        List.iter pks_to_check ~f:(fun pk ->
-            let expect = get_account_exn test_ledger pk in
-            let actual = get_account_exn (Sl.ledger staged_ledger) pk in
-            [%test_result: Account.t] ~expect actual ) ;
-        (* We only test that the proposer got any reward here, since calculating
+      List.iter pks_to_check ~f:(fun pk ->
+          let expect = get_account_exn test_ledger pk in
+          let actual = get_account_exn (Sl.ledger staged_ledger) pk in
+          [%test_result: Account.t] ~expect actual ) ;
+      (* We only test that the proposer got any reward here, since calculating
          the exact correct amount depends on the snark fees and tx fees. *)
-        let new_proposer_balance =
-          (get_account_exn (Sl.ledger staged_ledger) self_pk).balance
-        in
-        assert (Currency.Balance.(new_proposer_balance > old_proposer_balance))
-    end
-
-    module Utils = Make_test_utils (Sl)
-    open Utils
+      let new_proposer_balance =
+        (get_account_exn (Sl.ledger staged_ledger) self_pk).balance
+      in
+      assert (Currency.Balance.(new_proposer_balance > old_proposer_balance))
 
     (* Deterministically compute a prover public key from a snark work statement. *)
     let stmt_to_prover :
         Transaction_snark_work.Statement.t -> Public_key.Compressed.t =
      fun stmts ->
       let prover_seed =
-        List.fold stmts ~init:"P" ~f:(fun p stmt ->
+        One_or_two.fold stmts ~init:"P" ~f:(fun p stmt ->
             p ^ Frozen_ledger_hash.to_bytes stmt.target )
       in
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen
 
+    let proofs stmts : Ledger_proof.t One_or_two.t =
+      let sok_digest = Sok_message.Digest.default in
+      One_or_two.map stmts ~f:(fun statement ->
+          Ledger_proof.create ~statement ~sok_digest ~proof:Proof.dummy )
+
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =
       let prover = stmt_to_prover stmts in
-      Some
-        { Transaction_snark_work.Checked.fee= Fee.of_int 1
-        ; proofs= stmts
-        ; prover }
+      let fee = Fee.of_int 1 in
+      Some {Transaction_snark_work.Checked.fee; proofs= proofs stmts; prover}
 
     (* Fixed public key for when there is only one snark worker. *)
     let snark_worker_pk =
@@ -1994,7 +1409,8 @@ let%test_module "test" =
 
     let stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
-      Some {fee= Fee.of_int 1; proofs= stmts; prover= snark_worker_pk}
+      let fee = Fee.of_int 1 in
+      Some {fee; proofs= proofs stmts; prover= snark_worker_pk}
 
     let coinbase_fee_transfers_first_prediff = function
       | Staged_ledger_diff.At_most_two.Zero ->
@@ -2045,7 +1461,7 @@ let%test_module "test" =
      fun proof_opt ->
       let fee_excess =
         Option.value_map ~default:Fee.Signed.zero proof_opt ~f:(fun proof ->
-            (fst @@ Ledger_proof.statement proof).fee_excess )
+            (Ledger_proof.statement (fst proof)).fee_excess )
       in
       assert (Fee.Signed.(equal fee_excess zero))
 
@@ -2121,11 +1537,12 @@ let%test_module "test" =
      fun init_state cmds cmd_iters sl ?(expected_proof_count = 0) test_mask
          provers stmt_to_work ->
       let logger = Logger.null () in
+      let pids = Child_processes.Termination.create_pid_set () in
       let%map total_ledger_proofs =
         iter_cmds_acc cmds cmd_iters 0
           (fun cmds_left count_opt cmds_this_iter proof_count ->
             let%bind ledger_proof, diff =
-              create_and_apply sl logger cmds_this_iter stmt_to_work
+              create_and_apply sl logger pids cmds_this_iter stmt_to_work
             in
             let proof_count' =
               proof_count + if Option.is_some ledger_proof then 1 else 0
@@ -2157,7 +1574,7 @@ let%test_module "test" =
               (init_pks init_state) ;
             return (diff, proof_count') )
       in
-      (*Should have enough blocks to generate at least expected_proof_count 
+      (*Should have enough blocks to generate at least expected_proof_count
       proofs*)
       assert (total_ledger_proofs >= expected_proof_count)
 
@@ -2201,7 +1618,7 @@ let%test_module "test" =
       in
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    (*Same as gen_at_capacity except that the number of iterations[iters] is 
+    (*Same as gen_at_capacity except that the number of iterations[iters] is
     the function of [extra_block_count] and is same for all generated values*)
     let gen_at_capacity_fixed_blocks extra_block_count :
         ( Ledger.init_state
@@ -2337,6 +1754,7 @@ let%test_module "test" =
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               let logger = Logger.null () in
+              let pids = Child_processes.Termination.create_pid_set () in
               let%map checked =
                 iter_cmds_acc cmds iters true
                   (fun _cmds_left _count_opt cmds_this_iter checked ->
@@ -2351,7 +1769,7 @@ let%test_module "test" =
                       List.map
                         ~f:(fun stmts ->
                           { Transaction_snark_work.Checked.fee= Fee.zero
-                          ; proofs= stmts
+                          ; proofs= proofs stmts
                           ; prover= snark_worker_pk } )
                         work
                     in
@@ -2360,9 +1778,8 @@ let%test_module "test" =
                         (Sequence.to_list cmds_this_iter :> User_command.t list)
                         work_done partitions
                     in
-                    let%bind apply_res =
-                      Sl.apply !sl diff ~logger ~verifier:()
-                    in
+                    let%bind verifier = Verifier.create ~logger ~pids in
+                    let%bind apply_res = Sl.apply !sl diff ~logger ~verifier in
                     let checked', diff' =
                       match apply_res with
                       | Error (Sl.Staged_ledger_error.Non_zero_fee_excess _) ->
@@ -2387,12 +1804,13 @@ let%test_module "test" =
 
     let%test_unit "Snarked ledger" =
       let logger = Logger.null () in
+      let pids = Child_processes.Termination.create_pid_set () in
       Quickcheck.test (gen_below_capacity ()) ~trials:20
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               iter_cmds cmds iters (fun _cmds_left _count_opt cmds_this_iter ->
                   let%map proof_opt, diff =
-                    create_and_apply sl logger cmds_this_iter
+                    create_and_apply sl logger pids cmds_this_iter
                       stmt_to_work_random_prover
                   in
                   ( match proof_opt with
@@ -2400,7 +1818,7 @@ let%test_module "test" =
                       ()
                   | Some proof ->
                       let last_snarked_ledger_hash =
-                        (Tuple2.get1 proof).target
+                        (Ledger_proof.statement (fst proof)).target
                       in
                       let materialized_snarked_ledger_hash =
                         Or_error.ok_exn
@@ -2427,10 +1845,8 @@ let%test_module "test" =
           (List.find work_list ~f:(fun s ->
                Transaction_snark_work.Statement.compare s stmts = 0 ))
       then
-        Some
-          { Transaction_snark_work.Checked.fee= Fee.of_int 1
-          ; proofs= stmts
-          ; prover }
+        let fee = Fee.of_int 1 in
+        Some {Transaction_snark_work.Checked.fee; proofs= proofs stmts; prover}
       else None
 
     (** Like test_simple but with a random number of completed jobs available.
@@ -2446,24 +1862,21 @@ let%test_module "test" =
         -> unit Deferred.t =
      fun init_state cmds cmd_iters proofs_available sl test_mask provers ->
       let logger = Logger.null () in
+      let pids = Child_processes.Termination.create_pid_set () in
       let%map proofs_available_left =
         iter_cmds_acc cmds cmd_iters proofs_available
           (fun cmds_left _count_opt cmds_this_iter proofs_available_left ->
             let work_list : Transaction_snark_work.Statement.t list =
               let spec_list = Sl.all_work_pairs_exn !sl in
-              List.map spec_list ~f:(fun (s1, s2_opt) ->
-                  let stmt1 = Snark_work_lib.Work.Single.Spec.statement s1 in
-                  let stmt2 =
-                    Option.value_map s2_opt ~default:[] ~f:(fun s ->
-                        [Snark_work_lib.Work.Single.Spec.statement s] )
-                  in
-                  stmt1 :: stmt2 )
+              List.map spec_list ~f:(fun specs ->
+                  One_or_two.map specs
+                    ~f:Snark_work_lib.Work.Single.Spec.statement )
             in
             let proofs_available_this_iter =
               List.hd_exn proofs_available_left
             in
             let%map proof, diff =
-              create_and_apply sl logger cmds_this_iter
+              create_and_apply sl logger pids cmds_this_iter
                 (stmt_to_work_restricted
                    (List.take work_list proofs_available_this_iter)
                    provers)

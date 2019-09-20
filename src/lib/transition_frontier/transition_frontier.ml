@@ -8,24 +8,8 @@ open Pipe_lib
 
 module type Inputs_intf = Inputs.Inputs_intf
 
-module Make (Inputs : Inputs_intf) :
-  Coda_intf.Transition_frontier_intf
-  with type mostly_validated_external_transition :=
-              ( [`Time_received] * unit Truth.true_t
-              , [`Proof] * unit Truth.true_t
-              , [`Delta_transition_chain]
-                * State_hash.t Non_empty_list.t Truth.true_t
-              , [`Frontier_dependencies] * unit Truth.true_t
-              , [`Staged_ledger_diff] * unit Truth.false_t )
-              Inputs.External_transition.Validation.with_transition
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t
-   and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
-   and type staged_ledger := Inputs.Staged_ledger.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type verifier := Inputs.Verifier.t = struct
-  open Inputs
-
+module Make (Inputs : Inputs_intf) : Coda_intf.Transition_frontier_intf =
+struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
@@ -53,7 +37,7 @@ module Make (Inputs : Inputs_intf) :
     let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
     module Staged_ledger_validation =
-      External_transition.Staged_ledger_validation (Staged_ledger)
+      External_transition.Staged_ledger_validation
 
     let build ~logger ~verifier ~trust_system ~parent
         ~transition:transition_with_validation ~sender =
@@ -198,7 +182,7 @@ module Make (Inputs : Inputs_intf) :
           Set.union acc_set (User_command.Set.of_list user_commands) )
   end
 
-  let max_length = max_length
+  let max_length = Inputs.max_length
 
   module Diff = Diff.Make (struct
     include Inputs
@@ -615,6 +599,18 @@ module Make (Inputs : Inputs_intf) :
              ~f:(fun sum account ->
                sum + Currency.Balance.to_int account.balance ) )) ;
     Coda_metrics.(Counter.inc_one Transition_frontier.root_transitions) ;
+    let consensus_state = Breadcrumb.consensus_state new_root in
+    let blockchain_length =
+      consensus_state |> Consensus.Data.Consensus_state.blockchain_length
+      |> Coda_numbers.Length.to_int |> Float.of_int
+    in
+    let global_slot =
+      consensus_state |> Consensus.Data.Consensus_state.global_slot
+      |> Float.of_int
+    in
+    Coda_metrics.(
+      Gauge.set Transition_frontier.slot_fill_rate
+        (blockchain_length /. global_slot)) ;
     new_root_node
 
   let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :

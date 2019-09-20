@@ -6,8 +6,7 @@
 
 ### Basic setup:
 
-1. Start your daemon with the `-rest-port <port>` flag. For example: `coda daemon -rest-port 8000`
-2. Connect your GraphQL client to `[localhost:<port>/graphql](http://localhost:8000/graphql)` (with `<port>` replaced with the port you used above.
-3. [Optional] If you want to use an existing wallet with GraphQL, "import" it using the following: `coda daemon -propose-key <port> -unsafe-track-propose-key`. This is a temporary workaround that removes password protection from the private key file. You can always create a new wallet using the `addWallet` mutation. 
-4. Open your web browser to `http://localhost:<port>/graphql` to play with the api using [GraphiQL](https://github.com/graphql/graphiql)
-5. Look at the <a href="/docs/graphql/" target="_blank">GraphQL schema docs</a>
+1. Start your daemon as usual. By default an http server is available at port 3085 (configurable with `-rest-port`).
+2. Connect your GraphQL client to `http://localhost:3085/graphql` or open it in your browser to use [GraphiQL](https://github.com/graphql/graphiql)
+3. [Optional] If you want to use an existing keypair with GraphQL, first import it from the command line using the following: `coda advanced import -privkey-path <keyfile>`.
+4. Look at the <a href="/docs/graphql/" target="_blank">GraphQL schema docs</a>

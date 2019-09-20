@@ -230,7 +230,7 @@ end = struct
           in
           Node (Hash.merge ~height:i (hash l) (hash r), l, r)
       | _ ->
-          failwith "Sparse_ledger.get: Bad index"
+          failwith "Sparse_ledger.set: Bad index"
     in
     {t with tree= go (t.depth - 1) t.tree}
 

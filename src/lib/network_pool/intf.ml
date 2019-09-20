@@ -15,6 +15,7 @@ module type Resource_pool_base_intf = sig
 
   val create :
        logger:Logger.t
+    -> pids:Child_processes.Termination.t
     -> trust_system:Trust_system.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
@@ -62,6 +63,7 @@ module type Network_pool_base_intf = sig
 
   val create :
        logger:Logger.t
+    -> pids:Child_processes.Termination.t
     -> trust_system:Trust_system.t
     -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
                       Linear_pipe.Reader.t
@@ -99,16 +101,30 @@ module type Snark_resource_pool_intf = sig
     Resource_pool_base_intf
     with type transition_frontier := transition_frontier
 
-  val bin_writer_t : t Bin_prot.Writer.t
+  type serializable [@@deriving bin_io]
+
+  val of_serializable :
+       serializable
+    -> logger:Logger.t
+    -> pids:Child_processes.Termination.t
+    -> trust_system:Trust_system.t
+    -> t
 
   val add_snark :
        t
     -> work:work
-    -> proof:ledger_proof list
+    -> proof:ledger_proof One_or_two.t
     -> fee:Fee_with_prover.t
     -> [`Rebroadcast | `Don't_rebroadcast]
 
-  val request_proof : t -> work -> ledger_proof list Priced_proof.t option
+  val verify_and_act :
+       t
+    -> work:work * ledger_proof One_or_two.t Priced_proof.t
+    -> sender:Envelope.Sender.t
+    -> unit Deferred.Or_error.t
+
+  val request_proof :
+    t -> work -> ledger_proof One_or_two.t Priced_proof.t option
 
   val snark_pool_json : t -> Yojson.Safe.json
 
@@ -127,7 +143,8 @@ module type Snark_pool_diff_intf = sig
   module Stable : sig
     module V1 : sig
       type t =
-        | Add_solved_work of work * ledger_proof list Priced_proof.Stable.V1.t
+        | Add_solved_work of
+            work * ledger_proof One_or_two.Stable.V1.t Priced_proof.Stable.V1.t
       [@@deriving sexp, to_yojson, bin_io, version]
     end
 

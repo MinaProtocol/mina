@@ -8,7 +8,7 @@ let command_name = "snark-worker"
 module type Inputs_intf = sig
   open Snark_work_lib
 
-  module Ledger_proof : Coda_intf.Ledger_proof_intf
+  module Ledger_proof : Ledger_proof.S
 
   module Worker_state : sig
     type t
