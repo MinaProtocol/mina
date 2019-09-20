@@ -241,12 +241,7 @@ let best_tip_opt t =
   let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
-  let best_tip = Transition_frontier.best_tip frontier in
-  printf "$$$$$ got best tip: %s\n"
-    ( Yojson.Safe.to_string
-    @@ State_hash.to_yojson
-         (Transition_frontier.Breadcrumb.state_hash best_tip) ) ;
-  best_tip
+  Transition_frontier.best_tip frontier
 
 let transition_frontier t = t.components.transition_frontier
 

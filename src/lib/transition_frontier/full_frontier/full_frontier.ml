@@ -370,6 +370,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
        *)
       let old_root_node = Hashtbl.find_exn t.table t.root in
       let new_root_node = Hashtbl.find_exn t.table new_root_hash in
+      Ledger.Maskable.Debug.visualize ~filename:"pre_masks.dot" ;
       let new_root_mask =
         let m0 = Breadcrumb.mask old_root_node.breadcrumb in
         let m1 = Breadcrumb.mask new_root_node.breadcrumb in
@@ -396,10 +397,13 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
              new root's staged ledger mask after committing"
           ~expect:m1_hash_pre_commit (Ledger.merkle_root m0) ;
         (* reparent all the successors of m1 onto m0 *)
+        Ledger.remove_and_reparent_exn m1 m1 ;
+        (*
         ignore
           (Ledger.Maskable.unregister_mask_exn
              (Ledger.Any_ledger.cast (module Ledger.Mask.Attached) m0)
              m1) ;
+        *)
         if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
           let s =
             Ledger.(
@@ -416,6 +420,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
           ignore (Ledger.Maskable.unregister_mask_exn s mt) ) ;
         m0
       in
+      Ledger.Maskable.Debug.visualize ~filename:"post_masks.dot" ;
       let new_root_breadcrumb =
         Breadcrumb.create
           (Breadcrumb.validated_transition new_root_node.breadcrumb)

@@ -145,6 +145,7 @@ module Instance = struct
              `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
     in
+    (*
     Printf.printf
       !"genesis: %s\nroot transition: %s\nsnarked ledger db: %s\n%!"
       ( Ledger.merkle_root (Lazy.force Genesis_ledger.t)
@@ -155,6 +156,7 @@ module Instance = struct
       |> Yojson.Safe.to_string )
       ( Ledger.Db.merkle_root root_ledger
       |> Ledger_hash.to_yojson |> Yojson.Safe.to_string ) ;
+    *)
     (* construct the root staged ledger in memory *)
     let%bind root_staged_ledger =
       let open Deferred.Let_syntax in

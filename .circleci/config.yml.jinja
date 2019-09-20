@@ -377,6 +377,10 @@ jobs:
             {%- endfor %}
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: pre_masks.dot
+            - store_artifacts:
+                  path: post_masks.dot
     {%- endfor %}
 
 workflows:

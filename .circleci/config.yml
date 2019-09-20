@@ -604,6 +604,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation_medium_curves:coda-delegation-test"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: pre_masks.dot
+            - store_artifacts:
+                  path: post_masks.dot
     test--test_postake_medium_curves:
         resource_class: large
         docker:
@@ -623,6 +627,10 @@ jobs:
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: pre_masks.dot
+            - store_artifacts:
+                  path: post_masks.dot
     test--test_postake_snarkless_medium_curves:
         resource_class: large
         docker:
@@ -640,6 +648,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: pre_masks.dot
+            - store_artifacts:
+                  path: post_masks.dot
     test--test_postake_split_medium_curves:
         resource_class: large
         docker:
@@ -654,6 +666,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: pre_masks.dot
+            - store_artifacts:
+                  path: post_masks.dot
     test--test_postake_split_snarkless_medium_curves:
         resource_class: large
         docker:
@@ -689,6 +705,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-archive-node-test"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: pre_masks.dot
+            - store_artifacts:
+                  path: post_masks.dot
     test--test_postake_txns_medium_curves:
         resource_class: large
         docker:
@@ -706,6 +726,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns_medium_curves:coda-batch-payment-test"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: pre_masks.dot
+            - store_artifacts:
+                  path: post_masks.dot
 
 workflows:
     version: 2
