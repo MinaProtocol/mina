@@ -3,33 +3,19 @@ open Core_kernel
 open Coda_base
 open Coda_incremental
 open Pipe_lib
+open Coda_transition
 
 module Make (Inputs : sig
   include Inputs.Inputs_intf
 
-  module Breadcrumb :
-    Coda_intf.Transition_frontier_breadcrumb_intf
-    with type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
-                External_transition.Validation.with_transition
-     and type external_transition_validated := External_transition.Validated.t
-     and type staged_ledger := Staged_ledger.t
-     and type verifier := Verifier.t
+  module Breadcrumb : Coda_intf.Transition_frontier_breadcrumb_intf
 
   module Diff :
     Coda_intf.Transition_frontier_diff_intf
     with type breadcrumb := Breadcrumb.t
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type external_transition_validated := External_transition.Validated.t
 end) :
   Coda_intf.Transition_frontier_extensions_intf
   with type breadcrumb := Inputs.Breadcrumb.t
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
    and module Diff := Inputs.Diff = struct
   open Inputs
 
@@ -40,7 +26,7 @@ end) :
   module Work = Transaction_snark_work.Statement
 
   module Snark_pool_refcount = struct
-    module Work = Inputs.Transaction_snark_work.Statement
+    module Work = Transaction_snark_work.Statement
 
     type t = int Work.Table.t
 
@@ -50,8 +36,8 @@ end) :
 
     let get_work (breadcrumb : Breadcrumb.t) : Work.t list =
       let ledger = Inputs.Breadcrumb.staged_ledger breadcrumb in
-      let scan_state = Inputs.Staged_ledger.scan_state ledger in
-      Inputs.Staged_ledger.Scan_state.all_work_statements scan_state
+      let scan_state = Staged_ledger.scan_state ledger in
+      Staged_ledger.Scan_state.all_work_statements scan_state
 
     (** Returns true if this update changed which elements are in the table
     (but not if the same elements exist with a different reference count) *)
@@ -178,7 +164,7 @@ end) :
   let create root_breadcrumb =
     let new_transition =
       New_transition.Var.create
-        (Breadcrumb.external_transition root_breadcrumb)
+        (Breadcrumb.validated_transition root_breadcrumb)
     in
     { root_history= Root_history.create (2 * max_length)
     ; snark_pool_refcount= Snark_pool_refcount.create ()
@@ -272,6 +258,6 @@ end) :
         Transition_registry.notify t.transition_registry
           (Breadcrumb.state_hash bc) ;
         New_transition.Var.set t.new_transition
-        @@ Breadcrumb.external_transition bc ;
+        @@ Breadcrumb.validated_transition bc ;
         New_transition.stabilize () )
 end

@@ -6,7 +6,7 @@ let ( = ) = `Don't_use_polymorphic_equality
 module type Backend_intf = sig
   module N : Nat_intf.S
 
-  module Fq : Fields.Fp_intf with type nat := N.t
+  module Fq : Fields.Fp_intf with module Nat := N
 
   module Fqe : Fields.Extension_intf with type base = Fq.t
 

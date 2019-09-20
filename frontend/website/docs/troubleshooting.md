@@ -31,10 +31,14 @@ If you are on a shared network (like an office wireless network), you may get th
 AddPortMapping(8302, 8302, 192.168.101.7) failed with code 718 (ConflictInMappingEntry)
 ```
 
-If this happens, you can run the daemon with different ports and forward them, as long as they are unused by another application. If you forward custom ports, keep in mind:
+If this happens, you can forward different ports, as long as they are unused by another application:
+
+        $ sudo upnpc -r <custom-port> TCP <custom-port + 1> UDP
+
+If you forward custom ports, keep in mind:
 
 - The UDP port forwarded has to be the next consecutive port from the TCP mapping.
-- When running Coda daemon commands in the next step, you'll need to add the flag `-external-port <custom-TCP-port>` passing in the TCP port forwarded.
+- When running Coda daemon commands in the [next step](/docs/my-first-transaction#start-up-a-node), you'll need to add the flag `-external-port <custom-port>` passing in the TCP port you forwarded above.
 
 ### Manual port forwarding
 
@@ -75,7 +79,7 @@ This is necessary because sometimes macOS doesn't resolve your hostname to your 
 
 - If the number of peers is 0, there may be an issue with the IP address - make sure you typed in the IP address and port exactly as specified in [Start a Coda node](#start-a-coda-node).
 - If sync status is `Bootstrap`, you'll need to wait for a bit for your node to catch up to the rest of the network. In the Coda network, we do not have to download full transaction history from the genesis block, but nodes participating in block production and compression need to download recent history and the current account data in the network. Future versions of the client will allow non-operating nodes to avoid having to download this data.
-- If sync status is `Offline` or `Bootstrap` for more than 15 minutes, you may need to [configure port forwarding for your router](/docs/getting-started/#port-forwarding). Otherwise you may need to resolve connectivity issues with your home network.
+- If sync status is `Offline` or `Bootstrap` for more than 15 minutes, you may need to [configure port forwarding for your router](#port-forwarding). Otherwise you may need to resolve connectivity issues with your home network.
 
 ## Other issues
 
@@ -90,3 +94,8 @@ If you restart the Coda daemon and it fails, then try deleting your config folde
 
 ### Daemon restart on computer sleep
 If the machine running your Coda node enters sleep mode or hibernates, you will need to restart the Coda daemon once the machine becomes active.
+
+### Failed to connect to any initial peers
+Look in the logs for messages about "Chain ID mismatch". These messages mean your daemon was compiled for a different chain than the peers it tried to connect to. This can happen normally, but during startup at least one peer needs to have a matching chain ID.
+
+Otherwise, if there are messages about "Retrieving chain ID failed", or other errors, you may need to [configure port forwarding for your router](/docs/getting-started/#port-forwarding).

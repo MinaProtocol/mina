@@ -4,20 +4,18 @@ open Pipe_lib.Strict_pipe
 open Coda_base
 open Coda_state
 open Cache_lib
+open Coda_transition
 
 module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   Coda_intf.Transition_handler_validator_intf
-  with type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
-   and type unprocessed_transition_cache :=
+  with type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
-   and type transition_frontier := Inputs.Transition_frontier.t
-   and type staged_ledger := Inputs.Staged_ledger.t = struct
+   and type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
   let validate_transition ~logger ~frontier ~unprocessed_transition_cache
       (enveloped_transition :
-        External_transition.with_initial_validation Envelope.Incoming.t) =
+        External_transition.Initial_validated.t Envelope.Incoming.t) =
     let open Protocol_state in
     let open Result.Let_syntax in
     let {With_hash.hash= transition_hash; data= transition}, _ =
@@ -26,8 +24,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     let protocol_state = External_transition.protocol_state transition in
     let root_protocol_state =
       Transition_frontier.root frontier
-      |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
-      |> External_transition.Validated.protocol_state
+      |> Transition_frontier.Breadcrumb.protocol_state
     in
     let%bind () =
       Option.fold (Transition_frontier.find frontier transition_hash)
@@ -57,7 +54,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
 
   let run ~logger ~trust_system ~frontier ~transition_reader
       ~(valid_transition_writer :
-         ( ( External_transition.with_initial_validation Envelope.Incoming.t
+         ( ( External_transition.Initial_validated.t Envelope.Incoming.t
            , State_hash.t )
            Cached.t
          , crash buffered

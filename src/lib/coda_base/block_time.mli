@@ -14,7 +14,7 @@ module Time : sig
 
     val create : t -> t
 
-    val basic : t
+    val basic : logger:Logger.t -> t
   end
 
   module Stable : sig
@@ -73,6 +73,8 @@ module Time : sig
     val ( <= ) : t -> t -> bool
 
     val ( >= ) : t -> t -> bool
+
+    val min : t -> t -> t
   end
 
   val ( < ) : t -> t -> bool

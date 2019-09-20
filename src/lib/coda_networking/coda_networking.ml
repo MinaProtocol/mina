@@ -5,21 +5,13 @@ open Coda_base
 open Coda_state
 open Pipe_lib
 open Network_peer
+open Coda_transition
 
 let refused_answer_query_string = "Refused to answer_query"
 
-module type Base_inputs_intf = Coda_intf.Inputs_intf
+type exn += No_initial_peers
 
-(* assumption: the Rpcs functor is applied only once in the codebase, so that
-   any versions appearing in Inputs represent unique types
-
-   with that assumption, it's legitimate for the choice of versions to be made
-   inside the Rpcs functor, rather than at the locus of application
-*)
-
-module Make_rpcs (Inputs : Base_inputs_intf) = struct
-  open Inputs
-
+module Rpcs = struct
   (* for versioning of the types here, see
 
      RFC 0012, and
@@ -174,9 +166,9 @@ module Make_rpcs (Inputs : Base_inputs_intf) = struct
     end
   end
 
-  module Get_transition_chain_witness = struct
+  module Get_transition_chain_proof = struct
     module Master = struct
-      let name = "get_transition_chain_witness"
+      let name = "get_transition_chain_proof"
 
       module T = struct
         type query = State_hash.Stable.V1.t [@@deriving sexp, to_yojson]
@@ -383,8 +375,6 @@ module Make_rpcs (Inputs : Base_inputs_intf) = struct
 end
 
 module Make_message (Inputs : sig
-  include Base_inputs_intf
-
   module Snark_pool_diff : sig
     type t [@@deriving sexp]
 
@@ -460,8 +450,6 @@ struct
 end
 
 module type Inputs_intf = sig
-  include Base_inputs_intf
-
   module Snark_pool_diff : sig
     type t [@@deriving sexp, to_yojson]
 
@@ -472,6 +460,8 @@ module type Inputs_intf = sig
         end
       end
       with type V1.t = t
+
+    val compact_json : t -> Yojson.Safe.json
   end
 
   module Transaction_pool_diff : sig
@@ -501,7 +491,6 @@ end
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
   module Message = Make_message (Inputs)
-  module Rpcs = Make_rpcs (Inputs)
   module Gossip_net = Gossip_net.Make (Message)
   module Membership = Membership.Haskell
   module Peer = Peer
@@ -540,7 +529,7 @@ module Make (Inputs : Inputs_intf) = struct
   [@@deriving fields]
 
   let offline_time =
-    Block_time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_secs
+    Block_time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_ms
 
   let setup_timer time_controller sync_state_broadcaster =
     Block_time.Timeout.create time_controller offline_time ~f:(fun _ ->
@@ -588,7 +577,7 @@ module Make (Inputs : Inputs_intf) = struct
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
             Deferred.Option.t)
-      ~(get_transition_chain_witness :
+      ~(get_transition_chain_proof :
             State_hash.t Envelope.Incoming.t
          -> (State_hash.t * State_body_hash.t list) Deferred.Option.t)
       ~(get_transition_chain :
@@ -683,17 +672,17 @@ module Make (Inputs : Inputs_intf) = struct
       in
       record_unknown_item result sender action_msg msg_args
     in
-    let get_transition_chain_witness_rpc conn ~version:_ query =
+    let get_transition_chain_proof_rpc conn ~version:_ query =
       Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
-        "Sending transition_chain_witness to peer with IP %s"
+        "Sending transition_chain_proof to peer with IP %s"
         conn.Host_and_port.host ;
-      let action_msg = "Get_transition_chain_witness query: $query" in
+      let action_msg = "Get_transition_chain_proof query: $query" in
       let msg_args =
-        [("query", Rpcs.Get_transition_chain_witness.query_to_yojson query)]
+        [("query", Rpcs.Get_transition_chain_proof.query_to_yojson query)]
       in
       let%bind result, sender =
-        run_for_rpc_result conn query ~f:get_transition_chain_witness
-          action_msg msg_args
+        run_for_rpc_result conn query ~f:get_transition_chain_proof action_msg
+          msg_args
       in
       record_unknown_item result sender action_msg msg_args
     in
@@ -731,8 +720,8 @@ module Make (Inputs : Inputs_intf) = struct
         ; Rpcs.Get_bootstrappable_best_tip.implement_multi
             get_bootstrappable_best_tip_rpc
         ; Rpcs.Get_ancestry.implement_multi get_ancestry_rpc
-        ; Rpcs.Get_transition_chain_witness.implement_multi
-            get_transition_chain_witness_rpc
+        ; Rpcs.Get_transition_chain_proof.implement_multi
+            get_transition_chain_proof_rpc
         ; Rpcs.Get_transition_chain.implement_multi get_transition_chain_rpc
         ; Rpcs.Ban_notify.implement_multi ban_notify_rpc
         ; Consensus.Hooks.Rpcs.implementations ~logger:config.logger
@@ -741,6 +730,14 @@ module Make (Inputs : Inputs_intf) = struct
     let%map gossip_net =
       Gossip_net.create config.gossip_net_params implementations
     in
+    don't_wait_for
+      (let%map () = Ivar.read @@ Gossip_net.first_connect gossip_net in
+       (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
+       let initial_peers = Gossip_net.peers gossip_net in
+       if List.is_empty initial_peers then (
+         Logger.fatal config.logger "Failed to connect to any initial peers"
+           ~module_:__MODULE__ ~location:__LOC__ ;
+         raise No_initial_peers )) ;
     (* TODO: Think about buffering:
        I.e., what do we do when too many messages are coming in, or going out.
        For example, some things you really want to not drop (like your outgoing
@@ -763,12 +760,42 @@ module Make (Inputs : Inputs_intf) = struct
                    ( External_transition.protocol_state state
                    |> Protocol_state.blockchain_state
                    |> Blockchain_state.timestamp |> Block_time.to_time )) ;
+              if config.gossip_net_params.log_gossip_heard.new_state then
+                Logger.debug config.logger ~module_:__MODULE__
+                  ~location:__LOC__ "Received a block $block from $sender"
+                  ~metadata:
+                    [ ("block", External_transition.to_yojson state)
+                    ; ( "sender"
+                      , Envelope.(Sender.to_yojson (Incoming.sender envelope))
+                      ) ] ;
               `Fst
                 ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
                 , Block_time.now config.time_controller )
           | Snark_pool_diff diff ->
+              if config.gossip_net_params.log_gossip_heard.snark_pool_diff then
+                Logger.debug config.logger ~module_:__MODULE__
+                  ~location:__LOC__
+                  "Received Snark-pool diff $work from $sender"
+                  ~metadata:
+                    [ ("work", Snark_pool_diff.compact_json diff)
+                    ; ( "sender"
+                      , Envelope.(Sender.to_yojson (Incoming.sender envelope))
+                      ) ] ;
+              Coda_metrics.(
+                Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
               `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff))
           | Transaction_pool_diff diff ->
+              if
+                config.gossip_net_params.log_gossip_heard.transaction_pool_diff
+              then
+                Logger.debug config.logger ~module_:__MODULE__
+                  ~location:__LOC__
+                  "Received transaction-pool diff $txns from $sender"
+                  ~metadata:
+                    [ ("txns", Transaction_pool_diff.to_yojson diff)
+                    ; ( "sender"
+                      , Envelope.(Sender.to_yojson (Incoming.sender envelope))
+                      ) ] ;
               `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff)) )
     in
     { gossip_net
@@ -783,7 +810,10 @@ module Make (Inputs : Inputs_intf) = struct
 
   let first_message {first_received_message; _} = first_received_message
 
-  let first_connection {gossip_net; _} = gossip_net.first_connect
+  let first_connection {gossip_net; _} = Gossip_net.first_connect gossip_net
+
+  let high_connectivity {gossip_net; _} =
+    Gossip_net.high_connectivity_signal gossip_net
 
   (* TODO: Have better pushback behavior *)
   let broadcast t msg =
@@ -857,9 +887,9 @@ module Make (Inputs : Inputs_intf) = struct
     | Error e ->
         Error e
 
-  let get_transition_chain_witness =
+  let get_transition_chain_proof =
     make_rpc_request
-      ~rpc_dispatch:Rpcs.Get_transition_chain_witness.dispatch_multi
+      ~rpc_dispatch:Rpcs.Get_transition_chain_proof.dispatch_multi
       ~label:"transition"
 
   let get_transition_chain =
@@ -915,8 +945,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     loop peers 1
 
-  let peers_by_ip t inet_addr =
-    Hashtbl.find_multi t.gossip_net.peers_by_ip inet_addr
+  let peers_by_ip t = Gossip_net.peers_by_ip t.gossip_net
 
   let try_preferred_peer t inet_addr input ~rpc =
     let peers_at_addr = peers_by_ip t inet_addr in

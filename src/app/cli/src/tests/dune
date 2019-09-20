@@ -1,0 +1,14 @@
+(library
+  (name tests)
+  (public_name tests)
+  (libraries
+    ; opam deps
+    async core
+    ; libs
+    coda_base coda_graphql coda_lib coda_state
+    coda_transition coda_version parallel
+    transition_frontier
+    ; internal deps
+    init)
+  (preprocessor_deps ../../../../config.mlh)
+  (preprocess (pps ppx_coda ppx_jane)))

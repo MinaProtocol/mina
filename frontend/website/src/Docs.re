@@ -83,7 +83,7 @@ module Styles = {
       ),
       selector(
         "strong",
-        [fontWeight(`num(600)), color(Style.Colors.metallicBlue)],
+        [fontWeight(`num(600)), color(Style.Colors.saville)],
       ),
       selector(
         ".admonition",
@@ -178,34 +178,31 @@ module Styles = {
     ]);
 };
 
-let component = ReasonReact.statelessComponent("Blog");
-
-let make = _children => {
-  ...component,
-  render: _self => {
-    // We need to calculate the CDN url and inject it into the template
-    let chevronUrl = Links.Cdn.url("/static/img/chevron-down.svg");
-    let linkUrl = Links.Cdn.url("/static/img/link.svg");
-    <div
-      className=Css.(
-        merge([
-          Styles.markdownStyles(linkUrl),
-          style([
-            display(`flex),
-            flexDirection(`column),
-            alignItems(`flexStart),
-            justifyContent(`center),
-            marginLeft(`auto),
-            marginRight(`auto),
-            media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
-            media(Style.MediaQuery.somewhatLarge, [flexDirection(`row)]),
-          ]),
-        ])
-      )>
-      <aside
-        className=Styles.sideNav
-        dangerouslySetInnerHTML={
-          "__html": {j|
+[@react.component]
+let make = () => {
+  // We need to calculate the CDN url and inject it into the template
+  let chevronUrl = Links.Cdn.url("/static/img/chevron-down.svg");
+  let linkUrl = Links.Cdn.url("/static/img/link.svg");
+  <div
+    className=Css.(
+      merge([
+        Styles.markdownStyles(linkUrl),
+        style([
+          display(`flex),
+          flexDirection(`column),
+          alignItems(`flexStart),
+          justifyContent(`center),
+          marginLeft(`auto),
+          marginRight(`auto),
+          media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
+          media(Style.MediaQuery.somewhatLarge, [flexDirection(`row)]),
+        ]),
+      ])
+    )>
+    <aside
+      className=Styles.sideNav
+      dangerouslySetInnerHTML={
+        "__html": {j|
             {% if nav|length>1 %}
               <ul>
               {% for nav_item in nav %}
@@ -240,72 +237,69 @@ let make = _children => {
               </ul>
             {% endif %}
           |j},
-        }
-      />
-      <article
+      }
+    />
+    <article
+      className=Css.(style([maxWidth(`rem(43.)), width(`percent(100.))]))>
+      <A
+        name="Edit Link"
+        target="_blank"
+        href="{{ page.edit_url }}"
         className=Css.(
-          style([maxWidth(`rem(43.)), width(`percent(100.))])
+          style([
+            position(`relative),
+            float(`right),
+            display(`flex),
+            alignItems(`center),
+            marginTop(`rem(3.25)),
+            marginBottom(`rem(0.5)),
+            hover([color(Style.Colors.hyperlinkHover)]),
+            ...Style.Link.basicStyles,
+          ])
         )>
-        <A
-          name="Edit Link"
-          target="_blank"
-          href="{{ page.edit_url }}"
-          className=Css.(
-            style([
-              position(`relative),
-              float(`right),
-              display(`flex),
-              alignItems(`center),
-              marginTop(`rem(3.25)),
-              marginBottom(`rem(0.5)),
-              hover([color(Style.Colors.hyperlinkHover)]),
-              ...Style.Link.basicStyles,
-            ])
-          )>
-          <svg
-            fill="currentColor"
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24">
-            <path
-              d="M7.127 22.562l-7.127 1.438 1.438-7.128 5.689 5.69zm1.414-1.414l11.228-11.225-5.69-5.692-11.227 11.227 5.689 5.69zm9.768-21.148l-2.816 2.817 5.691 5.691 2.816-2.819-5.691-5.689z"
-            />
-          </svg>
-          <span className=Css.(style([marginLeft(`rem(0.25))]))>
-            {ReasonReact.string("Edit")}
-          </span>
+        <svg
+          fill="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24">
+          <path
+            d="M7.127 22.562l-7.127 1.438 1.438-7.128 5.689 5.69zm1.414-1.414l11.228-11.225-5.69-5.692-11.227 11.227 5.689 5.69zm9.768-21.148l-2.816 2.817 5.691 5.691 2.816-2.819-5.691-5.689z"
+          />
+        </svg>
+        <span className=Css.(style([marginLeft(`rem(0.25))]))>
+          {React.string("Edit")}
+        </span>
+      </A>
+      {React.string("{{ page.content }}")}
+      <hr
+        className=Css.(
+          style([
+            borderColor(Style.Colors.slateAlpha(0.1)),
+            margin2(~v=`rem(2.), ~h=`zero),
+          ])
+        )
+      />
+      <div
+        className=Css.(
+          style([display(`flex), justifyContent(`spaceBetween)])
+        )>
+        {React.string("{% if page.previous_page %}")}
+        <A name="next_page" href="{{ page.previous_page.url|url }}">
+          {React.string({js|← {{ page.previous_page.title }}|js})}
         </A>
-        {ReasonReact.string("{{ page.content }}")}
-        <hr
-          className=Css.(
-            style([
-              borderColor(Style.Colors.slateAlpha(0.1)),
-              margin2(~v=`rem(2.), ~h=`zero),
-            ])
-          )
-        />
-        <div
-          className=Css.(
-            style([display(`flex), justifyContent(`spaceBetween)])
-          )>
-          {ReasonReact.string("{% if page.previous_page %}")}
-          <A name="next_page" href="{{ page.previous_page.url|url }}">
-            {ReasonReact.string({js|← {{ page.previous_page.title }}|js})}
-          </A>
-          {ReasonReact.string("{% else %}")}
-          <span />
-          {ReasonReact.string("{% endif %}")}
-          {ReasonReact.string("{% if page.next_page %}")}
-          <A name="next_page" href="{{ page.next_page.url|url }}">
-            {ReasonReact.string({js|{{ page.next_page.title }} →|js})}
-          </A>
-          {ReasonReact.string("{% else %}")}
-          <span />
-          {ReasonReact.string("{% endif %}")}
-        </div>
-      </article>
-      <script src={Links.Cdn.url("/static/js/clipboard.js")} />
-    </div>;
-  },
+        {React.string("{% else %}")}
+        <span />
+        {React.string("{% endif %}")}
+        {React.string("{% if page.next_page %}")}
+        <A name="next_page" href="{{ page.next_page.url|url }}">
+          {React.string({js|{{ page.next_page.title }} →|js})}
+        </A>
+        {React.string("{% else %}")}
+        <span />
+        {React.string("{% endif %}")}
+      </div>
+    </article>
+    <script src={Links.Cdn.url("/static/js/clipboard.js")} />
+  </div>;
 };

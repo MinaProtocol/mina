@@ -3,6 +3,7 @@ open Async_kernel
 open Pipe_lib
 open Coda_base
 open Coda_incremental
+open Coda_transition
 
 (** An extension to the transition frontier that provides a view onto the data
     other components can use. These are exposed through the broadcast pipes
@@ -31,10 +32,6 @@ end
 
 module type Transition_frontier_diff_intf = sig
   type breadcrumb
-
-  type external_transition_validated
-
-  type transaction_snark_scan_state
 
   (* TODO: Remove New_frontier. 
     Each transition frontier extension should be initialized by the input, the root breadcrumb *)
@@ -80,7 +77,7 @@ module type Transition_frontier_diff_intf = sig
       end
 
       type 'root t =
-        ('root, transaction_snark_scan_state, Pending_coinbase.t) Poly.t
+        ('root, Staged_ledger.Scan_state.t, Pending_coinbase.t) Poly.t
     end
 
     (** Diff.Mutant is a GADT that represents operations that affect the changes
@@ -91,16 +88,14 @@ module type Transition_frontier_diff_intf = sig
         There are comments for each GADT that will discuss the operations that
         changes a `transition_frontier` and their corresponding side-effects.*)
     type _ t =
-      | New_frontier :
-          (external_transition_validated, State_hash.t) With_hash.t Root.t
-          -> unit t
+      | New_frontier : External_transition.Validated.t Root.t -> unit t
           (** New_frontier: When creating a new transition frontier, the
           transition_frontier will begin with a single breadcrumb that can be
           constructed mainly with a root external transition and a
           scan_state. There are no components in the frontier that affects
           the frontier. Therefore, the type of this diff is tagged as a unit. *)
       | Add_transition :
-          (external_transition_validated, State_hash.t) With_hash.t
+          External_transition.Validated.t
           -> Consensus.Data.Consensus_state.Value.t t
           (** Add_transition: Add_transition would simply add a transition to the
           frontier and is therefore the parameter for Add_transition. After
@@ -174,22 +169,16 @@ end
 module type Transition_frontier_extensions_intf = sig
   type breadcrumb
 
-  type external_transition_validated
-
-  type transaction_snark_scan_state
-
   module Diff :
-    Transition_frontier_diff_intf
-    with type breadcrumb := breadcrumb
-     and type external_transition_validated := external_transition_validated
-     and type transaction_snark_scan_state := transaction_snark_scan_state
+    Transition_frontier_diff_intf with type breadcrumb := breadcrumb
 
   module type Extension_intf =
     Transition_frontier_extension_intf
     with type transition_frontier_diff := Diff.t
 
   module Work : sig
-    type t = Transaction_snark.Statement.t list [@@deriving sexp, yojson]
+    type t = Transaction_snark.Statement.t One_or_two.t
+    [@@deriving sexp, yojson]
 
     module Stable :
       sig
@@ -244,7 +233,7 @@ module type Transition_frontier_extensions_intf = sig
     ; best_tip_diff: Diff.Best_tip_diff.t
     ; root_diff: Diff.Root_diff.t
     ; persistence_diff: Diff.Persistence_diff.t
-    ; new_transition: external_transition_validated New_transition.Var.t }
+    ; new_transition: External_transition.Validated.t New_transition.Var.t }
   [@@deriving fields]
 
   type writers =
@@ -276,28 +265,17 @@ module type Transition_frontier_breadcrumb_intf = sig
 
   type display [@@deriving yojson]
 
-  type staged_ledger
-
-  type mostly_validated_external_transition
-
-  type external_transition_validated
-
-  type verifier
-
-  val create :
-       (external_transition_validated, State_hash.t) With_hash.t
-    -> staged_ledger
-    -> t
+  val create : External_transition.Validated.t -> Staged_ledger.t -> t
 
   (** The copied breadcrumb delegates to [Staged_ledger.copy], the other fields are already immutable *)
   val copy : t -> t
 
   val build :
        logger:Logger.t
-    -> verifier:verifier
+    -> verifier:Verifier.t
     -> trust_system:Trust_system.t
     -> parent:t
-    -> transition:mostly_validated_external_transition
+    -> transition:External_transition.Almost_validated.t
     -> sender:Envelope.Sender.t option
     -> ( t
        , [ `Invalid_staged_ledger_diff of Error.t
@@ -306,54 +284,43 @@ module type Transition_frontier_breadcrumb_intf = sig
        Result.t
        Deferred.t
 
-  val transition_with_hash :
-    t -> (external_transition_validated, State_hash.t) With_hash.t
+  val validated_transition : t -> External_transition.Validated.t
 
-  val staged_ledger : t -> staged_ledger
+  val staged_ledger : t -> Staged_ledger.t
 
   val hash : t -> int
 
-  val external_transition : t -> external_transition_validated
+  val protocol_state : t -> Coda_state.Protocol_state.Value.t
+
+  val blockchain_state : t -> Coda_state.Blockchain_state.Value.t
+
+  val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
   val state_hash : t -> State_hash.t
+
+  val parent_hash : t -> State_hash.t
+
+  val proposer : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+
+  val payments : t -> User_command.t list
 
   val display : t -> display
 
   val name : t -> string
-
-  val to_user_commands : t -> User_command.t list
 end
 
 module type Transition_frontier_base_intf = sig
-  type mostly_validated_external_transition
-
-  type external_transition_validated
-
-  type transaction_snark_scan_state
-
-  type staged_ledger
-
-  type staged_ledger_diff
-
-  type verifier
-
   type t [@@deriving eq]
 
-  module Breadcrumb :
-    Transition_frontier_breadcrumb_intf
-    with type mostly_validated_external_transition :=
-                mostly_validated_external_transition
-     and type external_transition_validated := external_transition_validated
-     and type staged_ledger := staged_ledger
-     and type verifier := verifier
+  module Breadcrumb : Transition_frontier_breadcrumb_intf
 
   val create :
        logger:Logger.t
-    -> root_transition:( external_transition_validated
-                       , State_hash.t )
-                       With_hash.t
+    -> root_transition:External_transition.Validated.t
     -> root_snarked_ledger:Ledger.Db.t
-    -> root_staged_ledger:staged_ledger
+    -> root_staged_ledger:Staged_ledger.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> t Deferred.t
 
@@ -432,16 +399,11 @@ module type Transition_frontier_intf = sig
   val wait_for_transition : t -> State_hash.t -> unit Deferred.t
 
   module Diff :
-    Transition_frontier_diff_intf
-    with type breadcrumb := Breadcrumb.t
-     and type external_transition_validated := external_transition_validated
-     and type transaction_snark_scan_state := transaction_snark_scan_state
+    Transition_frontier_diff_intf with type breadcrumb := Breadcrumb.t
 
   module Extensions :
     Transition_frontier_extensions_intf
     with type breadcrumb := Breadcrumb.t
-     and type external_transition_validated := external_transition_validated
-     and type transaction_snark_scan_state := transaction_snark_scan_state
      and module Diff := Diff
 
   val snark_pool_refcount_pipe :
@@ -461,7 +423,7 @@ module type Transition_frontier_intf = sig
   val decr_num_catchup_jobs : t -> unit Deferred.t
 
   val new_transition :
-    t -> external_transition_validated Coda_incremental.New_transition.t
+    t -> External_transition.Validated.t Coda_incremental.New_transition.t
 
   val visualize_to_string : t -> string
 

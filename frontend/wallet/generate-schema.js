@@ -8,7 +8,6 @@ if (process.argv.length < 3) {
 }
 
 function writeSchema(data) {
-  console.log(data)
   const schema = buildClientSchema(data);
   console.log(printSchema(schema, {commentDescriptions: true}));
 }
@@ -19,7 +18,7 @@ if (fs.existsSync(endpoint)) {
   let data = JSON.parse(fileContents)["data"];
   writeSchema(data);
 } else {
-  console.log("Fetching from server.");
+  console.error("Fetching from server.");
   fetch(endpoint, {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },

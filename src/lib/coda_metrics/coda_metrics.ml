@@ -145,6 +145,26 @@ module Runtime = struct
       (fun () -> float_of_int !current.Gc.Stat.top_heap_words)
       ~help:"Maximum size reached by the major heap, in words."
 
+  let ocaml_gc_live_words =
+    simple_metric ~metric_type:Counter "ocaml_gc_live_words"
+      (fun () -> float_of_int !current.Gc.Stat.live_words)
+      ~help:"Live words allocated by the GC."
+
+  let ocaml_gc_free_words =
+    simple_metric ~metric_type:Counter "ocaml_gc_free_words"
+      (fun () -> float_of_int !current.Gc.Stat.free_words)
+      ~help:"Words freed by the GC."
+
+  let ocaml_gc_largest_free =
+    simple_metric ~metric_type:Counter "ocaml_gc_largest_free"
+      (fun () -> float_of_int !current.Gc.Stat.largest_free)
+      ~help:"Size of the largest block freed by the GC."
+
+  let ocaml_gc_stack_size =
+    simple_metric ~metric_type:Counter "ocaml_gc_stack_size"
+      (fun () -> float_of_int !current.Gc.Stat.stack_size)
+      ~help:"Current stack size."
+
   let process_cpu_seconds_total =
     simple_metric ~metric_type:Counter "process_cpu_seconds_total" Sys.time
       ~help:"Total user and system CPU time spent in seconds."
@@ -163,6 +183,10 @@ module Runtime = struct
     ; ocaml_gc_heap_words
     ; ocaml_gc_compactions
     ; ocaml_gc_top_heap_words
+    ; ocaml_gc_live_words
+    ; ocaml_gc_free_words
+    ; ocaml_gc_largest_free
+    ; ocaml_gc_stack_size
     ; process_cpu_seconds_total
     ; process_uptime_ms_total ]
 
@@ -173,8 +197,8 @@ module Runtime = struct
         register default info collector )
 end
 
-module Proving_time = struct
-  let subsystem = "Proving_time"
+module Cryptography = struct
+  let subsystem = "Cryptography"
 
   let blockchain_proving_time_ms =
     let help =
@@ -182,11 +206,23 @@ module Proving_time = struct
     in
     Gauge.v "blockchain_proving_time_ms" ~help ~namespace ~subsystem
 
+  let total_pedersen_hashes_computed =
+    let help = "# of pedersen hashes computed" in
+    Counter.v "total_pedersen_hash_computed" ~help ~namespace ~subsystem
+
   (* TODO:
   let transaction_proving_time_ms =
     let help = "time elapsed while proving most recently generated transaction snark" in
     Gauge.v "transaction_proving_time_ms" ~help ~namespace ~subsystem
   *)
+end
+
+module Bootstrap = struct
+  let subsystem = "Bootstrap"
+
+  let bootstrap_time_ms =
+    let help = "time elapsed while bootstrapping" in
+    Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
 end
 
 (* TODO:
@@ -210,7 +246,64 @@ module Network = struct
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
-  (* TODO: track non gossip RPC messages as well *)
+  module Rpc_map = Hashtbl.Make (String)
+
+  module Rpc_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 500. 2. 7
+  end)
+
+  let rpc_table = Rpc_map.of_alist_exn []
+
+  let rpc_latency_ms ~name : Gauge.t =
+    if Rpc_map.mem rpc_table name then Rpc_map.find_exn rpc_table name
+    else
+      let help = "time elapsed while doing rpc calls in ms" in
+      let rpc_gauge = Gauge.v name ~help ~namespace ~subsystem in
+      Rpc_map.add_exn rpc_table ~key:name ~data:rpc_gauge ;
+      rpc_gauge
+
+  let rpc_latency_ms_summary : Rpc_histogram.t =
+    let help = "A histogram for all rpc call latencies" in
+    Rpc_histogram.v "rpc_latency_ms_summary" ~help ~namespace ~subsystem
+end
+
+module Snark_work = struct
+  let subsystem = "Snark_work"
+
+  let completed_snark_work_received_gossip : Counter.t =
+    let help = "# of completed snark work bundles received from peers" in
+    Counter.v "completed_snark_work_received_gossip" ~help ~namespace
+      ~subsystem
+
+  let completed_snark_work_received_rpc : Counter.t =
+    let help = "# of completed snark work bundles received via rpc" in
+    Counter.v "completed_snark_work_received_rpc" ~help ~namespace ~subsystem
+
+  let snark_work_assigned_rpc : Counter.t =
+    let help = "# of snark work bundles assigned via rpc" in
+    Counter.v "snark_work_assigned_rpc" ~help ~namespace ~subsystem
+
+  let snark_work_timed_out_rpc : Counter.t =
+    let help =
+      "# of snark work bundles sent via rpc that did not complete within the \
+       value of the daemon flag work-reassignment-wait"
+    in
+    Counter.v "snark_work_timed_out_rpc" ~help ~namespace ~subsystem
+
+  let snark_pool_size : Gauge.t =
+    let help = "# of completed snark work bundles in the snark pool" in
+    Gauge.v "snark_pool_size" ~help ~namespace ~subsystem
+
+  let completed_snark_work_last_block : Gauge.t =
+    let help = "# of snark work bundles purchased per block" in
+    Gauge.v "completed_snark_work_last_block" ~help ~namespace ~subsystem
+
+  let scan_state_snark_work : Gauge.t =
+    let help =
+      "# of snark work in the scan state that are yet to be done/purchased \
+       after every block"
+    in
+    Gauge.v "scan_state_snark_work" ~help ~namespace ~subsystem
 end
 
 module Trust_system = struct
@@ -263,6 +356,10 @@ end
 
 module Transition_frontier = struct
   let subsystem = "Transition_frontier"
+
+  let slot_fill_rate : Gauge.t =
+    let help = "number of blocks / total slots since genesis" in
+    Gauge.v "slot_fill_rate" ~help ~namespace ~subsystem
 
   let active_breadcrumbs : Gauge.t =
     let help = "current # of breadcrumbs in the transition frontier" in
@@ -330,13 +427,17 @@ module Transition_frontier_controller = struct
     in
     Gauge.v "transitions_being_processed" ~help ~namespace ~subsystem
 
-  (* TODO:
   let transitions_in_catchup_scheduler =
-    Counter.v_label "transitions_in_catchup_scheduler" ~namespace ~subsystem
+    let help = "transitions stored inside catchup scheduler" in
+    Gauge.v "transitions_in_catchup_scheduler" ~help ~namespace ~subsystem
+
+  let catchup_time_ms =
+    let help = "time elapsed while doing catchup" in
+    Gauge.v "catchup_time_ms" ~help ~namespace ~subsystem
 
   let transitions_downloaded_from_catchup =
-    Counter.v_label "transitions_downloaded_from_catchup" ~namespace ~subsystem
-  *)
+    let help = "# of transitions downloaded by ledger_catchup" in
+    Gauge.v "transitions_downloaded_from_catchup" ~help ~namespace ~subsystem
 
   let breadcrumbs_built_by_processor : Counter.t =
     let help = "breadcrumbs built by the processor" in

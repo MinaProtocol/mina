@@ -1,17 +1,14 @@
 open Coda_base
-open Coda_state
 open Core
 open Async
 open Cache_lib
+open Coda_transition
 
 module Make (Inputs : Inputs.S) :
   Coda_intf.Breadcrumb_builder_intf
-  with type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
-   and type transition_frontier := Inputs.Transition_frontier.t
+  with type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
-              Inputs.Transition_frontier.Breadcrumb.t
-   and type verifier := Inputs.Verifier.t = struct
+              Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
 
   let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
@@ -37,7 +34,9 @@ module Make (Inputs : Inputs.S) :
                          Rose_tree.to_yojson
                            (fun enveloped_transitions ->
                              Cached.peek enveloped_transitions
-                             |> Envelope.Incoming.data |> fst |> With_hash.hash
+                             |> Envelope.Incoming.data
+                             |> External_transition.Initial_validated
+                                .state_hash
                              |> fun hash ->
                              `String
                                (Coda_base.State_hash.to_base58_check hash) )
@@ -80,13 +79,11 @@ module Make (Inputs : Inputs.S) :
                   let sender = Envelope.Incoming.sender enveloped_transition in
                   let parent = Cached.peek cached_parent in
                   let expected_parent_hash =
-                    Transition_frontier.Breadcrumb.transition_with_hash parent
-                    |> With_hash.hash
+                    Transition_frontier.Breadcrumb.state_hash parent
                   in
                   let actual_parent_hash =
                     transition_with_hash |> With_hash.data
-                    |> External_transition.protocol_state
-                    |> Protocol_state.previous_state_hash
+                    |> External_transition.parent_hash
                   in
                   let%bind () =
                     Deferred.return
