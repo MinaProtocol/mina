@@ -1181,11 +1181,14 @@ let%test_module _ =
 
     let assert_rebroadcastable pool cmds =
       let normalize = List.sort ~compare:User_command.compare in
+      let expected =
+        match normalize cmds with [] -> [] | normalized -> [normalized]
+      in
       [%test_eq: User_command.t list list]
         ( List.map ~f:normalize
         @@ Test.Resource_pool.get_rebroadcastable pool
              ~is_expired:(Fn.const false) )
-        [normalize cmds]
+        expected
 
     let mock_sender =
       Envelope.Sender.Remote (Unix.Inet_addr.of_string "1.2.3.4")
