@@ -376,8 +376,10 @@ include Make (struct
 
   let fake_accounts =
     let open Quickcheck in
-    random_value
-      (Generator.list_with_length fake_accounts_target Fake_accounts.gen)
+    random_value ~seed:(`Deterministic "fake accounts for testnet postake")
+      (Generator.list_with_length
+         (fake_accounts_target - List.length real_accounts)
+         Fake_accounts.gen)
 
   let accounts = real_accounts @ fake_accounts
 end)
