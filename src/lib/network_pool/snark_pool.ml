@@ -249,12 +249,18 @@ struct
           match Statement_table.find t.snark_tables.all work with
           | None ->
               update_and_rebroadcast ()
-          | Some prev ->
-              if Currency.Fee.( < ) fee.fee prev.fee.fee then
+          | Some prev -> (
+            match compare fee.fee prev.fee.fee with
+            | -1 ->
                 update_and_rebroadcast ()
-              else (
-                log_rejection_if_local "fee too high" ;
-                `Don't_rebroadcast )
+            | 0 ->
+                log_rejection_if_local "fee equal to cheapest snark we have" ;
+                `Don't_rebroadcast
+            | 1 ->
+                log_rejection_if_local "fee higher than cheapest snark we have" ;
+                `Don't_rebroadcast
+            | _ ->
+                failwith "compare didn't return -1, 0, or 1????" )
         else (
           log_rejection_if_local "statement not referenced" ;
           `Don't_rebroadcast )
