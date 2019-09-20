@@ -211,6 +211,11 @@ module Make (Inputs : Inputs.S) :
             let%bind transitions =
               Network.get_transition_chain network peer hashes
             in
+            Coda_metrics.(
+              Gauge.set
+                Transition_frontier_controller
+                .transitions_downloaded_from_catchup
+                (Float.of_int (List.length transitions))) ;
             if not @@ verify_against_hashes transitions hashes then (
               let error_msg =
                 sprintf

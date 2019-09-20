@@ -1,5 +1,7 @@
 open Core
 
+let default_password_env = "CODA_PRIVKEY_PASS"
+
 let read_hidden_line prompt : Bytes.t Async.Deferred.t =
   let open Unix in
   let open Async_unix in
@@ -26,15 +28,12 @@ let read_hidden_line prompt : Bytes.t Async.Deferred.t =
   | `Eof ->
       failwith "got EOF while reading password"
 
-let lift (t : 'a Async.Deferred.t) : 'a Async.Deferred.Or_error.t =
-  Async.Deferred.map t ~f:(fun x -> Ok x)
-
-let hidden_line_or_env prompt ~env : Bytes.t Async.Deferred.Or_error.t =
-  let open Async.Deferred.Or_error.Let_syntax in
+let hidden_line_or_env prompt ~env : Bytes.t Async.Deferred.t =
+  let open Async.Deferred.Let_syntax in
   match Sys.getenv env with
   | Some p ->
       return (Bytes.of_string p)
   | _ ->
-      lift (read_hidden_line prompt)
+      read_hidden_line prompt
 
-let read prompt = hidden_line_or_env prompt ~env:"CODA_PRIVKEY_PASS"
+let read prompt = hidden_line_or_env prompt ~env:default_password_env

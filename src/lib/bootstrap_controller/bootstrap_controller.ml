@@ -389,17 +389,24 @@ end = struct
               , Staged_ledger_hash.to_yojson received_staged_ledger_hash ) ]
           "Comparing $expected_staged_ledger_hash to \
            $received_staged_ledger_hash" ;
-        let%bind () =
-          Staged_ledger_hash.equal expected_staged_ledger_hash
-            received_staged_ledger_hash
-          |> Result.ok_if_true
-               ~error:(Error.of_string "received faulty scan state from peer")
+        let%bind new_root =
+          t.current_root
+          |> External_transition.skip_frontier_dependencies_validation
+               `This_transition_belongs_to_a_detached_subtree
+          |> External_transition.validate_staged_ledger_hash
+               (`Staged_ledger_already_materialized
+                 received_staged_ledger_hash)
+          |> Result.map_error ~f:(fun _ ->
+                 Error.of_string "received faulty scan state from peer" )
           |> Deferred.return
         in
-        Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-          ~logger ~verifier ~scan_state
-          ~snarked_ledger:(Ledger.of_database synced_db)
-          ~expected_merkle_root ~pending_coinbases
+        let%map root_staged_ledger =
+          Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
+            ~logger ~verifier ~scan_state
+            ~snarked_ledger:(Ledger.of_database synced_db)
+            ~expected_merkle_root ~pending_coinbases
+        in
+        (root_staged_ledger, new_root)
       with
       | Error e ->
           let%bind () =
@@ -423,24 +430,13 @@ end = struct
              Retry bootstrap" ;
           Writer.close sync_ledger_writer ;
           loop ()
-      | Ok root_staged_ledger -> (
+      | Ok (root_staged_ledger, new_root) -> (
           let%bind () =
             Trust_system.(
               record t.trust_system t.logger sender
                 Actions.
                   ( Fulfilled_request
                   , Some ("Received valid scan state from peer", []) ))
-          in
-          let new_root =
-            let root_transition =
-              External_transition.Validation.forget_validation t.current_root
-            in
-            (* TODO: review the correctness of this action #2480 *)
-            let (`I_swear_this_is_safe_see_my_comment
-                  validated_root_transition) =
-              External_transition.Validated.create_unsafe root_transition
-            in
-            validated_root_transition
           in
           let consensus_state =
             new_root |> External_transition.Validated.consensus_state

@@ -1216,10 +1216,7 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.add_wallet)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.add_wallet)]
       ~resolve:(fun {ctx= t; _} () password ->
-        let open Deferred.Let_syntax in
-        let password =
-          lazy (Deferred.Or_error.return (Bytes.of_string password))
-        in
+        let password = lazy (return (Bytes.of_string password)) in
         let%map pk =
           Coda_lib.wallets t |> Secrets.Wallets.generate_new ~password
         in
@@ -1231,10 +1228,7 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.unlock_wallet)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.unlock_wallet)]
       ~resolve:(fun {ctx= t; _} () (password, pk) ->
-        let password =
-          lazy (Deferred.Or_error.return (Bytes.of_string password))
-        in
-        let open Deferred.Let_syntax in
+        let password = lazy (return (Bytes.of_string password)) in
         match%map
           Coda_lib.wallets t |> Secrets.Wallets.unlock ~needle:pk ~password
         with
