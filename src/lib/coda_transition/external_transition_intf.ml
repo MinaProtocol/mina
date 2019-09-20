@@ -483,15 +483,17 @@ module type S = sig
        [`Staged_ledger_already_materialized of Staged_ledger_hash.t]
     -> ( 'time_received
        , 'proof
-       , 'delta_transition_chain
+       , 'delta_transition_chain_part1
        , 'frontier_dependencies
-       , [`Staged_ledger_diff] * unit Truth.false_t )
+       , [`Staged_ledger_diff] * unit Truth.false_t
+       , 'delta_transition_chain_part2 )
        Validation.with_transition
     -> ( ( 'time_received
          , 'proof
-         , 'delta_transition_chain
+         , 'delta_transition_chain_part1
          , 'frontier_dependencies
-         , [`Staged_ledger_diff] * unit Truth.true_t )
+         , [`Staged_ledger_diff] * unit Truth.true_t
+         , 'delta_transition_chain_part2 )
          Validation.with_transition
        , [> `Staged_ledger_hash_mismatch] )
        Result.t

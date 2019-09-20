@@ -390,6 +390,7 @@ end = struct
           "Comparing $expected_staged_ledger_hash to \
            $received_staged_ledger_hash" ;
         let%bind new_root =
+          let open Result.Let_syntax in
           t.current_root
           |> External_transition.skip_frontier_dependencies_validation
                `This_transition_belongs_to_a_detached_subtree
@@ -398,6 +399,8 @@ end = struct
                  received_staged_ledger_hash)
           |> Result.map_error ~f:(fun _ ->
                  Error.of_string "received faulty scan state from peer" )
+          >>| External_transition.validate_delta_transition_chain_part2
+                `This_transition_was_not_received_via_gossip
           |> Deferred.return
         in
         let%map root_staged_ledger =
