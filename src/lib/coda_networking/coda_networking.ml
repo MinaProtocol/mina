@@ -763,20 +763,32 @@ module Make (Inputs : Inputs_intf) = struct
       don't_wait_for
       @@ match%bind Process.create ~prog:filter_program ~args:[] () with
          | Ok filter_process ->
+             let message_queue = Queue.create () in
              Linear_pipe.transfer
                (received_gossips |> Strict_pipe.Reader.to_linear_pipe)
                (Process.stdin filter_process |> Writer.pipe)
                ~f:(fun gossip ->
-                 Envelope.Incoming.sexp_of_t Message.sexp_of_msg gossip
-                 |> Sexp.to_string )
+                 Queue.enqueue message_queue gossip ;
+                 let msg =
+                   Envelope.Incoming.to_yojson Message.msg_to_yojson gossip
+                   |> Yojson.Safe.to_string
+                 in
+                 msg ^ "\n" )
              |> don't_wait_for ;
-             Linear_pipe.transfer
-               ( Process.stdout filter_process
-               |> Reader.pipe |> Linear_pipe.wrap_reader )
-               (Strict_pipe.Writer.to_linear_pipe filtered_gossips_writer)
-               ~f:(fun gossip ->
-                 Sexp.of_string gossip
-                 |> Envelope.Incoming.t_of_sexp Message.msg_of_sexp )
+             Pipe.iter
+               (Process.stdout filter_process |> Reader.pipe)
+               ~f:(fun respond ->
+                 match Yojson.Safe.from_string respond with
+                 | `Assoc [("respond", `String "accept")] ->
+                     let msg = Queue.dequeue message_queue in
+                     return
+                     @@ Option.iter msg ~f:(fun msg ->
+                            Strict_pipe.Writer.write filtered_gossips_writer
+                              msg )
+                 | `Assoc [("respond", `String "reject")] ->
+                     return @@ ignore @@ Queue.dequeue message_queue
+                 | _ ->
+                     Deferred.unit )
          | Error e ->
              Logger.error config.logger ~module_:__MODULE__ ~location:__LOC__
                ~metadata:[("error", `String (Error.to_string_hum e))]
