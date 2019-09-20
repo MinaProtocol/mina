@@ -4,7 +4,8 @@ open Core_kernel
 module type S = sig
   type t
 
-  val create : unit -> t Deferred.t
+  val create :
+    logger:Logger.t -> pids:Child_processes.Termination.t -> t Deferred.t
 
   val verify_blockchain_snark :
     t -> Blockchain_snark.Blockchain.t -> bool Or_error.t Deferred.t
