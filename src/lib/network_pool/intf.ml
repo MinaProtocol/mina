@@ -115,7 +115,8 @@ module type Snark_resource_pool_intf = sig
     serializable -> logger:Logger.t -> trust_system:Trust_system.t -> t
 
   val add_snark :
-       t
+       ?is_local:bool
+    -> t
     -> work:work
     -> proof:ledger_proof One_or_two.t
     -> fee:Fee_with_prover.t

@@ -68,12 +68,12 @@ module Statement : sig
   include Comparable.S with type t := t
 end
 
-type t [@@deriving sexp, yojson]
+type t [@@deriving equal, sexp, yojson]
 
 module Stable :
   sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, yojson, version]
+      type t [@@deriving bin_io, equal, sexp, version, yojson]
     end
 
     module Latest = V1

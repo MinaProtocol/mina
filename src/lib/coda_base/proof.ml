@@ -12,6 +12,8 @@ module Stable = struct
 
       let of_string = Binable.of_string (module Tock_backend.Proof)
 
+      let equal a b = String.equal (to_string a) (to_string b)
+
       let version_byte = Base58_check.Version_bytes.proof
 
       let description = "Tock proof"
@@ -58,4 +60,4 @@ let dummy = Tock.Proof.dummy
 include Sexpable.Of_stringable (Stable.Latest)
 
 [%%define_locally
-Stable.Latest.(to_yojson, of_yojson)]
+Stable.Latest.(equal, to_yojson, of_yojson)]

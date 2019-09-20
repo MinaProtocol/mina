@@ -77,17 +77,19 @@ end)
           (Yojson.Safe.to_string @@ Work.compact_json work)
           (Yojson.Safe.to_string @@ Coda_base.Fee_with_prover.to_yojson fee)
 
+  (* TODO if sender is self, track and rebroadcast periodically. *)
   let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :
       t Or_error.t Deferred.t =
     let open Deferred.Or_error.Let_syntax in
-    let data = Envelope.Incoming.data t in
+    let {Envelope.Incoming.data= diff; sender} = t in
+    let is_local = match sender with Local -> true | _ -> false in
     let to_or_error = function
       | `Don't_rebroadcast ->
           Or_error.error_string "Worse fee or already in pool"
       | `Rebroadcast ->
-          Ok data
+          Ok diff
     in
-    match data with
+    match diff with
     | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) ->
         let%bind () =
           let check () =
@@ -102,5 +104,6 @@ end)
                 Deferred.Or_error.return ()
               else check ()
         in
-        Pool.add_snark pool ~work ~proof ~fee |> to_or_error |> Deferred.return
+        Pool.add_snark ~is_local pool ~work ~proof ~fee
+        |> to_or_error |> Deferred.return
 end

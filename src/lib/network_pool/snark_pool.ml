@@ -105,26 +105,36 @@ struct
     module T = struct
       (* TODO : Version this type *)
       type serializable =
-        Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-        Priced_proof.Stable.V1.t
-        Statement_table.t
+        { all:
+            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+            Priced_proof.Stable.V1.t
+            Statement_table.t
+              (** Every SNARK in the pool *)
+        ; rebroadcastable:
+            ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+              Priced_proof.Stable.V1.t
+            * Time.Stable.With_utc_sexp.V2.t )
+            Statement_table.t
+              (** Rebroadcastable SNARKs generated on this machine, along with
+                  when they were first added. *)
+        }
       [@@deriving sexp, bin_io]
 
       type t =
-        { snark_table: serializable
+        { snark_tables: serializable
         ; mutable ref_table: int Statement_table.t option
         ; logger: Logger.t sexp_opaque
         ; trust_system: Trust_system.t sexp_opaque }
       [@@deriving sexp]
 
-      let of_serializable table ~logger ~trust_system : t =
-        {snark_table= table; ref_table= None; logger; trust_system}
+      let of_serializable tables ~logger ~trust_system : t =
+        {snark_tables= tables; ref_table= None; logger; trust_system}
 
       let removed_breadcrumb_wait = 10
 
       let snark_pool_json t : Yojson.Safe.json =
         `List
-          (Statement_table.fold ~init:[] t.snark_table
+          (Statement_table.fold ~init:[] t.snark_tables.all
              ~f:(fun ~key ~data:{proof= _; fee= {fee; prover}} acc ->
                let work_ids =
                  Transaction_snark_work.Statement.compact_json key
@@ -138,62 +148,14 @@ struct
                :: acc ))
 
       let all_completed_work (t : t) : Transaction_snark_work.Info.t list =
-        Statement_table.fold ~init:[] t.snark_table
+        Statement_table.fold ~init:[] t.snark_tables.all
           ~f:(fun ~key ~data:{proof= _; fee= {fee; prover}} acc ->
             let work_ids = Transaction_snark_work.Statement.work_ids key in
             {Transaction_snark_work.Info.statements= key; work_ids; fee; prover}
             :: acc )
 
-      let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t) =
-        (* start with empty ref table *)
-        t.ref_table <- None ;
-        let tf_deferred =
-          Broadcast_pipe.Reader.iter frontier_broadcast_pipe ~f:(function
-            | Some tf ->
-                (* Start the count at the max so we flush after reconstructing the transition_frontier *)
-                let removedCounter = ref removed_breadcrumb_wait in
-                let pipe = Transition_frontier.snark_pool_refcount_pipe tf in
-                let deferred =
-                  Broadcast_pipe.Reader.iter pipe
-                    ~f:(fun (removed, refcount_table) ->
-                      t.ref_table <- Some refcount_table ;
-                      removedCounter := !removedCounter + removed ;
-                      if !removedCounter < removed_breadcrumb_wait then
-                        return ()
-                      else (
-                        removedCounter := 0 ;
-                        Statement_table.filter_keys_inplace t.snark_table
-                          ~f:(fun work ->
-                            Option.is_some
-                              (Statement_table.find refcount_table work) ) ;
-                        return
-                          (*when snark works removed from the pool*)
-                          Coda_metrics.(
-                            Gauge.set Snark_work.snark_pool_size
-                              (Float.of_int @@ Hashtbl.length t.snark_table)) )
-                  )
-                in
-                deferred
-            | None ->
-                t.ref_table <- None ;
-                return () )
-        in
-        Deferred.don't_wait_for tf_deferred
-
-      let create ~logger ~trust_system ~frontier_broadcast_pipe =
-        let t =
-          { snark_table= Statement_table.create ()
-          ; logger
-          ; trust_system
-          ; ref_table= None }
-        in
-        listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
-        t
-
-      let request_proof t = Statement_table.find t.snark_table
-
       (** True when there is no active transition_frontier or
-        when the refcount for the given work is 0 *)
+          when the refcount for the given work is 0 *)
       let work_is_referenced t work =
         match t.ref_table with
         | None ->
@@ -205,26 +167,94 @@ struct
           | Some _ ->
               true )
 
-      let add_snark t ~work ~(proof : Ledger_proof.t One_or_two.t) ~fee =
+      let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t) =
+        (* start with empty ref table *)
+        t.ref_table <- None ;
+        let tf_deferred =
+          Broadcast_pipe.Reader.iter frontier_broadcast_pipe ~f:(function
+            | Some tf ->
+                (* Start the count at the max so we flush after reconstructing
+                   the transition_frontier *)
+                let removedCounter = ref removed_breadcrumb_wait in
+                let pipe = Transition_frontier.snark_pool_refcount_pipe tf in
+                let deferred =
+                  Broadcast_pipe.Reader.iter pipe
+                    ~f:(fun (removed, refcount_table) ->
+                      t.ref_table <- Some refcount_table ;
+                      removedCounter := !removedCounter + removed ;
+                      if !removedCounter < removed_breadcrumb_wait then
+                        return ()
+                      else (
+                        removedCounter := 0 ;
+                        Statement_table.filter_keys_inplace t.snark_tables.all
+                          ~f:(work_is_referenced t) ;
+                        Statement_table.filter_keys_inplace
+                          t.snark_tables.rebroadcastable
+                          ~f:(work_is_referenced t) ;
+                        return
+                          (*when snark works removed from the pool*)
+                          Coda_metrics.(
+                            Gauge.set Snark_work.snark_pool_size
+                              ( Float.of_int
+                              @@ Hashtbl.length t.snark_tables.all )) ) )
+                in
+                deferred
+            | None ->
+                t.ref_table <- None ;
+                return () )
+        in
+        Deferred.don't_wait_for tf_deferred
+
+      let create ~logger ~trust_system ~frontier_broadcast_pipe =
+        let t =
+          { snark_tables=
+              { all= Statement_table.create ()
+              ; rebroadcastable= Statement_table.create () }
+          ; logger
+          ; trust_system
+          ; ref_table= None }
+        in
+        listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
+        t
+
+      let request_proof t = Statement_table.find t.snark_tables.all
+
+      let add_snark ?(is_local = false) t ~work
+          ~(proof : Ledger_proof.t One_or_two.t) ~fee =
+        let log_rejection_if_local reason =
+          if is_local then
+            Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
+              "Rejecting locally generated snark with statment $stmt, %s"
+              reason
+              ~metadata:
+                [ ( "stmt"
+                  , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
+                      work ) ]
+        in
         if work_is_referenced t work then
           let update_and_rebroadcast () =
-            Hashtbl.set t.snark_table ~key:work ~data:{proof; fee} ;
+            Hashtbl.set t.snark_tables.all ~key:work ~data:{proof; fee} ;
+            if is_local then
+              Hashtbl.set t.snark_tables.rebroadcastable ~key:work
+                ~data:({proof; fee}, Time.now ()) ;
             (*when snark work added to the pool*)
             Coda_metrics.(
               Gauge.set Snark_work.snark_pool_size
-                (Float.of_int @@ Hashtbl.length t.snark_table)) ;
+                (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ;
             `Rebroadcast
           in
-          match Statement_table.find t.snark_table work with
+          match Statement_table.find t.snark_tables.all work with
           | None ->
               update_and_rebroadcast ()
           | Some prev ->
               if Currency.Fee.( < ) fee.fee prev.fee.fee then
                 update_and_rebroadcast ()
-              else `Don't_rebroadcast
-        else `Don't_rebroadcast
-
-      let get_rebroadcastable _ ~is_expired:_ = []
+              else (
+                log_rejection_if_local "fee too high" ;
+                `Don't_rebroadcast )
+        else (
+          log_rejection_if_local "statement not referenced" ;
+          `Don't_rebroadcast )
 
       let verify_and_act t ~work ~sender =
         let statements, priced_proof = work in
@@ -289,7 +319,28 @@ struct
         (Transition_frontier)
         (T)
 
-    let remove_solved_work t = Statement_table.remove t.snark_table
+    let get_rebroadcastable t ~is_expired =
+      Hashtbl.filteri_inplace t.snark_tables.rebroadcastable
+        ~f:(fun ~key:stmt ~data:(_proof, time) ->
+          if is_expired time then (
+            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+              "No longer rebroadcasting SNARK with statement $stmt, it was \
+               added at $time its rebroadcast period is now expired"
+              ~metadata:
+                [ ( "stmt"
+                  , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
+                      stmt )
+                ; ( "time"
+                  , `String (Time.to_string_abs ~zone:Time.Zone.utc time) ) ] ;
+            false )
+          else true ) ;
+      Hashtbl.to_alist t.snark_tables.rebroadcastable
+      |> List.map ~f:(fun (stmt, (snark, _time)) ->
+             Diff.Stable.Latest.Add_solved_work (stmt, snark) )
+
+    let remove_solved_work t work =
+      Statement_table.remove t.snark_tables.all work ;
+      Statement_table.remove t.snark_tables.rebroadcastable work
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
