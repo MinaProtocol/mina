@@ -1,2 +1,2 @@
 [%%define ledger_depth 30]
-[%%define fake_accounts_target 1000000000]
+[%%define fake_accounts_target 20]
