@@ -1159,7 +1159,7 @@ let import_key =
                  port
              in
              printf
-               !"\n👝 Imported account!\nPublic key: %s\n"
+               !"\n😄 Imported account!\nPublic key: %s\n"
                (Public_key.Compressed.to_base58_check
                   (Public_key.compress public_key)) ))
 

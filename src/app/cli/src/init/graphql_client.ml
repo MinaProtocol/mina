@@ -2,6 +2,27 @@ open Core
 open Async
 open Signature_lib
 
+let graphql_error_to_string e =
+  let error_obj_to_string obj =
+    let open Yojson.Basic in
+    let obj_message =
+      let open Option.Let_syntax in
+      let%bind message = Util.to_option (Util.member "message") obj in
+      let%map path = Util.to_option (Util.member "path") obj in
+      let message =
+        Util.to_string_option message
+        |> Option.value ~default:(Yojson.Basic.to_string message)
+      in
+      Printf.sprintf "%s (in %s)" message (Yojson.Basic.to_string path)
+    in
+    match obj_message with Some m -> m | None -> to_string obj
+  in
+  match e with
+  | `List l ->
+      List.map ~f:error_obj_to_string l |> String.concat ~sep:"\n"
+  | e ->
+      error_obj_to_string e
+
 let query_or_error
     (query_obj :
       < parse: Yojson.Basic.json -> 'response
@@ -38,8 +59,8 @@ let query_or_error
   ( match (member "errors" body_json, member "data" body_json) with
   | `Null, `Null ->
       Error (`Graphql_error "Empty response from graphql query")
-  | data, `Null ->
-      Error (`Graphql_error (Yojson.Basic.to_string data))
+  | error, `Null ->
+      Error (`Graphql_error (graphql_error_to_string error))
   | _, data ->
       Result.try_with (fun () -> query_obj#parse data)
       |> Result.map_error ~f:(fun _ ->
