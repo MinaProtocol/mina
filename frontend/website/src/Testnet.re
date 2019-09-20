@@ -256,13 +256,24 @@ module Styles = {
       marginTop(`px(10)),
     ]);
   let ctaContent = style([display(`flex), flexDirection(`column)]);
-  let ctaText =
+  let ctaText = style([marginLeft(`px(10))]);
+  let ctaHeading =
     style([
       Style.Typeface.ibmplexsans,
       fontWeight(`num(600)),
-      fontSize(`px(30)),
-      lineHeight(`px(48)),
+      fontSize(`px(23)),
+      lineHeight(`px(35)),
       color(`hex("4782A0")),
+    ]);
+
+  let ctaBody =
+    style([
+      Style.Typeface.ibmplexsans,
+      fontStyle(`normal),
+      fontWeight(`normal),
+      fontSize(`px(13)),
+      color(`hex("4782A0")),
+      textAlign(`left),
     ]);
 };
 
@@ -329,7 +340,7 @@ let make = () => {
               <h2 className=Styles.ctaText>
                 {React.string({js| 📋 Get Started |js})}
               </h2>
-              <h4 className=Style.Body.small>
+              <h4 className=Styles.ctaBody>
                 {React.string(
                    "Get started by installing Coda and running a node",
                  )}
@@ -340,14 +351,17 @@ let make = () => {
         <a href="https://bit.ly/CodaDiscord">
           <button className=Styles.ctaButton>
             <div>
-              <h2 className=Styles.ctaText>
-                {React.string({js| 🔥 Discord |js})}
-              </h2>
-              <h4 className=Style.Body.small>
-                {React.string(
-                   "Connect with the community and participate in weekly challenges",
-                 )}
-              </h4>
+              <h2> {React.string({js| 🔥 |js})} </h2>
+              <div className=Styles.ctaText>
+                <h2 className=Styles.ctaHeading>
+                  {React.string({js| Discord |js})}
+                </h2>
+                <h4 className=Styles.ctaBody>
+                  {React.string(
+                     "Connect with the community and participate in weekly challenges",
+                   )}
+                </h4>
+              </div>
             </div>
           </button>
         </a>
@@ -356,7 +370,7 @@ let make = () => {
             <h2 className=Styles.ctaText>
               {React.string({js|💬 Forum |js})}
             </h2>
-            <h4 className=Style.Body.small>
+            <h4 className=Styles.ctaBody>
               {React.string("Find longer discussions and in-depth content")}
             </h4>
           </button>
@@ -365,9 +379,9 @@ let make = () => {
           href="https://docs.google.com/forms/d/e/1FAIpQLScQRGW0-xGattPmr5oT-yRb9aCkPE6yIKXSfw1LRmNx1oh6AA/viewform">
           <button className=Styles.ctaButton>
             <h2 className=Styles.ctaText>
-              {React.string({js|📬 Newsletter |js})}
+              {React.string({js|📬 Testnet Newsletter |js})}
             </h2>
-            <h4 className=Style.Body.small>
+            <h4 className=Styles.ctaBody>
               {React.string(
                  "Sign up for the newsletter to get weekly updates",
                )}
