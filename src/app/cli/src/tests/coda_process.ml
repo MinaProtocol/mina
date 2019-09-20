@@ -142,9 +142,13 @@ let replace_snark_worker_key (conn, _proc, _) key =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.replace_snark_worker_key ~arg:key
 
+let stop_snark_worker (conn, _, _) =
+  Coda_worker.Connection.run_exn conn
+    ~f:Coda_worker.functions.stop_snark_worker ~arg:()
+
 let disconnect ((conn, proc, _) as t) =
   (* This kills any strangling snark worker process *)
-  let%bind () = replace_snark_worker_key t None in
+  let%bind () = stop_snark_worker t in
   let%bind () = Coda_worker.Connection.close conn in
   let%map (_ : Unix.Exit_or_signal.t) = Process.wait proc in
   ()
