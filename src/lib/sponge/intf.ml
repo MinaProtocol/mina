@@ -9,7 +9,9 @@ module type Field = sig
 end
 
 module type Operations = sig
-  module Field : Field
+  module Field : sig
+    type t
+  end
 
   val add_block : state:Field.t array -> Field.t array -> unit
 
@@ -20,7 +22,11 @@ end
 
 module Inputs = struct
   module type Common = sig
-    module Field : Field
+    module Field : sig
+      type t
+
+      val zero : t
+    end
 
     val to_the_alpha : Field.t -> Field.t
 
@@ -35,7 +41,11 @@ module Inputs = struct
 end
 
 module type Permutation = sig
-  module Field : Field
+  module Field : sig
+    type t
+
+    val zero : t
+  end
 
   val add_block : state:Field.t array -> Field.t array -> unit
 
