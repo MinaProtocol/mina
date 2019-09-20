@@ -60,10 +60,12 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       width(`percent(100.)),
+      maxWidth(`px(500)),
       color(Style.Colors.slate),
       //textAlign(`center),
       margin2(~v=rem(3.5), ~h=`zero),
-      marginTop(rem(1.)),
+      marginTop(`px(50)),
+      marginBottom(`zero),
     ]);
 
   let content =
@@ -241,29 +243,34 @@ module Styles = {
       marginRight(`auto),
       marginTop(rem(3.)),
       marginBottom(rem(3.)),
-      justifyContent(`spaceBetween),
+      justifyContent(`spaceAround),
       alignItems(`center),
       flexDirection(`column),
       media(Style.MediaQuery.notMobile, [flexDirection(`row)]),
     ]);
   let ctaButton =
     style([
-      padding(`px(30)),
+      padding(`px(18)),
       background(`rgba((71, 137, 196, 0.1))),
       border(`px(1), `solid, `hex("2D9EDB")),
       borderRadius(`rem(0.25)),
       maxWidth(`px(300)),
       marginTop(`px(10)),
     ]);
-  let ctaContent = style([display(`flex), flexDirection(`column)]);
+  let ctaContent =
+    style([
+      display(`flex),
+      selector("p", [fontSize(`px(29)), marginTop(`px(7))]),
+    ]);
   let ctaText = style([marginLeft(`px(10))]);
   let ctaHeading =
     style([
       Style.Typeface.ibmplexsans,
       fontWeight(`num(600)),
-      fontSize(`px(23)),
+      fontSize(`px(22)),
       lineHeight(`px(35)),
       color(`hex("4782A0")),
+      textAlign(`left),
     ]);
 
   let ctaBody =
@@ -274,6 +281,16 @@ module Styles = {
       fontSize(`px(13)),
       color(`hex("4782A0")),
       textAlign(`left),
+      marginTop(`px(5)),
+    ]);
+  let heroRow =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`spaceAround),
+      alignItems(`center),
+      media("(min-width: 55rem)", [flexDirection(`row)]),
+      selector("img", [width(`percent(100.)), maxWidth(`px(500))]),
     ]);
 };
 
@@ -320,38 +337,53 @@ module Section = {
     </div>;
   };
 };
+let f = Links.Cdn.url;
 
 [@react.component]
 let make = () => {
   <div className=Styles.page>
-    <div className=Styles.header>
-      <h1 className=Style.H1.hero> {React.string("Coda Public Testnet")} </h1>
-      <p className=Style.Body.basic>
-        {React.string(
-           "Coda's public testnet is live! There are weekly challenges for the community to interact with the testnet and contribute to Coda's development. Each week features a new competition to recognize and reward top contributors with testnet points. By participating in the testnet, you'll be helping advance the first cryptocurrency that utilizes recursive zk-SNARKs and production-scale Ouroboros proof of stake consensus.",
-         )}
-      </p>
+    <div className=Styles.heroRow>
+      <img src={f("/static/img/Testnet.png")} />
+      <div className=Styles.header>
+        <h1 className=Style.H1.hero>
+          {React.string("Coda Public Testnet")}
+        </h1>
+        <p className=Style.Body.basic>
+          {React.string(
+             "Coda's public testnet is live! There are weekly challenges for the community to interact with the testnet and contribute to Coda's development. Each week features a new competition to recognize and reward top contributors with testnet points. By participating in the testnet, you'll be helping advance the first cryptocurrency that utilizes recursive zk-SNARKs and production-scale Ouroboros proof of stake consensus.",
+           )}
+        </p>
+        <br />
+        <p className=Style.Body.basic>
+          {React.string(
+             "By participating in the testnet, you'll be helping advance the first cryptocurrency that utilizes recursive zk-SNARKs and production-scale Ouroboros proof of stake consensus.",
+           )}
+        </p>
+      </div>
     </div>
     <div>
       <div className=Styles.buttonRow>
-        <a href="/docs/getting-started/">
+        <a href="https://bit.ly/CodaDiscord">
           <button className=Styles.ctaButton>
             <div className=Styles.ctaContent>
-              <h2 className=Styles.ctaText>
-                {React.string({js| 📋 Get Started |js})}
-              </h2>
-              <h4 className=Styles.ctaBody>
-                {React.string(
-                   "Get started by installing Coda and running a node",
-                 )}
-              </h4>
+              <p> {React.string({js| 📋 |js})} </p>
+              <div className=Styles.ctaText>
+                <h2 className=Styles.ctaHeading>
+                  {React.string({js| Get Started |js})}
+                </h2>
+                <h4 className=Styles.ctaBody>
+                  {React.string(
+                     "Get started by installing Coda and running a node",
+                   )}
+                </h4>
+              </div>
             </div>
           </button>
         </a>
         <a href="https://bit.ly/CodaDiscord">
           <button className=Styles.ctaButton>
-            <div>
-              <h2> {React.string({js| 🔥 |js})} </h2>
+            <div className=Styles.ctaContent>
+              <p> {React.string({js| 🔥 |js})} </p>
               <div className=Styles.ctaText>
                 <h2 className=Styles.ctaHeading>
                   {React.string({js| Discord |js})}
@@ -365,27 +397,38 @@ let make = () => {
             </div>
           </button>
         </a>
-        <a href="https://forums.codaprotocol.com/">
+        <a href="https://bit.ly/CodaDiscord">
           <button className=Styles.ctaButton>
-            <h2 className=Styles.ctaText>
-              {React.string({js|💬 Forum |js})}
-            </h2>
-            <h4 className=Styles.ctaBody>
-              {React.string("Find longer discussions and in-depth content")}
-            </h4>
+            <div className=Styles.ctaContent>
+              <p> {React.string({js|💬|js})} </p>
+              <div className=Styles.ctaText>
+                <h2 className=Styles.ctaHeading>
+                  {React.string({js| Forum |js})}
+                </h2>
+                <h4 className=Styles.ctaBody>
+                  {React.string(
+                     "Find longer discussions and in-depth content",
+                   )}
+                </h4>
+              </div>
+            </div>
           </button>
         </a>
-        <a
-          href="https://docs.google.com/forms/d/e/1FAIpQLScQRGW0-xGattPmr5oT-yRb9aCkPE6yIKXSfw1LRmNx1oh6AA/viewform">
+        <a href="https://bit.ly/CodaDiscord">
           <button className=Styles.ctaButton>
-            <h2 className=Styles.ctaText>
-              {React.string({js|📬 Testnet Newsletter |js})}
-            </h2>
-            <h4 className=Styles.ctaBody>
-              {React.string(
-                 "Sign up for the newsletter to get weekly updates",
-               )}
-            </h4>
+            <div className=Styles.ctaContent>
+              <p> {React.string({js| 📬 |js})} </p>
+              <div className=Styles.ctaText>
+                <h2 className=Styles.ctaHeading>
+                  {React.string({js| Testnet Newsletter |js})}
+                </h2>
+                <h4 className=Styles.ctaBody>
+                  {React.string(
+                     "Sign up for the newsletter to get weekly updates",
+                   )}
+                </h4>
+              </div>
+            </div>
           </button>
         </a>
       </div>
