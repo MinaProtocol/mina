@@ -1196,7 +1196,7 @@ let create_account =
          in
          let%map response =
            Graphql_client.query
-             (Graphql_client.Add_wallet.make
+             (Graphql_queries.Add_wallet.make
                 ~password:(Bytes.to_string password) ())
              port
          in
