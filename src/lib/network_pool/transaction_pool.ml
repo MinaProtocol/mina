@@ -213,14 +213,15 @@ struct
           ~f:(Hashtbl.mem t.locally_generated_uncommitted)
         |> Sequence.to_list_rev
       in
-      Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-        "Dropped locally generated commands $cmds during backtracking to \
-         maintain max size. Will attempt to re-add after forwardtracking."
-        ~metadata:
-          [ ( "cmds"
-            , `List
-                (List.map ~f:User_command.With_valid_signature.to_yojson
-                   locally_generated_dropped) ) ] ;
+      if not (List.is_empty locally_generated_dropped) then
+        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Dropped locally generated commands $cmds during backtracking to \
+           maintain max size. Will attempt to re-add after forwardtracking."
+          ~metadata:
+            [ ( "cmds"
+              , `List
+                  (List.map ~f:User_command.With_valid_signature.to_yojson
+                     locally_generated_dropped) ) ] ;
       let pool'' =
         List.fold new_user_commands ~init:pool' ~f:(fun p cmd ->
             let sender = User_command.sender cmd in
@@ -663,9 +664,12 @@ struct
       let rebroadcastable_txs =
         (Hashtbl.keys t.locally_generated_uncommitted :> User_command.t list)
       in
-      [ List.sort rebroadcastable_txs ~compare:(fun tx1 tx2 ->
-            User_command.(
-              Coda_numbers.Account_nonce.compare (nonce tx1) (nonce tx2)) ) ]
+      if List.is_empty rebroadcastable_txs then []
+      else
+        [ List.sort rebroadcastable_txs ~compare:(fun tx1 tx2 ->
+              User_command.(
+                Coda_numbers.Account_nonce.compare (nonce tx1) (nonce tx2)) )
+        ]
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
