@@ -1,7 +1,6 @@
 (* exit_handlers -- code to call at daemon exit *)
 
 open Core_kernel
-open Async_kernel
 
 (* register a thunk to be called at exit; log registration and execution *)
 let register_handler ~logger ~description (f : unit -> unit) =
