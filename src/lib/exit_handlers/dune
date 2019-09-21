@@ -2,8 +2,6 @@
  (name exit_handlers)
  (public_name exit_handlers)
  (library_flags -linkall)
- (inline_tests)
  (libraries core_kernel async_kernel logger)
- (preprocess
-  (pps ppx_jane bisect_ppx -- -conditional))
+ (preprocess (no_preprocessing))
  (synopsis "Exit handlers"))
