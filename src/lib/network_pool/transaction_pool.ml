@@ -141,15 +141,15 @@ struct
     let handle_diff t frontier
         ({new_user_commands; removed_user_commands; reorg_best_tip= _} :
           Transition_frontier.Diff.Best_tip_diff.view) =
-      (* This runs whenever the best tip changes. The simple case is when the new
-         best tip is an extension of the old one. There, we remove any user
-         commands that were included in it from the transaction pool. Dealing with
-         a fork is more intricate. In general we want to remove any commands from
-         the pool that are included in the new best tip; and add any commands to
-         the pool that were included in the old one but not the new one, provided
-         they are still valid against the ledger of the best tip. The goal is that
-         transactions are carried from losing forks to winning ones as much as
-         possible. *)
+      (* This runs whenever the best tip changes. The simple case is when the
+         new best tip is an extension of the old one. There, we remove any user
+         commands that were included in it from the transaction pool. Dealing
+         with a fork is more intricate. In general we want to remove any
+         commands from the pool that are included in the new best tip; and add
+         any commands to the pool that were included in the old one but not the
+         new one, provided they are still valid against the ledger of the best
+         tip. The goal is that transactions are carried from losing forks to
+         winning ones as much as possible. *)
       let validation_ledger = get_best_tip_ledger_and_update t frontier in
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
@@ -216,8 +216,8 @@ struct
              | None -> (
                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                    "no frontier" ;
-                 (* Sanity check: the view pipe should have been closed before the
-                          frontier was destroyed. *)
+                 (* Sanity check: the view pipe should have been closed before
+                    the frontier was destroyed. *)
                  match t.diff_reader with
                  | None ->
                      Deferred.unit
@@ -242,9 +242,8 @@ struct
                  let validation_ledger =
                    get_best_tip_ledger_and_update t frontier
                  in
-                 (* The frontier has changed, so transactions in the pool may not
-                    be valid against the current best tip.
-                 *)
+                 (* The frontier has changed, so transactions in the pool may
+                    not be valid against the current best tip. *)
                  let new_pool, dropped =
                    Indexed_pool.revalidate t.pool (fun sender ->
                        match
@@ -433,9 +432,10 @@ struct
                                 go txs'' pool'' (tx :: accepted)
                             | Error `Insufficient_replace_fee ->
                                 (* We can't punish peers for this, since an
-                               attacker can simultaneously send different
-                               transactions at the same nonce to different
-                               nodes, which will then naturally gossip them. *)
+                                   attacker can simultaneously send different
+                                   transactions at the same nonce to different
+                                   nodes, which will then naturally gossip them.
+                                *)
                                 Logger.debug t.logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   "rejecting $cmd because of insufficient \
