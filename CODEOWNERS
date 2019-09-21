@@ -45,6 +45,7 @@
 /src/lib/daemon_rpcs/ @wu-s-john @bkase @schmavery
 /src/lib/debug_assert/ @nholland94 @bkase @cmr
 /src/lib/dummy_values/ @bkase @imeckler @mrmr1993
+/src/lib/exit_handlers/ @psteckler @mrmr1993
 /src/lib/genesis_ledger/ @nholland94 @bkase @cmr @jkrauska @yourbuddyconner
 /src/lib/gossip_net/ @cmr @enolan @bkase
 /src/lib/group_map/ @rbkhmrcr @vanishreerao @imeckler
