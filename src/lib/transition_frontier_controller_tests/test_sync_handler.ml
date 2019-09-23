@@ -20,10 +20,12 @@ let%test_module "Sync_handler" =
 
     let hb_logger = Logger.create ()
 
+    let pids = Child_processes.Termination.create_pid_set ()
+
     let trust_system = Trust_system.null ()
 
-    let f_with_verifier ~f ~logger =
-      let%map verifier = Verifier.create () in
+    let f_with_verifier ~f ~logger ~pids =
+      let%map verifier = Verifier.create ~logger ~pids in
       f ~logger ~verifier
 
     let%test "sync with ledgers from another peer via glue_sync_ledger" =
@@ -34,7 +36,7 @@ let%test_module "Sync_handler" =
           Thread_safe.block_on_async_exn (fun () ->
               print_heartbeat hb_logger |> don't_wait_for ;
               let%bind frontier =
-                create_root_frontier ~logger Genesis_ledger.accounts
+                create_root_frontier ~logger ~pids Genesis_ledger.accounts
               in
               let source_ledger =
                 Transition_frontier.For_tests.root_snarked_ledger frontier
@@ -80,7 +82,6 @@ let%test_module "Sync_handler" =
       |> External_transition.Validation.forget_validation
 
     let%test "a node should be able to give a valid proof of their root" =
-      let trust_system = Trust_system.null () in
       heartbeat_flag := true ;
       let max_length = 4 in
       (* Generating this many breadcrumbs will ernsure the transition_frontier to be full  *)
@@ -88,12 +89,12 @@ let%test_module "Sync_handler" =
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
-            create_root_frontier ~logger Genesis_ledger.accounts
+            create_root_frontier ~logger ~pids Genesis_ledger.accounts
           in
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~trust_system
+                (gen_linear_breadcrumbs ~logger ~pids ~trust_system
                    ~size:num_breadcrumbs
                    ~accounts_with_secret_keys:Genesis_ledger.accounts)
           in
@@ -111,7 +112,7 @@ let%test_module "Sync_handler" =
               (Sync_handler.Root.prove ~logger ~frontier observed_state)
           in
           let%bind verify =
-            f_with_verifier ~f:Sync_handler.Root.verify ~logger
+            f_with_verifier ~f:Sync_handler.Root.verify ~logger ~pids
           in
           let%map `Root (root_transition, _), `Best_tip (best_tip_transition, _)
               =
@@ -136,7 +137,7 @@ let%test_module "Sync_handler" =
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
-            create_root_frontier ~logger Genesis_ledger.accounts
+            create_root_frontier ~logger ~pids Genesis_ledger.accounts
           in
           let root_breadcrumb = Transition_frontier.root frontier in
           let root_transition =
@@ -145,7 +146,7 @@ let%test_module "Sync_handler" =
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~trust_system
+                (gen_linear_breadcrumbs ~logger ~pids ~trust_system
                    ~size:num_breadcrumbs_to_cause_bootstrap
                    ~accounts_with_secret_keys:Genesis_ledger.accounts)
           in
@@ -159,7 +160,7 @@ let%test_module "Sync_handler" =
           in
           let%bind verify =
             f_with_verifier ~f:Sync_handler.Bootstrappable_best_tip.verify
-              ~logger
+              ~logger ~pids
           in
           let%map verification_result =
             verify root_consensus_state peer_best_tip_with_witness

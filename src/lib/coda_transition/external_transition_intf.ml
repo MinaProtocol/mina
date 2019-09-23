@@ -378,8 +378,25 @@ module type S = sig
        , 'staged_ledger_diff )
        Validation.with_transition
 
+  val validate_staged_ledger_hash :
+       [`Staged_ledger_already_materialized of Staged_ledger_hash.t]
+    -> ( 'time_received
+       , 'proof
+       , 'delta_transition_chain
+       , 'frontier_dependencies
+       , [`Staged_ledger_diff] * unit Truth.false_t )
+       Validation.with_transition
+    -> ( ( 'time_received
+         , 'proof
+         , 'delta_transition_chain
+         , 'frontier_dependencies
+         , [`Staged_ledger_diff] * unit Truth.true_t )
+         Validation.with_transition
+       , [> `Staged_ledger_hash_mismatch] )
+       Result.t
+
   val skip_staged_ledger_diff_validation :
-       [`This_is_unsafe]
+       [`This_transition_has_a_trusted_staged_ledger]
     -> ( 'time_received
        , 'proof
        , 'delta_transition_chain

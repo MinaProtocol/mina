@@ -1,4 +1,4 @@
-open Core
+(*open Core
 open Async
 open Pipe_lib
 open Stubs
@@ -109,4 +109,4 @@ let%test_module "Transition_handler.Processor tests" =
           new_frontier_size - old_frontier_size = test_size
           && Hash_set.for_all expected_state_hashes
                ~f:(Hash_set.mem all_states) )
-  end )
+  end ) *)
