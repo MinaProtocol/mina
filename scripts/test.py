@@ -237,7 +237,6 @@ def get_required_status():
             extra_required_status_checks
              )))
 
-
 def required_status(args):
     print('\n'.join(get_required_status()))
 

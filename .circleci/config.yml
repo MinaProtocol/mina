@@ -605,9 +605,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
             - store_artifacts:
-                  path: pre_masks.dot
-            - store_artifacts:
-                  path: post_masks.dot
+                  path: masks
     test--test_postake_medium_curves:
         resource_class: large
         docker:
@@ -628,9 +626,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
             - store_artifacts:
-                  path: pre_masks.dot
-            - store_artifacts:
-                  path: post_masks.dot
+                  path: masks
     test--test_postake_snarkless_medium_curves:
         resource_class: large
         docker:
@@ -649,9 +645,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
             - store_artifacts:
-                  path: pre_masks.dot
-            - store_artifacts:
-                  path: post_masks.dot
+                  path: masks
     test--test_postake_split_medium_curves:
         resource_class: large
         docker:
@@ -667,9 +661,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
             - store_artifacts:
-                  path: pre_masks.dot
-            - store_artifacts:
-                  path: post_masks.dot
+                  path: masks
     test--test_postake_split_snarkless_medium_curves:
         resource_class: large
         docker:
@@ -706,9 +698,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
             - store_artifacts:
-                  path: pre_masks.dot
-            - store_artifacts:
-                  path: post_masks.dot
+                  path: masks
     test--test_postake_txns_medium_curves:
         resource_class: large
         docker:
@@ -727,9 +717,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
             - store_artifacts:
-                  path: pre_masks.dot
-            - store_artifacts:
-                  path: post_masks.dot
+                  path: masks
 
 workflows:
     version: 2
