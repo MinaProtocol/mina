@@ -16,7 +16,9 @@ open Stubs
 
 let%test_module "Sync_handler" =
   ( module struct
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let hb_logger = Logger.create ()
 
     let trust_system = Trust_system.null ()
 
@@ -30,7 +32,7 @@ let%test_module "Sync_handler" =
       heartbeat_flag := true ;
       Ledger.with_ephemeral_ledger ~f:(fun dest_ledger ->
           Thread_safe.block_on_async_exn (fun () ->
-              print_heartbeat logger |> don't_wait_for ;
+              print_heartbeat hb_logger |> don't_wait_for ;
               let%bind frontier =
                 create_root_frontier ~logger Genesis_ledger.accounts
               in
@@ -78,14 +80,13 @@ let%test_module "Sync_handler" =
       |> External_transition.Validation.forget_validation
 
     let%test "a node should be able to give a valid proof of their root" =
-      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       heartbeat_flag := true ;
       let max_length = 4 in
       (* Generating this many breadcrumbs will ernsure the transition_frontier to be full  *)
       let num_breadcrumbs = max_length + 2 in
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
             create_root_frontier ~logger Genesis_ledger.accounts
           in
@@ -133,7 +134,7 @@ let%test_module "Sync_handler" =
       in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
             create_root_frontier ~logger Genesis_ledger.accounts
           in

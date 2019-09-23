@@ -31,6 +31,10 @@ end)
 
 let%test_module "Bootstrap Controller" =
   ( module struct
+    let hb_logger = Logger.create ()
+
+    let logger = Logger.null ()
+
     let f_with_verifier ~f ~logger ~trust_system =
       let%map verifier = Verifier.create () in
       f ~logger ~trust_system ~verifier
@@ -41,7 +45,6 @@ let%test_module "Bootstrap Controller" =
         Bootstrap_controller.For_tests.Transition_cache.create ()
       in
       let num_breadcrumbs = (Transition_frontier.max_length * 2) + 2 in
-      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       let network =
         Network.create_stub ~logger
@@ -50,7 +53,7 @@ let%test_module "Bootstrap Controller" =
       in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
             create_root_frontier ~logger Genesis_ledger.accounts
           in
@@ -156,13 +159,12 @@ let%test_module "Bootstrap Controller" =
 
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
-      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       let num_breadcrumbs = 10 in
       let accounts = Genesis_ledger.accounts in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier = create_root_frontier ~logger accounts in
           let%bind () =
             build_frontier_randomly frontier
@@ -231,11 +233,10 @@ let%test_module "Bootstrap Controller" =
       Backtrace.elide := false ;
       heartbeat_flag := true ;
       Printexc.record_backtrace true ;
-      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind syncing_frontier, peer, network =
             Network_builder.setup_me_and_a_peer ~logger ~trust_system
               ~num_breadcrumbs
@@ -272,11 +273,10 @@ let%test_module "Bootstrap Controller" =
       Backtrace.elide := false ;
       heartbeat_flag := true ;
       Printexc.record_backtrace true ;
-      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       let num_breadcrumbs = (2 * max_length) + Consensus.Constants.delta + 2 in
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind syncing_frontier, peer, network =
             Network_builder.setup_me_and_a_peer ~logger ~trust_system
               ~num_breadcrumbs
@@ -307,7 +307,6 @@ let%test_module "Bootstrap Controller" =
 
     let%test "when eagerly syncing to multiple nodes, you should sync to the \
               node with the highest transition_frontier" =
-      let logger = Logger.create () in
       heartbeat_flag := true ;
       let trust_system = Trust_system.null () in
       let unsynced_peer_num_breadcrumbs = 6 in
@@ -318,7 +317,7 @@ let%test_module "Bootstrap Controller" =
       let synced_peer_num_breadcrumbs = unsynced_peer_num_breadcrumbs * 2 in
       let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind {me; peers; network} =
             Network_builder.setup ~source_accounts ~logger ~trust_system
               [ { num_breadcrumbs= unsynced_peer_num_breadcrumbs
@@ -355,7 +354,6 @@ let%test_module "Bootstrap Controller" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       heartbeat_flag := true ;
-      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       let small_peer_num_breadcrumbs = 6 in
       let large_peer_num_breadcrumbs = small_peer_num_breadcrumbs * 2 in
@@ -365,7 +363,7 @@ let%test_module "Bootstrap Controller" =
           (List.length Genesis_ledger.accounts / 2)
       in
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let large_peer_accounts = Genesis_ledger.accounts in
           let%bind {me; peers; network} =
             Network_builder.setup ~source_accounts ~logger ~trust_system
@@ -412,12 +410,11 @@ let%test_module "Bootstrap Controller" =
             (root_hash large_peer.frontier) )
 
     let%test "`on_transition` should deny outdated transitions" =
-      let logger = Logger.create () in
       heartbeat_flag := true ;
       let trust_system = Trust_system.null () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind syncing_frontier, peer_with_frontier, network =
             Network_builder.setup_me_and_a_peer ~logger ~trust_system
               ~num_breadcrumbs ~source_accounts:Genesis_ledger.accounts

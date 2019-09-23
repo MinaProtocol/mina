@@ -17,7 +17,9 @@ let%test_module "transaction_status" =
       module Transaction_pool = Transaction_pool
     end)
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let hb_logger = Logger.create ()
 
     let trust_system = Trust_system.null ()
 
@@ -59,7 +61,7 @@ let%test_module "transaction_status" =
     let single_async_test ~f gen =
       heartbeat_flag := true ;
       Async.Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           Quickcheck.async_test ~trials:1 gen ~f )
 
     let get_status_exn ~frontier_broadcast_pipe ~transaction_pool user_command

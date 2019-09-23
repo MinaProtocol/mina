@@ -21,7 +21,9 @@ end)
 
 let%test_module "Transition Frontier Persistence" =
   ( module struct
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let hb_logger = Logger.create ()
 
     let trust_system = Trust_system.null ()
 
@@ -77,7 +79,7 @@ let%test_module "Transition Frontier Persistence" =
 
     let test_breadcrumbs ~gen_root_breadcrumb_builder num_breadcrumbs =
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let directory_name = Uuid.to_string (Uuid_unix.create ()) in
           let%map breadcrumbs =
             with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
@@ -116,7 +118,7 @@ let%test_module "Transition Frontier Persistence" =
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      print_heartbeat logger |> don't_wait_for ;
+      print_heartbeat hb_logger |> don't_wait_for ;
       let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%bind root, next_breadcrumb =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
@@ -215,7 +217,7 @@ let%test_module "Transition Frontier Persistence" =
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      print_heartbeat logger |> don't_wait_for ;
+      print_heartbeat hb_logger |> don't_wait_for ;
       let%bind frontier =
         create_root_frontier ~logger Genesis_ledger.accounts
       in
@@ -229,7 +231,7 @@ let%test_module "Transition Frontier Persistence" =
       Async.Scheduler.set_record_backtraces true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      print_heartbeat logger |> don't_wait_for ;
+      print_heartbeat hb_logger |> don't_wait_for ;
       let%map () =
         Stubs.with_genesis_frontier ~logger ~f:(fun frontier ->
             let%map is_serialization_correct =

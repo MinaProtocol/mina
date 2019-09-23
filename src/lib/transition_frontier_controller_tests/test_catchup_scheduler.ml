@@ -25,7 +25,9 @@ open Transition_handler
 
 let%test_module "Transition_handler.Catchup_scheduler tests" =
   ( module struct
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let hb_logger = Logger.create ()
 
     let trust_system = Trust_system.null ()
 
@@ -82,7 +84,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier = setup_random_frontier () in
           let trust_system = Trust_system.null () in
           let%bind create = create_catchup_scheduler () in
@@ -136,7 +138,6 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let%test_unit "if a linear sequence of transitions in reverse order, \
                    catchup scheduler should not create duplicate jobs" =
-      let logger = Logger.create () in
       heartbeat_flag := true ;
       let _catchup_job_reader, catchup_job_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
@@ -151,7 +152,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier = setup_random_frontier () in
           let trust_system = Trust_system.null () in
           let%bind create = create_catchup_scheduler () in
@@ -255,7 +256,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let open Deferred.Let_syntax in
           let%bind frontier = setup_random_frontier () in
           let trust_system = Trust_system.null () in

@@ -32,6 +32,10 @@ end)
 
 let%test_module "Ledger catchup" =
   ( module struct
+    let hb_logger = Logger.create ()
+
+    let logger = Logger.null ()
+
     let run_ledger_catchup () =
       let%map verifier = Verifier.create () in
       Ledger_catchup.run ~verifier
@@ -103,11 +107,10 @@ let%test_module "Ledger catchup" =
     let%test "catchup to a peer" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
-      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer
               ~source_accounts:Genesis_ledger.accounts ~logger ~trust_system
@@ -138,11 +141,10 @@ let%test_module "Ledger catchup" =
 
     let%test "peers can provide transitions with length between max_length to \
               2 * max_length" =
-      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let num_breadcrumbs =
             Int.gen_incl max_length (2 * max_length) |> Quickcheck.random_value
           in
@@ -189,11 +191,10 @@ let%test_module "Ledger catchup" =
 
     let%test "catchup would be successful even if the parent transition is \
               already in the frontier" =
-      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer ~logger ~trust_system
               ~source_accounts:Genesis_ledger.accounts
@@ -220,7 +221,6 @@ let%test_module "Ledger catchup" =
           res )
 
     let%test "catchup would fail if one of the parent transition fails" =
-      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       heartbeat_flag := true ;
       let catchup_job_reader, catchup_job_writer =
@@ -233,7 +233,7 @@ let%test_module "Ledger catchup" =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
       Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer ~logger ~trust_system
               ~source_accounts:Genesis_ledger.accounts
@@ -302,7 +302,6 @@ let%test_module "Ledger catchup" =
 
     let%test_unit "catchup won't be blocked by transitions that are still \
                    under processing" =
-      let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       heartbeat_flag := true ;
       let catchup_job_reader, catchup_job_writer =
@@ -316,7 +315,7 @@ let%test_module "Ledger catchup" =
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
-          print_heartbeat logger |> don't_wait_for ;
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer
               ~source_accounts:Genesis_ledger.accounts ~logger ~trust_system
