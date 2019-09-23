@@ -21,6 +21,8 @@ module Vector = struct
     val length : int
 
     val get : t -> int -> bool
+
+    val set : t -> int -> bool -> t
   end
 
   module type S = sig
@@ -57,7 +59,7 @@ module Vector = struct
     let set t i b = if b then t lor (one lsl i) else t land lognot (one lsl i)
   end
 
-  module Make (V : Basic) : Bits_intf.S with type t = V.t = struct
+  module Make (V : S) : Bits_intf.Convertable_bits with type t = V.t = struct
     type t = V.t
 
     let fold t =
@@ -74,31 +76,28 @@ module Vector = struct
       done
 
     let to_bits t = List.init V.length ~f:(V.get t)
-  end
 
-  module Bigstring (M : sig
-    val bit_length : int
-  end) : Basic with type t = Bigstring.t = struct
-    type t = Bigstring.t
-
-    let char_nth_bit c n = (Char.to_int c lsl n) land 1 = 1
-
-    let get t n =
-      char_nth_bit (Bigstring.get t (n / bits_per_char)) (n mod bits_per_char)
-
-    let length = M.bit_length
+    (* TODO: test *)
+    let of_bits bools =
+      List.foldi bools ~init:V.empty ~f:(fun i t bool -> V.set t i bool)
   end
 end
 
-module UInt64 : Bits_intf.S with type t := Unsigned.UInt64.t =
+module UInt64 : Bits_intf.Convertable_bits with type t := Unsigned.UInt64.t =
   Vector.Make (Vector.UInt64)
 
-module UInt32 : Bits_intf.S with type t := Unsigned.UInt32.t =
+module UInt32 : Bits_intf.Convertable_bits with type t := Unsigned.UInt32.t =
   Vector.Make (Vector.UInt32)
+
+module type Big_int_intf = sig
+  include Snarky.Bigint_intf.S
+
+  val to_field : t -> field
+end
 
 module Make_field0
     (Field : Snarky.Field_intf.S)
-    (Bigint : Snarky.Bigint_intf.S with type field := Field.t) (M : sig
+    (Bigint : Big_int_intf with type field := Field.t) (M : sig
         val bit_length : int
     end) : Bits_intf.S with type t = Field.t = struct
   open M
@@ -131,7 +130,7 @@ end
 
 module Make_field
     (Field : Snarky.Field_intf.S)
-    (Bigint : Snarky.Bigint_intf.S with type field := Field.t) :
+    (Bigint : Big_int_intf with type field := Field.t) :
   Bits_intf.S with type t = Field.t =
   Make_field0 (Field) (Bigint)
     (struct
@@ -140,7 +139,7 @@ module Make_field
 
 module Small
     (Field : Snarky.Field_intf.S)
-    (Bigint : Snarky.Bigint_intf.S with type field := Field.t) (M : sig
+    (Bigint : Big_int_intf with type field := Field.t) (M : sig
         val bit_length : int
     end) : Bits_intf.S with type t = Field.t = struct
   let () = assert (M.bit_length < Field.size_in_bits)

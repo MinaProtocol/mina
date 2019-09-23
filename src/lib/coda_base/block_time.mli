@@ -26,7 +26,7 @@ module Time : sig
 
   val length_in_triples : int
 
-  module Bits : Bits_intf.S with type t := t
+  module Bits : Bits_intf.Convertable_bits with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 
@@ -114,6 +114,8 @@ module Time : sig
   val now : Controller.t -> t
 
   val to_int64 : t -> Int64.t
+
+  val of_int64 : Int64.t -> t
 
   val to_string : t -> string
 

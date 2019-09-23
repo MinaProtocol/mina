@@ -2,6 +2,7 @@ open Core
 open Async
 open Coda_base
 open Archive_lib
+open Pipe_lib
 
 let () =
   let keys = Array.init 2 ~f:(fun _ -> Signature_lib.Keypair.create ()) in
@@ -13,16 +14,17 @@ let () =
   let block_time =
     Block_time.of_span_since_epoch @@ Block_time.Span.of_ms (Int64.of_int 100)
   in
-  let graphql_obj = Types.User_command.encode user_command block_time in
-  let graphql =
-    Graphql_commands.Transaction_pool_insert.make
-      ~user_commands:[|graphql_obj|] ()
-  in
-  let graphql_port = 9000 in
-  Async.Thread_safe.block_on_async_exn
+  let t = {Processor.uri= Graphql_commands.graphql_uri 9000} in
+  Thread_safe.block_on_async_exn
   @@ fun () ->
-  let%map _ =
-    Graphql_client_lib.query graphql
-      (Graphql_commands.graphql_uri graphql_port)
+  let map = User_command.Map.of_alist_exn [(user_command, block_time)] in
+  let reader, writer =
+    Strict_pipe.create ~name:"archive"
+      (Buffered (`Capacity 10, `Overflow Crash))
   in
-  ()
+  let deferred = Processor.run t reader in
+  Strict_pipe.Writer.write writer
+    (Transaction_pool
+       {Diff.Transaction_pool.added= map; removed= User_command.Set.empty}) ;
+  Strict_pipe.Writer.close writer ;
+  deferred

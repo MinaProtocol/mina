@@ -43,7 +43,7 @@ module type S_unchecked = sig
 
   val to_string : t -> string
 
-  module Bits : Bits_intf.S with type t := t
+  module Bits : Bits_intf.Convertable_bits with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 end
@@ -132,5 +132,5 @@ module type F = functor
 
       val random : unit -> t
     end)
-  (Bits : Bits_intf.S with type t := N.t)
+  (Bits : Bits_intf.Convertable_bits with type t := N.t)
   -> S with type t := N.t and module Bits := Bits

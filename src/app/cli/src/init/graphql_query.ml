@@ -3,17 +3,52 @@ open Graphql_client_lib
 
 let query query_obj port = query query_obj (make_local_uri port "graphql")
 
-module Get_wallet =
+module Get_wallets =
 [%graphql
 {|
-query getWallet {
+query {
   ownedWallets {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    locked
     balance {
       total @bsDecoder(fn: "Decoders.uint64")
     }
   }
 }
+|}]
+
+module Add_wallet =
+[%graphql
+{|
+mutation ($password: String) {
+  addWallet(input: {password: $password}) {
+    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+  }
+}
+|}]
+
+module Unlock_wallet =
+[%graphql
+{|
+mutation ($password: String, $public_key: PublicKey) {
+  unlockWallet(input: {password: $password, publicKey: $public_key }) {
+    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+  }
+}
+|}]
+
+module Lock_wallet =
+[%graphql
+{|
+mutation ($public_key: PublicKey) {
+  lockWallet(input: {publicKey: $public_key }) {
+    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+  }
+}
+|}]
+
+module Reload_wallets = [%graphql {|
+mutation { reloadWallets { success } }
 |}]
 
 module Snark_pool =

@@ -42,7 +42,8 @@ module Index = struct
     let set v i b = if b then v lor (one lsl i) else v land lnot (one lsl i)
   end
 
-  include (Bits.Vector.Make (Vector) : Bits_intf.S with type t := t)
+  include (
+    Bits.Vector.Make (Vector) : Bits_intf.Convertable_bits with type t := t)
 
   let fold_bits = fold
 

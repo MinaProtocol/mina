@@ -195,6 +195,8 @@ module Time = struct
 
   let to_int64 = Fn.compose Span.to_ms to_span_since_epoch
 
+  let of_int64 = Fn.compose of_span_since_epoch Span.of_ms
+
   let to_string = Fn.compose Int64.to_string to_int64
 
   let of_string_exn string =
