@@ -312,14 +312,14 @@ let calculate_diffs t breadcrumb =
 (* TODO: TEMP *)
 let root_transfer_id = ref 0
 
-let masks_dir = "masks"
+let mask_prefix () = Printf.sprintf "masks/%d." (Unix.getpid ())
 
 let dir_created = ref false
 
 (* TODO: refactor metrics tracking outside of apply_diff (could maybe even be an extension?) *)
 let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
     mutant * State_hash.t option =
-  (if not !dir_created then try Core.Unix.mkdir masks_dir with _ -> ()) ;
+  (if not !dir_created then try Core.Unix.mkdir "masks" with _ -> ()) ;
   dir_created := true ;
   match diff with
   | New_node (Full breadcrumb) ->
@@ -385,7 +385,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
       let old_root_node = Hashtbl.find_exn t.table t.root in
       let new_root_node = Hashtbl.find_exn t.table new_root_hash in
       Ledger.Maskable.Debug.visualize
-        ~filename:(Printf.sprintf "%s/%d.pre.dot" masks_dir id) ;
+        ~filename:(Printf.sprintf "%s.%d.pre.dot" (mask_prefix ()) id) ;
       let new_root_mask =
         let m0 = Breadcrumb.mask old_root_node.breadcrumb in
         let m1 = Breadcrumb.mask new_root_node.breadcrumb in
@@ -436,7 +436,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
         m0
       in
       Ledger.Maskable.Debug.visualize
-        ~filename:(Printf.sprintf "%s/%d.post.dot" masks_dir id) ;
+        ~filename:(Printf.sprintf "%s.%d.post.dot" (mask_prefix ()) id) ;
       let new_root_breadcrumb =
         Breadcrumb.create
           (Breadcrumb.validated_transition new_root_node.breadcrumb)

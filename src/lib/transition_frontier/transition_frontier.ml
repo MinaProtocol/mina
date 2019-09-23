@@ -106,6 +106,7 @@ let load_from_persistence_and_start config ~max_length ~persistent_root
                  (Persistent_frontier.Database.Error.not_found_message err) )
       )
   in
+  Ledger.Maskable.Debug.visualize ~filename:"post.dot" ;
   { config
   ; full_frontier
   ; persistent_root
@@ -128,6 +129,7 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~max_length ?(retry_with_fresh_db = true) config ~persistent_root
      ~persistent_frontier ->
+  Ledger.Maskable.Debug.visualize ~filename:"pre.dot" ;
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   (* let persistent_root = Persistent_root.create ~logger:config.logger ~directory:config.persistent_root_directory in *)
