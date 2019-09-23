@@ -232,14 +232,14 @@ let add_breadcrumb_exn t breadcrumb =
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
   Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
     ~metadata:
-      [ ( "best_tip_hash"
+      [ ( "state_hash"
         , State_hash.to_yojson
             (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier)
         )
       ; ( "n"
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
-    "PRE: ($best_tip_hash, $n)" ;
+    "PRE: ($state_hash, $n)" ;
   Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
     ~metadata:
       [ ( "diffs"
@@ -255,14 +255,14 @@ let add_breadcrumb_exn t breadcrumb =
       (Persistent_root.Instance.set_root_identifier t.persistent_root_instance) ;
   Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
     ~metadata:
-      [ ( "best_tip_hash"
+      [ ( "state_hash"
         , State_hash.to_yojson
             (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier)
         )
       ; ( "n"
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
-    "POST: ($best_tip_hash, $n)" ;
+    "POST: ($state_hash, $n)" ;
   let diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in

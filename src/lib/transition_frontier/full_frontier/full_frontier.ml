@@ -312,7 +312,7 @@ let calculate_diffs t breadcrumb =
 (* TODO: TEMP *)
 let root_transfer_id = ref 0
 
-let mask_prefix () = Printf.sprintf "masks/%d." (Unix.getpid ())
+let mask_prefix () = Printf.sprintf "masks/mask.%d" (Unix.getpid ())
 
 let dir_created = ref false
 
@@ -420,10 +420,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
              m1) ;
         *)
         if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
-          let s =
-            Ledger.(
-              Any_ledger.cast (module Ledger) (of_database t.root_ledger))
-          in
+          let s = Ledger.Any_ledger.cast (module Ledger.Db) t.root_ledger in
           let mt = Ledger.Maskable.register_mask s (Ledger.Mask.create ()) in
           Non_empty_list.iter
             (Option.value_exn
