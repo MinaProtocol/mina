@@ -128,12 +128,10 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~max_length ?(retry_with_fresh_db = true) config ~persistent_root
      ~persistent_frontier ->
-  Ledger.Maskable.Debug.visualize ~filename:"/tmp/genesis.true.dot" ;
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   (* let persistent_root = Persistent_root.create ~logger:config.logger ~directory:config.persistent_root_directory in *)
   let continue persistent_frontier_instance =
-    Ledger.Maskable.Debug.visualize ~filename:"/tmp/genesis.2.dot" ;
     let persistent_root_instance =
       Persistent_root.create_instance_exn persistent_root
     in
