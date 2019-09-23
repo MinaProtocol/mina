@@ -399,7 +399,7 @@ end = struct
                  received_staged_ledger_hash)
           |> Result.map_error ~f:(fun _ ->
                  Error.of_string "received faulty scan state from peer" )
-          >>| External_transition.validate_delta_transition_chain_part2
+          >>| External_transition.skip_delta_transition_chain_validation_part2
                 `This_transition_was_not_received_via_gossip
           |> Deferred.return
         in
