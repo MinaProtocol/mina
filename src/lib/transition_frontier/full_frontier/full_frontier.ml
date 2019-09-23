@@ -314,15 +314,12 @@ let root_transfer_id = ref 0
 
 let masks_dir = "masks"
 
-(* :shrug: this *might* work? *)
-(* let () = Async_kernel.don't_wait_for (File_system.create_dir masks_dir) *)
-
 let dir_created = ref false
 
 (* TODO: refactor metrics tracking outside of apply_diff (could maybe even be an extension?) *)
 let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
     mutant * State_hash.t option =
-  if not !dir_created then Core.Unix.mkdir masks_dir ;
+  (if not !dir_created then try Core.Unix.mkdir masks_dir with _ -> ()) ;
   dir_created := true ;
   match diff with
   | New_node (Full breadcrumb) ->
