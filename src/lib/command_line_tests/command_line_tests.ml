@@ -42,7 +42,7 @@ let%test_module "Command line tests" =
       (* create empty config dir to avoid any issues with the default config dir *)
       Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" ""
 
-    let _remove_config_directory config_dir =
+    let remove_config_directory config_dir =
       let%bind _ = Process.run_exn ~prog:"rm" ~args:["-rf"; config_dir] () in
       Deferred.unit
 
@@ -51,12 +51,9 @@ let%test_module "Command line tests" =
       let client_delay = 40. in
       let config_dir = create_config_directory () in
       Monitor.protect
-        ~finally:(fun () ->
-          Print.printf "log is at: %s\n" config_dir ;
-          Deferred.unit (* remove_config_directory config_dir *) )
+        ~finally:(fun () -> remove_config_directory config_dir)
         (fun () ->
-          let%bind err = start_daemon config_dir port in
-          ignore (Or_error.ok_exn err) ;
+          let%bind _ = start_daemon config_dir port in
           (* it takes awhile for the daemon to become available *)
           let%bind () = after (Time.Span.of_sec client_delay) in
           let%bind result = start_client port in
