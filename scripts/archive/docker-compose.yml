@@ -11,7 +11,7 @@ services:
     - ../../src/app/archive/create_schema.sql:/docker-entrypoint-initdb.d/create_schema.sql
     ports: 
     - "5432:5432"
-  graphql-engine: 
+  hasura: 
     image: hasura/graphql-engine:v1.0.0-beta.6
     environment: 
       HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@postgres:5432/archiver
@@ -22,3 +22,14 @@ services:
     depends_on:
     - "postgres"
     restart: always
+  configuration:
+    image: python:3.7-stretch
+    network_mode: host
+    command: ["/bin/sh", "make_hasura_configurations.sh"]
+    depends_on:
+    - "hasura"
+    volumes:
+      - ./metadata.json:/metadata.json
+      - ./make_hasura_configurations.sh:/make_hasura_configurations.sh
+      - ../introspection_query.py:/introspection_query.py
+      - ./output:/output

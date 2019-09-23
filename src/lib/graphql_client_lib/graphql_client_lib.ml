@@ -5,7 +5,12 @@ open Signature_lib
 let make_local_uri port address =
   Uri.of_string ("http://localhost:" ^ string_of_int port ^/ address)
 
-let query query_obj query_uri =
+let query_or_error
+    (query_obj :
+      < parse: Yojson.Basic.json -> 'response
+      ; query: string
+      ; variables: Yojson.Basic.json
+      ; .. >) query_uri : 'response Deferred.Or_error.t =
   let variables_string = Yojson.Basic.to_string query_obj#variables in
   let body_string =
     Printf.sprintf {|{"query": "%s", "variables": %s}|} query_obj#query
@@ -26,9 +31,12 @@ let query query_obj query_uri =
     |> Yojson.Basic.Util.member "data"
     |> query_obj#parse
   in
-  match%bind Deferred.Or_error.try_with ~extract_exn:true get_result with
-  | Ok e ->
-      return e
+  Deferred.Or_error.try_with ~extract_exn:true get_result
+
+let query query_obj url =
+  match%bind query_or_error query_obj url with
+  | Ok r ->
+      Deferred.return r
   | Error e ->
       eprintf "Error connecting to graphql endpoint: %s\n"
         (Error.to_string_hum e) ;
@@ -41,8 +49,7 @@ module Encoders = struct
 
   let uint32 value = `String (Unsigned.UInt32.to_string value)
 
-  let public_key public_key =
-    Yojson.Safe.to_basic @@ Public_key.Compressed.to_yojson public_key
+  let public_key value = `String (Public_key.Compressed.to_base58_check value)
 end
 
 module Decoders = struct

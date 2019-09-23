@@ -15,4 +15,4 @@ test_logs
 node_modules/
 .DS_Store
 .graphql_ppx_cache
-/src/app/archive/archive_graphql_schema.json
+/scripts/archive/output
