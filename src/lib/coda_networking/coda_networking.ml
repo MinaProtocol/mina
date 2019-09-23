@@ -763,32 +763,62 @@ module Make (Inputs : Inputs_intf) = struct
       don't_wait_for
       @@ match%bind Process.create ~prog:filter_program ~args:[] () with
          | Ok filter_process ->
-             let message_queue = Queue.create () in
+             let gossip_queue = Queue.create () in
              Linear_pipe.transfer
                (received_gossips |> Strict_pipe.Reader.to_linear_pipe)
                (Process.stdin filter_process |> Writer.pipe)
                ~f:(fun gossip ->
-                 Queue.enqueue message_queue gossip ;
-                 let msg =
+                 Queue.enqueue gossip_queue gossip ;
+                 let gossip_in_json_format =
                    Envelope.Incoming.to_yojson Message.msg_to_yojson gossip
-                   |> Yojson.Safe.to_string
                  in
-                 msg ^ "\n" )
+                 Logger.debug config.logger ~module_:__MODULE__
+                   ~location:__LOC__
+                   ~metadata:[("gossip", gossip_in_json_format)]
+                   "About to send $gossip to the filter layer" ;
+                 gossip_in_json_format |> Yojson.Safe.to_string )
+             |> don't_wait_for ;
+             Pipe.iter
+               (Process.stderr filter_process |> Reader.pipe)
+               ~f:(fun err ->
+                 Logger.error config.logger ~module_:__MODULE__
+                   ~location:__LOC__
+                   ~metadata:[("error", `String err)]
+                   "Filter layer throw an $error while handling gossips" ;
+                 return () )
              |> don't_wait_for ;
              Pipe.iter
                (Process.stdout filter_process |> Reader.pipe)
                ~f:(fun respond ->
                  match Yojson.Safe.from_string respond with
                  | `Assoc [("respond", `String "accept")] ->
-                     let msg = Queue.dequeue message_queue in
+                     let gossip = Queue.dequeue gossip_queue in
+                     Logger.debug config.logger ~module_:__MODULE__
+                       ~location:__LOC__
+                       ~metadata:
+                         [ ( "gossip"
+                           , Envelope.Incoming.to_yojson Message.msg_to_yojson
+                               (Option.value_exn gossip) ) ]
+                       "$gossip was accepted by the filter layer" ;
                      return
-                     @@ Option.iter msg ~f:(fun msg ->
-                            Strict_pipe.Writer.write filtered_gossips_writer
-                              msg )
+                     @@ Option.iter gossip
+                          ~f:(Strict_pipe.Writer.write filtered_gossips_writer)
                  | `Assoc [("respond", `String "reject")] ->
-                     return @@ ignore @@ Queue.dequeue message_queue
+                     let gossip = Queue.dequeue gossip_queue in
+                     Logger.debug config.logger ~module_:__MODULE__
+                       ~location:__LOC__
+                       ~metadata:
+                         [ ( "gossip"
+                           , Envelope.Incoming.to_yojson Message.msg_to_yojson
+                               (Option.value_exn gossip) ) ]
+                       "$gossip was denied by the filter layer" ;
+                     return ()
                  | _ ->
-                     Deferred.unit )
+                     Logger.debug config.logger ~module_:__MODULE__
+                       ~location:__LOC__
+                       ~metadata:[("respond", `String respond)]
+                       "Unrecognizable $respond from filter layer" ;
+                     return () )
          | Error e ->
              Logger.error config.logger ~module_:__MODULE__ ~location:__LOC__
                ~metadata:[("error", `String (Error.to_string_hum e))]
