@@ -43,6 +43,14 @@ module Stable = struct
       let proposer {staged_ledger_diff; _} =
         Staged_ledger_diff.creator staged_ledger_diff
 
+      let transactions {staged_ledger_diff; _} =
+        let open Staged_ledger.Pre_diff_info in
+        match get_transactions staged_ledger_diff with
+        | Ok transactions ->
+            transactions
+        | Error e ->
+            Core.Error.raise (Error.to_error e)
+
       let user_commands {staged_ledger_diff; _} =
         Staged_ledger_diff.user_commands staged_ledger_diff
 
@@ -104,6 +112,7 @@ Stable.Latest.
   , state_hash
   , parent_hash
   , proposer
+  , transactions
   , user_commands
   , payments
   , to_yojson )]
@@ -503,6 +512,8 @@ module With_validation = struct
 
   let user_commands t = lift user_commands t
 
+  let transactions t = lift transactions t
+
   let payments t = lift payments t
 
   let delta_transition_chain_proof t = lift delta_transition_chain_proof t
@@ -643,6 +654,7 @@ module Validated = struct
     , state_hash
     , parent_hash
     , proposer
+    , transactions
     , user_commands
     , payments
     , to_yojson )]

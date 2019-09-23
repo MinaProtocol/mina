@@ -10,12 +10,10 @@ CREATE TABLE public_keys (
 
 CREATE TABLE blocks (
   id serial PRIMARY KEY,
-  state_hash text,
+  state_hash text NOT NULL,
   creator int NOT NULL,
-  staged_ledger_hash text NOT NULL,
   ledger_hash text NOT NULL,
-  epoch int NOT NULL,
-  slot int NOT NULL,
+  global_slot int NOT NULL,
   ledger_proof_nonce int NOT NULL,
   status int NOT NULL,
   block_length int NOT NULL,
@@ -61,7 +59,7 @@ CREATE INDEX fast_user_command_receiver_pagination ON user_commands (receiver, f
 
 CREATE TABLE fee_transfers (
   id serial PRIMARY KEY,
-  hash text,
+  hash text NOT NULL,
   fee bit(64) NOT NULL,
   receiver int NOT NULL,
   first_seen bit(64),

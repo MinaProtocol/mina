@@ -1,5 +1,7 @@
 open Core
 open Coda_base
+open Coda_state
+open Coda_transition
 open Signature_lib
 
 (** Library used to encode and decode types to a graphql format. 
@@ -222,4 +224,124 @@ module User_command = struct
     to_graphql_obj
     @@ serialize user_command_with_hash (`Receiver receiver) (`Sender sender)
          (Some block_time)
+end
+
+module Fee_transfer = struct
+  type postgres =
+    { fee: Bitstring.t
+    ; first_seen: Bitstring.t option
+    ; hash: string
+    ; receiver: int }
+
+  let serialize {With_hash.data= fee_transfer; hash} receiver_id first_seen =
+    { first_seen= Option.map first_seen ~f:Block_time.serialize
+    ; hash= Transaction_hash.to_base58_check hash
+    ; receiver= receiver_id
+    ; fee= Bitstring.to_bitstring (module Currency.Fee) (snd fee_transfer) }
+
+  let to_graphql_obj {first_seen; hash; receiver; fee} =
+    let open Option in
+    object
+      method hash = some hash
+
+      method fee = some @@ Bitstring.to_yojson fee
+
+      method first_seen = Option.map first_seen ~f:Bitstring.to_yojson
+
+      method public_key = None
+
+      method receiver = some receiver
+
+      method blocks_fee_transfers = None
+    end
+
+  let encode fee_transfer_with_hash receiver block_time =
+    to_graphql_obj
+    @@ serialize fee_transfer_with_hash receiver (Some block_time)
+end
+
+module Blocks = struct
+  (* Graphql_commands.Blocks.Insert.make *)
+  (* TODO: Create another table for ledger hashes*)
+  type postgres =
+    { state_hash: string
+    ; creator: int
+    ; parent_hash: string
+    ; ledger_hash: string
+    ; global_slot: int
+    ; ledger_proof_nonce: int
+    ; (* Default is zero*)
+      status: int
+    ; block_length: Bitstring.t
+    ; block_time: Bitstring.t }
+
+  type graphql_output = {id: int; state_hash: State_hash.t option}
+
+  let serialize
+      (With_hash.{hash; data= external_transition} :
+        (External_transition.t, State_hash.t) With_hash.t) creator : postgres =
+    let blockchain_state =
+      External_transition.blockchain_state external_transition
+    in
+    let consensus_state =
+      External_transition.consensus_state external_transition
+    in
+    let global_slot =
+      Consensus.Data.Consensus_state.global_slot consensus_state
+    in
+    let block_length =
+      Consensus.Data.Consensus_state.blockchain_length consensus_state
+    in
+    let block_length =
+      Bitstring.to_bitstring (module Coda_numbers.Length) block_length
+    in
+    { state_hash= State_hash.to_base58_check hash
+    ; creator
+    ; parent_hash=
+        State_hash.to_base58_check
+        @@ External_transition.parent_hash external_transition
+    ; ledger_hash=
+        Ledger_hash.to_string @@ Staged_ledger_hash.ledger_hash
+        @@ Blockchain_state.staged_ledger_hash blockchain_state
+    ; global_slot
+    ; ledger_proof_nonce= 0
+    ; status= 0
+    ; block_length
+    ; block_time=
+        Block_time.serialize
+        @@ External_transition.timestamp external_transition }
+
+  let to_graphql_obj
+      { state_hash
+      ; creator
+      ; parent_hash
+      ; ledger_hash
+      ; global_slot
+      ; ledger_proof_nonce
+      ; status
+      ; block_length
+      ; block_time } =
+    let open Option in
+    object
+      method state_hash = some state_hash
+
+      method creator = some creator
+
+      method parent_hash = some parent_hash
+
+      method ledger_hash = some ledger_hash
+
+      method global_slot = some global_slot
+
+      method ledger_proof_nonce = some ledger_proof_nonce
+
+      method status = some status
+
+      method block_length = some @@ Bitstring.to_yojson block_length
+
+      method block_time = some @@ Bitstring.to_yojson block_time
+    end
+
+  let encode external_transition creator =
+    to_graphql_obj @@ serialize external_transition creator
 end

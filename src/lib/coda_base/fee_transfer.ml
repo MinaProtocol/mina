@@ -10,6 +10,10 @@ module Single = struct
         [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
       end
 
+      let description = "Fee transfer Single"
+
+      let version_byte = Base58_check.Version_bytes.fee_transfer_single
+
       include T
       include Registration.Make_latest_version (T)
     end
@@ -27,7 +31,16 @@ module Single = struct
   end
 
   (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson, hash]
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
+
+  include Comparable.Make (Stable.Latest)
+  module Base58_check = Codable.Make_base58_check (Stable.Latest)
+
+  [%%define_locally
+  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
+
+  [%%define_locally
+  Base58_check.String_ops.(to_string, of_string)]
 end
 
 module Stable = struct
@@ -54,6 +67,8 @@ module Stable = struct
   module Registrar = Registration.Make (Module_decl)
   module Registered_V1 = Registrar.Register (V1)
 end
+
+include Comparable.Make (Stable.Latest)
 
 (* bin_io omitted *)
 type t = Stable.Latest.t =

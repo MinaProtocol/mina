@@ -8,6 +8,39 @@ let deserialize_block_time =
   Option.map
     ~f:(Fn.compose Types.Block_time.deserialize Types.Bitstring.of_yojson)
 
+module Blocks = struct
+  let state_hash = Option.map ~f:State_hash.of_base58_check_exn
+
+  module Get_existing =
+  [%graphql
+  {|
+    query get_existing ($hashes: [String!]!) @bsRecord {
+        blocks(where: {hash: {_in: $hashes}} ) {
+            id
+            state_hash @bsDecoder(fn: "state_hash")
+        }
+    } 
+    |}]
+
+  open Types.Blocks
+
+  module Insert =
+  [%graphql
+  {|
+    mutation insert(
+        $blocks: [blocks_insert_input!]!
+        ) {
+        insert_blocks(objects: $blocks) {
+            returning @bsRecord {
+                id
+                state_hash @bsDecoder(fn: "state_hash")
+            }
+        }
+        }
+    
+    |}]
+end
+
 module User_commands = struct
   module Get_existing =
   [%graphql
@@ -19,12 +52,12 @@ module User_commands = struct
             first_seen @bsDecoder(fn: "deserialize_block_time")
         }
     }
-|}]
+    |}]
 
   module Update =
   [%graphql
   {|
-    mutation get_existing ($current_id: Int!, $new_first_seen: bit!) {
+    mutation update ($current_id: Int!, $new_first_seen: bit!) {
         update_user_commands(where: {id: {_eq: $current_id}}, _set: {first_seen: $new_first_seen}) {
             affected_rows
         }
@@ -33,22 +66,54 @@ module User_commands = struct
 
   module Insert =
   [%graphql
-  {|
-mutation transaction_insert(
-  $user_commands: [user_commands_insert_input!]!
-) {
-  insert_user_commands(objects: $user_commands,
-  on_conflict: {constraint: user_commands_pkey, update_columns: first_seen}
-  ) {
-    returning {
-      id
-      hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
-      first_seen @bsDecoder(fn: "deserialize_block_time")
+  {| mutation insert($user_commands: [user_commands_insert_input!]!) {
+      insert_user_commands(objects: $user_commands
+      ) {
+          returning {
+              id
+              hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
+              first_seen @bsDecoder(fn: "deserialize_block_time")
+            }
+        }
     }
-  }
-}
+    |}]
+end
 
+module Fee_transfer = struct
+  module Get_existing =
+  [%graphql
+  {| query get_existing ($hashes: [String!]!) @bsRecord {
+      fee_transfers(where: {hash: {_in: $hashes}} ) {
+          id
+          hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
+          first_seen @bsDecoder(fn: "deserialize_block_time")
+        }
+    }
 |}]
+
+  module Update =
+  [%graphql
+  {|
+    mutation update ($current_id: Int!, $new_first_seen: bit!) {
+        update_fee_transfers(where: {id: {_eq: $current_id}}, _set: {first_seen: $new_first_seen}) {
+            affected_rows
+        }
+    }
+|}]
+
+  module Insert =
+  [%graphql
+  {| mutation insert($fee_transfers: [fee_transfers_insert_input!]!) {
+      insert_fee_transfers(objects: $fee_transfers
+      ) {
+          returning {
+              id
+              hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
+              first_seen @bsDecoder(fn: "deserialize_block_time")
+            }
+        }
+    }
+    |}]
 end
 
 module Public_keys = struct
