@@ -10,7 +10,6 @@ open Strict_pipe
 open Signature_lib
 open O1trace
 open Otp_lib
-module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 module Config = Config
 module Subscriptions = Coda_subscriptions
 

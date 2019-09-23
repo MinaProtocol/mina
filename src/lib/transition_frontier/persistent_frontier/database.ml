@@ -232,7 +232,7 @@ let check t =
       Error `Invalid_version
 
 let initialize t ~root_data ~base_hash =
-  let open Root_data in
+  let open Root_data.Limited.Stable.Latest in
   let {With_hash.hash= root_state_hash; data= root_transition}, _ =
     External_transition.Validated.erase root_data.transition
   in
@@ -243,7 +243,7 @@ let initialize t ~root_data ~base_hash =
       Batch.set batch ~key:Db_version ~data:version ;
       Batch.set batch ~key:(Transition root_state_hash) ~data:root_transition ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
-      Batch.set batch ~key:Root ~data:(minimize root_data) ;
+      Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited root_data) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Frontier_hash ~data:base_hash )
 

@@ -39,6 +39,8 @@ module Minimal : sig
 
   type t = Stable.Latest.t
 
+  val of_limited : Limited.t -> t
+
   val upgrade : t -> External_transition.Validated.t -> Limited.t
 end
 

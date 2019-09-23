@@ -62,6 +62,10 @@ module Minimal = struct
 
   include Stable.Latest
 
+  let of_limited {Limited.Stable.V1.transition; scan_state; pending_coinbase} =
+    let hash = External_transition.Validated.state_hash transition in
+    {hash; scan_state; pending_coinbase}
+
   let upgrade {hash; scan_state; pending_coinbase} transition =
     assert (
       State_hash.equal

@@ -47,7 +47,7 @@ val check :
      Result.t
 
 val initialize :
-  t -> root_data:Root_data.t -> base_hash:Frontier_hash.t -> unit
+  t -> root_data:Root_data.Limited.t -> base_hash:Frontier_hash.t -> unit
 
 val add :
      t

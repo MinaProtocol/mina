@@ -77,6 +77,8 @@ module Instance = struct
 
   let destroy t =
     let open Deferred.Let_syntax in
+    Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
+      "Destroying transition frontier persistence instance" ;
     let%map () =
       if Option.is_some t.sync then
         stop_sync t
@@ -246,7 +248,7 @@ let with_instance_exn t ~f =
   x
 
 let reset_database_exn t ~root_data =
-  let open Root_data in
+  let open Root_data.Limited.Stable.Latest in
   let open Deferred.Let_syntax in
   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
     ~metadata:

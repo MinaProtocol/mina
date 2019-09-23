@@ -43,6 +43,35 @@ type t =
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int }
 
+let consensus_local_state {consensus_local_state; _} = consensus_local_state
+
+let set_hash_unsafe t (`I_promise_this_is_safe hash) = t.hash <- hash
+
+let hash t = t.hash
+
+let all_breadcrumbs t =
+  List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
+
+let find t hash =
+  let open Option.Let_syntax in
+  let%map node = Hashtbl.find t.table hash in
+  node.breadcrumb
+
+let find_exn t hash =
+  let node = Hashtbl.find_exn t.table hash in
+  node.breadcrumb
+
+let root t = find_exn t t.root
+
+let best_tip t = find_exn t t.best_tip
+
+let close t =
+  Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
+  ignore
+    (Ledger.Maskable.unregister_mask_exn ~grandchildren:`Recursive
+       (Ledger.Any_ledger.cast (module Ledger.Db) t.root_ledger)
+       (Breadcrumb.mask (root t)))
+
 let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     ~max_length =
   let open Root_data in
@@ -70,42 +99,18 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
   in
   let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
   Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
-  { logger
-  ; root_ledger
-  ; root= root_hash
-  ; best_tip= root_hash
-  ; hash= base_hash
-  ; table
-  ; consensus_local_state
-  ; max_length }
-
-let close _t =
-  Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
-  failwith
-    "TODO: detach root breadcrumb staged ledger ledger mask from root snarked \
-     ledger database"
-
-let consensus_local_state {consensus_local_state; _} = consensus_local_state
-
-let set_hash_unsafe t (`I_promise_this_is_safe hash) = t.hash <- hash
-
-let hash t = t.hash
-
-let all_breadcrumbs t =
-  List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
-
-let find t hash =
-  let open Option.Let_syntax in
-  let%map node = Hashtbl.find t.table hash in
-  node.breadcrumb
-
-let find_exn t hash =
-  let node = Hashtbl.find_exn t.table hash in
-  node.breadcrumb
-
-let root t = find_exn t t.root
-
-let best_tip t = find_exn t t.best_tip
+  let t =
+    { logger
+    ; root_ledger
+    ; root= root_hash
+    ; best_tip= root_hash
+    ; hash= base_hash
+    ; table
+    ; consensus_local_state
+    ; max_length }
+  in
+  Gc.Expert.add_finalizer_exn t (fun t -> close t) ;
+  t
 
 let root_data t =
   let open Root_data in
@@ -172,8 +177,6 @@ let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
 let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
-
-let root t = find_exn t t.root
 
 let shallow_copy_root_snarked_ledger {root_ledger; _} =
   Ledger.of_database root_ledger
@@ -306,6 +309,14 @@ let calculate_diffs t breadcrumb =
       (* reverse diffs so that they are applied in the correct order *)
       List.rev diffs )
 
+(* TODO: TEMP *)
+let root_transfer_id = ref 0
+
+let masks_dir = "masks"
+
+(* :shrug: this *might* work? *)
+(* let () = Async_kernel.don't_wait_for (File_system.create_dir masks_dir) *)
+
 (* TODO: refactor metrics tracking outside of apply_diff (could maybe even be an extension?) *)
 let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
     mutant * State_hash.t option =
@@ -368,9 +379,12 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
        *     7) commit `mt` into `s`, turning `s` into `s'`
        *     8) unattach and destroy `mt`
        *)
+      let id = !root_transfer_id in
+      incr root_transfer_id ;
       let old_root_node = Hashtbl.find_exn t.table t.root in
       let new_root_node = Hashtbl.find_exn t.table new_root_hash in
-      Ledger.Maskable.Debug.visualize ~filename:"pre_masks.dot" ;
+      Ledger.Maskable.Debug.visualize
+        ~filename:(Printf.sprintf "%s/%d.pre.dot" masks_dir id) ;
       let new_root_mask =
         let m0 = Breadcrumb.mask old_root_node.breadcrumb in
         let m1 = Breadcrumb.mask new_root_node.breadcrumb in
@@ -420,7 +434,8 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
           ignore (Ledger.Maskable.unregister_mask_exn s mt) ) ;
         m0
       in
-      Ledger.Maskable.Debug.visualize ~filename:"post_masks.dot" ;
+      Ledger.Maskable.Debug.visualize
+        ~filename:(Printf.sprintf "%s/%d.post.dot" masks_dir id) ;
       let new_root_breadcrumb =
         Breadcrumb.create
           (Breadcrumb.validated_transition new_root_node.breadcrumb)

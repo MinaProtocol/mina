@@ -40,23 +40,13 @@ type t =
   ; persistent_frontier_instance: Persistent_frontier.Instance.t
   ; extensions: Extensions.t }
 
-let genesis_root_data ~logger ~verifier ~snarked_ledger =
-  let open Root_data in
-  let snarked_ledger_hash =
-    Frozen_ledger_hash.of_ledger_hash (Ledger.Db.merkle_root snarked_ledger)
-  in
-  let pending_coinbase_collection =
-    Or_error.ok_exn (Pending_coinbase.create ())
-  in
-  let%map staged_ledger =
-    Staged_ledger.of_scan_state_and_ledger ~logger ~verifier
-      ~snarked_ledger_hash
-      ~ledger:(Ledger.of_database snarked_ledger)
-      ~scan_state:(Staged_ledger.Scan_state.empty ())
-      ~pending_coinbase_collection
-    >>| Or_error.ok_exn
-  in
-  {transition= Lazy.force External_transition.genesis; staged_ledger}
+let genesis_root_data =
+  lazy
+    (let open Root_data.Limited.Stable.Latest in
+    let transition = Lazy.force External_transition.genesis in
+    let scan_state = Staged_ledger.Scan_state.empty () in
+    let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
+    {transition; scan_state; pending_coinbase})
 
 let load_from_persistence_and_start config ~max_length ~persistent_root
     ~persistent_root_instance ~persistent_frontier
@@ -138,39 +128,32 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~max_length ?(retry_with_fresh_db = true) config ~persistent_root
      ~persistent_frontier ->
+  Ledger.Maskable.Debug.visualize ~filename:"/tmp/genesis.true.dot" ;
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   (* let persistent_root = Persistent_root.create ~logger:config.logger ~directory:config.persistent_root_directory in *)
-  let continue ~persistent_root_instance ~persistent_frontier_instance =
+  let continue persistent_frontier_instance =
+    Ledger.Maskable.Debug.visualize ~filename:"/tmp/genesis.2.dot" ;
+    let persistent_root_instance =
+      Persistent_root.create_instance_exn persistent_root
+    in
     load_from_persistence_and_start config ~max_length ~persistent_root
       ~persistent_root_instance ~persistent_frontier
       ~persistent_frontier_instance
-  in
-  let persistent_root_instance =
-    Persistent_root.create_instance_exn persistent_root
   in
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier
   in
   let reset_and_continue () =
-    let%bind root_data =
-      genesis_root_data ~logger:config.logger ~verifier:config.verifier
-        ~snarked_ledger:
-          (Persistent_root.Instance.snarked_ledger persistent_root_instance)
-    in
     let%bind () =
       Persistent_frontier.Instance.destroy persistent_frontier_instance
     in
     let%bind () =
-      Persistent_frontier.reset_database_exn persistent_frontier ~root_data
+      Persistent_frontier.reset_database_exn persistent_frontier
+        ~root_data:(Lazy.force genesis_root_data)
     in
-    Persistent_root.Instance.destroy persistent_root_instance ;
     let%bind () = Persistent_root.reset_to_genesis_exn persistent_root in
-    continue
-      ~persistent_root_instance:
-        (Persistent_root.create_instance_exn persistent_root)
-      ~persistent_frontier_instance:
-        (Persistent_frontier.create_instance_exn persistent_frontier)
+    continue (Persistent_frontier.create_instance_exn persistent_frontier)
   in
   match
     Persistent_frontier.Instance.check_database persistent_frontier_instance
@@ -197,7 +180,6 @@ let rec load_with_max_length :
         let%bind () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
-        Persistent_root.Instance.destroy persistent_root_instance ;
         let%bind () =
           Persistent_frontier.destroy_database_exn persistent_frontier
         in
@@ -212,20 +194,22 @@ let rec load_with_max_length :
                   err ) )
       else return (Error `Persistent_frontier_malformed)
   | Ok () ->
-      continue ~persistent_root_instance ~persistent_frontier_instance
+      continue persistent_frontier_instance
 
 let load = load_with_max_length ~max_length:global_max_length
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
 let close
-    { config= _
+    { config= {logger; _}
     ; full_frontier
     ; persistent_root= _safe_to_ignore_1
     ; persistent_root_instance
     ; persistent_frontier= _safe_to_ignore_2
     ; persistent_frontier_instance
     ; extensions } =
+  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+    "Closing transition frontier" ;
   let%map () =
     Persistent_frontier.Instance.destroy persistent_frontier_instance
   in

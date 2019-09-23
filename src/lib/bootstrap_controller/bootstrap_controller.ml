@@ -483,8 +483,10 @@ end = struct
           | Ok () ->
               (* Close the old frontier and reload a new on from disk. *)
               let new_root_data =
-                { Transition_frontier.Root_data.transition= new_root
-                ; staged_ledger= new_root_staged_ledger }
+                Transition_frontier.Root_data.(
+                  limit
+                    { transition= new_root
+                    ; staged_ledger= new_root_staged_ledger })
               in
               let%bind () = Transition_frontier.close frontier in
               let%bind () =

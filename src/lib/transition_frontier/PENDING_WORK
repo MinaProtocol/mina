@@ -1,3 +1,9 @@
+# Bugs
+
+- crash on startup with old config
+  - valid database
+  - corrupted database
+
 # Features
 
 + reimplement ledger catchup sync status (#3006)
