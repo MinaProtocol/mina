@@ -287,7 +287,7 @@ module Types = struct
         ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent
         ~snark_worker ~propose_pubkeys ~histograms ~consensus_time_best_tip
         ~consensus_time_now ~consensus_mechanism ~consensus_configuration
-        ~snark_work_fee ~next_proposal
+        ~next_proposal ~snark_work_fee
       |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =
