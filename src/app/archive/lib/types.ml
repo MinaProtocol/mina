@@ -13,6 +13,28 @@ open Signature_lib
     2. Graphql object phase: The intermediate Postgres types are converted directly to some input that the Hasura Graphql schema would accept. This is essentially lifting types with the Option type and coercing Postgres custom scalar into Yojson types 
 **)
 
+module Graphql_output = struct
+  module With_first_seen = struct
+    module Make (Hash : sig
+      type t
+    end) =
+    struct
+      type t = {id: int; hash: Hash.t; first_seen: Block_time.t option}
+      [@@deriving fields]
+    end
+
+    module Transaction_hash = Make (Transaction_hash)
+  end
+
+  module Public_keys = struct
+    type t = {id: int; value: Public_key.Compressed.t} [@@deriving fields]
+  end
+
+  module Blocks = struct
+    type t = {id: int; state_hash: State_hash.t} [@@deriving fields]
+  end
+end
+
 module type Numeric_intf = sig
   type t
 
@@ -185,12 +207,6 @@ module User_command = struct
 
   let public_key_obj_rel_insert_input = failwith "Need to implement"
 
-  (* let public_keys_on_conflict = object
-    method constraint_ = `String "public_keys_pkey"
-
-
-  end *)
-
   let to_graphql_obj
       {fee; hash; memo; nonce; receiver; sender; typ; amount; first_seen} =
     let open Option in
@@ -261,8 +277,6 @@ module Fee_transfer = struct
 end
 
 module Blocks = struct
-  (* Graphql_commands.Blocks.Insert.make *)
-  (* TODO: Create another table for ledger hashes*)
   type postgres =
     { state_hash: string
     ; creator: int
@@ -275,7 +289,7 @@ module Blocks = struct
     ; block_length: Bitstring.t
     ; block_time: Bitstring.t }
 
-  type graphql_output = {id: int; state_hash: State_hash.t option}
+  type graphql_output = {id: int; state_hash: State_hash.t}
 
   let serialize
       (With_hash.{hash; data= external_transition} :
@@ -340,6 +354,14 @@ module Blocks = struct
       method block_length = some @@ Bitstring.to_yojson block_length
 
       method block_time = some @@ Bitstring.to_yojson block_time
+
+      method blocks_fee_transfers = None
+
+      method blocks_snark_jobs = None
+
+      method blocks_user_commands = None
+
+      method public_key = None
     end
 
   let encode external_transition creator =

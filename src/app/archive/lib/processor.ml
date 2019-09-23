@@ -102,11 +102,9 @@ module Public_key_upsert = Make_upsert (struct
   module Data = Public_key.Compressed
 
   module Graphql_query_result = struct
-    type t = < id: int ; value: Public_key.Compressed.t >
+    include Types.Graphql_output.Public_keys
 
-    let id obj = obj#id
-
-    let hash obj = obj#value
+    let hash = value
   end
 
   let get_existing {uri; _} public_keys =
@@ -144,26 +142,36 @@ let upsert_public_keys t public_keys =
   let public_keys_map = Set.to_map public_keys ~f:Fn.id in
   Public_key_upsert.upsert t public_keys_map
 
-let update_transactions {uri}
+module type Graphql_result_intf = sig
+  type t
+
+  val first_seen : t -> Block_time.t option
+
+  val id : t -> int
+end
+
+let update_transactions (type graphql_result)
+    (module Graphql_result : Graphql_result_intf with type t = graphql_result)
+    {uri}
     ~(graphql_update :
           int
        -> Block_time.t
        -> Uri.t
        -> < affected_rows: int > Deferred.Or_error.t)
     (user_commands_map : ('transaction * Block_time.t) Transaction_hash.Map.t)
-    (existing_graphql_results : 'graphql_result Transaction_hash.Map.t) =
+    (existing_graphql_results : graphql_result Transaction_hash.Map.t) =
   let transactions_to_update =
     Transaction_hash.Map.filter_mapi user_commands_map
       ~f:(fun ~key:hash ~data:(_, first_time_seen) ->
         let open Option.Let_syntax in
         let%bind graphql_result = Map.find existing_graphql_results hash in
-        match graphql_result#first_seen with
+        match Graphql_result.first_seen graphql_result with
         | None ->
-            Some (graphql_result#id, first_time_seen)
+            Some (Graphql_result.id graphql_result, first_time_seen)
         | Some stored_time ->
             Option.some_if
               Block_time.(first_time_seen <= stored_time)
-              (graphql_result#id, first_time_seen) )
+              (Graphql_result.id graphql_result, first_time_seen) )
   in
   Map.data transactions_to_update
   |> List.map ~f:(fun (current_id, new_first_seen) ->
@@ -181,16 +189,8 @@ module User_commands_upsert = Make_upsert (struct
     type t = User_command.t * Block_time.t
   end
 
-  module Graphql_query_result = struct
-    type t =
-      < first_seen: Block_time.t sexp_option
-      ; hash: Transaction_hash.t
-      ; id: int >
-
-    let id obj = obj#id
-
-    let hash obj = obj#hash
-  end
+  module Graphql_query_result =
+    Types.Graphql_output.With_first_seen.Transaction_hash
 
   let get_existing {uri} transaction_hashes =
     let open Deferred.Result.Let_syntax in
@@ -205,7 +205,9 @@ module User_commands_upsert = Make_upsert (struct
     existing#user_commands
 
   let update =
-    update_transactions ~graphql_update:(fun current_id new_first_seen uri ->
+    update_transactions
+      (module Graphql_query_result)
+      ~graphql_update:(fun current_id new_first_seen uri ->
         let open Deferred.Result.Let_syntax in
         let graphql =
           Graphql_commands.User_commands.Update.make ~current_id
@@ -245,8 +247,8 @@ module User_commands_upsert = Make_upsert (struct
                    new_delegate
              in
              Types.User_command.encode
-               ~sender:(Map.find_exn public_keys_to_ids sender)#id
-               ~receiver:(Map.find_exn public_keys_to_ids receiver)#id
+               ~sender:(Map.find_exn public_keys_to_ids sender).id
+               ~receiver:(Map.find_exn public_keys_to_ids receiver).id
                {With_hash.hash; data= user_command}
                first_time_seen )
       |> Array.of_list
@@ -266,16 +268,8 @@ module Fee_transfer_upsert = Make_upsert (struct
     type t = Fee_transfer.Single.t * Block_time.t
   end
 
-  module Graphql_query_result = struct
-    type t =
-      < first_seen: Block_time.t sexp_option
-      ; hash: Transaction_hash.t
-      ; id: int >
-
-    let id obj = obj#id
-
-    let hash obj = obj#hash
-  end
+  module Graphql_query_result =
+    Types.Graphql_output.With_first_seen.Transaction_hash
 
   let get_existing {uri} transaction_hashes =
     let open Deferred.Result.Let_syntax in
@@ -290,7 +284,9 @@ module Fee_transfer_upsert = Make_upsert (struct
     existing#fee_transfers
 
   let update =
-    update_transactions ~graphql_update:(fun current_id new_first_seen uri ->
+    update_transactions
+      (module Graphql_query_result)
+      ~graphql_update:(fun current_id new_first_seen uri ->
         let open Deferred.Result.Let_syntax in
         let graphql =
           Graphql_commands.Fee_transfer.Update.make ~current_id
@@ -323,7 +319,7 @@ module Fee_transfer_upsert = Make_upsert (struct
               ->
              Types.Fee_transfer.encode
                {With_hash.hash; data= fee_transfer}
-               (Map.find_exn public_keys_to_ids receiver)#id first_time_seen )
+               (Map.find_exn public_keys_to_ids receiver).id first_time_seen )
       |> Array.of_list
     in
     let graphql =
@@ -441,36 +437,28 @@ module Block_upsert = struct
       in
       (user_commands_in_db, fee_transfer_in_db)
     in
-    let%bind public_keys =
+    let%bind creator_keys =
       let creators =
         Map.data blocks_to_be_added |> List.map ~f:External_transition.proposer
       in
       upsert_public_keys t (Public_key.Compressed.Set.of_list creators)
     in
-    let new_user_commands =
+    let new_blocks =
       Map.to_alist blocks_to_be_added
-      |> List.map ~f:(fun (hash, (user_command, first_time_seen)) ->
-             let sender = User_command.sender user_command in
-             let receiver =
-               match user_command.payload.body with
-               | Payment payment ->
-                   payment.receiver
-               | Stake_delegation (Set_delegate {new_delegate}) ->
-                   new_delegate
+      |> List.map ~f:(fun (hash, external_transition) ->
+             let creator_id =
+               (Map.find_exn creator_keys
+                  (External_transition.proposer external_transition))
+                 .id
              in
-             Types.User_command.encode
-               ~sender:(Map.find_exn public_keys_to_ids sender)#id
-               ~receiver:(Map.find_exn public_keys_to_ids receiver)#id
-               {With_hash.hash; data= user_command}
-               first_time_seen )
+             Types.Blocks.encode
+               {With_hash.hash; data= external_transition}
+               creator_id )
       |> Array.of_list
     in
-    let graphql =
-      Graphql_commands.User_commands.Insert.make
-        ~user_commands:new_user_commands ()
-    in
+    let graphql = Graphql_commands.Blocks.Insert.make ~blocks:new_blocks () in
     let%map result = Graphql_client_lib.query_or_error graphql t.uri in
-    Option.map result#insert_user_commands ~f:(fun result -> result#returning)
+    Option.map result#insert_blocks ~f:(fun result -> result#returning)
 end
 
 let run t reader =

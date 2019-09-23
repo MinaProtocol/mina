@@ -1340,7 +1340,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Int",
+                  "name": "bit",
                   "ofType": null
                 }
               },
@@ -1655,7 +1655,7 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "epoch",
+              "name": "global_slot",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1735,23 +1735,7 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "slot",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "description": null
-            },
-            {
-              "args": [],
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "staged_ledger_hash",
+              "name": "state_hash",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1760,18 +1744,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              },
-              "description": null
-            },
-            {
-              "args": [],
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "state_hash",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               },
               "description": null
             },
@@ -1881,7 +1853,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "Int_comparison_exp",
+                "name": "bit_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -1937,7 +1909,7 @@
               "description": null
             },
             {
-              "name": "epoch",
+              "name": "global_slot",
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
@@ -1982,26 +1954,6 @@
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "public_keys_bool_exp",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "slot",
-              "defaultValue": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "Int_comparison_exp",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "staged_ledger_hash",
-              "defaultValue": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "String_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -2515,16 +2467,6 @@
         {
           "inputFields": [
             {
-              "name": "block_length",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
               "name": "creator",
               "defaultValue": null,
               "type": {
@@ -2535,7 +2477,7 @@
               "description": null
             },
             {
-              "name": "epoch",
+              "name": "global_slot",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -2546,16 +2488,6 @@
             },
             {
               "name": "ledger_proof_nonce",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "slot",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -2590,7 +2522,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "bit",
                 "ofType": null
               },
               "description": null
@@ -2646,7 +2578,7 @@
               "description": null
             },
             {
-              "name": "epoch",
+              "name": "global_slot",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -2681,26 +2613,6 @@
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "public_keys_obj_rel_insert_input",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "slot",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "staged_ledger_hash",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
                 "ofType": null
               },
               "description": null
@@ -2900,7 +2812,7 @@
               "description": null
             },
             {
-              "name": "epoch",
+              "name": "global_slot",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -2945,26 +2857,6 @@
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "public_keys_order_by",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "slot",
-              "defaultValue": null,
-              "type": {
-                "kind": "ENUM",
-                "name": "order_by",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "staged_ledger_hash",
-              "defaultValue": null,
-              "type": {
-                "kind": "ENUM",
-                "name": "order_by",
                 "ofType": null
               },
               "description": null
@@ -3026,7 +2918,7 @@
             {
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "epoch",
+              "name": "global_slot",
               "description": "column name"
             },
             {
@@ -3045,18 +2937,6 @@
               "isDeprecated": false,
               "deprecationReason": null,
               "name": "ledger_proof_nonce",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "slot",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "staged_ledger_hash",
               "description": "column name"
             },
             {
@@ -3082,7 +2962,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "bit",
                 "ofType": null
               },
               "description": null
@@ -3108,7 +2988,7 @@
               "description": null
             },
             {
-              "name": "epoch",
+              "name": "global_slot",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -3133,26 +3013,6 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "slot",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "staged_ledger_hash",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
                 "ofType": null
               },
               "description": null
@@ -3674,7 +3534,7 @@
             {
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "epoch",
+              "name": "global_slot",
               "description": "column name"
             },
             {
@@ -3687,18 +3547,6 @@
               "isDeprecated": false,
               "deprecationReason": null,
               "name": "ledger_proof_nonce",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "slot",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "staged_ledger_hash",
               "description": "column name"
             },
             {

@@ -10,20 +10,21 @@ CREATE TABLE public_keys (
 
 CREATE TABLE blocks (
   id serial PRIMARY KEY,
+  parent_hash text NOT NULL, -- State hashes should be their own table and the id of the block will match the state_hashes
   state_hash text NOT NULL,
   creator int NOT NULL,
   ledger_hash text NOT NULL,
   global_slot int NOT NULL,
   ledger_proof_nonce int NOT NULL,
   status int NOT NULL,
-  block_length int NOT NULL,
+  block_length bit(32) NOT NULL,
   block_time bit(64) NOT NULL,
   FOREIGN KEY (creator) REFERENCES public_keys (id)
 );
 
 CREATE UNIQUE INDEX state_hash ON blocks (state_hash);
 
-CREATE INDEX block_compare ON blocks (block_length, epoch, slot);
+CREATE INDEX block_compare ON blocks (block_length, global_slot);
 
 CREATE INDEX block_time ON blocks (block_time);
 
