@@ -386,6 +386,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake:
         resource_class: large
         docker:
@@ -403,6 +405,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:transaction-snark-profiler -k 2"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_bootstrap:
         resource_class: large
         docker:
@@ -420,6 +424,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-long-fork -num-proposers 2"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_catchup:
         resource_class: large
         docker:
@@ -434,6 +440,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_delegation:
         resource_class: large
         docker:
@@ -448,6 +456,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation:coda-delegation-test"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_five_even_snarkless:
         resource_class: large
         docker:
@@ -462,6 +472,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_five_even_txns:
         resource_class: large
         docker:
@@ -476,6 +488,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_holy_grail:
         resource_class: large
         docker:
@@ -493,6 +507,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-long-fork -num-proposers 5"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_snarkless:
         resource_class: large
         docker:
@@ -510,6 +526,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:transaction-snark-profiler -k 2"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_split:
         resource_class: large
         docker:
@@ -524,6 +542,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_split_snarkless:
         resource_class: large
         docker:
@@ -559,6 +579,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-archive-node-test"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_three_proposers:
         resource_class: large
         docker:
@@ -573,6 +595,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_three_proposers:coda-txns-and-restart-non-proposers"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_txns:
         resource_class: large
         docker:
@@ -590,6 +614,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-batch-payment-test"'
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     test--test_postake_delegation_medium_curves:
         resource_class: large
         docker:

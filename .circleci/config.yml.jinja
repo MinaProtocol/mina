@@ -355,6 +355,8 @@ jobs:
             {%- endfor %}
             - store_artifacts:
                   path: test_logs
+            - store_artifacts:
+                  path: masks
     {%- endfor %}
 
     {%- for profile in medium_curves_tests.keys() | sort %}
