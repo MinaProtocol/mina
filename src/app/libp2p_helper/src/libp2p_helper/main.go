@@ -404,17 +404,9 @@ type incomingMsgUpcall struct {
 
 func handleStreamReads(app *app, stream net.Stream, idx int) {
 	go func() {
-		buf := make([]byte, 512)
+		buf := make([]byte, 4096)
 		for {
 			len, err := stream.Read(buf)
-			if err != nil && err != io.EOF {
-				app.writeMsg(streamLostUpcall{
-					Upcall:    "streamLost",
-					StreamIdx: idx,
-					Reason:    fmt.Sprintf("read failure: %s", err.Error()),
-				})
-				break
-			}
 
 			if len != 0 {
 				app.writeMsg(incomingMsgUpcall{
@@ -422,6 +414,15 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 					Data:      b58.Encode(buf[:len]),
 					StreamIdx: idx,
 				})
+			}
+
+			if err != nil && err != io.EOF {
+				app.writeMsg(streamLostUpcall{
+					Upcall:    "streamLost",
+					StreamIdx: idx,
+					Reason:    fmt.Sprintf("read failure: %s", err.Error()),
+				})
+				break
 			}
 
 			if err == io.EOF {
@@ -495,7 +496,7 @@ func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
 		return nil, needsConfigure()
 	}
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
-		err := stream.Close()
+		err := stream.Reset()
 		if err != nil {
 			return nil, badp2p(err)
 		}

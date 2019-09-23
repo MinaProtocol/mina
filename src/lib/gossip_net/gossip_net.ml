@@ -207,6 +207,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     ; ban_notification_reader: ban_notification Linear_pipe.Reader.t
     ; ban_notification_writer: ban_notification Linear_pipe.Writer.t
     ; mutable haskell_membership: Membership.t option
+    ; peer_event_writer: Peer.Event.t Linear_pipe.Writer.t
+    ; peer_event_reader: Peer.Event.t Linear_pipe.Reader.t
     ; mutable libp2p_membership: Coda_net2.net option
     ; connections:
         ( Unix.Inet_addr.t
@@ -367,38 +369,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         else call ()
 
   and record_peer_events t =
-    let open Peer.Event in
     trace_task "peer events" (fun () ->
         Option.map t.haskell_membership ~f:(fun membership ->
-            Linear_pipe.iter_unordered ~max_concurrency:64
-              (Membership.changes membership) ~f:(function
-              | Connect peers ->
-                  let%map kept_peers =
-                    Deferred.List.filter peers ~f:(fun peer ->
-                        if%map filter_peer t peer then (
-                          Coda_metrics.(Gauge.inc_one Network.peers) ;
-                          Peer_set.add t.peers peer ;
-                          Hashtbl.add_multi t.peers_by_ip ~key:peer.host
-                            ~data:peer ;
-                          if
-                            Int.equal (Peer_set.length t.peers)
-                              disconnect_clear_threshold
-                          then Hash_set.clear t.disconnected_peers
-                          else Hash_set.remove t.disconnected_peers peer ;
-                          true )
-                        else false )
-                  in
-                  Logger.info t.config.logger ~module_:__MODULE__
-                    ~location:__LOC__
-                    !"Connected to some peers [%s]"
-                    (Peer.pretty_list kept_peers) ;
-                  Ivar.fill_if_empty t.first_connect ()
-              | Disconnect peers ->
-                  Logger.info t.config.logger ~module_:__MODULE__
-                    ~location:__LOC__ "Some peers disconnected: %s"
-                    (Peer.pretty_list peers) ;
-                  List.iter peers ~f:(mark_peer_disconnected t) ;
-                  Deferred.unit ) )
+            Linear_pipe.transfer_id
+              (Membership.changes membership)
+              t.peer_event_writer )
         |> ignore )
 
   and restart_kademlia t addl_peers =
@@ -526,7 +501,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let create (config : Config.t)
       (implementation_list : Host_and_port.t Rpc.Implementation.t list) =
-    let t_for_restarting = ref None in
+    let t_hack = Ivar.create () in
+    let t_for_restarting = Ivar.read t_hack in
     trace_task "gossip net" (fun () ->
         let fail m =
           failwithf "Failed to connect to Kademlia process: %s" m ()
@@ -541,7 +517,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               (Exn.to_string e) () ;
           match Monitor.extract_exn e with
           | Kademlia.Membership.Child_died ->
-              let t = Option.value_exn !t_for_restarting in
+              let t = Option.value_exn (Deferred.peek t_for_restarting) in
               let peers =
                 List.map (Peer_set.to_list t.peers)
                   ~f:Peer.to_communications_host_and_port
@@ -565,6 +541,39 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               failwithf "Unhandled Membership.connect exception: %s"
                 (Exn.to_string e) ()
         in
+        let peer_event_reader, peer_event_writer = Linear_pipe.create () in
+        Linear_pipe.iter_unordered peer_event_reader ~max_concurrency:64
+          ~f:(fun event ->
+            let%bind t = t_for_restarting in
+            match event with
+            | Peer.Event.Connect peers ->
+                let%map kept_peers =
+                  Deferred.List.filter peers ~f:(fun peer ->
+                      if%map filter_peer t peer then (
+                        Coda_metrics.(Gauge.inc_one Network.peers) ;
+                        Peer_set.add t.peers peer ;
+                        Hashtbl.add_multi t.peers_by_ip ~key:peer.host
+                          ~data:peer ;
+                        if
+                          Int.equal (Peer_set.length t.peers)
+                            disconnect_clear_threshold
+                        then Hash_set.clear t.disconnected_peers
+                        else Hash_set.remove t.disconnected_peers peer ;
+                        true )
+                      else false )
+                in
+                Logger.info t.config.logger ~module_:__MODULE__
+                  ~location:__LOC__
+                  !"Connected to some peers [%s]"
+                  (Peer.pretty_list kept_peers) ;
+                Ivar.fill_if_empty t.first_connect ()
+            | Disconnect peers ->
+                Logger.info t.config.logger ~module_:__MODULE__
+                  ~location:__LOC__ "Some peers disconnected: %s"
+                  (Peer.pretty_list peers) ;
+                List.iter peers ~f:(mark_peer_disconnected t) ;
+                Deferred.unit )
+        |> don't_wait_for ;
         let%bind haskell_membership =
           if not config.disable_haskell then
             match%map
@@ -607,26 +616,25 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 Logger.info config.logger
                   "libp2p peer ID this session is $peer_id" ~location:__LOC__
                   ~module_:__MODULE__
-                  ~metadata:
-                    [ ( "peer_id"
-                      , `String peerid ) ] ;
+                  ~metadata:[("peer_id", `String peerid)] ;
                 let disc_proto = "coda/0.0.1/discovery-port" in
-                let on_new_peer peerid =
+                let on_new_peer {id= peerid; _} =
                   (let%bind stream =
                      open_stream net2 ~protocol:disc_proto peerid
                      >>| Or_error.ok_exn
                    in
                    let r, w = Stream.pipes stream in
-                   Pipe.close w ;
                    let%map msg = Pipe.read_all r in
                    let them_as_peer =
                      Queue.to_list msg |> String.concat
                      |> Yojson.Safe.from_string |> Peer.of_yojson
                      |> Result.ok_or_failwith
                    in
-                   Option.iter haskell_membership ~f:(fun membership ->
-                       Membership.Hacky_glue.inject_event membership
-                         (Peer.Event.Connect [them_as_peer]) ))
+                   Pipe.close w ;
+                   Linear_pipe.write peer_event_writer
+                     (Peer.Event.Connect [them_as_peer])
+                   |> don't_wait_for ;
+                   ())
                   |> don't_wait_for
                 in
                 let initializing_libp2p_result : unit Deferred.Or_error.t =
@@ -639,9 +647,13 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                     handle_protocol net2 ~on_handler_error:`Raise
                       ~protocol:disc_proto (fun stream ->
                         let _, w = Stream.pipes stream in
-                        let pushback = Pipe.write w
-                          ( Node_addrs_and_ports.to_peer config.addrs_and_ports
-                          |> Peer.to_yojson |> Yojson.Safe.to_string ) in Pipe.close w ; pushback )
+                        let pushback =
+                          Pipe.write w
+                            ( Node_addrs_and_ports.to_peer
+                                config.addrs_and_ports
+                            |> Peer.to_yojson |> Yojson.Safe.to_string )
+                        in
+                        Pipe.close w ; pushback )
                   in
                   (* TODO: chain ID as network ID. *)
                   let%map _ =
@@ -694,9 +706,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; haskell_membership
           ; libp2p_membership
           ; connections= Hashtbl.create (module Unix.Inet_addr)
+          ; peer_event_writer
+          ; peer_event_reader
           ; first_connect }
         in
-        t_for_restarting := Some t ;
+        Ivar.fill t_hack t ;
         don't_wait_for
           (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
              ~f:(fun (addr, banned_until) ->

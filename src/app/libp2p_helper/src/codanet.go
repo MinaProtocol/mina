@@ -9,6 +9,7 @@ import (
 	p2p "github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	host "github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	routing "github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -94,7 +95,7 @@ func MakeHelper(ctx context.Context, listenOn []multiaddr.Multiaddr, statedir st
 
 	rv := customValidator{Base: record.NamespacedValidator{"pk": record.PublicKeyValidator{}}}
 
-	// gross hack to exfiltrate a channel from the side effect of option evaluation
+	// gross hack to exfiltrate the DHT from the side effect of option evaluation
 	kadch := make(chan *kad.IpfsDHT)
 
 	// Make sure this doesn't get too out of sync with the defaults,

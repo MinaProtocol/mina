@@ -100,6 +100,8 @@ module PeerID : sig
   val of_keypair : Keypair.t -> t
 end
 
+type discovered_peer = {id: PeerID.t; maddrs: Multiaddr.t list}
+
 module Pubsub : sig
   (** A subscription to a pubsub topic. *)
   module Subscription : sig
@@ -172,7 +174,7 @@ val configure :
   -> me:Keypair.t
   -> maddrs:Multiaddr.t list
   -> network_id:string
-  -> on_new_peer:(PeerID.t -> unit)
+  -> on_new_peer:(discovered_peer -> unit)
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.
