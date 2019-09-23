@@ -21,9 +21,9 @@ module Icon = {
   module Svg = {
     let discord =
       <svg
-        width="34px"
+        width="44px"
         height="38px"
-        viewBox="0 0 34 38"
+        viewBox="0 0 34 32"
         version="1.1"
         xmlns="http://www.w3.org/2000/svg"
         xmlnsXlink="http://www.w3.org/1999/xlink">
