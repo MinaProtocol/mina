@@ -386,7 +386,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
       let new_root_node = Hashtbl.find_exn t.table new_root_hash in
       Ledger.Maskable.Debug.visualize
         ~filename:(Printf.sprintf "%s.%d.pre.dot" (mask_prefix ()) id) ;
-      let new_root_mask =
+      let new_staged_ledger =
         let m0 = Breadcrumb.mask old_root_node.breadcrumb in
         let m1 = Breadcrumb.mask new_root_node.breadcrumb in
         let m1_hash_pre_commit = Ledger.merkle_root m1 in
@@ -412,6 +412,12 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
              new root's staged ledger mask after committing"
           ~expect:m1_hash_pre_commit (Ledger.merkle_root m0) ;
         (* reparent all the successors of m1 onto m0 *)
+        (* the staged ledger's mask needs replaced before m1 is made invalid *)
+        let new_staged_ledger =
+          Staged_ledger.replace_ledger_exn
+            (Breadcrumb.staged_ledger new_root_node.breadcrumb)
+            m0
+        in
         Ledger.remove_and_reparent_exn m1 m1 ;
         (*
         ignore
@@ -430,22 +436,20 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
               ignore (Or_error.ok_exn (Ledger.apply_transaction mt txn)) ) ;
           Ledger.commit mt ;
           ignore (Ledger.Maskable.unregister_mask_exn s mt) ) ;
-        m0
+        new_staged_ledger
       in
-      Ledger.Maskable.Debug.visualize
-        ~filename:(Printf.sprintf "%s.%d.post.dot" (mask_prefix ()) id) ;
       let new_root_breadcrumb =
         Breadcrumb.create
           (Breadcrumb.validated_transition new_root_node.breadcrumb)
-          (Staged_ledger.replace_ledger_exn
-             (Breadcrumb.staged_ledger new_root_node.breadcrumb)
-             new_root_mask)
+          new_staged_ledger
       in
       let new_root_node =
         {new_root_node with breadcrumb= new_root_breadcrumb}
       in
       Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
       t.root <- new_root_hash ;
+      Ledger.Maskable.Debug.visualize
+        ~filename:(Printf.sprintf "%s.%d.post.dot" (mask_prefix ()) id) ;
       Coda_metrics.(
         let num_breadcrumbs_removed = Int.to_float (1 + List.length garbage) in
         let num_finalized_staged_txns =
