@@ -232,8 +232,6 @@ jobs:
         {%- endif %}
         docker:
             - image: codaprotocol/coda:toolchain-3e04ef86433fb33072d19b139e20cd17fff1a6d7
-        environment:
-            DUNE_PROFILE: {{profile}}
         steps:
             - checkout
             - run:
@@ -248,7 +246,6 @@ jobs:
                   name: Download candidate stable PV keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run: opam switch import src/opam.export
-            - run: declare -x DUNE_PROFILE_SAVE=$DUNE_PROFILE; unset DUNE_PROFILE
             - run: opam pin -y add src/external/ocaml-sodium
             - run: opam pin -y add src/external/rpc_parallel
             - run: opam pin -y add src/external/ocaml-extlib
@@ -256,11 +253,11 @@ jobs:
             - run: opam pin -y add src/external/async_kernel
             - run: opam pin -y add src/external/coda_base58
             - run: opam pin -y add src/external/graphql_ppx
-            - run: declare -x DUNE_PROFILE=$DUNE_PROFILE_SAVE; unset DUNE_PROFILE_SAVE
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   {%- if profile in medium_curve_profiles %}
+                  environment: DUNE_PROFILE: {{profile}}
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
