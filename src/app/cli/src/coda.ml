@@ -550,6 +550,8 @@ let daemon logger =
              [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
            >>| Or_error.ok
          in
+         Async_kernel.Async_kernel_scheduler.(
+           set_record_backtraces (t ()) true) ;
          Stream.iter
            (Async_kernel.Async_kernel_scheduler.(
               long_cycles_with_context @@ t ())
