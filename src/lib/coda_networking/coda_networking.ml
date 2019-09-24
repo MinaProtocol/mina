@@ -745,6 +745,12 @@ module Make (Inputs : Inputs_intf) = struct
     let first_received_message = Ivar.create () in
     let states, snark_pool_diffs, transaction_pool_diffs =
       Strict_pipe.Reader.partition_map3 received_gossips ~f:(fun envelope ->
+          Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "gossip"
+                , Envelope.Incoming.to_yojson Message.msg_to_yojson envelope )
+              ]
+            "received $gossip" ;
           Ivar.fill_if_empty first_received_message () ;
           match Envelope.Incoming.data envelope with
           | New_state state ->
@@ -753,14 +759,13 @@ module Make (Inputs : Inputs_intf) = struct
                    ( External_transition.protocol_state state
                    |> Protocol_state.blockchain_state
                    |> Blockchain_state.timestamp |> Block_time.to_time )) ;
-              if config.gossip_net_params.log_gossip_heard.new_state then
-                Logger.debug config.logger ~module_:__MODULE__
-                  ~location:__LOC__ "Received a block $block from $sender"
-                  ~metadata:
-                    [ ("block", External_transition.to_yojson state)
-                    ; ( "sender"
-                      , Envelope.(Sender.to_yojson (Incoming.sender envelope))
-                      ) ] ;
+              Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
+                "Received a block $block from $sender"
+                ~metadata:
+                  [ ("block", External_transition.to_yojson state)
+                  ; ( "sender"
+                    , Envelope.(Sender.to_yojson (Incoming.sender envelope)) )
+                  ] ;
               `Fst
                 ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
                 , Block_time.now config.time_controller )

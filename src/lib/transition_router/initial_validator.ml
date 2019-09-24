@@ -157,6 +157,12 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
                  (Fn.compose Protocol_state.hash
                     External_transition.protocol_state)
         in
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "transition"
+              , State_hash.to_yojson @@ With_hash.hash transition_with_hash )
+            ]
+          "received $transition for initial validation" ;
         Duplicate_proposal_detector.check duplicate_checker logger
           transition_with_hash ;
         let sender = Envelope.Incoming.sender transition_env in
@@ -172,6 +178,13 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
         | Ok verified_transition ->
             Envelope.Incoming.wrap ~data:verified_transition ~sender
             |> Writer.write valid_transition_writer ;
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ( "transition"
+                  , State_hash.to_yojson
+                    @@ External_transition.Initial_validated.state_hash
+                         verified_transition ) ]
+              "$transition passed initial validator" ;
             return ()
         | Error error ->
             handle_validation_error ~logger ~trust_system ~sender
