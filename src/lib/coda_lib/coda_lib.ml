@@ -60,6 +60,7 @@ type t =
   ; propose_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
+  ; mutable next_proposal: Consensus.Hooks.proposal option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
 [@@deriving fields]
@@ -475,8 +476,11 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
   Network_pool.Snark_pool.add_completed_work (snark_pool t) work
 
+let next_proposal t = t.next_proposal
+
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
+    ~set_next_proposal:(fun p -> t.next_proposal <- Some p)
     ~prover:t.processes.prover ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
       (Network_pool.Transaction_pool.resource_pool
@@ -831,6 +835,7 @@ let create (config : Config.t) =
           in
           Deferred.return
             { config
+            ; next_proposal= None
             ; processes= {prover; verifier; snark_worker}
             ; components=
                 { net
