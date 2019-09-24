@@ -7,6 +7,7 @@ open Currency
 open Fold_lib
 open Signature_lib
 open Module_version
+open Snark_params
 module Time = Coda_base.Block_time
 module Run = Snark_params.Tick.Run
 
@@ -144,26 +145,20 @@ module Data = struct
   module Epoch_seed = struct
     include Coda_base.Data_hash.Make_full_size ()
 
-    let initial : t = of_hash Snark_params.Tick.Pedersen.zero_hash
+    let initial : t = of_hash Tick.Pedersen.zero_hash
 
-    let fold_vrf_result seed vrf_result =
-      Fold.(fold seed +> Random_oracle.Digest.fold vrf_result)
+    let update (seed : t) vrf_result =
+      let open Random_oracle in
+      hash ~init:Hash_prefix_states.Random_oracle.epoch_seed
+        [|(seed :> Tick.Field.t); vrf_result|]
+      |> of_hash
 
-    let update seed vrf_result =
-      let open Snark_params.Tick in
-      of_hash
-        (Pedersen.digest_fold Coda_base.Hash_prefix.epoch_seed
-           (fold_vrf_result seed vrf_result))
-
-    let update_var (seed : var) (vrf_result : Random_oracle.Digest.Checked.t) :
-        (var, _) Snark_params.Tick.Checked.t =
-      let open Snark_params.Tick in
-      let%bind seed_triples = var_to_triples seed in
-      let%map hash =
-        Pedersen.Checked.digest_triples ~init:Coda_base.Hash_prefix.epoch_seed
-          (seed_triples @ Random_oracle.Digest.Checked.to_triples vrf_result)
-      in
-      var_of_hash_packed hash
+    let update_var (seed : var) vrf_result =
+      let open Random_oracle.Checked in
+      make_checked (fun () ->
+          hash ~init:Hash_prefix_states.Random_oracle.epoch_seed
+            [|var_to_hash_packed seed; vrf_result|]
+          |> var_of_hash_packed )
   end
 
   module Epoch = struct
@@ -219,8 +214,8 @@ module Data = struct
                 (x lsr Int.sub 31 i) land UInt32.one = UInt32.one )
             |> Bitstring_lib.Bitstring.Msb_first.of_list
           in
-          let open Snark_params.Tick in
-          let open Snark_params.Tick.Let_syntax in
+          let open Tick in
+          let open Tick.Let_syntax in
           let ( < ) = Bitstring_checked.lt_value in
           let ck = Constants.(c * k) |> UInt32.of_int in
           let ck_bitstring = uint32_msb ck
@@ -239,7 +234,7 @@ module Data = struct
 
       let%test_unit "in_seed_update_range unchecked vs. checked equality" =
         let test =
-          Test_util.test_equal typ Snark_params.Tick.Boolean.typ
+          Test_util.test_equal typ Tick.Boolean.typ
             Checked.in_seed_update_range in_seed_update_range
         in
         let x = Constants.(c * k) in
@@ -559,16 +554,15 @@ module Data = struct
      fun Coda_base.H_list.[hash; total_currency] -> {hash; total_currency}
 
     let data_spec =
-      Snark_params.Tick.Data_spec.
-        [Coda_base.Frozen_ledger_hash.typ; Amount.typ]
+      Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
 
     let typ : (var, Value.t) Typ.t =
-      Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
+      Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
     let var_to_triples {Poly.hash; total_currency} =
-      let open Snark_params.Tick.Checked.Let_syntax in
+      let open Tick.Checked.Let_syntax in
       let%map hash_triples =
         Coda_base.Frozen_ledger_hash.var_to_triples hash
       in
@@ -584,7 +578,7 @@ module Data = struct
     let if_ cond
         ~(then_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t)
         ~(else_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t) =
-      let open Snark_params.Tick.Checked.Let_syntax in
+      let open Tick.Checked.Let_syntax in
       let%map hash =
         Coda_base.Frozen_ledger_hash.if_ cond ~then_:then_.hash
           ~else_:else_.hash
@@ -602,15 +596,15 @@ module Data = struct
 
   module Vrf = struct
     module Scalar = struct
-      type value = Snark_params.Tick.Inner_curve.Scalar.t
+      type value = Tick.Inner_curve.Scalar.t
 
-      type var = Snark_params.Tick.Inner_curve.Scalar.var
+      type var = Tick.Inner_curve.Scalar.var
 
-      let typ : (var, value) Typ.t = Snark_params.Tick.Inner_curve.Scalar.typ
+      let typ : (var, value) Typ.t = Tick.Inner_curve.Scalar.typ
     end
 
     module Group = struct
-      open Snark_params.Tick
+      open Tick
 
       type value = Inner_curve.t
 
@@ -640,6 +634,13 @@ module Data = struct
         , Coda_base.Account.Index.Unpacked.var )
         t
 
+      let to_input ({epoch; slot; seed; delegator} : value) =
+        { Random_oracle.Input.field_elements= [|(seed :> Tick.field)|]
+        ; bitstrings=
+            [| Epoch.Bits.to_bits epoch
+             ; Slot.Bits.to_bits slot
+             ; Coda_base.Account.Index.to_bits delegator |] }
+
       let to_hlist {epoch; slot; seed; delegator} =
         Coda_base.H_list.[epoch; slot; seed; delegator]
 
@@ -652,44 +653,43 @@ module Data = struct
         {epoch; slot; seed; delegator}
 
       let data_spec =
-        let open Snark_params.Tick.Data_spec in
+        let open Tick.Data_spec in
         [ Epoch.typ
         ; Epoch.Slot.typ
         ; Epoch_seed.typ
         ; Coda_base.Account.Index.Unpacked.typ ]
 
       let typ : (var, value) Typ.t =
-        Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
+        Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
           ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
 
-      let fold {epoch; slot; seed; delegator} =
-        let open Fold in
-        Epoch.fold epoch +> Epoch.Slot.fold slot +> Epoch_seed.fold seed
-        +> Coda_base.Account.Index.fold delegator
-
       let hash_to_group msg =
-        let msg_hash_state =
-          Snark_params.Tick.Pedersen.hash_fold
-            Coda_base.Hash_prefix.vrf_message (fold msg)
-        in
-        msg_hash_state.acc
+        Group_map.to_group
+          (Random_oracle.hash
+             ~init:Coda_base.Hash_prefix.Random_oracle.vrf_message
+             (Random_oracle.pack_input (to_input msg)))
+        |> Tick.Inner_curve.of_affine
 
       module Checked = struct
-        let var_to_triples {epoch; slot; seed; delegator} =
-          let open Snark_params.Tick.Checked.Let_syntax in
-          let%map epoch = Epoch.Checked.to_triples epoch
-          and slot = Epoch.Slot.Checked.to_triples slot
-          and seed = Epoch_seed.var_to_triples seed in
-          epoch @ slot @ seed
-          @ Coda_base.Account.Index.Unpacked.var_to_triples delegator
+        open Tick
+
+        let to_input ({epoch; slot; seed; delegator} : var) =
+          let open Tick.Checked.Let_syntax in
+          let%map epoch = Epoch.Checked.to_bits epoch
+          and slot = Slot.Checked.to_bits slot in
+          let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
+          { Random_oracle.Input.field_elements=
+              [|Epoch_seed.var_to_hash_packed seed|]
+          ; bitstrings= [|s epoch; s slot; delegator|] }
 
         let hash_to_group msg =
-          let open Snark_params.Tick in
-          let open Snark_params.Tick.Checked.Let_syntax in
-          let%bind msg_triples = var_to_triples msg in
-          Pedersen.Checked.hash_triples ~init:Coda_base.Hash_prefix.vrf_message
-            msg_triples
+          let%bind input = to_input msg in
+          Tick.make_checked (fun () ->
+              Group_map.Checked.to_group
+                (Random_oracle.Checked.hash
+                   ~init:Coda_base.Hash_prefix.Random_oracle.vrf_message
+                   (Random_oracle.Checked.pack_input input)) )
       end
 
       let gen =
@@ -702,74 +702,94 @@ module Data = struct
     end
 
     module Output = struct
-      module Stable = struct
-        module V1 = struct
-          module T = struct
-            type t = Random_oracle.Digest.Stable.V1.t
-            [@@deriving sexp, bin_io, eq, compare, hash, yojson, version]
+      module Truncated = struct
+        module Stable = struct
+          module V1 = struct
+            module T = struct
+              type t = string
+              [@@deriving sexp, bin_io, eq, compare, hash, yojson, version]
+            end
+
+            include T
+            include Registration.Make_latest_version (T)
           end
 
-          include T
-          include Registration.Make_latest_version (T)
+          module Latest = V1
+
+          module Module_decl = struct
+            let name = "random_oracle_digest"
+
+            type latest = Latest.t
+          end
+
+          module Registrar = Registration.Make (Module_decl)
+          module Registered_V1 = Registrar.Register (V1)
         end
 
-        module Latest = V1
+        type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
-        module Module_decl = struct
-          let name = "random_oracle_digest"
+        let length_in_bytes = 32
 
-          type latest = Latest.t
+        let length_in_bits = 8 * length_in_bytes
+
+        open Tick
+
+        type var = Boolean.var array
+
+        let typ : (var, t) Typ.t =
+          Typ.array ~length:length_in_bits Boolean.typ
+          |> Typ.transport ~there:Blake2.string_to_bits
+               ~back:Blake2.bits_to_string
+
+        let dummy = String.init length_in_bytes ~f:(fun _ -> '\000')
+
+        module Checked = struct
+          let to_triples x =
+            Fold.(group3 ~default:Boolean.false_ (of_array x) |> to_list)
         end
 
-        module Registrar = Registration.Make (Module_decl)
-        module Registered_V1 = Registrar.Register (V1)
+        let fold = Fold.string_triples
+
+        let length_in_triples = (length_in_bits + 2) / 3
       end
 
-      type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
+      open Tick
 
-      type var = Random_oracle.Digest.Checked.t
+      let typ = Field.typ
 
-      let typ : (var, t) Typ.t = Random_oracle.Digest.typ
+      let gen = Field.gen
 
-      let fold = Random_oracle.Digest.fold
-
-      let length_in_triples = Random_oracle.Digest.length_in_triples
-
-      let gen = Random_oracle.Digest.gen
-
-      let to_string (t : t) = (t :> string)
-
-      type value = t [@@deriving sexp]
-
-      let dummy = Random_oracle.digest_string ""
+      let truncate x =
+        Random_oracle.Digest.to_bits ~length:Truncated.length_in_bits x
+        |> Array.of_list |> Blake2.bits_to_string
 
       let hash msg g =
-        let open Fold in
-        let compressed_g =
-          Non_zero_curve_point.(g |> of_inner_curve_exn |> compress)
+        let x, y = Non_zero_curve_point.of_inner_curve_exn g in
+        let input =
+          Random_oracle.Input.append (Message.to_input msg)
+            {field_elements= [|x; y|]; bitstrings= [||]}
         in
-        let digest =
-          Snark_params.Tick.Pedersen.digest_fold
-            Coda_base.Hash_prefix.vrf_output
-            ( Message.fold msg
-            +> Non_zero_curve_point.Compressed.fold compressed_g )
-        in
-        Random_oracle.digest_field digest
+        let open Random_oracle in
+        hash ~init:Hash_prefix_states.Random_oracle.vrf_output
+          (pack_input input)
 
       module Checked = struct
-        include Random_oracle.Digest.Checked
+        let truncate x =
+          Tick.make_checked (fun () ->
+              Random_oracle.Checked.Digest.to_bits
+                ~length:Truncated.length_in_bits x
+              |> Array.of_list )
 
-        let hash msg g =
-          let open Snark_params.Tick.Checked.Let_syntax in
-          let%bind msg_triples = Message.Checked.var_to_triples msg in
-          let%bind g_triples =
-            Non_zero_curve_point.(compress_var g >>= Compressed.var_to_triples)
+        let hash msg (x, y) =
+          let%bind msg = Message.Checked.to_input msg in
+          let input =
+            Random_oracle.Input.append msg
+              {field_elements= [|x; y|]; bitstrings= [||]}
           in
-          let%bind pedersen_digest =
-            Snark_params.Tick.Pedersen.Checked.digest_triples
-              ~init:Coda_base.Hash_prefix.vrf_output (msg_triples @ g_triples)
-          in
-          Random_oracle.Checked.digest_field pedersen_digest
+          make_checked (fun () ->
+              let open Random_oracle.Checked in
+              hash ~init:Hash_prefix_states.Random_oracle.vrf_output
+                (pack_input input) )
       end
 
       let%test_unit "hash unchecked vs. checked equality" =
@@ -785,10 +805,10 @@ module Data = struct
         in
         Quickcheck.test ~trials:10 gen_message_and_curve_point
           ~f:
-            (Test_util.test_equal ~equal:Random_oracle.Digest.equal
+            (Test_util.test_equal ~equal:Field.equal
                Snark_params.Tick.Typ.(
                  Message.typ * Snark_params.Tick.Inner_curve.typ)
-               Random_oracle.Digest.typ
+               typ
                (fun (msg, g) -> Checked.hash msg g)
                (fun (msg, g) -> hash msg g))
     end
@@ -835,18 +855,20 @@ module Data = struct
         in
         let rhs = Snarky_taylor.Exp.Unchecked.one_minus_exp params input in
         let lhs =
-          let bs = Random_oracle.Digest.to_bits vrf_output in
-          let n = of_bits_lsb (c_bias (Array.to_list bs)) in
+          let n =
+            of_bits_lsb
+              (c_bias (Array.to_list (Blake2.string_to_bits vrf_output)))
+          in
           Bignum.(
             of_bigint n
             / of_bigint
-                Bignum_bigint.(
-                  shift_left one Random_oracle.Digest.length_in_bits))
+                Bignum_bigint.(shift_left one Output.Truncated.length_in_bits))
         in
         Bignum.(lhs <= rhs)
 
       module Checked = struct
-        let is_satisfied ~my_stake ~total_stake (vrf_output : Output.var) =
+        let is_satisfied ~my_stake ~total_stake
+            (vrf_output : Output.Truncated.var) =
           let open Snarky_integer in
           let open Snarky_taylor in
           make_checked (fun () ->
@@ -866,15 +888,24 @@ module Data = struct
               let lhs = c_bias vrf_output in
               Floating_point.(
                 le ~m
-                  (of_bits ~m lhs
-                     ~precision:Random_oracle.Digest.length_in_bits)
+                  (of_bits ~m lhs ~precision:Output.Truncated.length_in_bits)
                   rhs) )
       end
     end
 
     module T =
       Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group) (Message)
-        (Output)
+        (struct
+          type value = Snark_params.Tick.Field.t
+
+          type var = Random_oracle.Checked.Digest.t
+
+          let hash = Output.hash
+
+          module Checked = struct
+            let hash = Output.Checked.hash
+          end
+        end)
 
     type _ Snarky.Request.t +=
       | Winner_address : Coda_base.Account.Index.t Snarky.Request.t
@@ -919,11 +950,12 @@ module Data = struct
           get_vrf_evaluation shifted ~ledger:epoch_ledger.hash
             ~message:{Message.epoch; slot; seed; delegator= winner_addr}
         in
+        let%bind truncated_result = Output.Checked.truncate result in
         let%map satisifed =
           Threshold.Checked.is_satisfied ~my_stake
-            ~total_stake:epoch_ledger.total_currency result
+            ~total_stake:epoch_ledger.total_currency truncated_result
         in
-        (satisifed, result)
+        (satisifed, result, truncated_result)
     end
 
     let eval = T.eval
@@ -998,6 +1030,7 @@ module Data = struct
               let vrf_result =
                 T.eval ~private_key {epoch; slot; seed; delegator}
               in
+              let truncated_vrf_result = Output.truncate vrf_result in
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                 "VRF result for delegator: $delegator, balance: $balance, \
                  amount: $amount, result: $result"
@@ -1009,14 +1042,14 @@ module Data = struct
                   ; ( "result"
                     , `String
                         (* use sexp representation; int might be too small *)
-                        ( Random_oracle.Digest.fold_bits vrf_result
+                        ( Fold.string_bits truncated_vrf_result
                         |> Bignum_bigint.of_bit_fold_lsb
                         |> Bignum_bigint.sexp_of_t |> Sexp.to_string ) ) ] ;
               Coda_metrics.Counter.inc_one
                 Coda_metrics.Consensus.vrf_evaluations ;
               if
                 Threshold.is_satisfied ~my_stake:balance ~total_stake
-                  vrf_result
+                  truncated_vrf_result
               then
                 return
                   (Some
@@ -1566,7 +1599,7 @@ module Data = struct
           module T = struct
             type t =
               ( Length.Stable.V1.t
-              , Vrf.Output.Stable.V1.t
+              , Vrf.Output.Truncated.Stable.V1.t
               , Amount.Stable.V1.t
               , Global_slot.Stable.V1.t
               , Epoch_data.Staking.Value.Stable.V1.t
@@ -1601,7 +1634,7 @@ module Data = struct
 
     type var =
       ( Length.Checked.t
-      , Vrf.Output.var
+      , Vrf.Output.Truncated.var
       , Amount.var
       , Global_slot.Checked.t
       , Epoch_data.var
@@ -1683,7 +1716,7 @@ module Data = struct
       [ Length.typ
       ; Length.typ
       ; Length.typ
-      ; Vrf.Output.typ
+      ; Vrf.Output.Truncated.typ
       ; Amount.typ
       ; Global_slot.Checked.typ
       ; Epoch_data.Staking.typ
@@ -1716,7 +1749,7 @@ module Data = struct
       and next_epoch_data = Epoch_data.var_to_triples next_epoch_data
       and checkpoints = Checkpoints.Hash.var_to_triples checkpoints in
       blockchain_length @ epoch_count @ min_epoch_length
-      @ Vrf.Output.Checked.to_triples last_vrf_output
+      @ Vrf.Output.Truncated.Checked.to_triples last_vrf_output
       @ curr_global_slot
       @ Amount.var_to_triples total_currency
       @ staking_epoch_data @ next_epoch_data
@@ -1739,7 +1772,7 @@ module Data = struct
       Length.fold blockchain_length
       +> Length.fold epoch_count
       +> Length.fold min_epoch_length
-      +> Vrf.Output.fold last_vrf_output
+      +> Vrf.Output.Truncated.fold last_vrf_output
       +> Global_slot.fold curr_global_slot
       +> Amount.fold total_currency
       +> Epoch_data.Staking.fold staking_epoch_data
@@ -1749,7 +1782,7 @@ module Data = struct
 
     let length_in_triples =
       Length.length_in_triples + Length.length_in_triples
-      + Vrf.Output.length_in_triples + Epoch.length_in_triples
+      + Vrf.Output.Truncated.length_in_triples + Epoch.length_in_triples
       + Epoch.Slot.length_in_triples + Amount.length_in_triples
       + Epoch_data.length_in_triples + Epoch_data.length_in_triples
 
@@ -1818,7 +1851,7 @@ module Data = struct
             Length.min previous_consensus_state.min_epoch_length
               previous_consensus_state.next_epoch_data.epoch_length
           else Length.zero )
-      ; last_vrf_output= proposer_vrf_result
+      ; last_vrf_output= Vrf.Output.truncate proposer_vrf_result
       ; total_currency
       ; curr_global_slot= consensus_transition
       ; staking_epoch_data
@@ -1857,7 +1890,7 @@ module Data = struct
         { Poly.blockchain_length= Length.zero
         ; epoch_count= Length.zero
         ; min_epoch_length= Length.of_int (UInt32.to_int Constants.Epoch.size)
-        ; last_vrf_output= Vrf.Output.dummy
+        ; last_vrf_output= Vrf.Output.Truncated.dummy
         ; total_currency= Lazy.force genesis_ledger_total_currency
         ; curr_global_slot= Global_slot.zero
         ; staking_epoch_data= Lazy.force Epoch_data.Staking.genesis
@@ -1910,7 +1943,7 @@ module Data = struct
         Epoch_data.if_ epoch_increased ~then_:previous_state.next_epoch_data
           ~else_:previous_state.staking_epoch_data
       in
-      let%bind threshold_satisfied, vrf_result =
+      let%bind threshold_satisfied, vrf_result, truncated_vrf_result =
         let%bind (module M) = Inner_curve.Checked.Shifted.create () in
         Vrf.Checked.check
           (module M)
@@ -2013,7 +2046,7 @@ module Data = struct
         , { Poly.blockchain_length
           ; epoch_count
           ; min_epoch_length
-          ; last_vrf_output= vrf_result
+          ; last_vrf_output= truncated_vrf_result
           ; curr_global_slot= next_global_slot
           ; total_currency= new_total_currency
           ; staking_epoch_data
@@ -2414,10 +2447,8 @@ module Hooks = struct
      * which takes the new state when true. Each predicate is also decorated
      * with a string description, used for debugging messages *)
     let candidate_vrf_is_bigger =
-      let d = Fn.compose Random_oracle.digest_string Vrf.Output.to_string in
-      Random_oracle.Digest.( > )
-        (d candidate.last_vrf_output)
-        (d existing.last_vrf_output)
+      let d x = Blake2.(to_raw_string (digest_string x)) in
+      String.( > ) (d candidate.last_vrf_output) (d existing.last_vrf_output)
     in
     let ( << ) a b =
       let c = Length.compare a b in
@@ -2846,7 +2877,7 @@ module Hooks = struct
                 Length.min prev.min_epoch_length
                   prev.next_epoch_data.epoch_length
               else Length.zero )
-          ; last_vrf_output= proposer_vrf_result
+          ; last_vrf_output= Vrf.Output.truncate proposer_vrf_result
           ; total_currency
           ; curr_global_slot
           ; staking_epoch_data
