@@ -309,12 +309,12 @@ module Styles = {
     ]);
   let ctaButton =
     style([
-      padding(`px(18)),
+      padding(`rem(1.125)),
       background(`rgba((71, 137, 196, 0.1))),
       border(`px(1), `solid, Style.Colors.hyperlink),
       borderRadius(`px(6)),
-      maxWidth(`px(300)),
-      marginTop(`px(10)),
+      maxWidth(`rem(18.75)),
+      marginTop(`rem(0.625)),
       hover([
         opacity(0.9),
         backgroundColor(Style.Colors.azureAlpha(0.2)),
@@ -325,18 +325,17 @@ module Styles = {
   let ctaContent =
     style([
       display(`flex),
-      selector("p", [fontSize(`px(29)), marginTop(`px(7))]),
+      selector("p", [fontSize(`px(29)), marginTop(`rem(0.4375))]),
     ]);
-  let ctaText = style([marginLeft(`px(10))]);
+  let ctaText = style([marginLeft(`rem(0.625))]);
   let ctaHeading =
     style([
       Style.Typeface.ibmplexsans,
       fontWeight(`num(600)),
-      fontSize(`px(24)),
-      lineHeight(`px(35)),
+      fontSize(`rem(1.5)),
+      lineHeight(`rem(2.1875)),
       color(`hex("4782A0")),
       textAlign(`left),
-      media(Style.MediaQuery.notMobile, [fontSize(`px(25))]),
     ]);
 
   let ctaBody =
@@ -347,7 +346,7 @@ module Styles = {
       fontSize(`px(13)),
       color(`hex("4782A0")),
       textAlign(`left),
-      marginTop(`px(5)),
+      marginTop(`rem(0.3125)),
     ]);
   let heroRow =
     style([
@@ -356,7 +355,6 @@ module Styles = {
       justifyContent(`spaceAround),
       alignItems(`center),
       media("(min-width: 70rem)", [flexDirection(`row)]),
-      selector("img", [width(`percent(100.)), maxWidth(`px(500))]),
     ]);
 
   let heroText =
@@ -364,16 +362,17 @@ module Styles = {
 
   let termynal =
     style([
-      minHeight(`px(270)),
-      margin(`px(30)),
-      fontSize(`px(10)),
+      height(`rem(16.875)),
+      marginLeft(`rem(1.875)),
+      marginRight(`rem(1.875)),
+      fontSize(`rem(0.625)),
       media(
         Style.MediaQuery.notMobile,
         [
-          height(`px(400)),
-          paddingTop(`px(75)),
-          paddingLeft(`px(35)),
-          fontSize(`px(16)),
+          height(`rem(25.)),
+          paddingTop(`rem(4.6875)),
+          paddingLeft(`rem(2.1875)),
+          fontSize(`rem(1.)),
         ],
       ),
     ]);
