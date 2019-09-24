@@ -48,7 +48,9 @@ module Make (Worker : Worker_intf) :
     assert_not_working t ;
     let thread = Worker.perform t.worker work in
     t.thread <- Some thread ;
-    thread
+    let%map x = thread in
+    t.thread <- None ;
+    x
 
   let close t = assert_not_working t ; Worker.close t.worker
 end
