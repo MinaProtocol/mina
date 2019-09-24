@@ -332,10 +332,11 @@ module Styles = {
     style([
       Style.Typeface.ibmplexsans,
       fontWeight(`num(600)),
-      fontSize(`px(25)),
+      fontSize(`px(24)),
       lineHeight(`px(35)),
       color(`hex("4782A0")),
       textAlign(`left),
+      media(Style.MediaQuery.notMobile, [fontSize(`px(25))]),
     ]);
 
   let ctaBody =
@@ -368,7 +369,12 @@ module Styles = {
       fontSize(`px(10)),
       media(
         Style.MediaQuery.notMobile,
-        [fontSize(`px(18)), height(`px(400))],
+        [
+          height(`px(400)),
+          paddingTop(`px(75)),
+          paddingLeft(`px(35)),
+          fontSize(`px(16)),
+        ],
       ),
     ]);
 };
@@ -447,12 +453,14 @@ let make = () => {
             typeDelay: 40,
             lineDelay: 700,
             lineData: [
-              { type: 'input', prompt: '>', value: 'coda daemon' },
+              { type: 'input', prompt: '>', value: 'coda daemon -peer ...' },
               { type: 'progress' },
               { value:  'Daemon ready. Clients can now connect!'},
               { type: 'input', prompt: '>', value: 'coda client status' },
-              { type: 'progress' },
-              { value:  'Daemon ready. Clients can now connect!'},
+              { value:  'Local uptime: 25m25s'},
+              { value:  'Peers: 5'},
+              { value:  'Consensus time now: epoch=16, slot=78'},
+              { value:  'Sync status: Synced'},
             ]
           });|}
         </RunScript>
@@ -533,17 +541,17 @@ let make = () => {
     </div>
     <hr />
     <Section name="Leaderboard">
-      <div className=Styles.header>
+      <div className=Styles.dashboardHeader>
         <h1 className=Style.H1.hero>
           {React.string("Testnet Leaderboard")}
         </h1>
+        <a
+          href="https://docs.google.com/spreadsheets/d/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/edit#gid=0"
+          target="_blank"
+          className=Styles.headerLink>
+          {React.string({j|View Full Leaderboard\u00A0→|j})}
+        </a>
       </div>
-      // <a
-      //   href="https://docs.google.com/spreadsheets/d/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/edit#gid=0"
-      //   target="_blank"
-      //   className=Styles.headerLink>
-      //   {React.string({j|View Full Leaderboard\u00A0→|j})}
-      // </a>
       <div className=Styles.content>
         <div id="testnet-leaderboard" className=Styles.leaderboard>
           <div className=Styles.headerRow>
@@ -563,32 +571,8 @@ let make = () => {
           </p>
           <p>
             {React.string(
-               "The goal of Testnet Points* is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
+               "The goal of Testnet Points is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
              )}
-          </p>
-          <p>
-            <h4 className=Styles.sidebarHeader>
-              {React.string("Community")}
-            </h4>
-          </p>
-          <p>
-            <a className=Style.Link.basic href="/docs">
-              {React.string("Testnet Docs")}
-            </a>
-            <br />
-            <a
-              className=Style.Link.basic
-              href="https://bit.ly/CodaDiscord"
-              target="_blank">
-              {React.string("Discord")}
-            </a>
-            <br />
-            <a
-              className=Style.Link.basic
-              href="https://forums.codaprotocol.com"
-              target="_blank">
-              {React.string("Coda Forums")}
-            </a>
           </p>
           <p>
             <h2 id="challenges-current-week" className=Styles.weekHeader />
