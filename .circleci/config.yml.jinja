@@ -248,13 +248,13 @@ jobs:
                   name: Download candidate stable PV keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run: opam switch import src/opam.export
-            - run: opam pin add src/external/ocaml-sodium
-            - run: opam pin add src/external/rpc_parallel
-            - run: opam pin add src/external/ocaml-extlib
-            - run: opam pin add src/external/digestif
-            - run: opam pin add src/external/async_kernel
-            - run: opam pin add src/external/coda_base58
-            - run: opam pin add src/external/graphql_ppx
+            - run: opam pin -y add src/external/ocaml-sodium
+            - run: opam pin -y add src/external/rpc_parallel
+            - run: opam pin -y add src/external/ocaml-extlib
+            - run: opam pin -y add src/external/digestif
+            - run: opam pin -y add src/external/async_kernel
+            - run: opam pin -y add src/external/coda_base58
+            - run: opam pin -y add src/external/graphql_ppx
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
