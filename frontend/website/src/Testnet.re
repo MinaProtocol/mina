@@ -376,7 +376,9 @@ module Styles = {
         [
           height(`rem(25.)),
           paddingTop(`rem(4.6875)),
+          paddingBottom(`rem(4.6875)),
           paddingLeft(`rem(2.1875)),
+          paddingRight(`rem(2.1875)),
           fontSize(`rem(1.)),
         ],
       ),

@@ -10,7 +10,7 @@ Today, we've arrived at the fifth week since Coda's first public testnet [BETA] 
 
 ## Week 5 Challenges
 
-The total number of Testnet Points\* that 105 users racked up on the [leaderboard](http://bit.ly/TestnetBetaLeaderboard) went over 140,000 last week! If you missed out on previous challenges, it is not too late to catch up, since we're having our biggest points\* challenge yet this week! You can also earn bonus points\* if you were active in the previous week(s), see Challenge #11 'Don't Break the Chain!'. Check out all challenges [here](https://codaprotocol.com/docs/coda-testnet/#testnet-points).
+The total number of Testnet Points\* that 105 users racked up on the [leaderboard](http://bit.ly/TestnetBetaLeaderboard) went over 140,000 last week! If you missed out on previous challenges, it is not too late to catch up, since we're having our biggest points\* challenge yet this week! You can also earn bonus points\* if you were active in the previous week(s), see Challenge #11 'Don't Break the Chain!'. Check out all challenges [here](https://codaprotocol.com/testnet.html).
 
 New challenges are here for you to rack up more Testnet Points\*! 
 

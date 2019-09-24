@@ -49,7 +49,7 @@ Note that only transactions that make it into a block and only snarks that are b
 
 User *garethtdavies* built an awesome [CODA Blockchain Explorer](https://www.notion.so/codaprotocol/Testnet-Beta-Week-7-Recap-Blog-Post-9a936a0cb3c646189816f6ff872422b8#14bac81942f24cebab129c5b29752e14) on top of the [Coda GraphQL API](https://garethtdavies.com/crypto/first-steps-with-coda-graphql-api.html) and won Gold `2500 pts`[\*](#disclaimer) for this challenge last week. 
 However, we noticed that some community members were confused about the deadline for challenge #15. In case you're building an interesting tool on top of the Coda API, we still want to reward you in the next week!
-When your tool is completed, please share it with us as a new thread on the [forum](https://forums.codaprotocol.com/) with a [GraphQL] tag, so we'll know about your creation! The full description of challenge #15 can be found [here](https://codaprotocol.com/docs/coda-testnet/#challenges).
+When your tool is completed, please share it with us as a new thread on the [forum](https://forums.codaprotocol.com/) with a [GraphQL] tag, so we'll know about your creation! The full description of challenge #15 can be found [here](https://codaprotocol.com/testnet.html).
 
 ## Retrospective Week 7
 
