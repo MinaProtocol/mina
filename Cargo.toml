@@ -1,0 +1,75 @@
+[package]
+authors = ["The Rust Project Developers"]
+description = "Big integer implementation for Rust"
+documentation = "https://docs.rs/num-bigint"
+homepage = "https://github.com/rust-num/num-bigint"
+keywords = ["mathematics", "numerics", "bignum"]
+categories = [ "algorithms", "data-structures", "science" ]
+license = "MIT/Apache-2.0"
+name = "num-bigint"
+repository = "https://github.com/rust-num/num-bigint"
+version = "0.2.3"
+readme = "README.md"
+build = "build.rs"
+
+[package.metadata.docs.rs]
+features = ["std", "serde", "rand", "quickcheck"]
+
+[[bench]]
+name = "bigint"
+
+[[bench]]
+name = "factorial"
+
+[[bench]]
+name = "gcd"
+
+[[bench]]
+name = "roots"
+
+[[bench]]
+harness = false
+name = "shootout-pidigits"
+
+[dependencies]
+
+[dependencies.num-integer]
+version = "0.1.39"
+default-features = false
+
+[dependencies.num-traits]
+version = "0.2.7"
+default-features = false
+
+[dependencies.rand]
+optional = true
+version = "0.5"
+default-features = false
+features = ["std"]
+
+[dependencies.serde]
+optional = true
+version = "1.0"
+default-features = false
+features = ["std"]
+
+[dependencies.quickcheck]
+optional = true
+version = "0.8"
+default-features = false
+
+[dependencies.quickcheck_macros]
+optional = true
+version = "0.8"
+default-features = false
+
+[dev-dependencies.serde_test]
+version = "1.0"
+
+[features]
+default = ["std"]
+i128 = ["num-integer/i128", "num-traits/i128"]
+std = ["num-integer/std", "num-traits/std"]
+
+[build-dependencies]
+autocfg = "0.1.2"
