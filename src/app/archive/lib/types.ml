@@ -108,6 +108,14 @@ module User_command_type = struct
         `String "payment"
     | `Delegation ->
         `String "delegation"
+
+  let decode = function
+    | `String "payment" ->
+        `Payment
+    | `String "delegation" ->
+        `Delegation
+    | _ ->
+        raise (Invalid_argument "Unexpected input to decode user command type")
 end
 
 module Public_key = struct
@@ -181,14 +189,6 @@ module User_command = struct
         | Stake_delegation _ ->
             `Delegation ) }
 
-  let public_key_obj_rel_insert_input = failwith "Need to implement"
-
-  (* let public_keys_on_conflict = object
-    method constraint_ = `String "public_keys_pkey"
-
-
-  end *)
-
   let to_graphql_obj
       {fee; hash; memo; nonce; receiver; sender; typ; amount; first_seen} =
     let open Option in
@@ -222,4 +222,29 @@ module User_command = struct
     to_graphql_obj
     @@ serialize user_command_with_hash (`Receiver receiver) (`Sender sender)
          (Some block_time)
+
+  let decode
+      {fee; hash= _; memo; nonce; receiver; sender; typ; amount; first_seen= _}
+      public_keys_map =
+    let receiver = Map.find_exn public_keys_map receiver in
+    let sender = Map.find_exn public_keys_map sender in
+    let body =
+      let open User_command_payload.Body in
+      match typ with
+      | `Delegation ->
+          Stake_delegation (Set_delegate {new_delegate= receiver})
+      | `Payment ->
+          Payment
+            { receiver
+            ; amount= Bitstring.of_bitstring (module Currency.Amount) amount }
+    in
+    let payload =
+      User_command_payload.create
+        ~fee:(Bitstring.of_bitstring (module Currency.Fee) fee)
+        ~nonce:
+          (Bitstring.of_bitstring (module Coda_numbers.Account_nonce) nonce)
+        ~memo:(User_command_memo.of_string memo)
+        ~body
+    in
+    Coda_base.{User_command.Poly.Stable.V1.payload; sender; signature= ()}
 end

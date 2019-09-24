@@ -2,45 +2,68 @@ open Core
 open Async
 open Signature_lib
 
+module type Config_intf = sig
+  val port : int
+
+  val address : string
+
+  val headers : string String.Map.t
+end
+
 let make_local_uri port address =
   Uri.of_string ("http://localhost:" ^ string_of_int port ^/ address)
 
-let query_or_error
-    (query_obj :
-      < parse: Yojson.Basic.json -> 'response
-      ; query: string
-      ; variables: Yojson.Basic.json
-      ; .. >) query_uri : 'response Deferred.Or_error.t =
-  let variables_string = Yojson.Basic.to_string query_obj#variables in
-  let body_string =
-    Printf.sprintf {|{"query": "%s", "variables": %s}|} query_obj#query
-      variables_string
-  in
-  let open Deferred.Let_syntax in
-  let get_result () =
-    let%bind _, body =
-      Cohttp_async.Client.post
-        ~headers:
-          (Cohttp.Header.add (Cohttp.Header.init ()) "Accept"
-             "application/json")
-        ~body:(Cohttp_async.Body.of_string body_string)
-        query_uri
-    in
-    let%map body = Cohttp_async.Body.to_string body in
-    Yojson.Basic.from_string body
-    |> Yojson.Basic.Util.member "data"
-    |> query_obj#parse
-  in
-  Deferred.Or_error.try_with ~extract_exn:true get_result
+module type S = sig
+  val query_or_error :
+       < parse: Yojson.Basic.json -> 'response
+       ; query: string
+       ; variables: Yojson.Basic.json >
+    -> 'response Deferred.Or_error.t
 
-let query query_obj url =
-  match%bind query_or_error query_obj url with
-  | Ok r ->
-      Deferred.return r
-  | Error e ->
-      eprintf "Error connecting to graphql endpoint: %s\n"
-        (Error.to_string_hum e) ;
-      exit 17
+  val query :
+       < parse: Yojson.Basic.json -> 'response
+       ; query: string
+       ; variables: Yojson.Basic.json >
+    -> 'response Deferred.t
+end
+
+module Make (Config : Config_intf) : S = struct
+  let local_uri = make_local_uri Config.port Config.address
+
+  let query_or_error query_obj =
+    let variables_string = Yojson.Basic.to_string query_obj#variables in
+    let body_string =
+      Printf.sprintf {|{"query": "%s", "variables": %s}|} query_obj#query
+        variables_string
+    in
+    let open Deferred.Let_syntax in
+    let headers =
+      List.fold ~init:(Cohttp.Header.init ())
+        (("Accept", "application/json") :: Map.to_alist Config.headers)
+        ~f:(fun header (key, value) -> Cohttp.Header.add header key value)
+    in
+    let get_result () =
+      let%bind _, body =
+        Cohttp_async.Client.post ~headers
+          ~body:(Cohttp_async.Body.of_string body_string)
+          local_uri
+      in
+      let%map body = Cohttp_async.Body.to_string body in
+      Yojson.Basic.from_string body
+      |> Yojson.Basic.Util.member "data"
+      |> query_obj#parse
+    in
+    Deferred.Or_error.try_with ~extract_exn:true get_result
+
+  let query query_obj =
+    match%bind query_or_error query_obj with
+    | Ok r ->
+        Deferred.return r
+    | Error e ->
+        eprintf "Error connecting to graphql endpoint: %s\n"
+          (Error.to_string_hum e) ;
+        exit 17
+end
 
 module Encoders = struct
   let optional = Option.value_map ~default:`Null

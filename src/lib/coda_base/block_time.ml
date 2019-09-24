@@ -201,6 +201,11 @@ module Time = struct
 
   let of_string_exn string =
     Int64.of_string string |> Span.of_ms |> of_span_since_epoch
+
+  let gen =
+    let open Quickcheck.Let_syntax in
+    let%map int64_time_span = Int64.(gen_incl zero max_value) in
+    of_span_since_epoch @@ Span.of_ms int64_time_span
 end
 
 include Time

@@ -33,7 +33,7 @@ module Make () = struct
         [@@deriving version {asserted; unnumbered}, hash, sexp, compare]
 
         [%%define_locally
-        T1.(to_raw_string, digest_string)]
+        T1.(to_raw_string, digest_string, to_hex)]
 
         include Binable.Of_stringable (T1)
         include Hashable.Make (T1)

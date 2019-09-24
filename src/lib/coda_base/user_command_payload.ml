@@ -53,7 +53,7 @@ module Common = struct
   end
 
   (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
+  type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
   let fold ({fee; nonce; memo} : t) =
     Fold.(Currency.Fee.fold fee +> Account_nonce.fold nonce +> Memo.fold memo)
@@ -204,7 +204,7 @@ module Stable = struct
 end
 
 (* bin_io omitted *)
-type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
+type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
 let create ~fee ~nonce ~memo ~body : t = {common= {fee; nonce; memo}; body}
 

@@ -1,8 +1,6 @@
 open Core
 open Graphql_client_lib
 
-let query query_obj port = query query_obj (make_local_uri port "graphql")
-
 module Get_wallets =
 [%graphql
 {|
