@@ -253,6 +253,15 @@ jobs:
                   {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
+            - run: git checkout --recurse-submodules HEAD
+            - run: opam switch import src/opam.export
+            - run: opam pin add src/external/ocaml-sodium
+            - run: opam pin add src/external/rpc_parallel
+            - run: opam pin add src/external/ocaml-extlib
+            - run: opam pin add src/external/digestif
+            - run: opam pin add src/external/async_kernel
+            - run: opam pin add src/external/coda_base58
+            - run: opam pin add src/external/graphql_ppx
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb

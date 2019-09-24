@@ -245,6 +245,15 @@ jobs:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   no_output_timeout: 20m
+            - run: git checkout --recurse-submodules HEAD
+            - run: opam switch import src/opam.export
+            - run: opam pin add src/external/ocaml-sodium
+            - run: opam pin add src/external/rpc_parallel
+            - run: opam pin add src/external/ocaml-extlib
+            - run: opam pin add src/external/digestif
+            - run: opam pin add src/external/async_kernel
+            - run: opam pin add src/external/coda_base58
+            - run: opam pin add src/external/graphql_ppx
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
