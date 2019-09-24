@@ -59,7 +59,6 @@ installed: [
   "biniou.1.2.0"
   "bisect_ppx.1.4.1"
   "bitstring.3.1.0"
-  "camlp4.4.07+1"
   "camomile.1.0.1"
   "cmdliner.1.0.3"
   "cohttp.2.1.2"
