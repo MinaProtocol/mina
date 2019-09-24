@@ -1,0 +1,39 @@
+[package]
+authors = ["Sean Bowe <ewillbefull@gmail.com>"]
+description = "zk-SNARK library"
+documentation = "https://github.com/ebfull/bellman"
+homepage = "https://github.com/ebfull/bellman"
+license = "MIT/Apache-2.0"
+name = "bellman"
+repository = "https://github.com/ebfull/bellman"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+bit-vec = "0.4.4"
+blake2s_simd = "0.5"
+ff = { path = "../ff" }
+futures = "0.1"
+futures-cpupool = { version = "0.1", optional = true }
+group = { path = "../group" }
+num_cpus = { version = "1", optional = true }
+crossbeam = { version = "0.7", optional = true }
+pairing = { path = "../pairing", optional = true }
+rand_core = "0.5"
+byteorder = "1"
+
+[dev-dependencies]
+hex-literal = "0.2"
+rand = "0.7"
+rand_xorshift = "0.2"
+sha2 = "0.8"
+
+[features]
+groth16 = ["pairing"]
+multicore = ["futures-cpupool", "crossbeam", "num_cpus"]
+default = ["groth16", "multicore"]
+
+[[test]]
+name = "mimc"
+path = "tests/mimc.rs"
+required-features = ["groth16"]

@@ -1,0 +1,16 @@
+[package]
+name = "zcash_client_backend"
+version = "0.0.0"
+authors = [
+    "Jack Grigg <jack@z.cash>",
+]
+edition = "2018"
+
+[dependencies]
+bech32 = "0.7"
+pairing = { path = "../pairing" }
+zcash_primitives = { path = "../zcash_primitives" }
+
+[dev-dependencies]
+rand_core = "0.5"
+rand_xorshift = "0.2"

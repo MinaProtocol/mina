@@ -1,0 +1,41 @@
+name: Rust
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+    - name: Build
+      run: cargo build --verbose --release --all
+    - name: Run tests
+      run: cargo test --verbose --release --all
+    - name: Run slow tests
+      run: cargo test --verbose --release --all -- --ignored
+
+  macOS:
+    name: Test on macOS-latest
+    runs-on: macOS-latest
+
+    steps:
+    - name: Install Rust
+      run: curl https://sh.rustup.rs -sSf | sh -s -- -y
+    - name: Install rustfmt
+      run: $HOME/.cargo/bin/rustup component add rustfmt
+    - uses: actions/checkout@v1
+    - name: Check formatting
+      run: $HOME/.cargo/bin/cargo fmt --all -- --check
+    - name: Build
+      run: $HOME/.cargo/bin/cargo build --verbose --release --all
+    - name: Run tests
+      run: $HOME/.cargo/bin/cargo test --verbose --release --all
+    - name: Run slow tests
+      run: $HOME/.cargo/bin/cargo test --verbose --release --all -- --ignored
