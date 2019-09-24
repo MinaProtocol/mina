@@ -31,7 +31,9 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
            (wallet, (reader, writer)) )
   in
   Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
-      let hash = new_block |> fst |> With_hash.hash in
+      let hash =
+        new_block |> Coda_transition.External_transition.Validated.state_hash
+      in
       let filtered_external_transition_result =
         if is_storing_all then
           Filtered_external_transition.of_transition `All new_block

@@ -1,6 +1,16 @@
 [%%import
 "../../config.mlh"]
 
+[%%inject
+"ledger_depth", ledger_depth]
+
+[%%inject
+"fake_accounts_target", fake_accounts_target]
+
+let _ =
+  if Base.Int.(fake_accounts_target > pow 2 ledger_depth) then
+    failwith "Genesis_ledger: fake_accounts_target >= 2**ledger_depth"
+
 [%%if
 defined genesis_ledger]
 

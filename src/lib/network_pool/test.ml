@@ -25,8 +25,9 @@ let%test_module "network pool test" =
             ; prover= Signature_lib.Public_key.Compressed.empty } }
       in
       let network_pool =
-        Mock_snark_pool.create ~logger:(Logger.null ()) ~trust_system
-          ~incoming_diffs:pool_reader
+        Mock_snark_pool.create ~logger:(Logger.null ())
+          ~pids:(Child_processes.Termination.create_pid_set ())
+          ~trust_system ~incoming_diffs:pool_reader
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -76,8 +77,9 @@ let%test_module "network pool test" =
           Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
         in
         let network_pool =
-          Mock_snark_pool.create ~logger:(Logger.null ()) ~trust_system
-            ~incoming_diffs:work_diffs
+          Mock_snark_pool.create ~logger:(Logger.null ())
+            ~pids:(Child_processes.Termination.create_pid_set ())
+            ~trust_system ~incoming_diffs:work_diffs
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         don't_wait_for
