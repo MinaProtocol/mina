@@ -37,6 +37,7 @@ module type S = sig
     with type resource_pool := Resource_pool.t
      and type resource_pool_diff := Resource_pool.Diff.t
      and type transition_frontier := transition_frontier
+     and type config := Resource_pool.Config.t
 
   val get_completed_work :
        t
@@ -44,9 +45,7 @@ module type S = sig
     -> transaction_snark_work_checked option
 
   val load :
-       logger:Logger.t
-    -> pids:Child_processes.Termination.t
-    -> trust_system:Trust_system.t
+       config:Resource_pool.Config.t
     -> disk_location:string
     -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
                       Linear_pipe.Reader.t
@@ -111,16 +110,25 @@ struct
         Statement_table.t
       [@@deriving sexp, bin_io]
 
+      module Config = struct
+        type t =
+          { logger: Logger.t sexp_opaque
+          ; trust_system: Trust_system.t sexp_opaque
+          ; verifier: Verifier.t sexp_opaque }
+        [@@deriving sexp]
+      end
+
       type t =
         { snark_table: serializable
         ; mutable ref_table: int Statement_table.t option
-        ; logger: Logger.t sexp_opaque
-        ; pids: Child_processes.Termination.t sexp_opaque
-        ; trust_system: Trust_system.t sexp_opaque }
+        ; config: Config.t }
       [@@deriving sexp]
 
-      let of_serializable table ~logger ~pids ~trust_system : t =
-        {snark_table= table; ref_table= None; logger; pids; trust_system}
+      let make_config ~logger ~trust_system ~verifier =
+        {Config.logger; trust_system; verifier}
+
+      let of_serializable table ~config : t =
+        {snark_table= table; ref_table= None; config}
 
       let removed_breadcrumb_wait = 10
 
@@ -182,13 +190,9 @@ struct
         in
         Deferred.don't_wait_for tf_deferred
 
-      let create ~logger ~pids ~trust_system ~frontier_broadcast_pipe =
+      let create ~frontier_broadcast_pipe ~config =
         let t =
-          { snark_table= Statement_table.create ()
-          ; logger
-          ; pids
-          ; trust_system
-          ; ref_table= None }
+          {snark_table= Statement_table.create (); config; ref_table= None}
         in
         listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
         t
@@ -232,7 +236,8 @@ struct
         let open Deferred.Or_error.Let_syntax in
         let {Priced_proof.proof= proofs; fee= {prover; fee}} = priced_proof in
         let trust_record =
-          Trust_system.record_envelope_sender t.trust_system t.logger sender
+          Trust_system.record_envelope_sender t.config.trust_system
+            t.config.logger sender
         in
         let log_and_punish ?(punish = true) statement e =
           let metadata =
@@ -241,8 +246,8 @@ struct
             ; ("fee", Currency.Fee.to_yojson fee)
             ; ("error", `String (Error.to_string_hum e)) ]
           in
-          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
-            "Error verifying transaction snark: $error" ;
+          Logger.error t.config.logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata "Error verifying transaction snark: $error" ;
           if punish then
             trust_record
               ( Trust_system.Actions.Sent_invalid_proof
@@ -260,11 +265,9 @@ struct
             let%map () = log_and_punish statement e in
             Error e
           else
-            let%bind verifier =
-              Verifier.create ~logger:t.logger ~pids:t.pids
-            in
             match%bind
-              Verifier.verify_transaction_snark verifier proof ~message
+              Verifier.verify_transaction_snark t.config.verifier proof
+                ~message
             with
             | Ok true ->
                 Deferred.Or_error.return ()
@@ -304,24 +307,21 @@ struct
         Transaction_snark_work.Checked.create_unsafe
           {Transaction_snark_work.fee; proofs= proof; prover} )
 
-  let load ~logger ~pids ~trust_system ~disk_location ~incoming_diffs
-      ~frontier_broadcast_pipe =
+  let load ~config ~disk_location ~incoming_diffs ~frontier_broadcast_pipe =
     match%map
       Async.Reader.load_bin_prot disk_location
         Resource_pool.bin_reader_serializable
     with
     | Ok snark_table ->
-        let pool =
-          Resource_pool.of_serializable snark_table ~logger ~pids ~trust_system
-        in
+        let pool = Resource_pool.of_serializable snark_table ~config in
         let network_pool =
-          of_resource_pool_and_diffs pool ~logger ~incoming_diffs
+          of_resource_pool_and_diffs pool ~logger:config.logger ~incoming_diffs
         in
         Resource_pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
           pool ;
         network_pool
     | Error _e ->
-        create ~logger ~pids ~trust_system ~incoming_diffs
+        create ~config ~logger:config.logger ~incoming_diffs
           ~frontier_broadcast_pipe
 
   open Snark_work_lib.Work
@@ -346,6 +346,8 @@ let%test_module "random set test" =
 
     let trust_system = Mocks.trust_system
 
+    let logger = Logger.null ()
+
     module Mock_snark_pool = Make (Mocks.Transition_frontier)
     open Ledger_proof.For_tests
 
@@ -354,6 +356,9 @@ let%test_module "random set test" =
         (Mock_snark_pool.Resource_pool.add_snark resource_pool ~work
            ~proof:(One_or_two.map work ~f:mk_dummy_proof)
            ~fee)
+
+    let config verifier =
+      Mock_snark_pool.Resource_pool.make_config ~logger ~verifier ~trust_system
 
     let gen =
       let open Quickcheck.Generator.Let_syntax in
@@ -365,10 +370,14 @@ let%test_module "random set test" =
       let frontier_broadcast_pipe_r, _ =
         Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
       in
+      let verifier =
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Verifier.create ~logger
+              ~pids:(Child_processes.Termination.create_pid_set ()) )
+      in
+      let config = config verifier in
       let resource_pool =
-        Mock_snark_pool.Resource_pool.create ~logger:(Logger.null ())
-          ~trust_system:(Trust_system.null ())
-          ~pids:(Child_processes.Termination.create_pid_set ())
+        Mock_snark_pool.Resource_pool.create ~config
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       List.iter sample_solved_work ~f:(fun (work, fee) ->
@@ -481,91 +490,101 @@ let%test_module "random set test" =
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
-      let pool_reader, _pool_writer = Linear_pipe.create () in
-      let frontier_broadcast_pipe_r, _ =
-        Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
-      in
-      let network_pool =
-        Mock_snark_pool.create ~logger:(Logger.null ())
-          ~pids:(Child_processes.Termination.create_pid_set ())
-          ~trust_system ~incoming_diffs:pool_reader
-          ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-      in
-      let priced_proof =
-        { Priced_proof.proof=
-            `One
-              (mk_dummy_proof
-                 (Quickcheck.random_value ~seed:(`Deterministic "test proof")
-                    Transaction_snark.Statement.gen))
-        ; fee=
-            { fee= Currency.Fee.of_int 0
-            ; prover= Signature_lib.Public_key.Compressed.empty } }
-      in
-      let command =
-        Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
-          (fake_work, priced_proof)
-      in
-      (fun () ->
-        don't_wait_for
-        @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
-             ~f:(fun _ ->
-               let pool = Mock_snark_pool.resource_pool network_pool in
-               ( match
-                   Mock_snark_pool.Resource_pool.request_proof pool fake_work
-                 with
-               | Some {proof; fee= _} ->
-                   assert (proof = priced_proof.proof)
-               | None ->
-                   failwith "There should have been a proof here" ) ;
-               Deferred.unit ) ;
-        Mock_snark_pool.apply_and_broadcast network_pool
-          (Envelope.Incoming.local command) )
-      |> Async.Thread_safe.block_on_async_exn
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let pool_reader, _pool_writer = Linear_pipe.create () in
+          let frontier_broadcast_pipe_r, _ =
+            Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
+          in
+          let%bind verifier =
+            Verifier.create ~logger
+              ~pids:(Child_processes.Termination.create_pid_set ())
+          in
+          let config = config verifier in
+          let network_pool =
+            Mock_snark_pool.create ~config ~incoming_diffs:pool_reader ~logger
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+          in
+          let priced_proof =
+            { Priced_proof.proof=
+                `One
+                  (mk_dummy_proof
+                     (Quickcheck.random_value
+                        ~seed:(`Deterministic "test proof")
+                        Transaction_snark.Statement.gen))
+            ; fee=
+                { fee= Currency.Fee.of_int 0
+                ; prover= Signature_lib.Public_key.Compressed.empty } }
+          in
+          let command =
+            Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
+              (fake_work, priced_proof)
+          in
+          don't_wait_for
+          @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
+               ~f:(fun _ ->
+                 let pool = Mock_snark_pool.resource_pool network_pool in
+                 ( match
+                     Mock_snark_pool.Resource_pool.request_proof pool fake_work
+                   with
+                 | Some {proof; fee= _} ->
+                     assert (proof = priced_proof.proof)
+                 | None ->
+                     failwith "There should have been a proof here" ) ;
+                 Deferred.unit ) ;
+          Mock_snark_pool.apply_and_broadcast network_pool
+            (Envelope.Incoming.local command) )
 
     let%test_unit "when creating a network, the incoming diffs in reader pipe \
                    will automatically get process" =
-      let works =
-        Quickcheck.random_sequence ~seed:(`Deterministic "works")
-          Transaction_snark.Statement.gen
-        |> Fn.flip Sequence.take 10
-        |> Sequence.map ~f:(fun x -> `One x)
-        |> Sequence.to_list
-      in
-      let verify_unsolved_work () =
-        let work_diffs =
-          List.map works ~f:(fun work ->
-              Envelope.Incoming.local
-                (Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
-                   ( work
-                   , Priced_proof.
-                       { proof= One_or_two.map ~f:mk_dummy_proof work
-                       ; fee=
-                           { fee= Currency.Fee.of_int 0
-                           ; prover= Signature_lib.Public_key.Compressed.empty
-                           } } )) )
-          |> Linear_pipe.of_list
-        in
-        let frontier_broadcast_pipe_r, _ =
-          Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
-        in
-        let network_pool =
-          Mock_snark_pool.create ~logger:(Logger.null ())
-            ~pids:(Child_processes.Termination.create_pid_set ())
-            ~trust_system ~incoming_diffs:work_diffs
-            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-        in
-        don't_wait_for
-        @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
-             ~f:(fun work_command ->
-               let work =
-                 match work_command with
-                 | Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
-                     (work, _) ->
-                     work
-               in
-               assert (List.mem works work ~equal:( = )) ;
-               Deferred.unit ) ;
-        Deferred.unit
-      in
-      verify_unsolved_work |> Async.Thread_safe.block_on_async_exn
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let works =
+            Quickcheck.random_sequence ~seed:(`Deterministic "works")
+              Transaction_snark.Statement.gen
+            |> Fn.flip Sequence.take 10
+            |> Sequence.map ~f:(fun x -> `One x)
+            |> Sequence.to_list
+          in
+          let verify_unsolved_work () =
+            let work_diffs =
+              List.map works ~f:(fun work ->
+                  Envelope.Incoming.local
+                    (Mock_snark_pool.Resource_pool.Diff.Stable.V1
+                     .Add_solved_work
+                       ( work
+                       , Priced_proof.
+                           { proof= One_or_two.map ~f:mk_dummy_proof work
+                           ; fee=
+                               { fee= Currency.Fee.of_int 0
+                               ; prover=
+                                   Signature_lib.Public_key.Compressed.empty }
+                           } )) )
+              |> Linear_pipe.of_list
+            in
+            let frontier_broadcast_pipe_r, _ =
+              Broadcast_pipe.create
+                (Some (Mocks.Transition_frontier.create ()))
+            in
+            let%bind verifier =
+              Verifier.create ~logger
+                ~pids:(Child_processes.Termination.create_pid_set ())
+            in
+            let config = config verifier in
+            let network_pool =
+              Mock_snark_pool.create ~logger ~config ~incoming_diffs:work_diffs
+                ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+            in
+            don't_wait_for
+            @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
+                 ~f:(fun work_command ->
+                   let work =
+                     match work_command with
+                     | Mock_snark_pool.Resource_pool.Diff.Stable.V1
+                       .Add_solved_work (work, _) ->
+                         work
+                   in
+                   assert (List.mem works work ~equal:( = )) ;
+                   Deferred.unit ) ;
+            Deferred.unit
+          in
+          verify_unsolved_work () )
   end )

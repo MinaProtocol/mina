@@ -55,6 +55,7 @@ module type S = sig
     with type resource_pool := Resource_pool.t
      and type transition_frontier := transition_frontier
      and type resource_pool_diff := Resource_pool.Diff.t
+     and type config := Resource_pool.Config.t
 
   val add : t -> User_command.t -> unit Deferred.t
 end
@@ -85,10 +86,15 @@ struct
   module Resource_pool = struct
     include Max_size
 
+    module Config = struct
+      type t =
+        {logger: Logger.t sexp_opaque; trust_system: Trust_system.t sexp_opaque}
+      [@@deriving sexp_of]
+    end
+
     type t =
       { mutable pool: Indexed_pool.t
-      ; logger: Logger.t sexp_opaque
-      ; trust_system: Trust_system.t sexp_opaque
+      ; config: Config.t
       ; mutable diff_reader: unit Deferred.t sexp_opaque Option.t
       ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
     [@@deriving sexp_of]
@@ -151,7 +157,7 @@ struct
          transactions are carried from losing forks to winning ones as much as
          possible. *)
       let validation_ledger = get_best_tip_ledger_and_update t frontier in
-      Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
           [ ( "removed"
             , `List (List.map removed_user_commands ~f:User_command.to_yojson)
@@ -194,18 +200,19 @@ struct
             Indexed_pool.handle_committed_txn p sender (User_command.nonce cmd)
               (Currency.Balance.to_amount balance) )
       in
-      Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
         !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
           %i commands during backtracking to maintain max size."
         (Indexed_pool.size t.pool) (Indexed_pool.size pool'') dropped_backtrack ;
       t.pool <- pool'' ;
       Deferred.unit
 
-    let create ~logger ~pids:_ ~trust_system ~frontier_broadcast_pipe =
+    let make_config ~logger ~trust_system = {Config.logger; trust_system}
+
+    let create ~frontier_broadcast_pipe ~config =
       let t =
         { pool= Indexed_pool.empty
-        ; logger
-        ; trust_system
+        ; config
         ; diff_reader= None
         ; best_tip_ledger= None }
       in
@@ -214,8 +221,8 @@ struct
            ~f:(fun frontier_opt ->
              match frontier_opt with
              | None -> (
-                 Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-                   "no frontier" ;
+                 Logger.debug t.config.logger ~module_:__MODULE__
+                   ~location:__LOC__ "no frontier" ;
                  (* Sanity check: the view pipe should have been closed before the
                           frontier was destroyed. *)
                  match t.diff_reader with
@@ -230,15 +237,15 @@ struct
                           is_finished := true)
                        ; (let%map () = Async.after (Time.Span.of_sec 5.) in
                           if not !is_finished then (
-                            Logger.fatal t.logger ~module_:__MODULE__
+                            Logger.fatal t.config.logger ~module_:__MODULE__
                               ~location:__LOC__
                               "Transition frontier closed without first \
                                closing best tip view pipe" ;
                             assert false )
                           else ()) ] )
              | Some frontier ->
-                 Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-                   "Got frontier!" ;
+                 Logger.debug t.config.logger ~module_:__MODULE__
+                   ~location:__LOC__ "Got frontier!" ;
                  let validation_ledger =
                    get_best_tip_ledger_and_update t frontier
                  in
@@ -263,7 +270,8 @@ struct
                            (acc.nonce, Currency.Balance.to_amount acc.balance)
                    )
                  in
-                 Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                 Logger.debug t.config.logger ~module_:__MODULE__
+                   ~location:__LOC__
                    !"Re-validated transaction pool after restart: dropped %i \
                      of %i previously in pool"
                    (Sequence.length dropped) (Indexed_pool.size t.pool) ;
@@ -316,8 +324,8 @@ struct
                unavailable, ignoring."
         | Some ledger ->
             let trust_record =
-              Trust_system.record_envelope_sender t.trust_system t.logger
-                sender
+              Trust_system.record_envelope_sender t.config.trust_system
+                t.config.logger sender
             in
             let rec go txs' pool accepted =
               match txs' with
@@ -414,16 +422,16 @@ struct
                                              .to_yojson seq)
                                 in
                                 if not (Sequence.is_empty dropped) then
-                                  Logger.debug t.logger ~module_:__MODULE__
-                                    ~location:__LOC__
+                                  Logger.debug t.config.logger
+                                    ~module_:__MODULE__ ~location:__LOC__
                                     "dropped commands due to transaction \
                                      replacement: $dropped"
                                     ~metadata:
                                       [("dropped", seq_cmd_to_yojson dropped)] ;
                                 if not (Sequence.is_empty dropped_for_size)
                                 then
-                                  Logger.debug t.logger ~module_:__MODULE__
-                                    ~location:__LOC__
+                                  Logger.debug t.config.logger
+                                    ~module_:__MODULE__ ~location:__LOC__
                                     "dropped commands to maintain max size: \
                                      $cmds"
                                     ~metadata:
@@ -436,8 +444,8 @@ struct
                                attacker can simultaneously send different
                                transactions at the same nonce to different
                                nodes, which will then naturally gossip them. *)
-                                Logger.debug t.logger ~module_:__MODULE__
-                                  ~location:__LOC__
+                                Logger.debug t.config.logger
+                                  ~module_:__MODULE__ ~location:__LOC__
                                   "rejecting $cmd because of insufficient \
                                    replace fee"
                                   ~metadata:[("cmd", User_command.to_yojson tx)] ;
@@ -588,10 +596,10 @@ let%test_module _ =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
       let trust_system = Trust_system.null () in
+      let logger = Logger.null () in
+      let config = Test.Resource_pool.make_config ~logger ~trust_system in
       let pool =
-        Test.Resource_pool.create ~logger:(Logger.null ())
-          ~pids:(Child_processes.Termination.create_pid_set ())
-          ~trust_system ~frontier_broadcast_pipe:tf_pipe_r
+        Test.Resource_pool.create ~config ~frontier_broadcast_pipe:tf_pipe_r
       in
       let%map () = Async.Scheduler.yield () in
       ( (fun txs ->
@@ -781,10 +789,11 @@ let%test_module _ =
       Thread_safe.block_on_async_exn (fun () ->
           (* Set up initial frontier *)
           let frontier_pipe_r, frontier_pipe_w = Broadcast_pipe.create None in
+          let logger = Logger.null () in
+          let trust_system = Trust_system.null () in
+          let config = Test.Resource_pool.make_config ~logger ~trust_system in
           let pool =
-            Test.Resource_pool.create ~logger:(Logger.null ())
-              ~pids:(Child_processes.Termination.create_pid_set ())
-              ~trust_system:(Trust_system.null ())
+            Test.Resource_pool.create ~config
               ~frontier_broadcast_pipe:frontier_pipe_r
           in
           let assert_pool_txs txs =
