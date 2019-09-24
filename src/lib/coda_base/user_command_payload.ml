@@ -55,6 +55,13 @@ module Common = struct
   (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
+  let to_input ({fee; nonce; memo} : t) : _ Random_oracle.Input.t =
+    { field_elements= [||]
+    ; bitstrings=
+        [| Currency.Fee.to_bits fee
+         ; Account_nonce.Bits.to_bits nonce
+         ; Memo.to_bits memo |] }
+
   let fold ({fee; nonce; memo} : t) =
     Fold.(Currency.Fee.fold fee +> Account_nonce.fold nonce +> Memo.fold memo)
 
@@ -98,6 +105,15 @@ module Common = struct
       { fee= Currency.Fee.var_of_t fee
       ; nonce= Account_nonce.Checked.constant nonce
       ; memo= Memo.Checked.constant memo }
+
+    let to_input ({fee; nonce; memo} : var) =
+      let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
+      let%map nonce = Account_nonce.Checked.to_bits nonce in
+      { Random_oracle.Input.field_elements= [||]
+      ; bitstrings=
+          [| s (Currency.Fee.var_to_bits fee)
+           ; s nonce
+           ; Array.to_list (memo :> Boolean.var array) |] }
 
     let to_triples ({fee; nonce; memo} : var) =
       let%map nonce = Account_nonce.Checked.to_triples nonce in

@@ -8,14 +8,14 @@ def random_value(F, prefix, i):
     return F(int(hashlib.sha256('%s%d' % (prefix, i)).hexdigest(), 16))
 
 m = 3
-rounds = 11
+rounds = 50
 
 prefix = 'CodaRescue'
 
 def round_constants(F):
     name = prefix + 'RoundConstants'
     return [ [ random_value(F, name, r * m + i) for i in xrange(m) ]
-            for r in xrange(2 * rounds + 1) ]
+            for r in xrange( rounds ) ]
 
 def matrix_str(rows):
     return '[|' + ';'.join('[|' + ';'.join('Field.of_string "{}"'.format(str(x)) for x in row) + '|]' for row in rows) + '|]'

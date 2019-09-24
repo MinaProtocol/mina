@@ -42,6 +42,8 @@ val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
 val request_work : t -> Snark_worker.Work.Spec.t option
 
+val add_work : t -> Snark_worker.Work.Result.t -> unit Deferred.t
+
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
 val best_ledger : t -> Ledger.t Participating_state.t
@@ -83,7 +85,7 @@ val snark_pool : t -> Network_pool.Snark_pool.t
 
 val start : t -> unit Deferred.t
 
-val stop_snark_worker : t -> unit Deferred.t
+val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
 val create : Config.t -> t Deferred.t
 

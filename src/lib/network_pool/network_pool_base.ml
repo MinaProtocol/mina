@@ -43,8 +43,10 @@ end)
     |> ignore ;
     network_pool
 
-  let create ~logger ~trust_system ~incoming_diffs ~frontier_broadcast_pipe =
+  let create ~logger ~pids ~trust_system ~incoming_diffs
+      ~frontier_broadcast_pipe =
     of_resource_pool_and_diffs
-      (Resource_pool.create ~logger ~trust_system ~frontier_broadcast_pipe)
+      (Resource_pool.create ~logger ~pids ~trust_system
+         ~frontier_broadcast_pipe)
       ~logger ~incoming_diffs
 end
