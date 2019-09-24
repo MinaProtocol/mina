@@ -568,9 +568,11 @@ let make = () => {
               {React.string("Testnet Points")}
             </h4>
           </p>
-          <p>
+          <p className=Styles.markdownStyles>
+            {React.string("The goal of Testnet Points")}
+            <a href="#disclaimer"> {React.string("*")} </a>
             {React.string(
-               "The goal of Testnet Points is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
+               " is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
              )}
           </p>
           <p>
