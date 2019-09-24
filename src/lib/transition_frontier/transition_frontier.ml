@@ -29,14 +29,12 @@ type config =
   ; verifier: Verifier.t
   ; consensus_local_state: Consensus.Data.Local_state.t }
 
-(* TODO: refactor persistent frontier sync into an extension *)
 type t =
   { config: config
   ; full_frontier: Full_frontier.t
   ; persistent_root: Persistent_root.t
   ; persistent_root_instance: Persistent_root.Instance.t
   ; persistent_frontier: Persistent_frontier.t
-        (* [new] TODO: !important -- this instance should only be owned by the sync process, as once the sync worker is an RPC worker, only that process can have an open connection the the database *)
   ; persistent_frontier_instance: Persistent_frontier.Instance.t
   ; extensions: Extensions.t }
 

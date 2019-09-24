@@ -3,8 +3,8 @@
 - snark_pool_refcount find_exn on garbage
   - FIX: pass full diffs to extensions, update full representation to include garbage
   - https://circleci.com/gh/CodaProtocol/coda/227853?utm_campaign=vcs-integration-link&utm_medium=referral&utm_source=github-build-link
-* busy diff buffer worker
-  - https://circleci.com/gh/CodaProtocol/coda/227852?utm_campaign=vcs-integration-link&utm_medium=referral&utm_source=github-build-link
++ busy diff buffer worker
+- frontier hash mismatch
 - crash on startup with old config
   - valid database
   - corrupted database

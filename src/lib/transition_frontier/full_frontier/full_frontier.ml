@@ -484,6 +484,9 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
 
 let apply_diffs t diffs =
   let open Root_identifier.Stable.Latest in
+  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+    "Applying %d diffs to full frontier (%s --> ?)" (List.length diffs)
+    (Frontier_hash.to_string t.hash) ;
   let local_state_was_synced_at_start =
     Consensus.Hooks.required_local_state_sync
       ~consensus_state:(Breadcrumb.consensus_state (best_tip t))
@@ -500,6 +503,9 @@ let apply_diffs t diffs =
         | Some state_hash ->
             Some {state_hash; frontier_hash= t.hash} )
   in
+  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+    "Reached state %s after applying diffs to full frontier"
+    (Frontier_hash.to_string t.hash) ;
   Debug_assert.debug_assert (fun () ->
       match
         Consensus.Hooks.required_local_state_sync

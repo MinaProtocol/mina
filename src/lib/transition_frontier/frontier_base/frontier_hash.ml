@@ -56,7 +56,7 @@ let empty = digest_string ""
 
 let merge_string t1 string = digestv_string [to_hex t1; string]
 
-let to_string = to_raw_string
+let to_string = to_hex
 
 let merge_state_hash acc state_hash =
   merge_string acc (State_hash.raw_hash_bytes state_hash)

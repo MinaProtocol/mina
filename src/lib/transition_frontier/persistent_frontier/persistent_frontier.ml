@@ -222,6 +222,9 @@ module Instance = struct
     in
     let%map () = apply_diff Diff.(E (Best_tip_changed best_tip)) in
     (* reset the frontier hash at the end so it matches the persistent frontier hash (for future sanity checks) *)
+    Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
+      "Pinning frontier hash at %s"
+      (Frontier_hash.to_string base_hash) ;
     Full_frontier.set_hash_unsafe frontier (`I_promise_this_is_safe base_hash) ;
     (frontier, extensions)
 end

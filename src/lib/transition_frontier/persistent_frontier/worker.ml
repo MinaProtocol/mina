@@ -93,6 +93,7 @@ module Worker = struct
     | [`Not_found of [`Frontier_hash]]
     | [`Invalid_resulting_frontier_hash of Frontier_hash.t] ]
 
+  (* TODO: rewrite with open polymorphic variants to avoid type coercion *)
   let perform t (diffs, target_hash) =
     let open Deferred.Let_syntax in
     match%map
@@ -102,6 +103,11 @@ module Worker = struct
           ( Database.get_frontier_hash t.db
             :> (Frontier_hash.t, perform_error) Result.t )
       in
+      Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+        "Applying %d diffs to the persistent frontier (%s --> %s)"
+        (List.length diffs)
+        (Frontier_hash.to_string base_hash)
+        (Frontier_hash.to_string target_hash) ;
       let%bind result_hash =
         (* Iterating over the diff application in this way
          * effectively allows the scheduler to scheduler
@@ -115,11 +121,14 @@ module Worker = struct
               ( handle_diff t acc_hash diff
                 :> (Frontier_hash.t, perform_error) Result.t ) )
       in
-      Deferred.return
-        ( Result.ok_if_true
-            (Frontier_hash.equal target_hash result_hash)
-            ~error:(`Invalid_resulting_frontier_hash result_hash)
-          :> (unit, perform_error) Result.t )
+      let%map () =
+        Deferred.return
+          ( Result.ok_if_true
+              (Frontier_hash.equal target_hash result_hash)
+              ~error:(`Invalid_resulting_frontier_hash result_hash)
+            :> (unit, perform_error) Result.t )
+      in
+      Database.set_frontier_hash t.db result_hash
     with
     | Ok () ->
         ()
