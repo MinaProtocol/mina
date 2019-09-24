@@ -1,12 +1,13 @@
 open Core
 module State = Array
 module Input = Input
+open Curve_choice
 
 let params : _ Sponge.Params.t =
-  let open Crypto_params.Rescue_params in
+  let open Sponge_params in
   {mds; round_constants}
 
-module Field = Crypto_params.Tick0.Field
+module Field = Tick0.Field
 
 let pack_input ~project {Input.field_elements; bitstrings} =
   let packed_bits =
@@ -58,11 +59,10 @@ module Inputs = struct
 
   let _alphath_root =
     let inv_alpha =
-      Bigint.of_string Crypto_params.Rescue_params.inv_alpha
-      |> Bigint.to_zarith_bigint
+      Bigint.of_string Sponge_params.inv_alpha |> Bigint.to_zarith_bigint
     in
     let k = 4 in
-    let chunks = (Crypto_params.Tick0.Field.size_in_bits + (k - 1)) / k in
+    let chunks = (Tick0.Field.size_in_bits + (k - 1)) / k in
     let inv_alpha =
       let chunk i =
         let b j = Z.testbit inv_alpha ((k * i) + j) in
@@ -93,7 +93,7 @@ module Inputs = struct
 end
 
 module Digest = struct
-  open Crypto_params.Tick0.Field
+  open Tick0.Field
 
   type nonrec t = t
 
@@ -114,7 +114,7 @@ let hash ?init = hash ?init params
 module Checked = struct
   module Inputs = struct
     module Field = struct
-      open Crypto_params.Tick0
+      open Tick0
 
       (* The linear combinations involved in computing Poseidon do not involve very many
    variables, but if they are represented as arithmetic expressions (that is, "Cvars"
@@ -148,8 +148,7 @@ module Checked = struct
         | x ->
             let c, ts = Field.Var.to_constant_and_terms x in
             ( Int.Map.of_alist_reduce
-                (List.map ts ~f:(fun (f, v) ->
-                     (Crypto_params.Tick_backend.Var.index v, f) ))
+                (List.map ts ~f:(fun (f, v) -> (Tick_backend.Var.index v, f)))
                 ~f:Field.add
             , Option.value ~default:Field.zero c )
 
@@ -172,7 +171,7 @@ module Checked = struct
     end
 
     let to_the_alpha x =
-      let open Crypto_params.Runners.Tick.Field in
+      let open Runners.Tick.Field in
       let zero = square in
       let one a = square a * x in
       let one' = x in
@@ -184,7 +183,7 @@ module Checked = struct
   end
 
   module Digest = struct
-    open Crypto_params.Runners.Tick.Field
+    open Runners.Tick.Field
 
     type nonrec t = t
 
@@ -208,7 +207,7 @@ module Checked = struct
       params (Array.map xs ~f:of_cvar)
     |> to_cvar
 
-  let pack_input = pack_input ~project:Crypto_params.Runners.Tick.Field.project
+  let pack_input = pack_input ~project:Runners.Tick.Field.project
 
   let initial_state = Array.map initial_state ~f:to_cvar
 
@@ -217,8 +216,15 @@ end
 
 let pack_input = pack_input ~project:Field.project
 
+let prefix_to_field (s : string) =
+  let open Tick0 in
+  assert (8 * String.length s < Field.size_in_bits) ;
+  Field.project Fold_lib.Fold.(to_list (string_bits (s :> string)))
+
+let salt (s : string) = update ~state:initial_state [|prefix_to_field s|]
+
 let%test_unit "iterativeness" =
-  let open Crypto_params.Tick0 in
+  let open Tick0 in
   let x1 = Field.random () in
   let x2 = Field.random () in
   let x3 = Field.random () in
@@ -230,14 +236,12 @@ let%test_unit "iterativeness" =
   [%test_eq: Field.t array] s_full s_it
 
 let%test_unit "sponge checked-unchecked" =
-  let module T = Crypto_params.Tick0 in
+  let module T = Tick0 in
   let x = T.Field.random () in
   let y = T.Field.random () in
   T.Test.test_equal ~equal:T.Field.equal ~sexp_of_t:T.Field.sexp_of_t
     T.Typ.(field * field)
     T.Typ.field
-    (fun (x, y) ->
-      Crypto_params.Runners.Tick.make_checked (fun () -> Checked.hash [|x; y|])
-      )
+    (fun (x, y) -> Runners.Tick.make_checked (fun () -> Checked.hash [|x; y|]))
     (fun (x, y) -> hash [|x; y|])
     (x, y)
