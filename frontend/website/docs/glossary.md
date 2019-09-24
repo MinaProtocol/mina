@@ -45,7 +45,7 @@ The Coda daemon is a background process that implements the Coda protocol and ru
 
 Because staking coda requires nodes to be online, some nodes may desire to delegate their coda to another node which runs a staking service. This process is called delegating a stake, and often the service provider or staking pool operator may charge a fee for running this service, which will be deducted any time the delegator gets selected to be a block producer.
 
-###Full Node
+####Full Node
 
 A Coda node that is able to verify the state of the network trustlessly. In Coda, every node is a full node since all nodes can receive and verify zk-SNARKs.
 
