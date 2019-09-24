@@ -140,6 +140,8 @@ module type Snark_resource_pool_intf = sig
   val snark_pool_json : t -> Yojson.Safe.json
 
   val all_completed_work : t -> work_info list
+
+  val get_logger : t -> Logger.t
 end
 
 (** A [Snark_pool_diff_intf] is the resource pool diff for

@@ -84,25 +84,39 @@ end)
     let is_local = match sender with Local -> true | _ -> false in
     let to_or_error = function
       | `Don't_rebroadcast ->
-          Or_error.error_string "Worse fee or already in pool"
+          Or_error.error_string "Already in pool"
       | `Rebroadcast ->
           Ok diff
     in
     match diff with
-    | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) ->
-        let%bind () =
-          let check () =
+    | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (
+        let reject_and_log_if_local reason =
+          if is_local then
+            Logger.warn (Pool.get_logger pool) ~module_:__MODULE__
+              ~location:__LOC__
+              "Rejecting locally generated snark work $work, %s" reason
+              ~metadata:[("work", Work.Stable.V1.to_yojson work)] ;
+          Deferred.return (Or_error.error_string reason)
+        in
+        let check_and_add () =
+          let%bind () =
             Pool.verify_and_act pool ~work:(work, p)
               ~sender:(Envelope.Incoming.sender t)
           in
-          match Pool.request_proof pool work with
-          | None ->
-              check ()
-          | Some {fee= {fee= prev; _}; _} ->
-              if Currency.Fee.( <= ) prev fee.fee then
-                Deferred.Or_error.return ()
-              else check ()
+          Pool.add_snark ~is_local pool ~work ~proof ~fee
+          |> to_or_error |> Deferred.return
         in
-        Pool.add_snark ~is_local pool ~work ~proof ~fee
-        |> to_or_error |> Deferred.return
+        match Pool.request_proof pool work with
+        | None ->
+            check_and_add ()
+        | Some {fee= {fee= prev; _}; _} -> (
+          match compare fee.fee prev with
+          | -1 ->
+              check_and_add ()
+          | 0 ->
+              reject_and_log_if_local "fee equal to cheapest work we have"
+          | 1 ->
+              reject_and_log_if_local "fee higher than cheapest work we have"
+          | _ ->
+              failwith "compare didn't return -1, 0, or 1!" ) )
 end
