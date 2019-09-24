@@ -1,8 +1,15 @@
+[%%import
+"../../config.mlh"]
+
+open Core_kernel
 open Functor.Without_private
 module Public_key = Signature_lib.Public_key
 
+[%%inject
+"fake_accounts_target", fake_accounts_target]
+
 include Make (struct
-  let accounts =
+  let real_accounts =
     [ { pk=
           Public_key.Compressed.of_base58_check_exn
             "tNcihhTPEQLJVkQYXXe9NjqWctZq5GXLGRKBh9CVeUMasWMb4imdxPD9r9fGh883Np3XixeGARbe9dCW43RqMt9UZvvmXrAaHDMjuFYyn5UJHg6XwGfyiBBYLAc6PxYMqJfGWCJKDd1Boo"
@@ -366,4 +373,13 @@ include Make (struct
             (Public_key.Compressed.of_base58_check_exn
                "tNciKu2s74n6JTSZTpyMcZ7on2pNQvizz7RnY8gsE23ThH61Gmsi7vxmECLjARzHCkXQQdZTYM7Ufz6xW3jdkGBdAvbLzj2gKvpJFRB38qUW7t1UWti2VSKTaxtRmFtCQC64o8xknA3xBk")
       } ]
+
+  let fake_accounts =
+    let open Quickcheck in
+    random_value ~seed:(`Deterministic "fake accounts for testnet postake")
+      (Generator.list_with_length
+         (fake_accounts_target - List.length real_accounts)
+         Fake_accounts.gen)
+
+  let accounts = real_accounts @ fake_accounts
 end)

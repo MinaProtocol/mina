@@ -15,6 +15,12 @@ module Body = struct
   type t = (Tag.t, Public_key.Compressed.t, Currency.Amount.t) t_
   [@@deriving sexp]
 
+  let to_input ~tag ~amount t =
+    let t1, t2 = tag t.tag in
+    let {Public_key.Compressed.Poly.x; is_odd} = t.public_key in
+    { Random_oracle.Input.bitstrings= [|[t1; t2]; amount t.amount; [is_odd]|]
+    ; field_elements= [|x|] }
+
   let fold ({tag; public_key; amount} : t) =
     Fold.(
       Tag.fold tag
@@ -77,11 +83,18 @@ module Body = struct
       ; public_key= Public_key.Compressed.var_of_t public_key
       ; amount= Currency.Amount.var_of_t amount }
 
+    let to_input t =
+      to_input t ~tag:Fn.id ~amount:(fun x ->
+          (Currency.Amount.var_to_bits x :> Boolean.var list) )
+
     let to_triples ({tag; public_key; amount} : var) =
       let%map public_key = Public_key.Compressed.var_to_triples public_key in
       Tag.Checked.to_triples tag @ public_key
       @ Currency.Amount.var_to_triples amount
   end
+
+  let to_input (t : t) =
+    to_input t ~tag:Tag.to_bits ~amount:Currency.Amount.to_bits
 end
 
 type t = (User_command_payload.Common.t, Body.t) User_command_payload.Poly.t
@@ -294,10 +307,19 @@ module Checked = struct
     and body = Body.Checked.to_triples body in
     common @ body
 
+  let to_input ({common; body} : var) =
+    let%map common = User_command_payload.Common.Checked.to_input common in
+    Random_oracle.Input.append common (Body.Checked.to_input body)
+
   let constant ({common; body} : t) : var =
     { common= User_command_payload.Common.Checked.constant common
     ; body= Body.Checked.constant body }
 end
+
+let to_input ({common; body} : t) =
+  Random_oracle.Input.append
+    (User_command_payload.Common.to_input common)
+    (Body.to_input body)
 
 let excess (payload : t) : Amount.Signed.t =
   let tag = payload.body.tag in

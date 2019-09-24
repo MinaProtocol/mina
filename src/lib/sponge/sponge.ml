@@ -12,7 +12,7 @@ module Make_operations (Field : Intf.Field) = struct
 
   let apply_matrix matrix v =
     let dotv row =
-      Array.reduce_exn (Array.map2_exn v row ~f:Field.( * )) ~f:Field.( + )
+      Array.reduce_exn (Array.map2_exn row v ~f:Field.( * )) ~f:Field.( + )
     in
     Array.map matrix ~f:dotv
 
