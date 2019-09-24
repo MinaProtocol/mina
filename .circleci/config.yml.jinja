@@ -249,6 +249,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run: opam switch import src/opam.export
             - run: opam pin -y add src/external/ocaml-sodium
+            - run: opam pin -y rem src/external/rpc_parallel
             - run: opam pin -y add src/external/rpc_parallel
             - run: opam pin -y add src/external/ocaml-extlib
             - run: opam pin -y add src/external/digestif
