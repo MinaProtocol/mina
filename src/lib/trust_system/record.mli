@@ -7,10 +7,6 @@ module type S = sig
 
   val ban : t -> t
 
-  val disable_bans : unit -> unit
-
-  val get_bans_disabled : unit -> bool
-
   val add_trust : t -> float -> t
 
   val to_peer_status : t -> Peer_status.t

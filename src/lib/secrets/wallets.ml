@@ -34,36 +34,39 @@ let decode_public_key key file path logger =
           ; ("error", `String (Error.to_string_hum e)) ] ;
       None
 
-let load ~logger ~disk_location : t Deferred.t =
+let reload ~logger {cache; path} : unit Deferred.t =
   let logger =
     Logger.extend logger [("wallets_context", `String "Wallets.get")]
   in
-  let path = disk_location ^/ "store" in
+  Public_key.Compressed.Table.clear cache ;
   let%bind () = File_system.create_dir path in
   let%bind files = Sys.readdir path >>| Array.to_list in
-  let%bind keypairs =
-    Deferred.List.filter_map files ~f:(fun file ->
+  let%bind () =
+    Deferred.List.iter files ~f:(fun file ->
         match String.chop_suffix file ~suffix:".pub" with
         | Some sk_filename -> (
             let%map lines = Reader.file_lines (path ^/ file) in
             match lines with
             | public_key :: _ ->
                 decode_public_key public_key file path logger
-                |> Option.map ~f:(fun pk -> (pk, Locked sk_filename))
+                |> Option.iter ~f:(fun pk ->
+                       ignore
+                       @@ Public_key.Compressed.Table.add cache ~key:pk
+                            ~data:(Locked sk_filename) )
             | _ ->
-                None )
+                () )
         | None ->
-            return None )
+            return () )
   in
-  let%map () = Unix.chmod path ~perm:0o700 in
-  let cache =
-    match Public_key.Compressed.Table.of_alist keypairs with
-    | `Ok m ->
-        m
-    | `Duplicate_key _ ->
-        failwith "impossible"
+  Unix.chmod path ~perm:0o700
+
+let load ~logger ~disk_location =
+  let t =
+    { cache= Public_key.Compressed.Table.create ()
+    ; path= disk_location ^/ "store" }
   in
-  {cache; path}
+  let%map () = reload ~logger t in
+  t
 
 let import_keypair_helper t keypair write_keypair =
   let compressed_pk = Public_key.compress keypair.Keypair.public_key in
@@ -132,7 +135,7 @@ let%test_module "wallets" =
   ( module struct
     let logger = Logger.create ()
 
-    let password = lazy (Deferred.Or_error.return (Bytes.of_string ""))
+    let password = lazy (Deferred.return (Bytes.of_string ""))
 
     module Set = Public_key.Compressed.Set
 

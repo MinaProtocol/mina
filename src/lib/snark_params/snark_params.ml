@@ -8,7 +8,6 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
-module Rescue = Rescue_inst
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -793,3 +792,15 @@ let pending_coinbase_depth =
 let target_bit_length = Tick.Field.size_in_bits - 8
 
 module type Snark_intf = Snark_intf.S
+
+module Group_map = struct
+  let to_group =
+    Group_map.to_group (module Tick.Field) ~params:Tock_backend.bg_params
+
+  module Checked = struct
+    let to_group =
+      Snarky_group_map.Checked.to_group
+        (module Tick.Run)
+        ~params:Tock_backend.bg_params
+  end
+end

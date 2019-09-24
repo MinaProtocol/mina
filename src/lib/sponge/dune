@@ -1,6 +1,6 @@
 (library
-  (name rescue)
-  (public_name rescue)
+  (name sponge)
+  (public_name sponge)
   (preprocess (pps ppx_jane ppx_deriving.eq))
   (inline_tests)
   (libraries
