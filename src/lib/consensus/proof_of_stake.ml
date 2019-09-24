@@ -928,6 +928,98 @@ module Data = struct
 
     let eval = T.eval
 
+    let%test_module "vrf threshold" =
+      ( module struct
+        let expected_threshold total_stake bal =
+          let (`Two_to_the cc) = c in
+          let open Float in
+          let c = 2. ** of_int cc in
+          let f = 0.5 in
+          let a = of_int (Balance.to_int bal) /. of_int total_stake in
+          c *. (1. -. ((1. - f) ** a))
+
+        let%test_unit "vrf threshold" =
+          let total_stake = 10_000_000 in
+          (* Input: f of the form f(x) = x <= C
+            Output: C
+          *)
+          let learn_threshold f =
+            (* bits is initially all 0s *)
+            let bits =
+              Array.init Output.Truncated.length_in_bits ~f:(fun _ -> false)
+            in
+            for i = Core.Int.(Output.Truncated.length_in_bits - 1) downto 0 do
+              bits.(i) <- true ;
+              if not (f bits) then bits.(i) <- false
+            done ;
+            bits
+          in
+          let bigint_of_bits bs =
+            let n = Array.length bs in
+            let rec go acc i =
+              if Core.Int.(i >= n) then acc
+              else
+                go
+                  Bigint.(acc lor if bs.(i) then shift_left one i else zero)
+                  Core.Int.(i + 1)
+            in
+            go Bigint.zero 0
+          in
+          Quickcheck.test
+            (Balance.gen_incl Balance.zero (Balance.of_int total_stake))
+            ~f:(fun my_stake ->
+              let f arr =
+                is_satisfied ~my_stake
+                  ~total_stake:(Amount.of_int total_stake)
+                  (Blake2.bits_to_string arr)
+              in
+              let t =
+                learn_threshold f |> bigint_of_bits |> Bignum.of_bigint
+                |> Bignum.(
+                     fun x ->
+                       x
+                       / of_bigint
+                           Bigint.(
+                             shift_left one Output.Truncated.length_in_bits))
+              in
+              assert (
+                Float.(
+                  abs
+                    ( Bignum.to_float t
+                    - expected_threshold total_stake my_stake )
+                  <= 0.05) ) )
+
+        let%test_unit "vrf sample approximates threshold" =
+          let private_key = Tock.Field.of_int 10 in
+          let total_stake = 10_000_000 in
+          let approx_eq x y =
+            let delta = Float.(abs (x - y)) in
+            if delta > 0.1 then
+              failwithf "%f !~= %f (delta of %f)" x y delta ()
+          in
+          Quickcheck.test ~trials:5
+            (Balance.gen_incl Balance.zero (Balance.of_int total_stake))
+            ~f:(fun my_stake ->
+              let n = 64 in
+              let count =
+                List.init n ~f:(fun i ->
+                    let epoch = Epoch.zero in
+                    let slot = Slot.of_int i in
+                    let seed =
+                      Epoch_seed.of_hash Snark_params.Tick.Field.one
+                    in
+                    let delegator = 0 in
+                    Threshold.is_satisfied ~my_stake
+                      ~total_stake:(Amount.of_int total_stake)
+                      (Output.truncate
+                         (eval ~private_key {epoch; slot; seed; delegator})) )
+                |> List.count ~f:Fn.id
+              in
+              approx_eq
+                Float.(of_int count / of_int n)
+                (Threshold.expected_threshold total_stake my_stake) )
+      end )
+
     module Precomputed = struct
       let keypairs = Lazy.force Coda_base.Sample_keypairs.keypairs
 
