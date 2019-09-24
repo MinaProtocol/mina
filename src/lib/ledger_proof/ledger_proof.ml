@@ -18,7 +18,7 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
     module V1 = struct
       module T = struct
         type t = Transaction_snark.Stable.V1.t
-        [@@deriving bin_io, sexp, version, yojson]
+        [@@deriving bin_io, compare, sexp, version, yojson]
       end
 
       include T
@@ -70,7 +70,7 @@ struct
         type t =
           Transaction_snark.Statement.Stable.V1.t
           * Sok_message.Digest.Stable.V1.t
-        [@@deriving bin_io, hash, sexp, version, yojson]
+        [@@deriving bin_io, compare, hash, sexp, version, yojson]
       end
 
       include T

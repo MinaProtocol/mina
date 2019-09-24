@@ -73,7 +73,7 @@ type t [@@deriving sexp, yojson]
 module Stable :
   sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, version, yojson]
+      type t [@@deriving bin_io, compare, sexp, version, yojson]
     end
 
     module Latest = V1

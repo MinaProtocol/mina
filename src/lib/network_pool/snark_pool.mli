@@ -32,6 +32,13 @@ module type S = sig
        and type resource_pool := t
   end
 
+  module For_tests : sig
+    val get_rebroadcastable :
+         Resource_pool.t
+      -> is_expired:(Time.t -> bool)
+      -> Resource_pool.Diff.t list
+  end
+
   include
     Intf.Network_pool_base_intf
     with type resource_pool := Resource_pool.t

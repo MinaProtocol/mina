@@ -32,6 +32,13 @@ module type S = sig
        and type resource_pool := t
   end
 
+  module For_tests : sig
+    val get_rebroadcastable :
+         Resource_pool.t
+      -> is_expired:(Time.t -> bool)
+      -> Resource_pool.Diff.t list
+  end
+
   include
     Intf.Network_pool_base_intf
     with type resource_pool := Resource_pool.t
@@ -340,6 +347,10 @@ struct
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
 
+  module For_tests = struct
+    let get_rebroadcastable = Resource_pool.get_rebroadcastable
+  end
+
   let get_completed_work t statement =
     Option.map
       (Resource_pool.request_proof (resource_pool t) statement)
@@ -393,13 +404,14 @@ let%test_module "random set test" =
     open Ledger_proof.For_tests
 
     let apply_diff resource_pool work
-        ?(proof = One_or_two.map ~f:mk_dummy_proof) fee =
+        ?(proof = One_or_two.map ~f:mk_dummy_proof)
+        ?(sender = Envelope.Sender.Local) fee =
       let diff =
         Mock_snark_pool.Resource_pool.Diff.Stable.Latest.Add_solved_work
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
       Mock_snark_pool.Resource_pool.Diff.apply resource_pool
-        (Envelope.Incoming.local diff)
+        {Envelope.Incoming.data= diff; sender}
 
     let gen =
       let open Quickcheck.Generator.Let_syntax in
@@ -629,4 +641,62 @@ let%test_module "random set test" =
         Deferred.unit
       in
       verify_unsolved_work |> Async.Thread_safe.block_on_async_exn
+
+    let%test_unit "rebroadcast behavior" =
+      let pool_reader, _pool_writer = Linear_pipe.create () in
+      let frontier_broadcast_pipe_r, _w = Broadcast_pipe.create None in
+      let network_pool =
+        Mock_snark_pool.create ~logger:(Logger.null ())
+          ~pids:(Child_processes.Termination.create_pid_set ())
+          ~trust_system ~incoming_diffs:pool_reader
+          ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+      in
+      let resource_pool = Mock_snark_pool.resource_pool network_pool in
+      let stmt1, stmt2 =
+        Quickcheck.random_value ~seed:(`Deterministic "")
+          (Quickcheck.Generator.filter
+             ~f:(fun (a, b) ->
+               Mocks.Transaction_snark_work.Statement.compare a b <> 0 )
+             (Quickcheck.Generator.tuple2
+                Mocks.Transaction_snark_work.Statement.gen
+                Mocks.Transaction_snark_work.Statement.gen))
+      in
+      let fee1, fee2 =
+        Quickcheck.random_value ~seed:(`Deterministic "")
+          (Quickcheck.Generator.tuple2 Fee_with_prover.gen Fee_with_prover.gen)
+      in
+      let fake_sender =
+        Envelope.Sender.Remote (Unix.Inet_addr.of_string "1.2.4.8")
+      in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let open Deferred.Let_syntax in
+          let%bind res1 =
+            apply_diff ~sender:fake_sender resource_pool stmt1 fee1
+          in
+          Or_error.ok_exn res1 |> ignore ;
+          let rebroadcastable1 =
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+              ~is_expired:(Fn.const false)
+          in
+          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
+            rebroadcastable1 [] ;
+          let%bind res2 = apply_diff resource_pool stmt2 fee2 in
+          let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
+          Or_error.ok_exn res2 |> ignore ;
+          let rebroadcastable2 =
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+              ~is_expired:(Fn.const false)
+          in
+          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
+            rebroadcastable2
+            [Add_solved_work (stmt2, {proof= proof2; fee= fee2})] ;
+          let rebroadcastable3 =
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+              ~is_expired:(Fn.const true)
+          in
+          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
+            rebroadcastable3 [] ;
+          Deferred.unit )
+
+    (* match%bind apply_diff network_pool  *)
   end )

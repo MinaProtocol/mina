@@ -3,14 +3,14 @@ open Async_kernel
 open Module_version
 
 module Make (Ledger_proof : sig
-  type t [@@deriving bin_io, sexp, to_yojson, version]
+  type t [@@deriving bin_io, compare, sexp, to_yojson, version]
 end) (Work : sig
   type t [@@deriving sexp]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, to_yojson, version, hash]
+        type t [@@deriving bin_io, compare, hash, sexp, to_yojson, version]
       end
     end
     with type V1.t = t
@@ -38,7 +38,7 @@ end)
           | Add_solved_work of
               Work.Stable.V1.t
               * Ledger_proof.t One_or_two.Stable.V1.t Priced_proof.Stable.V1.t
-        [@@deriving bin_io, sexp, to_yojson, version]
+        [@@deriving bin_io, compare, sexp, to_yojson, version]
       end
 
       include T
@@ -61,7 +61,7 @@ end)
   type t = Stable.Latest.t =
     | Add_solved_work of
         Work.Stable.V1.t * Ledger_proof.t One_or_two.t Priced_proof.Stable.V1.t
-  [@@deriving sexp, to_yojson]
+  [@@deriving compare, sexp, to_yojson]
 
   let compact_json = function
     | Add_solved_work (work, {proof= _; fee= {fee; prover}}) ->
@@ -110,7 +110,7 @@ end)
         | None ->
             check_and_add ()
         | Some {fee= {fee= prev; _}; _} -> (
-          match compare fee.fee prev with
+          match Currency.Fee.compare fee.fee prev with
           | -1 ->
               check_and_add ()
           | 0 ->

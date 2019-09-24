@@ -158,13 +158,13 @@ module type Snark_pool_diff_intf = sig
       type t =
         | Add_solved_work of
             work * ledger_proof One_or_two.Stable.V1.t Priced_proof.Stable.V1.t
-      [@@deriving sexp, to_yojson, bin_io, version]
+      [@@deriving bin_io, compare, sexp, to_yojson, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+  type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson]
 
   val summary : t -> string
 
