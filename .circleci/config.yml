@@ -242,14 +242,15 @@ jobs:
                   name: Download candidate stable PV keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run: opam switch import src/opam.export
+	    - run: declare -x DUNE_PROFILE_SAVE=$DUNE_PROFILE; unset DUNE_PROFILE
             - run: opam pin -y add src/external/ocaml-sodium
-            - run: opam pin -y rem src/external/rpc_parallel
             - run: opam pin -y add src/external/rpc_parallel
             - run: opam pin -y add src/external/ocaml-extlib
             - run: opam pin -y add src/external/digestif
             - run: opam pin -y add src/external/async_kernel
             - run: opam pin -y add src/external/coda_base58
             - run: opam pin -y add src/external/graphql_ppx
+	    - run: declare -x DUNE_PROFILE=$DUNE_PROFILE_SAVE; unset DUNE_PROFILE_SAVE
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
