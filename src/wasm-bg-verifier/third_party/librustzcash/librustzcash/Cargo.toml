@@ -1,0 +1,29 @@
+[package]
+name = "librustzcash"
+version = "0.1.0"
+authors = [
+    "Sean Bowe <ewillbefull@gmail.com>",
+    "Jack Grigg <jack@z.cash>",
+    "Jay Graber <jay@z.cash>",
+    "Simon Liu <simon@z.cash>"
+]
+edition = "2018"
+
+[lib]
+name = "rustzcash"
+path = "src/rustzcash.rs"
+crate-type = ["staticlib"]
+
+[dependencies]
+bellman = { path = "../bellman" }
+blake2b_simd = "0.5"
+blake2s_simd = "0.5"
+ff = { path = "../ff" }
+libc = "0.2"
+pairing = { path = "../pairing" }
+lazy_static = "1"
+byteorder = "1"
+rand_core = "0.5"
+rand_os = "0.2"
+zcash_primitives = { path = "../zcash_primitives" }
+zcash_proofs = { path = "../zcash_proofs" }

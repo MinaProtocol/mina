@@ -1,0 +1,66 @@
+
+# /************************************************************************
+ #  File: .gitlab-ci.yml
+ #  Author: mdr0id
+ #  Date: 9/10/2018
+ #  Description:  Used to setup runners/jobs for librustzcash
+ #  Usage: Commit source and the pipeline will trigger the according jobs.
+ #         For now the build and test are done in the same jobs.
+ #
+ #  Known bugs/missing features:
+ #
+ # ************************************************************************/
+  
+stages:
+  - build
+  - test
+  - deploy
+
+rust-latest:
+  stage: build
+  image: rust:latest
+  script:
+    - cargo --verbose --version
+    - time cargo build --verbose
+
+rust-nightly:
+  stage: build
+  image: rustlang/rust:nightly
+  script:
+    - cargo --verbose --version
+    - cargo build --verbose
+  allow_failure: true
+
+librustzcash-test-latest:
+  stage: test
+  image: rust:latest
+  script:
+    - cargo --verbose --version
+    - time cargo test --release --verbose
+
+librustzcash-test-rust-nightly:
+  stage: test
+  image: rustlang/rust:nightly
+  script:
+    - cargo --verbose --version
+    - cargo test --release --verbose
+  allow_failure: true
+
+#used to manually deploy a given release
+librustzcash-rust-rc:
+  stage: deploy
+  image: rust:latest
+  script:
+    - cargo --verbose --version
+    - time cargo build --release --verbose
+  when: manual
+
+#used to manually deploy a given release
+librustzcash-rust-nightly-rc:
+  stage: deploy
+  image: rustlang/rust:nightly
+  script:
+    - cargo --verbose --version
+    - cargo build --release --verbose
+  allow_failure: true
+  when: manual
