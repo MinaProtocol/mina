@@ -307,6 +307,7 @@ module Styles = {
       flexDirection(`column),
       media(Style.MediaQuery.notMobile, [flexDirection(`row)]),
     ]);
+
   let ctaButton =
     style([
       padding(`rem(1.125)),
@@ -322,12 +323,15 @@ module Styles = {
         cursor(`pointer),
       ]),
     ]);
+
   let ctaContent =
     style([
       display(`flex),
       selector("p", [fontSize(`px(29)), marginTop(`rem(0.4375))]),
     ]);
+
   let ctaText = style([marginLeft(`rem(0.625))]);
+
   let ctaHeading =
     style([
       Style.Typeface.ibmplexsans,
@@ -348,6 +352,7 @@ module Styles = {
       textAlign(`left),
       marginTop(`rem(0.3125)),
     ]);
+
   let heroRow =
     style([
       display(`flex),
