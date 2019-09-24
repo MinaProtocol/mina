@@ -29,4 +29,4 @@
 
 [%%define new_cli false]
 
-[%%define daemon_expiry "never"]
+[%%define daemon_expiry "2019-10-08 14:00:00-07:00"]
