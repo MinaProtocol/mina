@@ -4,8 +4,8 @@ compiler: [
   "base-threads.base"
   "base-unix.base"
   "ocaml.4.07.1"
-  "ocaml-base-compiler.4.07.1"
   "ocaml-config.1"
+  "ocaml-variants.4.07.1+spacetime"
 ]
 roots: [
   "angstrom.0.11.2"
