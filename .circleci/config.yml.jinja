@@ -257,7 +257,8 @@ jobs:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   {%- if profile in medium_curve_profiles %}
-                  environment: DUNE_PROFILE: {{profile}}
+                  environment:
+		    DUNE_PROFILE: {{profile}}
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
