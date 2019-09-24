@@ -74,34 +74,6 @@ module Minimal = struct
     {Limited.Stable.V1.transition; scan_state; pending_coinbase}
 end
 
-module Transition = struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type t =
-          {new_root: Minimal.Stable.V1.t; garbage: State_hash.Stable.V1.t list}
-        [@@deriving bin_io, version]
-      end
-
-      include T
-      include Registration.Make_latest_version (T)
-    end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transition_frontier_root_transition"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  include Stable.Latest
-end
-
 type t =
   {transition: External_transition.Validated.t; staged_ledger: Staged_ledger.t}
 

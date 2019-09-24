@@ -35,6 +35,7 @@
 - defunctor transition frontier components
 - create reusable pattern for singleton factories
 - singleton factory instance reuse after destruction prevention
+- persistent frontier worker open anonymous variants
 - remove identity pipe and extension
 + better encapsulate transition frontier sub libraries using top level interfaces
 + improved error handling in persistent frontier instance entrypoints

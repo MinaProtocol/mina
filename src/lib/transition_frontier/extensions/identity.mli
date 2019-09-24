@@ -1,3 +1,3 @@
 open Frontier_base
 
-include Intf.Extension_intf with type view = Diff.Lite.E.t list
+include Intf.Extension_intf with type view = Diff.Full.E.t list

@@ -44,26 +44,6 @@ module Minimal : sig
   val upgrade : t -> External_transition.Validated.t -> Limited.t
 end
 
-(** A root transition is a representation of the
- *  change that occurs in a transition frontier when the
- *  root is transitioned. It contains a pointer to the new
- *  root, as well as pointers to all the nodes which are removed
- *  by transitioning the root.
- *)
-module Transition : sig
-  module Stable : sig
-    module V1 : sig
-      type t =
-        {new_root: Minimal.Stable.V1.t; garbage: State_hash.Stable.V1.t list}
-      [@@deriving bin_io, version]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t
-end
-
 type t =
   {transition: External_transition.Validated.t; staged_ledger: Staged_ledger.t}
 

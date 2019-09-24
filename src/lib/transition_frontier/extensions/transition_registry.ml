@@ -1,7 +1,6 @@
 open Async_kernel
 open Core_kernel
 open Coda_base
-open Coda_transition
 open Frontier_base
 
 module T = struct
@@ -29,9 +28,8 @@ module T = struct
 
   let handle_diffs transition_registry _ diffs =
     List.iter diffs ~f:(function
-      | Diff.Lite.E.E (New_node (Lite transition)) ->
-          notify transition_registry
-            (External_transition.Validated.state_hash transition)
+      | Diff.Full.E.E (New_node (Full breadcrumb)) ->
+          notify transition_registry (Breadcrumb.state_hash breadcrumb)
       | _ ->
           () ) ;
     None

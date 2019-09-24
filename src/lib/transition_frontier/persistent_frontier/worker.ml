@@ -56,7 +56,7 @@ module Worker = struct
         map_error ~diff_type:`New_node ~diff_type_name:"New_node"
           ( Database.add t.db ~transition
             :> (mutant, apply_diff_error_internal) Result.t )
-    | Root_transitioned {new_root; garbage} ->
+    | Root_transitioned {new_root; garbage= Lite garbage} ->
         map_error ~diff_type:`Root_transitioned
           ~diff_type_name:"Root_transitioned"
           ( Database.move_root t.db ~new_root ~garbage
@@ -70,6 +70,8 @@ module Worker = struct
      * of this case despite the fact that it also won't
      * let you pass in a full node representation
      *)
+    | Root_transitioned {garbage= Full _; _} ->
+        failwith "impossible"
     | New_node (Full _) ->
         failwith "impossible"
 

@@ -98,8 +98,8 @@ let merge_diff : type mutant. t -> (Diff.lite, mutant) Diff.t -> t =
   match diff with
   | New_node (Lite node) ->
       merge_transition acc node
-  | Root_transitioned {new_root; garbage} ->
-      List.fold_left garbage
+  | Root_transitioned {new_root; garbage= Lite garbage_hashes} ->
+      List.fold_left garbage_hashes
         ~init:(merge_root_data acc new_root)
         ~f:merge_state_hash
   | Best_tip_changed best_tip ->

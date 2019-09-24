@@ -1,5 +1,4 @@
 open Core_kernel
-open Coda_transition
 open Frontier_base
 module Work = Transaction_snark_work.Statement
 
@@ -8,15 +7,12 @@ module T = struct
 
   type view = int * int Work.Table.t
 
-  let get_work (breadcrumb : Breadcrumb.t) : Work.t list =
-    let staged_ledger = Breadcrumb.staged_ledger breadcrumb in
-    let scan_state = Staged_ledger.scan_state staged_ledger in
-    Staged_ledger.Scan_state.all_work_statements scan_state
+  let get_work = Staged_ledger.Scan_state.all_work_statements
 
   (** Returns true if this update changed which elements are in the table
       (but not if the same elements exist with a different reference count) *)
-  let add_breadcrumb_to_ref_table table breadcrumb : bool =
-    List.fold ~init:false (get_work breadcrumb) ~f:(fun acc work ->
+  let add_scan_state_to_ref_table table scan_state : bool =
+    List.fold ~init:false (get_work scan_state) ~f:(fun acc work ->
         match Work.Table.find table work with
         | Some count ->
             Work.Table.set table ~key:work ~data:(count + 1) ;
@@ -27,8 +23,8 @@ module T = struct
 
   (** Returns true if this update changed which elements are in the table
       (but not if the same elements exist with a different reference count) *)
-  let remove_breadcrumb_from_ref_table table breadcrumb : bool =
-    List.fold (get_work breadcrumb) ~init:false ~f:(fun acc work ->
+  let remove_scan_state_from_ref_table table scan_state : bool =
+    List.fold (get_work scan_state) ~init:false ~f:(fun acc work ->
         match Work.Table.find table work with
         | Some 1 ->
             Work.Table.remove table work ;
@@ -42,44 +38,43 @@ module T = struct
   let create ~logger:_ frontier =
     let t = Work.Table.create () in
     let (_ : bool) =
-      add_breadcrumb_to_ref_table t (Full_frontier.root frontier)
+      Full_frontier.root frontier
+      |> Breadcrumb.staged_ledger |> Staged_ledger.scan_state
+      |> add_scan_state_to_ref_table t
     in
     (t, (0, t))
 
   type diff_update = {num_removed: int; is_added: bool}
 
-  let handle_diffs (t : t) (frontier : Full_frontier.t) diffs =
+  let handle_diffs t _frontier diffs =
     let open Diff in
     let {num_removed; is_added} =
       List.fold diffs ~init:{num_removed= 0; is_added= false}
         ~f:(fun ({num_removed; is_added} as init) -> function
-        | Lite.E.E (New_node (Lite transition)) ->
-            (* TODO: extensions need full diffs *)
+        | Full.E.E (New_node (Full breadcrumb)) ->
+            let scan_state =
+              Breadcrumb.staged_ledger breadcrumb |> Staged_ledger.scan_state
+            in
             { num_removed
-            ; is_added=
-                is_added
-                || add_breadcrumb_to_ref_table t
-                     (Full_frontier.find_exn frontier
-                        (External_transition.Validated.state_hash transition))
-            }
-        | Lite.E.E (Root_transitioned {new_root= _; garbage}) ->
+            ; is_added= is_added || add_scan_state_to_ref_table t scan_state }
+        | Full.E.E
+            (Root_transitioned {new_root= _; garbage= Full garbage_nodes}) ->
+            let open Diff.Node_list in
             let extra_num_removed =
-              List.fold ~init:0
-                ~f:(fun acc hash ->
-                  acc
-                  +
-                  if
-                    remove_breadcrumb_from_ref_table t
-                      (Full_frontier.find_exn frontier hash)
-                  then 1
-                  else 0 )
-                garbage
+              List.fold garbage_nodes ~init:0 ~f:(fun acc node ->
+                  let delta =
+                    if remove_scan_state_from_ref_table t node.scan_state then
+                      1
+                    else 0
+                  in
+                  acc + delta )
             in
             {num_removed= num_removed + extra_num_removed; is_added}
-        | Lite.E.E (Best_tip_changed _) ->
+        | Full.E.E (Best_tip_changed _) ->
             init
-        | Lite.E.E (New_node (Full _)) ->
-            (* cannot refute despite impossibility *)
+        | Full.E.E (Root_transitioned {garbage= Lite _; _}) ->
+            failwith "impossible"
+        | Full.E.E (New_node (Lite _)) ->
             failwith "impossible" )
     in
     if num_removed > 0 || is_added then Some (num_removed, t) else None

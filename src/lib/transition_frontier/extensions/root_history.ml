@@ -34,18 +34,16 @@ module T = struct
     let should_produce_view =
       List.exists diffs ~f:(function
         (* TODO: send full diffs to extensions to avoid extra lookups in frontier *)
-        | Lite.E.E (Root_transitioned trans) ->
-            let open Root_data in
-            let open Transition.Stable.Latest in
-            let open Minimal.Stable.Latest in
-            let root_transition =
+        | Full.E.E (Root_transitioned {new_root; _}) ->
+            let open Root_data.Minimal.Stable.Latest in
+            let new_root_transition =
               Breadcrumb.validated_transition
-                (Full_frontier.find_exn frontier trans.new_root.hash)
+                (Full_frontier.find_exn frontier new_root.hash)
             in
             enqueue root_history
-              (Minimal.upgrade trans.new_root root_transition) ;
+              (Root_data.Minimal.upgrade new_root new_root_transition) ;
             true
-        | Lite.E.E _ ->
+        | Full.E.E _ ->
             false )
     in
     Option.some_if should_produce_view root_history

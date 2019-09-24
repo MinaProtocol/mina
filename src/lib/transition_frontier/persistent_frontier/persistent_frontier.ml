@@ -185,7 +185,7 @@ module Instance = struct
     in
     let apply_diff diff =
       let (`New_root _) = Full_frontier.apply_diffs frontier [diff] in
-      Extensions.notify extensions ~frontier ~diffs:[Diff.Full.E.to_lite diff]
+      Extensions.notify extensions ~frontier ~diffs:[diff]
       |> Deferred.map ~f:Result.return
     in
     (* crawl through persistent frontier and load transitions into in memory frontier *)

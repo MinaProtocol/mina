@@ -261,12 +261,12 @@ let add_breadcrumb_exn t breadcrumb =
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "POST: ($state_hash, $n)" ;
-  let diffs =
+  let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
   let%bind sync_result =
     Persistent_frontier.Instance.notify_sync t.persistent_frontier_instance
-      ~diffs
+      ~diffs:lite_diffs
       ~hash_transition:
         {source= old_hash; target= Full_frontier.hash t.full_frontier}
   in

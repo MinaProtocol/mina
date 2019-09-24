@@ -10,7 +10,7 @@ module type Extension_base_intf = sig
   val create : logger:Logger.t -> Full_frontier.t -> t * view
 
   (* It is of upmost importance to make this synchronous. To prevent data races via context switching *)
-  val handle_diffs : t -> Full_frontier.t -> Diff.Lite.E.t list -> view option
+  val handle_diffs : t -> Full_frontier.t -> Diff.Full.E.t list -> view option
 end
 
 module type Broadcasted_extension_intf = sig
@@ -30,7 +30,7 @@ module type Broadcasted_extension_intf = sig
 
   val reader : t -> view Broadcast_pipe.Reader.t
 
-  val update : t -> Full_frontier.t -> Diff.Lite.E.t list -> unit Deferred.t
+  val update : t -> Full_frontier.t -> Diff.Full.E.t list -> unit Deferred.t
 end
 
 module type Extension_intf = sig

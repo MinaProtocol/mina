@@ -4,7 +4,7 @@ open Frontier_base
 module T = struct
   type t = unit
 
-  type view = Diff.Lite.E.t list
+  type view = Diff.Full.E.t list
 
   let create ~logger:_ _ = ((), [])
 

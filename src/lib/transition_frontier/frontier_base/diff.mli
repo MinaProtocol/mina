@@ -21,9 +21,64 @@ type lite
  *  the diff format can be shared between both the in memory
  *  transition frontier and the persistent transition frontier.
  *)
-type 'repr node_representation =
-  | Full : Breadcrumb.t -> full node_representation
-  | Lite : External_transition.Validated.t -> lite node_representation
+module Node : sig
+  type _ t =
+    | Full : Breadcrumb.t -> full t
+    | Lite : External_transition.Validated.t -> lite t
+end
+
+module Node_list : sig
+  type full_node =
+    { transition: External_transition.Validated.t
+    ; scan_state: Staged_ledger.Scan_state.t }
+
+  type lite_node = State_hash.Stable.V1.t
+
+  type _ t =
+    | Full : full_node list -> full t
+    | Lite : lite_node list -> lite t
+
+  type 'repr node_list = 'repr t
+
+  val to_lite : full_node list -> lite_node list
+
+  module Lite : sig
+    module Stable : sig
+      module V1 : sig
+        type t = lite node_list [@@deriving bin_io, version]
+      end
+
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t
+  end
+end
+
+(** A root transition is a representation of the
+ *  change that occurs in a transition frontier when the
+ *  root is transitioned. It contains a pointer to the new
+ *  root, as well as pointers to all the nodes which are removed
+ *  by transitioning the root.
+ *)
+module Root_transition : sig
+  type 'repr t =
+    {new_root: Root_data.Minimal.Stable.V1.t; garbage: 'repr Node_list.t}
+
+  type 'repr root_transition = 'repr t
+
+  module Lite : sig
+    module Stable : sig
+      module V1 : sig
+        type t = lite root_transition [@@deriving bin_io, version]
+      end
+
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t
+  end
+end
 
 (** A transition frontier diff represents a single item
  *  of mutation that can be or has been performed on
@@ -41,14 +96,14 @@ type 'repr node_representation =
  *  parameter for that diff.
  *)
 type ('repr, 'mutant) t =
-  | New_node : 'repr node_representation -> ('repr, unit) t
+  | New_node : 'repr Node.t -> ('repr, unit) t
       (** A diff representing new nodes which are added to
    *  the transition frontier. This has no mutant as adding
    *  a node merely depends on its parent being in the
    *  transition frontier already. If the parent wasn't
    *  already in the transition frontier, attempting to
    *  process this diff would generate an error instead. *)
-  | Root_transitioned : Root_data.Transition.t -> (_, State_hash.t) t
+  | Root_transitioned : 'repr Root_transition.t -> ('repr, State_hash.t) t
       (** A diff representing that the transition frontier root
    *  has been moved forward. The diff contains the state hash
    *  of the new root, as well as state hashes of all nodes that

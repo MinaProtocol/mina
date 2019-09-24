@@ -465,11 +465,11 @@ let root_diff t =
               Extensions.(get_view_pipe (extensions frontier) Identity))
             ~f:
               (Deferred.List.iter ~f:(function
-                | Transition_frontier.Diff.Lite.E.E (New_node _) ->
+                | Transition_frontier.Diff.Full.E.E (New_node _) ->
                     Deferred.unit
-                | Transition_frontier.Diff.Lite.E.E (Best_tip_changed _) ->
+                | Transition_frontier.Diff.Full.E.E (Best_tip_changed _) ->
                     Deferred.unit
-                | Transition_frontier.Diff.Lite.E.E
+                | Transition_frontier.Diff.Full.E.E
                     (Root_transitioned {new_root; _}) ->
                     Strict_pipe.Writer.write root_diff_writer
                       { user_commands=

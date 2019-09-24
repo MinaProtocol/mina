@@ -56,7 +56,7 @@ module T = struct
                  as acc )
                , old_best_tip
                , should_broadcast ) -> function
-          | Lite.E.E (Best_tip_changed new_best_tip) ->
+          | Full.E.E (Best_tip_changed new_best_tip) ->
               let new_best_tip_breadcrumb =
                 Full_frontier.find_exn frontier new_best_tip
               in
@@ -92,11 +92,11 @@ module T = struct
               in
               ( {new_user_commands; removed_user_commands; reorg_best_tip}
               , new_best_tip_breadcrumb
-              , true ) | Lite.E.E (New_node (Lite _)) ->
+              , true ) | Full.E.E (New_node (Full _)) ->
               (acc, old_best_tip, should_broadcast)
-          | Lite.E.E (Root_transitioned _) ->
+          | Full.E.E (Root_transitioned _) ->
               (acc, old_best_tip, should_broadcast)
-          | Lite.E.E (New_node (Full _)) -> failwith "impossible" )
+          | Full.E.E (New_node (Lite _)) -> failwith "impossible" )
     in
     Option.some_if should_broadcast view
 end

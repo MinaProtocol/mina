@@ -264,7 +264,15 @@ let calculate_root_transition_diff t heir =
     List.bind heir_siblings ~f:(fun sibling ->
         sibling :: successors_rec t sibling )
   in
-  let garbage_hashes = List.map garbage_breadcrumbs ~f:Breadcrumb.state_hash in
+  let garbage_nodes =
+    List.map garbage_breadcrumbs ~f:(fun breadcrumb ->
+        let open Diff.Node_list in
+        let transition = Breadcrumb.validated_transition breadcrumb in
+        let scan_state =
+          Staged_ledger.scan_state (Breadcrumb.staged_ledger breadcrumb)
+        in
+        {transition; scan_state} )
+  in
   let new_root_data =
     { hash= heir_hash
     ; scan_state= Staged_ledger.scan_state heir_staged_ledger
@@ -272,7 +280,7 @@ let calculate_root_transition_diff t heir =
         Staged_ledger.pending_coinbase_collection heir_staged_ledger }
   in
   Diff.Full.E.E
-    (Root_transitioned {new_root= new_root_data; garbage= garbage_hashes})
+    (Root_transitioned {new_root= new_root_data; garbage= Full garbage_nodes})
 
 (* calculates the diffs which need to be applied in order to add a breadcrumb to the frontier *)
 let calculate_diffs t breadcrumb =
@@ -340,7 +348,9 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
       let old_best_tip = t.best_tip in
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
-  | Root_transitioned {new_root= {hash= new_root_hash; _}; garbage} ->
+  | Root_transitioned
+      {new_root= {hash= new_root_hash; _}; garbage= Full garbage_breadcrumbs}
+    ->
       (* The transition frontier at this point in time has the following mask topology:
        *
        *   (`s` represents a snarked ledger, `m` represents a mask)
@@ -390,15 +400,19 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
         let m0 = Breadcrumb.mask old_root_node.breadcrumb in
         let m1 = Breadcrumb.mask new_root_node.breadcrumb in
         let m1_hash_pre_commit = Ledger.merkle_root m1 in
-        List.iter garbage ~f:(fun garbage_hash ->
-            let breadcrumb = Option.value_exn (find t garbage_hash) in
+        List.iter garbage_breadcrumbs ~f:(fun node ->
+            let open Diff.Node_list in
+            let hash =
+              External_transition.Validated.state_hash node.transition
+            in
+            let breadcrumb = find_exn t hash in
             let mask = Breadcrumb.mask breadcrumb in
             (* this should get garbage collected and should not require additional destruction *)
             ignore
               (Ledger.Maskable.unregister_mask_exn
                  (Ledger.Mask.Attached.get_parent mask)
                  mask) ;
-            Hashtbl.remove t.table garbage_hash ) ;
+            Hashtbl.remove t.table hash ) ;
         Hashtbl.remove t.table t.root ;
         Ledger.commit m1 ;
         [%test_result: Ledger_hash.t]
@@ -451,7 +465,9 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
       Ledger.Maskable.Debug.visualize
         ~filename:(Printf.sprintf "%s.%d.post.dot" (mask_prefix ()) id) ;
       Coda_metrics.(
-        let num_breadcrumbs_removed = Int.to_float (1 + List.length garbage) in
+        let num_breadcrumbs_removed =
+          Int.to_float (1 + List.length garbage_breadcrumbs)
+        in
         let num_finalized_staged_txns =
           Int.to_float
             (List.length (Breadcrumb.user_commands new_root_breadcrumb))
@@ -479,6 +495,10 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
           root_snarked_ledger_total_currency ;
         Counter.inc_one Transition_frontier.root_transitions) ;
       (Breadcrumb.state_hash old_root_node.breadcrumb, Some new_root_hash)
+  (* These are invalid inhabitants for the type signature of this function,
+   * but the OCaml compiler isn't smart enough to realize this. *)
+  | Root_transitioned {garbage= Lite _; _} ->
+      failwith "impossible"
   | New_node (Lite _) ->
       failwith "impossible"
 

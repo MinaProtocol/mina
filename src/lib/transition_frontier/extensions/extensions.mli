@@ -14,7 +14,7 @@ val create : logger:Logger.t -> Full_frontier.t -> t Deferred.t
 val close : t -> unit
 
 val notify :
-  t -> frontier:Full_frontier.t -> diffs:Diff.Lite.E.t list -> unit Deferred.t
+  t -> frontier:Full_frontier.t -> diffs:Diff.Full.E.t list -> unit Deferred.t
 
 type ('ext, 'view) access =
   | Root_history : (Root_history.t, Root_history.view) access
