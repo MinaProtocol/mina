@@ -63,8 +63,11 @@ let query_or_error
       Error (`Graphql_error (graphql_error_to_string error))
   | _, data ->
       Result.try_with (fun () -> query_obj#parse data)
-      |> Result.map_error ~f:(fun _ ->
-             `Graphql_error "Encountered problem parsing graphql response" ) )
+      |> Result.map_error ~f:(fun e ->
+             `Graphql_error
+               (Printf.sprintf
+                  "Problem parsing graphql response\nError message: %s"
+                  (Exn.to_string e)) ) )
   |> Deferred.return
 
 let query query_obj port =
