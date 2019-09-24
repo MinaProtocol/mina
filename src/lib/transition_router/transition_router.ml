@@ -85,7 +85,6 @@ module Make (Inputs : Inputs_intf) = struct
     in
     transition_reader_ref := bootstrap_controller_reader ;
     transition_writer_ref := bootstrap_controller_writer ;
-    let%map () = Transition_frontier.close frontier in
     don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
     upon
       (let%bind () =

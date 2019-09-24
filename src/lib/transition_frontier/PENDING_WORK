@@ -47,5 +47,5 @@
 
 - transition frontier graceful shutdown
 - improved persistent frontier database batched requests
-- extensions full diffs
++ extensions full diffs
 - dynamic extensions? (probably just open an issue for this)
