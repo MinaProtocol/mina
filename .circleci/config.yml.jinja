@@ -265,6 +265,8 @@ jobs:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   {%- if profile in medium_curve_profiles %}
+                  environment:
+                    DUNE_PROFILE: {{profile}}
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
