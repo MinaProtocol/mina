@@ -1,0 +1,3 @@
+[%%define scan_state_calc_params false]
+[%%define scan_state_tps_goal 1]
+[%%define scan_state_num_snark_workers 32]
