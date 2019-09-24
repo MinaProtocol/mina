@@ -83,9 +83,9 @@ end)
     let {Envelope.Incoming.data= diff; sender} = t in
     let is_local = match sender with Local -> true | _ -> false in
     let to_or_error = function
-      | `Don't_rebroadcast ->
-          Or_error.error_string "Already in pool"
-      | `Rebroadcast ->
+      | `Statement_not_referenced ->
+          Or_error.error_string "statement not referenced"
+      | `Added ->
           Ok diff
     in
     match diff with

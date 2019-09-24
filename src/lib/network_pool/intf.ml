@@ -126,7 +126,7 @@ module type Snark_resource_pool_intf = sig
     -> work:work
     -> proof:ledger_proof One_or_two.t
     -> fee:Fee_with_prover.t
-    -> [`Rebroadcast | `Don't_rebroadcast]
+    -> [`Added | `Statement_not_referenced]
 
   val verify_and_act :
        t

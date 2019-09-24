@@ -237,7 +237,7 @@ struct
           Coda_metrics.(
             Gauge.set Snark_work.snark_pool_size
               (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ;
-          `Rebroadcast )
+          `Added )
         else (
           if is_local then
             Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
@@ -247,7 +247,7 @@ struct
                 [ ( "stmt"
                   , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
                       work ) ] ;
-          `Don't_rebroadcast )
+          `Statement_not_referenced )
 
       let verify_and_act t ~work ~sender =
         let statements, priced_proof = work in
