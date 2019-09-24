@@ -386,7 +386,9 @@ let get_status ~flag t =
     let str time =
       let open Time in
       let time = Int64.to_float time |> Span.of_ms |> of_span_since_epoch in
-      sprintf "in %s" (Time.Span.to_string_hum (diff time (now ())))
+      let diff = diff time (now ()) in
+      if Span.(zero < diff) then sprintf "in %s" (Time.Span.to_string_hum diff)
+      else "Computing next proposal state..."
     in
     Option.map (Coda_lib.next_proposal t) ~f:(function
       | `Propose_now _ ->
