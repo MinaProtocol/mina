@@ -95,11 +95,11 @@ query IntrospectionQuery {
   }"""
 
 
-def print_schema(port, uri):
+def print_schema(port, uri, extra_headers):
     conn = http.client.HTTPConnection("localhost", port)
     headers = {"Content-type": "application/json; charset=uft",
-               "Accept": "text/plain",
-               "X-Hasura-Role": "user"}
+               "Accept": "text/plain"}
+    headers.update(extra_headers)
 
     json_body = {
       'query': introspection_query,
@@ -127,8 +127,11 @@ def main():
       '--uri', default='/graphql', type=str,
       help='The path to communicate to the graphql server')
 
+    parser.add_argument('--headers', nargs='*')
+
     args = parser.parse_args()
-    print_schema(args.port, args.uri)
+    headers = [key_value.split(':') for key_value in args.headers]
+    print_schema(args.port, args.uri, headers)
 
 if __name__ == "__main__":
     main()

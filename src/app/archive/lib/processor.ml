@@ -90,7 +90,7 @@ module Make_upsert (Inputs : Inputs_intf) = struct
 end
 
 module Make (Config : Graphql_client_lib.Config_intf) = struct
-  module Graphql_client = Graphql_client_lib.Make (Config)
+  module Client = Graphql_client_lib.Make (Config)
 
   module Public_key_upsert = Make_upsert (struct
     module Hash = Public_key.Compressed
@@ -107,7 +107,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
     let get_existing public_keys =
       let open Deferred.Result.Let_syntax in
       let%map result =
-        Graphql_client.query_or_error
+        Client.query_or_error
           (Graphql_commands.Public_keys.Get_existing.make
              ~public_keys:
                (Array.map public_keys ~f:Public_key.Compressed.to_base58_check)
@@ -120,7 +120,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
     let insert hash_to_data_map =
       let open Deferred.Result.Let_syntax in
       let%map result =
-        Graphql_client.query_or_error
+        Client.query_or_error
           (Graphql_commands.Public_keys.Insert.make
              ~public_keys:
                ( Public_key.Compressed.Map.keys hash_to_data_map
@@ -158,7 +158,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
     let get_existing transaction_hashes =
       let open Deferred.Result.Let_syntax in
       let%map existing =
-        Graphql_client.query_or_error
+        Client.query_or_error
           (Graphql_commands.User_commands.Get_existing.make
              ~hashes:
                (Array.map transaction_hashes
@@ -192,7 +192,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
                    @@ Types.Block_time.serialize new_first_seen )
                  ()
              in
-             let%bind result = Graphql_client.query_or_error graphql in
+             let%bind result = Client.query_or_error graphql in
              let%bind affected_rows =
                Result.of_option result#update_user_commands
                  ~error:
@@ -236,7 +236,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         Graphql_commands.User_commands.Insert.make
           ~user_commands:new_user_commands ()
       in
-      let%map result = Graphql_client.query_or_error graphql in
+      let%map result = Client.query_or_error graphql in
       Option.map result#insert_user_commands ~f:(fun result -> result#returning)
   end)
 
@@ -273,7 +273,7 @@ let%test_module "Processor" =
            Monitor.try_with_or_error ~name:"Write Processor" f
          in
          let%map clear_action =
-           Processor.Graphql_client.query_or_error
+           Processor.Client.query_or_error
            @@ Graphql_commands.Clear_data.make ()
          in
          Or_error.all_unit
@@ -328,7 +328,7 @@ let%test_module "Processor" =
               Strict_pipe.Writer.close writer ;
               let%bind () = deferred in
               let%bind query_result =
-                Processor.Graphql_client.query
+                Processor.Client.query
                   (Graphql_commands.User_commands.Query.make
                      ~hash:
                        Transaction_hash.(
@@ -337,7 +337,7 @@ let%test_module "Processor" =
               in
               let queried_user_command = query_result#user_commands.(0) in
               let%map public_keys =
-                Processor.Graphql_client.query
+                Processor.Client.query
                   (Graphql_commands.Public_keys.Get_existing.make
                      ~public_keys:
                        ( Array.map ~f:Public_key.Compressed.to_base58_check
