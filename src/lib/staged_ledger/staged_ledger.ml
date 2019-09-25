@@ -81,8 +81,15 @@ module T = struct
             , Transaction_snark.Statement.to_yojson
                 (Ledger_proof.statement proof) ) ]
     else
+      let start = Time.now () in
       match%bind Verifier.verify_transaction_snark verifier proof ~message with
       | Ok b ->
+          let time_ms = Time.abs_diff (Time.now ()) start |> Time.Span.to_ms in
+          Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("work_id", `Int (Transaction_snark.Statement.hash statement))
+              ; ("time", `Float time_ms) ]
+            "Verification in apply_diff for work $work_id took $time ms" ;
           Deferred.return b
       | Error e ->
           log_error (Error.to_string_hum e) ~metadata:[]

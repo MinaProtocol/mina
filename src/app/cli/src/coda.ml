@@ -550,13 +550,24 @@ let daemon logger =
              [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
            >>| Or_error.ok
          in
+         Async_kernel.Async_kernel_scheduler.(
+           set_record_backtraces (t ()) true) ;
          Stream.iter
-           (Async.Scheduler.long_cycles
+           (Async_kernel.Async_kernel_scheduler.(
+              long_cycles_with_context @@ t ())
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
-           ~f:(fun span ->
+           ~f:(fun (span, ctx) ->
+             let tm = Time_ns.Span.to_string span in
+             (* see if backtraces reveal anything about long async cycles *)
+             let metadata =
+               [ ("tm", `String tm)
+               ; ( "backtraces"
+                 , `List
+                     (List.map ctx.backtrace_history ~f:(fun bt ->
+                          `String (Backtrace.to_string bt) )) ) ]
+             in
              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-               "long async cycle %s"
-               (Time_ns.Span.to_string span) ) ;
+               "Long async cycle %s" tm ~metadata ) ;
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
              ~location typ
@@ -830,7 +841,8 @@ let coda_commands logger =
 new_cli]
 
 let coda_commands logger =
-  ("accounts", Client.accounts) :: coda_commands logger
+  ("accounts", Client.accounts)
+  :: ("client2", Client.client) :: coda_commands logger
 
 [%%endif]
 

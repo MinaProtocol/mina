@@ -217,7 +217,7 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-               ~blockchain_length:int ~uptime_secs:nn_int
+               ~next_proposal:string ~blockchain_length:int ~uptime_secs:nn_int
                ~ledger_merkle_root:string ~state_hash:string
                ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))

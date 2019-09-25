@@ -17,10 +17,10 @@
 [%%define cache_exceptions false]
 [%%define fake_hash false]
 
-[%%define genesis_ledger "testnet_postake"]
+[%%define genesis_ledger "testnet_filet_mignon"]
 
-[%%define genesis_state_timestamp "2019-09-18 4:30:00-07:00"]
-[%%define block_window_duration 300000]
+[%%define genesis_state_timestamp "2019-09-24 17:00:00-07:00"]
+[%%define block_window_duration 360000]
 
 [%%define integration_tests false]
 [%%define force_updates false]
@@ -29,4 +29,4 @@
 
 [%%define new_cli false]
 
-[%%define daemon_expiry "never"]
+[%%define daemon_expiry "2019-10-08 14:00:00-07:00"]
