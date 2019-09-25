@@ -482,7 +482,7 @@ let%test_module "random set test" =
                 Option.value_exn
                   (Mock_snark_pool.Resource_pool.request_proof t work)
               in
-              assert (fee <= fee_upper_bound) ) ) *)
+              assert (fee <= fee_upper_bound) ) )
 
     let%test_unit "A priced proof of a work will replace an existing priced \
                    proof of the same work only if it's fee is smaller than \
@@ -619,5 +619,5 @@ let%test_module "random set test" =
                    Deferred.unit ) ;
             Deferred.unit
           in
-          verify_unsolved_work () )
+          verify_unsolved_work () ) *)
   end )
