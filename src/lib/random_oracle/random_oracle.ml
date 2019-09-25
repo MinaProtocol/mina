@@ -218,7 +218,8 @@ let pack_input = pack_input ~project:Field.project
 
 let prefix_to_field (s : string) =
   let open Tick0 in
-  assert (8 * String.length s < Field.size_in_bits) ;
+  let bits_per_character = 8 in
+  assert (bits_per_character * String.length s < Field.size_in_bits) ;
   Field.project Fold_lib.Fold.(to_list (string_bits (s :> string)))
 
 let salt (s : string) = update ~state:initial_state [|prefix_to_field s|]
