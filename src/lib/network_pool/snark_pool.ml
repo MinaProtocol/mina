@@ -374,7 +374,7 @@ let%test_module "random set test" =
     let config verifier =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
 
-    let gen =
+    let _gen =
       let open Quickcheck.Generator.Let_syntax in
       let gen_entry =
         Quickcheck.Generator.tuple2 Mocks.Transaction_snark_work.Statement.gen
