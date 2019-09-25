@@ -109,7 +109,7 @@ end = struct
 end
 
 module type Data_hash_binable_intf = sig
-  type t [@@deriving sexp, compare, eq, yojson, hash]
+  type t = private Field.t [@@deriving sexp, compare, eq, yojson, hash]
 
   module Stable : sig
     module V1 : sig
@@ -127,6 +127,8 @@ module type Data_hash_binable_intf = sig
   val typ : (var, t) Typ.t
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
+
+  val var_to_hash_packed : var -> Field.Var.t
 
   val length_in_triples : int
 
@@ -273,6 +275,7 @@ struct
       , equal_var
       , length_in_triples
       , var_to_triples
+      , var_to_hash_packed
       , hash_fold_t
       , empty
       , push
