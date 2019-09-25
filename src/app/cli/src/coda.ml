@@ -554,7 +554,7 @@ let daemon logger =
            (Async.Scheduler.long_cycles
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
-             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                "Long async cycle, %0.01f seconds" (Time_ns.Span.to_sec span) ) ;
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
