@@ -2542,6 +2542,12 @@ module Hooks = struct
     log_choice ~precondition_msg ~choice_msg choice ;
     choice
 
+  type proposal =
+    [ `Check_again of Unix_timestamp.t
+    | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
+    | `Propose of Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t
+    ]
+
   let next_proposal now (state : Consensus_state.Value.t) ~local_state
       ~keypairs ~logger =
     let info_if_proposing =
