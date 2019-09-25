@@ -656,8 +656,7 @@ workflows:
             - test--test_postake_split_snarkless
             - test--test_postake_three_proposers
             - test--test_postake_txns
-            #delete this after the tests pass
-            - test-unit--dev_medium_curves
+
     daily:
         triggers:
           - schedule:
