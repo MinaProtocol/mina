@@ -143,7 +143,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
 
       include (U : module type of U with module Checked := U.Checked)
 
-      module Hash = Coda_base.State_hash
+      module Hash = struct
+        include Coda_base.State_hash
+
+        let var_to_field = var_to_hash_packed
+      end
 
       module Checked = struct
         include Blockchain_snark_state.Checked
