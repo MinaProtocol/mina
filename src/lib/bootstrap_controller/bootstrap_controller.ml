@@ -399,13 +399,17 @@ end = struct
         (* Construct the staged ledger before constructing the transition
          * frontier in order to verify the scan state we received.
          * TODO: reorganize the code to avoid doing this twice (#3480)  *)
-        let%map staged_ledger =
+        let temp_mask = Ledger.of_database temp_snarked_ledger in
+        let%map _ =
           Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-            ~logger ~verifier ~scan_state
-            ~snarked_ledger:(Ledger.of_database temp_snarked_ledger)
+            ~logger ~verifier ~scan_state ~snarked_ledger:temp_mask
             ~expected_merkle_root ~pending_coinbases
         in
-        Ledger.close (Staged_ledger.ledger staged_ledger) ;
+        ignore
+          (Ledger.Maskable.unregister_mask_exn
+             (Ledger.Mask.Attached.get_parent temp_mask)
+             temp_mask) ;
+        Ledger.close temp_mask ;
         Transition_frontier.Persistent_root.Instance.destroy
           temp_persistent_root_instance ;
         (scan_state, pending_coinbases)
