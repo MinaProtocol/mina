@@ -11,6 +11,7 @@ let extraHeaders = () =>
     <link rel="stylesheet" href={Links.Cdn.url("/static/css/termynal.css")} />
   </>;
 
+// TODO: Extract this icon
 module Icon = {
   let fillStyle = colorVar =>
     ReactDOMRe.Style.unsafeAddProp(
@@ -137,6 +138,21 @@ module Styles = {
       media(Style.MediaQuery.somewhatLarge, [flexDirection(`row)]),
     ]);
 
+  let rowStyles = [
+    display(`grid),
+    gridColumnGap(rem(1.5)),
+    gridTemplateColumns([rem(1.), rem(5.5), rem(5.5), rem(2.5)]),
+    media(
+      Style.MediaQuery.notMobile,
+      [
+        width(`percent(100.)),
+        gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(2.5)]),
+      ],
+    ),
+  ];
+
+  let row = style(rowStyles);
+
   let leaderboard =
     style([
       background(Style.Colors.hyperlinkAlpha(0.15)),
@@ -147,22 +163,7 @@ module Styles = {
       Style.Typeface.pragmataPro,
       lineHeight(rem(1.5)),
       color(Style.Colors.midnight),
-      selector(
-        ".leaderboard-row",
-        [
-          display(`grid),
-          gridColumnGap(rem(1.5)),
-          gridTemplateColumns([rem(1.), rem(5.5), rem(5.5), rem(2.5)]),
-          width(`rem(25.)),
-          media(
-            Style.MediaQuery.notMobile,
-            [
-              gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(2.5)]),
-              width(`percent(100.)),
-            ],
-          ),
-        ],
-      ),
+      selector(".leaderboard-row", rowStyles),
       selector(
         ".leaderboard-row > span",
         [textOverflow(`ellipsis), whiteSpace(`nowrap), overflow(`hidden)],
@@ -186,20 +187,9 @@ module Styles = {
 
   let headerRow =
     merge([
+      row,
       Style.Body.basic_semibold,
-      style([
-        display(`grid),
-        color(Style.Colors.midnight),
-        gridColumnGap(rem(1.5)),
-        gridTemplateColumns([rem(1.), rem(5.5), rem(5.5), rem(2.5)]),
-        media(
-          Style.MediaQuery.notMobile,
-          [
-            width(`percent(100.)),
-            gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(2.5)]),
-          ],
-        ),
-      ]),
+      style([color(Style.Colors.midnight)]),
     ]);
 
   let copy =
@@ -305,6 +295,8 @@ module Styles = {
       justifyContent(`spaceAround),
       alignItems(`center),
       flexDirection(`column),
+      maxWidth(`rem(43.75)),
+      media("(min-width: 86rem)", [maxWidth(`percent(100.))]),
       media(Style.MediaQuery.notMobile, [flexDirection(`row)]),
     ]);
 
@@ -338,7 +330,7 @@ module Styles = {
       fontWeight(`num(600)),
       fontSize(`rem(1.5)),
       lineHeight(`rem(2.1875)),
-      color(`hex("4782A0")),
+      color(Style.Colors.teal),
       textAlign(`left),
     ]);
 
@@ -348,7 +340,7 @@ module Styles = {
       fontStyle(`normal),
       fontWeight(`normal),
       fontSize(`px(13)),
-      color(`hex("4782A0")),
+      color(Style.Colors.teal),
       textAlign(`left),
       marginTop(`rem(0.3125)),
     ]);
@@ -462,7 +454,7 @@ let make = () => {
               { type: 'input', prompt: '>', value: 'coda daemon -peer ...' },
               { type: 'progress' },
               { value:  'Daemon ready. Clients can now connect!'},
-              { type: 'input', prompt: '>', value: 'coda client status' },
+              { type: 'input', lineDelay: '10', prompt: '>', value: 'coda client status' },
               { value:  'Local uptime: 25m25s'},
               { value:  'Peers: 5'},
               { value:  'Consensus time now: epoch=16, slot=78'},
@@ -474,75 +466,36 @@ let make = () => {
     </div>
     <div>
       <div className=Styles.buttonRow>
-        <a href="/docs/getting-started/">
-          <button className=Styles.ctaButton>
-            <div className=Styles.ctaContent>
-              <p> {React.string({js| 📋 |js})} </p>
-              <div className=Styles.ctaText>
-                <h2 className=Styles.ctaHeading>
-                  {React.string({js| Get Started |js})}
-                </h2>
-                <h4 className=Styles.ctaBody>
-                  {React.string(
-                     "Get started by installing Coda and running a node",
-                   )}
-                </h4>
-              </div>
-            </div>
-          </button>
-        </a>
-        <a href="https://bit.ly/CodaDiscord">
-          <button className=Styles.ctaButton>
-            <div className=Styles.ctaContent>
-              Icon.Svg.discord
-              <div className=Styles.ctaText>
-                <h2 className=Styles.ctaHeading>
-                  {React.string({js| Discord |js})}
-                </h2>
-                <h4 className=Styles.ctaBody>
-                  {React.string(
-                     "Connect with the community and participate in weekly challenges",
-                   )}
-                </h4>
-              </div>
-            </div>
-          </button>
-        </a>
-        <a href="https://forums.codaprotocol.com/">
-          <button className=Styles.ctaButton>
-            <div className=Styles.ctaContent>
-              <p> {React.string({js|💬|js})} </p>
-              <div className=Styles.ctaText>
-                <h2 className=Styles.ctaHeading>
-                  {React.string({js| Forum |js})}
-                </h2>
-                <h4 className=Styles.ctaBody>
-                  {React.string(
-                     "Find longer discussions and in-depth content",
-                   )}
-                </h4>
-              </div>
-            </div>
-          </button>
-        </a>
-        <a
-          href="https://docs.google.com/forms/d/e/1FAIpQLScQRGW0-xGattPmr5oT-yRb9aCkPE6yIKXSfw1LRmNx1oh6AA/viewform">
-          <button className=Styles.ctaButton>
-            <div className=Styles.ctaContent>
-              <p> {React.string({js| 📬 |js})} </p>
-              <div className=Styles.ctaText>
-                <h2 className=Styles.ctaHeading>
-                  {React.string({js| Testnet Newsletter |js})}
-                </h2>
-                <h4 className=Styles.ctaBody>
-                  {React.string(
-                     "Sign up for the newsletter to get weekly updates",
-                   )}
-                </h4>
-              </div>
-            </div>
-          </button>
-        </a>
+        <ActionButton
+          icon={React.string({js| 📋 |js})}
+          heading={React.string({js| Get Started |js})}
+          text={React.string(
+            "Get started by installing Coda and running a node",
+          )}
+          href="/docs/getting-started/"
+        />
+        <ActionButton
+          icon=Icon.Svg.discord
+          heading={React.string({js| Discord |js})}
+          text={React.string(
+            "Connect with the community and participate in weekly challenges",
+          )}
+          href="https://bit.ly/CodaDiscord"
+        />
+        <ActionButton
+          icon={React.string({js|💬|js})}
+          heading={React.string({js| Forum |js})}
+          text={React.string("Find longer discussions and in-depth content")}
+          href="https://forums.codaprotocol.com/"
+        />
+        <ActionButton
+          icon={React.string({js| 📬 |js})}
+          heading={React.string({js| Testnet Newsletter |js})}
+          text={React.string(
+            "Sign up for the newsletter to get weekly updates",
+          )}
+          href="https://docs.google.com/forms/d/e/1FAIpQLScQRGW0-xGattPmr5oT-yRb9aCkPE6yIKXSfw1LRmNx1oh6AA/viewform"
+        />
       </div>
     </div>
     <hr />
