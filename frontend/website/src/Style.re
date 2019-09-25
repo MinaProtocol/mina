@@ -382,7 +382,6 @@ module H4 = {
 
   let (wide, wideStyles) =
     generateStyles([
-      whiteSpace(`nowrap),
       fontSize(`rem(0.75)),
       letterSpacing(`rem(0.125)),
       Typeface.aktivgrotesk,
@@ -390,6 +389,7 @@ module H4 = {
       fontStyle(`normal),
       textAlign(`center),
       textTransform(`uppercase),
+      media(MediaQuery.notMobile, [whiteSpace(`nowrap)]),
     ]);
 };
 
