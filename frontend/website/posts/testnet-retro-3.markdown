@@ -36,7 +36,7 @@ If you earned points this week and the previous 3 weeks  - 300 pts\*
 
 Etc.
 
-You can still earn Testnet Points\* with past challenges! [Find them here](https://codaprotocol.com/docs/coda-testnet/#testnet-points).
+You can still earn Testnet Points\* with past challenges! [Find them here](https://codaprotocol.com/testnet.html).
 
 ## Community in Action
 

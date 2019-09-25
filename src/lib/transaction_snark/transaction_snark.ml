@@ -306,10 +306,10 @@ module Base = struct
   open Tick
   open Let_syntax
 
-  let%snarkydef check_signature shifted ~payload_section ~is_user_command
-      ~sender ~signature =
+  let%snarkydef check_signature shifted ~payload ~is_user_command ~sender
+      ~signature =
     let%bind verifies =
-      Schnorr.Checked.verifies shifted signature sender payload_section
+      Schnorr.Checked.verifies shifted signature sender payload
     in
     Boolean.Assert.any [Boolean.not is_user_command; verifies]
 
@@ -346,8 +346,7 @@ module Base = struct
       Transaction_union.Tag.Checked.is_user_command tag
     in
     let%bind () =
-      check_signature shifted ~payload_section ~is_user_command ~sender
-        ~signature
+      check_signature shifted ~payload ~is_user_command ~sender ~signature
     in
     let%bind {excess; sender_delta; supply_increase; receiver_increase} =
       Transaction_union_payload.Changes.Checked.of_payload payload
