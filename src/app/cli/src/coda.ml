@@ -566,7 +566,7 @@ let daemon logger =
                      (List.map ctx.backtrace_history ~f:(fun bt ->
                           `String (Backtrace.to_string bt) )) ) ]
              in
-             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                "Long async cycle %s" tm ~metadata ) ;
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
