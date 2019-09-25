@@ -38,9 +38,7 @@ let%test_module "transaction_status" =
 
     let create_pool ~frontier_broadcast_pipe =
       let incoming_diffs, _ = Linear_pipe.create () in
-      let config =
-        Transaction_pool.Resource_pool.make_config ~logger ~trust_system
-      in
+      let config = Transaction_pool.Resource_pool.make_config ~trust_system in
       let transaction_pool =
         Transaction_pool.create ~config ~incoming_diffs ~logger
           ~frontier_broadcast_pipe

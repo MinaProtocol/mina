@@ -21,6 +21,7 @@ module type Resource_pool_base_intf = sig
        frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> config:Config.t
+    -> logger:Logger.t
     -> t
 end
 
@@ -105,14 +106,11 @@ module type Snark_resource_pool_intf = sig
     with type transition_frontier := transition_frontier
 
   val make_config :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> verifier:Verifier.t
-    -> Config.t
+    trust_system:Trust_system.t -> verifier:Verifier.t -> Config.t
 
   type serializable [@@deriving bin_io]
 
-  val of_serializable : serializable -> config:Config.t -> t
+  val of_serializable : serializable -> config:Config.t -> logger:Logger.t -> t
 
   val add_snark :
        t
@@ -189,7 +187,7 @@ module type Transaction_resource_pool_intf = sig
     with type transition_frontier := transition_frontier
      and type t := t
 
-  val make_config : logger:Logger.t -> trust_system:Trust_system.t -> Config.t
+  val make_config : trust_system:Trust_system.t -> Config.t
 
   val member : t -> User_command.With_valid_signature.t -> bool
 

@@ -11,7 +11,7 @@ let%test_module "network pool test" =
     module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
 
     let config verifier =
-      Mock_snark_pool.Resource_pool.make_config ~logger ~verifier ~trust_system
+      Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =

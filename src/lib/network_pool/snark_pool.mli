@@ -46,6 +46,7 @@ module type S = sig
 
   val load :
        config:Resource_pool.Config.t
+    -> logger:Logger.t
     -> disk_location:string
     -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
                       Linear_pipe.Reader.t

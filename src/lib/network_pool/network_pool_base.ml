@@ -46,6 +46,6 @@ end)
 
   let create ~config ~incoming_diffs ~frontier_broadcast_pipe ~logger =
     of_resource_pool_and_diffs
-      (Resource_pool.create ~config ~frontier_broadcast_pipe)
+      (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe)
       ~incoming_diffs ~logger
 end
