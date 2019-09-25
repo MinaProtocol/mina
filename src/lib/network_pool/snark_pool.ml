@@ -457,7 +457,7 @@ let%test_module "random set test" =
                     apply_diff t statements proofs fee )
               in
               [%test_eq: Transaction_snark_work.Info.t list] completed_works
-                (Mock_snark_pool.Resource_pool.all_completed_work t) ) ) *)
+                (Mock_snark_pool.Resource_pool.all_completed_work t) ) )
 
     let%test_unit "When two priced proofs of the same work are inserted into \
                    the snark pool, the fee of the work is at most the minimum \
@@ -482,7 +482,7 @@ let%test_module "random set test" =
                 Option.value_exn
                   (Mock_snark_pool.Resource_pool.request_proof t work)
               in
-              assert (fee <= fee_upper_bound) ) )
+              assert (fee <= fee_upper_bound) ) ) *)
 
     let%test_unit "A priced proof of a work will replace an existing priced \
                    proof of the same work only if it's fee is smaller than \
