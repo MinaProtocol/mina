@@ -328,18 +328,24 @@ module type Bootstrap_controller_intf = sig
 
   type transition_frontier
 
+  type persistent_root
+
+  type persistent_frontier
+
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> network:network
-    -> frontier:transition_frontier
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> transition_reader:( [< `Transition of
                               External_transition.Initial_validated.t
                               Envelope.Incoming.t ]
                          * [< `Time_received of Block_time.t] )
                          Strict_pipe.Reader.t
+    -> persistent_root:persistent_root
+    -> persistent_frontier:persistent_frontier
+    -> initial_root_transition:External_transition.Validated.t
     -> ( transition_frontier
        * External_transition.Initial_validated.t Envelope.Incoming.t list )
        Deferred.t

@@ -33,6 +33,8 @@ module Make (Inputs : Inputs_intf) : sig
     Coda_intf.Bootstrap_controller_intf
     with type network := Network.t
      and type transition_frontier := Transition_frontier.t
+     and type persistent_root := Transition_frontier.Persistent_root.t
+     and type persistent_frontier := Transition_frontier.Persistent_frontier.t
 
   module For_tests : sig
     type t
@@ -61,7 +63,6 @@ module Make (Inputs : Inputs_intf) : sig
       -> trust_system:Trust_system.t
       -> verifier:Verifier.t
       -> network:Network.t
-      -> frontier:Transition_frontier.t
       -> consensus_local_state:Consensus.Data.Local_state.t
       -> transition_reader:( [< `Transition of
                                 External_transition.Initial_validated.t
@@ -69,6 +70,9 @@ module Make (Inputs : Inputs_intf) : sig
                            * [< `Time_received of Block_time.t] )
                            Pipe_lib.Strict_pipe.Reader.t
       -> should_ask_best_tip:bool
+      -> persistent_root:Transition_frontier.Persistent_root.t
+      -> persistent_frontier:Transition_frontier.Persistent_frontier.t
+      -> initial_root_transition:External_transition.Validated.t
       -> ( Transition_frontier.t
          * External_transition.Initial_validated.t Envelope.Incoming.t list )
          Deferred.t
@@ -312,25 +316,19 @@ end = struct
   (* We conditionally ask other peers for their best tip. This is for testing
      eager bootstrapping and the regular functionalities of bootstrapping in
      isolation *)
-  let run ~logger ~trust_system ~verifier ~network ~frontier
-      ~consensus_local_state ~transition_reader ~should_ask_best_tip =
+  let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
+      ~transition_reader ~should_ask_best_tip ~persistent_root
+      ~persistent_frontier ~initial_root_transition =
     let rec loop () =
       let sync_ledger_reader, sync_ledger_writer =
         create ~name:"sync ledger pipe"
           (Buffered (`Capacity 50, `Overflow Crash))
       in
-      transfer_while_writer_alive transition_reader sync_ledger_writer ~f:Fn.id
-      |> don't_wait_for ;
-      let persistent_frontier =
-        Transition_frontier.persistent_frontier frontier
-      in
-      let persistent_root = Transition_frontier.persistent_root frontier in
-      let initial_breadcrumb = Transition_frontier.root frontier in
-      let initial_transition =
-        Transition_frontier.Breadcrumb.validated_transition initial_breadcrumb
-      in
+      don't_wait_for
+        (transfer_while_writer_alive transition_reader sync_ledger_writer
+           ~f:Fn.id) ;
       let initial_root_transition =
-        initial_transition
+        initial_root_transition
         |> External_transition.Validation
            .reset_frontier_dependencies_validation
         |> External_transition.Validation.reset_staged_ledger_diff_validation
@@ -344,10 +342,17 @@ end = struct
         ; current_root= initial_root_transition }
       in
       let transition_graph = Transition_cache.create () in
-      let snarked_ledger = Transition_frontier.root_snarked_ledger frontier in
+      let temp_persistent_root_instance =
+        Transition_frontier.Persistent_root.create_instance_exn persistent_root
+      in
+      let temp_snarked_ledger =
+        Transition_frontier.Persistent_root.Instance.snarked_ledger
+          temp_persistent_root_instance
+      in
       let%bind hash, sender, expected_staged_ledger_hash =
         let root_sync_ledger =
-          Root_sync_ledger.create snarked_ledger ~logger:t.logger ~trust_system
+          Root_sync_ledger.create temp_snarked_ledger ~logger:t.logger
+            ~trust_system
         in
         let%bind () =
           if should_ask_best_tip then
@@ -361,12 +366,10 @@ end = struct
         (* We ignore the resulting ledger returned here since it will always
          * be the same as the ledger we started with because we are syncing
          * a db ledger. *)
-        let%map _, root_data = Root_sync_ledger.valid_tree root_sync_ledger in
+        let%map _, data = Root_sync_ledger.valid_tree root_sync_ledger in
         Root_sync_ledger.destroy root_sync_ledger ;
-        root_data
+        data
       in
-      (* Retrieve staged ledger scan state and reconstruct the new root
-       * staged ledger *)
       match%bind
         let open Deferred.Or_error.Let_syntax in
         let%bind scan_state, expected_merkle_root, pending_coinbases =
@@ -393,10 +396,19 @@ end = struct
                ~error:(Error.of_string "received faulty scan state from peer")
           |> Deferred.return
         in
-        Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-          ~logger ~verifier ~scan_state
-          ~snarked_ledger:(Ledger.of_database snarked_ledger)
-          ~expected_merkle_root ~pending_coinbases
+        (* Construct the staged ledger before constructing the transition
+         * frontier in order to verify the scan state we received.
+         * TODO: reorganize the code to avoid doing this twice (#3480)  *)
+        let%map staged_ledger =
+          Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
+            ~logger ~verifier ~scan_state
+            ~snarked_ledger:(Ledger.of_database temp_snarked_ledger)
+            ~expected_merkle_root ~pending_coinbases
+        in
+        Ledger.close (Staged_ledger.ledger staged_ledger) ;
+        Transition_frontier.Persistent_root.Instance.destroy
+          temp_persistent_root_instance ;
+        (scan_state, pending_coinbases)
       with
       | Error e ->
           let%bind () =
@@ -420,7 +432,7 @@ end = struct
              Retry bootstrap" ;
           Writer.close sync_ledger_writer ;
           loop ()
-      | Ok new_root_staged_ledger -> (
+      | Ok (scan_state, pending_coinbase) -> (
           let%bind () =
             Trust_system.(
               record t.trust_system t.logger sender
@@ -483,16 +495,12 @@ end = struct
           | Ok () ->
               (* Close the old frontier and reload a new on from disk. *)
               let new_root_data =
-                Transition_frontier.Root_data.(
-                  limit
-                    { transition= new_root
-                    ; staged_ledger= new_root_staged_ledger })
+                Transition_frontier.Root_data.Limited.Stable.V1.
+                  {transition= new_root; scan_state; pending_coinbase}
               in
-              let%bind () = Transition_frontier.close frontier in
               let%bind () =
                 Transition_frontier.Persistent_frontier.reset_database_exn
-                  (Transition_frontier.persistent_frontier frontier)
-                  ~root_data:new_root_data
+                  persistent_frontier ~root_data:new_root_data
               in
               let%map new_frontier =
                 Transition_frontier.load

@@ -21,6 +21,8 @@ module type Inputs_intf = sig
     Coda_intf.Bootstrap_controller_intf
     with type network := Network.t
      and type transition_frontier := Transition_frontier.t
+     and type persistent_root := Transition_frontier.Persistent_root.t
+     and type persistent_frontier := Transition_frontier.Persistent_frontier.t
 end
 
 module Make (Inputs : Inputs_intf) :
