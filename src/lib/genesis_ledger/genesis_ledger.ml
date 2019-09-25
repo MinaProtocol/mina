@@ -59,6 +59,11 @@ genesis_ledger = "testnet_medium_rare"]
 
 include Testnet_medium_rare_ledger
 
+[%%elif
+genesis_ledger = "testnet_filet_mignon"]
+
+include Testnet_filet_mignon_ledger
+
 [%%else]
 
 [%%error

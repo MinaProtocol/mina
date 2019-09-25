@@ -1,4 +1,3 @@
-
 open Functor.Without_private
 module Public_key = Signature_lib.Public_key
 
@@ -1111,5 +1110,5 @@ include Make (struct
           Public_key.Compressed.of_base58_check_exn
             "tNcik6XeAF6d2WXKuVb9TRjKV9Gqm2WK2kWVVGoR1VKPMSfLxzYhkH7YxCAVPHBLBwnMKinrGiBCynRPzML8SuMGtqG1mnE398wtYgLor2xMmYLc5PZbu2pimTmrmvbKLZLoiY7JaAUGds"
       ; balance= 1
-      ; delegate= None }]
+      ; delegate= None } ]
 end)
