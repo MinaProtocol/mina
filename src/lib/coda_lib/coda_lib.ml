@@ -676,9 +676,13 @@ let create (config : Config.t) =
               ~get_transition_chain:
                 (handle_request ~f:Sync_handler.get_transition_chain)
           in
+          let txn_pool_config =
+            Network_pool.Transaction_pool.Resource_pool.make_config
+              ~trust_system:config.trust_system
+          in
           let transaction_pool =
-            Network_pool.Transaction_pool.create ~logger:config.logger
-              ~pids:config.pids ~trust_system:config.trust_system
+            Network_pool.Transaction_pool.create ~config:txn_pool_config
+              ~logger:config.logger
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
@@ -775,9 +779,13 @@ let create (config : Config.t) =
                    Coda_networking.ban_notify net peer banned_until
                  in
                  () )) ;
+          let snark_pool_config =
+            Network_pool.Snark_pool.Resource_pool.make_config ~verifier
+              ~trust_system:config.trust_system
+          in
           let%bind snark_pool =
-            Network_pool.Snark_pool.load ~logger:config.logger
-              ~pids:config.pids ~trust_system:config.trust_system
+            Network_pool.Snark_pool.load ~config:snark_pool_config
+              ~logger:config.logger
               ~disk_location:config.snark_pool_disk_location
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r

@@ -55,6 +55,7 @@ module type S = sig
     with type resource_pool := Resource_pool.t
      and type transition_frontier := transition_frontier
      and type resource_pool_diff := Resource_pool.Diff.t
+     and type config := Resource_pool.Config.t
 
   val add : t -> User_command.t -> unit Deferred.t
 end
@@ -85,10 +86,17 @@ struct
   module Resource_pool = struct
     include Max_size
 
+    module Config = struct
+      type t = {trust_system: Trust_system.t sexp_opaque}
+      [@@deriving sexp_of, make]
+    end
+
+    let make_config = Config.make
+
     type t =
       { mutable pool: Indexed_pool.t
+      ; config: Config.t
       ; logger: Logger.t sexp_opaque
-      ; trust_system: Trust_system.t sexp_opaque
       ; mutable diff_reader: unit Deferred.t sexp_opaque Option.t
       ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
     [@@deriving sexp_of]
@@ -201,11 +209,11 @@ struct
       t.pool <- pool'' ;
       Deferred.unit
 
-    let create ~logger ~pids:_ ~trust_system ~frontier_broadcast_pipe =
+    let create ~frontier_broadcast_pipe ~config ~logger =
       let t =
         { pool= Indexed_pool.empty
+        ; config
         ; logger
-        ; trust_system
         ; diff_reader= None
         ; best_tip_ledger= None }
       in
@@ -316,8 +324,8 @@ struct
                unavailable, ignoring."
         | Some ledger ->
             let trust_record =
-              Trust_system.record_envelope_sender t.trust_system t.logger
-                sender
+              Trust_system.record_envelope_sender t.config.trust_system
+                t.logger sender
             in
             let rec go txs' pool accepted =
               match txs' with
@@ -588,10 +596,11 @@ let%test_module _ =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
       let trust_system = Trust_system.null () in
+      let logger = Logger.null () in
+      let config = Test.Resource_pool.make_config ~trust_system in
       let pool =
-        Test.Resource_pool.create ~logger:(Logger.null ())
-          ~pids:(Child_processes.Termination.create_pid_set ())
-          ~trust_system ~frontier_broadcast_pipe:tf_pipe_r
+        Test.Resource_pool.create ~config ~logger
+          ~frontier_broadcast_pipe:tf_pipe_r
       in
       let%map () = Async.Scheduler.yield () in
       ( (fun txs ->
@@ -781,10 +790,11 @@ let%test_module _ =
       Thread_safe.block_on_async_exn (fun () ->
           (* Set up initial frontier *)
           let frontier_pipe_r, frontier_pipe_w = Broadcast_pipe.create None in
+          let logger = Logger.null () in
+          let trust_system = Trust_system.null () in
+          let config = Test.Resource_pool.make_config ~trust_system in
           let pool =
-            Test.Resource_pool.create ~logger:(Logger.null ())
-              ~pids:(Child_processes.Termination.create_pid_set ())
-              ~trust_system:(Trust_system.null ())
+            Test.Resource_pool.create ~config ~logger
               ~frontier_broadcast_pipe:frontier_pipe_r
           in
           let assert_pool_txs txs =
