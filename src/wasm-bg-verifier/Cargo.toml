@@ -1,0 +1,14 @@
+[package]
+name = "wasm-bg-verifier"
+version = "0.1.0"
+authors = ["cmr <cmr@o1labs.org>"]
+edition = "2018"
+license = "Apache-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ff = { path = "third_party/librustzcash/ff" }
+group = { path = "third_party/librustzcash/group" }
+pairing = { path = "third_party/librustzcash/pairing" }
+num-bigint = {git = "https://github.com/rust-num/num-bigint.git", rev = "8d398ea5308fa2261d9a5c278610fe6cf5d493e8"}
