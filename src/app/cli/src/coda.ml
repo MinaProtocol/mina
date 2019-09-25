@@ -830,7 +830,8 @@ let coda_commands logger =
 new_cli]
 
 let coda_commands logger =
-  ("accounts", Client.accounts) :: coda_commands logger
+  ("accounts", Client.accounts)
+  :: ("client2", Client.client) :: coda_commands logger
 
 [%%endif]
 
