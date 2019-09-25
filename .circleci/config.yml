@@ -151,8 +151,9 @@ jobs:
                 name: Ensure/Fix opam permisssions
                 command: |
                     set +e
-                    sudo chown -R distiller /Users/distiller/.opam
-                    sudo chmod -R u+w /Users/distiller/.opam
+                    sudo mkdir -p /Users/distiller/.opam
+                    sudo chown -R distiller /Users/distiller/.opam | true
+                    sudo chmod -R u+w /Users/distiller/.opam | true
             - run:
                 name: Install macos dependencies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
