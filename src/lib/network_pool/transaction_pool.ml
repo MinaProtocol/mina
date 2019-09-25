@@ -103,7 +103,7 @@ struct
       ; locally_generated_committed:
           (User_command.With_valid_signature.t, Time.t) Hashtbl.t
             (** Ones that are included in the current best tip. *)
-      ; config : Config.t
+      ; config: Config.t
       ; logger: Logger.t sexp_opaque
       ; mutable diff_reader: unit Deferred.t sexp_opaque Option.t
       ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
@@ -115,16 +115,14 @@ struct
       Sequence.unfold ~init:p ~f:(fun pool ->
           match Indexed_pool.get_highest_fee pool with
           | Some cmd ->
-              let unchecked = User_command.forget_check cmd in
               Some
                 ( cmd
-                , Indexed_pool.handle_committed_txn pool
-                    (User_command.sender unchecked)
-                    (User_command.nonce unchecked)
-                    (* we have the invariant that the transactions currently in
-                     the pool are always valid against the best tip, so no need
-                     to check balances here *)
-                    Currency.Amount.max_int )
+                , fst
+                  @@ Indexed_pool.handle_committed_txn pool cmd
+                       (* we have the invariant that the transactions currently
+                          in the pool are always valid against the best tip, so
+                          no need to check balances here *)
+                       Currency.Amount.max_int )
           | None ->
               None )
 
@@ -230,8 +228,9 @@ struct
               , `List
                   (List.map ~f:User_command.With_valid_signature.to_yojson
                      locally_generated_dropped) ) ] ;
-      let pool'' =
-        List.fold new_user_commands ~init:pool' ~f:(fun p cmd ->
+      let pool'', dropped_commit_conflicts =
+        List.fold new_user_commands ~init:(pool', Sequence.empty)
+          ~f:(fun (p, dropped_so_far) cmd ->
             let sender = User_command.sender cmd in
             let balance =
               match Base_ledger.location_of_key validation_ledger sender with
@@ -257,9 +256,27 @@ struct
                   ~metadata:[("cmd", User_command.to_yojson cmd)] ;
                 Hashtbl.add_exn t.locally_generated_committed ~key:cmd'
                   ~data:time_added ) ;
-            Indexed_pool.handle_committed_txn p sender (User_command.nonce cmd)
-              (Currency.Balance.to_amount balance) )
+            let p', dropped =
+              Indexed_pool.handle_committed_txn p cmd'
+                (Currency.Balance.to_amount balance)
+            in
+            (p', Sequence.append dropped_so_far dropped) )
       in
+      let commit_conflicts_locally_generated =
+        Sequence.filter dropped_commit_conflicts ~f:(fun cmd ->
+            Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+            |> Option.is_some )
+      in
+      if not @@ Sequence.is_empty commit_conflicts_locally_generated then
+        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Locally generated commands $cmds dropped because they conflicted \
+           with a committed command."
+          ~metadata:
+            [ ( "cmds"
+              , `List
+                  (Sequence.to_list
+                     (Sequence.map commit_conflicts_locally_generated
+                        ~f:User_command.With_valid_signature.to_yojson)) ) ] ;
       Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
         !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
           %i commands during backtracking to maintain max size."
@@ -653,21 +670,25 @@ struct
       in
       Hashtbl.filteri_inplace t.locally_generated_uncommitted
         ~f:(fun ~key ~data ->
-          if is_expired data then (
-            Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-              "No longer rebroadcasting uncommitted command $cmd, %s" added_str
-              ~metadata:(metadata ~key ~data) ;
-            false )
-          else true ) ;
+          match is_expired data with
+          | `Expired ->
+              Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                "No longer rebroadcasting uncommitted command $cmd, %s"
+                added_str ~metadata:(metadata ~key ~data) ;
+              false
+          | `Ok ->
+              true ) ;
       Hashtbl.filteri_inplace t.locally_generated_committed
         ~f:(fun ~key ~data ->
-          if is_expired data then (
-            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-              "Removing committed locally generated command $cmd from \
-               possible rebroadcast pool, %s"
-              added_str ~metadata:(metadata ~key ~data) ;
-            false )
-          else true ) ;
+          match is_expired data with
+          | `Expired ->
+              Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                "Removing committed locally generated command $cmd from \
+                 possible rebroadcast pool, %s"
+                added_str ~metadata:(metadata ~key ~data) ;
+              false
+          | `Ok ->
+              true ) ;
       (* Important to maintain ordering here *)
       let rebroadcastable_txs =
         (Hashtbl.keys t.locally_generated_uncommitted :> User_command.t list)
@@ -809,7 +830,12 @@ let%test_module _ =
                 key (Time.to_string committed)
                 (Time.to_string uncommitted)
                 ()
-          | `Left cmd | `Right cmd ->
+          | `Left cmd ->
+              Some cmd
+          | `Right cmd ->
+              (* Locally generated uncommitted transactions should be in the
+                 pool, so long as we're not in the middle of updating it. *)
+              assert (Indexed_pool.member pool.pool key) ;
               Some cmd )
       in
       ()
@@ -978,7 +1004,7 @@ let%test_module _ =
           best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 1_000 1] ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= List.take independent_cmds 1
+              { new_user_commands= List.take independent_cmds 2
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -1197,7 +1223,7 @@ let%test_module _ =
       [%test_eq: User_command.t list list]
         ( List.map ~f:normalize
         @@ Test.Resource_pool.get_rebroadcastable pool
-             ~is_expired:(Fn.const false) )
+             ~is_expired:(Fn.const `Ok) )
         expected
 
     let mock_sender =
@@ -1286,7 +1312,7 @@ let%test_module _ =
           *)
           let _ =
             Test.Resource_pool.get_rebroadcastable pool
-              ~is_expired:(Fn.const true)
+              ~is_expired:(Fn.const `Expired)
           in
           assert_pool_txs (List.drop local_cmds 4 @ remote_cmds) ;
           assert_rebroadcastable pool [] ;

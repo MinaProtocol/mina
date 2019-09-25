@@ -54,7 +54,8 @@ module type Resource_pool_intf = sig
       anymore. If it does, the implementation should not return that item, and
       remove it from the set of potentially-rebroadcastable item.
   *)
-  val get_rebroadcastable : t -> is_expired:(Time.t -> bool) -> Diff.t list
+  val get_rebroadcastable :
+    t -> is_expired:(Time.t -> [`Expired | `Ok]) -> Diff.t list
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a

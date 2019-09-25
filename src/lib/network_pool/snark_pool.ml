@@ -35,7 +35,7 @@ module type S = sig
   module For_tests : sig
     val get_rebroadcastable :
          Resource_pool.t
-      -> is_expired:(Time.t -> bool)
+      -> is_expired:(Time.t -> [`Expired | `Ok])
       -> Resource_pool.Diff.t list
   end
 
@@ -203,10 +203,12 @@ struct
                         return ()
                       else (
                         removedCounter := 0 ;
-                        Statement_table.filter_keys_inplace t.snark_tables.all
-                          ~f:(work_is_referenced t) ;
                         Statement_table.filter_keys_inplace
-                          t.snark_tables.rebroadcastable
+                          t.snark_tables.rebroadcastable ~f:(fun work ->
+                            (* Rebroadcastable should always be a subset of all. *)
+                            assert (Hashtbl.mem t.snark_tables.all work) ;
+                            work_is_referenced t work ) ;
+                        Statement_table.filter_keys_inplace t.snark_tables.all
                           ~f:(work_is_referenced t) ;
                         return
                           (*when snark works removed from the pool*)
@@ -228,7 +230,7 @@ struct
               { all= Statement_table.create ()
               ; rebroadcastable= Statement_table.create () }
           ; logger
-            ; config
+          ; config
           ; ref_table= None }
         in
         listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
@@ -246,7 +248,12 @@ struct
           Hashtbl.set t.snark_tables.all ~key:work ~data:{proof; fee} ;
           if is_local then
             Hashtbl.set t.snark_tables.rebroadcastable ~key:work
-              ~data:({proof; fee}, Time.now ()) ;
+              ~data:({proof; fee}, Time.now ())
+          else
+            (* Stop rebroadcasting locally generated snarks if they are
+               overwritten. No-op if there is no rebroadcastable SNARK with that
+               statement. *)
+            Hashtbl.remove t.snark_tables.rebroadcastable work ;
           (*when snark work is added to the pool*)
           Coda_metrics.(
             Gauge.set Snark_work.snark_pool_size
@@ -341,18 +348,21 @@ struct
     let get_rebroadcastable t ~is_expired =
       Hashtbl.filteri_inplace t.snark_tables.rebroadcastable
         ~f:(fun ~key:stmt ~data:(_proof, time) ->
-          if is_expired time then (
-            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-              "No longer rebroadcasting SNARK with statement $stmt, it was \
-               added at $time its rebroadcast period is now expired"
-              ~metadata:
-                [ ( "stmt"
-                  , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
-                      stmt )
-                ; ( "time"
-                  , `String (Time.to_string_abs ~zone:Time.Zone.utc time) ) ] ;
-            false )
-          else true ) ;
+          match is_expired time with
+          | `Expired ->
+              Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                "No longer rebroadcasting SNARK with statement $stmt, it was \
+                 added at $time its rebroadcast period is now expired"
+                ~metadata:
+                  [ ( "stmt"
+                    , One_or_two.to_yojson
+                        Transaction_snark.Statement.to_yojson stmt )
+                  ; ( "time"
+                    , `String (Time.to_string_abs ~zone:Time.Zone.utc time) )
+                  ] ;
+              false
+          | `Ok ->
+              true ) ;
       Hashtbl.to_alist t.snark_tables.rebroadcastable
       |> List.map ~f:(fun (stmt, (snark, _time)) ->
              Diff.Stable.Latest.Add_solved_work (stmt, snark) )
@@ -710,8 +720,8 @@ let%test_module "random set test" =
           in
           let config = config verifier in
           let network_pool =
-            Mock_snark_pool.create ~logger:(Logger.null ())
-              ~config ~incoming_diffs:pool_reader
+            Mock_snark_pool.create ~logger:(Logger.null ()) ~config
+              ~incoming_diffs:pool_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
@@ -721,7 +731,7 @@ let%test_module "random set test" =
           Or_error.ok_exn res1 |> ignore ;
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
-              ~is_expired:(Fn.const false)
+              ~is_expired:(Fn.const `Ok)
           in
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
             rebroadcastable1 [] ;
@@ -730,17 +740,16 @@ let%test_module "random set test" =
           Or_error.ok_exn res2 |> ignore ;
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
-              ~is_expired:(Fn.const false)
+              ~is_expired:(Fn.const `Ok)
           in
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
             rebroadcastable2
             [Add_solved_work (stmt2, {proof= proof2; fee= fee2})] ;
           let rebroadcastable3 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
-              ~is_expired:(Fn.const true)
+              ~is_expired:(Fn.const `Expired)
           in
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
             rebroadcastable3 [] ;
           Deferred.unit )
-
   end )

@@ -35,7 +35,7 @@ module type S = sig
   module For_tests : sig
     val get_rebroadcastable :
          Resource_pool.t
-      -> is_expired:(Time.t -> bool)
+      -> is_expired:(Time.t -> [`Expired | `Ok])
       -> Resource_pool.Diff.t list
   end
 

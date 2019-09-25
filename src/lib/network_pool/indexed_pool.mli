@@ -34,13 +34,17 @@ val get_highest_fee : t -> User_command.With_valid_signature.t option
 
 (** Call this when a transaction is added to the best tip or when generating a
     sequence of transactions to apply. This will drop any transactions at that
-    nonce from the pool. *)
+    nonce from the pool. May also drop queued commands for that sender if there
+    was a different queued transaction from that sender at that nonce, and the
+    committed one consumes more currency than the queued one. In that case it'll
+    return the dropped ones in the sequence, including the one with the same
+    nonce as the committed one if it's different.
+*)
 val handle_committed_txn :
      t
-  -> Public_key.Compressed.t
-  -> Account_nonce.t (** Nonce of command committed. *)
+  -> User_command.With_valid_signature.t
   -> Currency.Amount.t (** Current balance of sender account. *)
-  -> t
+  -> t * User_command.With_valid_signature.t Sequence.t
 
 (** Add a command to the pool. Pass the current nonce for the account and
     its current balance. Throws if the contents of the pool before adding the

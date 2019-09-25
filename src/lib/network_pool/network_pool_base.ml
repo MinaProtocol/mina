@@ -45,7 +45,17 @@ end)
     network_pool
 
   (* Rebroadcast locally generated pool items every 5 minutes or every slot,
-     whichever is slower. Do so for half an hour before giving up. *)
+     whichever is slower. Do so for half an hour before giving up.
+
+     The goal here is to be resilient to short term network failures and
+     partitions. Note that with gossip we don't know anything about the state of
+     other peers' pools (we know if something made it into a block, but that can
+     take a long time and it's possible for things to be successfully received
+     but never used in a block), so in a healthy network all repetition is spam.
+     We need to balance reliability with efficiency. Exponential "backoff" would
+     be better, but it'd complicate the interface between this module and the
+     specific pool implementations.
+  *)
   let rebroadcast_loop : t -> Logger.t -> unit Deferred.t =
    fun t logger ->
     let rebroadcast_interval =
@@ -54,7 +64,9 @@ end)
           (of_ms @@ Float.of_int Consensus.Constants.block_window_duration_ms)
           (of_min 5.))
     in
-    let is_expired time = Time.(add time (Time.Span.of_min 30.) < now ()) in
+    let is_expired time =
+      if Time.(add time (Time.Span.of_min 30.) < now ()) then `Expired else `Ok
+    in
     let rec go () =
       let rebroadcastable =
         Resource_pool.get_rebroadcastable t.resource_pool ~is_expired
@@ -83,8 +95,11 @@ end)
     go ()
 
   let create ~config ~incoming_diffs ~frontier_broadcast_pipe ~logger =
-    let t = of_resource_pool_and_diffs
-      (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe)
-      ~incoming_diffs ~logger in
-    don't_wait_for (rebroadcast_loop t logger) ; t
+    let t =
+      of_resource_pool_and_diffs
+        (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe)
+        ~incoming_diffs ~logger
+    in
+    don't_wait_for (rebroadcast_loop t logger) ;
+    t
 end
