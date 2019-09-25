@@ -50,29 +50,29 @@ module type Inputs_intf = sig
 end
 
 module Make_upsert (Inputs : Inputs_intf) = struct
-  open Inputs
-
-  let upsert (hash_to_data_map : Data.t Hash.Map.t) =
+  let upsert (hash_to_data_map : Inputs.Data.t Inputs.Hash.Map.t) =
     let open Deferred.Result.Let_syntax in
-    let hash_set = Hash.Set.of_map_keys hash_to_data_map in
+    let hash_set = Inputs.Hash.Set.of_map_keys hash_to_data_map in
     let%bind existing_graphql_objects_map =
-      let%map graphql_objs = get_existing (Set.to_array hash_set) in
-      Array.map graphql_objs ~f:(fun obj -> (Graphql_query_result.hash obj, obj)
-      )
-      |> Array.to_list |> Hash.Map.of_alist_exn
+      let%map graphql_objs = Inputs.get_existing (Set.to_array hash_set) in
+      Array.map graphql_objs ~f:(fun obj ->
+          (Inputs.Graphql_query_result.hash obj, obj) )
+      |> Array.to_list |> Inputs.Hash.Map.of_alist_exn
     in
-    let%bind () = update hash_to_data_map existing_graphql_objects_map in
+    let%bind () =
+      Inputs.update hash_to_data_map existing_graphql_objects_map
+    in
     let%map inserted_items =
       let existing_hashes = Set.of_map_keys existing_graphql_objects_map in
       let data_to_insert =
         Map.filter_keys hash_to_data_map
           ~f:(Fn.compose not (Set.mem existing_hashes))
       in
-      let%map response_opt = insert data_to_insert in
+      let%map response_opt = Inputs.insert data_to_insert in
       Option.map response_opt ~f:(fun response ->
-          Hash.Map.of_alist_exn
+          Inputs.Hash.Map.of_alist_exn
             ( Array.map response ~f:(fun obj ->
-                  (Graphql_query_result.hash obj, obj) )
+                  (Inputs.Graphql_query_result.hash obj, obj) )
             |> Array.to_list ) )
     in
     match inserted_items with

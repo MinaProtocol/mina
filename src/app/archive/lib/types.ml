@@ -2,14 +2,32 @@ open Core
 open Coda_base
 open Signature_lib
 
-(** Library used to encode and decode types to a graphql format. 
-    
-    Unfortunately, the graphql_ppx does not have an "encode" attribute that allows us to map an OCaml type into some graphql schema type in a clean way. Therefore, we have to make our own encode and decode functions. On top of this, the generated GraphQL schema constructed by Hasura creates insert methods where the input fields are optional, even though the inputs are explicitly labeled as NOT NULL in Postgres. Additionally, graphql_ppx does not let us redefine a new type to make these optional inputs mandatory. Therefore, we are forced to lift the option types to some of our types. Furthermore, some types that are in Postgres but are not GraphQL primitive types are treated as custom scalars. These types include `bigint`, `bit(n)` and enums. graphql_ppx treats custom scalars as Yojson.Basic.t types (usually they are encoded as Json string types). 
-    
-    As a result, encoding a type to a Hasura input is broken into two phases: 
-    1. Postgres phase: This phase converts OCaml type (such as blocks and transactions) to some intermediate representation that is very similar to their respective Postgres schema type. 
-    2. Graphql object phase: The intermediate Postgres types are converted directly to some input that the Hasura Graphql schema would accept. This is essentially lifting types with the Option type and coercing Postgres custom scalar into Yojson types 
-**)
+(** Library used to encode and decode types to a graphql format.
+
+    Unfortunately, the graphql_ppx does not have an "encode" attribute that
+    allows us to map an OCaml type into some graphql schema type in a clean
+    way. Therefore, we have to make our own encode and decode functions. On top
+    of this, the generated GraphQL schema constructed by Hasura creates insert
+    methods where the fields for each argument are optional, even though the
+    inputs are explicitly labeled as NOT NULL in Postgres.Therefore, we are
+    forced to lift the option types to these nested types. Furthermore, some
+    types that are in Postgres but are not GraphQL primitive types are treated
+    as custom scalars. These types include `bigint`, `bit(n)` and enums.
+    graphql_ppx treats custom scalars as Yojson.Basic.t types (usually they are
+    encoded as Json string types).
+
+    As a result, encoding a type to a Hasura input is broken into two phases:
+
+    1. Postgres phase: This phase converts OCaml type (such as blocks and
+    transactions) to some intermediate representation that is very similar to
+    their respective Postgres schema type.
+
+    2. Graphql object phase: The intermediate Postgres types are converted
+    directly to some input that the Hasura Graphql schema would accept. This is
+    essentially lifting types with the Option type and coercing Postgres custom
+    scalar into Yojson types
+
+    **)
 
 module type Numeric_intf = sig
   type t
