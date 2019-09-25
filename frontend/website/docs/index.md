@@ -8,7 +8,7 @@ This breakthrough is made possible due to zk-SNARKs - a type of succinct cryptog
 
 ## Try Coda
 
-The Coda public testnet beta is live! Head over to the [testnet landing page](/docs/coda-testnet/) to learn more about the testnet and how to get involved.
+The Coda public testnet beta is live! Head over to the [testnet landing page](/testnet.html) to learn more about the testnet and how to get involved.
 
 If you're ready to install Coda and begin running a node, head over to the [Getting Started page](/docs/getting-started/).
 

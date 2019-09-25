@@ -283,7 +283,7 @@ let extend_blockchain {connection; _} chain next_state block prover_state
                 (Binable.to_string (module Extend_blockchain_input) input) )
           ; ("error", `String (Error.to_string_hum e)) ]
         "Prover failed: $error" ;
-      Error.raise e
+      Error e
 
 let prove t ~prev_state ~prev_state_proof ~next_state
     (transition : Internal_transition.t) pending_coinbase =
