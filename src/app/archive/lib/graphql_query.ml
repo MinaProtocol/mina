@@ -23,6 +23,7 @@ module User_commands = struct
 
   open Types.User_command
 
+  (* TODO: replace this with pagination *)
   module Query =
   [%graphql
   {|

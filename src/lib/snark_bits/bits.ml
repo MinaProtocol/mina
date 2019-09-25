@@ -77,7 +77,6 @@ module Vector = struct
 
     let to_bits t = List.init V.length ~f:(V.get t)
 
-    (* TODO: test *)
     let of_bits bools =
       List.foldi bools ~init:V.empty ~f:(fun i t bool -> V.set t i bool)
   end

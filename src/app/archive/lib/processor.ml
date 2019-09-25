@@ -108,7 +108,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
       let open Deferred.Result.Let_syntax in
       let%map result =
         Client.query_or_error
-          (Graphql_commands.Public_keys.Get_existing.make
+          (Graphql_query.Public_keys.Get_existing.make
              ~public_keys:
                (Array.map public_keys ~f:Public_key.Compressed.to_base58_check)
              ())
@@ -121,7 +121,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
       let open Deferred.Result.Let_syntax in
       let%map result =
         Client.query_or_error
-          (Graphql_commands.Public_keys.Insert.make
+          (Graphql_query.Public_keys.Insert.make
              ~public_keys:
                ( Public_key.Compressed.Map.keys hash_to_data_map
                |> Array.of_list
@@ -159,7 +159,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
       let open Deferred.Result.Let_syntax in
       let%map existing =
         Client.query_or_error
-          (Graphql_commands.User_commands.Get_existing.make
+          (Graphql_query.User_commands.Get_existing.make
              ~hashes:
                (Array.map transaction_hashes
                   ~f:Transaction_hash.to_base58_check)
@@ -186,7 +186,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
       |> List.map ~f:(fun (current_id, new_first_seen) ->
              let open Deferred.Result.Let_syntax in
              let graphql =
-               Graphql_commands.User_commands.Update.make ~current_id
+               Graphql_query.User_commands.Update.make ~current_id
                  ~new_first_seen:
                    ( Types.Bitstring.to_yojson
                    @@ Types.Block_time.serialize new_first_seen )
@@ -233,7 +233,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         |> Array.of_list
       in
       let graphql =
-        Graphql_commands.User_commands.Insert.make
+        Graphql_query.User_commands.Insert.make
           ~user_commands:new_user_commands ()
       in
       let%map result = Client.query_or_error graphql in
@@ -273,8 +273,7 @@ let%test_module "Processor" =
            Monitor.try_with_or_error ~name:"Write Processor" f
          in
          let%map clear_action =
-           Processor.Client.query_or_error
-           @@ Graphql_commands.Clear_data.make ()
+           Processor.Client.query_or_error @@ Graphql_query.Clear_data.make ()
          in
          Or_error.all_unit
            [ result
@@ -329,7 +328,7 @@ let%test_module "Processor" =
               let%bind () = deferred in
               let%bind query_result =
                 Processor.Client.query
-                  (Graphql_commands.User_commands.Query.make
+                  (Graphql_query.User_commands.Query.make
                      ~hash:
                        Transaction_hash.(
                          to_base58_check @@ hash_user_command user_command)
@@ -338,7 +337,7 @@ let%test_module "Processor" =
               let queried_user_command = query_result#user_commands.(0) in
               let%map public_keys =
                 Processor.Client.query
-                  (Graphql_commands.Public_keys.Get_existing.make
+                  (Graphql_query.Public_keys.Get_existing.make
                      ~public_keys:
                        ( Array.map ~f:Public_key.Compressed.to_base58_check
                        @@ Array.of_list

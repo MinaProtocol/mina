@@ -143,6 +143,10 @@ struct
 
   module Bits = Bits
 
+  let to_bits = Bits.to_bits
+
+  let of_bits = Bits.of_bits
+
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 
   let length_in_triples = (length_in_bits + 2) / 3

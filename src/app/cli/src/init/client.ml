@@ -886,9 +886,8 @@ let set_snark_work_fee =
   @@ Cli_lib.Background_daemon.graphql_init
        Command.Param.(anon @@ ("fee" %: Cli_lib.Arg_type.txn_fee))
        ~f:(fun (module Client) fee ->
-         let open Graphql_query in
          let graphql =
-           Set_snark_work_fee.make
+           Graphql_query.Set_snark_work_fee.make
              ~fee:
                ( Graphql_client_lib.Encoders.uint64
                @@ Currency.Fee.to_uint64 fee )
