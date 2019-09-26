@@ -13,12 +13,15 @@ import (
 	"sync"
 	"time"
 
+	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
+
 	"github.com/go-errors/errors"
 	logging "github.com/ipfs/go-log"
 	logwriter "github.com/ipfs/go-log/writer"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -130,6 +133,10 @@ func needsConfigure() error {
 	return badRPC(errors.New("helper not yet configured"))
 }
 
+func needsDHT() error {
+	return badRPC(errors.New("helper not yet joined to pubsub"))
+}
+
 type configureMsg struct {
 	Statedir  string   `json:"statedir"`
 	Privk     string   `json:"privk"`
@@ -161,19 +168,6 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		maddrs[i] = res
 	}
 	helper, err := codanet.MakeHelper(app.Ctx, maddrs, m.Statedir, privk, m.NetworkID)
-	go func() {
-		for info := range helper.DiscoveredPeers {
-			addrStrings := make([]string, len(info.Addrs))
-			for i, a := range info.Addrs {
-				addrStrings[i] = a.String()
-			}
-			app.writeMsg(discoveredPeerUpcall{
-				ID:     peer.IDB58Encode(info.ID),
-				Addrs:  addrStrings,
-				Upcall: "discoveredPeer",
-			})
-		}
-	}()
 	if err != nil {
 		return nil, badHelper(err)
 	}
@@ -219,6 +213,10 @@ func (t *publishMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+	if app.P2p.Dht == nil {
+		return nil, needsDHT()
+	}
+
 	data, err := b58.Decode(t.Data)
 	if err != nil {
 		return nil, badRPC(err)
@@ -243,6 +241,9 @@ type publishUpcall struct {
 func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
+	}
+	if app.P2p.Dht == nil {
+		return nil, needsDHT()
 	}
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
 		seqno := <-seqs
@@ -403,17 +404,9 @@ type incomingMsgUpcall struct {
 
 func handleStreamReads(app *app, stream net.Stream, idx int) {
 	go func() {
-		buf := make([]byte, 512)
+		buf := make([]byte, 4096)
 		for {
 			len, err := stream.Read(buf)
-			if err != nil && err != io.EOF {
-				app.writeMsg(streamLostUpcall{
-					Upcall:    "streamLost",
-					StreamIdx: idx,
-					Reason:    fmt.Sprintf("read failure: %s", err.Error()),
-				})
-				stream.Reset()
-			}
 
 			if len != 0 {
 				app.writeMsg(incomingMsgUpcall{
@@ -421,6 +414,15 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 					Data:      b58.Encode(buf[:len]),
 					StreamIdx: idx,
 				})
+			}
+
+			if err != nil && err != io.EOF {
+				app.writeMsg(streamLostUpcall{
+					Upcall:    "streamLost",
+					StreamIdx: idx,
+					Reason:    fmt.Sprintf("read failure: %s", err.Error()),
+				})
+				break
 			}
 
 			if err == io.EOF {
@@ -459,7 +461,11 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.Streams[streamIdx] = stream
-	handleStreamReads(app, stream, streamIdx)
+	go func() {
+		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
+		time.Sleep(250 * time.Millisecond)
+		handleStreamReads(app, stream, streamIdx)
+	}()
 	return openStreamResult{StreamIdx: streamIdx, RemoteAddr: stream.Conn().RemoteMultiaddr().String(), RemotePeerID: stream.Conn().RemotePeer().String()}, nil
 }
 
@@ -490,7 +496,7 @@ func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
 		return nil, needsConfigure()
 	}
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
-		err := stream.Close()
+		err := stream.Reset()
 		if err != nil {
 			return nil, badp2p(err)
 		}
@@ -604,12 +610,89 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 type beginAdvertisingMsg struct {
 }
 
+type mdnsListener struct {
+	FoundPeer chan peer.AddrInfo
+}
+
+func (l *mdnsListener) HandlePeerFound(info peer.AddrInfo) {
+	l.FoundPeer <- info
+}
+
 func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
 
-	discovery.Advertise(app.Ctx, app.P2p.Discovery, app.P2p.Rendezvous)
+	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Minute, "_coda-discovery._udp.local")
+	if err != nil {
+		return nil, err
+	}
+	app.P2p.Mdns = &mdns
+	l := &mdnsListener{FoundPeer: make(chan peer.AddrInfo)}
+	mdns.RegisterNotifee(l)
+
+	routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
+
+	if routingDiscovery == nil {
+		return nil, errors.New("failed to create routing discovery")
+	}
+
+	app.P2p.Discovery = routingDiscovery
+
+	discovered := make(chan peer.AddrInfo)
+	app.P2p.DiscoveredPeers = discovered
+
+	foundPeer := func(info peer.AddrInfo, source string) {
+		if info.ID != "" && len(info.Addrs) != 0 {
+			ctx, cancel := context.WithTimeout(app.Ctx, 15*time.Second)
+			defer cancel()
+			if err := app.P2p.Host.Connect(ctx, info); err != nil {
+				app.P2p.Logger.Warning("couldn't connect to %s peer %v (maybe the network ID mismatched?): %v", source, info.Loggable(), err)
+			} else {
+				app.P2p.Logger.Info("Found a %s peer: %s", source, info.Loggable())
+				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+				addrStrings := make([]string, len(info.Addrs))
+				for i, a := range info.Addrs {
+					addrStrings[i] = a.String()
+				}
+				app.writeMsg(discoveredPeerUpcall{
+					ID:     peer.IDB58Encode(info.ID),
+					Addrs:  addrStrings,
+					Upcall: "discoveredPeer",
+				})
+			}
+		}
+	}
+
+	// report local discovery peers
+	go func() {
+		for info := range l.FoundPeer {
+			foundPeer(info, "local")
+		}
+	}()
+
+	// report dht peers
+	go func() {
+		for {
+			// default is to yield only 100 peers at a time. for now, always be
+			// looking... TODO: Is there a better way to use discovery? Should we only
+			// have to explicitly search once at startup?
+			dhtpeers, err := routingDiscovery.FindPeers(app.Ctx, app.P2p.Rendezvous)
+			if err != nil {
+				app.P2p.Logger.Error("failed to find DHT peers: ", err)
+			}
+			for info := range dhtpeers {
+				foundPeer(info, "dht")
+			}
+			time.Sleep(5 * time.Minute)
+		}
+	}()
+
+	if err := app.P2p.Dht.Bootstrap(app.Ctx); err != nil {
+		return nil, badp2p(err)
+	}
+
+	discovery.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
 
 	return "beginAdvertising success", nil
 }
@@ -647,7 +730,7 @@ func main() {
 	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
 	log.SetOutput(os.Stderr)
 	logging.SetAllLoggers(logging2.INFO)
-	helper_log := logging.Logger("helper top-level JSON handling")
+	helperLog := logging.Logger("helper top-level JSON handling")
 
 	go func() {
 		i := 0
@@ -688,7 +771,7 @@ func main() {
 		}
 		defer func() {
 			if r := recover(); r != nil {
-				helper_log.Error("While handling RPC:", line, "\nThe following panic occurred: ", r)
+				helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r)
 			}
 		}()
 		res, err := msg.run(app)
