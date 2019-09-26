@@ -240,7 +240,7 @@ jobs:
             - run:
                   name: Download candidate stable PV keys
                   environment:
-                    DUNE_PROFILE: {{profile}}
+                    DUNE_PROFILE: testnet_postake_medium_curves
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run: opam switch import src/opam.export
             - run: opam pin -y add src/external/ocaml-sodium
