@@ -30,7 +30,7 @@ If you haven’t started yet, this week will be great timing. We have a New Memb
 
 Challenge #16 “New Member Welcome Bonus”
 
-This week, we have a package deal with a big bonus for new members. This would be a great chance to invite your friends to join! New members who complete all of the following three challenges this week will receive *two times the total points\* value as a bonus*: #1 ‘Connect to Testnet’, #3 ‘Join Discord’, and #6 ‘Nice to Meet You’ (check out all challenge descriptions [here](https://codaprotocol.com/docs/coda-testnet/)). So instead of 700 pts\* (respectively 500 + 100 + 100), new users will receive 1400 pts\* ! — [Get started](https://codaprotocol.com/docs/getting-started/)!
+This week, we have a package deal with a big bonus for new members. This would be a great chance to invite your friends to join! New members who complete all of the following three challenges this week will receive *two times the total points\* value as a bonus*: #1 ‘Connect to Testnet’, #3 ‘Join Discord’, and #6 ‘Nice to Meet You’ (check out all challenge descriptions [here](https://codaprotocol.com/testnet.html)). So instead of 700 pts\* (respectively 500 + 100 + 100), new users will receive 1400 pts\* ! — [Get started](https://codaprotocol.com/docs/getting-started/)!
 
 Challenge #17 “Hello Memo”
 

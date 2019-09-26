@@ -8,7 +8,6 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
-module Sponge = Sponge_inst
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -794,19 +793,14 @@ let target_bit_length = Tick.Field.size_in_bits - 8
 
 module type Snark_intf = Snark_intf.S
 
-let%bench_fun "pedersen" =
-  let open Tick in
-  let x = Field.random () |> Field.unpack in
-  fun () ->
-    Pedersen.digest_fold (Pedersen.State.create ())
-      Fold_lib.Fold.(group3 ~default:false (of_list x))
+module Group_map = struct
+  let to_group =
+    Group_map.to_group (module Tick.Field) ~params:Tock_backend.bg_params
 
-let%bench_fun "rescue" =
-  let open Tick in
-  let x = Field.random () in
-  fun () -> Sponge.hash [|x|]
-
-let%bench_fun "poseidon" =
-  let open Tick in
-  let x = Field.random () in
-  fun () -> Sponge.Poseidon.hash Sponge.params [|x|]
+  module Checked = struct
+    let to_group =
+      Snarky_group_map.Checked.to_group
+        (module Tick.Run)
+        ~params:Tock_backend.bg_params
+  end
+end
