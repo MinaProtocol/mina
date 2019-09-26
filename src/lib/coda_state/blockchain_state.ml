@@ -127,12 +127,11 @@ type display = (string, string, string) Poly.t [@@deriving yojson]
 
 let display Poly.{staged_ledger_hash; snarked_ledger_hash; timestamp} =
   { Poly.staged_ledger_hash=
-      Visualization.display_short_sexp (module Ledger_hash)
+      Visualization.display_prefix_of_string @@ Ledger_hash.to_string
       @@ Staged_ledger_hash.ledger_hash staged_ledger_hash
   ; snarked_ledger_hash=
-      Visualization.display_short_sexp
-        (module Frozen_ledger_hash)
-        snarked_ledger_hash
+      Visualization.display_prefix_of_string
+      @@ Frozen_ledger_hash.to_string snarked_ledger_hash
   ; timestamp=
       Time.to_string_trimmed ~zone:Time.Zone.utc (Block_time.to_time timestamp)
   }
