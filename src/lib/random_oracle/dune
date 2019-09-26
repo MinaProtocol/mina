@@ -6,6 +6,5 @@
   (libraries
     core_kernel
     snarky
-    snarky_blake2
-    random_oracle_base
+    sponge
     crypto_params))

@@ -203,6 +203,15 @@ module F (Impl : Snarky.Snark_intf.S) :
   Intf.S with type 'a Base.t_ = 'a and type 'a A.t = 'a and module Impl = Impl =
 struct
   module T = struct
+    module Unchecked = struct
+      include Impl.Field
+      module Nat = Snarkette.Nat
+
+      let order = Snarkette.Nat.of_string (Bigint.to_string Impl.Field.size)
+
+      let to_yojson t = `String (to_string t)
+    end
+
     module Impl = Impl
     open Impl
 
@@ -236,12 +245,6 @@ struct
 
     let to_list x = [x]
 
-    module Unchecked = struct
-      include Field
-
-      let to_yojson t = `String (to_string t)
-    end
-
     type t = Field.Var.t
 
     let if_ = Field.Checked.if_
@@ -271,6 +274,8 @@ struct
     let square = `Custom Field.Checked.square
 
     let inv_exn = `Custom Field.Checked.inv
+
+    let real_part = Fn.id
   end
 
   include T
@@ -406,6 +411,8 @@ end = struct
     let inv_exn = `Define
 
     let assert_square = `Custom assert_square
+
+    let real_part (x, _) = Base.real_part x
   end
 
   include T
@@ -579,6 +586,8 @@ module E3
     let inv_exn = `Define
 
     let assert_square = `Define
+
+    let real_part (a, _, _) = F.real_part a
   end
 
   include T
@@ -668,6 +677,8 @@ module F3
     let square = `Define
 
     let assert_square = `Define
+
+    let real_part (a, _, _) = F.real_part a
   end
 
   include T

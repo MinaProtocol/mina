@@ -397,6 +397,8 @@ module type S = sig
       val curr_epoch : Value.t -> Epoch.t
 
       val curr_slot : Value.t -> Slot.t
+
+      val global_slot : Value.t -> int
     end
 
     module Proposal_data : sig
@@ -438,6 +440,12 @@ module type S = sig
       -> logger:Logger.t
       -> [`Keep | `Take]
 
+    type proposal =
+      [ `Check_again of Unix_timestamp.t
+      | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
+      | `Propose of
+        Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t ]
+
     (**
      * Determine if and when to perform the next transition proposal. Either
      * informs the callee to check again at some time in the future, or to
@@ -451,10 +459,7 @@ module type S = sig
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
-      -> [ `Check_again of Unix_timestamp.t
-         | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
-         | `Propose of
-           Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t ]
+      -> proposal
 
     (**
      * A hook for managing local state when the locked tip is updated.

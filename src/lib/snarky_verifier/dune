@@ -4,6 +4,7 @@
   (preprocess (pps ppx_jane ppx_deriving.eq))
   (libraries
     sgn_type
+    snarky_curves
     snarky
     snarky_curves
     snarkette

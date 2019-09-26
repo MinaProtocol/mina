@@ -604,7 +604,7 @@ module Tick = struct
     include Snarky_pairing.Make (T)
   end
 
-  module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
+  module Run = Crypto_params.Runners.Tick
 
   let m : Run.field Snarky.Snark.m = (module Run)
 
@@ -767,3 +767,15 @@ let%test_unit "miller-loop" =
              ~f:(Triple.map ~f:(Fn.compose Field.project M.Fq.to_bits))
         : Fqk.Unchecked.t ) )
     (Inner_curve.random (), G2.Unchecked.random ())
+
+module Group_map = struct
+  let to_group =
+    Group_map.to_group (module Tick.Field) ~params:Tock_backend.bg_params
+
+  module Checked = struct
+    let to_group =
+      Snarky_group_map.Checked.to_group
+        (module Tick.Run)
+        ~params:Tock_backend.bg_params
+  end
+end

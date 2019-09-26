@@ -31,11 +31,40 @@ module At_most_one : sig
   val increase : 'a t -> 'a list -> 'a t Or_error.t
 end
 
-module Pre_diff_with_at_most_two_coinbase : sig
-  type t =
-    { completed_works: Transaction_snark_work.t list
-    ; user_commands: User_command.t list
+module Pre_diff_two : sig
+  type ('a, 'b) t =
+    { completed_works: 'a list
+    ; user_commands: 'b list
     ; coinbase: Fee_transfer.Single.t At_most_two.t }
+  [@@deriving sexp, to_yojson]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type ('a, 'b) t [@@deriving sexp, to_yojson, bin_io, version]
+      end
+    end
+    with type ('a, 'b) V1.t = ('a, 'b) t
+end
+
+module Pre_diff_one : sig
+  type ('a, 'b) t =
+    { completed_works: 'a list
+    ; user_commands: 'b list
+    ; coinbase: Fee_transfer.Single.t At_most_one.t }
+  [@@deriving sexp, to_yojson]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type ('a, 'b) t [@@deriving sexp, to_yojson, bin_io, version]
+      end
+    end
+    with type ('a, 'b) V1.t = ('a, 'b) t
+end
+
+module Pre_diff_with_at_most_two_coinbase : sig
+  type t = (Transaction_snark_work.t, User_command.t) Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -48,10 +77,7 @@ module Pre_diff_with_at_most_two_coinbase : sig
 end
 
 module Pre_diff_with_at_most_one_coinbase : sig
-  type t =
-    { completed_works: Transaction_snark_work.t list
-    ; user_commands: User_command.t list
-    ; coinbase: Fee_transfer.Single.t At_most_one.t }
+  type t = (Transaction_snark_work.t, User_command.t) Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -94,26 +120,57 @@ module Stable :
 
 module With_valid_signatures_and_proofs : sig
   type pre_diff_with_at_most_two_coinbase =
-    { completed_works: Transaction_snark_work.Checked.t list
-    ; user_commands: User_command.With_valid_signature.t list
-    ; coinbase: Fee_transfer.Single.t At_most_two.t }
-  [@@deriving sexp]
+    ( Transaction_snark_work.Checked.t
+    , User_command.With_valid_signature.t )
+    Pre_diff_two.t
+  [@@deriving sexp, to_yojson]
 
   type pre_diff_with_at_most_one_coinbase =
-    { completed_works: Transaction_snark_work.Checked.t list
-    ; user_commands: User_command.With_valid_signature.t list
-    ; coinbase: Fee_transfer.Single.t At_most_one.t }
-  [@@deriving sexp]
+    ( Transaction_snark_work.Checked.t
+    , User_command.With_valid_signature.t )
+    Pre_diff_one.t
+  [@@deriving sexp, to_yojson]
 
   type diff =
     pre_diff_with_at_most_two_coinbase
     * pre_diff_with_at_most_one_coinbase option
-  [@@deriving sexp]
+  [@@deriving sexp, to_yojson]
 
-  type t = {diff: diff; creator: Public_key.Compressed.t} [@@deriving sexp]
+  type t = {diff: diff; creator: Public_key.Compressed.t}
+  [@@deriving sexp, to_yojson]
 
   val user_commands : t -> User_command.With_valid_signature.t list
 end
+
+module With_valid_signatures : sig
+  type pre_diff_with_at_most_two_coinbase =
+    ( Transaction_snark_work.t
+    , User_command.With_valid_signature.t )
+    Pre_diff_two.t
+  [@@deriving sexp, to_yojson]
+
+  type pre_diff_with_at_most_one_coinbase =
+    ( Transaction_snark_work.t
+    , User_command.With_valid_signature.t )
+    Pre_diff_one.t
+  [@@deriving sexp, to_yojson]
+
+  type diff =
+    pre_diff_with_at_most_two_coinbase
+    * pre_diff_with_at_most_one_coinbase option
+  [@@deriving sexp, to_yojson]
+
+  type t = {diff: diff; creator: Public_key.Compressed.t}
+  [@@deriving sexp, to_yojson]
+end
+
+val forget_proof_checks :
+  With_valid_signatures_and_proofs.t -> With_valid_signatures.t
+
+val validate_user_commands :
+     t
+  -> check:(User_command.t -> User_command.With_valid_signature.t option)
+  -> (With_valid_signatures.t, User_command.t) result
 
 val forget : With_valid_signatures_and_proofs.t -> t
 

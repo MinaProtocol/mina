@@ -55,6 +55,7 @@ module type S = sig
     with type resource_pool := Resource_pool.t
      and type transition_frontier := transition_frontier
      and type resource_pool_diff := Resource_pool.Diff.t
+     and type config := Resource_pool.Config.t
 
   val add : t -> User_command.t -> unit Deferred.t
 end
@@ -85,10 +86,17 @@ struct
   module Resource_pool = struct
     include Max_size
 
+    module Config = struct
+      type t = {trust_system: Trust_system.t sexp_opaque}
+      [@@deriving sexp_of, make]
+    end
+
+    let make_config = Config.make
+
     type t =
       { mutable pool: Indexed_pool.t
+      ; config: Config.t
       ; logger: Logger.t sexp_opaque
-      ; trust_system: Trust_system.t sexp_opaque
       ; mutable diff_reader: unit Deferred.t sexp_opaque Option.t
       ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
     [@@deriving sexp_of]
@@ -141,15 +149,15 @@ struct
     let handle_diff t frontier
         ({new_user_commands; removed_user_commands; reorg_best_tip= _} :
           Transition_frontier.Diff.Best_tip_diff.view) =
-      (* This runs whenever the best tip changes. The simple case is when the new
-         best tip is an extension of the old one. There, we remove any user
-         commands that were included in it from the transaction pool. Dealing with
-         a fork is more intricate. In general we want to remove any commands from
-         the pool that are included in the new best tip; and add any commands to
-         the pool that were included in the old one but not the new one, provided
-         they are still valid against the ledger of the best tip. The goal is that
-         transactions are carried from losing forks to winning ones as much as
-         possible. *)
+      (* This runs whenever the best tip changes. The simple case is when the
+         new best tip is an extension of the old one. There, we remove any user
+         commands that were included in it from the transaction pool. Dealing
+         with a fork is more intricate. In general we want to remove any
+         commands from the pool that are included in the new best tip; and add
+         any commands to the pool that were included in the old one but not the
+         new one, provided they are still valid against the ledger of the best
+         tip. The goal is that transactions are carried from losing forks to
+         winning ones as much as possible. *)
       let validation_ledger = get_best_tip_ledger_and_update t frontier in
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
@@ -201,11 +209,11 @@ struct
       t.pool <- pool'' ;
       Deferred.unit
 
-    let create ~logger ~trust_system ~frontier_broadcast_pipe =
+    let create ~frontier_broadcast_pipe ~config ~logger =
       let t =
         { pool= Indexed_pool.empty
+        ; config
         ; logger
-        ; trust_system
         ; diff_reader= None
         ; best_tip_ledger= None }
       in
@@ -216,8 +224,8 @@ struct
              | None -> (
                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                    "no frontier" ;
-                 (* Sanity check: the view pipe should have been closed before the
-                          frontier was destroyed. *)
+                 (* Sanity check: the view pipe should have been closed before
+                    the frontier was destroyed. *)
                  match t.diff_reader with
                  | None ->
                      Deferred.unit
@@ -242,9 +250,8 @@ struct
                  let validation_ledger =
                    get_best_tip_ledger_and_update t frontier
                  in
-                 (* The frontier has changed, so transactions in the pool may not
-                    be valid against the current best tip.
-                 *)
+                 (* The frontier has changed, so transactions in the pool may
+                    not be valid against the current best tip. *)
                  let new_pool, dropped =
                    Indexed_pool.revalidate t.pool (fun sender ->
                        match
@@ -316,8 +323,8 @@ struct
                unavailable, ignoring."
         | Some ledger ->
             let trust_record =
-              Trust_system.record_envelope_sender t.trust_system t.logger
-                sender
+              Trust_system.record_envelope_sender t.config.trust_system
+                t.logger sender
             in
             let rec go txs' pool accepted =
               match txs' with
@@ -433,9 +440,10 @@ struct
                                 go txs'' pool'' (tx :: accepted)
                             | Error `Insufficient_replace_fee ->
                                 (* We can't punish peers for this, since an
-                               attacker can simultaneously send different
-                               transactions at the same nonce to different
-                               nodes, which will then naturally gossip them. *)
+                                   attacker can simultaneously send different
+                                   transactions at the same nonce to different
+                                   nodes, which will then naturally gossip them.
+                                *)
                                 Logger.debug t.logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   "rejecting $cmd because of insufficient \
@@ -588,8 +596,10 @@ let%test_module _ =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
       let trust_system = Trust_system.null () in
+      let logger = Logger.null () in
+      let config = Test.Resource_pool.make_config ~trust_system in
       let pool =
-        Test.Resource_pool.create ~logger:(Logger.null ()) ~trust_system
+        Test.Resource_pool.create ~config ~logger
           ~frontier_broadcast_pipe:tf_pipe_r
       in
       let%map () = Async.Scheduler.yield () in
@@ -780,9 +790,11 @@ let%test_module _ =
       Thread_safe.block_on_async_exn (fun () ->
           (* Set up initial frontier *)
           let frontier_pipe_r, frontier_pipe_w = Broadcast_pipe.create None in
+          let logger = Logger.null () in
+          let trust_system = Trust_system.null () in
+          let config = Test.Resource_pool.make_config ~trust_system in
           let pool =
-            Test.Resource_pool.create ~logger:(Logger.null ())
-              ~trust_system:(Trust_system.null ())
+            Test.Resource_pool.create ~config ~logger
               ~frontier_broadcast_pipe:frontier_pipe_r
           in
           let assert_pool_txs txs =

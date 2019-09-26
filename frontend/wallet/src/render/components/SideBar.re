@@ -33,10 +33,11 @@ module Styles = {
     ]);
 };
 
+// TODO: Don't use an empty password
 module AddWallet = [%graphql
   {|
     mutation addWallet {
-        addWallet {
+        addWallet(input: {password: ""}) {
           publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
         }
     }

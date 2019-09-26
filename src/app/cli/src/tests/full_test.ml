@@ -68,6 +68,7 @@ let print_heartbeat logger =
 
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
+  let pids = Child_processes.Termination.create_pid_set () in
   setup_time_offsets () ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
@@ -115,7 +116,7 @@ let run_test () : unit Deferred.t =
         Auxiliary_database.External_transition_database.create ~logger
           external_transition_database_dir
       in
-      let time_controller = Block_time.Controller.(create basic) in
+      let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let consensus_local_state =
         Consensus.Data.Local_state.create
           (Public_key.Compressed.Set.singleton
@@ -167,7 +168,7 @@ let run_test () : unit Deferred.t =
       in
       let%bind coda =
         Coda_lib.create
-          (Coda_lib.Config.make ~logger ~trust_system ~net_config
+          (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~conf_dir:temp_conf_dir
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)

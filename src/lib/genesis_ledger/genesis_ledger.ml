@@ -1,6 +1,16 @@
 [%%import
 "../../config.mlh"]
 
+[%%inject
+"ledger_depth", ledger_depth]
+
+[%%inject
+"fake_accounts_target", fake_accounts_target]
+
+let _ =
+  if Base.Int.(fake_accounts_target > pow 2 ledger_depth) then
+    failwith "Genesis_ledger: fake_accounts_target >= 2**ledger_depth"
+
 [%%if
 defined genesis_ledger]
 
@@ -25,9 +35,9 @@ genesis_ledger = "test_five_even_stakes"]
 include Test_five_even_stakes
 
 [%%elif
-genesis_ledger = "test_holy_grail"]
+genesis_ledger = "test_three_even_stakes"]
 
-include Test_holy_grail
+include Test_three_even_stakes_ledger
 
 [%%elif
 genesis_ledger = "test_delegation"]
@@ -48,6 +58,11 @@ include Testnet_postake_ledger_many_proposers
 genesis_ledger = "testnet_medium_rare"]
 
 include Testnet_medium_rare_ledger
+
+[%%elif
+genesis_ledger = "testnet_filet_mignon"]
+
+include Testnet_filet_mignon_ledger
 
 [%%else]
 

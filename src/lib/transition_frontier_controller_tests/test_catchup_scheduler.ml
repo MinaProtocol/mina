@@ -27,9 +27,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
   ( module struct
     let logger = Logger.null ()
 
+    let pids = Child_processes.Termination.create_pid_set ()
+
     let trust_system = Trust_system.null ()
 
-    let time_controller = Block_time.Controller.basic
+    let time_controller = Block_time.Controller.basic ~logger
 
     let timeout_duration = Block_time.Span.of_ms 200L
 
@@ -40,7 +42,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let setup_random_frontier () =
       let open Deferred.Let_syntax in
       let%bind frontier =
-        create_root_frontier ~logger accounts_with_secret_keys
+        create_root_frontier ~logger ~pids accounts_with_secret_keys
       in
       let%map (_ : unit) =
         build_frontier_randomly
@@ -48,7 +50,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Quickcheck.Generator.with_size ~size:num_breadcrumbs
             @@ Quickcheck_lib.gen_imperative_ktree
                  (root_breadcrumb |> return |> Quickcheck.Generator.return)
-                 (gen_breadcrumb ~logger ~trust_system
+                 (gen_breadcrumb ~logger ~pids ~trust_system
                     ~accounts_with_secret_keys) )
           frontier
       in
@@ -64,7 +66,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       Rose_tree.T (root, children)
 
     let create_catchup_scheduler () =
-      let%map verifier = Verifier.create () in
+      let%map verifier = Verifier.create ~logger ~pids in
       Catchup_scheduler.create ~verifier
 
     let%test_unit "after the timeout expires, the missing node still doesn't \
@@ -96,7 +98,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind upcoming_breadcrumbs =
             Deferred.all
             @@ Quickcheck.random_value
-                 (gen_linear_breadcrumbs ~logger ~trust_system ~size:2
+                 (gen_linear_breadcrumbs ~logger ~pids ~trust_system ~size:2
                     ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let missing_hash =
@@ -163,7 +165,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind upcoming_breadcrumbs =
             Deferred.all
             @@ Quickcheck.random_value
-                 (gen_linear_breadcrumbs ~logger ~trust_system ~size
+                 (gen_linear_breadcrumbs ~logger ~pids ~trust_system ~size
                     ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let upcoming_transitions =
@@ -264,7 +266,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind upcoming_rose_tree =
             Rose_tree.Deferred.all
             @@ Quickcheck.random_value
-                 (gen_tree ~logger ~trust_system ~size:5
+                 (gen_tree ~logger ~pids ~trust_system ~size:5
                     ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let upcoming_breadcrumbs = Rose_tree.flatten upcoming_rose_tree in

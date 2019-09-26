@@ -35,18 +35,14 @@ let chain_id =
      let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
      Blake2.to_hex b2)
 
+[%%inject
+"daemon_expiry", daemon_expiry]
+
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir = Cli_lib.Flag.conf_dir
-     and unsafe_track_propose_key =
-       flag "unsafe-track-propose-key"
-         ~doc:
-           "Your private key will be copied to the internal wallets folder \
-            stripped of its password if it is given using the `propose-key` \
-            flag. (default: don't copy the private key)"
-         no_arg
      and propose_key =
        flag "propose-key"
          ~doc:
@@ -54,13 +50,6 @@ let daemon logger =
             provide both `propose-key` and `propose-public-key`. (default: \
             don't produce blocks)"
          (optional string)
-     and propose_public_key =
-       flag "propose-public-key"
-         ~doc:
-           "PUBLICKEY Public key for the associated private key that is being \
-            tracked by this daemon. You cannot provide both `propose-key` and \
-            `propose-public-key`. (default: don't produce blocks)"
-         (optional public_key_compressed)
      and initial_peers_raw =
        flag "peer"
          ~doc:
@@ -168,11 +157,6 @@ let daemon logger =
            "true|false Log transaction-pool diff received from peers \
             (default: false)"
          (optional bool)
-     and no_bans =
-       let module Expiration = struct
-         [%%expires_after "20190907"]
-       end in
-       flag "no-bans" no_arg ~doc:"don't ban peers (**TEMPORARY FOR TESTNET**)"
      and enable_libp2p =
        flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
      and libp2p_port =
@@ -216,7 +200,6 @@ let daemon logger =
              | Ok ll ->
                  Deferred.return ll )
        in
-       if no_bans then Trust_system.disable_bans () ;
        let%bind conf_dir =
          if is_background then
            let home = Core.Sys.home_directory () in
@@ -264,6 +247,22 @@ let daemon logger =
          ~metadata:
            [ ("commit", `String Coda_version.commit_id)
            ; ("branch", `String Coda_version.branch) ] ;
+       if not @@ String.equal daemon_expiry "never" then (
+         Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+           "Daemon will expire at $exp"
+           ~metadata:[("exp", `String daemon_expiry)] ;
+         let tm =
+           (* same approach as in Consensus.Constants.genesis_state_timestamp *)
+           let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
+           Core.Time.of_string_gen
+             ~if_no_timezone:(`Use_this_one default_timezone) daemon_expiry
+         in
+         Clock.run_at tm
+           (fun () ->
+             Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+               "Daemon has expired, shutting down" ;
+             Core.exit 0 )
+           () ) ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Booting may take several seconds, please wait" ;
        let libp2p_keypair =
@@ -346,7 +345,7 @@ let daemon logger =
          (let bytes_per_word = Sys.word_size / 8 in
           let rec loop () =
             let stat = Gc.stat () in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "OCaml memory statistics"
               ~metadata:
                 [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
@@ -537,54 +536,12 @@ let daemon logger =
            ; client_port
            ; libp2p_port }
          in
-         let wallets_disk_location = conf_dir ^/ "wallets" in
-         (* HACK: Until we can properly change propose keys at runtime we'll
-          * suffer by accepting a propose_public_key flag and reloading the wallet
-          * db here to find the keypair for the pubkey *)
          let%bind propose_keypair =
-           match (propose_key, propose_public_key) with
-           | Some _, Some _ ->
-               eprintf
-                 "Error: You cannot provide both `propose-key` and \
-                  `propose-public-key`\n" ;
-               exit 11
-           | Some sk_file, None ->
-               let%bind keypair =
-                 Secrets.Keypair.Terminal_stdin.read_exn sk_file
-               in
-               let%map () =
-                 (* If we wish to track the propose key *)
-                 if unsafe_track_propose_key then
-                   let pk = Public_key.compress keypair.public_key in
-                   let%bind wallets =
-                     Secrets.Wallets.load ~logger
-                       ~disk_location:wallets_disk_location
-                   in
-                   (* Either we already are tracking it *)
-                   match Secrets.Wallets.find wallets ~needle:pk with
-                   | Some _ ->
-                       Deferred.unit
-                   | None ->
-                       (* Or we import it *)
-                       Secrets.Wallets.import_keypair wallets keypair
-                       >>| ignore
-                 else Deferred.unit
-               in
-               Some keypair
-           | None, Some wallet_pk -> (
-               match%bind
-                 Secrets.Wallets.load ~logger
-                   ~disk_location:wallets_disk_location
-                 >>| Secrets.Wallets.find ~needle:wallet_pk
-               with
-               | Some keypair ->
-                   Deferred.Option.return keypair
-               | None ->
-                   eprintf
-                     "Error: This public key was not found in the local \
-                      daemon's wallet database\n" ;
-                   exit 12 )
-           | None, None ->
+           match propose_key with
+           | Some sk_file ->
+               let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
+               Some kp
+           | None ->
                return None
          in
          let%bind client_whitelist =
@@ -597,9 +554,8 @@ let daemon logger =
            (Async.Scheduler.long_cycles
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
-             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-               "long async cycle %s"
-               (Time_ns.Span.to_string span) ) ;
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               "Long async cycle, %0.01f seconds" (Time_ns.Span.to_sec span) ) ;
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
              ~location typ
@@ -613,7 +569,7 @@ let daemon logger =
          let trust_system = Trust_system.create ~db_dir:trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let time_controller =
-           Block_time.Controller.create Block_time.Controller.basic
+           Block_time.Controller.create @@ Block_time.Controller.basic ~logger
          in
          let initial_propose_keypairs =
            propose_keypair |> Option.to_list |> Keypair.Set.of_list
@@ -675,9 +631,59 @@ let daemon logger =
            Auxiliary_database.External_transition_database.create ~logger
              external_transition_database_dir
          in
+         (* log terminated child processes *)
+         let pids = Child_processes.Termination.create_pid_set () in
+         let rec terminated_child_loop () =
+           match
+             try Unix.wait_nohang `Any
+             with
+             | Unix.Unix_error (errno, _, _)
+             when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
+                  (* no child processes exist *)
+             ->
+               None
+           with
+           | None ->
+               (* no children have terminated, wait to check again *)
+               let%bind () = Async.after (Time.Span.of_min 1.) in
+               terminated_child_loop ()
+           | Some (child_pid, exit_or_signal) ->
+               let child_pid_metadata =
+                 [("child_pid", `Int (Pid.to_int child_pid))]
+               in
+               ( match exit_or_signal with
+               | Ok () ->
+                   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                     "Daemon child process $child_pid terminated with exit \
+                      code 0"
+                     ~metadata:child_pid_metadata
+               | Error err -> (
+                 match err with
+                 | `Signal signal ->
+                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                       "Daemon child process $child_pid terminated after \
+                        receiving signal $signal"
+                       ~metadata:
+                         ( ("signal", `String (Signal.to_string signal))
+                         :: child_pid_metadata )
+                 | `Exit_non_zero exit_code ->
+                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                       "Daemon child process $child_pid terminated with \
+                        nonzero exit code $exit_code"
+                       ~metadata:
+                         (("exit_code", `Int exit_code) :: child_pid_metadata)
+                 ) ) ;
+               (* terminate daemon if children registered *)
+               Child_processes.Termination.check_terminated_child pids
+                 child_pid logger ;
+               (* check for other terminated children, without waiting *)
+               terminated_child_loop ()
+         in
+         Deferred.don't_wait_for @@ terminated_child_loop () ;
          let%map coda =
            Coda_lib.create
-             (Coda_lib.Config.make ~logger ~trust_system ~conf_dir ~net_config
+             (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+                ~net_config
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
@@ -823,7 +829,8 @@ let coda_commands logger =
 new_cli]
 
 let coda_commands logger =
-  ("accounts", Client.accounts) :: coda_commands logger
+  ("accounts", Client.accounts)
+  :: ("client2", Client.client) :: coda_commands logger
 
 [%%endif]
 
@@ -854,6 +861,7 @@ let coda_commands logger =
         ; (module Coda_bootstrap_test)
         ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
+        ; (module Coda_txns_and_restart_non_proposers)
         ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)
