@@ -260,6 +260,9 @@ jobs:
                   name: Update and pin external submodules
                   command: ./scripts/pin-external-submodules.sh
             - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
+            - run:
                   name: Download candidate stable PV keys
                   environment:
                     DUNE_PROFILE: {{profile}}
