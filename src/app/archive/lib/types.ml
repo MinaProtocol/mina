@@ -4,14 +4,32 @@ open Coda_state
 open Coda_transition
 open Signature_lib
 
-(** Library used to encode and decode types to a graphql format. 
-    
-    Unfortunately, the graphql_ppx does not have an "encode" attribute that allows us to map an OCaml type into some graphql schema type in a clean way. Therefore, we have to make our own encode and decode functions. On top of this, the generated GraphQL schema constructed by Hasura creates insert methods where the input fields are optional, even though the inputs are explicitly labeled as NOT NULL in Postgres. Additionally, graphql_ppx does not let us redefine a new type to make these optional inputs mandatory. Therefore, we are forced to lift the option types to some of our types. Furthermore, some types that are in Postgres but are not GraphQL primitive types are treated as custom scalars. These types include `bigint`, `bit(n)` and enums. graphql_ppx treats custom scalars as Yojson.Basic.t types (usually they are encoded as Json string types). 
-    
-    As a result, encoding a type to a Hasura input is broken into two phases: 
-    1. Postgres phase: This phase converts OCaml type (such as blocks and transactions) to some intermediate representation that is very similar to their respective Postgres schema type. 
-    2. Graphql object phase: The intermediate Postgres types are converted directly to some input that the Hasura Graphql schema would accept. This is essentially lifting types with the Option type and coercing Postgres custom scalar into Yojson types 
-**)
+(** Library used to encode and decode types to a graphql format.
+
+    Unfortunately, the graphql_ppx does not have an "encode" attribute that
+    allows us to map an OCaml type into some graphql schema type in a clean
+    way. Therefore, we have to make our own encode and decode functions. On top
+    of this, the generated GraphQL schema constructed by Hasura creates insert
+    methods where the fields for each argument are optional, even though the
+    inputs are explicitly labeled as NOT NULL in Postgres.Therefore, we are
+    forced to lift the option types to these nested types. Furthermore, some
+    types that are in Postgres but are not GraphQL primitive types are treated
+    as custom scalars. These types include `bigint`, `bit(n)` and enums.
+    graphql_ppx treats custom scalars as Yojson.Basic.t types (usually they are
+    encoded as Json string types).
+
+    As a result, encoding a type to a Hasura input is broken into two phases:
+
+    1. Postgres phase: This phase converts OCaml type (such as blocks and
+    transactions) to some intermediate representation that is very similar to
+    their respective Postgres schema type.
+
+    2. Graphql object phase: The intermediate Postgres types are converted
+    directly to some input that the Hasura Graphql schema would accept. This is
+    essentially lifting types with the Option type and coercing Postgres custom
+    scalar into Yojson types
+
+    **)
 
 module Graphql_output = struct
   module With_first_seen = struct
@@ -132,6 +150,14 @@ module User_command_type = struct
         `String "payment"
     | `Delegation ->
         `String "delegation"
+
+  let decode = function
+    | `String "payment" ->
+        `Payment
+    | `String "delegation" ->
+        `Delegation
+    | _ ->
+        raise (Invalid_argument "Unexpected input to decode user command type")
 end
 
 module Public_key = struct
@@ -205,8 +231,6 @@ module User_command = struct
         | Stake_delegation _ ->
             `Delegation ) }
 
-  let public_key_obj_rel_insert_input = failwith "Need to implement"
-
   let to_graphql_obj
       {fee; hash; memo; nonce; receiver; sender; typ; amount; first_seen} =
     let open Option in
@@ -225,7 +249,9 @@ module User_command = struct
 
       method nonce = some @@ Bitstring.to_yojson nonce
 
-      method public_key = None
+      (* method public_key = object 
+        method data = 
+      end *)
 
       method publicKeyByReceiver = None
 
@@ -234,12 +260,38 @@ module User_command = struct
       method receiver = some receiver
 
       method typ = some @@ User_command_type.encode typ
+
     end
 
   let encode ~receiver ~sender user_command_with_hash block_time =
     to_graphql_obj
     @@ serialize user_command_with_hash (`Receiver receiver) (`Sender sender)
          (Some block_time)
+
+  let decode
+      {fee; hash= _; memo; nonce; receiver; sender; typ; amount; first_seen= _}
+      public_keys_map =
+    let receiver = Map.find_exn public_keys_map receiver in
+    let sender = Map.find_exn public_keys_map sender in
+    let body =
+      let open User_command_payload.Body in
+      match typ with
+      | `Delegation ->
+          Stake_delegation (Set_delegate {new_delegate= receiver})
+      | `Payment ->
+          Payment
+            { receiver
+            ; amount= Bitstring.of_bitstring (module Currency.Amount) amount }
+    in
+    let payload =
+      User_command_payload.create
+        ~fee:(Bitstring.of_bitstring (module Currency.Fee) fee)
+        ~nonce:
+          (Bitstring.of_bitstring (module Coda_numbers.Account_nonce) nonce)
+        ~memo:(User_command_memo.of_string memo)
+        ~body
+    in
+    Coda_base.{User_command.Poly.Stable.V1.payload; sender; signature= ()}
 end
 
 module Fee_transfer = struct
@@ -276,6 +328,15 @@ module Fee_transfer = struct
     @@ serialize fee_transfer_with_hash receiver (Some block_time)
 end
 
+(* module Blocks_user_commands = struct
+  type postgres = {
+    block_id: int;
+    user_command_id: int
+  }
+
+  let serialize = Fn.id
+end *)
+
 module Blocks = struct
   type postgres =
     { state_hash: string
@@ -284,16 +345,17 @@ module Blocks = struct
     ; ledger_hash: string
     ; global_slot: int
     ; ledger_proof_nonce: int
-    ; (* Default is zero*)
-      status: int
+    ; status: int (* Default is zero*)
     ; block_length: Bitstring.t
-    ; block_time: Bitstring.t }
+    ; block_time: Bitstring.t
+    ; user_commands: int list }
 
   type graphql_output = {id: int; state_hash: State_hash.t}
 
   let serialize
       (With_hash.{hash; data= external_transition} :
-        (External_transition.t, State_hash.t) With_hash.t) creator : postgres =
+        (External_transition.t, State_hash.t) With_hash.t) user_commands
+      creator : postgres =
     let blockchain_state =
       External_transition.blockchain_state external_transition
     in
@@ -323,7 +385,8 @@ module Blocks = struct
     ; block_length
     ; block_time=
         Block_time.serialize
-        @@ External_transition.timestamp external_transition }
+        @@ External_transition.timestamp external_transition
+    ; user_commands }
 
   let to_graphql_obj
       { state_hash
@@ -334,7 +397,8 @@ module Blocks = struct
       ; ledger_proof_nonce
       ; status
       ; block_length
-      ; block_time } =
+      ; block_time
+      ; user_commands } =
     let open Option in
     object
       method state_hash = some state_hash
@@ -359,11 +423,33 @@ module Blocks = struct
 
       method blocks_snark_jobs = None
 
-      method blocks_user_commands = None
+      method constraint = failwith "Hello"
+
+      method blocks_user_commands =
+        some
+        @@ object 
+             method data =
+               Array.map (Array.of_list user_commands)
+                 ~f:(fun user_command_id ->
+                   object
+                     method block = None
+
+                     method block_id = None
+
+                     method receipt_chain_hash = None
+
+                     method receipt_chain_hash_id = None
+                     
+                     method user_command = None
+                     
+                     method user_command_id = some user_command_id
+
+                   end )
+           end
 
       method public_key = None
     end
 
-  let encode external_transition creator =
-    to_graphql_obj @@ serialize external_transition creator
+  let encode external_transition user_command_ids creator =
+    to_graphql_obj @@ serialize external_transition user_command_ids creator
 end

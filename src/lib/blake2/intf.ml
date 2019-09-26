@@ -27,5 +27,7 @@ module type S = sig
 
   val to_raw_string : t -> string
 
+  val to_hex : t -> string
+
   val digest_string : ?off:int -> ?len:int -> String.t -> t
 end

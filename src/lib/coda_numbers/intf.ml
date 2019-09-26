@@ -45,6 +45,10 @@ module type S_unchecked = sig
 
   module Bits : Bits_intf.Convertable_bits with type t := t
 
+  val to_bits : t -> bool list
+
+  val of_bits : bool list -> t
+
   val fold : t -> bool Triple.t Fold.t
 end
 

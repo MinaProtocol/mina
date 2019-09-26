@@ -76,7 +76,7 @@ let stop_daemon =
   let open Daemon_rpcs in
   let open Command.Param in
   Command.async ~summary:"Stop the daemon"
-    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          let%map res = dispatch Stop_daemon.rpc () port in
          printf "%s"
            (or_error_str res
@@ -92,7 +92,7 @@ let get_balance =
       (required Cli_lib.Arg_type.public_key)
   in
   Command.async ~summary:"Get balance associated with a public key"
-    (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
+    (Cli_lib.Background_daemon.rpc_init address_flag ~f:(fun port address ->
          let%map res =
            dispatch_join_errors Daemon_rpcs.Get_balance.rpc
              (Public_key.compress address)
@@ -140,7 +140,8 @@ let get_trust_status =
   let json_flag = Cli_lib.Flag.json in
   let flags = Args.zip2 address_flag json_flag in
   Command.async ~summary:"Get the trust status associated with an IP address"
-    (Cli_lib.Background_daemon.init flags ~f:(fun port (ip_address, json) ->
+    (Cli_lib.Background_daemon.rpc_init flags
+       ~f:(fun port (ip_address, json) ->
          match%map
            dispatch Daemon_rpcs.Get_trust_status.rpc ip_address port
          with
@@ -179,7 +180,7 @@ let get_trust_status_all =
   let flags = Args.zip2 nonzero_flag json_flag in
   Command.async
     ~summary:"Get trust statuses for all peers known to the trust system"
-    (Cli_lib.Background_daemon.init flags ~f:(fun port (nonzero, json) ->
+    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (nonzero, json) ->
          match%map dispatch Daemon_rpcs.Get_trust_status_all.rpc () port with
          | Ok ip_trust_statuses ->
              (* always round the trust scores for display *)
@@ -212,7 +213,8 @@ let reset_trust_status =
   let json_flag = Cli_lib.Flag.json in
   let flags = Args.zip2 address_flag json_flag in
   Command.async ~summary:"Reset the trust status associated with an IP address"
-    (Cli_lib.Background_daemon.init flags ~f:(fun port (ip_address, json) ->
+    (Cli_lib.Background_daemon.rpc_init flags
+       ~f:(fun port (ip_address, json) ->
          match%map
            dispatch Daemon_rpcs.Reset_trust_status.rpc ip_address port
          with
@@ -231,7 +233,7 @@ let get_public_keys =
   in
   let error_ctx = "Failed to get public-keys" in
   Command.async ~summary:"Get public keys"
-    (Cli_lib.Background_daemon.init
+    (Cli_lib.Background_daemon.rpc_init
        (Args.zip2 with_details_flag Cli_lib.Flag.json)
        ~f:(fun port (is_balance_included, json) ->
          if is_balance_included then
@@ -259,7 +261,8 @@ let generate_receipt =
       (required public_key_compressed)
   in
   Command.async ~summary:"Generate a receipt for a sent payment"
-    (Cli_lib.Background_daemon.init (Args.zip2 receipt_hash_flag address_flag)
+    (Cli_lib.Background_daemon.rpc_init
+       (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
          dispatch_with_message Prove_receipt.rpc (receipt_chain_hash, pk) port
            ~success:Cli_lib.Render.Prove_receipt.to_text
@@ -298,7 +301,7 @@ let verify_receipt =
       (required public_key_compressed)
   in
   Command.async ~summary:"Verify a receipt of a sent payment"
-    (Cli_lib.Background_daemon.init
+    (Cli_lib.Background_daemon.rpc_init
        (Args.zip3 payment_path_flag proof_path_flag address_flag)
        ~f:(fun port (payment_path, proof_path, pk) ->
          let dispatch_result =
@@ -358,7 +361,7 @@ let get_nonce_cmd =
       (required Cli_lib.Arg_type.public_key)
   in
   Command.async ~summary:"Get the current nonce for an account"
-    (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
+    (Cli_lib.Background_daemon.rpc_init address_flag ~f:(fun port address ->
          match%bind get_nonce ~rpc:Daemon_rpcs.Get_nonce.rpc address port with
          | Error e ->
              eprintf "Failed to get nonce\n%s\n" e ;
@@ -371,7 +374,8 @@ let status =
   let open Daemon_rpcs in
   let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Get running daemon status"
-    (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
+    (Cli_lib.Background_daemon.rpc_init flag
+       ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json ~join_error:Fn.id
            ~error_ctx:"Failed to get status"
            (module Daemon_rpcs.Types.Status)
@@ -383,7 +387,8 @@ let status_clear_hist =
   let open Daemon_rpcs in
   let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Clear histograms reported in status"
-    (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
+    (Cli_lib.Background_daemon.rpc_init flag
+       ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json ~join_error:Fn.id
            ~error_ctx:"Failed to clear histograms reported in status"
            (module Daemon_rpcs.Types.Status)
@@ -468,7 +473,7 @@ let batch_send_payments =
       ~join_error:Or_error.join
   in
   Command.async ~summary:"Send multiple payments from a file"
-    (Cli_lib.Background_daemon.init
+    (Cli_lib.Background_daemon.rpc_init
        (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
        ~f:main)
 
@@ -507,7 +512,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
       memo_flag
   in
   Command.async ~summary
-    (Cli_lib.Background_daemon.init flag
+    (Cli_lib.Background_daemon.rpc_init flag
        ~f:(fun port (body, from_account, fee_opt, nonce_opt, memo_opt) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp =
@@ -567,7 +572,7 @@ let cancel_transaction =
     ~summary:
       "Cancel a transaction -- this submits a replacement transaction with a \
        fee larger than the cancelled transaction."
-    (Cli_lib.Background_daemon.init args
+    (Cli_lib.Background_daemon.rpc_init args
        ~f:(fun port (privkey_read_path, serialized_transaction) ->
          match User_command.of_base58_check serialized_transaction with
          | Ok user_command ->
@@ -645,7 +650,7 @@ let cancel_transaction =
 
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
-    (Cli_lib.Background_daemon.init
+    (Cli_lib.Background_daemon.rpc_init
        Command.Param.(anon @@ ("txn-id" %: string))
        ~f:(fun port serialized_transaction ->
          match User_command.of_base58_check serialized_transaction with
@@ -734,7 +739,7 @@ let dump_ledger =
   let json_flag = Cli_lib.Flag.json in
   let flags = Args.zip2 sl_hash_flag json_flag in
   Command.async ~summary:"Print the ledger with given Merkle root"
-    (Cli_lib.Background_daemon.init flags ~f:(fun port (sl_hash, json) ->
+    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (sl_hash, json) ->
          (* TODO: allow input in Base58Check format: issue #3036 *)
          let staged_ledger_hash =
            Option.map sl_hash ~f:(fun s ->
@@ -773,7 +778,7 @@ let snark_job_list =
   let open Deferred.Let_syntax in
   let open Command.Param in
   Command.async ~summary:"List of snark jobs in the scan state in JSON format"
-    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          match%map
            dispatch_join_errors Daemon_rpcs.Snark_job_list.rpc () port
          with
@@ -785,9 +790,10 @@ let snark_job_list =
 let snark_pool_list =
   let open Command.Param in
   Command.async ~summary:"List of snark works in the snark pool in JSON format"
-    (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
+    (Cli_lib.Background_daemon.graphql_init (return ())
+       ~f:(fun (module Client) () ->
          Deferred.map
-           (Graphql_query.query (Graphql_query.Snark_pool.make ()) port)
+           (Client.query (Graphql_query.Snark_pool.make ()))
            ~f:(fun response ->
              let lst =
                [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
@@ -806,7 +812,7 @@ let start_tracing =
   let open Deferred.Let_syntax in
   let open Command.Param in
   Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
-    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          match%map dispatch Daemon_rpcs.Start_tracing.rpc () port with
          | Ok () ->
              printf "Daemon started tracing!"
@@ -817,7 +823,7 @@ let stop_tracing =
   let open Deferred.Let_syntax in
   let open Command.Param in
   Command.async ~summary:"Stop async tracing"
-    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          match%map dispatch Daemon_rpcs.Stop_tracing.rpc () port with
          | Ok () ->
              printf "Daemon stopped printing!"
@@ -827,7 +833,8 @@ let stop_tracing =
 let set_staking =
   let privkey_path = Cli_lib.Flag.privkey_read_path in
   Command.async ~summary:"Set new block proposer keys"
-    (Cli_lib.Background_daemon.init privkey_path ~f:(fun port privkey_path ->
+    (Cli_lib.Background_daemon.rpc_init privkey_path
+       ~f:(fun port privkey_path ->
          let%bind ({Keypair.public_key; _} as keypair) =
            Secrets.Keypair.Terminal_stdin.read_exn privkey_path
          in
@@ -851,8 +858,8 @@ let set_snark_worker =
   in
   Command.async
     ~summary:"Set key you wish to snark work with or disable snark working"
-    (Cli_lib.Background_daemon.init ~rest:true public_key_flag
-       ~f:(fun port optional_public_key ->
+    (Cli_lib.Background_daemon.graphql_init public_key_flag
+       ~f:(fun (module Client) optional_public_key ->
          let open Graphql_query in
          let graphql =
            Set_snark_worker.make
@@ -861,7 +868,7 @@ let set_snark_worker =
                  optional optional_public_key ~f:public_key)
              ()
          in
-         Deferred.map (query graphql port) ~f:(fun response ->
+         Deferred.map (Client.query graphql) ~f:(fun response ->
              ( match optional_public_key with
              | Some public_key ->
                  printf
@@ -876,18 +883,17 @@ let set_snark_worker =
 
 let set_snark_work_fee =
   Command.async ~summary:"Set fee reward for doing transaction snark work"
-  @@ Cli_lib.Background_daemon.init ~rest:true
+  @@ Cli_lib.Background_daemon.graphql_init
        Command.Param.(anon @@ ("fee" %: Cli_lib.Arg_type.txn_fee))
-       ~f:(fun port fee ->
-         let open Graphql_query in
+       ~f:(fun (module Client) fee ->
          let graphql =
-           Set_snark_work_fee.make
+           Graphql_query.Set_snark_work_fee.make
              ~fee:
                ( Graphql_client_lib.Encoders.uint64
                @@ Currency.Fee.to_uint64 fee )
              ()
          in
-         Deferred.map (query graphql port) ~f:(fun response ->
+         Deferred.map (Client.query graphql) ~f:(fun response ->
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
                (Currency.Fee.to_int fee)
@@ -947,8 +953,8 @@ let import_key =
   Command.async
     ~summary:
       "Import a password protected private key to be tracked by the daemon."
-    (Cli_lib.Background_daemon.init ~rest:true flags
-       ~f:(fun port (privkey_path, conf_dir) ->
+    (Cli_lib.Background_daemon.graphql_init flags
+       ~f:(fun (module Client) (privkey_path, conf_dir) ->
          let open Deferred.Let_syntax in
          let%bind home = Sys.home_directory () in
          let conf_dir =
@@ -979,7 +985,7 @@ let import_key =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
              let%map _response =
-               Graphql_query.query (Graphql_query.Reload_wallets.make ()) port
+               Client.query (Graphql_query.Reload_wallets.make ())
              in
              printf
                !"\n👝 Imported account!\nPublic key: %s\n"
@@ -989,10 +995,9 @@ let import_key =
 let list_accounts =
   let open Command.Param in
   Command.async ~summary:"List all owned accounts"
-    (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
-         let%map response =
-           Graphql_query.query (Graphql_query.Get_wallets.make ()) port
-         in
+    (Cli_lib.Background_daemon.graphql_init (return ())
+       ~f:(fun (module Client) () ->
+         let%map response = Client.query (Graphql_query.Get_wallets.make ()) in
          match response#ownedWallets with
          | [||] ->
              printf
@@ -1013,15 +1018,15 @@ let list_accounts =
 let create_account =
   let open Command.Param in
   Command.async ~summary:"Create new account"
-    (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
+    (Cli_lib.Background_daemon.graphql_init (return ())
+       ~f:(fun (module Client) () ->
          let%bind password =
            Secrets.Keypair.prompt_password "Password for new account: "
          in
          let%map response =
-           Graphql_query.query
+           Client.query
              (Graphql_query.Add_wallet.make
                 ~password:(Bytes.to_string password) ())
-             port
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
@@ -1036,8 +1041,8 @@ let unlock_account =
       (required string)
   in
   Command.async ~summary:"Unlock a tracked account"
-    (Cli_lib.Background_daemon.init ~rest:true public_key
-       ~f:(fun port pk_str ->
+    (Cli_lib.Background_daemon.graphql_init public_key
+       ~f:(fun (module Client) pk_str ->
          let args =
            let open Deferred.Or_error.Let_syntax in
            let%bind pk =
@@ -1052,12 +1057,11 @@ let unlock_account =
          match%bind args with
          | Ok (pk, password_bytes) ->
              let%map response =
-               Graphql_query.query
+               Client.query
                  (Graphql_query.Unlock_wallet.make
                     ~public_key:(Graphql_client_lib.Encoders.public_key pk)
                     ~password:(Bytes.to_string password_bytes)
                     ())
-                 port
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
@@ -1076,16 +1080,15 @@ let lock_account =
       (required string)
   in
   Command.async ~summary:"Lock a tracked account"
-    (Cli_lib.Background_daemon.init ~rest:true public_key
-       ~f:(fun port pk_str ->
+    (Cli_lib.Background_daemon.graphql_init public_key
+       ~f:(fun (module Client) pk_str ->
          match Public_key.Compressed.of_base58_check pk_str with
          | Ok pk ->
              let%map response =
-               Graphql_query.query
+               Client.query
                  (Graphql_query.Lock_wallet.make
                     ~public_key:(Graphql_client_lib.Encoders.public_key pk)
                     ())
-                 port
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
@@ -1127,7 +1130,7 @@ module Visualization = struct
     let open Deferred.Let_syntax in
     Command.async
       ~summary:(sprintf !"Produce a visualization of the %s" name)
-      (Cli_lib.Background_daemon.init
+      (Cli_lib.Background_daemon.rpc_init
          Command.Param.(anon @@ ("output-filepath" %: string))
          ~f:(fun port filename ->
            let%map message =

@@ -120,6 +120,8 @@ module Time : sig
   val to_string : t -> string
 
   val of_string_exn : string -> t
+
+  val gen : t Quickcheck.Generator.t
 end
 
 include module type of Time
