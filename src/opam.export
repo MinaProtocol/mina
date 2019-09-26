@@ -37,7 +37,6 @@ roots: [
   "re2.v0.12.0"
   "rpc_parallel.v0.12.0"
   "sexp_diff_kernel.v0.12.0"
-  "sodium.dev"
   "utop.2.3.0"
   "yojson.1.5.0"
 ]
@@ -183,7 +182,6 @@ installed: [
   "sexp_diff_kernel.v0.12.0"
   "sexplib.v0.12.0"
   "sexplib0.v0.12.0"
-  "sodium.dev"
   "spacetime_lib.0.3.0"
   "spawn.v0.13.0"
   "splittable_random.v0.12.0"
