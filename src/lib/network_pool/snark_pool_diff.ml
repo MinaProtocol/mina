@@ -95,7 +95,7 @@ end)
             Logger.warn (Pool.get_logger pool) ~module_:__MODULE__
               ~location:__LOC__
               "Rejecting locally generated snark work $work, %s" reason
-              ~metadata:[("work", Work.Stable.V1.to_yojson work)] ;
+              ~metadata:[("work", Work.compact_json work)] ;
           Deferred.return (Or_error.error_string reason)
         in
         let check_and_add () =

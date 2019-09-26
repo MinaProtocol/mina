@@ -44,8 +44,8 @@ end)
     |> ignore ;
     network_pool
 
-  (* Rebroadcast locally generated pool items every 5 minutes or every slot,
-     whichever is slower. Do so for half an hour before giving up.
+  (* Rebroadcast locally generated pool items every 10 minutes. Do so for 50
+     minutes - at most 5 rebroadcasts - before giving up.
 
      The goal here is to be resilient to short term network failures and
      partitions. Note that with gossip we don't know anything about the state of
@@ -58,14 +58,10 @@ end)
   *)
   let rebroadcast_loop : t -> Logger.t -> unit Deferred.t =
    fun t logger ->
-    let rebroadcast_interval =
-      Time.Span.(
-        max
-          (of_ms @@ Float.of_int Consensus.Constants.block_window_duration_ms)
-          (of_min 5.))
-    in
+    let rebroadcast_interval = Time.Span.of_min 10. in
+    let rebroadcast_window = Time.Span.scale rebroadcast_interval 5. in
     let is_expired time =
-      if Time.(add time (Time.Span.of_min 30.) < now ()) then `Expired else `Ok
+      if Time.(add time rebroadcast_window < now ()) then `Expired else `Ok
     in
     let rec go () =
       let rebroadcastable =
