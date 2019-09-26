@@ -3,7 +3,7 @@
 
 (* in the config files, we either have:
 
-    - transaction_capacity_log_2 and work_delay exp explicitly, or
+    - transaction_capacity_log_2 and work_delay explicitly, or
     - those same parameters, and a tps_goal
 
    use the config boolean scan_state_with_tps_goal to distinguish those cases
