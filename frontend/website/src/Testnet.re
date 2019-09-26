@@ -406,11 +406,11 @@ let make = () => {
               { type: 'input', prompt: '>', value: 'coda daemon -peer ...' },
               { type: 'progress' },
               { value:  'Daemon ready. Clients can now connect!'},
-              { type: 'input', lineDelay: '10', prompt: '>', value: 'coda client status' },
-              { value:  'Local uptime: 1m10s'},
-              { value:  'Peers: 5'},
-              { value:  'Consensus time now: epoch=16, slot=78'},
-              { value:  'Sync status: Synced'},
+              { type: 'input', prompt: '>', value: 'coda client status' },
+              { delay: '0', value:  'Max observed block length: 120'},
+              { delay: '0', value:  'Peers: 23'},
+              { delay: '0', value:  'Consensus time now: epoch=1, slot=13'},
+              { delay: '0', value:  'Sync status: Synced'},
             ]
           });|}
         </RunScript>
