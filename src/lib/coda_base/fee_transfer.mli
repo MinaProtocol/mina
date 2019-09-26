@@ -11,7 +11,9 @@ module Single : sig
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson, hash]
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
+
+  include Comparable.S with type t := t
 
   include Codable.Base58_check_intf with type t := t
 end

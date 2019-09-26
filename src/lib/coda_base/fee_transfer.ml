@@ -7,7 +7,7 @@ module Single = struct
     module V1 = struct
       module T = struct
         type t = Public_key.Compressed.Stable.V1.t * Currency.Fee.Stable.V1.t
-        [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
+        [@@deriving bin_io, sexp, compare, yojson, version, hash]
       end
 
       let description = "Fee transfer Single"
@@ -15,6 +15,7 @@ module Single = struct
       let version_byte = Base58_check.Version_bytes.fee_transfer_single
 
       include T
+      include Comparable.Make (T)
       include Registration.Make_latest_version (T)
     end
 

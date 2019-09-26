@@ -320,7 +320,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
       Option.map result#insert_fee_transfers ~f:(fun result -> result#returning)
   end)
 
-  module Block_upsert = Make_upsert(struct
+  module Block_upsert = Make_upsert (struct
     module Hash = State_hash.Stable.V1
 
     module Data = struct

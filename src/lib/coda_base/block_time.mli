@@ -5,9 +5,9 @@ open Tuple_lib
 open Fold_lib
 
 module Time : sig
-  type t [@@deriving sexp, eq, yojson]
+  type t [@@deriving sexp, compare, yojson]
 
-  type t0 = t
+  include Comparable.S with type t := t
 
   module Controller : sig
     type t
@@ -126,16 +126,20 @@ end
 
 include module type of Time
 
-module Timeout : sig
-  type 'a t
+module Timeout :
+  sig
+    type 'a t
 
-  val create : Controller.t -> Span.t -> f:(t0 -> 'a) -> 'a t
+    type time
 
-  val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
+    val create : Controller.t -> Span.t -> f:(time -> 'a) -> 'a t
 
-  val peek : 'a t -> 'a option
+    val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
 
-  val cancel : Controller.t -> 'a t -> 'a -> unit
+    val peek : 'a t -> 'a option
 
-  val remaining_time : 'a t -> Span.t
-end
+    val cancel : Controller.t -> 'a t -> 'a -> unit
+
+    val remaining_time : 'a t -> Span.t
+  end
+  with type time := t

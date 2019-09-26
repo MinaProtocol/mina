@@ -249,9 +249,7 @@ module User_command = struct
 
       method nonce = some @@ Bitstring.to_yojson nonce
 
-      (* method public_key = object 
-        method data = 
-      end *)
+      method public_key = None
 
       method publicKeyByReceiver = None
 
@@ -260,7 +258,6 @@ module User_command = struct
       method receiver = some receiver
 
       method typ = some @@ User_command_type.encode typ
-
     end
 
   let encode ~receiver ~sender user_command_with_hash block_time =
@@ -423,11 +420,9 @@ module Blocks = struct
 
       method blocks_snark_jobs = None
 
-      method constraint = failwith "Hello"
-
       method blocks_user_commands =
         some
-        @@ object 
+        @@ object
              method data =
                Array.map (Array.of_list user_commands)
                  ~f:(fun user_command_id ->
@@ -439,11 +434,10 @@ module Blocks = struct
                      method receipt_chain_hash = None
 
                      method receipt_chain_hash_id = None
-                     
-                     method user_command = None
-                     
-                     method user_command_id = some user_command_id
 
+                     method user_command = None
+
+                     method user_command_id = some user_command_id
                    end )
            end
 

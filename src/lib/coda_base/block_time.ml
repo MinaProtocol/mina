@@ -69,10 +69,9 @@ module Time = struct
   end
 
   (* DO NOT add bin_io the deriving list *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
-  type t0 = t
-
+  include Comparable.Make (Stable.Latest)
   module B = Bits
 
   let bit_length = 64
