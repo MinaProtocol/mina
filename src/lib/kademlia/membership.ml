@@ -300,6 +300,10 @@ module Haskell_process = struct
     Pipe.filter_map
       (Reader.lines (Process.stdout process))
       ~f:(fun line ->
+        let logger =
+          Logger.extend logger
+            [("kademlia_pid", `String (Process.pid process |> Pid.to_string))]
+        in
         let prefix_name_size = 4 in
         let prefix_size = prefix_name_size + 2 in
         (* a colon and a space *)
@@ -474,7 +478,9 @@ end = struct
 
   let changes t = t.changes_reader
 
-  let stop t = P.kill t.p
+  let stop t =
+    Pipe.close t.changes_writer ;
+    P.kill t.p
 
   module Hacky_glue = struct
     let inject_event t e =

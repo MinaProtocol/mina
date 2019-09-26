@@ -9,6 +9,8 @@ open Kademlia
 open O1trace
 module Membership = Membership.Haskell
 
+exception Foo
+
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
 
@@ -273,8 +275,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           let%map () =
             if Hash_set.mem t.disconnected_peers peer then (
               (* optimistically, mark all disconnected peers as peers *)
+              let backtrace = Printexc.get_backtrace () in
               Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:[("peer", Peer.to_yojson peer)]
+                ~metadata:
+                  [ ("peer", Peer.to_yojson peer)
+                  ; ("backtrace", `String backtrace) ]
                 !"On RPC call, reconnected to a disconnected peer: $peer" ;
               unmark_all_disconnected_peers t )
             else return ()
@@ -373,6 +378,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             Linear_pipe.iter_unordered ~max_concurrency:64
               (Membership.changes membership) ~f:(function
               | Connect peers ->
+                  Logger.info t.config.logger ~module_:__MODULE__
+                    ~location:__LOC__
+                    !"[RAW] Connected to peers [%s]"
+                    (Peer.pretty_list peers) ;
                   let%map kept_peers =
                     Deferred.List.filter peers ~f:(fun peer ->
                         if%map filter_peer t peer then (
@@ -432,7 +441,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let disconnected_peers =
       List.map
         (Hash_set.to_list t.disconnected_peers)
-        ~f:Peer.to_communications_host_and_port
+        ~f:Peer.to_discovery_host_and_port
     in
     Hash_set.clear t.disconnected_peers ;
     restart_kademlia t disconnected_peers
@@ -440,7 +449,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   and filter_peer t peer =
     match%map try_call_rpc t peer Get_chain_id.dispatch_multi () with
     | Ok their_chain_id ->
-        if String.equal their_chain_id t.config.chain_id then true
+        if String.equal their_chain_id t.config.chain_id then (
+          Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
+            "filter_peer succeeded" ;
+          true )
         else (
           Logger.warn t.config.logger
             "Chain ID mismatch: refusing to connect to %s" ~location:__LOC__
@@ -737,6 +749,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               ( Message.implement_multi
                   (fun client_host_and_port ~version:_ msg ->
                     (* wrap received message in envelope *)
+                    Logger.debug t.config.logger ~module_:__MODULE__
+                      ~location:__LOC__
+                      ~metadata:[("msg", Message.msg_to_yojson msg)]
+                      "received $msg" ;
                     Coda_metrics.(
                       Counter.inc_one Network.gossip_messages_received) ;
                     let sender =
@@ -790,7 +806,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               let client_inet_addr = Socket.Address.Inet.addr client in
               let%bind () =
                 Trust_system.(
-                  record t.config.trust_system t.config.logger client_inet_addr
+                  record t.config.trust_system
+                    (Logger.extend t.config.logger
+                       [("context", `String "gossip")])
+                    client_inet_addr
                     Actions.(Connected, None))
               in
               let conn_map =
