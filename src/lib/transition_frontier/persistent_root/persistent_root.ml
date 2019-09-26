@@ -5,6 +5,12 @@ open Coda_state
 open Frontier_base
 module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
+let genesis_root_identifier =
+  lazy
+    (let open Root_identifier.Stable.Latest in
+    { state_hash= With_hash.hash (Lazy.force Genesis_protocol_state.t)
+    ; frontier_hash= Frontier_hash.empty })
+
 let with_file ?size filename access_level ~f =
   let open Unix in
   let shared, mode =
@@ -101,6 +107,13 @@ module Instance = struct
               "Loaded persistent root identifier" ;
             Some root_identifier )
 
+  let set_root_state_hash t state_hash =
+    let root_identifier =
+      load_root_identifier t
+      |> Option.value ~default:(Lazy.force genesis_root_identifier)
+    in
+    set_root_identifier t {root_identifier with state_hash}
+
   (*
   let at_genesis t =
     let%map state_hash = load_state_hash t in
@@ -126,17 +139,13 @@ let with_instance_exn t ~f =
   Instance.destroy instance ; x
 
 let reset_to_genesis_exn t =
-  let open Root_identifier.Stable.Latest in
   let open Deferred.Let_syntax in
   assert (t.instance = None) ;
   let%map () = File_system.remove_dir t.directory in
-  let genesis_root_identifier =
-    { state_hash= With_hash.hash (Lazy.force Genesis_protocol_state.t)
-    ; frontier_hash= Frontier_hash.empty }
-  in
   with_instance_exn t ~f:(fun instance ->
       ignore
         (Ledger_transfer.transfer_accounts
            ~src:(Lazy.force Genesis_ledger.t)
            ~dest:(Instance.snarked_ledger instance)) ;
-      Instance.set_root_identifier instance genesis_root_identifier )
+      Instance.set_root_identifier instance
+        (Lazy.force genesis_root_identifier) )

@@ -8,15 +8,28 @@ module Database = Database
 
 let construct_staged_ledger_at_root ~logger ~verifier ~root_ledger
     ~root_transition ~root =
+  let open Deferred.Or_error.Let_syntax in
   let open Root_data.Minimal.Stable.Latest in
   let snarked_ledger_hash =
     External_transition.Validated.blockchain_state root_transition
     |> Blockchain_state.snarked_ledger_hash
   in
+  let%bind transactions =
+    Deferred.return
+      (Staged_ledger.Scan_state.staged_transactions root.scan_state)
+  in
+  let mask = Ledger.of_database root_ledger in
+  let%bind () =
+    Deferred.return
+      (List.fold transactions ~init:(Or_error.return ()) ~f:(fun acc txn ->
+           let open Or_error.Let_syntax in
+           let%bind () = acc in
+           let%map _ = Ledger.apply_transaction mask txn in
+           () ))
+  in
   (* [new] TODO: !important -- make mask off root ledger and apply all scan state transactions to it *)
   Staged_ledger.of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash
-    ~ledger:(Ledger.of_database root_ledger)
-    ~scan_state:root.scan_state
+    ~ledger:mask ~scan_state:root.scan_state
     ~pending_coinbase_collection:root.pending_coinbase
 
 (* [new] TODO: create a reusable singleton factory abstraction *)
@@ -116,7 +129,14 @@ module Instance = struct
         ~error:
           (`Failure
             "already at persistent root, but frontier hash did not match")
-    else Error `Bootstrap_required
+    else (
+      Logger.warn t.factory.logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [ ("current_root", State_hash.to_yojson root.hash)
+          ; ("target_root", State_hash.to_yojson target_root.state_hash) ]
+        "Cannot fast forward persistent frontier's root: bootstrap is \
+         required ($current_root --> $target_root)" ;
+      Error `Bootstrap_required )
 
   let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length =
     let open Deferred.Result.Let_syntax in

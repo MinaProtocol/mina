@@ -38,6 +38,8 @@ module Scan_state : sig
 
   val target_merkle_root : t -> Frozen_ledger_hash.t option
 
+  val staged_transactions : t -> Transaction.t list Or_error.t
+
   val all_work_statements : t -> Transaction_snark_work.Statement.t list
 
   val work_statements_for_new_diff :

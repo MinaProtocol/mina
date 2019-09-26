@@ -319,7 +319,15 @@ end = struct
   let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       ~transition_reader ~should_ask_best_tip ~persistent_root
       ~persistent_frontier ~initial_root_transition =
+    let id = ref 0 in
+    let log_mask ctx =
+      Ledger.Maskable.Debug.visualize
+        ~filename:(Printf.sprintf "bootstrap.%d.%s.dot" !id ctx) ;
+      incr id
+    in
+    log_mask "genesis" ;
     let rec loop () =
+      log_mask "start" ;
       let sync_ledger_reader, sync_ledger_writer =
         create ~name:"sync ledger pipe"
           (Buffered (`Capacity 50, `Overflow Crash))
@@ -370,7 +378,8 @@ end = struct
         Root_sync_ledger.destroy root_sync_ledger ;
         data
       in
-      match%bind
+      log_mask "sync" ;
+      let%bind staged_ledger_aux_result =
         let open Deferred.Or_error.Let_syntax in
         let%bind scan_state, expected_merkle_root, pending_coinbases =
           Network.get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
@@ -399,22 +408,27 @@ end = struct
         (* Construct the staged ledger before constructing the transition
          * frontier in order to verify the scan state we received.
          * TODO: reorganize the code to avoid doing this twice (#3480)  *)
-        let temp_mask = Ledger.of_database temp_snarked_ledger in
         let%map _ =
-          Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-            ~logger ~verifier ~scan_state ~snarked_ledger:temp_mask
-            ~expected_merkle_root ~pending_coinbases
+          let open Deferred.Let_syntax in
+          let temp_mask = Ledger.of_database temp_snarked_ledger in
+          let%map result =
+            Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
+              ~logger ~verifier ~scan_state ~snarked_ledger:temp_mask
+              ~expected_merkle_root ~pending_coinbases
+          in
+          ignore
+            (Ledger.Maskable.unregister_mask_exn
+               (Ledger.Mask.Attached.get_parent temp_mask)
+               temp_mask) ;
+          result
         in
-        ignore
-          (Ledger.Maskable.unregister_mask_exn
-             (Ledger.Mask.Attached.get_parent temp_mask)
-             temp_mask) ;
-        Ledger.close temp_mask ;
-        Transition_frontier.Persistent_root.Instance.destroy
-          temp_persistent_root_instance ;
         (scan_state, pending_coinbases)
-      with
+      in
+      Transition_frontier.Persistent_root.Instance.destroy
+        temp_persistent_root_instance ;
+      match staged_ledger_aux_result with
       | Error e ->
+          log_mask "error" ;
           let%bind () =
             Trust_system.(
               record t.trust_system t.logger sender
@@ -437,6 +451,7 @@ end = struct
           Writer.close sync_ledger_writer ;
           loop ()
       | Ok (scan_state, pending_coinbase) -> (
+          log_mask "success" ;
           let%bind () =
             Trust_system.(
               record t.trust_system t.logger sender
@@ -491,12 +506,14 @@ end = struct
                   sync_jobs
           with
           | Error e ->
+              log_mask "local_sync_error" ;
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:[("error", `String (Error.to_string_hum e))]
                 "Local state sync failed: $error. Retry bootstrap" ;
               Writer.close sync_ledger_writer ;
               loop ()
           | Ok () ->
+              log_mask "local_sync_success" ;
               (* Close the old frontier and reload a new on from disk. *)
               let new_root_data =
                 Transition_frontier.Root_data.Limited.Stable.V1.
@@ -506,21 +523,35 @@ end = struct
                 Transition_frontier.Persistent_frontier.reset_database_exn
                   persistent_frontier ~root_data:new_root_data
               in
+              (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
+              Transition_frontier.Persistent_root.(
+                with_instance_exn persistent_root ~f:(fun instance ->
+                    Instance.set_root_state_hash instance
+                      (External_transition.Validated.state_hash new_root) )) ;
               let%map new_frontier =
+                let fail msg =
+                  failwith
+                    ( "failed to initialize transition frontier after \
+                       bootstrapping: " ^ msg )
+                in
                 Transition_frontier.load
                   { Transition_frontier.logger= t.logger
                   ; verifier
                   ; consensus_local_state }
                   ~persistent_root ~persistent_frontier
-                >>| Fn.(
-                      compose Or_error.ok_exn
-                        (Result.map_error
-                           ~f:
-                             ( const
-                             @@ Error.of_string
-                                  "failed to initialize transition frontier \
-                                   after bootstrapping" )))
+                >>| function
+                | Ok frontier ->
+                    frontier
+                | Error (`Failure msg) ->
+                    fail msg
+                | Error `Bootstrap_required ->
+                    fail
+                      "bootstrap still required (indicates logical error in \
+                       code)"
+                | Error `Persistent_frontier_malformed ->
+                    fail "persistent frontier was malformed"
               in
+              log_mask "load" ;
               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                 "Bootstrap state: complete." ;
               let collected_transitions =

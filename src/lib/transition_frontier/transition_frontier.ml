@@ -208,12 +208,12 @@ let close
     ; extensions } =
   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
     "Closing transition frontier" ;
+  Full_frontier.close full_frontier ;
+  Extensions.close extensions ;
   let%map () =
     Persistent_frontier.Instance.destroy persistent_frontier_instance
   in
-  Persistent_root.Instance.destroy persistent_root_instance ;
-  Extensions.close extensions ;
-  Full_frontier.close full_frontier
+  Persistent_root.Instance.destroy persistent_root_instance
 
 let persistent_root {persistent_root; _} = persistent_root
 
