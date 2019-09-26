@@ -259,17 +259,17 @@ jobs:
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
-                  {%- if profile in medium_curve_profiles %}
                   environment:
                     DUNE_PROFILE: {{profile}}
+                  {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
-                  {%- if profile in medium_curve_profiles %}
                   environment:
                     DUNE_PROFILE: {{profile}}
+                  {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
