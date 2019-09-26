@@ -57,7 +57,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-3e04ef86433fb33072d19b139e20cd17fff1a6d7
         steps:
             - checkout
             - run:
@@ -232,9 +232,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
-        environment:
-            DUNE_PROFILE: {{profile}}
+            - image: codaprotocol/coda:toolchain-3e04ef86433fb33072d19b139e20cd17fff1a6d7
         steps:
             - checkout
             - run:
@@ -247,17 +245,31 @@ jobs:
                   command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download candidate stable PV keys
+                  environment:
+                    DUNE_PROFILE: {{profile}}
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
+            - run: opam switch import src/opam.export
+            - run: opam pin -y add src/external/ocaml-sodium
+            - run: opam pin -y add src/external/rpc_parallel
+            - run: opam pin -y add src/external/ocaml-extlib
+            - run: opam pin -y add src/external/digestif
+            - run: opam pin -y add src/external/async_kernel
+            - run: opam pin -y add src/external/coda_base58
+            - run: opam pin -y add src/external/graphql_ppx
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   {%- if profile in medium_curve_profiles %}
+                  environment:
+                    DUNE_PROFILE: {{profile}}
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   {%- if profile in medium_curve_profiles %}
+                  environment:
+                    DUNE_PROFILE: {{profile}}
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
@@ -283,7 +295,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-3e04ef86433fb33072d19b139e20cd17fff1a6d7
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -324,7 +336,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-3e04ef86433fb33072d19b139e20cd17fff1a6d7
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -343,7 +355,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-3e04ef86433fb33072d19b139e20cd17fff1a6d7
         steps:
             - checkout
             - run:
@@ -362,7 +374,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-3e04ef86433fb33072d19b139e20cd17fff1a6d7
         steps:
             - checkout
             - run:
