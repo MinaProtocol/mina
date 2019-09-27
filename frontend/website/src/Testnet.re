@@ -22,9 +22,8 @@ module Icon = {
   module Svg = {
     let discord =
       <svg
-        width="44px"
-        height="38px"
-        viewBox="0 0 34 32"
+        height="39px"
+        viewBox="0 0 38 55"
         version="1.1"
         xmlns="http://www.w3.org/2000/svg"
         xmlnsXlink="http://www.w3.org/1999/xlink">
@@ -294,7 +293,7 @@ module Styles = {
       marginRight(`auto),
       marginTop(rem(3.)),
       marginBottom(rem(3.)),
-      justifyContent(`spaceAround),
+      justifyContent(`spaceBetween),
       alignItems(`center),
       flexDirection(`column),
       maxWidth(`rem(43.75)),
@@ -306,7 +305,7 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-      justifyContent(`spaceAround),
+      justifyContent(`spaceBetween),
       alignItems(`center),
       media("(min-width: 70rem)", [flexDirection(`row)]),
     ]);
@@ -318,7 +317,6 @@ module Styles = {
     style([
       height(`rem(16.875)),
       marginLeft(`rem(1.875)),
-      marginRight(`rem(1.875)),
       fontSize(`rem(0.625)),
       media(
         Style.MediaQuery.notMobile,
