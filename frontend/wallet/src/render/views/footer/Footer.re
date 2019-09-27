@@ -1,5 +1,3 @@
-open Tc;
-
 module Styles = {
   open Css;
 
@@ -79,26 +77,6 @@ module Wallets = [%graphql
 
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
-module SendPayment = [%graphql
-  {|
-    mutation (
-      $from: PublicKey!,
-      $to_: PublicKey!,
-      $amount: UInt64!,
-      $fee: UInt64!,
-      $memo: String) {
-      sendPayment(input:
-                    {from: $from, to: $to_, amount: $amount, fee: $fee, memo: $memo}) {
-        payment {
-          nonce
-        }
-      }
-    }
-  |}
-];
-
-module SendPaymentMutation = ReasonApollo.CreateMutation(SendPayment);
-
 [@react.component]
 let make = () => {
   let (modalState, setModalState) = React.useState(() => false);
@@ -123,48 +101,7 @@ let make = () => {
                   <RequestCodaModal wallets=data##ownedWallets setModalState />
                 }}
                <Spacer width=1. />
-               <SendPaymentMutation>
-                 (
-                   (mutation, _) =>
-                     <SendButton
-                       wallets=data##ownedWallets
-                       onSubmit={(
-                         {from, to_, amount, fee, memoOpt}: SendButton.ModalState.Validated.t,
-                         afterSubmit,
-                       ) => {
-                         let variables =
-                           SendPayment.make(
-                             ~from=Apollo.Encoders.publicKey(from),
-                             ~to_=Apollo.Encoders.publicKey(to_),
-                             ~amount=Js.Json.string(amount),
-                             ~fee=Js.Json.string(fee),
-                             ~memo=?memoOpt,
-                             (),
-                           )##variables;
-                         let performMutation =
-                           Task.liftPromise(() => mutation(~variables, ()));
-                         Task.perform(
-                           performMutation,
-                           ~f=
-                             fun
-                             | Data(_)
-                             | EmptyResponse => afterSubmit(Belt.Result.Ok())
-                             | Errors(err) => {
-                                 /* TODO: Display more than first error? */
-                                 let message =
-                                   err
-                                   |> Array.get(~index=0)
-                                   |> Option.map(~f=e => e##message)
-                                   |> Option.withDefault(
-                                        ~default="Server error",
-                                      );
-                                 afterSubmit(Error(message));
-                               },
-                         );
-                       }}
-                     />
-                 )
-               </SendPaymentMutation>
+               <SendButton />
              </>
            }}
       </WalletQuery>

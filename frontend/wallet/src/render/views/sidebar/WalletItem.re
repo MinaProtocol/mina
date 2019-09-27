@@ -49,7 +49,6 @@ let make = (~wallet: Wallet.t) => {
       PublicKey.equal(activeWallet, wallet.publicKey)
     )
     |> Option.withDefault(~default=false);
-  let (modalOpen, setModalState) = React.useState(() => false);
   <div
     className={
       switch (isActive) {
@@ -58,23 +57,15 @@ let make = (~wallet: Wallet.t) => {
       }
     }
     onClick={_ =>
-      // ReasonReact.Router.push(
-      //   "/wallet/" ++ PublicKey.uriEncode(wallet.publicKey),
-      // )
-      ()}>
-    <div className=Styles.balance onClick={_ => setModalState(_ => true)}>
-      <WalletName pubkey={wallet.publicKey} />
+      ReasonReact.Router.push(
+        "/wallet/" ++ PublicKey.uriEncode(wallet.publicKey),
+      )
+    }>
+    <WalletName pubkey={wallet.publicKey} />
+    <div className=Styles.balance>
       {ReasonReact.string(
          {js|■ |js} ++ Int64.to_string(wallet.balance##total),
        )}
     </div>
-    {switch (modalOpen) {
-     | false => React.null
-     | true =>
-       <UnlockModal
-         wallet={wallet.publicKey}
-         onClose={() => setModalState(_ => false)}
-       />
-     }}
   </div>;
 };
