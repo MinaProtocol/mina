@@ -145,7 +145,7 @@ end)
 
 module Make_bowe_gabizon (M : sig
   val hash :
-       ?message:bool array
+       ?message:Fq.t array
     -> a:G1.t
     -> b:G2.t
     -> c:G1.t

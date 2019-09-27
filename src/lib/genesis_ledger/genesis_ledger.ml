@@ -54,16 +54,6 @@ genesis_ledger = "testnet_postake_many_proposers"]
 
 include Testnet_postake_ledger_many_proposers
 
-[%%elif
-genesis_ledger = "testnet_medium_rare"]
-
-include Testnet_medium_rare_ledger
-
-[%%elif
-genesis_ledger = "testnet_filet_mignon"]
-
-include Testnet_filet_mignon_ledger
-
 [%%else]
 
 [%%error

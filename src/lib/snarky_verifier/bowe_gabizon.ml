@@ -5,7 +5,7 @@ module type Inputs_intf = sig
   include Inputs.S
 
   val hash :
-       ?message:Impl.Boolean.var array
+       ?message:Impl.Field.Var.t array
     -> a:G1.t
     -> b:G2.t
     -> c:G1.t
