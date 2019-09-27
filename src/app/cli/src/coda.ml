@@ -161,19 +161,20 @@ let daemon logger =
        flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
      and libp2p_port =
        flag "libp2p-port" (optional int)
-         ~doc:"Port to use for libp2p (default: 28675)"
+         ~doc:"PORT Port to use for libp2p (default: 28675)"
      and disable_haskell =
        flag "disable-old-discovery" no_arg
          ~doc:"Disable the old discovery mechanism"
      and libp2p_keypair =
        flag "libp2p-keypair" (optional string)
          ~doc:
-           "Keypair (generated from `coda advanced generate-libp2p-keypair`) \
-            to use with libp2p (default: generate new keypair)"
+           "KEYPAIR Keypair (generated from `coda advanced \
+            generate-libp2p-keypair`) to use with libp2p (default: generate \
+            new keypair)"
      and libp2p_peers_raw =
        flag "libp2p-peer"
          ~doc:
-           "/ip4/HOST/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
+           "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             libp2p discovery"
          (listed string)
      in
@@ -416,13 +417,9 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "rest-port"
              ~default:Port.default_rest rest_server_port
          in
-         ignore libp2p_port ;
-         (* FIXME HACK: make this configurable when we can pass the port in the CLI *)
          let libp2p_port =
-           (*
            or_from_config YJ.Util.to_int_option "libp2p-port"
-             ~default:Port.default_libp2p libp2p_port *)
-           Port.default_libp2p
+             ~default:Port.default_libp2p libp2p_port
          in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
@@ -829,7 +826,8 @@ let coda_commands logger =
 new_cli]
 
 let coda_commands logger =
-  ("accounts", Client.accounts) :: coda_commands logger
+  ("accounts", Client.accounts)
+  :: ("client2", Client.client) :: coda_commands logger
 
 [%%endif]
 
