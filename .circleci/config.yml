@@ -4,7 +4,7 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
+            - image: codaprotocol/coda:toolchain-rust-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -253,6 +253,9 @@ jobs:
             - run:
                   name: Update and pin external submodules
                   command: ./scripts/pin-external-submodules.sh
+            - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
             - run:
                   name: Download candidate stable PV keys
                   environment:
