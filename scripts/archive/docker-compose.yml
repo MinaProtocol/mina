@@ -23,9 +23,11 @@ services:
     - "postgres"
     restart: always
   configuration:
-    image: python:3.7-stretch
+    image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
     network_mode: host
-    command: ["/bin/sh", "make_hasura_configurations.sh"]
+    # command: "pwd"
+    # command: ["/bin/sh", "/make_hasura_configurations.sh"]
+    command: ["python", "--version"]
     depends_on:
     - "hasura"
     volumes:
@@ -33,3 +35,4 @@ services:
       - ./make_hasura_configurations.sh:/make_hasura_configurations.sh
       - ../introspection_query.py:/introspection_query.py
       - ./output:/output
+      - ./ocaml:/home/opam/opam-repository/archive-ocaml-script

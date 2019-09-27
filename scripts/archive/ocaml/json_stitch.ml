@@ -2,12 +2,12 @@ open Core
 
 module Combinators = struct
   module Scalar = struct
-    type _ t =
-      | Int : int -> int t
-      | String : string -> string t
-      | Null : [`Null] t
+    type t =
+      | Int of int
+      | String of string
+      | Null 
 
-    let is_json_equal (type a) : a t -> Yojson.Basic.json -> bool = function
+    let is_json_equal  : t -> Yojson.Basic.json -> bool = function
       | Int int_value -> (
           function
           | `Int json_int_value ->
@@ -49,8 +49,7 @@ module Combinators = struct
       in
       List.find_map assoc_list ~f:(get_individual_value test_name)
 
-    let is_equal_scalar (type scalar) :
-        scalar Scalar.t -> Yojson.Basic.json -> bool option =
+    let is_equal_scalar : Scalar.t -> Yojson.Basic.json -> bool option =
      fun target_json json ->
       Option.some @@ Scalar.is_json_equal target_json json
 
