@@ -21,7 +21,9 @@ end)
 
 let%test_module "Transition Frontier Persistence" =
   ( module struct
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let hb_logger = Logger.create ()
 
     let pids = Child_processes.Termination.create_pid_set ()
 
@@ -80,6 +82,7 @@ let%test_module "Transition Frontier Persistence" =
     let test_breadcrumbs ~gen_root_breadcrumb_builder num_breadcrumbs =
       Thread_safe.block_on_async_exn
       @@ fun () ->
+      print_heartbeat hb_logger |> don't_wait_for ;
       let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%map breadcrumbs =
         with_persistence ~logger ~pids ~directory_name ~f:(fun (frontier, t) ->
@@ -94,9 +97,13 @@ let%test_module "Transition Frontier Persistence" =
             let%map () = store_transitions frontier breadcrumbs in
             breadcrumbs )
       in
-      Transition_frontier_persistence.with_database ~directory_name
-        ~f:(fun transition_storage ->
-          return @@ check_transitions transition_storage breadcrumbs )
+      let res =
+        Transition_frontier_persistence.with_database ~directory_name
+          ~f:(fun transition_storage ->
+            return @@ check_transitions transition_storage breadcrumbs )
+      in
+      heartbeat_flag := false ;
+      res
 
     let test_linear_breadcrumbs =
       test_breadcrumbs ~gen_root_breadcrumb_builder:gen_linear_breadcrumbs
@@ -109,8 +116,10 @@ let%test_module "Transition Frontier Persistence" =
                    Add_transition diffs into the storage" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
+      print_heartbeat hb_logger |> don't_wait_for ;
       let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%bind root, next_breadcrumb =
         with_persistence ~logger ~pids ~directory_name ~f:(fun (frontier, t) ->
@@ -148,20 +157,27 @@ let%test_module "Transition Frontier Persistence" =
             |> ignore ;
             (root, next_breadcrumb) )
       in
-      Transition_frontier_persistence.with_database ~directory_name
-        ~f:(fun storage ->
-          return @@ check_transitions storage [root; next_breadcrumb] )
+      let%map res =
+        Transition_frontier_persistence.with_database ~directory_name
+          ~f:(fun storage ->
+            return @@ check_transitions storage [root; next_breadcrumb] )
+      in
+      heartbeat_flag := false ;
+      res
 
     let%test_unit "Dump external transitions to disk" =
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
           test_linear_breadcrumbs (max_length - 1) )
 
     let%test_unit "Root changes multiple times" =
       Printexc.record_backtrace true ;
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
           test_linear_breadcrumbs (2 * max_length) )
 
     let%test_unit "Randomly generate a tree" =
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
           test_tree_breadcrumbs (2 * max_length) )
 
@@ -199,12 +215,16 @@ let%test_module "Transition Frontier Persistence" =
               same transition_frontier" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
+      print_heartbeat hb_logger |> don't_wait_for ;
       let%bind frontier =
         create_root_frontier ~logger ~pids Genesis_ledger.accounts
       in
-      test_deserialization max_length frontier
+      let%map x = test_deserialization max_length frontier in
+      heartbeat_flag := true ;
+      x
 
     let%test_unit "Serializing a frontier and then deserializing it  from \
                    genesis should give us the same transition_frontier" =
@@ -212,11 +232,15 @@ let%test_module "Transition Frontier Persistence" =
       Async.Scheduler.set_record_backtraces true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      Stubs.with_genesis_frontier ~logger ~pids ~f:(fun frontier ->
-          let%map is_serialization_correct =
-            test_deserialization (max_length / 2) frontier
-          in
-          assert is_serialization_correct )
+      print_heartbeat hb_logger |> don't_wait_for ;
+      let%map () =
+        Stubs.with_genesis_frontier ~logger ~pids ~f:(fun frontier ->
+            let%map is_serialization_correct =
+              test_deserialization (max_length / 2) frontier
+            in
+            assert is_serialization_correct )
+      in
+      heartbeat_flag := false
 
     (* TODO: create a test where a batch of diffs are being applied, but the
        worker dies in the middle. The transition_frontier_database can be left

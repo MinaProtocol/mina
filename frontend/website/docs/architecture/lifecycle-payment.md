@@ -40,6 +40,6 @@ There are a couple reasons why a transaction shared with peer nodes may not get 
 
 If a transaction is valid and the network is honest, then in all likelihood, a transaction will make it into a block. However, there is one case where a transaction may be dumped from a transaction pool:
 
-- If the transaction pool hits its capacity, or `max_txpool_size`, then it will evict the transaction with thelowest fee in the pool, causing it dumped from memory. If this happens, the sender will need to re-send the transaction with a higher fee, according to market dynamics at the time.
+- If the transaction pool hits its capacity, or `max_txpool_size`, then it will evict the transaction with the lowest fee in the pool, causing it dumped from memory. If this happens, the sender will need to re-send the transaction with a higher fee, according to market dynamics at the time.
 
 
