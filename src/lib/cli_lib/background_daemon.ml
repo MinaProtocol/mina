@@ -38,16 +38,5 @@ let graphql_init ~f arg_flag =
   let open Command.Param.Applicative_infix in
   Command.Param.return (fun rest_port arg () ->
       let port = Option.value rest_port ~default:Port.default_rest in
-      let (module Graphql_client : Graphql_client_lib.S) =
-        ( module struct
-          include Graphql_client_lib.Make (struct
-            let address = "graphql"
-
-            let port = port
-
-            let headers = String.Map.empty
-          end)
-        end )
-      in
-      f (module Graphql_client : Graphql_client_lib.S) arg )
+      f port arg )
   <*> Flag.rest_port <*> arg_flag

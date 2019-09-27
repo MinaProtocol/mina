@@ -7,47 +7,27 @@ let deserialize_optional_block_time =
     ~f:(Fn.compose Types.Block_time.deserialize Types.Bitstring.of_yojson)
 
 module User_commands = struct
-  module Get_existing =
-  [%graphql
-  {|
-    query get_existing ($hashes: [String!]!) {
-        user_commands(where: {hash: {_in: $hashes}} ) {
-            id
-            hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
-            first_seen @bsDecoder(fn: "deserialize_optional_block_time")
-        }
-    }
-|}]
-
   let bitstring_block_time = Option.map ~f:Types.Bitstring.of_yojson
-
-  open Types.User_command
 
   (* TODO: replace this with pagination *)
   module Query =
   [%graphql
   {|
     query query ($hash: String!) {
-        user_commands(where: {hash: {_eq: $hash}} ) @bsRecord {
+        user_commands(where: {hash: {_eq: $hash}} ) {
             fee @bsDecoder (fn: "Types.Bitstring.of_yojson")
             hash
             memo
             nonce @bsDecoder (fn: "Types.Bitstring.of_yojson")
-            receiver
-            sender
+            public_key {
+                value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
+            }
+            publicKeyByReceiver {
+              value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
+            } 
             typ @bsDecoder (fn: "Types.User_command_type.decode")
             amount @bsDecoder (fn: "Types.Bitstring.of_yojson")
             first_seen @bsDecoder(fn: "bitstring_block_time")
-        }
-    }
-|}]
-
-  module Update =
-  [%graphql
-  {|
-    mutation get_existing ($current_id: Int!, $new_first_seen: bit!) {
-        update_user_commands(where: {id: {_eq: $current_id}}, _set: {first_seen: $new_first_seen}) {
-            affected_rows
         }
     }
 |}]
@@ -66,32 +46,6 @@ module User_commands = struct
       }
     }
   }
-|}]
-end
-
-module Public_keys = struct
-  module Get_existing =
-  [%graphql
-  {|
-    query get_existing ($public_keys: [String!]!) {
-        public_keys(where: {value: {_in: $public_keys}} ) {
-            id
-            value @bsDecoder(fn: "Public_key.Compressed.of_base58_check_exn")
-        }
-    }
-|}]
-
-  module Insert =
-  [%graphql
-  {|
-    mutation insert ($public_keys: [public_keys_insert_input!]!) {
-        insert_public_keys(objects: $public_keys ) {
-            returning {
-                id
-                value @bsDecoder(fn: "Public_key.Compressed.of_base58_check_exn")
-            }
-        }
-    }
 |}]
 end
 

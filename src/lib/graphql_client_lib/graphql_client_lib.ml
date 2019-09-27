@@ -3,11 +3,11 @@ open Async
 open Signature_lib
 
 module type Config_intf = sig
-  val port : int
-
   val address : string
 
   val headers : string String.Map.t
+
+  val preprocess_variables_string : string -> string
 end
 
 let make_local_uri port address =
@@ -18,20 +18,25 @@ module type S = sig
        < parse: Yojson.Basic.json -> 'response
        ; query: string
        ; variables: Yojson.Basic.json >
+    -> int
     -> 'response Deferred.Or_error.t
 
   val query :
        < parse: Yojson.Basic.json -> 'response
        ; query: string
        ; variables: Yojson.Basic.json >
+    -> int
     -> 'response Deferred.t
 end
 
 module Make (Config : Config_intf) : S = struct
-  let local_uri = make_local_uri Config.port Config.address
+  let local_uri port = make_local_uri port Config.address
 
-  let query_or_error query_obj =
-    let variables_string = Yojson.Basic.to_string query_obj#variables in
+  let query_or_error query_obj port =
+    let variables_string =
+      Config.preprocess_variables_string
+      @@ Yojson.Basic.to_string query_obj#variables
+    in
     let body_string =
       Printf.sprintf {|{"query": "%s", "variables": %s}|} query_obj#query
         variables_string
@@ -46,7 +51,7 @@ module Make (Config : Config_intf) : S = struct
       let%bind _, body =
         Cohttp_async.Client.post ~headers
           ~body:(Cohttp_async.Body.of_string body_string)
-          local_uri
+          (local_uri port)
       in
       let%map body = Cohttp_async.Body.to_string body in
       Yojson.Basic.from_string body
@@ -55,8 +60,8 @@ module Make (Config : Config_intf) : S = struct
     in
     Deferred.Or_error.try_with ~extract_exn:true get_result
 
-  let query query_obj =
-    match%bind query_or_error query_obj with
+  let query query_obj port =
+    match%bind query_or_error query_obj port with
     | Ok r ->
         Deferred.return r
     | Error e ->

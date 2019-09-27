@@ -43,7 +43,7 @@ let change_constraint =
     in
   let action json =
     let open Change in
-    association_list json ~f:(value_with_name "name" ~f: (Fn.const (Or_error.return @@ `String "_constraint")))
+    association_list json ~f:(value_with_name "name" ~f: (Fn.const (Or_error.return @@ `String "constraint_")))
   in
     stitch ~predicate ~action
 
