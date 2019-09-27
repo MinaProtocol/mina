@@ -34,7 +34,7 @@ end
 
 (* Invariant: The path from the root to the tip inclusively, will be max_length *)
 type t =
-  { root_ledger: Ledger.Db.t
+  { root_ledger: Ledger.Any_ledger.witness
   ; mutable root: State_hash.t
   ; mutable best_tip: State_hash.t
   ; mutable hash: Frontier_hash.t
@@ -70,7 +70,7 @@ let close t =
   Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
   ignore
     (Ledger.Maskable.unregister_mask_exn ~grandchildren:`Recursive
-       (Ledger.Any_ledger.cast (module Ledger.Db) t.root_ledger)
+       t.root_ledger
        (Breadcrumb.mask (root t)))
 
 let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
@@ -90,7 +90,8 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
   in
   assert (
     Frozen_ledger_hash.equal
-      (Frozen_ledger_hash.of_ledger_hash (Ledger.Db.merkle_root root_ledger))
+      (Frozen_ledger_hash.of_ledger_hash
+         (Ledger.Any_ledger.M.merkle_root root_ledger))
       root_blockchain_state_ledger_hash ) ;
   let root_breadcrumb =
     Breadcrumb.create root_data.transition root_data.staged_ledger
@@ -177,9 +178,6 @@ let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
 let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
-
-let shallow_copy_root_snarked_ledger {root_ledger; _} =
-  Ledger.of_database root_ledger
 
 let best_tip_path_length_exn {table; root; best_tip; _} =
   let open Option.Let_syntax in
@@ -433,14 +431,8 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
             m0
         in
         Ledger.remove_and_reparent_exn m1 m1 ;
-        (*
-        ignore
-          (Ledger.Maskable.unregister_mask_exn
-             (Ledger.Any_ledger.cast (module Ledger.Mask.Attached) m0)
-             m1) ;
-        *)
         if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
-          let s = Ledger.Any_ledger.cast (module Ledger.Db) t.root_ledger in
+          let s = t.root_ledger in
           let mt = Ledger.Maskable.register_mask s (Ledger.Mask.create ()) in
           Non_empty_list.iter
             (Option.value_exn
@@ -473,7 +465,9 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
             (List.length (Breadcrumb.user_commands new_root_breadcrumb))
         in
         (* TODO: this metric collection super inefficient right now *)
-        let root_snarked_ledger_accounts = Ledger.Db.to_list t.root_ledger in
+        let root_snarked_ledger_accounts =
+          Ledger.Any_ledger.M.to_list t.root_ledger
+        in
         let num_root_snarked_ledger_accounts =
           Int.to_float (List.length root_snarked_ledger_accounts)
         in

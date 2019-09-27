@@ -35,10 +35,15 @@ module Make (Inputs : Inputs_intf) :
       Sequence.of_lazy
         (lazy (Sequence.of_list @@ get_breadcrumb_ledgers frontier))
     in
-    Sequence.append
-      (Sequence.singleton
-         (Transition_frontier.shallow_copy_root_snarked_ledger frontier))
-      ledger_breadcrumbs
+    let root_ledger =
+      Ledger.Any_ledger.cast
+        (module Ledger.Db)
+        (Transition_frontier.root_snarked_ledger frontier)
+    in
+    let mask =
+      Ledger.Maskable.register_mask root_ledger (Ledger.Mask.create ())
+    in
+    Sequence.append (Sequence.singleton mask) ledger_breadcrumbs
     |> Sequence.find ~f:(fun ledger ->
            Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash )
 

@@ -24,13 +24,10 @@ module Persistent_frontier = Persistent_frontier
 
 let global_max_length = Consensus.Constants.k
 
-type config =
+type t =
   { logger: Logger.t
   ; verifier: Verifier.t
-  ; consensus_local_state: Consensus.Data.Local_state.t }
-
-type t =
-  { config: config
+  ; consensus_local_state: Consensus.Data.Local_state.t
   ; full_frontier: Full_frontier.t
   ; persistent_root: Persistent_root.t
   ; persistent_root_instance: Persistent_root.Instance.t
@@ -46,8 +43,8 @@ let genesis_root_data =
     let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
     {transition; scan_state; pending_coinbase})
 
-let load_from_persistence_and_start config ~max_length ~persistent_root
-    ~persistent_root_instance ~persistent_frontier
+let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
+    ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
     ~persistent_frontier_instance =
   let open Deferred.Result.Let_syntax in
   let root_identifier =
@@ -71,7 +68,7 @@ let load_from_persistence_and_start config ~max_length ~persistent_root
            | `Bootstrap_required ->
                `Bootstrap_required
            | `Failure msg ->
-               Logger.fatal config.logger ~module_:__MODULE__ ~location:__LOC__
+               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
                  ~metadata:
                    [ ( "target_root"
                      , Root_identifier.Stable.Latest.to_yojson root_identifier
@@ -85,7 +82,7 @@ let load_from_persistence_and_start config ~max_length ~persistent_root
          persistent_frontier_instance ~max_length
          ~root_ledger:
            (Persistent_root.Instance.snarked_ledger persistent_root_instance)
-         ~consensus_local_state:config.consensus_local_state)
+         ~consensus_local_state)
       ~f:
         (Result.map_error ~f:(function
           | `Sync_cannot_be_running ->
@@ -105,7 +102,9 @@ let load_from_persistence_and_start config ~max_length ~persistent_root
       )
   in
   Ledger.Maskable.Debug.visualize ~filename:"post.dot" ;
-  { config
+  { logger
+  ; verifier
+  ; consensus_local_state
   ; full_frontier
   ; persistent_root
   ; persistent_root_instance
@@ -117,7 +116,9 @@ let load_from_persistence_and_start config ~max_length ~persistent_root
 let rec load_with_max_length :
        max_length:int
     -> ?retry_with_fresh_db:bool
-    -> config
+    -> logger:Logger.t
+    -> verifier:Verifier.t
+    -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
     -> ( t
@@ -125,19 +126,18 @@ let rec load_with_max_length :
          | `Persistent_frontier_malformed
          | `Failure of string ] )
        Deferred.Result.t =
- fun ~max_length ?(retry_with_fresh_db = true) config ~persistent_root
-     ~persistent_frontier ->
+ fun ~max_length ?(retry_with_fresh_db = true) ~logger ~verifier
+     ~consensus_local_state ~persistent_root ~persistent_frontier ->
   Ledger.Maskable.Debug.visualize ~filename:"pre.dot" ;
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
-  (* let persistent_root = Persistent_root.create ~logger:config.logger ~directory:config.persistent_root_directory in *)
   let continue persistent_frontier_instance =
     let persistent_root_instance =
       Persistent_root.create_instance_exn persistent_root
     in
-    load_from_persistence_and_start config ~max_length ~persistent_root
-      ~persistent_root_instance ~persistent_frontier
-      ~persistent_frontier_instance
+    load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
+      ~max_length ~persistent_root ~persistent_root_instance
+      ~persistent_frontier ~persistent_frontier_instance
   in
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier
@@ -160,20 +160,20 @@ let rec load_with_max_length :
       (* [new] TODO: this case can be optimized to not create the
          * database twice through rocks -- currently on clean bootup,
          * this code path will reinitialize the rocksdb twice *)
-      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "persistent frontier database does not exist" ;
       reset_and_continue ()
   | Error `Invalid_version ->
-      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "persistent frontier database out of date" ;
       reset_and_continue ()
   | Error (`Corrupt err) ->
-      Logger.error config.logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
         "Persistent frontier database is corrupt: %s"
         (Persistent_frontier.Database.Error.message err) ;
       if retry_with_fresh_db then (
         (* should retry be on by default? this could be unnecessarily destructive *)
-        Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "destroying old persistent frontier database " ;
         let%bind () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
@@ -181,8 +181,9 @@ let rec load_with_max_length :
         let%bind () =
           Persistent_frontier.destroy_database_exn persistent_frontier
         in
-        load_with_max_length ~max_length config ~persistent_root
-          ~persistent_frontier ~retry_with_fresh_db:false
+        load_with_max_length ~max_length ~logger ~verifier
+          ~consensus_local_state ~persistent_root ~persistent_frontier
+          ~retry_with_fresh_db:false
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -199,7 +200,9 @@ let load = load_with_max_length ~max_length:global_max_length
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
 let close
-    { config= {logger; _}
+    { logger
+    ; verifier= _
+    ; consensus_local_state= _
     ; full_frontier
     ; persistent_root= _safe_to_ignore_1
     ; persistent_root_instance
@@ -228,7 +231,7 @@ let add_breadcrumb_exn t breadcrumb =
   let open Deferred.Let_syntax in
   let old_hash = Full_frontier.hash t.full_frontier in
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
-  Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
+  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
@@ -238,7 +241,7 @@ let add_breadcrumb_exn t breadcrumb =
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "PRE: ($state_hash, $n)" ;
-  Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
+  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     ~metadata:
       [ ( "diffs"
         , `List
@@ -251,7 +254,7 @@ let add_breadcrumb_exn t breadcrumb =
   Option.iter new_root_identifier
     ~f:
       (Persistent_root.Instance.set_root_identifier t.persistent_root_instance) ;
-  Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
+  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
@@ -334,15 +337,184 @@ include struct
   (* TODO: should this be nested under For_tests? should never be used in production *)
   let equal = proxy2 equal
 
-  (* TODO: remove? what is this for? *)
-  let shallow_copy_root_snarked_ledger =
-    proxy1 shallow_copy_root_snarked_ledger
-
   (* why can't this one be proxied? *)
   let path_map {full_frontier; _} breadcrumb ~f =
     path_map full_frontier breadcrumb ~f
 end
 
 module For_tests = struct
+  open Signature_lib
+  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
+
   let load_with_max_length = load_with_max_length
+
+  let rec deferred_rose_tree_iter (Rose_tree.T (root, trees)) ~f =
+    let%bind () = f root in
+    Deferred.List.iter trees ~f:(deferred_rose_tree_iter ~f)
+
+  (*
+  let with_frontier_from_rose_tree (Rose_tree.T (root, trees)) ~logger ~verifier ~consensus_local_state ~max_length ~root_snarked_ledger ~f =
+    with_temp_persistence ~f:(fun ~persistent_root ~persistent_frontier ->
+      Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
+        Persistent_root.Instance.set_root_state_hash instance (Breadcrumb.state_hash @@ root);
+        ignore @@ Ledger_transfer.transfer_accounts
+          ~src:root_snarked_ledger
+          ~dest:(Persistent_root.snarked_ledger instance));
+      let frontier =
+        let fail msg = failwith ("failed to load transition frontier: "^msg) in
+        load_with_max_length
+          {logger; verifier; consensus_local_state}
+          ~persistent_root ~persistent_frontier
+          ~max_length
+        >>| Result.map_error ~f:(Fn.compose fail (function
+          | `Bootstrap_required -> "bootstrap required"
+          | `Persistent_frontier_malformed -> "persistent frontier malformed"
+          | `Faliure msg -> msg))
+        >>| Result.ok_or_failwith
+      in
+      let%bind () = Deferred.List.iter trees ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) in
+      f frontier)
+  *)
+
+  (* a helper quickcheck generator which always returns the genesis breadcrumb *)
+  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ?verifier () =
+    let verifier =
+      match verifier with
+      | Some x ->
+          x
+      | None ->
+          Async.Thread_safe.block_on_async_exn Verifier.Dummy.create
+    in
+    Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
+        let genesis_transition = Lazy.force External_transition.genesis in
+        let genesis_ledger = Lazy.force Genesis_ledger.t in
+        let genesis_staged_ledger =
+          Or_error.ok_exn
+            (Async.Thread_safe.block_on_async_exn (fun () ->
+                 Staged_ledger
+                 .of_scan_state_pending_coinbases_and_snarked_ledger ~logger
+                   ~verifier
+                   ~scan_state:(Staged_ledger.Scan_state.empty ())
+                   ~pending_coinbases:
+                     (Or_error.ok_exn @@ Pending_coinbase.create ())
+                   ~snarked_ledger:genesis_ledger
+                   ~expected_merkle_root:(Ledger.merkle_root genesis_ledger) ))
+        in
+        Breadcrumb.create genesis_transition genesis_staged_ledger )
+
+  let gen_persistence ?(logger = Logger.null ()) ?verifier () =
+    let open Core in
+    let verifier =
+      match verifier with
+      | Some x ->
+          x
+      | None ->
+          Async.Thread_safe.block_on_async_exn Verifier.Dummy.create
+    in
+    let root_dir = "/tmp/coda_unit_test" in
+    Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
+        let uuid = Uuid_unix.create () in
+        let temp_dir = root_dir ^/ Uuid.to_string uuid in
+        let root_dir = temp_dir ^/ "root" in
+        let frontier_dir = temp_dir ^/ "frontier" in
+        let cleaned = ref false in
+        let clean_temp_dirs _ =
+          if not !cleaned then (
+            let process_info =
+              Unix.create_process ~prog:"rm" ~args:["-rf"; temp_dir]
+            in
+            Unix.waitpid process_info.pid
+            |> Result.map_error ~f:(function
+                 | `Exit_non_zero n ->
+                     Printf.sprintf "error (exit code %d)" n
+                 | `Signal _ ->
+                     "error (received unexpected signal)" )
+            |> Result.ok_or_failwith ;
+            cleaned := true )
+        in
+        Unix.mkdir_p temp_dir ;
+        Unix.mkdir root_dir ;
+        Unix.mkdir frontier_dir ;
+        let persistent_root =
+          Persistent_root.create ~logger ~directory:root_dir
+        in
+        let persistent_frontier =
+          Persistent_frontier.create ~logger ~verifier ~directory:frontier_dir
+        in
+        Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
+        Gc.Expert.add_finalizer_exn persistent_frontier clean_temp_dirs ;
+        (persistent_root, persistent_frontier) )
+
+  let gen ?(logger = Logger.null ()) ?verifier ?trust_system
+      ?consensus_local_state
+      ?(root_ledger_and_accounts =
+        (Lazy.force Genesis_ledger.t, Genesis_ledger.accounts))
+      ?(gen_root_breadcrumb = gen_genesis_breadcrumb ~logger ?verifier ())
+      ~max_length ~size () =
+    let open Quickcheck.Generator.Let_syntax in
+    let verifier =
+      match verifier with
+      | Some x ->
+          x
+      | None ->
+          Async.Thread_safe.block_on_async_exn Verifier.Dummy.create
+    in
+    let trust_system =
+      Option.value trust_system ~default:(Trust_system.null ())
+    in
+    let consensus_local_state =
+      Option.value consensus_local_state
+        ~default:
+          (Consensus.Data.Local_state.create Public_key.Compressed.Set.empty)
+    in
+    let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
+    (* TODO: ensure that rose_tree cannot be longer than k *)
+    let%bind (Rose_tree.T (root, branches)) =
+      Quickcheck.Generator.with_size ~size
+        (Quickcheck_lib.gen_imperative_rose_tree gen_root_breadcrumb
+           (Breadcrumb.For_tests.gen_non_deferred ~logger ~trust_system
+              ~accounts_with_secret_keys:root_ledger_accounts))
+    in
+    let root_data =
+      { Root_data.Limited.Stable.Latest.transition=
+          Breadcrumb.validated_transition root
+      ; scan_state= Breadcrumb.staged_ledger root |> Staged_ledger.scan_state
+      ; pending_coinbase=
+          Breadcrumb.staged_ledger root
+          |> Staged_ledger.pending_coinbase_collection }
+    in
+    let%map persistent_root, persistent_frontier =
+      gen_persistence ~logger ()
+    in
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Persistent_frontier.reset_database_exn persistent_frontier ~root_data
+    ) ;
+    Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
+        Persistent_root.Instance.set_root_state_hash instance
+          (External_transition.Validated.state_hash root_data.transition) ;
+        ignore
+        @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
+             ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;
+    let frontier_result =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          load_with_max_length ~max_length ~retry_with_fresh_db:false ~logger
+            ~verifier ~consensus_local_state ~persistent_root
+            ~persistent_frontier )
+    in
+    let frontier =
+      let fail msg = failwith ("failed to load transition frontier: " ^ msg) in
+      match frontier_result with
+      | Error `Bootstrap_required ->
+          fail "bootstrap required"
+      | Error `Persistent_frontier_malformed ->
+          fail "persistent frontier malformed"
+      | Error (`Failure msg) ->
+          fail msg
+      | Ok frontier ->
+          frontier
+    in
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Deferred.List.iter ~how:`Sequential branches
+          ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) ) ;
+    frontier
 end

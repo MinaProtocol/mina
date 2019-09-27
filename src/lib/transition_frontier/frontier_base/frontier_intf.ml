@@ -39,8 +39,6 @@ module type S = sig
 
   val best_tip_path_length_exn : t -> int
 
-  val shallow_copy_root_snarked_ledger : t -> Ledger.Mask.Attached.t
-
   val visualize_to_string : t -> string
 
   val visualize : filename:string -> t -> unit

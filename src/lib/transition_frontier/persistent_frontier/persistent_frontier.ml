@@ -196,7 +196,8 @@ module Instance = struct
       Full_frontier.create ~logger:t.factory.logger ~base_hash
         ~root_data:
           {transition= root_transition; staged_ledger= root_staged_ledger}
-        ~root_ledger ~consensus_local_state ~max_length
+        ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)
+        ~consensus_local_state ~max_length
     in
     let%bind extensions =
       Deferred.map

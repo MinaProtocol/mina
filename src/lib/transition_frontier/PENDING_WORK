@@ -1,10 +1,10 @@
 # Bugs
 
-- snark_pool_refcount find_exn on garbage
++ snark_pool_refcount find_exn on garbage
   - FIX: pass full diffs to extensions, update full representation to include garbage
   - https://circleci.com/gh/CodaProtocol/coda/227853?utm_campaign=vcs-integration-link&utm_medium=referral&utm_source=github-build-link
 + busy diff buffer worker
-- frontier hash mismatch
++ frontier hash mismatch
 - crash on startup with old config
   - valid database
   - corrupted database
@@ -25,7 +25,7 @@
 
 # Regressions
 
-- add unit tests back in
+* add unit tests back in
 - fix visualization logging on crashes
 - create O(1) `Staged_ledger.Scan_state.target_merkle_root` (for sync_handler RPCs)
 
