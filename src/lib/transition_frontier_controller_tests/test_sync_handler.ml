@@ -18,6 +18,8 @@ let%test_module "Sync_handler" =
   ( module struct
     let logger = Logger.null ()
 
+    let hb_logger = Logger.create ()
+
     let pids = Child_processes.Termination.create_pid_set ()
 
     let trust_system = Trust_system.null ()
@@ -29,8 +31,10 @@ let%test_module "Sync_handler" =
     let%test "sync with ledgers from another peer via glue_sync_ledger" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
+      heartbeat_flag := true ;
       Ledger.with_ephemeral_ledger ~f:(fun dest_ledger ->
           Thread_safe.block_on_async_exn (fun () ->
+              print_heartbeat hb_logger |> don't_wait_for ;
               let%bind frontier =
                 create_root_frontier ~logger ~pids Genesis_ledger.accounts
               in
@@ -62,6 +66,7 @@ let%test_module "Sync_handler" =
                   ~equal:(fun () () -> true)
               with
               | `Ok synced_ledger ->
+                  heartbeat_flag := false ;
                   Ledger_hash.equal
                     (Ledger.merkle_root dest_ledger)
                     (Ledger.merkle_root source_ledger)
@@ -69,6 +74,7 @@ let%test_module "Sync_handler" =
                        (Ledger.merkle_root synced_ledger)
                        (Ledger.merkle_root source_ledger)
               | `Target_changed _ ->
+                  heartbeat_flag := false ;
                   failwith "target of sync_ledger should not change" ) )
 
     let to_external_transition breadcrumb =
@@ -76,13 +82,12 @@ let%test_module "Sync_handler" =
       |> External_transition.Validation.forget_validation
 
     let%test "a node should be able to give a valid proof of their root" =
-      let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_set () in
-      let trust_system = Trust_system.null () in
+      heartbeat_flag := true ;
       let max_length = 4 in
       (* Generating this many breadcrumbs will ernsure the transition_frontier to be full  *)
       let num_breadcrumbs = max_length + 2 in
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
             create_root_frontier ~logger ~pids Genesis_ledger.accounts
           in
@@ -113,6 +118,7 @@ let%test_module "Sync_handler" =
               =
             verify observed_state root_with_proof |> Deferred.Or_error.ok_exn
           in
+          heartbeat_flag := false ;
           External_transition.(
             equal
               (With_hash.data root_transition)
@@ -127,7 +133,9 @@ let%test_module "Sync_handler" =
       let num_breadcrumbs_to_cause_bootstrap =
         (2 * max_length) + Consensus.Constants.delta + 1
       in
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
             create_root_frontier ~logger ~pids Genesis_ledger.accounts
           in
@@ -157,5 +165,6 @@ let%test_module "Sync_handler" =
           let%map verification_result =
             verify root_consensus_state peer_best_tip_with_witness
           in
+          heartbeat_flag := false ;
           Result.is_ok verification_result )
   end )
