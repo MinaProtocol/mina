@@ -2823,7 +2823,7 @@
         {
           "inputFields": [
             {
-              "name": "constraint",
+              "name": "_constraint",
               "defaultValue": null,
               "type": {
                 "kind": "NON_NULL",
@@ -4860,7 +4860,7 @@
         {
           "inputFields": [
             {
-              "name": "constraint",
+              "name": "_constraint",
               "defaultValue": null,
               "type": {
                 "kind": "NON_NULL",
@@ -6917,7 +6917,7 @@
         {
           "inputFields": [
             {
-              "name": "constraint",
+              "name": "_constraint",
               "defaultValue": null,
               "type": {
                 "kind": "NON_NULL",
@@ -8634,7 +8634,7 @@
         {
           "inputFields": [
             {
-              "name": "constraint",
+              "name": "_constraint",
               "defaultValue": null,
               "type": {
                 "kind": "NON_NULL",
@@ -9356,7 +9356,7 @@
         {
           "inputFields": [
             {
-              "name": "constraint",
+              "name": "_constraint",
               "defaultValue": null,
               "type": {
                 "kind": "NON_NULL",
@@ -11360,26 +11360,6 @@
               "description": null
             },
             {
-              "name": "receiver",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "sender",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
               "name": "typ",
               "defaultValue": null,
               "type": {
@@ -11487,7 +11467,7 @@
         {
           "inputFields": [
             {
-              "name": "constraint",
+              "name": "_constraint",
               "defaultValue": null,
               "type": {
                 "kind": "NON_NULL",
