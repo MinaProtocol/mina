@@ -43,9 +43,9 @@ RUN cd /rocksdb && sudo make static_lib PORTABLE=1 -j$(nproc) && sudo cp librock
 RUN opam switch create $OCAML_VERSION+spacetime
 RUN eval $(opam env)
 
-# Install OPAM packages for spacetime compiler
+# Install OPAM packages for spacetime compiler; use ulimited stack for camlp4 build
 ADD /src/opam.export .
-RUN opam switch import opam.export ; rm opam.export
+RUN ulimit stack unlimited && opam switch import opam.export ; rm opam.export
 
 # OPAM dependencies for vanilla compiler
 RUN git -C /home/opam/opam-repository pull
