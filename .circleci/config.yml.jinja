@@ -348,7 +348,7 @@ jobs:
 
     {%- for profile in unit_test_profiles_medium_curves %}
     test-unit--{{profile}}:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
@@ -398,7 +398,7 @@ jobs:
 
     {%- for profile in medium_curves_tests.keys() | sort %}
     test--{{profile}}:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
@@ -448,6 +448,7 @@ workflows:
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
+
     daily:
         triggers:
           - schedule:

@@ -373,30 +373,8 @@ jobs:
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
-    test-unit--test_postake_snarkless_medium_curves_unit_test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
-        steps:
-            - checkout
-            - run: ulimit -c unlimited
-            - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
-            - run:
-                  name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_medium_curves_unit_test -j8 && (dune runtest --profile=test_postake_snarkless_medium_curves_unit_test -j8 || (./scripts/link-coredumps.sh && false))'
-                  no_output_timeout: 1h
-            - store_artifacts:
-                path: core_dumps
     test-unit--dev_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
@@ -713,28 +691,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-batch-payment-test"'
             - store_artifacts:
                   path: test_logs
-    test--test_postake_delegation_medium_curves:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
-        steps:
-            - checkout
-            - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
-            - run:
-                  name: Running test -- test_postake_delegation_medium_curves:coda-delegation-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation_medium_curves:coda-delegation-test"'
-            - store_artifacts:
-                  path: test_logs
     test--test_postake_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
@@ -759,7 +717,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
     test--test_postake_snarkless_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
@@ -782,7 +740,7 @@ jobs:
             - store_artifacts:
                   path: test_logs
     test--test_postake_split_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
@@ -799,70 +757,6 @@ jobs:
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2"'
-            - store_artifacts:
-                  path: test_logs
-    test--test_postake_split_snarkless_medium_curves:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
-        steps:
-            - checkout
-            - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-peers-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-peers-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-transitive-peers-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-transitive-peers-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-block-production-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-block-production-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 0
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 0"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 1
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 1"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-restart-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-restart-node-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-change-snark-worker-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-change-snark-worker-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-archive-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-archive-node-test"'
-            - store_artifacts:
-                  path: test_logs
-    test--test_postake_txns_medium_curves:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
-        steps:
-            - checkout
-            - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
-            - run:
-                  name: Running test -- test_postake_txns_medium_curves:coda-shared-state-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns_medium_curves:coda-shared-state-test"'
-            - run:
-                  name: Running test -- test_postake_txns_medium_curves:coda-batch-payment-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns_medium_curves:coda-batch-payment-test"'
             - store_artifacts:
                   path: test_logs
 
@@ -897,6 +791,7 @@ workflows:
             - test--test_postake_split_snarkless
             - test--test_postake_three_proposers
             - test--test_postake_txns
+
     daily:
         triggers:
           - schedule:
@@ -907,11 +802,7 @@ workflows:
                     - develop
                     - /release\/.*/
         jobs:
-          - test-unit--test_postake_snarkless_medium_curves_unit_test
           - test-unit--dev_medium_curves
-          - test--test_postake_delegation_medium_curves
           - test--test_postake_medium_curves
           - test--test_postake_snarkless_medium_curves
           - test--test_postake_split_medium_curves
-          - test--test_postake_split_snarkless_medium_curves
-          - test--test_postake_txns_medium_curves

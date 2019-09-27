@@ -15,13 +15,13 @@ module Random_oracle : sig
   val vrf_output : Field.t State.t
 
   val epoch_seed : Field.t State.t
+
+  val protocol_state : Field.t State.t
+
+  val protocol_state_body : Field.t State.t
 end
 
 val length_in_triples : int
-
-val protocol_state : Tick.Pedersen.State.t
-
-val protocol_state_body : Tick.Pedersen.State.t
 
 val account : Tick.Pedersen.State.t
 
