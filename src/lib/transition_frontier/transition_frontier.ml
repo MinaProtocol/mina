@@ -121,13 +121,14 @@ let rec load_with_max_length :
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
+    -> unit
     -> ( t
        , [> `Bootstrap_required
          | `Persistent_frontier_malformed
          | `Failure of string ] )
        Deferred.Result.t =
  fun ~max_length ?(retry_with_fresh_db = true) ~logger ~verifier
-     ~consensus_local_state ~persistent_root ~persistent_frontier ->
+     ~consensus_local_state ~persistent_root ~persistent_frontier () ->
   Ledger.Maskable.Debug.visualize ~filename:"pre.dot" ;
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
@@ -183,7 +184,7 @@ let rec load_with_max_length :
         in
         load_with_max_length ~max_length ~logger ~verifier
           ~consensus_local_state ~persistent_root ~persistent_frontier
-          ~retry_with_fresh_db:false
+          ~retry_with_fresh_db:false ()
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -499,7 +500,7 @@ module For_tests = struct
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false ~logger
             ~verifier ~consensus_local_state ~persistent_root
-            ~persistent_frontier )
+            ~persistent_frontier () )
     in
     let frontier =
       let fail msg = failwith ("failed to load transition frontier: " ^ msg) in

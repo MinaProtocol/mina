@@ -554,10 +554,8 @@ let create (config : Config.t) =
           (* TODO: (#3053) push transition frontier ownership down into transition router
              * (then persistent root can be owned by transition frontier only) *)
           let%bind transition_frontier =
-            Transition_frontier.load
-              { Transition_frontier.logger= config.logger
-              ; verifier
-              ; consensus_local_state= config.consensus_local_state }
+            Transition_frontier.load ~logger:config.logger ~verifier
+              ~consensus_local_state:config.consensus_local_state
               ~persistent_root:
                 (Transition_frontier.Persistent_root.create
                    ~logger:config.logger
@@ -566,6 +564,7 @@ let create (config : Config.t) =
                 (Transition_frontier.Persistent_frontier.create
                    ~logger:config.logger ~verifier
                    ~directory:config.persistent_frontier_location)
+              ()
             >>| Fn.compose Result.ok_or_failwith
                   (Result.map_error ~f:(function
                     | `Persistent_frontier_malformed ->

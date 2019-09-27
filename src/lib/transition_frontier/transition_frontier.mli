@@ -23,6 +23,7 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
+  -> unit
   -> ( t
      , [> `Failure of string
        | `Bootstrap_required
@@ -52,6 +53,7 @@ module For_tests : sig
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
+    -> unit
     -> ( t
        , [> `Failure of string
          | `Bootstrap_required

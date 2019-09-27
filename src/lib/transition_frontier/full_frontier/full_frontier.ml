@@ -456,6 +456,10 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
       t.root <- new_root_hash ;
       Ledger.Maskable.Debug.visualize
         ~filename:(Printf.sprintf "%s.%d.post.dot" (mask_prefix ()) id) ;
+      Consensus.Hooks.frontier_root_transition
+        (Breadcrumb.consensus_state old_root_node.breadcrumb)
+        (Breadcrumb.consensus_state new_root_node.breadcrumb)
+        ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger ;
       Coda_metrics.(
         let num_breadcrumbs_removed =
           Int.to_float (1 + List.length garbage_breadcrumbs)
@@ -464,7 +468,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
           Int.to_float
             (List.length (Breadcrumb.user_commands new_root_breadcrumb))
         in
-        (* TODO: this metric collection super inefficient right now *)
+        (* TODO: this metric collection is super inefficient right now *)
         let root_snarked_ledger_accounts =
           Ledger.Any_ledger.M.to_list t.root_ledger
         in

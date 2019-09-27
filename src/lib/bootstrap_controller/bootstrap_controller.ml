@@ -534,11 +534,9 @@ end = struct
                     ( "failed to initialize transition frontier after \
                        bootstrapping: " ^ msg )
                 in
-                Transition_frontier.load
-                  { Transition_frontier.logger= t.logger
-                  ; verifier
-                  ; consensus_local_state }
-                  ~persistent_root ~persistent_frontier
+                Transition_frontier.load ~retry_with_fresh_db:false ~logger
+                  ~verifier ~consensus_local_state ~persistent_root
+                  ~persistent_frontier ()
                 >>| function
                 | Ok frontier ->
                     frontier
