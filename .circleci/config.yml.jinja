@@ -4,7 +4,7 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
+            - image: codaprotocol/coda:toolchain-rust-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -57,7 +57,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
             - checkout
             - run:
@@ -232,7 +232,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
             - checkout
             - run:
@@ -296,7 +296,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -337,7 +337,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -356,7 +356,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
             - checkout
             - run:
@@ -375,7 +375,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
         steps:
             - checkout
             - run:
