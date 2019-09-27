@@ -763,8 +763,8 @@ module Data = struct
       let hash msg g =
         let x, y = Non_zero_curve_point.of_inner_curve_exn g in
         let input =
-          Random_oracle.Input.append (Message.to_input msg)
-            {field_elements= [|x; y|]; bitstrings= [||]}
+          Random_oracle.Input.(
+            append (Message.to_input msg) (field_elements [|x; y|]))
         in
         let open Random_oracle in
         hash ~init:Hash_prefix_states.Random_oracle.vrf_output
@@ -780,8 +780,7 @@ module Data = struct
         let hash msg (x, y) =
           let%bind msg = Message.Checked.to_input msg in
           let input =
-            Random_oracle.Input.append msg
-              {field_elements= [|x; y|]; bitstrings= [||]}
+            Random_oracle.Input.(append msg (field_elements [|x; y|]))
           in
           make_checked (fun () ->
               let open Random_oracle.Checked in
@@ -1287,8 +1286,9 @@ module Data = struct
             var) =
         let open Tick in
         let%map epoch_length = Length.Checked.to_bits epoch_length in
+        let open Random_oracle.Input in
         let input =
-          { Random_oracle.Input.field_elements=
+          { field_elements=
               [| Epoch_seed.var_to_hash_packed seed
                ; Coda_base.State_hash.var_to_hash_packed start_checkpoint |]
           ; bitstrings= [|Bitstring.Lsb_first.to_list epoch_length|] }
@@ -1296,9 +1296,7 @@ module Data = struct
         List.reduce_exn ~f:Random_oracle.Input.append
           [ input
           ; Epoch_ledger.var_to_input ledger
-          ; { field_elements=
-                [|Coda_base.State_hash.var_to_hash_packed lock_checkpoint|]
-            ; bitstrings= [||] } ]
+          ; field (Coda_base.State_hash.var_to_hash_packed lock_checkpoint) ]
 
       let genesis =
         lazy
@@ -1314,9 +1312,7 @@ module Data = struct
     module Staking = Make (struct
       include Coda_base.State_hash
 
-      let to_input (t : t) =
-        { Random_oracle.Input.field_elements= [|(t :> Tick.Field.t)|]
-        ; bitstrings= [||] }
+      let to_input (t : t) = Random_oracle.Input.field (t :> Tick.Field.t)
 
       let null = Coda_base.State_hash.(of_hash zero)
     end)
@@ -1325,10 +1321,8 @@ module Data = struct
       include Optional_state_hash
 
       let to_input (t : t) =
-        { Random_oracle.Input.field_elements=
-            [| ( Option.value ~default:Optional_state_hash.none t
-                 :> Tick.Field.t ) |]
-        ; bitstrings= [||] }
+        Random_oracle.Input.field
+          (Option.value ~default:Optional_state_hash.none t :> Tick.Field.t)
 
       let null = None
     end)
