@@ -1,5 +1,3 @@
-open Tc;
-
 module UnlockWallet = [%graphql
   {| mutation unlock($password: String, $publicKey: PublicKey) {
       unlockWallet(input: {password: $password, publicKey: $publicKey}) {
@@ -11,10 +9,10 @@ module UnlockWallet = [%graphql
 module UnlockMutation = ReasonApollo.CreateMutation(UnlockWallet);
 
 [@react.component]
-let make = (~wallet, ~setModalState, ~onClose) => {
+let make = (~wallet, ~onClose) => {
   let (password, setPassword) = React.useState(() => "");
   <Modal
-    title="Unlock Wallet" onRequestClose={() => setModalState(_ => false)}>
+    title="Unlock Wallet" onRequestClose=onClose>
     <div className=Modal.Styles.default>
       <p className=Theme.Text.Body.regular>
         {React.string("Please enter password for ")}
@@ -33,7 +31,7 @@ let make = (~wallet, ~setModalState, ~onClose) => {
         <Button
           label="Cancel"
           style=Button.Gray
-          onClick={_ => setModalState(_ => false)}
+          onClick={ _ => onClose()}
         />
         <Spacer width=1. />
         <UnlockMutation>
@@ -48,24 +46,7 @@ let make = (~wallet, ~setModalState, ~onClose) => {
                      ~publicKey=Apollo.Encoders.publicKey(wallet),
                      (),
                    )##variables;
-                 let performMutation =
-                   Task.liftPromise(() => mutation(~variables, ()));
-                 Task.perform(
-                   performMutation,
-                   ~f=
-                     fun
-                     | Data(_) =>
-                       log(`Info, "Unlock successful of %s", publicKey)
-                     | Error(e) =>
-                       log(
-                         `Error,
-                         "Unlock failed for %s, error: %s",
-                         publicKey,
-                         Js.String.make(e),
-                       )
-                     | NotFound =>
-                       log(`Error, "Got 'NotFound' unlocking %s", publicKey),
-                 );
+                 mutation(~variables, ()) |> ignore;
                  onClose();
                }}
              />}
