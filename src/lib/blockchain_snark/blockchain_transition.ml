@@ -278,6 +278,25 @@ module Make (T : Transaction_snark.Verification.S) = struct
   end
 end
 
+let instance_hash wrap_vk =
+  let open Coda_base in
+  let init =
+    Random_oracle.update
+      ~state:Hash_prefix.Random_oracle.transition_system_snark
+      Snark_params.Tick.Verifier.(
+        let vk = vk_of_backend_vk wrap_vk in
+        let g1 = Tick.Inner_curve.to_affine_exn in
+        let g2 = Tick.Pairing.G2.Unchecked.to_affine_exn in
+        Verification_key.to_field_elements
+          { vk with
+            query_base= g1 vk.query_base
+          ; query= List.map ~f:g1 vk.query
+          ; delta= g2 vk.delta })
+  in
+  stage (fun state ->
+      Random_oracle.hash ~init [|(Protocol_state.hash state :> Tick.Field.t)|]
+  )
+
 let constraint_system_digests () =
   let module M = Make (Transaction_snark.Verification.Make (struct
     let keys = Transaction_snark.Keys.Verification.dummy
