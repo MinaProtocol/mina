@@ -322,9 +322,11 @@ module Styles = {
       fontSize(`rem(0.625)),
       media(
         Style.MediaQuery.notMobile,
-        Style.paddingX(`rem(2.1875))
-        @ Style.paddingY(`rem(4.6875))
-        @ [height(`rem(25.)), fontSize(`rem(1.))],
+        [
+          padding2(~v=`rem(4.6875), ~h=`rem(2.1875)),
+          height(`rem(25.)),
+          fontSize(`rem(1.)),
+        ],
       ),
     ]);
 };
