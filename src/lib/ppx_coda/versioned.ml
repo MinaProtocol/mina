@@ -230,6 +230,8 @@ let whitelisted_prefix prefix ~loc =
 
 let is_stable_latest =
   let is_ldot_with_id id = function
+    | Lident s when String.equal id s ->
+        true
     | Ldot (_lident, s) when String.equal id s ->
         true
     | _ ->
