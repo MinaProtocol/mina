@@ -1,8 +1,5 @@
 open Core_kernel
 open Coda_base
-open Fold_lib
-open Tuple_lib
-open Snark_params
 open Snark_params.Tick
 
 module Poly : sig
@@ -73,31 +70,10 @@ val genesis : Value.t Lazy.t
 
 val set_timestamp : ('a, 'b, 'c) Poly.t -> 'c -> ('a, 'b, 'c) Poly.t
 
-val fold : Value.t -> bool Triple.t Fold.t
+val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
-val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
 type display = (string, string, string) Poly.t [@@deriving yojson]
 
 val display : Value.t -> display
-
-module Message :
-  Signature_lib.Checked.Message_intf
-  with type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
-   and type boolean_var := Tick.Boolean.var
-   and type curve_scalar := Inner_curve.Scalar.t
-   and type curve_scalar_var := Inner_curve.Scalar.var
-   and type t = Value.t
-   and type var = var
-
-open Tick
-
-module Signature :
-  Signature_lib.Checked.S
-  with module Impl := Tick
-   and type curve := Inner_curve.t
-   and type curve_var := Inner_curve.var
-   and type curve_scalar := Inner_curve.Scalar.t
-   and type curve_scalar_var := Inner_curve.Scalar.var
-   and module Message := Message
-   and module Shifted := Snark_params.Tick.Inner_curve.Checked.Shifted
