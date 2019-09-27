@@ -90,11 +90,17 @@ module Make (Inputs : Inputs.S) :
                        over the transition frontier root"
                     , metadata ) )
             in
+            Cached.invalidate_with_failure
+              cached_initially_validated_transition
+            |> ignore ;
             Error ()
         | Error `Already_in_frontier ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
               "Refusing to process the transition with hash $state_hash \
                because is is already in the transition frontier" ;
+            Cached.invalidate_with_failure
+              cached_initially_validated_transition
+            |> ignore ;
             return (Error ())
         | Error `Parent_missing_from_frontier -> (
             let _, validation =
@@ -146,8 +152,14 @@ module Make (Inputs : Inputs.S) :
                     @ [("error", `String (Error.to_string_hum error))] )
                   "Error while building breadcrumb in the transition handler \
                    processor: $error" ;
+                Cached.invalidate_with_failure
+                  cached_initially_validated_transition
+                |> ignore ;
                 Deferred.return (Error ())
             | Error (`Fatal_error exn) ->
+                Cached.invalidate_with_failure
+                  cached_initially_validated_transition
+                |> ignore ;
                 raise exn
             | Ok breadcrumb ->
                 Deferred.return (Ok breadcrumb) )
@@ -238,6 +250,10 @@ module Make (Inputs : Inputs.S) :
                    | Ok () ->
                        ()
                    | Error err ->
+                       List.iter breadcrumb_subtrees ~f:(fun tree ->
+                           Rose_tree.iter tree ~f:(fun cached_breadcrumb ->
+                               Cached.invalidate_with_failure cached_breadcrumb
+                               |> ignore ) ) ;
                        Logger.error logger ~module_:__MODULE__
                          ~location:__LOC__
                          "Error, failed to attach all catchup breadcrumbs to \
@@ -262,7 +278,8 @@ module Make (Inputs : Inputs.S) :
                            ~metadata:
                              [("error", `String (Error.to_string_hum err))]
                            "Error, failed to attach proposed breadcrumb to \
-                            transition frontier: $error"
+                            transition frontier: $error" ;
+                         Cached.invalidate_with_failure breadcrumb |> ignore
                    in
                    Coda_metrics.(
                      Gauge.dec_one
