@@ -1,7 +1,5 @@
 open Core_kernel
 open Coda_base
-open Fold_lib
-open Tuple_lib
 open Snark_params.Tick
 
 module Poly : sig
@@ -72,9 +70,9 @@ val genesis : Value.t Lazy.t
 
 val set_timestamp : ('a, 'b, 'c) Poly.t -> 'c -> ('a, 'b, 'c) Poly.t
 
-val fold : Value.t -> bool Triple.t Fold.t
+val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
-val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
 type display = (string, string, string) Poly.t [@@deriving yojson]
 
