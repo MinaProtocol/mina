@@ -60,6 +60,7 @@ type t =
   ; propose_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
+  ; mutable next_proposal: Consensus.Hooks.proposal option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
 [@@deriving fields]
@@ -475,8 +476,11 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
   Network_pool.Snark_pool.add_completed_work (snark_pool t) work
 
+let next_proposal t = t.next_proposal
+
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
+    ~set_next_proposal:(fun p -> t.next_proposal <- Some p)
     ~prover:t.processes.prover ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
       (Network_pool.Transaction_pool.resource_pool
@@ -670,9 +674,13 @@ let create (config : Config.t) =
               ~get_transition_chain:
                 (handle_request ~f:Sync_handler.get_transition_chain)
           in
+          let txn_pool_config =
+            Network_pool.Transaction_pool.Resource_pool.make_config
+              ~trust_system:config.trust_system
+          in
           let transaction_pool =
-            Network_pool.Transaction_pool.create ~logger:config.logger
-              ~pids:config.pids ~trust_system:config.trust_system
+            Network_pool.Transaction_pool.create ~config:txn_pool_config
+              ~logger:config.logger
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
@@ -769,9 +777,13 @@ let create (config : Config.t) =
                    Coda_networking.ban_notify net peer banned_until
                  in
                  () )) ;
+          let snark_pool_config =
+            Network_pool.Snark_pool.Resource_pool.make_config ~verifier
+              ~trust_system:config.trust_system
+          in
           let%bind snark_pool =
-            Network_pool.Snark_pool.load ~logger:config.logger
-              ~pids:config.pids ~trust_system:config.trust_system
+            Network_pool.Snark_pool.load ~config:snark_pool_config
+              ~logger:config.logger
               ~disk_location:config.snark_pool_disk_location
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -829,6 +841,7 @@ let create (config : Config.t) =
           in
           Deferred.return
             { config
+            ; next_proposal= None
             ; processes= {prover; verifier; snark_worker}
             ; components=
                 { net
