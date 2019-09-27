@@ -226,6 +226,26 @@ let whitelisted_prefix prefix ~loc =
       Ppx_deriving.raise_errorf ~loc
         "Type name contains unexpected application"
 
+(* disallow Stable.Latest types in versioned types *)
+
+let is_stable_latest =
+  let is_ldot_with_id id = function
+    | Ldot (_lident, s) when String.equal id s ->
+        true
+    | _ ->
+        false
+  in
+  let is_stable = is_ldot_with_id "Stable" in
+  let is_latest = is_ldot_with_id "Latest" in
+  fun prefix ->
+    is_latest prefix
+    &&
+    match prefix with
+    | Ldot (lident, _) when is_stable lident ->
+        true
+    | _ ->
+        false
+
 let rec generate_core_type_version_decls type_name core_type =
   match core_type.ptyp_desc with
   | Ptyp_constr ({txt; _}, core_types) -> (
@@ -256,7 +276,12 @@ let rec generate_core_type_version_decls type_name core_type =
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
            if prefix not whitelisted, generate: let _ = A.B.__versioned__
+           disallow Stable.Latest.t
         *)
+        if is_stable_latest prefix then
+          Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+            "Cannot use type of the form Stable.Latest.t, which may change \
+             over time, within a versioned type" ;
         let core_type_decls =
           generate_version_lets_for_core_types type_name core_types
         in
