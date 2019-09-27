@@ -682,21 +682,36 @@ module Tick = struct
     include Snarky_verifier.Bowe_gabizon.Make (struct
       include Pairing
 
-      module H =
-        Snarky_bowe_gabizon_hash.Make (Run) (Tick0)
-          (struct
-            module Fqe = Pairing.Fqe
+      module H = Bowe_gabizon_hash.Make (struct
+        open Run
+        module Field = Field
+        module Fqe = Pairing.Fqe
 
-            let init =
-              Pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string)
+        module G1 = struct
+          type t = Field.t * Field.t
 
-            let pedersen x =
-              Pedersen.Checked.digest_triples ~init (Fold_lib.Fold.to_list x)
+          let to_affine_exn = Fn.id
 
-            let params = Tock_backend.bg_params
-          end)
+          let of_affine = Fn.id
+        end
 
-      let hash = H.hash
+        module G2 = struct
+          type t = Fqe.t * Fqe.t
+
+          let to_affine_exn = Fn.id
+        end
+
+        let hash xs =
+          Random_oracle.Checked.hash ~init:(Lazy.force Tock_backend.bg_salt) xs
+
+        let group_map =
+          Snarky_group_map.Checked.to_group
+            (module Run)
+            ~params:Tock_backend.bg_params
+      end)
+
+      let hash ?message ~a ~b ~c ~delta_prime =
+        make_checked (fun () -> H.hash ?message ~a ~b ~c ~delta_prime)
     end)
 
     let conv_fqe v =
