@@ -297,7 +297,7 @@ module Styles = {
       alignItems(`center),
       flexDirection(`column),
       maxWidth(`rem(43.75)),
-      media("(min-width: 86rem)", [maxWidth(`percent(100.))]),
+      media("(min-width: 72rem)", [maxWidth(`percent(100.))]),
       media(Style.MediaQuery.notMobile, [flexDirection(`row)]),
     ]);
 

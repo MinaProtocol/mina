@@ -15,6 +15,10 @@ module Styles = {
         border(`px(1), `solid, Style.Colors.hyperlinkHover),
         cursor(`pointer),
       ]),
+      media(
+        "(min-width: 69rem) and (max-width: 83.9375rem)",
+        [maxWidth(`rem(15.75))],
+      ),
     ]);
 
   let ctaContent =
@@ -33,6 +37,10 @@ module Styles = {
       lineHeight(`rem(2.1875)),
       color(Style.Colors.teal),
       textAlign(`left),
+      media(
+        "(min-width: 69rem) and (max-width: 83.9375rem)",
+        [fontSize(`rem(1.25))],
+      ),
     ]);
 
   let ctaBody =
@@ -44,9 +52,14 @@ module Styles = {
       color(Style.Colors.teal),
       textAlign(`left),
       marginTop(`rem(0.3125)),
+      media(
+        "(min-width: 69rem) and (max-width: 83.9375rem)",
+        [fontSize(`px(11))],
+      ),
     ]);
 
-  let ctaIcon = style([minWidth(`px(29)), flexShrink(0)]);
+  let ctaIcon =
+    style([minWidth(`px(29)), maxHeight(`px(29)), flexShrink(0)]);
 };
 
 [@react.component]
