@@ -1,3 +1,10 @@
+let getName = (pubkey, addressBook) => {
+  switch (AddressBook.lookup(addressBook, pubkey)) {
+  | Some(name) => name
+  | None => PublicKey.toString(pubkey)
+  };
+};
+
 [@react.component]
 let make = (~pubkey, ~className="") => {
   let (addressBook, _) = React.useContext(AddressBookProvider.context);
