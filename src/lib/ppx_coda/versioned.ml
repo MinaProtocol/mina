@@ -229,7 +229,7 @@ let whitelisted_prefix prefix ~loc =
 (* disallow Stable.Latest types in versioned types *)
 
 let is_stable_latest =
-  let is_ldot_with_id id = function
+  let is_longident_with_id id = function
     | Lident s when String.equal id s ->
         true
     | Ldot (_lident, s) when String.equal id s ->
@@ -237,8 +237,8 @@ let is_stable_latest =
     | _ ->
         false
   in
-  let is_stable = is_ldot_with_id "Stable" in
-  let is_latest = is_ldot_with_id "Latest" in
+  let is_stable = is_longident_with_id "Stable" in
+  let is_latest = is_longident_with_id "Latest" in
   fun prefix ->
     is_latest prefix
     &&
