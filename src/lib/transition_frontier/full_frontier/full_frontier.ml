@@ -261,6 +261,7 @@ let calculate_root_transition_diff t heir =
   let garbage_breadcrumbs =
     List.bind heir_siblings ~f:(fun sibling ->
         sibling :: successors_rec t sibling )
+    |> List.rev
   in
   let garbage_nodes =
     List.map garbage_breadcrumbs ~f:(fun breadcrumb ->

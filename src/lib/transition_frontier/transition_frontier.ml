@@ -384,7 +384,7 @@ module For_tests = struct
       | Some x ->
           x
       | None ->
-          Async.Thread_safe.block_on_async_exn Verifier.Dummy.create
+          Async.Thread_safe.block_on_async_exn Verifier.create
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let genesis_transition = Lazy.force External_transition.genesis in
@@ -410,7 +410,7 @@ module For_tests = struct
       | Some x ->
           x
       | None ->
-          Async.Thread_safe.block_on_async_exn Verifier.Dummy.create
+          Async.Thread_safe.block_on_async_exn Verifier.create
     in
     let root_dir = "/tmp/coda_unit_test" in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
@@ -458,7 +458,7 @@ module For_tests = struct
       | Some x ->
           x
       | None ->
-          Async.Thread_safe.block_on_async_exn Verifier.Dummy.create
+          Async.Thread_safe.block_on_async_exn Verifier.create
     in
     let trust_system =
       Option.value trust_system ~default:(Trust_system.null ())
