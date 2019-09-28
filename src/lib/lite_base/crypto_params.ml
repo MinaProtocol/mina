@@ -47,30 +47,13 @@ module Tock = struct
       ~a:G1.Coefficients.a ~b:G1.Coefficients.b
 
   module Bowe_gabizon = Tock0.Make_bowe_gabizon (Bowe_gabizon_hash.Make (struct
-    module Field = struct
-      include Fq
-
-      let of_bits t = Core_kernel.Option.value_exn (of_bits t)
-    end
-
+    module Field = Fq
     module Fqe = Fq3
     module G1 = G1
     module G2 = G2
 
-    module Bigint = struct
-      include N
+    let group_map = Group_map.to_group (module Field) ~params:bg_params
 
-      let of_field = Fq.to_bigint
-    end
-
-    let params = bg_params
-
-    let init =
-      lazy
-        (Pedersen.State.salt
-           (Lazy.force Lite_params.pedersen_params)
-           (Hash_prefixes.bowe_gabizon_hash :> string))
-
-    let pedersen t = Pedersen.digest_fold (Lazy.force init) t
+    let hash _ = failwith "TODO"
   end))
 end

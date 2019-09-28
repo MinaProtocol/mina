@@ -5,7 +5,6 @@ open Snark_params
 open Tick
 open Coda_base
 open Coda_state
-open Let_syntax
 
 module type Update_intf = sig
   module Checked : sig
@@ -121,20 +120,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           ~blockchain_state:(Snark_transition.blockchain_state transition)
           ~consensus_state
       in
-      let%bind state_triples = Protocol_state.var_to_triples new_state in
-      let%bind state_partial =
-        Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty
-          ~start:Hash_prefix.length_in_triples state_triples
-      in
-      let%map state_hash =
-        Pedersen.Checked.Section.create
-          ~acc:(`Value Hash_prefix.protocol_state.acc)
-          ~support:
-            (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
-        |> Pedersen.Checked.Section.disjoint_union_exn state_partial
-        >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
-      in
-      (State_hash.var_of_hash_packed state_hash, new_state, `Success success)
+      let%map state_hash = Protocol_state.hash_checked new_state in
+      (state_hash, new_state, `Success success)
   end
 end
 
@@ -145,8 +132,5 @@ module Checked = struct
          ((Lazy.force Genesis_protocol_state.t).hash :> Field.t))
       (State_hash.var_to_hash_packed h)
 
-  let%snarkydef hash (t : Protocol_state.var) =
-    Protocol_state.var_to_triples t
-    >>= Pedersen.Checked.digest_triples ~init:Hash_prefix.protocol_state
-    >>| State_hash.var_of_hash_packed
+  let%snarkydef hash (t : Protocol_state.var) = Protocol_state.hash_checked t
 end

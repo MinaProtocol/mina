@@ -1,7 +1,7 @@
 (library
-  (name bowe_gabizon_hash)
-  (public_name bowe_gabizon_hash)
+  (name sponge_params)
+  (public_name sponge_params)
   (preprocess (pps ppx_jane ppx_deriving.eq))
   (inline_tests)
   (libraries
-    core_kernel ))
+    curve_choice ))

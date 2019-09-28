@@ -1,7 +1,5 @@
 open Core_kernel
 open Coda_base
-open Fold_lib
-open Tuple_lib
 open Snark_params.Tick
 
 module Poly : sig
@@ -18,11 +16,6 @@ module Poly : sig
   type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t
   [@@deriving sexp]
 end
-
-val fold_abstract :
-     fold_body:('body -> bool Triple.t Fold.t)
-  -> (State_hash.t, 'body) Poly.t
-  -> bool Triple.t Fold.t
 
 val hash_abstract :
      hash_body:('body -> State_body_hash.t)
@@ -113,6 +106,6 @@ val consensus_state : (_, (_, 'a) Body.t) Poly.t -> 'a
 
 val negative_one : Value.t Lazy.t
 
-val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+val hash_checked : var -> (State_hash.var, _) Checked.t
 
 val hash : Value.t -> State_hash.t
