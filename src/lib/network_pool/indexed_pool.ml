@@ -515,10 +515,6 @@ let rec add_from_gossip_exn :
           F_sequence.head_exn queued_cmds
           |> User_command.forget_check |> User_command.nonce
         in
-        Printf.printf
-          !"!!!!! first_queued_nonce: %d, current_nonce: %d\n%!"
-          (Account_nonce.to_int first_queued_nonce)
-          (Account_nonce.to_int current_nonce) ;
         assert (Account_nonce.equal first_queued_nonce current_nonce) ;
         let%bind () =
           Result.ok_if_true

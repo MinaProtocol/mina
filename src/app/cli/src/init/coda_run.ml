@@ -65,7 +65,7 @@ let get_lite_chain :
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
 (*TODO check deferred now and copy theose files to the temp directory*)
-let log_shutdown ~conf_dir ~top_logger coda_ref =
+let log_shutdown ~conf_dir:_ ~top_logger:_ _coda_ref =
   (* [new] TODO: !important add visualization logging back in *)
   ()
 
