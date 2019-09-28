@@ -282,8 +282,8 @@ let rec generate_core_type_version_decls type_name core_type =
         *)
         if is_stable_latest prefix then
           Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
-            "Cannot use type of the form Stable.Latest.t, which may change \
-             over time, within a versioned type" ;
+            "Cannot use type of the form Stable.Latest.t within a versioned \
+             type" ;
         let core_type_decls =
           generate_version_lets_for_core_types type_name core_types
         in
