@@ -1,4 +1,3 @@
 [%%define scan_state_with_tps_goal true]
 [%%define scan_state_tps_goal 1]
-[%%define scan_state_transaction_capacity_log_2 3]
 [%%define scan_state_work_delay 2]
