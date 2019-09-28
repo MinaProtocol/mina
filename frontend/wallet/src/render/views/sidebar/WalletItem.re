@@ -39,7 +39,7 @@ module Styles = {
       top(`zero),
       left(`zero),
       bottom(`zero),
-      width(`rem(0.5)),
+      width(`rem(0.25)),
       backgroundColor(Colors.marine),
     ]);
 
