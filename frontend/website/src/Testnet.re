@@ -22,9 +22,8 @@ module Icon = {
   module Svg = {
     let discord =
       <svg
-        width="44px"
-        height="38px"
-        viewBox="0 0 34 32"
+        height="39px"
+        viewBox="0 0 38 55"
         version="1.1"
         xmlns="http://www.w3.org/2000/svg"
         xmlnsXlink="http://www.w3.org/1999/xlink">
@@ -157,6 +156,8 @@ module Styles = {
     style([
       background(Style.Colors.hyperlinkAlpha(0.15)),
       width(`percent(100.)),
+      height(`rem(60.)),
+      overflow(`scroll),
       maxWidth(rem(41.)),
       borderRadius(px(3)),
       padding2(~v=`rem(1.), ~h=`zero),
@@ -292,7 +293,7 @@ module Styles = {
       marginRight(`auto),
       marginTop(rem(3.)),
       marginBottom(rem(3.)),
-      justifyContent(`spaceAround),
+      justifyContent(`spaceBetween),
       alignItems(`center),
       flexDirection(`column),
       maxWidth(`rem(43.75)),
@@ -300,56 +301,11 @@ module Styles = {
       media(Style.MediaQuery.notMobile, [flexDirection(`row)]),
     ]);
 
-  let ctaButton =
-    style([
-      padding(`rem(1.125)),
-      background(`rgba((71, 137, 196, 0.1))),
-      border(`px(1), `solid, Style.Colors.hyperlink),
-      borderRadius(`px(6)),
-      maxWidth(`rem(18.75)),
-      marginTop(`rem(0.625)),
-      hover([
-        opacity(0.9),
-        backgroundColor(Style.Colors.azureAlpha(0.2)),
-        border(`px(1), `solid, Style.Colors.hyperlinkHover),
-        cursor(`pointer),
-      ]),
-    ]);
-
-  let ctaContent =
-    style([
-      display(`flex),
-      selector("p", [fontSize(`px(29)), marginTop(`rem(0.4375))]),
-    ]);
-
-  let ctaText = style([marginLeft(`rem(0.625))]);
-
-  let ctaHeading =
-    style([
-      Style.Typeface.ibmplexsans,
-      fontWeight(`num(600)),
-      fontSize(`rem(1.5)),
-      lineHeight(`rem(2.1875)),
-      color(Style.Colors.teal),
-      textAlign(`left),
-    ]);
-
-  let ctaBody =
-    style([
-      Style.Typeface.ibmplexsans,
-      fontStyle(`normal),
-      fontWeight(`normal),
-      fontSize(`px(13)),
-      color(Style.Colors.teal),
-      textAlign(`left),
-      marginTop(`rem(0.3125)),
-    ]);
-
   let heroRow =
     style([
       display(`flex),
       flexDirection(`column),
-      justifyContent(`spaceAround),
+      justifyContent(`spaceBetween),
       alignItems(`center),
       media("(min-width: 70rem)", [flexDirection(`row)]),
     ]);
@@ -361,16 +317,12 @@ module Styles = {
     style([
       height(`rem(16.875)),
       marginLeft(`rem(1.875)),
-      marginRight(`rem(1.875)),
       fontSize(`rem(0.625)),
       media(
         Style.MediaQuery.notMobile,
         [
+          padding2(~v=`rem(4.6875), ~h=`rem(2.1875)),
           height(`rem(25.)),
-          paddingTop(`rem(4.6875)),
-          paddingBottom(`rem(4.6875)),
-          paddingLeft(`rem(2.1875)),
-          paddingRight(`rem(2.1875)),
           fontSize(`rem(1.)),
         ],
       ),
@@ -454,11 +406,11 @@ let make = () => {
               { type: 'input', prompt: '>', value: 'coda daemon -peer ...' },
               { type: 'progress' },
               { value:  'Daemon ready. Clients can now connect!'},
-              { type: 'input', lineDelay: '10', prompt: '>', value: 'coda client status' },
-              { value:  'Local uptime: 25m25s'},
-              { value:  'Peers: 5'},
-              { value:  'Consensus time now: epoch=16, slot=78'},
-              { value:  'Sync status: Synced'},
+              { type: 'input', prompt: '>', value: 'coda client status' },
+              { delay: '0', value:  'Max observed block length: 120'},
+              { delay: '0', value:  'Peers: 23'},
+              { delay: '0', value:  'Consensus time now: epoch=1, slot=13'},
+              { delay: '0', value:  'Sync status: Synced'},
             ]
           });|}
         </RunScript>
