@@ -161,6 +161,7 @@ let make =
       ~value,
       ~label,
       ~mono=false,
+      ~type_="text",
       ~button=React.null,
       ~placeholder=?,
       ~disabled=false,

@@ -130,6 +130,7 @@ module SendForm = {
   [@react.component]
   let make = (~onSubmit, ~onClose) => {
     let activeWallet = Hooks.useActiveWallet();
+    let (addressBook, _) = React.useContext(AddressBookProvider.context);
     let (sendState, setModalState) =
       React.useState(_ => emptyModal(activeWallet));
     let {fromStr, toStr, amountStr, feeStr, memoOpt, errorOpt} = sendState;
@@ -141,13 +142,14 @@ module SendForm = {
        }}
       spacer
       // Disable dropdown, only show active Wallet
-      <Dropdown
+      <TextField
         label="From"
-        value=fromStr
+        value={WalletName.getName(
+          Option.getExn(fromStr) |> PublicKey.ofStringExn,
+          addressBook,
+        )}
+        disabled=true
         onChange={value => setModalState(s => {...s, fromStr: Some(value)})}
-        options=[
-          (Option.withDefault(~default="", fromStr), React.string("")),
-        ]
       />
       spacer
       <TextField

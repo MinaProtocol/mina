@@ -11,8 +11,7 @@ module UnlockMutation = ReasonApollo.CreateMutation(UnlockWallet);
 [@react.component]
 let make = (~wallet, ~onClose) => {
   let (password, setPassword) = React.useState(() => "");
-  <Modal
-    title="Unlock Wallet" onRequestClose=onClose>
+  <Modal title="Unlock Wallet" onRequestClose=onClose>
     <div className=Modal.Styles.default>
       <p className=Theme.Text.Body.regular>
         {React.string("Please enter password for ")}
@@ -28,11 +27,7 @@ let make = (~wallet, ~onClose) => {
       />
       <Spacer height=1.5 />
       <div className=Css.(style([display(`flex)]))>
-        <Button
-          label="Cancel"
-          style=Button.Gray
-          onClick={ _ => onClose()}
-        />
+        <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
         <Spacer width=1. />
         <UnlockMutation>
           {(mutation, _) =>
@@ -46,7 +41,8 @@ let make = (~wallet, ~onClose) => {
                      ~publicKey=Apollo.Encoders.publicKey(wallet),
                      (),
                    )##variables;
-                 mutation(~variables, ()) |> ignore;
+                 mutation(~variables, ~refetchQueries=[|"getWallets"|], ())
+                 |> ignore;
                  onClose();
                }}
              />}
