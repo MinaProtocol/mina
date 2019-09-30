@@ -22,9 +22,6 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
       List.map user_commands_with_hashes_and_times
         ~f:(fun ({With_hash.hash; _}, _) -> hash)
     in
-    Core.printf
-      !"User_command hashes: %{sexp: Transaction_hash.t list}\n"
-      user_command_hashes ;
     let hashes_to_first_seen_graphql =
       Graphql_query.User_commands.Query_first_seen.make
         ~hashes:
@@ -32,18 +29,13 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
           |> Array.of_list )
         ()
     in
-    let%map queried_existing_user_commands =
+    let%bind queried_existing_user_commands =
       let open Deferred.Or_error.Let_syntax in
       let%map obj = Client.query_or_error hashes_to_first_seen_graphql port in
       let list =
         Array.map obj#user_commands ~f:(fun obj -> (obj#hash, obj#first_seen))
         |> Array.to_list
       in
-      Core.printf !"Num elements to retrieve %i \n" @@ List.length list ;
-      Core.printf
-        !"Stuff retreived: %{sexp: (Transaction_hash.t * (Block_time.t \
-          option) ) list}!\n"
-        list ;
       Transaction_hash.Map.of_alist_exn list
     in
     let user_commands =
@@ -74,8 +66,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
           (* TODO: Implement *)
           Deferred.return ()
       | Transaction_pool {added; removed= _} ->
-          Deferred.Or_error.ok_exn (added_transactions t added)
-          |> Deferred.ignore )
+          Deferred.Or_error.ok_exn (added_transactions t added) )
 end
 
 let%test_module "Processor" =
@@ -179,7 +170,6 @@ let%test_module "Processor" =
                    ; removed= User_command.Set.empty }) ;
               Strict_pipe.Writer.close writer ;
               let%bind () = deferred in
-              let%bind () = Async.after (Core.Time.Span.of_sec 5.0) in
               let%bind public_keys =
                 Processor.Client.query
                   (Graphql_query.Public_key.Query.make ())
@@ -188,9 +178,6 @@ let%test_module "Processor" =
               let queried_public_keys =
                 Array.map public_keys#public_keys ~f:(fun obj -> obj#value)
               in
-              Core.printf
-                !"Queried public keys: %{sexp: Public_key.Compressed.t array}"
-                queried_public_keys ;
               assert (Array.length queried_public_keys = n_keys) ;
               let queried_public_keys =
                 Public_key.Compressed.Set.of_array queried_public_keys
