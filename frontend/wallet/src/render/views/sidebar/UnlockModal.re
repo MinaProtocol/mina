@@ -1,3 +1,5 @@
+open Tc;
+
 module UnlockWallet = [%graphql
   {| mutation unlock($password: String, $publicKey: PublicKey) {
       unlockWallet(input: {password: $password, publicKey: $publicKey}) {
@@ -8,8 +10,11 @@ module UnlockWallet = [%graphql
 
 module UnlockMutation = ReasonApollo.CreateMutation(UnlockWallet);
 
+type modalState = {error: option(string)};
+
 [@react.component]
 let make = (~wallet, ~onClose) => {
+  let (error, setError) = React.useState(() => None);
   let (password, setPassword) = React.useState(() => "");
   <Modal title="Unlock Wallet" onRequestClose=onClose>
     <div className=Modal.Styles.default>
@@ -25,6 +30,10 @@ let make = (~wallet, ~onClose) => {
         onChange={value => setPassword(_ => value)}
         value=password
       />
+      {switch (error) {
+       | Some(error) => <Alert kind=`Danger message=error />
+       | None => React.null
+       }}
       <Spacer height=1.5 />
       <div className=Css.(style([display(`flex)]))>
         <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
@@ -41,13 +50,29 @@ let make = (~wallet, ~onClose) => {
                      ~publicKey=Apollo.Encoders.publicKey(wallet),
                      (),
                    )##variables;
-                 mutation(
-                   ~variables,
-                   ~refetchQueries=[|"getWallets", "walletLocked"|],
-                   (),
-                 )
-                 |> ignore;
-                 onClose();
+                 let performMutation =
+                   Task.liftPromise(() =>
+                     mutation(
+                       ~variables,
+                       ~refetchQueries=[|"getWallets", "walletLocked"|],
+                       (),
+                     )
+                   );
+                 Task.perform(
+                   performMutation,
+                   ~f=
+                     fun
+                     | EmptyResponse => ()
+                     | Data(_) => onClose()
+                     | Errors(err) => {
+                         let message =
+                           err
+                           |> Array.get(~index=0)
+                           |> Option.map(~f=e => e##message)
+                           |> Option.withDefault(~default="Server error");
+                         setError(_ => Some(message));
+                       },
+                 );
                }}
              />}
         </UnlockMutation>
