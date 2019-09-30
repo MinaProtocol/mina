@@ -101,7 +101,6 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
                  (Persistent_frontier.Database.Error.not_found_message err) )
       )
   in
-  Ledger.Maskable.Debug.visualize ~filename:"post.dot" ;
   { logger
   ; verifier
   ; consensus_local_state
@@ -129,7 +128,6 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~max_length ?(retry_with_fresh_db = true) ~logger ~verifier
      ~consensus_local_state ~persistent_root ~persistent_frontier () ->
-  Ledger.Maskable.Debug.visualize ~filename:"pre.dot" ;
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   let continue persistent_frontier_instance =

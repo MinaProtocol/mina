@@ -316,18 +316,9 @@ let calculate_diffs t breadcrumb =
       (* reverse diffs so that they are applied in the correct order *)
       List.rev diffs )
 
-(* TODO: TEMP *)
-let root_transfer_id = ref 0
-
-let mask_prefix () = Printf.sprintf "masks/mask.%d" (Unix.getpid ())
-
-let dir_created = ref false
-
 (* TODO: refactor metrics tracking outside of apply_diff (could maybe even be an extension?) *)
 let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
     mutant * State_hash.t option =
-  (if not !dir_created then try Core.Unix.mkdir "masks" with _ -> ()) ;
-  dir_created := true ;
   match diff with
   | New_node (Full breadcrumb) ->
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
@@ -389,12 +380,8 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
        *     7) commit `mt` into `s`, turning `s` into `s'`
        *     8) unattach and destroy `mt`
        *)
-      let id = !root_transfer_id in
-      incr root_transfer_id ;
       let old_root_node = Hashtbl.find_exn t.table t.root in
       let new_root_node = Hashtbl.find_exn t.table new_root_hash in
-      Ledger.Maskable.Debug.visualize
-        ~filename:(Printf.sprintf "%s.%d.pre.dot" (mask_prefix ()) id) ;
       let new_staged_ledger =
         let m0 = Breadcrumb.mask old_root_node.breadcrumb in
         let m1 = Breadcrumb.mask new_root_node.breadcrumb in
@@ -455,8 +442,6 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
       in
       Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
       t.root <- new_root_hash ;
-      Ledger.Maskable.Debug.visualize
-        ~filename:(Printf.sprintf "%s.%d.post.dot" (mask_prefix ()) id) ;
       Consensus.Hooks.frontier_root_transition
         (Breadcrumb.consensus_state old_root_node.breadcrumb)
         (Breadcrumb.consensus_state new_root_node.breadcrumb)
