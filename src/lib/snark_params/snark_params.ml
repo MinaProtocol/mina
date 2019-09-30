@@ -8,7 +8,6 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
-module Sponge = Sponge_inst
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -683,21 +682,36 @@ module Tick = struct
     include Snarky_verifier.Bowe_gabizon.Make (struct
       include Pairing
 
-      module H =
-        Snarky_bowe_gabizon_hash.Make (Run) (Tick0)
-          (struct
-            module Fqe = Pairing.Fqe
+      module H = Bowe_gabizon_hash.Make (struct
+        open Run
+        module Field = Field
+        module Fqe = Pairing.Fqe
 
-            let init =
-              Pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string)
+        module G1 = struct
+          type t = Field.t * Field.t
 
-            let pedersen x =
-              Pedersen.Checked.digest_triples ~init (Fold_lib.Fold.to_list x)
+          let to_affine_exn = Fn.id
 
-            let params = Tock_backend.bg_params
-          end)
+          let of_affine = Fn.id
+        end
 
-      let hash = H.hash
+        module G2 = struct
+          type t = Fqe.t * Fqe.t
+
+          let to_affine_exn = Fn.id
+        end
+
+        let hash xs =
+          Random_oracle.Checked.hash ~init:(Lazy.force Tock_backend.bg_salt) xs
+
+        let group_map =
+          Snarky_group_map.Checked.to_group
+            (module Run)
+            ~params:Tock_backend.bg_params
+      end)
+
+      let hash ?message ~a ~b ~c ~delta_prime =
+        make_checked (fun () -> H.hash ?message ~a ~b ~c ~delta_prime)
     end)
 
     let conv_fqe v =
@@ -794,19 +808,14 @@ let target_bit_length = Tick.Field.size_in_bits - 8
 
 module type Snark_intf = Snark_intf.S
 
-let%bench_fun "pedersen" =
-  let open Tick in
-  let x = Field.random () |> Field.unpack in
-  fun () ->
-    Pedersen.digest_fold (Pedersen.State.create ())
-      Fold_lib.Fold.(group3 ~default:false (of_list x))
+module Group_map = struct
+  let to_group =
+    Group_map.to_group (module Tick.Field) ~params:Tock_backend.bg_params
 
-let%bench_fun "rescue" =
-  let open Tick in
-  let x = Field.random () in
-  fun () -> Sponge.hash [|x|]
-
-let%bench_fun "poseidon" =
-  let open Tick in
-  let x = Field.random () in
-  fun () -> Sponge.Poseidon.hash Sponge.params [|x|]
+  module Checked = struct
+    let to_group =
+      Snarky_group_map.Checked.to_group
+        (module Tick.Run)
+        ~params:Tock_backend.bg_params
+  end
+end

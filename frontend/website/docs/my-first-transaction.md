@@ -6,7 +6,7 @@ In this section, we'll make our first transaction on the Coda network. After [in
 
 Run the following command to start up a Coda node instance and connect to the network:
 
-    coda daemon -peer golden-hour.o1test.net:8303
+    coda daemon -peer filet-mignon.o1test.net:8303
 
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8302 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
 

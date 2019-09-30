@@ -32,6 +32,12 @@ end)
 
 let%test_module "Ledger catchup" =
   ( module struct
+    let hb_logger = Logger.create ()
+
+    let logger = Logger.null ()
+
+    let trust_system = Trust_system.null ()
+
     let run_ledger_catchup ~logger ~pids =
       let%map verifier = Verifier.create ~logger ~pids in
       Ledger_catchup.run ~verifier
@@ -103,10 +109,10 @@ let%test_module "Ledger catchup" =
     let%test "catchup to a peer" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
-      let logger = Logger.create () in
       let pids = Child_processes.Termination.create_pid_set () in
-      let trust_system = Trust_system.null () in
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer
               ~source_accounts:Genesis_ledger.accounts ~logger ~pids
@@ -128,17 +134,22 @@ let%test_module "Ledger catchup" =
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
           in
-          test_catchup ~logger ~pids ~trust_system ~network me best_transition
-            ( Transition_frontier.path_map peer.frontier best_breadcrumb
-                ~f:Fn.id
-            |> Rose_tree.of_list_exn ) )
+          let%map res =
+            test_catchup ~logger ~pids ~trust_system ~network me
+              best_transition
+              ( Transition_frontier.path_map peer.frontier best_breadcrumb
+                  ~f:Fn.id
+              |> Rose_tree.of_list_exn )
+          in
+          heartbeat_flag := false ;
+          res )
 
     let%test "peers can provide transitions with length between max_length to \
               2 * max_length" =
-      let logger = Logger.create () in
       let pids = Child_processes.Termination.create_pid_set () in
-      let trust_system = Trust_system.null () in
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let num_breadcrumbs =
             Int.gen_incl max_length (2 * max_length) |> Quickcheck.random_value
           in
@@ -177,16 +188,20 @@ let%test_module "Ledger catchup" =
               ~f:Fn.id
             |> Option.value_exn
           in
-          test_catchup ~logger ~pids ~trust_system ~network me
-            best_transition_enveloped
-            (Rose_tree.of_list_exn @@ Non_empty_list.tail history) )
+          let%map res =
+            test_catchup ~logger ~pids ~trust_system ~network me
+              best_transition_enveloped
+              (Rose_tree.of_list_exn @@ Non_empty_list.tail history)
+          in
+          heartbeat_flag := false ;
+          res )
 
     let%test "catchup would be successful even if the parent transition is \
               already in the frontier" =
-      let logger = Logger.create () in
       let pids = Child_processes.Termination.create_pid_set () in
-      let trust_system = Trust_system.null () in
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
               ~source_accounts:Genesis_ledger.accounts
@@ -196,24 +211,27 @@ let%test_module "Ledger catchup" =
           let best_transition =
             Transition_frontier.Breadcrumb.validated_transition best_breadcrumb
           in
-          test_catchup ~logger ~pids ~trust_system ~network me
-            (let transition =
-               best_transition
-               |> External_transition.Validation
-                  .reset_frontier_dependencies_validation
-               |> External_transition.Validation
-                  .reset_delta_transition_chain_validation_part2
-               |> External_transition.Validation
-                  .reset_staged_ledger_diff_validation
-             in
-             Envelope.Incoming.wrap ~data:transition
-               ~sender:Envelope.Sender.Local)
-            (Rose_tree.of_list_exn [best_breadcrumb]) )
+          let%map res =
+            test_catchup ~logger ~pids ~trust_system ~network me
+              (let transition =
+                 best_transition
+                 |> External_transition.Validation
+                    .reset_frontier_dependencies_validation
+                 |> External_transition.Validation
+                    .reset_delta_transition_chain_validation_part2
+                 |> External_transition.Validation
+                    .reset_staged_ledger_diff_validation
+               in
+               Envelope.Incoming.wrap ~data:transition
+                 ~sender:Envelope.Sender.Local)
+              (Rose_tree.of_list_exn [best_breadcrumb])
+          in
+          heartbeat_flag := false ;
+          res )
 
     let%test "catchup would fail if one of the parent transition fails" =
-      let logger = Logger.create () in
       let pids = Child_processes.Termination.create_pid_set () in
-      let trust_system = Trust_system.null () in
+      heartbeat_flag := true ;
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
       in
@@ -224,6 +242,7 @@ let%test_module "Ledger catchup" =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
               ~source_accounts:Genesis_ledger.accounts
@@ -291,13 +310,13 @@ let%test_module "Ledger catchup" =
           let%map result =
             Ivar.read (Cache_lib.Cached.final_state cached_best_transition)
           in
+          heartbeat_flag := false ;
           result = `Failed )
 
     let%test_unit "catchup won't be blocked by transitions that are still \
                    under processing" =
-      let logger = Logger.create () in
       let pids = Child_processes.Termination.create_pid_set () in
-      let trust_system = Trust_system.null () in
+      heartbeat_flag := true ;
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
       in
@@ -309,6 +328,7 @@ let%test_module "Ledger catchup" =
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer
               ~source_accounts:Genesis_ledger.accounts ~logger ~pids
@@ -405,5 +425,6 @@ let%test_module "Ledger catchup" =
           |> don't_wait_for ;
           let%bind () = Ivar.read finished in
           let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
+          heartbeat_flag := false ;
           assert_catchup_jobs_are_flushed me )
   end )

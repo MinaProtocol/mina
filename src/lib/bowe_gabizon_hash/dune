@@ -4,8 +4,4 @@
   (preprocess (pps ppx_jane ppx_deriving.eq))
   (inline_tests)
   (libraries
-    core_kernel
-    tuple_lib
-    fold_lib
-    group_map
-    blake2 ))
+    core_kernel ))

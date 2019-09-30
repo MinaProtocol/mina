@@ -76,6 +76,10 @@ val create_from_string_exn : string -> t
  *)
 val create_from_string : string -> t Or_error.t
 
+(** convert a memo to a list of bools
+ *)
+val to_bits : t -> bool list
+
 (** convert a memo to a fold of boolean triples
  *)
 val fold : t -> bool Tuple_lib.Triple.t Fold_lib.Fold.t

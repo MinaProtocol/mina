@@ -235,7 +235,8 @@ let generate_next_state ~previous_protocol_state ~time_controller
 
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs
-    ~consensus_local_state ~frontier_reader ~transition_writer =
+    ~consensus_local_state ~frontier_reader ~transition_writer
+    ~set_next_proposal =
   trace_task "block_producer" (fun () ->
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -538,12 +539,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     ~local_state:consensus_local_state
                   = None ) ;
                 let now = Time.now time_controller in
-                match
+                let next_proposal =
                   measure "asking conensus what to do" (fun () ->
                       Consensus.Hooks.next_proposal (time_to_ms now)
                         consensus_state ~local_state:consensus_local_state
                         ~keypairs ~logger )
-                with
+                in
+                set_next_proposal next_proposal ;
+                match next_proposal with
                 | `Check_again time ->
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_for_proposal

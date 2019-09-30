@@ -1,8 +1,5 @@
 open Core_kernel
 open Coda_base
-open Bitstring_lib
-open Fold_lib
-open Snark_params
 open Snark_params.Tick
 
 module Poly = struct
@@ -91,21 +88,21 @@ let typ : (var, Value.t) Typ.t =
   Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let var_to_triples ({staged_ledger_hash; snarked_ledger_hash; timestamp} : var)
-    =
-  let%map ledger_hash_triples =
-    Frozen_ledger_hash.var_to_triples snarked_ledger_hash
-  and staged_ledger_hash_triples =
-    Staged_ledger_hash.var_to_triples staged_ledger_hash
-  in
-  staged_ledger_hash_triples @ ledger_hash_triples
-  @ Block_time.Unpacked.var_to_triples timestamp
+let var_to_input ({staged_ledger_hash; snarked_ledger_hash; timestamp} : var) =
+  let open Random_oracle.Input in
+  List.reduce_exn ~f:append
+    [ Staged_ledger_hash.var_to_input staged_ledger_hash
+    ; field (Frozen_ledger_hash.var_to_hash_packed snarked_ledger_hash)
+    ; bitstring
+        (Bitstring_lib.Bitstring.Lsb_first.to_list
+           (Block_time.Unpacked.var_to_bits timestamp)) ]
 
-let fold ({staged_ledger_hash; snarked_ledger_hash; timestamp} : Value.t) =
-  Fold.(
-    Staged_ledger_hash.fold staged_ledger_hash
-    +> Frozen_ledger_hash.fold snarked_ledger_hash
-    +> Block_time.fold timestamp)
+let to_input ({staged_ledger_hash; snarked_ledger_hash; timestamp} : Value.t) =
+  let open Random_oracle.Input in
+  List.reduce_exn ~f:append
+    [ Staged_ledger_hash.to_input staged_ledger_hash
+    ; field (snarked_ledger_hash :> Field.t)
+    ; bitstring (Block_time.Bits.to_bits timestamp) ]
 
 let length_in_triples =
   Staged_ledger_hash.length_in_triples + Frozen_ledger_hash.length_in_triples
@@ -138,33 +135,3 @@ let display Poly.{staged_ledger_hash; snarked_ledger_hash; timestamp} =
   ; timestamp=
       Time.to_string_trimmed ~zone:Time.Zone.utc (Block_time.to_time timestamp)
   }
-
-module Message = struct
-  open Tick
-
-  type t = Value.t
-
-  type nonrec var = var
-
-  let hash t ~nonce =
-    let d =
-      Pedersen.digest_fold Hash_prefix.signature
-        Fold.(fold t +> Fold.(of_list nonce))
-    in
-    List.take (Field.unpack d) Inner_curve.Scalar.length_in_bits
-    |> Inner_curve.Scalar.of_bits
-
-  let%snarkydef hash_checked t ~nonce =
-    let%bind trips = var_to_triples t in
-    let%bind hash =
-      Pedersen.Checked.digest_triples ~init:Hash_prefix.signature
-        (trips @ nonce)
-    in
-    let%map bs = Pedersen.Checked.Digest.choose_preimage hash in
-    Bitstring.Lsb_first.of_list
-      (List.take (bs :> Boolean.var list) Inner_curve.Scalar.length_in_bits)
-end
-
-module Signature =
-  Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve)
-    (Message)
