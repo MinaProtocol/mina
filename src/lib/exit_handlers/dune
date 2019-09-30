@@ -1,0 +1,7 @@
+(library
+ (name exit_handlers)
+ (public_name exit_handlers)
+ (library_flags -linkall)
+ (libraries core_kernel logger)
+ (preprocess (no_preprocessing))
+ (synopsis "Exit handlers"))

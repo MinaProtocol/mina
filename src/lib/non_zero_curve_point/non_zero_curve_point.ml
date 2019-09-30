@@ -13,7 +13,7 @@ module Compressed = struct
       module V1 = struct
         module T = struct
           type ('field, 'boolean) t = {x: 'field; is_odd: 'boolean}
-          [@@deriving bin_io, sexp, compare, eq, hash, version]
+          [@@deriving bin_io, compare, eq, hash, version]
         end
 
         include T
@@ -24,14 +24,15 @@ module Compressed = struct
 
     type ('field, 'boolean) t = ('field, 'boolean) Stable.Latest.t =
       {x: 'field; is_odd: 'boolean}
-    [@@deriving sexp, compare, eq, hash]
+    [@@deriving compare, eq, hash]
   end
 
   module Stable = struct
     module V1 = struct
       module T = struct
+        (* we define sexp operations manually, don't derive them *)
         type t = (Field.t, bool) Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
+        [@@deriving bin_io, eq, compare, hash, version {asserted}]
       end
 
       include T
@@ -56,6 +57,11 @@ module Compressed = struct
 
         let version_byte = version_byte
       end)
+
+      (* sexp representation is a Base58Check string, like the yojson representation *)
+      let sexp_of_t t = to_base58_check t |> Sexp.of_string
+
+      let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
     end
 
     module Latest = V1
@@ -70,12 +76,15 @@ module Compressed = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  (* bin_io omitted *)
-  type t = (Field.t, bool) Poly.t [@@deriving sexp, compare, hash]
+  (* bin_io, sexp omitted *)
+  type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving compare, hash]
 
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
   include Codable.Make_base58_check (Stable.Latest)
+
+  [%%define_locally
+  Stable.Latest.(sexp_of_t, t_of_sexp)]
 
   let compress (x, y) : t = {x; is_odd= parity y}
 
@@ -161,8 +170,10 @@ let decompress_exn t = Option.value_exn (decompress t)
 module Stable = struct
   module V1 = struct
     module T = struct
-      type t = Tick.Field.t * Tick.Field.t
-      [@@deriving sexp, eq, compare, hash, version {asserted}]
+      type t =
+        Tick.Field.t * Tick.Field.t
+        (* sexp operations written manually, don't derive them *)
+      [@@deriving eq, compare, hash, version {asserted}]
 
       include Binable.Of_binable
                 (Compressed.Stable.V1)
@@ -190,7 +201,7 @@ module Stable = struct
       let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
       bs
 
-    (* We reuse the base58check based yojson (de)serialization from the
+    (* We reuse the Base58check-based yojson (de)serialization from the
        compressed representation. *)
     let of_yojson json =
       let open Result in
@@ -200,6 +211,12 @@ module Stable = struct
         (decompress compressed)
 
     let to_yojson t = Compressed.to_yojson @@ compress t
+
+    (* as for yojson, use the Base58check-based sexps from the compressed representation *)
+    let sexp_of_t t = Compressed.sexp_of_t @@ compress t
+
+    let t_of_sexp sexp =
+      Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
   end
 
   module Latest = V1
@@ -215,7 +232,7 @@ module Stable = struct
 end
 
 (* bin_io omitted *)
-type t = Stable.Latest.t [@@deriving compare, hash, sexp, yojson]
+type t = Stable.Latest.t [@@deriving compare, hash, yojson]
 
 (* so we can make sets of public keys *)
 include Comparable.Make_binable (Stable.Latest)
@@ -270,7 +287,7 @@ let%snarkydef compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   {Compressed.Poly.x; is_odd}
 
 [%%define_locally
-Stable.Latest.(of_bigstring, to_bigstring)]
+Stable.Latest.(of_bigstring, to_bigstring, sexp_of_t, t_of_sexp)]
 
 let%test_unit "point-compression: decompress . compress = id" =
   Quickcheck.test gen ~f:(fun pk ->

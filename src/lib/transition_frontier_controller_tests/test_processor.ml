@@ -1,4 +1,4 @@
-(* open Core
+(*open Core
 open Async
 open Pipe_lib
 open Stubs
@@ -23,7 +23,7 @@ let%test_module "Transition_handler.Processor tests" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       let test_size = 10 in
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let gen_next_breadcrumb frontier =
         let open Core.Quickcheck.Let_syntax in
         let%map create_breadcrumb = gen_breadcrumb ~logger in
@@ -36,8 +36,7 @@ let%test_module "Transition_handler.Processor tests" =
       in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier =
-            create_root_frontier
-              ~max_length:Consensus.Constants.k ~logger
+            create_root_frontier ~max_length:Consensus.Constants.k ~logger
           in
           let%bind () =
             build_frontier_randomly frontier
