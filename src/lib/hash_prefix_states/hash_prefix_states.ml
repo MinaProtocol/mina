@@ -5,10 +5,6 @@ let length_in_triples = length_in_triples
 
 let salt (s : t) = Snark_params.Tick.Pedersen.(State.salt (s :> string))
 
-let protocol_state = salt protocol_state
-
-let protocol_state_body = salt protocol_state_body
-
 let account = salt account
 
 let proof_of_work = salt proof_of_work
@@ -31,6 +27,10 @@ let checkpoint_list = salt checkpoint_list
 
 module Random_oracle = struct
   let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
+
+  let protocol_state = salt protocol_state
+
+  let protocol_state_body = salt protocol_state_body
 
   let merkle_tree =
     Array.init Snark_params.ledger_depth ~f:(fun i -> salt (merkle_tree i))
