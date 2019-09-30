@@ -2,7 +2,7 @@ open Tc;
 
 module WalletLocked = [%graphql
   {|
-    query ($publicKey: PublicKey!) @bsRecord {
+    query walletLocked ($publicKey: PublicKey!) @bsRecord {
       wallet(publicKey: $publicKey) {
         locked @bsDecoder(fn: "Tc.Option.getExn")
       }
