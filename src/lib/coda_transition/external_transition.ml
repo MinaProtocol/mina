@@ -134,32 +134,29 @@ module Validation = struct
       module T = struct
         type ( 'time_received
              , 'proof
-             , 'delta_transition_chain_part1
+             , 'delta_merkle_list
              , 'frontier_dependencies
              , 'staged_ledger_diff
-             , 'delta_transition_chain_part2 )
+             , 'delta_boundary )
              t =
           'time_received
           * 'proof
-          * 'delta_transition_chain_part1
+          * 'delta_merkle_list
           * 'frontier_dependencies
           * 'staged_ledger_diff
-          * 'delta_transition_chain_part2
+          * 'delta_boundary
           constraint 'time_received = [`Time_received] * (unit, _) Truth.t
           constraint 'proof = [`Proof] * (unit, _) Truth.t
           constraint
-            'delta_transition_chain_part1 =
-            [`Delta_transition_chain_part1]
-            * (State_hash.t Non_empty_list.t, _) Truth.t
+            'delta_merkle_list =
+            [`Delta_merkle_list] * (State_hash.t Non_empty_list.t, _) Truth.t
           constraint
             'frontier_dependencies =
             [`Frontier_dependencies] * (unit, _) Truth.t
           constraint
             'staged_ledger_diff =
             [`Staged_ledger_diff] * (unit, _) Truth.t
-          constraint
-            'delta_transition_chain_part2 =
-            [`Delta_transition_chain_part2] * (unit, _) Truth.t
+          constraint 'delta_boundary = [`Delta_boundary] * (unit, _) Truth.t
         [@@deriving version]
       end
 
@@ -171,81 +168,77 @@ module Validation = struct
 
   type ( 'time_received
        , 'proof
-       , 'delta_transition_chain_part1
+       , 'delta_merkle_list
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'delta_transition_chain_part2 )
+       , 'delta_boundary )
        t =
     ( 'time_received
     , 'proof
-    , 'delta_transition_chain_part1
+    , 'delta_merkle_list
     , 'frontier_dependencies
     , 'staged_ledger_diff
-    , 'delta_transition_chain_part2 )
+    , 'delta_boundary )
     Stable.Latest.t
 
   type fully_invalid =
     ( [`Time_received] * unit Truth.false_t
     , [`Proof] * unit Truth.false_t
-    , [`Delta_transition_chain_part1]
-      * State_hash.t Non_empty_list.t Truth.false_t
+    , [`Delta_merkle_list] * State_hash.t Non_empty_list.t Truth.false_t
     , [`Frontier_dependencies] * unit Truth.false_t
     , [`Staged_ledger_diff] * unit Truth.false_t
-    , [`Delta_transition_chain_part2] * unit Truth.false_t )
+    , [`Delta_boundary] * unit Truth.false_t )
     t
 
   type fully_valid =
     ( [`Time_received] * unit Truth.true_t
     , [`Proof] * unit Truth.true_t
-    , [`Delta_transition_chain_part1]
-      * State_hash.t Non_empty_list.t Truth.true_t
+    , [`Delta_merkle_list] * State_hash.t Non_empty_list.t Truth.true_t
     , [`Frontier_dependencies] * unit Truth.true_t
     , [`Staged_ledger_diff] * unit Truth.true_t
-    , [`Delta_transition_chain_part2] * unit Truth.true_t )
+    , [`Delta_boundary] * unit Truth.true_t )
     t
 
   type ( 'time_received
        , 'proof
-       , 'delta_transition_chain_part1
+       , 'delta_merkle_list
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'delta_transition_chain_part2 )
+       , 'delta_boundary )
        with_transition =
     (external_transition, State_hash.t) With_hash.t
     * ( 'time_received
       , 'proof
-      , 'delta_transition_chain_part1
+      , 'delta_merkle_list
       , 'frontier_dependencies
       , 'staged_ledger_diff
-      , 'delta_transition_chain_part2 )
+      , 'delta_boundary )
       t
 
   let fully_invalid =
     ( (`Time_received, Truth.False)
     , (`Proof, Truth.False)
-    , (`Delta_transition_chain_part1, Truth.False)
+    , (`Delta_merkle_list, Truth.False)
     , (`Frontier_dependencies, Truth.False)
     , (`Staged_ledger_diff, Truth.False)
-    , (`Delta_transition_chain_part2, Truth.False) )
+    , (`Delta_boundary, Truth.False) )
 
   type initial_valid =
     ( [`Time_received] * unit Truth.true_t
     , [`Proof] * unit Truth.true_t
-    , [`Delta_transition_chain_part1]
-      * State_hash.t Non_empty_list.t Truth.true_t
+    , [`Delta_merkle_list] * State_hash.t Non_empty_list.t Truth.true_t
     , [`Frontier_dependencies] * unit Truth.false_t
     , [`Staged_ledger_diff] * unit Truth.false_t
-    , [`Delta_transition_chain_part2] * unit Truth.false_t )
+    , [`Delta_boundary] * unit Truth.false_t )
     t
 
   type almost_valid =
     ( [`Time_received] * unit Truth.true_t
     , [`Proof] * unit Truth.true_t
-    , [`Delta_transition_chain_part1]
-      * State_hash.t Non_empty_list.t Truth.true_t
+    , [`Delta_merkle_list] * State_hash.t Non_empty_list.t Truth.true_t
     , [`Frontier_dependencies] * unit Truth.true_t
     , [`Staged_ledger_diff] * unit Truth.false_t
-    , [`Delta_transition_chain_part2] * unit Truth.true_t )
+    , [`Delta_boundary] * unit Truth.true_t )
     t
 
   let wrap t = (t, fully_invalid)
@@ -253,8 +246,7 @@ module Validation = struct
   let extract_delta_transition_chain_witness = function
     | ( _
       , _
-      , ( `Delta_transition_chain_part1
-        , Truth.True delta_transition_chain_witness )
+      , (`Delta_merkle_list, Truth.True delta_transition_chain_witness)
       , _
       , _
       , _ ) ->
@@ -267,17 +259,17 @@ module Validation = struct
     match validation with
     | ( time_received
       , proof
-      , delta_transition_chain_part1
+      , delta_merkle_list
       , (`Frontier_dependencies, Truth.True ())
       , staged_ledger_diff
-      , delta_transition_chain_part2 ) ->
+      , delta_boundary ) ->
         ( transition_with_hash
         , ( time_received
           , proof
-          , delta_transition_chain_part1
+          , delta_merkle_list
           , (`Frontier_dependencies, Truth.False)
           , staged_ledger_diff
-          , delta_transition_chain_part2 ) )
+          , delta_boundary ) )
     | _ ->
         failwith "why can't this be refuted?"
 
@@ -286,17 +278,17 @@ module Validation = struct
     match validation with
     | ( time_received
       , proof
-      , delta_transition_chain_part1
+      , delta_merkle_list
       , frontier_dependencies
       , staged_ledger_diff
-      , (`Delta_transition_chain_part2, Truth.True ()) ) ->
+      , (`Delta_boundary, Truth.True ()) ) ->
         ( transition_with_hash
         , ( time_received
           , proof
-          , delta_transition_chain_part1
+          , delta_merkle_list
           , frontier_dependencies
           , staged_ledger_diff
-          , (`Delta_transition_chain_part2, Truth.False) ) )
+          , (`Delta_boundary, Truth.False) ) )
     | _ ->
         failwith "why can't this be refuted?"
 
@@ -304,17 +296,17 @@ module Validation = struct
     match validation with
     | ( time_received
       , proof
-      , delta_transition_chain_part1
+      , delta_merkle_list
       , frontier_dependencies
       , (`Staged_ledger_diff, Truth.True ())
-      , delta_transition_chain_part2 ) ->
+      , delta_boundary ) ->
         ( transition_with_hash
         , ( time_received
           , proof
-          , delta_transition_chain_part1
+          , delta_merkle_list
           , frontier_dependencies
           , (`Staged_ledger_diff, Truth.False)
-          , delta_transition_chain_part2 ) )
+          , delta_boundary ) )
     | _ ->
         failwith "why can't this be refuted?"
 
@@ -324,185 +316,183 @@ module Validation = struct
     let set_valid_time_received :
            ( [`Time_received] * unit Truth.false_t
            , 'proof
-           , 'delta_transition_chain_part1
+           , 'delta_merkle_list
            , 'frontier_dependencies
            , 'staged_ledger_diff
-           , 'delta_transition_chain_part2 )
+           , 'delta_boundary )
            t
         -> ( [`Time_received] * unit Truth.true_t
            , 'proof
-           , 'delta_transition_chain_part1
+           , 'delta_merkle_list
            , 'frontier_dependencies
            , 'staged_ledger_diff
-           , 'delta_transition_chain_part2 )
+           , 'delta_boundary )
            t = function
       | ( (`Time_received, Truth.False)
         , proof
-        , delta_transition_chain_part1
+        , delta_merkle_list
         , frontier_dependencies
         , staged_ledger_diff
-        , delta_transition_chain_part2 ) ->
+        , delta_boundary ) ->
           ( (`Time_received, Truth.True ())
           , proof
-          , delta_transition_chain_part1
+          , delta_merkle_list
           , frontier_dependencies
           , staged_ledger_diff
-          , delta_transition_chain_part2 )
+          , delta_boundary )
       | _ ->
           failwith "why can't this be refuted?"
 
     let set_valid_proof :
            ( 'time_received
            , [`Proof] * unit Truth.false_t
-           , 'delta_transition_chain_part1
+           , 'delta_merkle_list
            , 'frontier_dependencies
            , 'staged_ledger_diff
-           , 'delta_transition_chain_part2 )
+           , 'delta_boundary )
            t
         -> ( 'time_received
            , [`Proof] * unit Truth.true_t
-           , 'delta_transition_chain_part1
+           , 'delta_merkle_list
            , 'frontier_dependencies
            , 'staged_ledger_diff
-           , 'delta_transition_chain_part2 )
+           , 'delta_boundary )
            t = function
       | ( time_received
         , (`Proof, Truth.False)
-        , delta_transition_chain_part1
+        , delta_merkle_list
         , frontier_dependencies
         , staged_ledger_diff
-        , delta_transition_chain_part2 ) ->
+        , delta_boundary ) ->
           ( time_received
           , (`Proof, Truth.True ())
-          , delta_transition_chain_part1
+          , delta_merkle_list
           , frontier_dependencies
           , staged_ledger_diff
-          , delta_transition_chain_part2 )
+          , delta_boundary )
       | _ ->
           failwith "why can't this be refuted?"
 
-    let set_valid_delta_transition_chain_part1 :
+    let set_valid_delta_merkle_list :
            ( 'time_received
            , 'proof
-           , [`Delta_transition_chain_part1]
-             * State_hash.t Non_empty_list.t Truth.false_t
+           , [`Delta_merkle_list] * State_hash.t Non_empty_list.t Truth.false_t
            , 'frontier_dependencies
            , 'staged_ledger_diff
-           , 'delta_transition_chain_part2 )
+           , 'delta_boundary )
            t
         -> State_hash.t Non_empty_list.t
         -> ( 'time_received
            , 'proof
-           , [`Delta_transition_chain_part1]
-             * State_hash.t Non_empty_list.t Truth.true_t
+           , [`Delta_merkle_list] * State_hash.t Non_empty_list.t Truth.true_t
            , 'frontier_dependencies
            , 'staged_ledger_diff
-           , 'delta_transition_chain_part2 )
+           , 'delta_boundary )
            t =
      fun validation hashes ->
       match validation with
       | ( time_received
         , proof
-        , (`Delta_transition_chain_part1, Truth.False)
+        , (`Delta_merkle_list, Truth.False)
         , frontier_dependencies
         , staged_ledger_diff
-        , delta_transition_chain_part2 ) ->
+        , delta_boundary ) ->
           ( time_received
           , proof
-          , (`Delta_transition_chain_part1, Truth.True hashes)
+          , (`Delta_merkle_list, Truth.True hashes)
           , frontier_dependencies
           , staged_ledger_diff
-          , delta_transition_chain_part2 )
+          , delta_boundary )
       | _ ->
           failwith "why can't this be refuted?"
 
     let set_valid_frontier_dependencies :
            ( 'time_received
            , 'proof
-           , 'delta_transition_chain_part1
+           , 'delta_merkle_list
            , [`Frontier_dependencies] * unit Truth.false_t
            , 'staged_ledger_diff
-           , 'delta_transition_chain_part2 )
+           , 'delta_boundary )
            t
         -> ( 'time_received
            , 'proof
-           , 'delta_transition_chain_part1
+           , 'delta_merkle_list
            , [`Frontier_dependencies] * unit Truth.true_t
            , 'staged_ledger_diff
-           , 'delta_transition_chain_part2 )
+           , 'delta_boundary )
            t = function
       | ( time_received
         , proof
-        , delta_transition_chain_part1
+        , delta_merkle_list
         , (`Frontier_dependencies, Truth.False)
         , staged_ledger_diff
-        , delta_transition_chain_part2 ) ->
+        , delta_boundary ) ->
           ( time_received
           , proof
-          , delta_transition_chain_part1
+          , delta_merkle_list
           , (`Frontier_dependencies, Truth.True ())
           , staged_ledger_diff
-          , delta_transition_chain_part2 )
+          , delta_boundary )
       | _ ->
           failwith "why can't this be refuted?"
 
     let set_valid_staged_ledger_diff :
            ( 'time_received
            , 'proof
-           , 'delta_transition_chain_part1
+           , 'delta_merkle_list
            , 'frontier_dependencies
            , [`Staged_ledger_diff] * unit Truth.false_t
-           , 'delta_transition_chain_part2 )
+           , 'delta_boundary )
            t
         -> ( 'time_received
            , 'proof
-           , 'delta_transition_chain_part1
+           , 'delta_merkle_list
            , 'frontier_dependencies
            , [`Staged_ledger_diff] * unit Truth.true_t
-           , 'delta_transition_chain_part2 )
+           , 'delta_boundary )
            t = function
       | ( time_received
         , proof
-        , delta_transition_chain_part1
+        , delta_merkle_list
         , frontier_dependencies
         , (`Staged_ledger_diff, Truth.False)
-        , delta_transition_chain_part2 ) ->
+        , delta_boundary ) ->
           ( time_received
           , proof
-          , delta_transition_chain_part1
+          , delta_merkle_list
           , frontier_dependencies
           , (`Staged_ledger_diff, Truth.True ())
-          , delta_transition_chain_part2 )
+          , delta_boundary )
       | _ ->
           failwith "why can't this be refuted?"
 
-    let set_valid_delta_transition_chain_part2 :
+    let set_valid_delta_boundary :
            ( 'time_received
            , 'proof
-           , 'delta_transition_chain_part1
+           , 'delta_merkle_list
            , 'frontier_dependencies
            , 'staged_ledger_diff
-           , [`Delta_transition_chain_part2] * unit Truth.false_t )
+           , [`Delta_boundary] * unit Truth.false_t )
            t
         -> ( 'time_received
            , 'proof
-           , 'delta_transition_chain_part1
+           , 'delta_merkle_list
            , 'frontier_dependencies
            , 'staged_ledger_diff
-           , [`Delta_transition_chain_part2] * unit Truth.true_t )
+           , [`Delta_boundary] * unit Truth.true_t )
            t = function
       | ( time_received
         , proof
-        , delta_transition_chain_part1
+        , delta_merkle_list
         , frontier_dependencies
         , staged_ledger_diff
-        , (`Delta_transition_chain_part2, Truth.False) ) ->
+        , (`Delta_boundary, Truth.False) ) ->
           ( time_received
           , proof
-          , delta_transition_chain_part1
+          , delta_merkle_list
           , frontier_dependencies
           , staged_ledger_diff
-          , (`Delta_transition_chain_part2, Truth.True ()) )
+          , (`Delta_boundary, Truth.True ()) )
       | _ ->
           failwith "why can't this be refuted?"
   end
@@ -536,7 +526,7 @@ let skip_delta_transition_chain_validation_part1
     `This_transition_was_not_received_via_gossip (t, validation) =
   let previous_protocol_state_hash = With_hash.data t |> parent_hash in
   ( t
-  , Validation.Unsafe.set_valid_delta_transition_chain_part1 validation
+  , Validation.Unsafe.set_valid_delta_merkle_list validation
       (Non_empty_list.singleton previous_protocol_state_hash) )
 
 let validate_proof (t, validation) ~verifier =
@@ -552,17 +542,14 @@ let validate_proof (t, validation) ~verifier =
   | Error e ->
       Error (`Verifier_error e)
 
-let validate_delta_transition_chain_part1 (t, validation) =
+let validate_delta_merkle_list (t, validation) =
   let transition = With_hash.data t in
   match
     Transition_chain_verifier.verify ~target_hash:(parent_hash transition)
       ~transition_chain_proof:transition.delta_transition_chain_proof
   with
   | Some hashes ->
-      Ok
-        ( t
-        , Validation.Unsafe.set_valid_delta_transition_chain_part1 validation
-            hashes )
+      Ok (t, Validation.Unsafe.set_valid_delta_merkle_list validation hashes)
   | None ->
       Error `Invalid_delta_transition_chain_proof
 
@@ -585,7 +572,7 @@ let skip_staged_ledger_diff_validation
 
 let skip_delta_transition_chain_validation_part2
     `This_transition_was_not_received_via_gossip (t, validation) =
-  (t, Validation.Unsafe.set_valid_delta_transition_chain_part2 validation)
+  (t, Validation.Unsafe.set_valid_delta_boundary validation)
 
 module With_validation = struct
   let state_hash (t, _) = With_hash.hash t
@@ -640,7 +627,7 @@ module Validated = struct
           * ( [`Time_received]
               * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
             , [`Proof] * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
-            , [`Delta_transition_chain_part1]
+            , [`Delta_merkle_list]
               * ( State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
                 , Truth.True.Stable.V1.t )
                 Truth.Stable.V1.t
@@ -648,7 +635,7 @@ module Validated = struct
               * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
             , [`Staged_ledger_diff]
               * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
-            , [`Delta_transition_chain_part2]
+            , [`Delta_boundary]
               * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t )
             Validation.Stable.V1.t
         [@@deriving version]
@@ -668,11 +655,10 @@ module Validated = struct
           ( transition_with_hash
           , ( (`Time_received, Truth.True ())
             , (`Proof, Truth.True ())
-            , ( `Delta_transition_chain_part1
-              , Truth.True delta_transition_chain_witness )
+            , (`Delta_merkle_list, Truth.True delta_transition_chain_witness)
             , (`Frontier_dependencies, Truth.True ())
             , (`Staged_ledger_diff, Truth.True ())
-            , (`Delta_transition_chain_part2, Truth.True ()) ) )
+            , (`Delta_boundary, Truth.True ()) ) )
 
         include Sexpable.Of_sexpable (struct
                     type t = erased [@@deriving sexp]
@@ -820,7 +806,7 @@ struct
     in
     (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
 
-  let validate_delta_transition_chain_part2 (t, validation) ~frontier =
+  let validate_delta_boundary (t, validation) ~frontier =
     let open Int in
     let open Result.Let_syntax in
     let global_slot =
@@ -874,8 +860,7 @@ struct
       | Some false ->
           Error `Including_unnecessary_transitions_in_delta_transition_chain
     in
-    return
-    @@ (t, Validation.Unsafe.set_valid_delta_transition_chain_part2 validation)
+    return @@ (t, Validation.Unsafe.set_valid_delta_boundary validation)
 end
 
 module Staged_ledger_validation = struct
@@ -886,10 +871,10 @@ module Staged_ledger_validation = struct
   let validate_staged_ledger_diff :
          ( 'time_received
          , 'proof
-         , 'delta_transition_chain_part1
+         , 'delta_merkle_list
          , 'frontier_dependencies
          , [`Staged_ledger_diff] * unit Truth.false_t
-         , 'delta_transition_chain_part2 )
+         , 'delta_boundary )
          Validation.with_transition
       -> logger:Logger.t
       -> verifier:Verifier.t
@@ -898,10 +883,10 @@ module Staged_ledger_validation = struct
            * [ `External_transition_with_validation of
                ( 'time_received
                , 'proof
-               , 'delta_transition_chain_part1
+               , 'delta_merkle_list
                , 'frontier_dependencies
                , [`Staged_ledger_diff] * unit Truth.true_t
-               , 'delta_transition_chain_part2 )
+               , 'delta_boundary )
                Validation.with_transition ]
            * [`Staged_ledger of Staged_ledger.t]
          , [ `Invalid_staged_ledger_diff of

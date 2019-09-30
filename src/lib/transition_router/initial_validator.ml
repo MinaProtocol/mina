@@ -167,8 +167,7 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
             |> Fn.compose Deferred.return
                  (validate_time_received ~time_received)
             >>= validate_proof ~verifier
-            >>= Fn.compose Deferred.return
-                  validate_delta_transition_chain_part1)
+            >>= Fn.compose Deferred.return validate_delta_merkle_list)
         with
         | Ok verified_transition ->
             ( `Transition
