@@ -38,6 +38,9 @@ module Stable = struct
       let blockchain_state {protocol_state; _} =
         Protocol_state.blockchain_state protocol_state
 
+      let protocol_state_body_hash {protocol_state; _} =
+        Protocol_state.body protocol_state |> Protocol_state.Body.hash
+
       let state_hash {protocol_state; _} = Protocol_state.hash protocol_state
 
       let parent_hash {protocol_state; _} =
@@ -99,6 +102,7 @@ type external_transition = t
 [%%define_locally
 Stable.Latest.
   ( protocol_state
+  , protocol_state_body_hash
   , protocol_state_proof
   , delta_transition_chain_proof
   , blockchain_state
@@ -590,6 +594,8 @@ module With_validation = struct
 
   let protocol_state t = lift protocol_state t
 
+  let protocol_state_body_hash t = lift protocol_state_body_hash t
+
   let protocol_state_proof t = lift protocol_state_proof t
 
   let blockchain_state t = lift blockchain_state t
@@ -740,6 +746,7 @@ module Validated = struct
     , t_of_sexp
     , create_unsafe
     , protocol_state
+    , protocol_state_body_hash
     , delta_transition_chain_proof
     , protocol_state_proof
     , blockchain_state

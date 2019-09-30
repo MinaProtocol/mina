@@ -1,6 +1,5 @@
 open Core
 open Coda_base
-open Coda_state
 open Coda_transition
 
 module type Inputs_intf = sig
@@ -20,8 +19,7 @@ module Make (Inputs : Inputs_intf) = struct
     type proof_elem = State_body_hash.t
 
     let to_proof_elem transition =
-      transition |> External_transition.Validated.protocol_state
-      |> Protocol_state.body |> Protocol_state.Body.hash
+      transition |> External_transition.Validated.protocol_state_body_hash
 
     let get_previous ~context:(frontier, global_slot) transition =
       if

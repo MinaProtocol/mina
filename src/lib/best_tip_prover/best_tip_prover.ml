@@ -23,8 +23,8 @@ module Make (Inputs : Inputs_intf) :
     type proof_elem = State_body_hash.t
 
     let to_proof_elem external_transition =
-      external_transition |> External_transition.Validated.protocol_state
-      |> Protocol_state.body |> Protocol_state.Body.hash
+      external_transition
+      |> External_transition.Validated.protocol_state_body_hash
 
     let get_previous ~context transition =
       let parent_hash =

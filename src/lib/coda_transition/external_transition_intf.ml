@@ -9,6 +9,8 @@ module type External_transition_common_intf = sig
 
   val protocol_state : t -> Protocol_state.Value.t
 
+  val protocol_state_body_hash : t -> State_body_hash.t
+
   val protocol_state_proof : t -> Proof.t
 
   val blockchain_state : t -> Blockchain_state.Value.t
