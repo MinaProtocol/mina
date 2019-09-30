@@ -57,7 +57,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -151,8 +151,9 @@ jobs:
                 name: Ensure/Fix opam permisssions
                 command: |
                     set +e
-                    sudo chown -R distiller /Users/distiller/.opam
-                    sudo chmod -R u+w /Users/distiller/.opam
+                    sudo mkdir -p /Users/distiller/.opam
+                    sudo chown -R distiller /Users/distiller/.opam | true
+                    sudo chmod -R u+w /Users/distiller/.opam | true
             - run:
                 name: Install macos dependencies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
@@ -231,7 +232,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -282,7 +283,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -323,7 +324,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -342,7 +343,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -355,15 +356,13 @@ jobs:
             {%- endfor %}
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     {%- endfor %}
 
     {%- for profile in medium_curves_tests.keys() | sort %}
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -379,8 +378,6 @@ jobs:
             {%- endfor %}
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     {%- endfor %}
 
 workflows:

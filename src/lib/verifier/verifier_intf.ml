@@ -60,5 +60,6 @@ end
 module type S = sig
   include Base.S
 
-  val create : unit -> t Deferred.t
+  val create :
+    logger:Logger.t -> pids:Child_processes.Termination.t -> t Deferred.t
 end

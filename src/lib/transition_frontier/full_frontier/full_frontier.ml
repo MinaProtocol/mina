@@ -467,6 +467,16 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
                ~f:(fun sum account ->
                  sum + Currency.Balance.to_int account.balance ))
         in
+        let consensus_state = Breadcrumb.consensus_state new_root_breadcrumb in
+        let blockchain_length =
+          Int.to_float
+            ( Consensus.Data.Consensus_state.blockchain_length consensus_state
+            |> Coda_numbers.Length.to_int )
+        in
+        let global_slot =
+          Int.to_float
+            (Consensus.Data.Consensus_state.global_slot consensus_state)
+        in
         Gauge.dec Transition_frontier.active_breadcrumbs
           num_breadcrumbs_removed ;
         Gauge.set Transition_frontier.recently_finalized_staged_txns
@@ -477,7 +487,9 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
           num_root_snarked_ledger_accounts ;
         Gauge.set Transition_frontier.root_snarked_ledger_total_currency
           root_snarked_ledger_total_currency ;
-        Counter.inc_one Transition_frontier.root_transitions) ;
+        Counter.inc_one Transition_frontier.root_transitions ;
+        Gauge.set Transition_frontier.slot_fill_rate
+          (blockchain_length /. global_slot)) ;
       (Breadcrumb.state_hash old_root_node.breadcrumb, Some new_root_hash)
   (* These are invalid inhabitants for the type signature of this function,
    * but the OCaml compiler isn't smart enough to realize this. *)

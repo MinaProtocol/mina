@@ -57,7 +57,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -151,8 +151,9 @@ jobs:
                 name: Ensure/Fix opam permisssions
                 command: |
                     set +e
-                    sudo chown -R distiller /Users/distiller/.opam
-                    sudo chmod -R u+w /Users/distiller/.opam
+                    sudo mkdir -p /Users/distiller/.opam
+                    sudo chown -R distiller /Users/distiller/.opam | true
+                    sudo chmod -R u+w /Users/distiller/.opam | true
             - run:
                 name: Install macos dependencies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
@@ -225,7 +226,7 @@ jobs:
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         environment:
             DUNE_PROFILE: testnet_postake_medium_curves
         steps:
@@ -267,7 +268,7 @@ jobs:
     test-unit--test_postake_snarkless_unittest:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -305,7 +306,7 @@ jobs:
     test-unit--dev:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -343,7 +344,7 @@ jobs:
     test-unit--test_postake_snarkless_medium_curves_unit_test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -359,7 +360,7 @@ jobs:
     test-unit--dev_medium_curves:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -375,7 +376,7 @@ jobs:
     test--fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -386,12 +387,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -405,12 +404,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:transaction-snark-profiler -k 2"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_bootstrap:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -424,12 +421,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-long-fork -num-proposers 2"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_catchup:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -440,12 +435,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_delegation:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -456,12 +449,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation:coda-delegation-test"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_five_even_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -472,12 +463,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_five_even_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -488,12 +477,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_holy_grail:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -507,12 +494,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-long-fork -num-proposers 5"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -526,12 +511,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:transaction-snark-profiler -k 2"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_split:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -542,12 +525,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_split_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -579,12 +560,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-archive-node-test"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_three_proposers:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -595,12 +574,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_three_proposers:coda-txns-and-restart-non-proposers"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -614,12 +591,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-batch-payment-test"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_delegation_medium_curves:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -630,12 +605,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation_medium_curves:coda-delegation-test"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_medium_curves:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -651,12 +624,10 @@ jobs:
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_snarkless_medium_curves:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -670,12 +641,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_split_medium_curves:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -686,12 +655,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_split_snarkless_medium_curves:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -723,12 +690,10 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-archive-node-test"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
     test--test_postake_txns_medium_curves:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
         steps:
             - checkout
             - run:
@@ -742,8 +707,6 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns_medium_curves:coda-batch-payment-test"'
             - store_artifacts:
                   path: test_logs
-            - store_artifacts:
-                  path: masks
 
 workflows:
     version: 2

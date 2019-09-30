@@ -217,7 +217,7 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-               ~blockchain_length:int ~uptime_secs:nn_int
+               ~next_proposal:string ~blockchain_length:int ~uptime_secs:nn_int
                ~ledger_merkle_root:string ~state_hash:string
                ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
@@ -1216,10 +1216,7 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.add_wallet)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.add_wallet)]
       ~resolve:(fun {ctx= t; _} () password ->
-        let open Deferred.Let_syntax in
-        let password =
-          lazy (Deferred.Or_error.return (Bytes.of_string password))
-        in
+        let password = lazy (return (Bytes.of_string password)) in
         let%map pk =
           Coda_lib.wallets t |> Secrets.Wallets.generate_new ~password
         in
@@ -1231,10 +1228,7 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.unlock_wallet)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.unlock_wallet)]
       ~resolve:(fun {ctx= t; _} () (password, pk) ->
-        let password =
-          lazy (Deferred.Or_error.return (Bytes.of_string password))
-        in
-        let open Deferred.Let_syntax in
+        let password = lazy (return (Bytes.of_string password)) in
         match%map
           Coda_lib.wallets t |> Secrets.Wallets.unlock ~needle:pk ~password
         with

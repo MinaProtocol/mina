@@ -13,11 +13,15 @@ module type Resource_pool_base_intf = sig
 
   type transition_frontier
 
+  module Config : sig
+    type t [@@deriving sexp_of]
+  end
+
   val create :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> frontier_broadcast_pipe:transition_frontier Option.t
+       frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
+    -> config:Config.t
+    -> logger:Logger.t
     -> t
 end
 
@@ -58,15 +62,17 @@ module type Network_pool_base_intf = sig
 
   type resource_pool_diff
 
+  type config
+
   type transition_frontier
 
   val create :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
+       config:config
     -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
                       Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
+    -> logger:Logger.t
     -> t
 
   val of_resource_pool_and_diffs :
@@ -99,7 +105,12 @@ module type Snark_resource_pool_intf = sig
     Resource_pool_base_intf
     with type transition_frontier := transition_frontier
 
-  val bin_writer_t : t Bin_prot.Writer.t
+  val make_config :
+    trust_system:Trust_system.t -> verifier:Verifier.t -> Config.t
+
+  type serializable [@@deriving bin_io]
+
+  val of_serializable : serializable -> config:Config.t -> logger:Logger.t -> t
 
   val add_snark :
        t
@@ -107,6 +118,12 @@ module type Snark_resource_pool_intf = sig
     -> proof:ledger_proof One_or_two.t
     -> fee:Fee_with_prover.t
     -> [`Rebroadcast | `Don't_rebroadcast]
+
+  val verify_and_act :
+       t
+    -> work:work * ledger_proof One_or_two.t Priced_proof.t
+    -> sender:Envelope.Sender.t
+    -> unit Deferred.Or_error.t
 
   val request_proof :
     t -> work -> ledger_proof One_or_two.t Priced_proof.t option
@@ -169,6 +186,8 @@ module type Transaction_resource_pool_intf = sig
     Resource_pool_base_intf
     with type transition_frontier := transition_frontier
      and type t := t
+
+  val make_config : trust_system:Trust_system.t -> Config.t
 
   val member : t -> User_command.With_valid_signature.t -> bool
 

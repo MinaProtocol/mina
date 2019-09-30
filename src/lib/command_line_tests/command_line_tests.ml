@@ -8,7 +8,7 @@ open Async
 let%test_module "Command line tests" =
   ( module struct
     let () =
-      Backtrace.elide := false;
+      Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true
 
     (* executable location relative to src/default/lib/command_line_tests
@@ -57,10 +57,15 @@ let%test_module "Command line tests" =
       let config_dir = create_config_directory () in
       Monitor.protect
         ~finally:(fun () ->
-          if !test_failed then (
-            let contents = Core.In_channel.(with_file (config_dir ^/ "coda.log") ~f:input_all) in
-            Core.Printf.printf !"**** DAEMON CRASHED (OUTPUT BELOW) ****\n%s\n************\n%!" contents ) ;
-          remove_config_directory config_dir)
+          ( if !test_failed then
+            let contents =
+              Core.In_channel.(
+                with_file (config_dir ^/ "coda.log") ~f:input_all)
+            in
+            Core.Printf.printf
+              !"**** DAEMON CRASHED (OUTPUT BELOW) ****\n%s\n************\n%!"
+              contents ) ;
+          remove_config_directory config_dir )
         (fun () ->
           match%map
             let open Deferred.Or_error.Let_syntax in
@@ -75,13 +80,16 @@ let%test_module "Command line tests" =
             let%map _ = stop_daemon port in
             ()
           with
-          | Ok () -> true
-          | Error err -> test_failed := true; Error.raise err)
+          | Ok () ->
+              true
+          | Error err ->
+              test_failed := true ;
+              Error.raise err )
 
     let%test "The coda daemon works in background mode" =
       match Core.Sys.is_file coda_exe with
       | `Yes ->
-          Async.Thread_safe.block_on_async_exn (test_background_daemon)
+          Async.Thread_safe.block_on_async_exn test_background_daemon
       | `No | `Unknown ->
           printf "Please build coda.exe in order to run this test\n%!" ;
           false
