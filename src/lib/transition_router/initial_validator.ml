@@ -17,12 +17,12 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash
   let open Trust_system.Actions in
   let punish action message =
     let message' =
-      "external transition with state hash $hash"
+      "external transition with state hash $state_hash"
       ^ Option.value_map message ~default:"" ~f:(fun (txt, _) ->
             sprintf ", %s" txt )
     in
     let metadata =
-      ("hash", State_hash.to_yojson state_hash)
+      ("state_hash", State_hash.to_yojson state_hash)
       :: Option.value_map message ~default:[] ~f:Tuple2.get2
     in
     Trust_system.record_envelope_sender trust_system logger sender

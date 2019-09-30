@@ -79,7 +79,8 @@ module Make (Inputs : Inputs_intf) = struct
   let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
       ~time_controller ~proposer_transition_reader ~verified_transition_writer
       ~clear_reader ~transition_reader_ref ~transition_writer_ref
-      ~consensus_local_state ~frontier_w frontier =
+      ~consensus_local_state ~frontier_w ~initial_root_transition
+      ~persistent_root ~persistent_frontier =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Starting Bootstrap Controller phase" ;
     let bootstrap_controller_reader, bootstrap_controller_writer =
@@ -87,15 +88,6 @@ module Make (Inputs : Inputs_intf) = struct
     in
     transition_reader_ref := bootstrap_controller_reader ;
     transition_writer_ref := bootstrap_controller_writer ;
-    let persistent_root = Transition_frontier.persistent_root frontier in
-    let persistent_frontier =
-      Transition_frontier.persistent_frontier frontier
-    in
-    let initial_root_transition =
-      Transition_frontier.Breadcrumb.validated_transition
-        (Transition_frontier.root frontier)
-    in
-    let%map () = Transition_frontier.close frontier in
     don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
     upon
       (let%bind () =
@@ -129,11 +121,11 @@ module Make (Inputs : Inputs_intf) = struct
           new_frontier )
 
   let run ~logger ~trust_system ~verifier ~network ~time_controller
-      ~consensus_local_state ~frontier_broadcast_pipe:(frontier_r, frontier_w)
+      ~consensus_local_state ~persistent_root ~persistent_frontier
+      ~frontier_broadcast_pipe:(frontier_r, frontier_w)
       ~network_transition_reader ~proposer_transition_reader
       ~most_recent_valid_block:( most_recent_valid_block_reader
                                , most_recent_valid_block_writer ) =
-    let frontier = Option.value_exn (Broadcast_pipe.Reader.peek frontier_r) in
     let clear_reader, clear_writer =
       Strict_pipe.create ~name:"clear" Synchronous
     in
@@ -153,56 +145,78 @@ module Make (Inputs : Inputs_intf) = struct
     let now = Coda_base.Block_time.now time_controller in
     don't_wait_for
       (let%map () =
-         if
-           try Consensus.Hooks.is_genesis now
-           with Invalid_argument _ ->
-             (* if "now" is before the genesis timestamp, the calculation
-             of the proof-of-stake epoch results in an exception
-          *)
-             let module Time = Coda_base.Block_time in
-             let time_till_genesis =
-               Time.diff Consensus.Constants.genesis_state_timestamp now
-             in
-             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-               ~metadata:
-                 [ ( "time_till_genesis"
-                   , `Int
-                       (Int64.to_int_exn (Time.Span.to_ms time_till_genesis))
-                   ) ]
-               "Node started before genesis: waiting $time_till_genesis \
-                milliseconds before running transition router" ;
-             let seconds_to_wait = 30 in
-             let milliseconds_to_wait =
-               Int64.of_int_exn (seconds_to_wait * 1000)
-             in
-             let rec wait_loop tm =
-               if Int64.(tm <= zero) then ()
-               else (
-                 Core.Unix.sleep seconds_to_wait ;
-                 let tm_remaining = Int64.(tm - milliseconds_to_wait) in
+         match Broadcast_pipe.Reader.peek frontier_r with
+         | Some frontier ->
+             if
+               try Consensus.Hooks.is_genesis now
+               with Invalid_argument _ ->
+                 (* if "now" is before the genesis timestamp, the calculation
+                of the proof-of-stake epoch results in an exception
+             *)
+                 let module Time = Coda_base.Block_time in
+                 let time_till_genesis =
+                   Time.diff Consensus.Constants.genesis_state_timestamp now
+                 in
                  Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-                   "Still waiting $tm_remaining milliseconds before running \
-                    transition router"
                    ~metadata:
-                     [("tm_remaining", `Int (Int64.to_int_exn tm_remaining))] ;
-                 wait_loop tm_remaining )
+                     [ ( "time_till_genesis"
+                       , `Int
+                           (Int64.to_int_exn
+                              (Time.Span.to_ms time_till_genesis)) ) ]
+                   "Node started before genesis: waiting $time_till_genesis \
+                    milliseconds before running transition router" ;
+                 let seconds_to_wait = 30 in
+                 let milliseconds_to_wait =
+                   Int64.of_int_exn (seconds_to_wait * 1000)
+                 in
+                 let rec wait_loop tm =
+                   if Int64.(tm <= zero) then ()
+                   else (
+                     Core.Unix.sleep seconds_to_wait ;
+                     let tm_remaining = Int64.(tm - milliseconds_to_wait) in
+                     Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                       "Still waiting $tm_remaining milliseconds before \
+                        running transition router"
+                       ~metadata:
+                         [ ( "tm_remaining"
+                           , `Int (Int64.to_int_exn tm_remaining) ) ] ;
+                     wait_loop tm_remaining )
+                 in
+                 wait_loop @@ Time.Span.to_ms time_till_genesis ;
+                 (* after waiting, we're at least at the genesis time, maybe a bit past it *)
+                 Consensus.Hooks.is_genesis
+                 @@ Coda_base.Block_time.now time_controller
+             then (
+               start_transition_frontier_controller ~logger ~trust_system
+                 ~verifier ~network ~time_controller
+                 ~proposer_transition_reader ~verified_transition_writer
+                 ~clear_reader ~collected_transitions:[] ~transition_reader_ref
+                 ~transition_writer_ref ~frontier_w frontier ;
+               Deferred.unit )
+             else
+               let initial_root_transition =
+                 Transition_frontier.(
+                   Breadcrumb.validated_transition (root frontier))
+               in
+               let%map () = Transition_frontier.close frontier in
+               start_bootstrap_controller ~logger ~trust_system ~verifier
+                 ~network ~time_controller ~proposer_transition_reader
+                 ~verified_transition_writer ~clear_reader
+                 ~transition_reader_ref ~consensus_local_state
+                 ~transition_writer_ref ~frontier_w ~persistent_root
+                 ~persistent_frontier ~initial_root_transition
+         | None ->
+             let%map initial_root_transition =
+               Persistent_frontier.(
+                 with_instance_exn persistent_frontier
+                   ~f:Instance.get_root_transition)
+               >>| Result.ok_or_failwith
              in
-             wait_loop @@ Time.Span.to_ms time_till_genesis ;
-             (* after waiting, we're at least at the genesis time, maybe a bit past it *)
-             Consensus.Hooks.is_genesis
-             @@ Coda_base.Block_time.now time_controller
-         then (
-           start_transition_frontier_controller ~logger ~trust_system ~verifier
-             ~network ~time_controller ~proposer_transition_reader
-             ~verified_transition_writer ~clear_reader
-             ~collected_transitions:[] ~transition_reader_ref
-             ~transition_writer_ref ~frontier_w frontier ;
-           Deferred.unit )
-         else
-           start_bootstrap_controller ~logger ~trust_system ~verifier ~network
-             ~time_controller ~proposer_transition_reader
-             ~verified_transition_writer ~clear_reader ~transition_reader_ref
-             ~consensus_local_state ~transition_writer_ref ~frontier_w frontier
+             start_bootstrap_controller ~logger ~trust_system ~verifier
+               ~network ~time_controller ~proposer_transition_reader
+               ~verified_transition_writer ~clear_reader ~transition_reader_ref
+               ~consensus_local_state ~transition_writer_ref ~frontier_w
+               ~persistent_root ~persistent_frontier ~initial_root_transition
        in
        let ( valid_protocol_state_transition_reader
            , valid_protocol_state_transition_writer ) =
@@ -251,12 +265,18 @@ module Make (Inputs : Inputs_intf) = struct
                          Strict_pipe.Writer.kill !transition_writer_ref ;
                          don't_wait_for
                            (Strict_pipe.Writer.write clear_writer `Clear) ;
+                         let initial_root_transition =
+                           Transition_frontier.(
+                             Breadcrumb.validated_transition (root frontier))
+                         in
+                         let%map () = Transition_frontier.close frontier in
                          start_bootstrap_controller ~logger ~trust_system
                            ~verifier ~network ~time_controller
                            ~proposer_transition_reader
                            ~verified_transition_writer ~clear_reader
                            ~transition_reader_ref ~transition_writer_ref
-                           ~consensus_local_state ~frontier_w frontier )
+                           ~consensus_local_state ~frontier_w ~persistent_root
+                           ~persistent_frontier ~initial_root_transition )
                        else Deferred.unit
                    | None ->
                        Deferred.unit

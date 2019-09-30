@@ -136,9 +136,19 @@ let rec load_with_max_length :
     let persistent_root_instance =
       Persistent_root.create_instance_exn persistent_root
     in
-    load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
-      ~max_length ~persistent_root ~persistent_root_instance
-      ~persistent_frontier ~persistent_frontier_instance
+    match%bind
+      load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
+        ~max_length ~persistent_root ~persistent_root_instance
+        ~persistent_frontier ~persistent_frontier_instance
+    with
+    | Ok _ as result ->
+        return result
+    | Error _ as err ->
+        let%map () =
+          Persistent_frontier.Instance.destroy persistent_frontier_instance
+        in
+        Persistent_root.Instance.destroy persistent_root_instance ;
+        err
   in
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier

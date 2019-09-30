@@ -94,7 +94,7 @@ let run ~logger ~trust_system ~frontier ~transition_reader
              Trust_system.record_envelope_sender trust_system logger sender
                ( Trust_system.Actions.Sent_old_gossip
                , Some
-                   ( "external transition with state hash $hash"
+                   ( "external transition with state hash $state_hash"
                    , [ ("state_hash", State_hash.to_yojson transition_hash)
                      ; ("transition", External_transition.to_yojson transition)
                      ] ) )

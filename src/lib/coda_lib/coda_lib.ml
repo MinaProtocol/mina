@@ -553,35 +553,35 @@ let create (config : Config.t) =
           in
           (* TODO: (#3053) push transition frontier ownership down into transition router
              * (then persistent root can be owned by transition frontier only) *)
-          let%bind transition_frontier =
+          let persistent_frontier =
+            Transition_frontier.Persistent_frontier.create
+              ~logger:config.logger ~verifier
+              ~directory:config.persistent_frontier_location
+          in
+          let persistent_root =
+            Transition_frontier.Persistent_root.create ~logger:config.logger
+              ~directory:config.persistent_root_location
+          in
+          let%bind transition_frontier_opt =
             Transition_frontier.load ~logger:config.logger ~verifier
               ~consensus_local_state:config.consensus_local_state
-              ~persistent_root:
-                (Transition_frontier.Persistent_root.create
-                   ~logger:config.logger
-                   ~directory:config.persistent_root_location)
-              ~persistent_frontier:
-                (Transition_frontier.Persistent_frontier.create
-                   ~logger:config.logger ~verifier
-                   ~directory:config.persistent_frontier_location)
-              ()
-            >>| Fn.compose Result.ok_or_failwith
-                  (Result.map_error ~f:(function
-                    | `Persistent_frontier_malformed ->
-                        "persistent frontier unexpectedly malformed -- this \
-                         should not happen with retry enabled"
-                    | `Bootstrap_required ->
-                        "TODO: bootstrap required"
-                    | `Failure err ->
-                        "failed to initialize transition frontier: " ^ err ))
-          in
-          let first_transition =
-            Transition_frontier.root transition_frontier
-            |> Transition_frontier.Breadcrumb.validated_transition
-            |> External_transition.Validation.forget_validation
+              ~persistent_root ~persistent_frontier ()
+            >>| function
+            | Ok frontier ->
+                Some frontier
+            | Error `Persistent_frontier_malformed ->
+                failwith
+                  "persistent frontier unexpectedly malformed -- this should \
+                   not happen with retry enabled"
+            | Error `Bootstrap_required ->
+                Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
+                  "" ;
+                None
+            | Error (`Failure err) ->
+                failwith ("failed to initialize transition frontier: " ^ err)
           in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
-            Broadcast_pipe.create (Some transition_frontier)
+            Broadcast_pipe.create transition_frontier_opt
           in
           let handle_request ~f query_env =
             let input = Envelope.Incoming.data query_env in
@@ -668,13 +668,16 @@ let create (config : Config.t) =
           in
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
-            Broadcast_pipe.create first_transition
+            Broadcast_pipe.create
+              ( Lazy.force External_transition.genesis
+              |> External_transition.Validation.forget_validation )
           in
           let valid_transitions =
             Transition_router.run ~logger:config.logger
               ~trust_system:config.trust_system ~verifier ~network:net
               ~time_controller:config.time_controller
               ~consensus_local_state:config.consensus_local_state
+              ~persistent_root ~persistent_frontier
               ~frontier_broadcast_pipe:
                 (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
               ~network_transition_reader:
