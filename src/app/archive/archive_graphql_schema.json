@@ -2047,6 +2047,12 @@
               "deprecationReason": null,
               "name": "blocks_pkey",
               "description": "unique or primary key constraint"
+            },
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "blocks_state_hash_key",
+              "description": "unique or primary key constraint"
             }
           ],
           "description": "unique or primary key constraints on table \"blocks\"",
@@ -2150,6 +2156,16 @@
                 }
               },
               "description": null
+            },
+            {
+              "name": "on_conflict",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_fee_transfers_on_conflict",
+                "ofType": null
+              },
+              "description": null
             }
           ],
           "kind": "INPUT_OBJECT",
@@ -2247,6 +2263,23 @@
           "name": "blocks_fee_transfers_bool_exp",
           "enumValues": null,
           "description": "Boolean expression to filter rows from the table \"blocks_fee_transfers\". All fields are combined with a logical 'AND'.",
+          "fields": null
+        },
+        {
+          "inputFields": null,
+          "kind": "ENUM",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "blocks_fee_transfers_constraint",
+          "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "blocks_fee_transfers_block_id_fee_transfer_id_key",
+              "description": "unique or primary key constraint"
+            }
+          ],
+          "description": "unique or primary key constraints on table \"blocks_fee_transfers\"",
           "fields": null
         },
         {
@@ -2397,6 +2430,16 @@
                 }
               },
               "description": null
+            },
+            {
+              "name": "on_conflict",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_fee_transfers_on_conflict",
+                "ofType": null
+              },
+              "description": null
             }
           ],
           "kind": "INPUT_OBJECT",
@@ -2405,6 +2448,53 @@
           "name": "blocks_fee_transfers_obj_rel_insert_input",
           "enumValues": null,
           "description": "input type for inserting object relation for remote table \"blocks_fee_transfers\"",
+          "fields": null
+        },
+        {
+          "inputFields": [
+            {
+              "name": "constraint_",
+              "defaultValue": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "blocks_fee_transfers_constraint",
+                  "ofType": null
+                }
+              },
+              "description": null
+            },
+            {
+              "name": "update_columns",
+              "defaultValue": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "blocks_fee_transfers_update_column",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "blocks_fee_transfers_on_conflict",
+          "enumValues": null,
+          "description": "on conflict condition type for table \"blocks_fee_transfers\"",
           "fields": null
         },
         {
@@ -2510,6 +2600,29 @@
           "name": "blocks_fee_transfers_set_input",
           "enumValues": null,
           "description": "input type for updating data in table \"blocks_fee_transfers\"",
+          "fields": null
+        },
+        {
+          "inputFields": null,
+          "kind": "ENUM",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "blocks_fee_transfers_update_column",
+          "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_id",
+              "description": "column name"
+            },
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee_transfer_id",
+              "description": "column name"
+            }
+          ],
+          "description": "update columns of table \"blocks_fee_transfers\"",
           "fields": null
         },
         {
@@ -3284,6 +3397,16 @@
                 }
               },
               "description": null
+            },
+            {
+              "name": "on_conflict",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_snark_jobs_on_conflict",
+                "ofType": null
+              },
+              "description": null
             }
           ],
           "kind": "INPUT_OBJECT",
@@ -3381,6 +3504,23 @@
           "name": "blocks_snark_jobs_bool_exp",
           "enumValues": null,
           "description": "Boolean expression to filter rows from the table \"blocks_snark_jobs\". All fields are combined with a logical 'AND'.",
+          "fields": null
+        },
+        {
+          "inputFields": null,
+          "kind": "ENUM",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "blocks_snark_jobs_constraint",
+          "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "blocks_snark_jobs_block_id_snark_job_id_key",
+              "description": "unique or primary key constraint"
+            }
+          ],
+          "description": "unique or primary key constraints on table \"blocks_snark_jobs\"",
           "fields": null
         },
         {
@@ -3531,6 +3671,16 @@
                 }
               },
               "description": null
+            },
+            {
+              "name": "on_conflict",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_snark_jobs_on_conflict",
+                "ofType": null
+              },
+              "description": null
             }
           ],
           "kind": "INPUT_OBJECT",
@@ -3539,6 +3689,53 @@
           "name": "blocks_snark_jobs_obj_rel_insert_input",
           "enumValues": null,
           "description": "input type for inserting object relation for remote table \"blocks_snark_jobs\"",
+          "fields": null
+        },
+        {
+          "inputFields": [
+            {
+              "name": "constraint_",
+              "defaultValue": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "blocks_snark_jobs_constraint",
+                  "ofType": null
+                }
+              },
+              "description": null
+            },
+            {
+              "name": "update_columns",
+              "defaultValue": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "blocks_snark_jobs_update_column",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "blocks_snark_jobs_on_conflict",
+          "enumValues": null,
+          "description": "on conflict condition type for table \"blocks_snark_jobs\"",
           "fields": null
         },
         {
@@ -3644,6 +3841,29 @@
           "name": "blocks_snark_jobs_set_input",
           "enumValues": null,
           "description": "input type for updating data in table \"blocks_snark_jobs\"",
+          "fields": null
+        },
+        {
+          "inputFields": null,
+          "kind": "ENUM",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "blocks_snark_jobs_update_column",
+          "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_id",
+              "description": "column name"
+            },
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "snark_job_id",
+              "description": "column name"
+            }
+          ],
+          "description": "update columns of table \"blocks_snark_jobs\"",
           "fields": null
         },
         {
@@ -3839,6 +4059,16 @@
                 }
               },
               "description": null
+            },
+            {
+              "name": "on_conflict",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_user_commands_on_conflict",
+                "ofType": null
+              },
+              "description": null
             }
           ],
           "kind": "INPUT_OBJECT",
@@ -3956,6 +4186,23 @@
           "name": "blocks_user_commands_bool_exp",
           "enumValues": null,
           "description": "Boolean expression to filter rows from the table \"blocks_user_commands\". All fields are combined with a logical 'AND'.",
+          "fields": null
+        },
+        {
+          "inputFields": null,
+          "kind": "ENUM",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "blocks_user_commands_constraint",
+          "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "blocks_user_commands_block_id_user_command_id_receipt_chain_has",
+              "description": "unique or primary key constraint"
+            }
+          ],
+          "description": "unique or primary key constraints on table \"blocks_user_commands\"",
           "fields": null
         },
         {
@@ -4136,6 +4383,16 @@
                 }
               },
               "description": null
+            },
+            {
+              "name": "on_conflict",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_user_commands_on_conflict",
+                "ofType": null
+              },
+              "description": null
             }
           ],
           "kind": "INPUT_OBJECT",
@@ -4144,6 +4401,53 @@
           "name": "blocks_user_commands_obj_rel_insert_input",
           "enumValues": null,
           "description": "input type for inserting object relation for remote table \"blocks_user_commands\"",
+          "fields": null
+        },
+        {
+          "inputFields": [
+            {
+              "name": "constraint_",
+              "defaultValue": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "blocks_user_commands_constraint",
+                  "ofType": null
+                }
+              },
+              "description": null
+            },
+            {
+              "name": "update_columns",
+              "defaultValue": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "blocks_user_commands_update_column",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "blocks_user_commands_on_conflict",
+          "enumValues": null,
+          "description": "on conflict condition type for table \"blocks_user_commands\"",
           "fields": null
         },
         {
@@ -4285,6 +4589,35 @@
           "name": "blocks_user_commands_set_input",
           "enumValues": null,
           "description": "input type for updating data in table \"blocks_user_commands\"",
+          "fields": null
+        },
+        {
+          "inputFields": null,
+          "kind": "ENUM",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "blocks_user_commands_update_column",
+          "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_id",
+              "description": "column name"
+            },
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "receipt_chain_hash_id",
+              "description": "column name"
+            },
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "user_command_id",
+              "description": "column name"
+            }
+          ],
+          "description": "update columns of table \"blocks_user_commands\"",
           "fields": null
         },
         {
@@ -4669,6 +5002,12 @@
           "interfaces": null,
           "name": "fee_transfers_constraint",
           "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee_transfers_hash_key",
+              "description": "unique or primary key constraint"
+            },
             {
               "isDeprecated": false,
               "deprecationReason": null,
@@ -5422,6 +5761,16 @@
                     }
                   },
                   "description": "the rows to be inserted"
+                },
+                {
+                  "name": "on_conflict",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "blocks_fee_transfers_on_conflict",
+                    "ofType": null
+                  },
+                  "description": "on conflict condition"
                 }
               ],
               "isDeprecated": false,
@@ -5457,6 +5806,16 @@
                     }
                   },
                   "description": "the rows to be inserted"
+                },
+                {
+                  "name": "on_conflict",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "blocks_snark_jobs_on_conflict",
+                    "ofType": null
+                  },
+                  "description": "on conflict condition"
                 }
               ],
               "isDeprecated": false,
@@ -5492,6 +5851,16 @@
                     }
                   },
                   "description": "the rows to be inserted"
+                },
+                {
+                  "name": "on_conflict",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "blocks_user_commands_on_conflict",
+                    "ofType": null
+                  },
+                  "description": "on conflict condition"
                 }
               ],
               "isDeprecated": false,
@@ -6761,6 +7130,12 @@
               "isDeprecated": false,
               "deprecationReason": null,
               "name": "public_keys_pkey",
+              "description": "unique or primary key constraint"
+            },
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "public_keys_value_key",
               "description": "unique or primary key constraint"
             }
           ],
@@ -8456,6 +8831,12 @@
             {
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "receipt_chain_hashes_hash_key",
+              "description": "unique or primary key constraint"
+            },
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "receipt_chain_hashes_pkey",
               "description": "unique or primary key constraint"
             }
@@ -9145,6 +9526,12 @@
           "interfaces": null,
           "name": "snark_jobs_constraint",
           "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "snark_jobs_job1_job2_key",
+              "description": "unique or primary key constraint"
+            },
             {
               "isDeprecated": false,
               "deprecationReason": null,
@@ -11226,6 +11613,12 @@
           "interfaces": null,
           "name": "user_commands_constraint",
           "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "user_commands_hash_key",
+              "description": "unique or primary key constraint"
+            },
             {
               "isDeprecated": false,
               "deprecationReason": null,

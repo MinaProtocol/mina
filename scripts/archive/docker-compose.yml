@@ -22,17 +22,21 @@ services:
     depends_on:
     - "postgres"
     restart: always
+  ocaml-builder:
+    build: .
+    volumes:
+      - ./ocaml:/home/opam/opam-repository/archive-ocaml-script
+      - ./_build:/home/opam/opam-repository/_build
   configuration:
-    image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+    image: python:3.7-stretch
     network_mode: host
-    # command: "pwd"
-    # command: ["/bin/sh", "/make_hasura_configurations.sh"]
-    command: ["python", "--version"]
+    command: ["/bin/sh", "/make_hasura_configurations.sh"]
     depends_on:
     - "hasura"
+    - "ocaml-builder"
     volumes:
       - ./metadata.json:/metadata.json
       - ./make_hasura_configurations.sh:/make_hasura_configurations.sh
       - ../introspection_query.py:/introspection_query.py
       - ./output:/output
-      - ./ocaml:/home/opam/opam-repository/archive-ocaml-script
+      - ./_build:/_build
