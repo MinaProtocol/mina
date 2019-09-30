@@ -37,6 +37,17 @@ let with_check = false
 [%%endif]
 
 [%%if
+curve_size = 753]
+
+let medium_curves = true
+
+[%%else]
+
+let medium_curves = false
+
+[%%endif]
+
+[%%if
 time_offsets = true]
 
 let setup_time_offsets () =
@@ -410,11 +421,16 @@ let run_test () : unit Deferred.t =
                ( Genesis_ledger.keypair_of_account_record_exn (sk, account)
                , account ) )
       in
+      let timeout_mins =
+        if (with_snark || with_check) && medium_curves then 90.
+        else if with_snark then 15.
+        else 7.
+      in
       let%map () =
         if with_snark then
           let accounts = List.take other_accounts 2 in
           let%bind blockchain_length' =
-            test_multiple_payments accounts ~txn_count:2 120.
+            test_multiple_payments accounts ~txn_count:2 timeout_mins
           in
           (*wait for a block after the ledger_proof is emitted*)
           let%map () =
@@ -431,14 +447,14 @@ let run_test () : unit Deferred.t =
           let%map _ =
             test_multiple_payments other_accounts
               ~txn_count:(List.length other_accounts / 2)
-              7.
+              timeout_mins
           in
           ()
         else
           let%bind _ =
             test_multiple_payments other_accounts
               ~txn_count:(List.length other_accounts)
-              7.
+              timeout_mins
           in
           test_duplicate_payments sender_keypair receiver_keypair
       in

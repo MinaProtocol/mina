@@ -2,8 +2,6 @@ open Core_kernel
 open Coda_numbers
 open Async
 open Currency
-open Fold_lib
-open Tuple_lib
 open Signature_lib
 open Coda_base
 
@@ -379,13 +377,12 @@ module type S = sig
 
       val length_in_triples : int
 
-      val var_to_triples :
-           var
-        -> ( Snark_params.Tick.Boolean.var Triple.t list
-           , _ )
-           Snark_params.Tick.Checked.t
+      open Snark_params.Tick
 
-      val fold : Value.t -> bool Triple.t Fold.t
+      val var_to_input :
+        var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+
+      val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
       val blockchain_length : Value.t -> Length.t
 
