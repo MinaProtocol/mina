@@ -22,16 +22,16 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
       List.map user_commands_with_hashes_and_times
         ~f:(fun ({With_hash.hash; _}, _) -> hash)
     in
-    let hashes_to_first_seen_graphql =
-      Graphql_query.User_commands.Query_first_seen.make
-        ~hashes:
-          ( List.map user_command_hashes ~f:Transaction_hash.to_base58_check
-          |> Array.of_list )
-        ()
-    in
     let%bind queried_existing_user_commands =
       let open Deferred.Or_error.Let_syntax in
-      let%map obj = Client.query_or_error hashes_to_first_seen_graphql port in
+      let graphql =
+        Graphql_query.User_commands.Query_first_seen.make
+          ~hashes:
+            ( List.map user_command_hashes ~f:Transaction_hash.to_base58_check
+            |> Array.of_list )
+          ()
+      in
+      let%map obj = Client.query_or_error graphql port in
       let list =
         Array.map obj#user_commands ~f:(fun obj -> (obj#hash, obj#first_seen))
         |> Array.to_list
@@ -154,7 +154,7 @@ let%test_module "Processor" =
               in
               let min_block_time = Block_time.min block_time0 block_time1 in
               let max_block_time = Block_time.max block_time0 block_time1 in
-              let deferred = Processor.run t reader in
+              let processing_deferred_job = Processor.run t reader in
               Strict_pipe.Writer.write writer
                 (Transaction_pool
                    { Diff.Transaction_pool.added=
@@ -169,7 +169,7 @@ let%test_module "Processor" =
                          [(user_command1, max_block_time)]
                    ; removed= User_command.Set.empty }) ;
               Strict_pipe.Writer.close writer ;
-              let%bind () = deferred in
+              let%bind () = processing_deferred_job in
               let%bind public_keys =
                 Processor.Client.query
                   (Graphql_query.Public_key.Query.make ())
@@ -178,7 +178,8 @@ let%test_module "Processor" =
               let queried_public_keys =
                 Array.map public_keys#public_keys ~f:(fun obj -> obj#value)
               in
-              assert (Array.length queried_public_keys = n_keys) ;
+              [%test_result: Int.t] ~equal:Int.equal 
+              ~expect:n_keys (Array.length queried_public_keys) ;
               let queried_public_keys =
                 Public_key.Compressed.Set.of_array queried_public_keys
               in
