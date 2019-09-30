@@ -2,23 +2,32 @@ open Signature_lib
 open Coda_base
 open Core
 
-let deserialize_optional_block_time =
-  Option.map
-    ~f:(Fn.compose Types.Block_time.deserialize Types.Bitstring.of_yojson)
+let deserialize_optional_block_time = Option.map ~f:Types.Bitstring.of_yojson
 
 module User_commands = struct
-  let bitstring_block_time = Option.map ~f:Types.Bitstring.of_yojson
+  let decode_optional_block_time = Option.map ~f:Types.Block_time.deserialize
+
+  module Query_first_seen =
+  [%graphql
+  {|
+    query query_first_seen ($hashes: [String!]!) {
+        user_commands(where: {hash: {_in: $hashes}} ) {
+            hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
+            first_seen @bsDecoder(fn: "decode_optional_block_time")
+        }
+    }
+|}]
 
   (* TODO: replace this with pagination *)
   module Query =
   [%graphql
   {|
-    query query ($hash: String!) {
+    query query_user_commands ($hash: String!) {
         user_commands(where: {hash: {_eq: $hash}} ) {
-            fee @bsDecoder (fn: "Types.Bitstring.of_yojson")
-            hash
-            memo
-            nonce @bsDecoder (fn: "Types.Bitstring.of_yojson")
+            fee @bsDecoder (fn: "Types.Fee.deserialize")
+            hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
+            memo @bsDecoder(fn: "User_command_memo.of_string")
+            nonce @bsDecoder (fn: "Types.Nonce.deserialize")
             public_key {
                 value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
             }
@@ -26,8 +35,8 @@ module User_commands = struct
               value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
             } 
             typ @bsDecoder (fn: "Types.User_command_type.decode")
-            amount @bsDecoder (fn: "Types.Bitstring.of_yojson")
-            first_seen @bsDecoder(fn: "bitstring_block_time")
+            amount @bsDecoder (fn: "Types.Amount.deserialize")
+            first_seen @bsDecoder(fn: "decode_optional_block_time")
         }
     }
 |}]
@@ -37,7 +46,7 @@ module User_commands = struct
   {|
     mutation transaction_insert($user_commands: [user_commands_insert_input!]!) {
     insert_user_commands(objects: $user_commands,
-    on_conflict: {constraint: user_commands_pkey, update_columns: first_seen}
+    on_conflict: {constraint: user_commands_hash_key, update_columns: first_seen}
     ) {
       returning {
         id
@@ -46,6 +55,18 @@ module User_commands = struct
       }
     }
   }
+|}]
+end
+
+module Public_key = struct
+  module Query =
+  [%graphql
+  {|
+    query query_public_keys {
+        public_keys {
+            value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
+        }
+    }
 |}]
 end
 

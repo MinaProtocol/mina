@@ -5,7 +5,7 @@ open Tuple_lib
 open Fold_lib
 
 module Time : sig
-  type t [@@deriving sexp, eq, yojson]
+  type t [@@deriving sexp, yojson, compare]
 
   type t0 = t
 
@@ -77,15 +77,7 @@ module Time : sig
     val min : t -> t -> t
   end
 
-  val ( < ) : t -> t -> bool
-
-  val ( > ) : t -> t -> bool
-
-  val ( = ) : t -> t -> bool
-
-  val ( <= ) : t -> t -> bool
-
-  val ( >= ) : t -> t -> bool
+  include Comparable.S with type t := t
 
   val field_var_to_unpacked :
     Tick.Field.Var.t -> (Unpacked.var, _) Tick.Checked.t
@@ -120,6 +112,8 @@ module Time : sig
   val to_string : t -> string
 
   val of_string_exn : string -> t
+
+  val gen_incl : t -> t -> t Quickcheck.Generator.t
 
   val gen : t Quickcheck.Generator.t
 end

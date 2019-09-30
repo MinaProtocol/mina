@@ -69,7 +69,7 @@ module Time = struct
   end
 
   (* DO NOT add bin_io the deriving list *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   type t0 = t
 
@@ -139,15 +139,7 @@ module Time = struct
     let min = UInt64.min
   end
 
-  let ( < ) = UInt64.( < )
-
-  let ( > ) = UInt64.( > )
-
-  let ( = ) = UInt64.( = )
-
-  let ( <= ) = UInt64.( <= )
-
-  let ( >= ) = UInt64.( >= )
+  include Comparable.Make (Stable.Latest)
 
   let of_time t =
     UInt64.of_int64
@@ -201,6 +193,15 @@ module Time = struct
 
   let of_string_exn string =
     Int64.of_string string |> Span.of_ms |> of_span_since_epoch
+
+  let gen_incl time_beginning time_end =
+    let open Quickcheck.Let_syntax in
+    let time_beginning_int64 = to_int64 time_beginning in
+    let time_end_int64 = to_int64 time_end in
+    let%map int64_time_span =
+      Int64.(gen_incl time_beginning_int64 time_end_int64)
+    in
+    of_span_since_epoch @@ Span.of_ms int64_time_span
 
   let gen =
     let open Quickcheck.Let_syntax in

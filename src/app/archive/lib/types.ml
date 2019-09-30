@@ -125,12 +125,28 @@ module User_command_type = struct
         raise (Invalid_argument "Unexpected input to decode user command type")
 end
 
+module Make_Bitstring_converters (Bit : Binary_intf) = struct
+  open Bitstring
+
+  let serialize amount = to_yojson @@ to_bitstring (module Bit) amount
+
+  let deserialize yojson = of_bitstring (module Bit) @@ of_yojson yojson
+end
+
+module Fee = Make_Bitstring_converters (Currency.Fee)
+module Amount = Make_Bitstring_converters (Currency.Amount)
+module Nonce = Make_Bitstring_converters (Account.Nonce)
+
 module Block_time = struct
   let serialize value =
-    Bitstring.of_numeric (module Int64) @@ Block_time.to_int64 value
+    Bitstring.to_yojson
+    @@ Bitstring.of_numeric (module Int64)
+    @@ Block_time.to_int64 value
 
   let deserialize value =
-    Block_time.of_int64 @@ Bitstring.to_numeric (module Int64) value
+    Block_time.of_int64
+    @@ Bitstring.to_numeric (module Int64)
+    @@ Bitstring.of_yojson value
 end
 
 module User_command = struct
@@ -159,9 +175,9 @@ module User_command = struct
       method on_conflict =
         Option.some
         @@ object
-             method constraint_ = `public_keys_pkey
+             method constraint_ = `public_keys_value_key
 
-             method update_columns = Array.of_list []
+             method update_columns = Array.of_list [`value]
            end
     end
 
@@ -175,38 +191,30 @@ module User_command = struct
       Public_key.Compressed.to_base58_check @@ receiver user_command
     in
     let open Option in
-    let open Bitstring in
     object
       method hash = some @@ Transaction_hash.to_base58_check hash
 
       method blocks_user_commands = None
 
       method amount =
-        some @@ to_yojson
-        @@ to_bitstring
-             (module Currency.Amount)
+        some
+        @@ Amount.serialize
              ( match body with
              | Payment payment ->
                  payment.amount
              | Stake_delegation _ ->
                  Currency.Amount.zero )
 
-      method fee =
-        some @@ Bitstring.to_yojson
-        @@ to_bitstring (module Currency.Fee) (User_command.fee user_command)
+      method fee = some @@ Fee.serialize (User_command.fee user_command)
 
-      method first_seen =
-        Option.map first_seen
-          ~f:(Fn.compose Bitstring.to_yojson Block_time.serialize)
+      method first_seen = Option.map first_seen ~f:Block_time.serialize
 
       method memo =
         some @@ User_command_memo.to_string
         @@ User_command_payload.memo payload
 
       method nonce =
-        some @@ Bitstring.to_yojson
-        @@ to_bitstring (module Coda_numbers.Account_nonce)
-        @@ User_command_payload.nonce payload
+        some @@ Nonce.serialize @@ User_command_payload.nonce payload
 
       method public_key = some @@ create_public_key_obj sender
 
@@ -235,18 +243,12 @@ module User_command = struct
       | `Delegation ->
           Stake_delegation (Set_delegate {new_delegate= receiver})
       | `Payment ->
-          Payment
-            { receiver
-            ; amount=
-                Bitstring.of_bitstring (module Currency.Amount) obj#amount }
+          Payment {receiver; amount= obj#amount}
     in
     let payload =
-      User_command_payload.create
-        ~fee:(Bitstring.of_bitstring (module Currency.Fee) obj#fee)
-        ~nonce:
-          (Bitstring.of_bitstring (module Coda_numbers.Account_nonce) obj#nonce)
-        ~memo:(User_command_memo.of_string obj#memo)
+      User_command_payload.create ~fee:obj#fee ~nonce:obj#nonce ~memo:obj#memo
         ~body
     in
-    Coda_base.{User_command.Poly.Stable.V1.payload; sender; signature= ()}
+    ( Coda_base.{User_command.Poly.Stable.V1.payload; sender; signature= ()}
+    , obj#first_seen )
 end
