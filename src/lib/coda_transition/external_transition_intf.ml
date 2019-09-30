@@ -188,7 +188,7 @@ module type S = sig
          , 'delta_boundary )
          with_transition
 
-    val reset_delta_transition_chain_validation_part2 :
+    val reset_delta_boundary_validation :
          ( 'time_received
          , 'proof
          , 'delta_merkle_list
@@ -254,6 +254,8 @@ module type S = sig
       external_transition -> [`I_swear_this_is_safe_see_my_comment of t]
 
     include External_transition_base_intf with type t := t
+
+    val degenerate_to_initial_validated : t -> Initial_validated.t
   end
 
   val create :
@@ -318,7 +320,7 @@ module type S = sig
        , 'delta_boundary )
        Validation.with_transition
 
-  val skip_delta_transition_chain_validation_part1 :
+  val skip_delta_merkle_list_validation :
        [`This_transition_was_not_received_via_gossip]
     -> ( 'time_received
        , 'proof
@@ -335,7 +337,7 @@ module type S = sig
        , 'delta_boundary )
        Validation.with_transition
 
-  val skip_delta_transition_chain_validation_part2 :
+  val skip_delta_boundary_validation :
        [`This_transition_was_not_received_via_gossip]
     -> ( 'time_received
        , 'proof

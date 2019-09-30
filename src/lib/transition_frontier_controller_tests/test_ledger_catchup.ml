@@ -124,12 +124,7 @@ let%test_module "Ledger catchup" =
             let transition =
               Transition_frontier.Breadcrumb.validated_transition
                 best_breadcrumb
-              |> External_transition.Validation
-                 .reset_frontier_dependencies_validation
-              |> External_transition.Validation
-                 .reset_delta_transition_chain_validation_part2
-              |> External_transition.Validation
-                 .reset_staged_ledger_diff_validation
+              |> External_transition.Validated.degenerate_to_initial_validated
             in
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
@@ -165,12 +160,7 @@ let%test_module "Ledger catchup" =
           let best_transition_enveloped =
             let transition =
               best_transition
-              |> External_transition.Validation
-                 .reset_frontier_dependencies_validation
-              |> External_transition.Validation
-                 .reset_delta_transition_chain_validation_part2
-              |> External_transition.Validation
-                 .reset_staged_ledger_diff_validation
+              |> External_transition.Validated.degenerate_to_initial_validated
             in
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
@@ -215,12 +205,8 @@ let%test_module "Ledger catchup" =
             test_catchup ~logger ~pids ~trust_system ~network me
               (let transition =
                  best_transition
-                 |> External_transition.Validation
-                    .reset_frontier_dependencies_validation
-                 |> External_transition.Validation
-                    .reset_delta_transition_chain_validation_part2
-                 |> External_transition.Validation
-                    .reset_staged_ledger_diff_validation
+                 |> External_transition.Validated
+                    .degenerate_to_initial_validated
                in
                Envelope.Incoming.wrap ~data:transition
                  ~sender:Envelope.Sender.Local)
@@ -269,12 +255,8 @@ let%test_module "Ledger catchup" =
               unprocessed_transition_cache
               (let transition =
                  best_transition
-                 |> External_transition.Validation
-                    .reset_frontier_dependencies_validation
-                 |> External_transition.Validation
-                    .reset_delta_transition_chain_validation_part2
-                 |> External_transition.Validation
-                    .reset_staged_ledger_diff_validation
+                 |> External_transition.Validated
+                    .degenerate_to_initial_validated
                in
                Envelope.Incoming.wrap ~data:transition
                  ~sender:Envelope.Sender.Local)
@@ -290,12 +272,8 @@ let%test_module "Ledger catchup" =
               unprocessed_transition_cache
               (let transition =
                  failing_transition
-                 |> External_transition.Validation
-                    .reset_frontier_dependencies_validation
-                 |> External_transition.Validation
-                    .reset_delta_transition_chain_validation_part2
-                 |> External_transition.Validation
-                    .reset_staged_ledger_diff_validation
+                 |> External_transition.Validated
+                    .degenerate_to_initial_validated
                in
                Envelope.Incoming.wrap ~data:transition
                  ~sender:Envelope.Sender.Local)
@@ -360,12 +338,8 @@ let%test_module "Ledger catchup" =
             List.map missing_transitions ~f:(fun transition ->
                 let transition =
                   transition
-                  |> External_transition.Validation
-                     .reset_frontier_dependencies_validation
-                  |> External_transition.Validation
-                     .reset_delta_transition_chain_validation_part2
-                  |> External_transition.Validation
-                     .reset_staged_ledger_diff_validation
+                  |> External_transition.Validated
+                     .degenerate_to_initial_validated
                 in
                 Envelope.Incoming.wrap ~data:transition
                   ~sender:Envelope.Sender.Local

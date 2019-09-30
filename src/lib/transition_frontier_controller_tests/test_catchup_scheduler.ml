@@ -113,12 +113,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             let transition =
               Transition_frontier.Breadcrumb.validated_transition
                 dangling_breadcrumb
-              |> External_transition.Validation
-                 .reset_frontier_dependencies_validation
-              |> External_transition.Validation
-                 .reset_delta_transition_chain_validation_part2
-              |> External_transition.Validation
-                 .reset_staged_ledger_diff_validation
+              |> External_transition.Validated.degenerate_to_initial_validated
             in
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
@@ -185,12 +180,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             List.map dangling_transitions ~f:(fun transition ->
                 let transition =
                   transition
-                  |> External_transition.Validation
-                     .reset_frontier_dependencies_validation
-                  |> External_transition.Validation
-                     .reset_delta_transition_chain_validation_part2
-                  |> External_transition.Validation
-                     .reset_staged_ledger_diff_validation
+                  |> External_transition.Validated
+                     .degenerate_to_initial_validated
                 in
                 Envelope.Incoming.wrap ~data:transition
                   ~sender:Envelope.Sender.Local
@@ -223,12 +214,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                     (let transition =
                        Transition_frontier.Breadcrumb.validated_transition
                          missing_breadcrumb
-                       |> External_transition.Validation
-                          .reset_frontier_dependencies_validation
-                       |> External_transition.Validation
-                          .reset_delta_transition_chain_validation_part2
-                       |> External_transition.Validation
-                          .reset_staged_ledger_diff_validation
+                       |> External_transition.Validated
+                          .degenerate_to_initial_validated
                      in
                      Envelope.Incoming.wrap ~data:transition
                        ~sender:Envelope.Sender.Local)
@@ -293,12 +280,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             List.map dangling_transitions ~f:(fun transition ->
                 let transition =
                   transition
-                  |> External_transition.Validation
-                     .reset_frontier_dependencies_validation
-                  |> External_transition.Validation
-                     .reset_delta_transition_chain_validation_part2
-                  |> External_transition.Validation
-                     .reset_staged_ledger_diff_validation
+                  |> External_transition.Validated
+                     .degenerate_to_initial_validated
                 in
                 Envelope.Incoming.wrap ~data:transition
                   ~sender:Envelope.Sender.Local
@@ -328,12 +311,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                     (let transition =
                        Transition_frontier.Breadcrumb.validated_transition
                          missing_breadcrumb
-                       |> External_transition.Validation
-                          .reset_frontier_dependencies_validation
-                       |> External_transition.Validation
-                          .reset_delta_transition_chain_validation_part2
-                       |> External_transition.Validation
-                          .reset_staged_ledger_diff_validation
+                       |> External_transition.Validated
+                          .degenerate_to_initial_validated
                      in
                      Envelope.Incoming.wrap ~data:transition
                        ~sender:Envelope.Sender.Local)

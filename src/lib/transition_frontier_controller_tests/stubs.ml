@@ -747,11 +747,7 @@ struct
           |> Transition_frontier.Breadcrumb.validated_transition
         in
         validated_transition
-        |> External_transition.Validation
-           .reset_frontier_dependencies_validation
-        |> External_transition.Validation
-           .reset_delta_transition_chain_validation_part2
-        |> External_transition.Validation.reset_staged_ledger_diff_validation
+        |> External_transition.Validated.degenerate_to_initial_validated
       in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:

@@ -380,10 +380,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         |> External_transition.skip_proof_validation
                              `This_transition_was_generated_internally
                         |> External_transition
-                           .skip_delta_transition_chain_validation_part1
+                           .skip_delta_merkle_list_validation
                              `This_transition_was_not_received_via_gossip
-                        |> External_transition
-                           .skip_delta_transition_chain_validation_part2
+                        |> External_transition.skip_delta_boundary_validation
                              `This_transition_was_not_received_via_gossip
                         |> Transition_frontier_validation
                            .validate_frontier_dependencies ~logger ~frontier

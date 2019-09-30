@@ -86,7 +86,7 @@ module Make (Inputs : Inputs_intf) :
            `This_transition_was_not_received_via_gossip
       |> validate_proof ~verifier
       >>= Fn.compose Deferred.Result.return
-            (skip_delta_transition_chain_validation_part1
+            (skip_delta_merkle_list_validation
                `This_transition_was_not_received_via_gossip)
       |> Deferred.map
            ~f:

@@ -273,8 +273,7 @@ module Validation = struct
     | _ ->
         failwith "why can't this be refuted?"
 
-  let reset_delta_transition_chain_validation_part2
-      (transition_with_hash, validation) =
+  let reset_delta_boundary_validation (transition_with_hash, validation) =
     match validation with
     | ( time_received
       , proof
@@ -522,7 +521,7 @@ let skip_proof_validation `This_transition_was_generated_internally
     (t, validation) =
   (t, Validation.Unsafe.set_valid_proof validation)
 
-let skip_delta_transition_chain_validation_part1
+let skip_delta_merkle_list_validation
     `This_transition_was_not_received_via_gossip (t, validation) =
   let previous_protocol_state_hash = With_hash.data t |> parent_hash in
   ( t
@@ -570,8 +569,8 @@ let skip_staged_ledger_diff_validation
     `This_transition_has_a_trusted_staged_ledger (t, validation) =
   (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
 
-let skip_delta_transition_chain_validation_part2
-    `This_transition_was_not_received_via_gossip (t, validation) =
+let skip_delta_boundary_validation `This_transition_was_not_received_via_gossip
+    (t, validation) =
   (t, Validation.Unsafe.set_valid_delta_boundary validation)
 
 module With_validation = struct
@@ -695,13 +694,13 @@ module Validated = struct
             |> skip_time_received_validation
                  `This_transition_was_not_received_via_gossip
             |> skip_proof_validation `This_transition_was_generated_internally
-            |> skip_delta_transition_chain_validation_part1
+            |> skip_delta_merkle_list_validation
                  `This_transition_was_not_received_via_gossip
             |> skip_frontier_dependencies_validation
                  `This_transition_belongs_to_a_detached_subtree
             |> skip_staged_ledger_diff_validation
                  `This_transition_has_a_trusted_staged_ledger
-            |> skip_delta_transition_chain_validation_part2
+            |> skip_delta_boundary_validation
                  `This_transition_was_not_received_via_gossip )
 
         include With_validation
@@ -747,6 +746,11 @@ module Validated = struct
     , global_slot )]
 
   include Comparable.Make (Stable.Latest)
+
+  let degenerate_to_initial_validated t =
+    t |> Validation.reset_frontier_dependencies_validation
+    |> Validation.reset_delta_boundary_validation
+    |> Validation.reset_staged_ledger_diff_validation
 end
 
 module Transition_frontier_validation (Transition_frontier : sig

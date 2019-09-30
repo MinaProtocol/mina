@@ -334,11 +334,7 @@ end = struct
       in
       let initial_root_transition =
         initial_transition
-        |> External_transition.Validation
-           .reset_frontier_dependencies_validation
-        |> External_transition.Validation
-           .reset_delta_transition_chain_validation_part2
-        |> External_transition.Validation.reset_staged_ledger_diff_validation
+        |> External_transition.Validated.degenerate_to_initial_validated
       in
       let t =
         { network
@@ -399,7 +395,7 @@ end = struct
                  received_staged_ledger_hash)
           |> Result.map_error ~f:(fun _ ->
                  Error.of_string "received faulty scan state from peer" )
-          >>| External_transition.skip_delta_transition_chain_validation_part2
+          >>| External_transition.skip_delta_boundary_validation
                 `This_transition_was_not_received_via_gossip
           |> Deferred.return
         in
@@ -544,11 +540,7 @@ end = struct
     let make_bootstrap ~logger ~trust_system ~verifier ~genesis_root ~network =
       let transition =
         genesis_root
-        |> External_transition.Validation
-           .reset_frontier_dependencies_validation
-        |> External_transition.Validation
-           .reset_delta_transition_chain_validation_part2
-        |> External_transition.Validation.reset_staged_ledger_diff_validation
+        |> External_transition.Validated.degenerate_to_initial_validated
       in
       { logger
       ; trust_system

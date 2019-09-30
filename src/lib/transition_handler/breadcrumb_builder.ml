@@ -79,8 +79,7 @@ module Make (Inputs : Inputs.S) :
                     (* TODO: at this point we has no way to verify this *)
                     (* since we are building a disconnected subtree of breadcrumbs,
                      * we skip this step in validation *)
-                    |> External_transition
-                       .skip_delta_transition_chain_validation_part2
+                    |> External_transition.skip_delta_boundary_validation
                          `This_transition_was_not_received_via_gossip
                   in
                   let sender = Envelope.Incoming.sender enveloped_transition in
