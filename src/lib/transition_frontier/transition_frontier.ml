@@ -373,6 +373,9 @@ struct
   let find_in_root_history t hash =
     Extensions.Root_history.lookup t.extensions.root_history hash
 
+  let find_in_frontier_or_root_history t hash =
+    Option.merge (find t hash) (find_in_root_history t hash) ~f:Fn.const
+
   let path_search t state_hash ~find ~f =
     let open Option.Let_syntax in
     let rec go state_hash =

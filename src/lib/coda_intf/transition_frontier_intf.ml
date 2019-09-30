@@ -370,6 +370,9 @@ module type Transition_frontier_intf = sig
 
   val find_in_root_history : t -> State_hash.t -> Breadcrumb.t option
 
+  val find_in_frontier_or_root_history :
+    t -> State_hash.t -> Breadcrumb.t option
+
   val root_history_path_map :
     t -> State_hash.t -> f:(Breadcrumb.t -> 'a) -> 'a Non_empty_list.t option
 

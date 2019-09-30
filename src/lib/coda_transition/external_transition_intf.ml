@@ -417,7 +417,8 @@ module type S = sig
 
     val find : t -> State_hash.t -> Breadcrumb.t option
 
-    val find_in_root_history : t -> State_hash.t -> Breadcrumb.t option
+    val find_in_frontier_or_root_history :
+      t -> State_hash.t -> Breadcrumb.t option
   end) : sig
     val validate_frontier_dependencies :
          ( 'time_received

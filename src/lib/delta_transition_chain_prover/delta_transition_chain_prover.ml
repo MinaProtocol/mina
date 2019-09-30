@@ -33,10 +33,8 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let open Option.Let_syntax in
         let%bind parent_breadcrumb =
-          Option.merge
-            (Transition_frontier.find frontier parent_hash)
-            (Transition_frontier.find_in_root_history frontier parent_hash)
-            ~f:Fn.const
+          Transition_frontier.find_in_frontier_or_root_history frontier
+            parent_hash
         in
         let current_global_slot =
           External_transition.Validated.consensus_state transition
@@ -53,10 +51,7 @@ module Make (Inputs : Inputs_intf) = struct
   let prove ~frontier ~global_slot state_hash =
     let open Option.Let_syntax in
     let%map requested_breadcrumb =
-      Option.merge
-        (Transition_frontier.find frontier state_hash)
-        (Transition_frontier.find_in_root_history frontier state_hash)
-        ~f:Fn.const
+      Transition_frontier.find_in_frontier_or_root_history frontier state_hash
     in
     let requested_transition =
       Transition_frontier.Breadcrumb.validated_transition requested_breadcrumb

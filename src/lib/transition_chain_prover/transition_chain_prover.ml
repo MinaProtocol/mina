@@ -29,10 +29,8 @@ module Make (Inputs : Inputs_intf) :
       in
       let open Option.Let_syntax in
       let%map breadcrumb =
-        Option.merge
-          (Transition_frontier.find context parent_hash)
-          (Transition_frontier.find_in_root_history context parent_hash)
-          ~f:Fn.const
+        Transition_frontier.find_in_frontier_or_root_history context
+          parent_hash
       in
       Transition_frontier.Breadcrumb.validated_transition breadcrumb
   end)
@@ -40,10 +38,7 @@ module Make (Inputs : Inputs_intf) :
   let prove ~frontier state_hash =
     let open Option.Let_syntax in
     let%map requested_breadcrumb =
-      Option.merge
-        (Transition_frontier.find frontier state_hash)
-        (Transition_frontier.find_in_root_history frontier state_hash)
-        ~f:Fn.const
+      Transition_frontier.find_in_frontier_or_root_history frontier state_hash
     in
     let requested_transition =
       Transition_frontier.Breadcrumb.validated_transition requested_breadcrumb

@@ -58,10 +58,7 @@ module Make (Inputs : Inputs_intf) :
       =
     let open Option.Let_syntax in
     let%map breadcrumb =
-      Option.merge
-        (Transition_frontier.find frontier state_hash)
-        (Transition_frontier.find_in_root_history frontier state_hash)
-        ~f:Fn.const
+      Transition_frontier.find_in_frontier_or_root_history frontier state_hash
     in
     let staged_ledger =
       Transition_frontier.Breadcrumb.staged_ledger breadcrumb
@@ -78,10 +75,7 @@ module Make (Inputs : Inputs_intf) :
   let get_transition_chain ~frontier hashes =
     Option.all
     @@ List.map hashes ~f:(fun hash ->
-           Option.merge
-             (Transition_frontier.find frontier hash)
-             (Transition_frontier.find_in_root_history frontier hash)
-             ~f:Fn.const
+           Transition_frontier.find_in_frontier_or_root_history frontier hash
            |> Option.map ~f:(fun breadcrumb ->
                   Transition_frontier.Breadcrumb.validated_transition
                     breadcrumb
