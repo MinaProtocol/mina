@@ -41,7 +41,11 @@ let make = (~wallet, ~onClose) => {
                      ~publicKey=Apollo.Encoders.publicKey(wallet),
                      (),
                    )##variables;
-                 mutation(~variables, ~refetchQueries=[|"getWallets"|], ())
+                 mutation(
+                   ~variables,
+                   ~refetchQueries=[|"getWallets", "walletLocked"|],
+                   (),
+                 )
                  |> ignore;
                  onClose();
                }}

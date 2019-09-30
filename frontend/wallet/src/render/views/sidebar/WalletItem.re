@@ -105,7 +105,11 @@ let make = (~wallet: Wallet.t) => {
              ReactEvent.Synthetic.stopPropagation(evt);
              isLocked
                ? setModalOpen(_ => true)
-               : lockWallet(~variables, ~refetchQueries=[|"getWallets"|], ())
+               : lockWallet(
+                   ~variables,
+                   ~refetchQueries=[|"getWallets", "walletLocked"|],
+                   (),
+                 )
                  |> ignore;
            }}
            className=Styles.lockIcon>
