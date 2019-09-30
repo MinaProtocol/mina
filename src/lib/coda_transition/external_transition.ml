@@ -527,22 +527,19 @@ module Validated = struct
     module V1 = struct
       module T = struct
         type t =
-          ( Stable.Latest.t
-          , State_hash.Stable.Latest.t )
-          With_hash.Stable.Latest.t
+          (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
           * ( [`Time_received]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t
-            , [`Proof]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t
+              * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
+            , [`Proof] * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
             , [`Delta_transition_chain]
-              * ( State_hash.Stable.Latest.t Non_empty_list.Stable.Latest.t
-                , Truth.True.Stable.Latest.t )
-                Truth.Stable.Latest.t
+              * ( State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
+                , Truth.True.Stable.V1.t )
+                Truth.Stable.V1.t
             , [`Frontier_dependencies]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t
+              * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
             , [`Staged_ledger_diff]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t )
-            Validation.Stable.Latest.t
+              * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t )
+            Validation.Stable.V1.t
         [@@deriving version]
 
         type erased =
