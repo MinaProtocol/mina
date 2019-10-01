@@ -77,8 +77,6 @@ module Time : sig
     val min : t -> t -> t
   end
 
-  include Comparable.S with type t := t
-
   val field_var_to_unpacked :
     Tick.Field.Var.t -> (Unpacked.var, _) Tick.Checked.t
 

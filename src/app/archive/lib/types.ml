@@ -160,6 +160,7 @@ end
 module Fee = Make_Bitstring_converters (Currency.Fee)
 module Amount = Make_Bitstring_converters (Currency.Amount)
 module Nonce = Make_Bitstring_converters (Account.Nonce)
+module Length = Make_Bitstring_converters (Coda_numbers.Length)
 
 module Block_time = struct
   let serialize value =
@@ -173,28 +174,36 @@ module Block_time = struct
     @@ Bitstring.of_yojson value
 end
 
-module User_command = struct
-  let receiver user_command =
-    match (User_command.payload user_command).body with
-    | Payment payment ->
-        payment.receiver
-    | Stake_delegation (Set_delegate delegation) ->
-        delegation.new_delegate
+let encode_as_insert_input ~constraint_name ~updated_column data =
+  object
+    method data = Array.of_list [data]
 
-  let create_public_key_obj public_key =
+    method on_conflict =
+      Option.some
+      @@ object
+           method constraint_ = constraint_name
+
+           method update_columns = Array.of_list [updated_column]
+         end
+  end
+
+module Public_key = struct
+  let encode public_key =
     object
-      method data =
-        object
-          method blocks = None
+      method blocks = None
 
-          method fee_transfers = None
+      method fee_transfers = None
 
-          method userCommandsByReceiver = None
+      method userCommandsByReceiver = None
 
-          method user_commands = None
+      method user_commands = None
 
-          method value = Some public_key
-        end
+      method value = Some public_key
+    end
+
+  let encode_as_insert_input public_key =
+    object
+      method data = encode public_key
 
       method on_conflict =
         Option.some
@@ -204,15 +213,26 @@ module User_command = struct
              method update_columns = Array.of_list [`value]
            end
     end
+end
+
+module User_command = struct
+  let receiver user_command =
+    match (User_command.payload user_command).body with
+    | Payment payment ->
+        payment.receiver
+    | Stake_delegation (Set_delegate delegation) ->
+        delegation.new_delegate
 
   let encode {With_hash.data= user_command; hash} first_seen =
     let payload = User_command.payload user_command in
     let body = payload.body in
     let sender =
-      Public_key.Compressed.to_base58_check @@ User_command.sender user_command
+      Signature_lib.Public_key.Compressed.to_base58_check
+      @@ User_command.sender user_command
     in
     let receiver =
-      Public_key.Compressed.to_base58_check @@ receiver user_command
+      Signature_lib.Public_key.Compressed.to_base58_check
+      @@ receiver user_command
     in
     let open Option in
     object
@@ -240,9 +260,10 @@ module User_command = struct
       method nonce =
         some @@ Nonce.serialize @@ User_command_payload.nonce payload
 
-      method public_key = some @@ create_public_key_obj sender
+      method public_key = some @@ Public_key.encode_as_insert_input sender
 
-      method publicKeyByReceiver = some @@ create_public_key_obj receiver
+      method publicKeyByReceiver =
+        some @@ Public_key.encode_as_insert_input receiver
 
       method sender = None
 
@@ -257,6 +278,11 @@ module User_command = struct
              | Stake_delegation _ ->
                  `Delegation )
     end
+
+  let encode_as_insert_input user_command_with_hash first_seen =
+    encode_as_insert_input ~constraint_name:`user_commands_hash_key
+      ~updated_column:`first_seen
+      (encode user_command_with_hash first_seen)
 
   let decode obj =
     let receiver = (obj#publicKeyByReceiver)#value in
@@ -278,67 +304,98 @@ module User_command = struct
 end
 
 module Fee_transfer = struct
-  type postgres =
-    { fee: Bitstring.t
-    ; first_seen: Bitstring.t option
-    ; hash: string
-    ; receiver: int }
-
-  let serialize {With_hash.data= fee_transfer; hash} receiver_id first_seen =
-    { first_seen= Option.map first_seen ~f:Block_time.serialize
-    ; hash= Transaction_hash.to_base58_check hash
-    ; receiver= receiver_id
-    ; fee= Bitstring.to_bitstring (module Currency.Fee) (snd fee_transfer) }
-
-  let to_graphql_obj {first_seen; hash; receiver; fee} =
+  let encode {With_hash.data: Fee_transfer.Single.t = (receiver, fee); hash}
+      first_seen =
     let open Option in
     object
-      method hash = some hash
+      method hash = some @@ Transaction_hash.to_base58_check hash
 
-      method fee = some @@ Bitstring.to_yojson fee
+      method fee = some @@ Fee.serialize fee
 
-      method first_seen = Option.map first_seen ~f:Bitstring.to_yojson
+      method first_seen = Option.map first_seen ~f:Block_time.serialize
 
       method public_key = None
 
-      method receiver = some receiver
+      method receiver = some @@ Public_key.encode_as_insert_input receiver
 
       method blocks_fee_transfers = None
     end
 
-  let encode fee_transfer_with_hash receiver block_time =
-    to_graphql_obj
-    @@ serialize fee_transfer_with_hash receiver (Some block_time)
+  let encode_as_insert_input fee_transfer_with_hash first_seen =
+    object
+      method data = encode fee_transfer_with_hash first_seen
+
+      method on_conflict =
+        Option.some
+        @@ object
+             method constraint_ = `user_commands_hash_key
+
+             method update_columns = Array.of_list [`first_seen]
+           end
+    end
 end
 
-(* module Blocks_user_commands = struct
-  type postgres = {
-    block_id: int;
-    user_command_id: int
-  }
+module Receipt_chain_hash = struct
+  let encode hash previous_hash =
+    let open Option in
+    object
+      (* May have to cut id *)
+      method blocks_user_commands = None
 
-  let serialize = Fn.id
+      method hash = some @@ Receipt.Chain_hash.to_bytes @@ hash
+
+      method parent_id = None
+
+      method receipt_chain_hash = None
+
+      (* TODO: check if this is correct *)
+      method receipt_chain_hashes =
+        some
+        @@ object
+             method data =
+               some
+               @@ object
+                    method blocks_user_commands = None
+
+                    method hash =
+                      some @@ Receipt.Chain_hash.to_bytes @@ previous_hash
+
+                    method parent_id = None
+
+                    method receipt_chain_hash = None
+
+                    method receipt_chain_hashes = None
+                  end
+
+             method on_conflict =
+               some
+               @@ object
+                    method constraint_ = `receipt_chain_hashes_hash_key
+
+                    method update_columns = Array.of_list [`hash]
+                  end
+           end
+      (* method receipt_chain_hash = object
+        method data = object
+          method blocks
+        end
+      end *)
+    end
+end
+
+(* module Snark_job = struct
+  let encode (snark_job_ids) =
+
 end *)
 
 module Blocks = struct
-  type postgres =
-    { state_hash: string
-    ; creator: int
-    ; parent_hash: string
-    ; ledger_hash: string
-    ; global_slot: int
-    ; ledger_proof_nonce: int
-    ; status: int (* Default is zero*)
-    ; block_length: Bitstring.t
-    ; block_time: Bitstring.t
-    ; user_commands: int list }
-
-  type graphql_output = {id: int; state_hash: State_hash.t}
-
   let serialize
       (With_hash.{hash; data= external_transition} :
-        (External_transition.t, State_hash.t) With_hash.t) user_commands
-      creator : postgres =
+        (External_transition.t, State_hash.t) With_hash.t)
+      (user_commands_with_hashes_and_time :
+        ( (Coda_base.User_command.t, Transaction_hash.t) With_hash.t
+        * Coda_base.Block_time.t option )
+        list) =
     let blockchain_state =
       External_transition.blockchain_state external_transition
     in
@@ -348,88 +405,85 @@ module Blocks = struct
     let global_slot =
       Consensus.Data.Consensus_state.global_slot consensus_state
     in
-    let block_length =
-      Consensus.Data.Consensus_state.blockchain_length consensus_state
-    in
-    let block_length =
-      Bitstring.to_bitstring (module Coda_numbers.Length) block_length
-    in
-    { state_hash= State_hash.to_base58_check hash
-    ; creator
-    ; parent_hash=
-        State_hash.to_base58_check
-        @@ External_transition.parent_hash external_transition
-    ; ledger_hash=
-        Ledger_hash.to_string @@ Staged_ledger_hash.ledger_hash
-        @@ Blockchain_state.staged_ledger_hash blockchain_state
-    ; global_slot
-    ; ledger_proof_nonce= 0
-    ; status= 0
-    ; block_length
-    ; block_time=
-        Block_time.serialize
-        @@ External_transition.timestamp external_transition
-    ; user_commands }
-
-  let to_graphql_obj
-      { state_hash
-      ; creator
-      ; parent_hash
-      ; ledger_hash
-      ; global_slot
-      ; ledger_proof_nonce
-      ; status
-      ; block_length
-      ; block_time
-      ; user_commands } =
+    (* let staged_ledger_diff = External_transition.staged_ledger_diff external_transition in
+    let snark_jobs =
+        List.map
+          (Staged_ledger_diff.completed_works staged_ledger_diff)
+          ~f:Transaction_snark_work.info
+    in *)
     let open Option in
     object
-      method state_hash = some state_hash
+      method state_hash = some @@ State_hash.to_base58_check hash
 
-      method creator = some creator
+      method creator = None
 
-      method parent_hash = some parent_hash
+      method public_key =
+        some @@ Public_key.encode_as_insert_input
+        @@ Signature_lib.Public_key.Compressed.to_base58_check
+        @@ External_transition.proposer external_transition
 
-      method ledger_hash = some ledger_hash
+      method parent_hash =
+        some @@ State_hash.to_base58_check
+        @@ External_transition.parent_hash external_transition
+
+      method ledger_hash =
+        some @@ Ledger_hash.to_string @@ Staged_ledger_hash.ledger_hash
+        @@ Blockchain_state.staged_ledger_hash blockchain_state
 
       method global_slot = some global_slot
 
-      method ledger_proof_nonce = some ledger_proof_nonce
+      method ledger_proof_nonce = some 0
 
-      method status = some status
+      method status = some 0
 
-      method block_length = some @@ Bitstring.to_yojson block_length
+      method block_length =
+        some @@ Length.serialize
+        @@ Consensus.Data.Consensus_state.blockchain_length consensus_state
 
-      method block_time = some @@ Bitstring.to_yojson block_time
+      method block_time =
+        some @@ Block_time.serialize
+        @@ External_transition.timestamp external_transition
 
       method blocks_fee_transfers = None
 
       method blocks_snark_jobs = None
 
+      (* some @@ User_command.encode_as_insert_input user_commands *)
       method blocks_user_commands =
-        some
-        @@ object
-             method data =
-               Array.map (Array.of_list user_commands)
-                 ~f:(fun user_command_id ->
+        object
+          method data =
+            Array.of_list
+            @@ List.map user_commands_with_hashes_and_time
+                 ~f:(fun (user_command_with_hash, first_seen) ->
                    object
+                     (* TODO: Might have to remove block *)
                      method block = None
 
                      method block_id = None
 
+                     (* TODO: fill in the receipt chain hash *)
                      method receipt_chain_hash = None
 
                      method receipt_chain_hash_id = None
 
-                     method user_command = None
+                     method user_command =
+                       some
+                       @@ User_command.encode_as_insert_input
+                            user_command_with_hash first_seen
 
-                     method user_command_id = some user_command_id
+                     method user_command_id = None
                    end )
-           end
 
-      method public_key = None
+          method on_conflict =
+            some
+            @@ object
+                 method constraint_ =
+                   `blocks_user_commands_block_id_user_command_id_receipt_chain_has
+
+                 method update_columns =
+                   Array.of_list
+                     [`block_id; `user_command_id; `receipt_chain_hash_id]
+               end
+        end
     end
-
-  let encode external_transition user_command_ids creator =
-    to_graphql_obj @@ serialize external_transition user_command_ids creator
 end

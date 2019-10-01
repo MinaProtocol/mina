@@ -60,6 +60,75 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
     let%map _result = Client.query_or_error graphql port in
     ()
 
+  let added_transition {port}
+      ({With_hash.data= block; _} as block_with_hash :
+        (External_transition.t, State_hash.t) With_hash.t)
+      (_sender_receipt_chains_from_parent_ledger :
+        Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
+    let open Deferred.Or_error.Let_syntax in
+    let transactions =
+      List.bind (External_transition.transactions block) ~f:(function
+        | User_command checked_user_command ->
+            [`User_command (User_command.forget_check checked_user_command)]
+        | Fee_transfer fee_transfer -> (
+          match fee_transfer with
+          | One fee_transfer ->
+              [`Fee_transfer fee_transfer]
+          | Two (fee_transfer1, fee_transfer2) ->
+              [`Fee_transfer fee_transfer1; `Fee_transfer fee_transfer2] )
+        | Coinbase _ ->
+            [] )
+    in
+    let user_commands, _fee_transfers =
+      List.fold transactions ~init:([], [])
+        ~f:(fun (acc_user_commands, acc_fee_transfers) -> function
+        | `User_command user_command ->
+            ( With_hash.of_data user_command
+                ~hash_data:Transaction_hash.hash_user_command
+              :: acc_user_commands
+            , acc_fee_transfers )
+        | `Fee_transfer fee_transfer ->
+            ( acc_user_commands
+            , With_hash.of_data fee_transfer
+                ~hash_data:Transaction_hash.hash_fee_transfer
+              :: acc_fee_transfers ) )
+    in
+    let%map first_seen_user_commands =
+      let user_command_hashes =
+        List.map user_commands
+          ~f:(Fn.compose Transaction_hash.to_base58_check With_hash.hash)
+      in
+      let graphql =
+        Graphql_query.User_commands.Query_first_seen.make
+          ~hashes:(Array.of_list user_command_hashes)
+          ()
+      in
+      let%map first_query_response =
+        let%map result = Client.query_or_error graphql port in
+        Array.to_list result#user_commands
+        |> List.map ~f:(fun obj -> (obj#hash, obj#first_seen))
+      in
+      Transaction_hash.Map.of_alist_exn first_query_response
+    in
+    let block_time =
+      Blockchain_state.timestamp @@ External_transition.blockchain_state block
+    in
+    let user_commands_with_time =
+      List.map user_commands
+        ~f:(fun ({With_hash.hash; _} as user_command_with_hash) ->
+          let first_seen_in_db =
+            Option.join @@ Map.find first_seen_user_commands hash
+          in
+          ( user_command_with_hash
+          , Option.value_map first_seen_in_db ~default:(Some block_time)
+              ~f:Option.some ) )
+    in
+    let encoded_block =
+      Types.Blocks.serialize block_with_hash user_commands_with_time
+    in
+    (* Array.of_list [encoded_block] *)
+    Graphql_query.Blocks.Insert.make ~blocks:(Array.of_list [encoded_block])
+
   let create port = {port}
 
   let run t reader =

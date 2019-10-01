@@ -50,7 +50,7 @@ module User_commands = struct
     insert_user_commands(objects: $user_commands,
     on_conflict: {constraint: user_commands_hash_key, update_columns: first_seen}
     ) {
-      returning @bsRecord {
+      returning {
         id
         hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
         first_seen @bsDecoder(fn: "deserialize_optional_block_time")
@@ -73,35 +73,12 @@ module Public_key = struct
 end
 
 module Fee_transfer = struct
-  open Types.Graphql_output.With_first_seen.Transaction_hash
-
-  module Get_existing =
-  [%graphql
-  {| query get_existing ($hashes: [String!]!) {
-      fee_transfers(where: {hash: {_in: $hashes}} ) @bsRecord {
-          id
-          hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
-          first_seen @bsDecoder(fn: "deserialize_optional_block_time")
-        }
-    }
-|}]
-
-  module Update =
-  [%graphql
-  {|
-    mutation update ($current_id: Int!, $new_first_seen: bit!) {
-        update_fee_transfers(where: {id: {_eq: $current_id}}, _set: {first_seen: $new_first_seen}) {
-            affected_rows
-        }
-    }
-|}]
-
   module Insert =
   [%graphql
   {| mutation insert($fee_transfers: [fee_transfers_insert_input!]!) {
-      insert_fee_transfers(objects: $fee_transfers
+      insert_fee_transfers(objects: $fee_transfers, on_conflict: {constraint: fee_transfers_hash_key, update_columns: hash}
       ) {
-          returning @bsRecord {
+          returning {
               id
               hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
               first_seen @bsDecoder(fn: "deserialize_optional_block_time")
@@ -112,14 +89,11 @@ module Fee_transfer = struct
 end
 
 module Blocks = struct
-  open Types.Graphql_output.Blocks
-
   module Get_existing =
   [%graphql
   {|
     query get_existing ($hashes: [String!]!) {
-        blocks(where: {hash: {_in: $hashes}} ) @bsRecord {
-            id
+        blocks(where: {hash: {_in: $hashes}} ) {
             state_hash @bsDecoder(fn: "State_hash.of_base58_check_exn")
         }
     } 
@@ -131,14 +105,13 @@ module Blocks = struct
     mutation insert(
         $blocks: [blocks_insert_input!]!
         ) {
-        insert_blocks(objects: $blocks) {
-            returning @bsRecord {
+        insert_blocks(objects: $blocks, on_conflict: {constraint: blocks_pkey, update_columns: state_hash}) {
+            returning {
                 id
                 state_hash @bsDecoder(fn: "State_hash.of_base58_check_exn")
             }
         }
         }
-    
     |}]
 end
 
