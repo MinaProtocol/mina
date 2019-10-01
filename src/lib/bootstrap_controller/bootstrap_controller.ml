@@ -319,15 +319,7 @@ end = struct
   let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       ~transition_reader ~should_ask_best_tip ~persistent_root
       ~persistent_frontier ~initial_root_transition =
-    let id = ref 0 in
-    let log_mask ctx =
-      Ledger.Maskable.Debug.visualize
-        ~filename:(Printf.sprintf "bootstrap.%d.%s.dot" !id ctx) ;
-      incr id
-    in
-    log_mask "genesis" ;
     let rec loop () =
-      log_mask "start" ;
       let sync_ledger_reader, sync_ledger_writer =
         create ~name:"sync ledger pipe"
           (Buffered (`Capacity 50, `Overflow Crash))
@@ -378,7 +370,6 @@ end = struct
         Root_sync_ledger.destroy root_sync_ledger ;
         data
       in
-      log_mask "sync" ;
       let%bind staged_ledger_aux_result =
         let open Deferred.Or_error.Let_syntax in
         let%bind scan_state, expected_merkle_root, pending_coinbases =
@@ -432,7 +423,6 @@ end = struct
         temp_persistent_root_instance ;
       match staged_ledger_aux_result with
       | Error e ->
-          log_mask "error" ;
           let%bind () =
             Trust_system.(
               record t.trust_system t.logger sender
@@ -498,14 +488,12 @@ end = struct
                   sync_jobs
           with
           | Error e ->
-              log_mask "local_sync_error" ;
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:[("error", `String (Error.to_string_hum e))]
                 "Local state sync failed: $error. Retry bootstrap" ;
               Writer.close sync_ledger_writer ;
               loop ()
           | Ok () ->
-              log_mask "local_sync_success" ;
               (* Close the old frontier and reload a new on from disk. *)
               let new_root_data =
                 Transition_frontier.Root_data.Limited.Stable.V1.
@@ -541,7 +529,6 @@ end = struct
                 | Error `Persistent_frontier_malformed ->
                     fail "persistent frontier was malformed"
               in
-              log_mask "load" ;
               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                 "Bootstrap state: complete." ;
               let collected_transitions =
