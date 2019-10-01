@@ -12,7 +12,7 @@ let dispatch rpc query port =
     ~timeout:(Time.Span.of_sec 1.)
     (fun _ r w ->
       let open Deferred.Let_syntax in
-      match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
+      match%bind Rpc.Connection.create r w ~heartbeat_config:(Rpc.Connection.Heartbeat_config.create ~timeout:(Time_ns.Span.of_sec 120.) ~send_every:(Time_ns.Span.of_sec 30.)) ~handshake_timeout:(Time.Span.of_sec 120.) ~connection_state:(fun _ -> ()) with
       | Error exn ->
           return
             (Or_error.errorf
