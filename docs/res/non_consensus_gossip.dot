@@ -1,0 +1,21 @@
+digraph G {
+
+    Block_Producer -> Non_Consensus_Node_1 [label="block headers",color=blue];
+    Non_Consensus_Node_1 -> Non_Consensus_Node_2 [label="block headers", color=blue];
+    Non_Consensus_Node_2 -> Non_Consensus_Node_1 [label="block headers", color=blue];
+
+    Block_Producer -> Non_Consensus_Node_2 [label="block headers", color=blue];
+
+    Snark_Worker -> Block_Producer [label="snark work, transactions", color=red];
+    Block_Producer -> Snark_Worker [label="blocks, transactions", color=red];
+    Block_Producer -> Archive_Node [label="blocks, transactions", color=red];
+    Snark_Worker -> Archive_Node [label="snark work, transactions", color=red];
+    Archive_Node -> Snark_Worker [label="blocks", color=red];
+
+    Archive_Node -> Non_Consensus_Node_2 [label="block headers", color=blue];
+
+    Non_Consensus_Node_1 -> Block_Producer [label="transactions", color=green];
+    Non_Consensus_Node_2 -> Block_Producer [label="transactions", color=green];
+    Non_Consensus_Node_2 -> Archive_Node [label="transactions", color=green];
+
+}
