@@ -124,7 +124,7 @@ let create ~logger ~pids =
     Error.raise err
   in
   let%map connection, process =
-    Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
+    Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 2.)
       ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:() ()
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__

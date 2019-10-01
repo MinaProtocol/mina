@@ -264,7 +264,14 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             -> 'q Deferred.Or_error.t =
    fun t peer dispatch query ->
     let call () =
-      Rpc.Connection.with_client ~heartbeat_config:(Rpc.Connection.Heartbeat_config.create ~timeout:(Time_ns.Span.of_sec 120.) ~send_every:(Time_ns.Span.of_sec 30.)) ~handshake_timeout:(Time.Span.of_sec 120.) (to_where_to_connect t peer) (fun conn ->
+      Rpc.Connection.with_client
+        ~heartbeat_config:
+          (Rpc.Connection.Heartbeat_config.create
+             ~timeout:(Time_ns.Span.of_sec 120.)
+             ~send_every:(Time_ns.Span.of_sec 30.))
+        ~handshake_timeout:(Time.Span.of_sec 120.)
+        (to_where_to_connect t peer)
+        (fun conn ->
           Versioned_rpc.Connection_with_menu.create conn
           >>=? fun conn' -> dispatch conn' query )
       >>= function
@@ -474,8 +481,12 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             List.random_element_exn (Hash_set.to_list t.disconnected_peers)
           in
           Deferred.ignore
-            (Rpc.Connection.with_client (to_where_to_connect t peer)
-               ~heartbeat_config:(Rpc.Connection.Heartbeat_config.create ~timeout:(Time_ns.Span.of_sec 120.) ~send_every:(Time_ns.Span.of_sec 30.))
+            (Rpc.Connection.with_client
+               (to_where_to_connect t peer)
+               ~heartbeat_config:
+                 (Rpc.Connection.Heartbeat_config.create
+                    ~timeout:(Time_ns.Span.of_sec 120.)
+                    ~send_every:(Time_ns.Span.of_sec 30.))
                ~handshake_timeout:(Time.Span.of_sec 120.)
                (fun conn ->
                  match%bind Versioned_rpc.Connection_with_menu.create conn with
@@ -842,7 +853,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 let%map () =
                   Rpc.Connection.server_with_close reader writer
                     ~handshake_timeout:(Time.Span.of_sec 120.)
-                    ~heartbeat_config:(Rpc.Connection.Heartbeat_config.create ~timeout:(Time_ns.Span.of_sec 120.) ~send_every:(Time_ns.Span.of_sec 30.))
+                    ~heartbeat_config:
+                      (Rpc.Connection.Heartbeat_config.create
+                         ~timeout:(Time_ns.Span.of_sec 120.)
+                         ~send_every:(Time_ns.Span.of_sec 30.))
                     ~implementations
                     ~connection_state:(fun conn ->
                       (* connection state is the client's IP and ephemeral port

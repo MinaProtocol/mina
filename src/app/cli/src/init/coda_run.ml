@@ -397,7 +397,10 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                    ~on_unknown_rpc:`Raise)
               ~connection_state:(fun _ -> ())
               ~handshake_timeout:(Time.Span.of_sec 120.)
-              ~heartbeat_config:(Rpc.Connection.Heartbeat_config.create ~timeout:(Time_ns.Span.of_sec 120.) ~send_every:(Time_ns.Span.of_sec 120.))
+              ~heartbeat_config:
+                (Rpc.Connection.Heartbeat_config.create
+                   ~timeout:(Time_ns.Span.of_sec 120.)
+                   ~send_every:(Time_ns.Span.of_sec 120.))
               ~on_handshake_error:
                 (`Call
                   (fun exn ->

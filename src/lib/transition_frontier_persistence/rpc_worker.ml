@@ -98,7 +98,7 @@ module Make (Inputs : Intf.Worker_inputs) = struct
     in
     let%map connection, process =
       Rpc_worker.spawn_in_foreground_exn
-        ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
+        ~connection_timeout:(Time.Span.of_min 2.) ~on_failure
         ~shutdown_on:Disconnect ~connection_state_init_arg:() directory_name
     in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
