@@ -1,5 +1,6 @@
 FROM ocaml/opam2:debian-9-ocaml-4.08
 
+# if updated, also change in Dockerfile
 ARG OCAML_VERSION=4.07.1
 
 # don't keep sources, to force reinstall of pinned packages from Coda sources
