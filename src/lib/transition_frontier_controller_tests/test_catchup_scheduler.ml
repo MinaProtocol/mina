@@ -27,9 +27,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
   ( module struct
     let logger = Logger.null ()
 
+    let hb_logger = Logger.create ()
+
+    let pids = Child_processes.Termination.create_pid_set ()
+
     let trust_system = Trust_system.null ()
 
-    let time_controller = Block_time.Controller.basic
+    let time_controller = Block_time.Controller.basic ~logger
 
     let timeout_duration = Block_time.Span.of_ms 200L
 
@@ -40,7 +44,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let setup_random_frontier () =
       let open Deferred.Let_syntax in
       let%bind frontier =
-        create_root_frontier ~logger accounts_with_secret_keys
+        create_root_frontier ~logger ~pids accounts_with_secret_keys
       in
       let%map (_ : unit) =
         build_frontier_randomly
@@ -48,7 +52,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Quickcheck.Generator.with_size ~size:num_breadcrumbs
             @@ Quickcheck_lib.gen_imperative_ktree
                  (root_breadcrumb |> return |> Quickcheck.Generator.return)
-                 (gen_breadcrumb ~logger ~trust_system
+                 (gen_breadcrumb ~logger ~pids ~trust_system
                     ~accounts_with_secret_keys) )
           frontier
       in
@@ -64,12 +68,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       Rose_tree.T (root, children)
 
     let create_catchup_scheduler () =
-      let%map verifier = Verifier.create () in
+      let%map verifier = Verifier.create ~logger ~pids in
       Catchup_scheduler.create ~verifier
 
     let%test_unit "after the timeout expires, the missing node still doesn't \
                    show up, so the catchup job is fired" =
       Core.Backtrace.elide := false ;
+      heartbeat_flag := true ;
       Async.Scheduler.set_record_backtraces true ;
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
@@ -81,8 +86,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier = setup_random_frontier () in
-          let trust_system = Trust_system.null () in
           let%bind create = create_catchup_scheduler () in
           let scheduler =
             create ~logger ~trust_system ~frontier ~time_controller
@@ -96,7 +101,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind upcoming_breadcrumbs =
             Deferred.all
             @@ Quickcheck.random_value
-                 (gen_linear_breadcrumbs ~logger ~trust_system ~size:2
+                 (gen_linear_breadcrumbs ~logger ~pids ~trust_system ~size:2
                     ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let missing_hash =
@@ -126,6 +131,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%map catchup_parent_hash =
             match%map Ivar.read result_ivar with hash, _ -> hash
           in
+          heartbeat_flag := false ;
           assert (Catchup_scheduler.is_empty scheduler) ;
           assert (Coda_base.State_hash.equal missing_hash catchup_parent_hash) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
@@ -133,7 +139,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let%test_unit "if a linear sequence of transitions in reverse order, \
                    catchup scheduler should not create duplicate jobs" =
-      let logger = Logger.null () in
+      heartbeat_flag := true ;
       let _catchup_job_reader, catchup_job_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
           (Buffered (`Capacity 10, `Overflow Crash))
@@ -147,8 +153,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier = setup_random_frontier () in
-          let trust_system = Trust_system.null () in
           let%bind create = create_catchup_scheduler () in
           let scheduler =
             create ~logger ~trust_system ~frontier ~time_controller
@@ -163,7 +169,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind upcoming_breadcrumbs =
             Deferred.all
             @@ Quickcheck.random_value
-                 (gen_linear_breadcrumbs ~logger ~trust_system ~size
+                 (gen_linear_breadcrumbs ~logger ~pids ~trust_system ~size
                     ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let upcoming_transitions =
@@ -226,6 +232,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Rose_tree.map cached_received_rose_tree
               ~f:Cached.invalidate_with_success
           in
+          heartbeat_flag := false ;
           assert (
             List.equal Transition_frontier.Breadcrumb.equal
               (Rose_tree.flatten received_rose_tree)
@@ -247,10 +254,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let unprocessed_transition_cache =
         Unprocessed_transition_cache.create ~logger
       in
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let open Deferred.Let_syntax in
           let%bind frontier = setup_random_frontier () in
-          let trust_system = Trust_system.null () in
           let%bind create = create_catchup_scheduler () in
           let scheduler =
             create ~logger ~trust_system ~frontier ~time_controller
@@ -264,7 +272,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind upcoming_rose_tree =
             Rose_tree.Deferred.all
             @@ Quickcheck.random_value
-                 (gen_tree ~logger ~trust_system ~size:5
+                 (gen_tree ~logger ~pids ~trust_system ~size:5
                     ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let upcoming_breadcrumbs = Rose_tree.flatten upcoming_rose_tree in
@@ -325,6 +333,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Rose_tree.map cached_received_rose_tree
               ~f:Cached.invalidate_with_success
           in
+          heartbeat_flag := false ;
           assert (
             Rose_tree.equiv received_rose_tree upcoming_rose_tree
               ~f:Transition_frontier.Breadcrumb.equal ) ;

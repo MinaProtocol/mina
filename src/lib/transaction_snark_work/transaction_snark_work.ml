@@ -1,16 +1,13 @@
 open Core_kernel
-open Async_kernel
 open Module_version
 open Currency
 open Signature_lib
-
-let proofs_length = 2
 
 module Statement = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Transaction_snark.Statement.Stable.V1.t list
+        type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
         [@@deriving bin_io, sexp, hash, compare, yojson, version]
       end
 
@@ -36,14 +33,15 @@ module Statement = struct
 
   include Hashable.Make (Stable.Latest)
 
-  let gen =
-    Quickcheck.Generator.list_with_length proofs_length
-      Transaction_snark.Statement.gen
+  let gen = One_or_two.gen Transaction_snark.Statement.gen
 
   let compact_json t =
-    `List (List.map ~f:(fun s -> `Int (Transaction_snark.Statement.hash s)) t)
+    `List
+      ( One_or_two.map ~f:(fun s -> `Int (Transaction_snark.Statement.hash s)) t
+      |> One_or_two.to_list )
 
-  let work_ids t : int list = List.map t ~f:Transaction_snark.Statement.hash
+  let work_ids t : int One_or_two.t =
+    One_or_two.map t ~f:Transaction_snark.Statement.hash
 end
 
 module Info = struct
@@ -52,7 +50,7 @@ module Info = struct
       module T = struct
         type t =
           { statements: Statement.Stable.V1.t
-          ; work_ids: int list
+          ; work_ids: int One_or_two.Stable.V1.t
           ; fee: Fee.Stable.V1.t
           ; prover: Public_key.Compressed.Stable.V1.t }
         [@@deriving sexp, to_yojson, bin_io, version]
@@ -77,10 +75,10 @@ module Info = struct
   (* bin_io omitted *)
   type t = Stable.Latest.t =
     { statements: Statement.Stable.V1.t
-    ; work_ids: int list
+    ; work_ids: int One_or_two.t
     ; fee: Fee.Stable.V1.t
     ; prover: Public_key.Compressed.Stable.V1.t }
-  [@@deriving to_yojson, sexp]
+  [@@deriving to_yojson, sexp, compare]
 end
 
 module T = struct
@@ -89,7 +87,7 @@ module T = struct
       module T = struct
         type t =
           { fee: Fee.Stable.V1.t
-          ; proofs: Ledger_proof.Stable.V1.t list
+          ; proofs: Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
           ; prover: Public_key.Compressed.Stable.V1.t }
         [@@deriving sexp, to_yojson, bin_io, version]
       end
@@ -112,13 +110,15 @@ module T = struct
 
   (* bin_io omitted *)
   type t = Stable.Latest.t =
-    {fee: Fee.t; proofs: Ledger_proof.t list; prover: Public_key.Compressed.t}
+    { fee: Fee.t
+    ; proofs: Ledger_proof.t One_or_two.t
+    ; prover: Public_key.Compressed.t }
   [@@deriving to_yojson, sexp]
 
   let info t =
-    let statements = List.map t.proofs ~f:Ledger_proof.statement in
+    let statements = One_or_two.map t.proofs ~f:Ledger_proof.statement in
     { Info.statements
-    ; work_ids= List.map statements ~f:Transaction_snark.Statement.hash
+    ; work_ids= One_or_two.map statements ~f:Transaction_snark.Statement.hash
     ; fee= t.fee
     ; prover= t.prover }
 end

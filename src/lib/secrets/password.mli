@@ -1,5 +1,9 @@
 open Async
 
-val read : string -> bytes Deferred.Or_error.t
+val default_password_env : string
 
-val hidden_line_or_env : string -> env:string -> Bytes.t Deferred.Or_error.t
+val read_hidden_line : string -> Bytes.t Deferred.t
+
+val read : string -> bytes Deferred.t
+
+val hidden_line_or_env : string -> env:string -> Bytes.t Deferred.t

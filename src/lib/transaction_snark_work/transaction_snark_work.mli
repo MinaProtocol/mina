@@ -3,7 +3,7 @@ open Currency
 open Signature_lib
 
 module Statement : sig
-  type t = Transaction_snark.Statement.t list [@@deriving yojson, sexp]
+  type t = Transaction_snark.Statement.t One_or_two.t [@@deriving yojson, sexp]
 
   include Hashable.S with type t := t
 
@@ -21,16 +21,16 @@ module Statement : sig
 
   val compact_json : t -> Yojson.Safe.json
 
-  val work_ids : t -> int list
+  val work_ids : t -> int One_or_two.t
 end
 
 module Info : sig
   type t =
     { statements: Statement.Stable.V1.t
-    ; work_ids: int list
+    ; work_ids: int One_or_two.Stable.V1.t
     ; fee: Fee.Stable.V1.t
     ; prover: Public_key.Compressed.Stable.V1.t }
-  [@@deriving to_yojson, sexp]
+  [@@deriving to_yojson, sexp, compare]
 
   module Stable :
     sig
@@ -48,7 +48,9 @@ end
     *)
 
 type t =
-  {fee: Fee.t; proofs: Ledger_proof.t list; prover: Public_key.Compressed.t}
+  { fee: Fee.t
+  ; proofs: Ledger_proof.t One_or_two.t
+  ; prover: Public_key.Compressed.t }
 [@@deriving sexp, to_yojson]
 
 val fee : t -> Fee.t
@@ -67,7 +69,9 @@ type unchecked = t
 
 module Checked : sig
   type nonrec t = t =
-    {fee: Fee.t; proofs: Ledger_proof.t list; prover: Public_key.Compressed.t}
+    { fee: Fee.t
+    ; proofs: Ledger_proof.t One_or_two.t
+    ; prover: Public_key.Compressed.t }
   [@@deriving sexp, to_yojson]
 
   module Stable : module type of Stable
@@ -76,5 +80,3 @@ module Checked : sig
 end
 
 val forget : Checked.t -> t
-
-val proofs_length : int

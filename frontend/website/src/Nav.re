@@ -380,6 +380,11 @@ let make = (~page) => {
         link="https://github.com/CodaProtocol/coda"
         activePage=false
       />,
+      <SimpleButton
+        name="Testnet"
+        link="/testnet.html"
+        activePage={page == `Testnet}
+      />,
     |]
   </NavWrapper>;
 };

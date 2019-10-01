@@ -1,0 +1,10 @@
+{
+  "trailingSlash": true,
+  "cleanUrls": [
+    "/",
+    "/blog",
+    "/docs",
+    "/docs/**",
+    "/jobs"
+  ]
+}

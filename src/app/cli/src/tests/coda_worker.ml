@@ -111,6 +111,7 @@ module T = struct
         Rpc_parallel.Function.t
     ; replace_snark_worker_key:
         ('worker, Public_key.Compressed.t option, unit) Rpc_parallel.Function.t
+    ; stop_snark_worker: ('worker, unit, unit) Rpc_parallel.Function.t
     ; validated_transitions_keyswaptest:
         ( 'worker
         , unit
@@ -142,6 +143,7 @@ module T = struct
         -> User_command.Stable.V1.t list Deferred.t
     ; coda_replace_snark_worker_key:
         Public_key.Compressed.Stable.V1.t option -> unit Deferred.t
+    ; coda_stop_snark_worker: unit -> unit Deferred.t
     ; coda_validated_transitions_keyswaptest:
            unit
         -> External_transition.Validated.Stable.V1.t Pipe.Reader.t Deferred.t
@@ -230,6 +232,9 @@ module T = struct
 
     let best_path_impl ~worker_state ~conn_state:() () =
       worker_state.coda_best_path ()
+
+    let stop_snark_worker_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_stop_snark_worker ()
 
     let replace_snark_worker_key_impl ~worker_state ~conn_state:() key =
       worker_state.coda_replace_snark_worker_key key
@@ -346,6 +351,10 @@ module T = struct
           [%bin_type_class: Public_key.Compressed.Stable.Latest.t option]
         ~bin_output:Unit.bin_t ()
 
+    let stop_snark_worker =
+      C.create_rpc ~name:"stop_snark_worker" ~f:stop_snark_worker_impl
+        ~bin_input:Unit.bin_t ~bin_output:Unit.bin_t ()
+
     let functions =
       { peers
       ; start
@@ -364,6 +373,7 @@ module T = struct
       ; new_user_command
       ; get_all_user_commands
       ; replace_snark_worker_key
+      ; stop_snark_worker
       ; validated_transitions_keyswaptest
       ; get_all_transitions }
 
@@ -387,6 +397,7 @@ module T = struct
             ; ("port", `Int addrs_and_ports.communication_port) ]
           ()
       in
+      let pids = Child_processes.Termination.create_pid_set () in
       let%bind () =
         Option.value_map trace_dir
           ~f:(fun d ->
@@ -431,7 +442,7 @@ module T = struct
           trace_database_initialization "external_transition_database" __LOC__
             external_transition_database_dir ;
           let time_controller =
-            Block_time.Controller.create Block_time.Controller.basic
+            Block_time.Controller.create (Block_time.Controller.basic ~logger)
           in
           let propose_keypair =
             Option.map proposer ~f:(fun i ->
@@ -481,7 +492,8 @@ module T = struct
           in
           let coda_deferred () =
             Coda_lib.create
-              (Coda_lib.Config.make ~logger ~trust_system ~conf_dir ~net_config
+              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+                 ~net_config
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
@@ -583,6 +595,9 @@ module T = struct
           in
           let coda_replace_snark_worker_key =
             Coda_lib.replace_snark_worker_key coda
+          in
+          let coda_stop_snark_worker () =
+            Coda_lib.stop_snark_worker ~should_wait_kill:true coda
           in
           let coda_new_block key =
             Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
@@ -697,8 +712,8 @@ module T = struct
               with_monitor coda_validated_transitions_keyswaptest
           ; coda_replace_snark_worker_key=
               with_monitor coda_replace_snark_worker_key
-          ; coda_get_all_transitions= with_monitor coda_get_all_transitions }
-      )
+          ; coda_get_all_transitions= with_monitor coda_get_all_transitions
+          ; coda_stop_snark_worker= with_monitor coda_stop_snark_worker } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

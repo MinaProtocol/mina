@@ -2,8 +2,6 @@ open Core_kernel
 open Coda_numbers
 open Async
 open Currency
-open Fold_lib
-open Tuple_lib
 open Signature_lib
 open Coda_base
 
@@ -376,13 +374,12 @@ module type S = sig
 
       val length_in_triples : int
 
-      val var_to_triples :
-           var
-        -> ( Snark_params.Tick.Boolean.var Triple.t list
-           , _ )
-           Snark_params.Tick.Checked.t
+      open Snark_params.Tick
 
-      val fold : Value.t -> bool Triple.t Fold.t
+      val var_to_input :
+        var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+
+      val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
       val blockchain_length : Value.t -> Length.t
 
@@ -397,6 +394,8 @@ module type S = sig
       val curr_epoch : Value.t -> Epoch.t
 
       val curr_slot : Value.t -> Slot.t
+
+      val global_slot : Value.t -> int
     end
 
     module Proposal_data : sig
@@ -438,6 +437,12 @@ module type S = sig
       -> logger:Logger.t
       -> [`Keep | `Take]
 
+    type proposal =
+      [ `Check_again of Unix_timestamp.t
+      | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
+      | `Propose of
+        Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t ]
+
     (**
      * Determine if and when to perform the next transition proposal. Either
      * informs the callee to check again at some time in the future, or to
@@ -451,10 +456,7 @@ module type S = sig
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
-      -> [ `Check_again of Unix_timestamp.t
-         | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
-         | `Propose of
-           Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t ]
+      -> proposal
 
     (**
      * A hook for managing local state when the locked tip is updated.
