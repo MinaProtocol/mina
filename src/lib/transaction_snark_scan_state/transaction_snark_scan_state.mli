@@ -139,4 +139,4 @@ val all_work_pairs_exn :
      One_or_two.t
      list
 
-module Constants : Constants_intf.S
+module Constants : Snark_params.Scan_state_constants.S

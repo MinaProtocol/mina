@@ -8,6 +8,7 @@ open Fold_lib
 open Signature_lib
 open Module_version
 open Snark_params
+open Bitstring_lib
 module Time = Coda_base.Block_time
 module Run = Snark_params.Tick.Run
 
@@ -543,6 +544,11 @@ module Data = struct
       type t = Stable.Latest.t [@@deriving sexp, compare, hash, to_yojson]
     end
 
+    let to_input ({hash; total_currency} : Value.t) =
+      let open Snark_params.Tick in
+      { Random_oracle.Input.field_elements= [|(hash :> Field.t)|]
+      ; bitstrings= [|Amount.to_bits total_currency|] }
+
     type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t
 
     let to_hlist {Poly.hash; total_currency} =
@@ -561,16 +567,12 @@ module Data = struct
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let var_to_triples {Poly.hash; total_currency} =
-      let open Tick.Checked.Let_syntax in
-      let%map hash_triples =
-        Coda_base.Frozen_ledger_hash.var_to_triples hash
-      in
-      hash_triples @ Amount.var_to_triples total_currency
-
-    let fold {Poly.hash; total_currency} =
-      let open Fold in
-      Coda_base.Frozen_ledger_hash.fold hash +> Amount.fold total_currency
+    let var_to_input ({Poly.hash; total_currency} : var) =
+      { Random_oracle.Input.field_elements=
+          [|Coda_base.Frozen_ledger_hash.var_to_hash_packed hash|]
+      ; bitstrings=
+          [|Bitstring.Lsb_first.to_list (Amount.var_to_bits total_currency)|]
+      }
 
     let length_in_triples =
       Coda_base.Frozen_ledger_hash.length_in_triples + Amount.length_in_triples
@@ -743,12 +745,7 @@ module Data = struct
 
         let dummy = String.init length_in_bytes ~f:(fun _ -> '\000')
 
-        module Checked = struct
-          let to_triples x =
-            Fold.(group3 ~default:Boolean.false_ (of_array x) |> to_list)
-        end
-
-        let fold = Fold.string_triples
+        let to_bits t = Fold.(to_list (string_bits t))
 
         let length_in_triples = (length_in_bits + 2) / 3
       end
@@ -766,8 +763,8 @@ module Data = struct
       let hash msg g =
         let x, y = Non_zero_curve_point.of_inner_curve_exn g in
         let input =
-          Random_oracle.Input.append (Message.to_input msg)
-            {field_elements= [|x; y|]; bitstrings= [||]}
+          Random_oracle.Input.(
+            append (Message.to_input msg) (field_elements [|x; y|]))
         in
         let open Random_oracle in
         hash ~init:Hash_prefix_states.Random_oracle.vrf_output
@@ -783,8 +780,7 @@ module Data = struct
         let hash msg (x, y) =
           let%bind msg = Message.Checked.to_input msg in
           let input =
-            Random_oracle.Input.append msg
-              {field_elements= [|x; y|]; bitstrings= [||]}
+            Random_oracle.Input.(append msg (field_elements [|x; y|]))
           in
           make_checked (fun () ->
               let open Random_oracle.Checked in
@@ -1086,21 +1082,14 @@ module Data = struct
 
     open Snark_params.Tick
 
+    let none = Coda_base.State_hash.(of_hash zero)
+
     let typ : (var, value) Typ.t =
-      let there = function
-        | None ->
-            Coda_base.State_hash.(of_hash zero)
-        | Some h ->
-            h
-      in
+      let there = function None -> none | Some h -> h in
       let back h =
         if Coda_base.State_hash.(equal h (of_hash zero)) then None else Some h
       in
       Typ.transport Coda_base.State_hash.typ ~there ~back
-
-    let fold =
-      Fn.compose Coda_base.State_hash.fold
-        (Option.value ~default:Coda_base.State_hash.(of_hash zero))
   end
 
   module Epoch_data = struct
@@ -1155,17 +1144,6 @@ module Data = struct
       , Coda_base.State_hash.var
       , Length.Checked.t )
       Poly.t
-
-    let var_to_triples
-        {Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length} =
-      let open Snark_params.Tick.Checked.Let_syntax in
-      let%map ledger = Epoch_ledger.var_to_triples ledger
-      and seed = Epoch_seed.var_to_triples seed
-      and start_checkpoint =
-        Coda_base.State_hash.var_to_triples start_checkpoint
-      and lock_checkpoint = Coda_base.State_hash.var_to_triples lock_checkpoint
-      and epoch_length = Length.Checked.to_triples epoch_length in
-      ledger @ seed @ start_checkpoint @ lock_checkpoint @ epoch_length
 
     let length_in_triples =
       Epoch_ledger.length_in_triples + Epoch_seed.length_in_triples
@@ -1229,11 +1207,14 @@ module Data = struct
 
       val typ : (Coda_base.State_hash.var, t) Typ.t
 
-      val fold : t -> bool Tuple_lib.Triple.t Fold.t
+      val to_input :
+        t -> (Snark_params.Tick.Field.t, bool) Random_oracle.Input.t
 
       val null : t
     end) =
     struct
+      open Snark_params
+
       module Value = struct
         module Stable = struct
           module V1 = struct
@@ -1275,7 +1256,7 @@ module Data = struct
       end
 
       let data_spec =
-        let open Snark_params.Tick.Data_spec in
+        let open Tick.Data_spec in
         [ Epoch_ledger.typ
         ; Epoch_seed.typ
         ; Coda_base.State_hash.typ
@@ -1283,18 +1264,39 @@ module Data = struct
         ; Length.typ ]
 
       let typ : (var, Value.t) Typ.t =
-        Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
+        Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
           ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
 
-      let fold
-          {Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length}
-          =
-        let open Fold in
-        Epoch_ledger.fold ledger +> Epoch_seed.fold seed
-        +> Coda_base.State_hash.fold start_checkpoint
-        +> Lock_checkpoint.fold lock_checkpoint
-        +> Length.fold epoch_length
+      let to_input
+          ({ledger; seed; start_checkpoint; lock_checkpoint; epoch_length} :
+            Value.t) =
+        let input =
+          { Random_oracle.Input.field_elements=
+              [|(seed :> Tick.Field.t); (start_checkpoint :> Tick.Field.t)|]
+          ; bitstrings= [|Length.Bits.to_bits epoch_length|] }
+        in
+        List.reduce_exn ~f:Random_oracle.Input.append
+          [ input
+          ; Epoch_ledger.to_input ledger
+          ; Lock_checkpoint.to_input lock_checkpoint ]
+
+      let var_to_input
+          ({ledger; seed; start_checkpoint; lock_checkpoint; epoch_length} :
+            var) =
+        let open Tick in
+        let%map epoch_length = Length.Checked.to_bits epoch_length in
+        let open Random_oracle.Input in
+        let input =
+          { field_elements=
+              [| Epoch_seed.var_to_hash_packed seed
+               ; Coda_base.State_hash.var_to_hash_packed start_checkpoint |]
+          ; bitstrings= [|Bitstring.Lsb_first.to_list epoch_length|] }
+        in
+        List.reduce_exn ~f:Random_oracle.Input.append
+          [ input
+          ; Epoch_ledger.var_to_input ledger
+          ; field (Coda_base.State_hash.var_to_hash_packed lock_checkpoint) ]
 
       let genesis =
         lazy
@@ -1310,11 +1312,17 @@ module Data = struct
     module Staking = Make (struct
       include Coda_base.State_hash
 
+      let to_input (t : t) = Random_oracle.Input.field (t :> Tick.Field.t)
+
       let null = Coda_base.State_hash.(of_hash zero)
     end)
 
     module Next = Make (struct
       include Optional_state_hash
+
+      let to_input (t : t) =
+        Random_oracle.Input.field
+          (Option.value ~default:Optional_state_hash.none t :> Tick.Field.t)
 
       let null = None
     end)
@@ -1729,34 +1737,7 @@ module Data = struct
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let var_to_triples
-        { Poly.blockchain_length
-        ; epoch_count
-        ; min_epoch_length
-        ; last_vrf_output
-        ; total_currency
-        ; curr_global_slot
-        ; staking_epoch_data
-        ; next_epoch_data
-        ; has_ancestor_in_same_checkpoint_window
-        ; checkpoints } =
-      let open Snark_params.Tick.Checked.Let_syntax in
-      let%map blockchain_length = Length.Checked.to_triples blockchain_length
-      and epoch_count = Length.Checked.to_triples epoch_count
-      and min_epoch_length = Length.Checked.to_triples min_epoch_length
-      and curr_global_slot = Global_slot.Checked.to_triples curr_global_slot
-      and staking_epoch_data = Epoch_data.var_to_triples staking_epoch_data
-      and next_epoch_data = Epoch_data.var_to_triples next_epoch_data
-      and checkpoints = Checkpoints.Hash.var_to_triples checkpoints in
-      blockchain_length @ epoch_count @ min_epoch_length
-      @ Vrf.Output.Truncated.Checked.to_triples last_vrf_output
-      @ curr_global_slot
-      @ Amount.var_to_triples total_currency
-      @ staking_epoch_data @ next_epoch_data
-      @ [Boolean.(has_ancestor_in_same_checkpoint_window, false_, false_)]
-      @ checkpoints
-
-    let fold
+    let to_input
         ({ Poly.blockchain_length
          ; epoch_count
          ; min_epoch_length
@@ -1768,17 +1749,60 @@ module Data = struct
          ; has_ancestor_in_same_checkpoint_window
          ; checkpoints } :
           Value.t) =
-      let open Fold in
-      Length.fold blockchain_length
-      +> Length.fold epoch_count
-      +> Length.fold min_epoch_length
-      +> Vrf.Output.Truncated.fold last_vrf_output
-      +> Global_slot.fold curr_global_slot
-      +> Amount.fold total_currency
-      +> Epoch_data.Staking.fold staking_epoch_data
-      +> Epoch_data.Next.fold next_epoch_data
-      +> return (has_ancestor_in_same_checkpoint_window, false, false)
-      +> Checkpoints.Hash.fold checkpoints.hash
+      let input =
+        { Random_oracle.Input.bitstrings=
+            [| Length.Bits.to_bits blockchain_length
+             ; Length.Bits.to_bits epoch_count
+             ; Length.Bits.to_bits min_epoch_length
+             ; Vrf.Output.Truncated.to_bits last_vrf_output
+             ; Amount.to_bits total_currency
+             ; Global_slot.Bits.to_bits curr_global_slot
+             ; [has_ancestor_in_same_checkpoint_window] |]
+        ; field_elements= [|(checkpoints.hash :> Tick.Field.t)|] }
+      in
+      List.reduce_exn ~f:Random_oracle.Input.append
+        [ input
+        ; Epoch_data.Staking.to_input staking_epoch_data
+        ; Epoch_data.Next.to_input next_epoch_data ]
+
+    let var_to_input
+        ({ Poly.blockchain_length
+         ; epoch_count
+         ; min_epoch_length
+         ; last_vrf_output
+         ; total_currency
+         ; curr_global_slot
+         ; staking_epoch_data
+         ; next_epoch_data
+         ; has_ancestor_in_same_checkpoint_window
+         ; checkpoints } :
+          var) =
+      let open Tick.Checked.Let_syntax in
+      let%map input =
+        let bs = Bitstring.Lsb_first.to_list in
+        let up k x = k x >>| Bitstring.Lsb_first.to_list in
+        let length = up Length.Checked.to_bits in
+        let%map blockchain_length = length blockchain_length
+        and epoch_count = length epoch_count
+        and min_epoch_length = length min_epoch_length
+        and curr_global_slot =
+          up Global_slot.Checked.to_bits curr_global_slot
+        in
+        { Random_oracle.Input.bitstrings=
+            [| blockchain_length
+             ; epoch_count
+             ; min_epoch_length
+             ; Array.to_list last_vrf_output
+             ; bs (Amount.var_to_bits total_currency)
+             ; curr_global_slot
+             ; [has_ancestor_in_same_checkpoint_window] |]
+        ; field_elements= [|Checkpoints.Hash.var_to_hash_packed checkpoints|]
+        }
+      and staking_epoch_data =
+        Epoch_data.Staking.var_to_input staking_epoch_data
+      and next_epoch_data = Epoch_data.Next.var_to_input next_epoch_data in
+      List.reduce_exn ~f:Random_oracle.Input.append
+        [input; staking_epoch_data; next_epoch_data]
 
     let length_in_triples =
       Length.length_in_triples + Length.length_in_triples
