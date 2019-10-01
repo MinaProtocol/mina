@@ -482,4 +482,5 @@ You might be trying to connect to a different network version, or need to troubl
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           !"Coda process was interrupted by $signal"
           ~metadata:[("signal", `String (to_string signal))] ;
-        Stdlib.exit 130 ))
+        (* causes async shutdown and at_exit handlers to run *)
+        Async.shutdown 130 ))
