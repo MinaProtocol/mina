@@ -5,12 +5,13 @@ RED="\e[31m"
 MAGENTA="\e[35m"
 DARK_GREY="\e[90m"
 
-log() { echo "$1**** $2 ****$RESET"; }
+log() { echo -e "$1**** $2 ****$RESET"; }
 trace() { log "$MAGENTA" "$1"; }
 error() { log "$RED" "$1"; }
 heartbeat() { log "$DARK_GREY" 'CI HEARTBEAT'; }
 
 profile="$1"
+[ -z "$profile" ] && (error 'BUILD PROFILE ARGUMENT IS REQUIRED' && exit 1)
 
 trace 'BUILDING'
 dune build "--profile=$profile" -j8 || (error 'BUILD FAILED' && exit 1)
@@ -18,6 +19,7 @@ dune build "--profile=$profile" -j8 || (error 'BUILD FAILED' && exit 1)
 trace 'RUNNING TESTS'
 dune runtest "--profile=$profile" -j8 &
 test_pid=$!
+trap "kill \"$test_pid\"" EXIT
 
 i=0
 while ps | grep " $test_pid "; do
