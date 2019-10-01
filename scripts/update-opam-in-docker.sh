@@ -17,13 +17,15 @@ opam switch import src/opam.export
 
 git submodule update --init --recursive
 
-# reinstalls of pinned packages should not use saved sources
+# don't save or reuse sources when repinning
 declare -x OPAMKEEPBUILDDIR=false
 declare -x OPAMREUSEBUILDDIR=false
 
-function reinstall () {
+# in Docker, pinned packages are at root directory
+# adding a pin at src/external will rebuild it
+function repin () {
     echo "Updating OPAM package $1"
-    opam reinstall -y $1
+    opam pin -y add src/external/$1
 }
 
 function uptodate () {
@@ -35,7 +37,7 @@ for pkg in async_kernel digestif graphql_ppx ocaml-extlib ppx_optcomp rpc_parall
     CURRENT_COMMIT=$(git submodule status src/external/$pkg | awk '{print $1}')
     DOCKER_COMMIT=$(cat ~opam/opam-repository/$pkg.commit)
     if [ $CURRENT_COMMIT != $DOCKER_COMMIT ] ; then
-        reinstall $pkg
+        repin $pkg
     else
 	uptodate $pkg
     fi
@@ -46,7 +48,7 @@ for pkg in ocaml-sodium ocaml-rocksdb coda_base58 ; do
     CURRENT_COMMIT=$(git log --format=oneline -n 1 src/external/$pkg | awk '{print $1}')
     DOCKER_COMMIT=$(cat ~opam/opam-repository/$pkg.commit)
     if [ $CURRENT_COMMIT != $DOCKER_COMMIT ] ; then
-        reinstall $pkg
+        repin $pkg
     else
 	uptodate $pkg
     fi
