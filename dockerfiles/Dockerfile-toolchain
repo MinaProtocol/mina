@@ -56,8 +56,8 @@ RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib ppx_optcomp rpc_pa
       cd /coda && sudo bash -c "git submodule status src/external/$pkg | awk '{print \$1}' | sed s/-// > ~opam/opam-repository/$pkg.commit" ; \
     done
 
-# use log commit for ocaml-sodium, ocaml-rocksdb, coda_base58, which are not submodules
-RUN for pkg in ocaml-sodium ocaml-rocksdb coda_base58 ; do \
+# use log commit for ocaml-sodium, coda_base58, which are not submodules
+RUN for pkg in ocaml-sodium coda_base58 ; do \
       cd /coda && sudo bash -c "git log --format=oneline -n 1 src/external/$pkg | awk '{print \$1}' > ~opam/opam-repository/$pkg.commit" ; \
     done
 
