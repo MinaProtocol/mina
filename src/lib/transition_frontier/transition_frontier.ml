@@ -392,7 +392,9 @@ module For_tests = struct
       | Some x ->
           x
       | None ->
-          Async.Thread_safe.block_on_async_exn Verifier.create
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              Verifier.create ~logger
+                ~pids:(Child_processes.Termination.create_pid_set ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let genesis_transition = Lazy.force External_transition.genesis in
@@ -418,7 +420,9 @@ module For_tests = struct
       | Some x ->
           x
       | None ->
-          Async.Thread_safe.block_on_async_exn Verifier.create
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              Verifier.create ~logger
+                ~pids:(Child_processes.Termination.create_pid_set ()) )
     in
     let root_dir = "/tmp/coda_unit_test" in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
@@ -466,7 +470,9 @@ module For_tests = struct
       | Some x ->
           x
       | None ->
-          Async.Thread_safe.block_on_async_exn Verifier.create
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              Verifier.create ~logger
+                ~pids:(Child_processes.Termination.create_pid_set ()) )
     in
     let trust_system =
       Option.value trust_system ~default:(Trust_system.null ())
@@ -481,8 +487,8 @@ module For_tests = struct
     let%bind (Rose_tree.T (root, branches)) =
       Quickcheck.Generator.with_size ~size
         (Quickcheck_lib.gen_imperative_rose_tree gen_root_breadcrumb
-           (Breadcrumb.For_tests.gen_non_deferred ~logger ~trust_system
-              ~accounts_with_secret_keys:root_ledger_accounts))
+           (Breadcrumb.For_tests.gen_non_deferred ~logger ~verifier
+              ~trust_system ~accounts_with_secret_keys:root_ledger_accounts))
     in
     let root_data =
       { Root_data.Limited.Stable.Latest.transition=

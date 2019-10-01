@@ -91,6 +91,6 @@ let%test_module "Command line tests" =
       | `Yes ->
           Async.Thread_safe.block_on_async_exn test_background_daemon
       | `No | `Unknown ->
-          printf "Please build coda.exe in order to run this test\n%!" ;
+          printf !"Please build coda.exe in order to run this test\n%!" ;
           false
   end )

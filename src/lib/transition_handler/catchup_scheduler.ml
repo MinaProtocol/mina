@@ -275,6 +275,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let trust_system = Trust_system.null ()
 
+    let pids = Child_processes.Termination.create_pid_set ()
+
     let time_controller = Block_time.Controller.basic ~logger
 
     let max_length = 10
@@ -332,7 +334,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let%test_unit "catchup jobs fire after the timeout" =
       let timeout_duration = Block_time.Span.of_ms 200L in
       let test_delta = Block_time.Span.of_ms 100L in
-      let verifier = Async.Thread_safe.block_on_async_exn Verifier.create in
+      let verifier =
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Verifier.create ~logger ~pids )
+      in
       Quickcheck.test ~trials:3
         (gen_frontier_and_branch ~verifier ~frontier_size:1 ~branch_size:2 ())
         ~f:(fun (frontier, branch) ->
@@ -381,7 +386,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                    invalidated" =
       let timeout_duration = Block_time.Span.of_ms 200L in
       let test_delta = Block_time.Span.of_ms 100L in
-      let verifier = Async.Thread_safe.block_on_async_exn Verifier.create in
+      let verifier =
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Verifier.create ~logger ~pids )
+      in
       Quickcheck.test ~trials:3
         (gen_frontier_and_branch ~verifier ~frontier_size:1 ~branch_size:2 ())
         ~f:(fun (frontier, branch) ->
@@ -460,7 +468,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let%test_unit "catchup scheduler should not create duplicate jobs when a \
                    sequence of transitions is added in reverse order" =
       let timeout_duration = Block_time.Span.of_ms 400L in
-      let verifier = Async.Thread_safe.block_on_async_exn Verifier.create in
+      let verifier =
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Verifier.create ~logger ~pids )
+      in
       Quickcheck.test ~trials:3
         (gen_frontier_and_branch ~verifier ~frontier_size:1 ~branch_size:5 ())
         ~f:(fun (frontier, branch) ->

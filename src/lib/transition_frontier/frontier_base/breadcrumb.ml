@@ -199,9 +199,19 @@ module For_tests = struct
         in
         User_command.sign sender_keypair payload )
 
-  let gen ~logger ~trust_system ~accounts_with_secret_keys :
+  let gen ?(logger = Logger.null ()) ?verifier
+      ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
+    let verifier =
+      match verifier with
+      | Some verifier ->
+          verifier
+      | None ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              Verifier.create ~logger
+                ~pids:(Child_processes.Termination.create_pid_set ()) )
+    in
     let gen_slot_advancement = Int.gen_incl 1 10 in
     let%map make_next_consensus_state =
       Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
@@ -291,7 +301,6 @@ module For_tests = struct
             next_verified_external_transition) =
         External_transition.Validated.create_unsafe next_external_transition
       in
-      let%bind verifier = Verifier.create () in
       match%map
         build ~logger ~trust_system ~verifier ~parent:parent_breadcrumb
           ~transition:
@@ -313,18 +322,19 @@ module For_tests = struct
       | Error (`Invalid_staged_ledger_hash e) ->
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
-  let gen_non_deferred ~logger ~trust_system ~accounts_with_secret_keys =
+  let gen_non_deferred ?logger ?verifier ?trust_system
+      ~accounts_with_secret_keys =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
-      gen ~logger ~trust_system ~accounts_with_secret_keys
+      gen ?logger ?verifier ?trust_system ~accounts_with_secret_keys
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
-  let gen_seq ~logger ~trust_system ~accounts_with_secret_keys n =
+  let gen_seq ?logger ?verifier ?trust_system ~accounts_with_secret_keys n =
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n
-        (gen ~logger ~trust_system ~accounts_with_secret_keys)
+        (gen ?logger ?verifier ?trust_system ~accounts_with_secret_keys)
     in
     let%map breadcrumbs_constructors = gen_list in
     fun root ->

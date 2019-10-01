@@ -16,15 +16,14 @@ let%test_module "Full_frontier tests" =
 
     let accounts_with_secret_keys = Genesis_ledger.accounts
 
-    let trust_system = Trust_system.null ()
-
     let max_length = 5
 
     let gen_breadcrumb =
-      Breadcrumb.For_tests.gen ~logger ~trust_system ~accounts_with_secret_keys
+      Breadcrumb.For_tests.gen ~logger ?verifier:None ?trust_system:None
+        ~accounts_with_secret_keys
 
     let gen_breadcrumb_seq =
-      Breadcrumb.For_tests.gen_seq ~logger ~trust_system
+      Breadcrumb.For_tests.gen_seq ~logger ?verifier:None ?trust_system:None
         ~accounts_with_secret_keys
 
     module Transfer = Ledger_transfer.Make (Ledger) (Ledger)

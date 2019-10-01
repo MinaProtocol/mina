@@ -65,20 +65,23 @@ val name : t -> string
 
 module For_tests : sig
   val gen :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
+       ?logger:Logger.t
+    -> ?verifier:Verifier.t
+    -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
     -> (t -> t Deferred.t) Quickcheck.Generator.t
 
   val gen_non_deferred :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
+       ?logger:Logger.t
+    -> ?verifier:Verifier.t
+    -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
     -> (t -> t) Quickcheck.Generator.t
 
   val gen_seq :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
+       ?logger:Logger.t
+    -> ?verifier:Verifier.t
+    -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
     -> int
     -> (t -> t list Deferred.t) Quickcheck.Generator.t
