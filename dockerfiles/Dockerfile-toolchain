@@ -68,8 +68,10 @@ RUN sudo rm -rf /coda
 RUN git -C /home/opam/opam-repository pull
 RUN opam update -y && opam upgrade -y
 
+# install vanilla OCaml compiler
+RUN opam switch create $OCAML_VERSION
 
-# spacetime OCaml compiler
+# install, use spacetime OCaml compiler
 RUN opam switch create $OCAML_VERSION+spacetime
 RUN eval $(opam env)
 
@@ -94,18 +96,23 @@ ADD /src/external/async_kernel /async_kernel
 # Source copy of graphql_ppx, updated for 4.07.1/4.08.0 support
 ADD /src/external/graphql_ppx /graphql_ppx
 
+# Remove .git files for submodules
+RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib ppx_optcomp rpc_parallel ; do \
+      rm -f /$pkg/.git ; \
+    done
+
 # Pin packages for spacetime compiler
 
 RUN cd /ocaml-sodium && opam pin -y add .
-RUN sudo rm -f /rpc_parallel/.git && cd /rpc_parallel && opam pin -y add .
-RUN sudo rm -f /ocaml-extlib/.git && cd /ocaml-extlib && opam pin -y add .
-RUN sudo rm -f /digestif/.git && cd /digestif && opam pin -y add .
-RUN sudo rm -f /async_kernel/.git && cd /async_kernel && opam pin -y add .
-RUN sudo rm -f /coda_base58/.git && cd /coda_base58 && opam pin -y add .
-RUN sudo rm -f /graphql_ppx/.git && cd /graphql_ppx && opam pin -y add .
+RUN cd /rpc_parallel && opam pin -y add .
+RUN cd /ocaml-extlib && opam pin -y add .
+RUN cd /digestif && opam pin -y add .
+RUN cd /async_kernel && opam pin -y add .
+RUN cd /coda_base58 && opam pin -y add .
+RUN cd /graphql_ppx && opam pin -y add .
 
-# vanilla OCaml compiler
-RUN opam switch create $OCAML_VERSION
+# use vanilla OCaml compiler
+RUN opam switch $OCAML_VERSION
 RUN eval $(opam env)
 
 # Install OPAM packages for vanilla compiler
