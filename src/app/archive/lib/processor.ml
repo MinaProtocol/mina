@@ -63,8 +63,9 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
   let added_transition {port}
       ({With_hash.data= block; _} as block_with_hash :
         (External_transition.t, State_hash.t) With_hash.t)
-      (_sender_receipt_chains_from_parent_ledger :
-        Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
+      (* (_sender_receipt_chains_from_parent_ledger :
+        Receipt.Chain_hash.t Public_key.Compressed.Map.t)  *)
+      =
     let open Deferred.Or_error.Let_syntax in
     let transactions =
       List.bind (External_transition.transactions block) ~f:(function
@@ -93,7 +94,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
                 ~hash_data:Transaction_hash.hash_fee_transfer
               :: acc_fee_transfers ) )
     in
-    let%map first_seen_user_commands =
+    let%bind first_seen_user_commands =
       let user_command_hashes =
         List.map user_commands
           ~f:(Fn.compose Transaction_hash.to_base58_check With_hash.hash)
@@ -127,12 +128,22 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
       Types.Blocks.serialize block_with_hash user_commands_with_time
     in
     (* Array.of_list [encoded_block] *)
-    Graphql_query.Blocks.Insert.make ~blocks:(Array.of_list [encoded_block])
+    let graphql =
+      Graphql_query.Blocks.Insert.make
+        ~blocks:(Array.of_list [encoded_block])
+        ()
+    in
+    let%bind _ = Client.query_or_error graphql port in
+    Deferred.Or_error.return ()
 
   let create port = {port}
 
   let run t reader =
     Strict_pipe.Reader.iter reader ~f:(function
+      | Diff.Transition_frontier
+          (Breadcrumb_added
+            {block; sender_receipt_chains_from_parent_ledger= _}) ->
+          Deferred.Or_error.ok_exn (added_transition t block)
       | Diff.Transition_frontier _ ->
           (* TODO: Implement *)
           Deferred.return ()
@@ -142,6 +153,10 @@ end
 
 let%test_module "Processor" =
   ( module struct
+    module Stubs = Transition_frontier_controller_tests.Stubs.Make (struct
+      let max_length = 4
+    end)
+
     module Processor = Make (struct
       let address = "v1/graphql"
 
@@ -151,6 +166,8 @@ let%test_module "Processor" =
         String.substr_replace_all ~pattern:{|"constraint_"|}
           ~with_:{|"constraint"|}
     end)
+
+    let logger = Logger.create ()
 
     let t = {Processor.port= 9000}
 
@@ -288,4 +305,11 @@ let%test_module "Processor" =
               assert_user_command
                 (user_command2, Some block_time2)
                 decoded_user_command2 ) )
+
+    (* let%test_unit "a block should be added to postgres" = 
+      Async.Thread_safe.block_on_async_exn @@ fun () -> 
+      let%bind frontier = 
+        Stubs.create_root_frontier ~logger ~pids:(Pid.Hash_set.of_list []) Genesis_ledger.accounts in
+      let root_breadcrumb = Transition_frontier.root frontier in
+      Deferred.unit *)
   end )

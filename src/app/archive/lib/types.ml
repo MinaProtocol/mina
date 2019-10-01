@@ -174,16 +174,16 @@ module Block_time = struct
     @@ Bitstring.of_yojson value
 end
 
-let encode_as_insert_input ~constraint_name ~updated_column data =
+let encode_as_insert_input ~constraint_name ~updated_columns data =
   object
-    method data = Array.of_list [data]
+    method data = data
 
     method on_conflict =
       Option.some
       @@ object
            method constraint_ = constraint_name
 
-           method update_columns = Array.of_list [updated_column]
+           method update_columns = Array.of_list updated_columns
          end
   end
 
@@ -281,7 +281,7 @@ module User_command = struct
 
   let encode_as_insert_input user_command_with_hash first_seen =
     encode_as_insert_input ~constraint_name:`user_commands_hash_key
-      ~updated_column:`first_seen
+      ~updated_columns:[`first_seen]
       (encode user_command_with_hash first_seen)
 
   let decode obj =
@@ -375,11 +375,6 @@ module Receipt_chain_hash = struct
                     method update_columns = Array.of_list [`hash]
                   end
            end
-      (* method receipt_chain_hash = object
-        method data = object
-          method blocks
-        end
-      end *)
     end
 end
 
@@ -387,6 +382,62 @@ end
   let encode (snark_job_ids) =
 
 end *)
+
+module Blocks_user_commands = struct
+  let encode user_command_with_hash first_seen =
+    object
+      (* TODO: Might have to remove block *)
+      method block = None
+
+      method block_id = None
+
+      (* TODO: fill in the receipt chain hash *)
+      method receipt_chain_hash = None
+
+      method receipt_chain_hash_id = None
+
+      method user_command =
+        Some
+          (User_command.encode_as_insert_input user_command_with_hash
+             first_seen)
+
+      method user_command_id = None
+    end
+
+  let encode_as_insert_input user_commands_with_hashes_and_time =
+    encode_as_insert_input
+      ~constraint_name:
+        `blocks_user_commands_block_id_user_command_id_receipt_chain_has
+      ~updated_columns:[`block_id; `user_command_id; `receipt_chain_hash_id]
+      ( Array.of_list
+      @@ List.map user_commands_with_hashes_and_time
+           ~f:(fun (user_command_with_hash, first_seen) ->
+             encode user_command_with_hash first_seen ) )
+end
+
+let create_blocks_user_commands user_commands_with_hashes_and_time =
+  let open Option in
+  Array.of_list
+  @@ List.map user_commands_with_hashes_and_time
+       ~f:(fun (user_command_with_hash, first_seen) ->
+         object
+           (* TODO: Might have to remove block *)
+           method block = None
+
+           method block_id = None
+
+           (* TODO: fill in the receipt chain hash *)
+           method receipt_chain_hash = None
+
+           method receipt_chain_hash_id = None
+
+           method user_command =
+             some
+             @@ User_command.encode_as_insert_input user_command_with_hash
+                  first_seen
+
+           method user_command_id = None
+         end )
 
 module Blocks = struct
   let serialize
@@ -450,40 +501,8 @@ module Blocks = struct
 
       (* some @@ User_command.encode_as_insert_input user_commands *)
       method blocks_user_commands =
-        object
-          method data =
-            Array.of_list
-            @@ List.map user_commands_with_hashes_and_time
-                 ~f:(fun (user_command_with_hash, first_seen) ->
-                   object
-                     (* TODO: Might have to remove block *)
-                     method block = None
-
-                     method block_id = None
-
-                     (* TODO: fill in the receipt chain hash *)
-                     method receipt_chain_hash = None
-
-                     method receipt_chain_hash_id = None
-
-                     method user_command =
-                       some
-                       @@ User_command.encode_as_insert_input
-                            user_command_with_hash first_seen
-
-                     method user_command_id = None
-                   end )
-
-          method on_conflict =
-            some
-            @@ object
-                 method constraint_ =
-                   `blocks_user_commands_block_id_user_command_id_receipt_chain_has
-
-                 method update_columns =
-                   Array.of_list
-                     [`block_id; `user_command_id; `receipt_chain_hash_id]
-               end
-        end
+        some
+        @@ Blocks_user_commands.encode_as_insert_input
+             user_commands_with_hashes_and_time
     end
 end

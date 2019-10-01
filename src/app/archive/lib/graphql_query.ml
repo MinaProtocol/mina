@@ -115,6 +115,21 @@ module Blocks = struct
     |}]
 end
 
+module Blocks_user_commands = struct
+  module Type_Test =
+  [%graphql
+  {|
+mutation insert($input: [blocks_user_commands_insert_input!]!) {
+  insert_blocks_user_commands(objects: $input, 
+    on_conflict: {constraint: blocks_user_commands_block_id_user_command_id_receipt_chain_has, 
+      update_columns: block_id}) {
+        affected_rows
+      }
+}
+
+|}]
+end
+
 module Clear_data =
 [%graphql
 {|
