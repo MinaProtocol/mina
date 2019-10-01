@@ -112,6 +112,8 @@ module Instance = struct
     >>= Database.get_transition t.db
     |> Result.map_error ~f:Database.Error.message
 
+  let set_frontier_hash t = Database.set_frontier_hash t.db
+
   let fast_forward t target_root :
       (unit, [> `Failure of string | `Bootstrap_required]) Result.t =
     let open Root_identifier.Stable.Latest in
@@ -132,9 +134,7 @@ module Instance = struct
       (* TODO: gracefully recover from this state *)
       Result.ok_if_true
         (Frontier_hash.equal frontier_hash target_root.frontier_hash)
-        ~error:
-          (`Failure
-            "already at persistent root, but frontier hash did not match")
+        ~error:`Frontier_hash_does_not_match
     else (
       Logger.warn t.factory.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
@@ -173,18 +173,6 @@ module Instance = struct
              `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
     in
-    (*
-    Printf.printf
-      !"genesis: %s\nroot transition: %s\nsnarked ledger db: %s\n%!"
-      ( Ledger.merkle_root (Lazy.force Genesis_ledger.t)
-      |> Ledger_hash.to_yojson |> Yojson.Safe.to_string )
-      ( External_transition.Validated.protocol_state root_transition
-      |> Protocol_state.blockchain_state
-      |> Blockchain_state.snarked_ledger_hash |> Frozen_ledger_hash.to_yojson
-      |> Yojson.Safe.to_string )
-      ( Ledger.Db.merkle_root root_ledger
-      |> Ledger_hash.to_yojson |> Yojson.Safe.to_string ) ;
-    *)
     (* construct the root staged ledger in memory *)
     let%bind root_staged_ledger =
       let open Deferred.Let_syntax in

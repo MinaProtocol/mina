@@ -6,7 +6,7 @@ module Stable : sig
   module Latest = V1
 end
 
-type t = Stable.Latest.t [@@deriving eq]
+type t = Stable.Latest.t [@@deriving eq, yojson]
 
 type transition = {source: t; target: t}
 

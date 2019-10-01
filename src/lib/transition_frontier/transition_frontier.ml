@@ -60,21 +60,32 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
   in
   let%bind () =
     Deferred.return
-      ( Persistent_frontier.Instance.fast_forward persistent_frontier_instance
-          root_identifier
-      |> Result.map_error ~f:(function
-           | `Sync_cannot_be_running ->
-               `Failure "sync job is already running on persistent frontier"
-           | `Bootstrap_required ->
-               `Bootstrap_required
-           | `Failure msg ->
-               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                 ~metadata:
-                   [ ( "target_root"
-                     , Root_identifier.Stable.Latest.to_yojson root_identifier
-                     ) ]
-                 "Unable to fast forward persistent frontier: %s" msg ;
-               `Failure msg ) )
+      ( match
+          Persistent_frontier.Instance.fast_forward
+            persistent_frontier_instance root_identifier
+        with
+      | Ok () ->
+          Ok ()
+      | Error `Frontier_hash_does_not_match ->
+          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [("frontier_hash", Hash.to_yojson root_identifier.frontier_hash)]
+            "Persistent frontier hash did not match persistent root frontier \
+             hash (resetting frontier hash)" ;
+          Persistent_frontier.Instance.set_frontier_hash
+            persistent_frontier_instance root_identifier.frontier_hash ;
+          Ok ()
+      | Error `Sync_cannot_be_running ->
+          Error (`Failure "sync job is already running on persistent frontier")
+      | Error `Bootstrap_required ->
+          Error `Bootstrap_required
+      | Error (`Failure msg) ->
+          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "target_root"
+                , Root_identifier.Stable.Latest.to_yojson root_identifier ) ]
+            "Unable to fast forward persistent frontier: %s" msg ;
+          Error (`Failure msg) )
   in
   let%bind full_frontier, extensions =
     Deferred.map
