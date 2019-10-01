@@ -82,7 +82,7 @@ let build ~logger ~verifier ~trust_system ~parent
                       , [("error", `String error_string)] ) )
                 in
                 let open Trust_system.Actions in
-                (* TODO : refine these actions, issue 2375 *)
+                (* TODO : refine these actions (#2375) *)
                 let open Staged_ledger.Pre_diff_info.Error in
                 let action =
                   match staged_ledger_error with

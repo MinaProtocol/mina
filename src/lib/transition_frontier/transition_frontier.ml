@@ -463,7 +463,9 @@ module For_tests = struct
           Persistent_root.create ~logger ~directory:root_dir
         in
         let persistent_frontier =
-          Persistent_frontier.create ~logger ~verifier ~directory:frontier_dir
+          Persistent_frontier.create ~logger ~verifier
+            ~time_controller:(Block_time.Controller.basic ~logger)
+            ~directory:frontier_dir
         in
         Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
         Gc.Expert.add_finalizer_exn persistent_frontier clean_temp_dirs ;

@@ -546,6 +546,7 @@ let create (config : Config.t) =
           let persistent_frontier =
             Transition_frontier.Persistent_frontier.create
               ~logger:config.logger ~verifier
+              ~time_controller:config.time_controller
               ~directory:config.persistent_frontier_location
           in
           let persistent_root =

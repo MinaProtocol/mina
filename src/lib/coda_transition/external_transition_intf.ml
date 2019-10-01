@@ -373,7 +373,8 @@ module type S = sig
   end
 
   val skip_frontier_dependencies_validation :
-       [`This_transition_belongs_to_a_detached_subtree]
+       [ `This_transition_belongs_to_a_detached_subtree
+       | `This_transition_was_loaded_from_persistence ]
     -> ( 'time_received
        , 'proof
        , 'delta_transition_chain

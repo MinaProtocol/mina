@@ -13,13 +13,13 @@
 
 + reimplement ledger catchup sync status (#3006)
 + implement persistent transition frontier loading
-* implement short term fast forward hack
++ implement short term fast forward hack
   - push transition frontier ownership down into transition router
-  - bootstrap recovery
-  - failure recovery (clean and retry once)
+  + bootstrap recovery
+  + failure recovery (clean and retry once)
 + implement persistent frontier database reset
 + implement persistent frontier database destruction
-- audit persistent root state management (updates, resets)
++ audit persistent root state management (updates, resets)
 + audit persistent frontier sync vs instance resource management
 - diff buffer flush on interval
 

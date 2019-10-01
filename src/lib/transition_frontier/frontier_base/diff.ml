@@ -175,7 +175,6 @@ let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
   | Best_tip_changed b ->
       Best_tip_changed b
 
-(* TODO: add versioning to Lite *)
 module Lite = struct
   type 'mutant t = (lite, 'mutant) diff
 

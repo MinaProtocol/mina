@@ -466,7 +466,9 @@ let validate_delta_transition_chain (t, validation) =
       Error `Invalid_delta_transition_chain_proof
 
 let skip_frontier_dependencies_validation
-    `This_transition_belongs_to_a_detached_subtree (t, validation) =
+    (_ :
+      [ `This_transition_belongs_to_a_detached_subtree
+      | `This_transition_was_loaded_from_persistence ]) (t, validation) =
   (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
 
 let validate_staged_ledger_hash

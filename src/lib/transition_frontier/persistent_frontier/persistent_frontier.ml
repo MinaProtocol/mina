@@ -27,12 +27,10 @@ let construct_staged_ledger_at_root ~logger ~verifier ~root_ledger
            let%map _ = Ledger.apply_transaction mask txn in
            () ))
   in
-  (* [new] TODO: !important -- make mask off root ledger and apply all scan state transactions to it *)
   Staged_ledger.of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash
     ~ledger:mask ~scan_state:root.scan_state
     ~pending_coinbase_collection:root.pending_coinbase
 
-(* [new] TODO: create a reusable singleton factory abstraction *)
 module rec Instance_type : sig
   type t =
     {db: Database.t; mutable sync: Sync.t option; factory: Factory_type.t}
@@ -44,6 +42,7 @@ and Factory_type : sig
     { logger: Logger.t
     ; directory: string
     ; verifier: Verifier.t
+    ; time_controller: Block_time.Controller.t
     ; mutable instance: Instance_type.t option }
 end =
   Factory_type
@@ -74,7 +73,10 @@ module Instance = struct
     let open Result.Let_syntax in
     let%bind () = assert_no_sync t in
     let%map base_hash = Database.get_frontier_hash t.db in
-    t.sync <- Some (Sync.create ~logger:t.factory.logger ~base_hash ~db:t.db)
+    t.sync
+    <- Some
+         (Sync.create ~logger:t.factory.logger
+            ~time_controller:t.factory.time_controller ~base_hash ~db:t.db)
 
   let stop_sync t =
     let open Deferred.Let_syntax in
@@ -119,7 +121,6 @@ module Instance = struct
     let open Root_identifier.Stable.Latest in
     let open Result.Let_syntax in
     let%bind () = assert_no_sync t in
-    (* TODO: don't swallow up underlying error in lift_error *)
     let lift_error r msg = Result.map_error r ~f:(Fn.const (`Failure msg)) in
     let%bind root =
       lift_error (Database.get_root t.db) "failed to get root hash"
@@ -131,7 +132,6 @@ module Instance = struct
           (Database.get_frontier_hash t.db)
           "failed to get frontier hash"
       in
-      (* TODO: gracefully recover from this state *)
       Result.ok_if_true
         (Frontier_hash.equal frontier_hash target_root.frontier_hash)
         ~error:`Frontier_hash_does_not_match
@@ -156,9 +156,8 @@ module Instance = struct
            `This_transition_was_generated_internally
       |> External_transition.skip_delta_transition_chain_validation
            `This_transition_was_not_received_via_gossip
-      (* TODO: add new variant for loaded from persistence *)
       |> External_transition.skip_frontier_dependencies_validation
-           `This_transition_belongs_to_a_detached_subtree
+           `This_transition_was_loaded_from_persistence
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
@@ -246,8 +245,8 @@ end
 
 type t = Factory_type.t
 
-let create ~logger ~verifier ~directory =
-  {logger; verifier; directory; instance= None}
+let create ~logger ~verifier ~time_controller ~directory =
+  {logger; verifier; time_controller; directory; instance= None}
 
 let destroy_database_exn t =
   assert (t.instance = None) ;
@@ -278,13 +277,14 @@ let reset_database_exn t ~root_data =
   let%bind () = destroy_database_exn t in
   with_instance_exn t ~f:(fun instance ->
       Database.initialize instance.db ~root_data ~base_hash:Frontier_hash.empty ;
-      (* TODO: remove, this is only a temp sanity check *)
-      Database.check instance.db
-      |> Result.map_error ~f:(function
-           | `Invalid_version ->
-               "invalid version"
-           | `Not_initialized ->
-               "not initialized"
-           | `Corrupt err ->
-               Database.Error.message err )
-      |> Result.ok_or_failwith )
+      (* sanity check database after initialization on debug builds *)
+      Debug_assert.debug_assert (fun () ->
+          Database.check instance.db
+          |> Result.map_error ~f:(function
+               | `Invalid_version ->
+                   "invalid version"
+               | `Not_initialized ->
+                   "not initialized"
+               | `Corrupt err ->
+                   Database.Error.message err )
+          |> Result.ok_or_failwith ) )

@@ -1,9 +1,15 @@
 open Async_kernel
+open Coda_base
 open Frontier_base
 
 type t
 
-val create : logger:Logger.t -> base_hash:Frontier_hash.t -> db:Database.t -> t
+val create :
+     logger:Logger.t
+  -> time_controller:Block_time.Controller.t
+  -> base_hash:Frontier_hash.t
+  -> db:Database.t
+  -> t
 
 val notify :
      t
