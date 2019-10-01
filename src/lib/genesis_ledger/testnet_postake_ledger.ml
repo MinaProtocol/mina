@@ -12,7 +12,7 @@ include Make (struct
   let real_accounts =
     [ { pk=
           Public_key.Compressed.of_base58_check_exn
-            "tdNDtXVVYw2N5Sc6yAeFr2Wd8yL1GQVLnfHjsgMGHTVZeRWHCmjXApbrWRDLqLiKMs1C2jA9zUpB4k2WwwQBH3jBGErLVK5zck1fxxGkt2un3iAYkXqX4Y1v4hpWpFEPzEw4notdKTu53p"
+            "tdNEJsZZgAKgcuuqtRs8cb3SDJAfTdwpbAdg6aNnV2WZXftd2USKNFc6VPU7KtFZD1JNnCzWq3ygaioNNxqw1d6DW4KyR8MhNthdLDQMYK2nwz8zeCWUm6EQpREnvQDw11khpbKoyBX9uJ"
       ; balance= 0
       ; delegate= None }
     ; { pk=
