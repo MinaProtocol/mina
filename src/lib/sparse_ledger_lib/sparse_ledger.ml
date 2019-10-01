@@ -214,7 +214,19 @@ end = struct
           let go_right = ith_bit idx i in
           if go_right then go (i - 1) r else go (i - 1) l
       | _ ->
-          failwith "Sparse_ledger.get: Bad index"
+          let expected_kind = if i < 0 then "n account" else " node" in
+          let kind =
+            match tree with
+            | Account _ ->
+                "n account"
+            | Hash _ ->
+                " hash"
+            | Node _ ->
+                " node"
+          in
+          failwithf
+            "Spare_ledger.get: Bad index %i. Expected a%s, but got a%s." idx
+            expected_kind kind ()
     in
     go (depth - 1) tree
 
@@ -230,7 +242,19 @@ end = struct
           in
           Node (Hash.merge ~height:i (hash l) (hash r), l, r)
       | _ ->
-          failwith "Sparse_ledger.set: Bad index"
+          let expected_kind = if i < 0 then "n account" else " node" in
+          let kind =
+            match tree with
+            | Account _ ->
+                "n account"
+            | Hash _ ->
+                " hash"
+            | Node _ ->
+                " node"
+          in
+          failwithf
+            "Spare_ledger.set: Bad index %i. Expected a%s, but got a%s." idx
+            expected_kind kind ()
     in
     {t with tree= go (t.depth - 1) t.tree}
 
@@ -240,9 +264,9 @@ end = struct
       else
         match tree with
         | Poly.Tree.Account _ ->
-            failwith "Sparse_ledger.path: Bad depth"
+            failwithf "Sparse_ledger.path: Bad depth at index %i." idx ()
         | Hash _ ->
-            failwith "Sparse_ledger.path: Dead end"
+            failwithf "Sparse_ledger.path: Dead end at index %i." idx ()
         | Node (_, l, r) ->
             let go_right = ith_bit idx i in
             if go_right then go (`Right (hash l) :: acc) (i - 1) r
