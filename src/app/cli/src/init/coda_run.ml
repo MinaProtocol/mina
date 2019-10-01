@@ -6,7 +6,7 @@ open Coda_transition
 open Coda_state
 open O1trace
 module Graphql_cohttp_async =
-  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Io)
+  Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
 
 let snark_job_list_json t =
