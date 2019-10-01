@@ -57,7 +57,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5`
+`docker pull codaprotocol/coda:toolchain-d9610596d89adb803ee5174ea9bb7f9cac8d1936`
 
 * Create local builder image
 
@@ -66,6 +66,10 @@ of the repo.
 * Start developer container
 
 `make containerstart`
+
+* Update OPAM packages
+
+`make USEDOCKER=TRUE update-opam`
 
 * Start a build (go stretch your arms)
 

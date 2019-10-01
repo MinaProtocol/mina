@@ -4,7 +4,7 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
+            - image: codaprotocol/coda:toolchain-rust-d9610596d89adb803ee5174ea9bb7f9cac8d1936
         steps:
             - checkout
             - run:
@@ -61,18 +61,12 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-d9610596d89adb803ee5174ea9bb7f9cac8d1936
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
@@ -242,7 +236,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-d9610596d89adb803ee5174ea9bb7f9cac8d1936
         steps:
             - checkout
             - run:
@@ -251,14 +245,8 @@ jobs:
                       mkdir -p /tmp/artifacts
                       touch /tmp/artifacts/coda_pvkeys_dummy
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
@@ -306,19 +294,13 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-d9610596d89adb803ee5174ea9bb7f9cac8d1936
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
           # Uncomment if you want to try debugging why this install breaks
           # some unit tests:
           # 1. The command_line_tests
@@ -353,19 +335,13 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-d9610596d89adb803ee5174ea9bb7f9cac8d1936
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
@@ -378,18 +354,12 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-d9610596d89adb803ee5174ea9bb7f9cac8d1936
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
@@ -403,18 +373,12 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-d9610596d89adb803ee5174ea9bb7f9cac8d1936
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             {%- for test in medium_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
