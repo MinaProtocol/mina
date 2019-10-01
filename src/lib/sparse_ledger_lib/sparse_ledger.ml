@@ -256,7 +256,7 @@ end = struct
           failwithf
             "Spare_ledger.set: Bad index %i. Expected a%s, but got a%s at \
              depth %i."
-            idx expected_kind kind (depth - i) ()
+            idx expected_kind kind (t.depth - i) ()
     in
     {t with tree= go (t.depth - 1) t.tree}
 
