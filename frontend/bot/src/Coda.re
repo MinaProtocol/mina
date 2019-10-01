@@ -54,7 +54,7 @@ let unlock = (~publicKey, ~password) => {
            `Error,
            "Unlock failed for %s, error: %s",
            publicKey,
-           Js.String.make(e),
+           Graphql.combinedErrorToString(e),
          )
        | NotFound => log(`Error, "Got 'NotFound' unlocking %s", publicKey)
        }
