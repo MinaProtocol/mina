@@ -73,29 +73,28 @@ With the block header at the root, NC nodes can query the account state from the
 
 The current value of k is 2160 which means for a transaction to be finalized, it would take 10 days. That does not seem like a good user experience. Transactions on Bitcoin and Ethereum are finalized after 6 (~an hour) and 30 (~7mins) block respectively.
 
-The probability that there will be a fork of length for different values of k:
+The probability that there will be a fork of length k:
 
-| k | fork probability(P) | epoch-length | duration (hrs)|
-|---|----------|--------------|----------|
-| 5 | 179995.500055806 |1| 0.5|
-| 30| 179970.502416786 |1| 3|
-| 100| 179900.527495185 |1|10|
-| 1000| 895016.349355270 |5|100|
-| 1199| 894027.405824661 |5| ~120|
-| 1200| 1.07282692682344e6 |6|120|
-| 1500| 1.24954709968124e6 |7|150|
-| 2000| 1.60210408093512e6 |9|200|
-| 2160| 1.77853402351249e6 |10|216|
+| k | fork probability | duration (hrs) (block_window_duration = 6mins)|
+|---|----------|----------|
+| 5 | 0.49024 | 0.5|
+| 30| 0.313376 | 3|
+| 100| 0.110262|10|
+| 200| 0.0273769 | 20 |
+| 300| 0.00697404 | 30 |
+| 400| 0.00179144 | 40 |
+| 500| 0.000461763 | 50 |
+| 600| 0.000119216 | 60 |
+| 700| 3.0803e-05 | 70 |
+| 800| 7.96218e-06 | 80 |
+| 900| 2.05858e-06 | 90 |
+| 1000| 5.32297e-07|100 |
 
-These values are from the following equation provided by @vanishreerao:
+(\(\epsilon\) = 0.4)
 
-$P = R*e^{-\epsilon^4k/18}  / (1 - e^{-\epsilon^4/18})$
+k (for non-consensus nodes) = 100?
 
-where
-    $R$ = epoch length (240 slots per epoch, #slots = #blocks assuming there is block in each slot)
-    \(\epsilon\) = 0.1
-
-k = 1200 then?
+The block window duration would change with the hash function change which would reduce the wait time for finalization?
 
 ### Gossip layer
 
