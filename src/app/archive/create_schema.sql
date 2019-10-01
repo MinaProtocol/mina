@@ -8,6 +8,10 @@ CREATE TABLE public_keys (
   value text NOT NULL
 );
 
+alter table public_keys add constraint public_keys_value_key unique (value);
+
+CREATE INDEX public_keys_value_index ON public_keys (value);
+
 CREATE TABLE blocks (
   id serial PRIMARY KEY,
   parent_hash text NOT NULL, -- State hashes should be their own table and the id of the block will match the state_hashes
@@ -22,7 +26,9 @@ CREATE TABLE blocks (
   FOREIGN KEY (creator) REFERENCES public_keys (id)
 );
 
-CREATE UNIQUE INDEX state_hash ON blocks (state_hash);
+alter table blocks add constraint blocks_state_hash_key unique (state_hash);
+
+CREATE INDEX blocks_state_hash_index ON blocks (state_hash);
 
 CREATE INDEX block_compare ON blocks (block_length, global_slot);
 
@@ -35,7 +41,9 @@ CREATE TABLE receipt_chain_hashes (
   FOREIGN KEY (parent_id) REFERENCES receipt_chain_hashes (id)
 );
 
-CREATE UNIQUE INDEX receipt_chain_hash_id ON receipt_chain_hashes (hash);
+alter table receipt_chain_hashes add constraint receipt_chain_hashes_hash_key unique (hash);
+
+CREATE UNIQUE INDEX receipt_chain_hashes_hash_index ON receipt_chain_hashes (hash);
 
 CREATE TABLE user_commands (
   id serial PRIMARY KEY,
@@ -52,7 +60,9 @@ CREATE TABLE user_commands (
   FOREIGN KEY (receiver) REFERENCES public_keys (id)
 );
 
-CREATE UNIQUE INDEX user_command_hash ON user_commands (hash);
+alter table user_commands add constraint user_commands_hash_key unique (hash);
+
+CREATE INDEX user_commands_hash_index ON user_commands (hash);
 
 CREATE INDEX fast_user_command_sender_pagination ON user_commands (sender, first_seen);
 
@@ -67,9 +77,11 @@ CREATE TABLE fee_transfers (
   FOREIGN KEY (receiver) REFERENCES public_keys (id)
 );
 
-CREATE UNIQUE INDEX fee_transfer_hash ON fee_transfers (hash);
+alter table fee_transfers add constraint fee_transfers_hash_key unique (hash);
 
-CREATE INDEX fee_transfer_receiver ON fee_transfers (receiver, first_seen);
+CREATE INDEX fee_transfer_hash_index ON fee_transfers (hash);
+
+CREATE INDEX fee_transfer_receiver_index ON fee_transfers (receiver, first_seen);
 
 CREATE TABLE blocks_user_commands (
   block_id int NOT NULL,
@@ -79,6 +91,8 @@ CREATE TABLE blocks_user_commands (
   FOREIGN KEY (user_command_id) REFERENCES user_commands (id),
   FOREIGN KEY (receipt_chain_hash_id) REFERENCES receipt_chain_hashes(id)
 );
+
+alter table blocks_user_commands add constraint blocks_user_commands_block_id_user_command_id_receipt_chain_hash_id_key unique (block_id, user_command_id, receipt_chain_hash_id);
 
 CREATE INDEX blocks_user_command__block_id ON blocks_user_commands (block_id);
 
@@ -90,6 +104,8 @@ CREATE TABLE blocks_fee_transfers (
   FOREIGN KEY (block_id) REFERENCES blocks (id),
   FOREIGN KEY (fee_transfer_id) REFERENCES fee_transfers (id)
 );
+
+alter table blocks_fee_transfers add constraint blocks_fee_transfers_block_id_fee_transfer_id_key unique (block_id, fee_transfer_id);
 
 CREATE INDEX blocks_fee_transfers__block_id ON blocks_fee_transfers (block_id);
 
@@ -103,7 +119,9 @@ CREATE TABLE snark_jobs (
   job2 int
 );
 
-CREATE UNIQUE INDEX snark_job ON snark_jobs (job1, job2);
+CREATE INDEX snark_job_index ON snark_jobs (job1, job2);
+
+alter table snark_jobs add constraint snark_jobs_job1_job2_key unique (job1, job2);
 
 CREATE TABLE blocks_snark_jobs (
   block_id int NOT NULL,
@@ -111,3 +129,5 @@ CREATE TABLE blocks_snark_jobs (
   FOREIGN KEY (block_id) REFERENCES blocks (id),
   FOREIGN KEY (snark_job_id) REFERENCES snark_jobs (id)
 );
+
+alter table blocks_snark_jobs add constraint blocks_snark_jobs_block_id_snark_job_id_key unique (block_id, snark_job_id);

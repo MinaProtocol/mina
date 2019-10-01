@@ -74,6 +74,11 @@ build: git_hooks reformat-diff
 	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build app/logproc/logproc.exe app/cli/src/coda.exe  --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
+build_archive: git_hooks reformat-diff
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && dune build app/archive/archive.exe --profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
 dev: codabuilder containerstart build
 
 macos-portable:

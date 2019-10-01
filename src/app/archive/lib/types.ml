@@ -18,17 +18,6 @@ open Signature_lib
     graphql_ppx treats custom scalars as Yojson.Basic.t types (usually they are
     encoded as Json string types).
 
-    As a result, encoding a type to a Hasura input is broken into two phases:
-
-    1. Postgres phase: This phase converts OCaml type (such as blocks and
-    transactions) to some intermediate representation that is very similar to
-    their respective Postgres schema type.
-
-    2. Graphql object phase: The intermediate Postgres types are converted
-    directly to some input that the Hasura Graphql schema would accept. This is
-    essentially lifting types with the Option type and coercing Postgres custom
-    scalar into Yojson types
-
     **)
 
 module Graphql_output = struct
@@ -160,135 +149,132 @@ module User_command_type = struct
         raise (Invalid_argument "Unexpected input to decode user command type")
 end
 
-module Public_key = struct
-  type postgres = {value: string}
+module Make_Bitstring_converters (Bit : Binary_intf) = struct
+  open Bitstring
 
-  let serialize public_key =
-    {value= Public_key.Compressed.to_base58_check public_key}
+  let serialize amount = to_yojson @@ to_bitstring (module Bit) amount
 
-  let to_graphql_obj {value; _} =
-    object
-      method value = Some value
-
-      method user_commands = None
-
-      method userCommandsByReceiver = None
-
-      method fee_transfers = None
-
-      method blocks = None
-    end
-
-  let encode = Fn.compose to_graphql_obj serialize
+  let deserialize yojson = of_bitstring (module Bit) @@ of_yojson yojson
 end
+
+module Fee = Make_Bitstring_converters (Currency.Fee)
+module Amount = Make_Bitstring_converters (Currency.Amount)
+module Nonce = Make_Bitstring_converters (Account.Nonce)
 
 module Block_time = struct
   let serialize value =
-    Bitstring.of_numeric (module Int64) @@ Block_time.to_int64 value
+    Bitstring.to_yojson
+    @@ Bitstring.of_numeric (module Int64)
+    @@ Block_time.to_int64 value
 
   let deserialize value =
-    Block_time.of_int64 @@ Bitstring.to_numeric (module Int64) value
+    Block_time.of_int64
+    @@ Bitstring.to_numeric (module Int64)
+    @@ Bitstring.of_yojson value
 end
 
 module User_command = struct
-  type postgres =
-    { fee: Bitstring.t
-    ; hash: string
-    ; memo: string
-    ; nonce: Bitstring.t
-    ; receiver: int
-    ; sender: int
-    ; typ: [`Payment | `Delegation]
-    ; amount: Bitstring.t
-    ; first_seen: Bitstring.t option }
+  let receiver user_command =
+    match (User_command.payload user_command).body with
+    | Payment payment ->
+        payment.receiver
+    | Stake_delegation (Set_delegate delegation) ->
+        delegation.new_delegate
 
-  let serialize {With_hash.data= user_command; hash} (`Receiver receiver_id)
-      (`Sender sender_id) first_seen =
+  let create_public_key_obj public_key =
+    object
+      method data =
+        object
+          method blocks = None
+
+          method fee_transfers = None
+
+          method userCommandsByReceiver = None
+
+          method user_commands = None
+
+          method value = Some public_key
+        end
+
+      method on_conflict =
+        Option.some
+        @@ object
+             method constraint_ = `public_keys_value_key
+
+             method update_columns = Array.of_list [`value]
+           end
+    end
+
+  let encode {With_hash.data= user_command; hash} first_seen =
     let payload = User_command.payload user_command in
     let body = payload.body in
-    let open Bitstring in
-    { amount=
-        to_bitstring
-          (module Currency.Amount)
-          ( match body with
-          | Payment payment ->
-              payment.amount
-          | Stake_delegation _ ->
-              Currency.Amount.zero )
-    ; fee= to_bitstring (module Currency.Fee) (User_command.fee user_command)
-    ; first_seen= Option.map first_seen ~f:Block_time.serialize
-    ; hash= Transaction_hash.to_base58_check hash
-    ; memo= User_command_memo.to_string @@ User_command_payload.memo payload
-    ; nonce=
-        to_bitstring (module Coda_numbers.Account_nonce)
-        @@ User_command_payload.nonce payload
-    ; sender= sender_id
-    ; receiver= receiver_id
-    ; typ=
-        ( match body with
-        | Payment _ ->
-            `Payment
-        | Stake_delegation _ ->
-            `Delegation ) }
-
-  let to_graphql_obj
-      {fee; hash; memo; nonce; receiver; sender; typ; amount; first_seen} =
+    let sender =
+      Public_key.Compressed.to_base58_check @@ User_command.sender user_command
+    in
+    let receiver =
+      Public_key.Compressed.to_base58_check @@ receiver user_command
+    in
     let open Option in
     object
-      method hash = some hash
+      method hash = some @@ Transaction_hash.to_base58_check hash
 
       method blocks_user_commands = None
 
-      method amount = some @@ Bitstring.to_yojson amount
+      method amount =
+        some
+        @@ Amount.serialize
+             ( match body with
+             | Payment payment ->
+                 payment.amount
+             | Stake_delegation _ ->
+                 Currency.Amount.zero )
 
-      method fee = some @@ Bitstring.to_yojson fee
+      method fee = some @@ Fee.serialize (User_command.fee user_command)
 
-      method first_seen = Option.map first_seen ~f:Bitstring.to_yojson
+      method first_seen = Option.map first_seen ~f:Block_time.serialize
 
-      method memo = some @@ memo
+      method memo =
+        some @@ User_command_memo.to_string
+        @@ User_command_payload.memo payload
 
-      method nonce = some @@ Bitstring.to_yojson nonce
+      method nonce =
+        some @@ Nonce.serialize @@ User_command_payload.nonce payload
 
-      method public_key = None
+      method public_key = some @@ create_public_key_obj sender
 
-      method publicKeyByReceiver = None
+      method publicKeyByReceiver = some @@ create_public_key_obj receiver
 
-      method sender = some sender
+      method sender = None
 
-      method receiver = some receiver
+      method receiver = None
 
-      method typ = some @@ User_command_type.encode typ
+      method typ =
+        some
+        @@ User_command_type.encode
+             ( match body with
+             | Payment _ ->
+                 `Payment
+             | Stake_delegation _ ->
+                 `Delegation )
     end
 
-  let encode ~receiver ~sender user_command_with_hash block_time =
-    to_graphql_obj
-    @@ serialize user_command_with_hash (`Receiver receiver) (`Sender sender)
-         (Some block_time)
-
-  let decode
-      {fee; hash= _; memo; nonce; receiver; sender; typ; amount; first_seen= _}
-      public_keys_map =
-    let receiver = Map.find_exn public_keys_map receiver in
-    let sender = Map.find_exn public_keys_map sender in
+  let decode obj =
+    let receiver = (obj#publicKeyByReceiver)#value in
+    let sender = (obj#public_key)#value in
     let body =
       let open User_command_payload.Body in
-      match typ with
+      match obj#typ with
       | `Delegation ->
           Stake_delegation (Set_delegate {new_delegate= receiver})
       | `Payment ->
-          Payment
-            { receiver
-            ; amount= Bitstring.of_bitstring (module Currency.Amount) amount }
+          Payment {receiver; amount= obj#amount}
     in
     let payload =
-      User_command_payload.create
-        ~fee:(Bitstring.of_bitstring (module Currency.Fee) fee)
-        ~nonce:
-          (Bitstring.of_bitstring (module Coda_numbers.Account_nonce) nonce)
-        ~memo:(User_command_memo.of_string memo)
+      User_command_payload.create ~fee:obj#fee ~nonce:obj#nonce ~memo:obj#memo
         ~body
     in
-    Coda_base.{User_command.Poly.Stable.V1.payload; sender; signature= ()}
+    ( Coda_base.{User_command.Poly.Stable.V1.payload; sender; signature= ()}
+    , obj#first_seen )
 end
 
 module Fee_transfer = struct

@@ -2,22 +2,18 @@ open Signature_lib
 open Coda_base
 open Core
 
-let deserialize_optional_block_time =
-  Option.map
-    ~f:(Fn.compose Types.Block_time.deserialize Types.Bitstring.of_yojson)
+let deserialize_optional_block_time = Option.map ~f:Types.Bitstring.of_yojson
 
 module User_commands = struct
-  open Types.Graphql_output.With_first_seen.Transaction_hash
-  open Types.User_command
+  let decode_optional_block_time = Option.map ~f:Types.Block_time.deserialize
 
-  module Get_existing =
+  module Query_first_seen =
   [%graphql
   {|
-    query get_existing ($hashes: [String!]!) {
-        user_commands(where: {hash: {_in: $hashes}} ) @bsRecord {
-            id
+    query query_first_seen ($hashes: [String!]!) {
+        user_commands(where: {hash: {_in: $hashes}} ) {
             hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
-            first_seen @bsDecoder(fn: "deserialize_optional_block_time")
+            first_seen @bsDecoder(fn: "decode_optional_block_time")
         }
     }
 |}]
@@ -28,27 +24,21 @@ module User_commands = struct
   module Query =
   [%graphql
   {|
-    query query ($hash: String!) {
-        user_commands(where: {hash: {_eq: $hash}} ) @bsRecord {
-            fee @bsDecoder (fn: "Types.Bitstring.of_yojson")
-            hash
-            memo
-            nonce @bsDecoder (fn: "Types.Bitstring.of_yojson")
-            receiver
-            sender
+    query query_user_commands ($hash: String!) {
+        user_commands(where: {hash: {_eq: $hash}} ) {
+            fee @bsDecoder (fn: "Types.Fee.deserialize")
+            hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
+            memo @bsDecoder(fn: "User_command_memo.of_string")
+            nonce @bsDecoder (fn: "Types.Nonce.deserialize")
+            public_key {
+                value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
+            }
+            publicKeyByReceiver {
+              value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
+            } 
             typ @bsDecoder (fn: "Types.User_command_type.decode")
-            amount @bsDecoder (fn: "Types.Bitstring.of_yojson")
-            first_seen @bsDecoder(fn: "bitstring_block_time")
-        }
-    }
-|}]
-
-  module Update =
-  [%graphql
-  {|
-    mutation get_existing ($current_id: Int!, $new_first_seen: bit!) {
-        update_user_commands(where: {id: {_eq: $current_id}}, _set: {first_seen: $new_first_seen}) {
-            affected_rows
+            amount @bsDecoder (fn: "Types.Amount.deserialize")
+            first_seen @bsDecoder(fn: "decode_optional_block_time")
         }
     }
 |}]
@@ -58,7 +48,7 @@ module User_commands = struct
   {|
     mutation transaction_insert($user_commands: [user_commands_insert_input!]!) {
     insert_user_commands(objects: $user_commands,
-    on_conflict: {constraint: user_commands_pkey, update_columns: first_seen}
+    on_conflict: {constraint: user_commands_hash_key, update_columns: first_seen}
     ) {
       returning @bsRecord {
         id
@@ -70,29 +60,13 @@ module User_commands = struct
 |}]
 end
 
-module Public_keys = struct
-  open Types.Graphql_output.Public_keys
-
-  module Get_existing =
+module Public_key = struct
+  module Query =
   [%graphql
   {|
-    query get_existing ($public_keys: [String!]!) {
-        public_keys(where: {value: {_in: $public_keys}} ) @bsRecord {
-            id
-            value @bsDecoder(fn: "Public_key.Compressed.of_base58_check_exn")
-        }
-    }
-|}]
-
-  module Insert =
-  [%graphql
-  {|
-    mutation insert ($public_keys: [public_keys_insert_input!]!) {
-        insert_public_keys(objects: $public_keys ) {
-            returning @bsRecord {
-                id
-                value @bsDecoder(fn: "Public_key.Compressed.of_base58_check_exn")
-            }
+    query query_public_keys {
+        public_keys {
+            value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
         }
     }
 |}]

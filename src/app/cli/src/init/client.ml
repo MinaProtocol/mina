@@ -3,6 +3,14 @@ open Async
 open Signature_lib
 open Coda_base
 
+module Graphql_client = Graphql_client_lib.Make (struct
+  let address = "graphql"
+
+  let preprocess_variables_string = Fn.id
+
+  let headers = String.Map.empty
+end)
+
 let print_rpc_error error =
   eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
 
@@ -790,10 +798,9 @@ let snark_job_list =
 let snark_pool_list =
   let open Command.Param in
   Command.async ~summary:"List of snark works in the snark pool in JSON format"
-    (Cli_lib.Background_daemon.graphql_init (return ())
-       ~f:(fun (module Client) () ->
+    (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
          Deferred.map
-           (Client.query (Graphql_query.Snark_pool.make ()))
+           (Graphql_client.query (Graphql_query.Snark_pool.make ()) port)
            ~f:(fun response ->
              let lst =
                [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
@@ -859,7 +866,7 @@ let set_snark_worker =
   Command.async
     ~summary:"Set key you wish to snark work with or disable snark working"
     (Cli_lib.Background_daemon.graphql_init public_key_flag
-       ~f:(fun (module Client) optional_public_key ->
+       ~f:(fun port optional_public_key ->
          let open Graphql_query in
          let graphql =
            Set_snark_worker.make
@@ -868,7 +875,7 @@ let set_snark_worker =
                  optional optional_public_key ~f:public_key)
              ()
          in
-         Deferred.map (Client.query graphql) ~f:(fun response ->
+         Deferred.map (Graphql_client.query graphql port) ~f:(fun response ->
              ( match optional_public_key with
              | Some public_key ->
                  printf
@@ -885,7 +892,7 @@ let set_snark_work_fee =
   Command.async ~summary:"Set fee reward for doing transaction snark work"
   @@ Cli_lib.Background_daemon.graphql_init
        Command.Param.(anon @@ ("fee" %: Cli_lib.Arg_type.txn_fee))
-       ~f:(fun (module Client) fee ->
+       ~f:(fun port fee ->
          let graphql =
            Graphql_query.Set_snark_work_fee.make
              ~fee:
@@ -893,7 +900,7 @@ let set_snark_work_fee =
                @@ Currency.Fee.to_uint64 fee )
              ()
          in
-         Deferred.map (Client.query graphql) ~f:(fun response ->
+         Deferred.map (Graphql_client.query graphql port) ~f:(fun response ->
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
                (Currency.Fee.to_int fee)
@@ -954,7 +961,7 @@ let import_key =
     ~summary:
       "Import a password protected private key to be tracked by the daemon."
     (Cli_lib.Background_daemon.graphql_init flags
-       ~f:(fun (module Client) (privkey_path, conf_dir) ->
+       ~f:(fun port (privkey_path, conf_dir) ->
          let open Deferred.Let_syntax in
          let%bind home = Sys.home_directory () in
          let conf_dir =
@@ -985,7 +992,7 @@ let import_key =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
              let%map _response =
-               Client.query (Graphql_query.Reload_wallets.make ())
+               Graphql_client.query (Graphql_query.Reload_wallets.make ()) port
              in
              printf
                !"\n👝 Imported account!\nPublic key: %s\n"
@@ -995,9 +1002,10 @@ let import_key =
 let list_accounts =
   let open Command.Param in
   Command.async ~summary:"List all owned accounts"
-    (Cli_lib.Background_daemon.graphql_init (return ())
-       ~f:(fun (module Client) () ->
-         let%map response = Client.query (Graphql_query.Get_wallets.make ()) in
+    (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
+         let%map response =
+           Graphql_client.query (Graphql_query.Get_wallets.make ()) port
+         in
          match response#ownedWallets with
          | [||] ->
              printf
@@ -1018,15 +1026,15 @@ let list_accounts =
 let create_account =
   let open Command.Param in
   Command.async ~summary:"Create new account"
-    (Cli_lib.Background_daemon.graphql_init (return ())
-       ~f:(fun (module Client) () ->
+    (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
          let%bind password =
            Secrets.Keypair.prompt_password "Password for new account: "
          in
          let%map response =
-           Client.query
+           Graphql_client.query
              (Graphql_query.Add_wallet.make
                 ~password:(Bytes.to_string password) ())
+             port
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
@@ -1041,8 +1049,7 @@ let unlock_account =
       (required string)
   in
   Command.async ~summary:"Unlock a tracked account"
-    (Cli_lib.Background_daemon.graphql_init public_key
-       ~f:(fun (module Client) pk_str ->
+    (Cli_lib.Background_daemon.graphql_init public_key ~f:(fun port pk_str ->
          let args =
            let open Deferred.Or_error.Let_syntax in
            let%bind pk =
@@ -1057,11 +1064,12 @@ let unlock_account =
          match%bind args with
          | Ok (pk, password_bytes) ->
              let%map response =
-               Client.query
+               Graphql_client.query
                  (Graphql_query.Unlock_wallet.make
                     ~public_key:(Graphql_client_lib.Encoders.public_key pk)
                     ~password:(Bytes.to_string password_bytes)
                     ())
+                 port
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
@@ -1080,15 +1088,15 @@ let lock_account =
       (required string)
   in
   Command.async ~summary:"Lock a tracked account"
-    (Cli_lib.Background_daemon.graphql_init public_key
-       ~f:(fun (module Client) pk_str ->
+    (Cli_lib.Background_daemon.graphql_init public_key ~f:(fun port pk_str ->
          match Public_key.Compressed.of_base58_check pk_str with
          | Ok pk ->
              let%map response =
-               Client.query
+               Graphql_client.query
                  (Graphql_query.Lock_wallet.make
                     ~public_key:(Graphql_client_lib.Encoders.public_key pk)
                     ())
+                 port
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
