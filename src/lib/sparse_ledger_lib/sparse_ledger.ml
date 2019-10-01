@@ -225,8 +225,9 @@ end = struct
                 " node"
           in
           failwithf
-            "Spare_ledger.get: Bad index %i. Expected a%s, but got a%s." idx
-            expected_kind kind ()
+            "Spare_ledger.get: Bad index %i. Expected a%s, but got a%s at \
+             depth %i."
+            idx expected_kind kind (depth - i) ()
     in
     go (depth - 1) tree
 
@@ -253,8 +254,9 @@ end = struct
                 " node"
           in
           failwithf
-            "Spare_ledger.set: Bad index %i. Expected a%s, but got a%s." idx
-            expected_kind kind ()
+            "Spare_ledger.set: Bad index %i. Expected a%s, but got a%s at \
+             depth %i."
+            idx expected_kind kind (depth - i) ()
     in
     {t with tree= go (t.depth - 1) t.tree}
 
