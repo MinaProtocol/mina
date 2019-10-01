@@ -306,18 +306,18 @@ let create_sync_status_observer ~logger
         | `Online -> (
           match active_status with
           | None ->
-              Logger.info (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__ "Coda daemon is now bootstrapping" ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Coda daemon is now bootstrapping" ;
               `Bootstrap
           | Some (_, catchup_signal) -> (
             match catchup_signal with
             | `Catchup ->
-                Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  "Coda daemon is now doing ledger catchup" ;
                 `Catchup
             | `Normal ->
-                Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now synced" ;
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  "Coda daemon is now synced" ;
                 `Synced ) ) )
   in
   let observer = observe incremental_status in
