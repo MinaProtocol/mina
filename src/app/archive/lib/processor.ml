@@ -178,8 +178,8 @@ let%test_module "Processor" =
               let queried_public_keys =
                 Array.map public_keys#public_keys ~f:(fun obj -> obj#value)
               in
-              [%test_result: Int.t] ~equal:Int.equal 
-              ~expect:n_keys (Array.length queried_public_keys) ;
+              [%test_result: Int.t] ~equal:Int.equal ~expect:n_keys
+                (Array.length queried_public_keys) ;
               let queried_public_keys =
                 Public_key.Compressed.Set.of_array queried_public_keys
               in
