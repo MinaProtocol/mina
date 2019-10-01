@@ -340,7 +340,7 @@ jobs:
                     #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/run_unit_tests_ci.sh || (./scripts/link-coredumps.sh {{profile}} && false)'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/run_unit_tests_ci.sh {{profile}} || (./scripts/link-coredumps.sh && false)'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
@@ -365,7 +365,7 @@ jobs:
                   command: ./scripts/pin-external-submodules.sh
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/run_unit_tests_ci.sh {{profile}} || (./scripts/link-coredumps.sh && false)'
                   no_output_timeout: 1h
             - store_artifacts:
                 path: core_dumps
