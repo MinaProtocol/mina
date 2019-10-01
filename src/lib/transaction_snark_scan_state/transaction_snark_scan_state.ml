@@ -1,6 +1,7 @@
 open Core_kernel
 open Coda_base
 open Module_version
+module Constants = Snark_params.Scan_state_constants
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -649,5 +650,3 @@ let fill_work_and_enqueue_transactions t transactions work =
         else Or_error.error_string "Unexpected ledger proof emitted" )
   in
   (result_opt, updated_scan_state)
-
-module Constants = Constants
