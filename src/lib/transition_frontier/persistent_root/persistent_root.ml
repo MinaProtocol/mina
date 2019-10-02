@@ -72,7 +72,7 @@ module Instance = struct
     Ledger.Db.close t.snarked_ledger ;
     t.factory.instance <- None
 
-  (* [new] TODO: encapsulate functionality of snarked ledger *)
+  (* TODO: encapsulate functionality of snarked ledger *)
   let snarked_ledger {snarked_ledger; _} = snarked_ledger
 
   let set_root_identifier t new_root_identifier =

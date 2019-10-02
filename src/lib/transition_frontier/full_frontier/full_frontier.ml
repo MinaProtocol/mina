@@ -174,7 +174,6 @@ let path_map t breadcrumb ~f =
 
 let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
 
-(* TODO: create a unit test for hash_path *)
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
 let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)

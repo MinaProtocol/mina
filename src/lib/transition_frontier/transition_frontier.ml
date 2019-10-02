@@ -7,14 +7,6 @@ open Core_kernel
 open Async_kernel
 open Coda_base
 open Coda_transition
-
-(* [new] TODO: rework abstraction so that a transition frontier can be
-*   "migrated" to another state, retaining the open instances of the
-*   persistent root and persistent frontier while chucking out the
-*   old extensions and full frontier. Currently, the bootstrap
-*   controller has to close the instances before immediately
-*   reopening them. *)
-
 include Frontier_base
 module Hash = Frontier_hash
 module Full_frontier = Full_frontier
@@ -122,7 +114,6 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
   ; persistent_frontier_instance
   ; extensions }
 
-(* TODO: re-add `Bootstrap_required support or redo signature *)
 let rec load_with_max_length :
        max_length:int
     -> ?retry_with_fresh_db:bool
@@ -177,7 +168,7 @@ let rec load_with_max_length :
     Persistent_frontier.Instance.check_database persistent_frontier_instance
   with
   | Error `Not_initialized ->
-      (* [new] TODO: this case can be optimized to not create the
+      (* TODO: this case can be optimized to not create the
          * database twice through rocks -- currently on clean bootup,
          * this code path will reinitialize the rocksdb twice *)
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -320,7 +311,6 @@ include struct
 
   let visualize_to_string = proxy1 visualize_to_string
 
-  (* TODO: better name *)
   let iter = proxy1 iter
 
   let common_ancestor = proxy1 common_ancestor
@@ -334,7 +324,6 @@ include struct
 
   let successor_hashes_rec = proxy1 successor_hashes_rec
 
-  (* TODO: remove? *)
   let hash_path = proxy1 hash_path
 
   let best_tip = proxy1 best_tip
