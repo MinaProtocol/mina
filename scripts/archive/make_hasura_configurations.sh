@@ -3,7 +3,7 @@ set -e
 
 opam config exec -- dune build scripts/archive/ocaml/stitch_introspection.exe
 
-sleep 3
+sleep 20
 
 curl -d'{"type":"replace_metadata", "args":'$(cat scripts/archive/metadata.json)'}' \
     http://localhost:9000/v1/query
