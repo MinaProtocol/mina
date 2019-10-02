@@ -1,4 +1,6 @@
 # Makes a database queryable through graphql
+set -e
+
 opam config exec -- dune build scripts/archive/ocaml/stitch_introspection.exe
 
 sleep 3
