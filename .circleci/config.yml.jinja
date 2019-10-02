@@ -69,7 +69,7 @@ jobs:
                   docker_layer_caching: true
             - run:
                   name: Build Docker Containers
-                  command: docker-compose build
+                  command: cd scripts/archive && docker-compose build
             - run:
                   name: Setup Postgres and Hasura docker containers
                   command: cd scripts/archive && docker-compose -f docker-compose.yml -f docker-compose.override.yml run configuration
