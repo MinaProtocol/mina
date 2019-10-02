@@ -188,46 +188,6 @@ end
    we create modules for each component
 *)
 
-module type Var_for_checked_push = sig
-  open Tick0
-
-  type var
-
-  val length_in_triples : int
-
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
-end
-
-module type T_for_checked_push = sig
-  include Var_for_checked_push
-
-  val var_of_hash_packed : Field.Var.t -> var
-end
-
-(* abstract over checked "push" for data, state hash components of stack *)
-
-let checked_push (type t var)
-    (module M_t : T_for_checked_push with type var = t)
-    (module M_var : Var_for_checked_push with type var = var) hash_prefix_acc t
-    (var : var) =
-  let init =
-    Pedersen.Checked.Section.create ~acc:(`Value hash_prefix_acc)
-      ~support:(Interval_union.of_interval (0, Hash_prefix.length_in_triples))
-  in
-  let start = Hash_prefix.length_in_triples in
-  let%bind section =
-    let%bind bs = M_var.var_to_triples var in
-    Pedersen.Checked.Section.extend init bs ~start
-  in
-  let start = start + M_var.length_in_triples in
-  let%bind with_t =
-    let%bind bs = M_t.var_to_triples t in
-    Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs ~start
-  in
-  let%map s = Pedersen.Checked.Section.disjoint_union_exn section with_t in
-  let digest, _ = Pedersen.Checked.Section.to_initial_segment_digest_exn s in
-  M_t.var_of_hash_packed digest
-
 module Coinbase_stack_data = struct
   include Data_hash_binable
 
@@ -247,10 +207,28 @@ module Coinbase_stack_data = struct
 
     let push (t : t) (coinbase : Coinbase_data.var) =
       (*Prefix+Coinbase+Current-stack*)
-      checked_push
-        (module Data_hash_binable)
-        (module Coinbase_data)
-        Hash_prefix.coinbase_stack_data.acc t coinbase
+      let init =
+        Pedersen.Checked.Section.create
+          ~acc:(`Value Hash_prefix.coinbase_stack_data.acc)
+          ~support:
+            (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
+      in
+      let start = Hash_prefix.length_in_triples in
+      let%bind section =
+        let%bind bs = Coinbase_data.var_to_triples coinbase in
+        Pedersen.Checked.Section.extend init bs ~start
+      in
+      let start = start + Coinbase_data.length_in_triples in
+      let%bind with_t =
+        let%bind bs = Data_hash_binable.var_to_triples t in
+        Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
+          ~start
+      in
+      let%map s = Pedersen.Checked.Section.disjoint_union_exn section with_t in
+      let digest, _ =
+        Pedersen.Checked.Section.to_initial_segment_digest_exn s
+      in
+      Data_hash_binable.var_of_hash_packed digest
 
     let if_ = if_
   end
@@ -313,12 +291,26 @@ module Coinbase_stack_state_hash = struct
   module Checked = struct
     type t = var
 
+    (* same computation as Protocol_state.hash_checked *)
+    let update_state_hash ~(state_hash : State_hash.var)
+        ~(state_body_hash : State_body_hash.var) =
+      make_checked (fun () ->
+          Random_oracle.Checked.hash
+            ~init:Hash_prefix.Random_oracle.protocol_state
+            [| State_hash.var_to_hash_packed state_hash
+             ; State_body_hash.var_to_hash_packed state_body_hash |]
+          |> State_hash.var_of_hash_packed )
+
     let push (t : t) ((_, _, state_body_hash) : Coinbase_data.var) =
-      (*Prefix+State-hash+Current-stack*)
-      checked_push
-        (module State_hash)
-        (module State_body_hash)
-        Hash_prefix.coinbase_stack_state_hash.acc t state_body_hash
+      let%bind state_hash = update_state_hash ~state_hash:t ~state_body_hash in
+      let%bind update_triples = State_hash.(var_to_triples state_hash) in
+      let%bind t_triples = State_hash.(var_to_triples t) in
+      let%map digest =
+        Pedersen.Checked.digest_triples
+          ~init:Hash_prefix.coinbase_stack_state_hash
+          (update_triples @ t_triples)
+      in
+      State_hash.var_of_hash_packed digest
   end
 end
 
@@ -498,6 +490,9 @@ struct
       ; state_hash= Coinbase_stack_state_hash.empty }
 
     let equal_data t1 t2 = Coinbase_stack_data.equal t1.Poly.data t2.Poly.data
+
+    let equal_state_hash t1 t2 =
+      State_hash.equal t1.Poly.state_hash t2.Poly.state_hash
 
     let push t (cb : Coinbase.t) =
       let data = Coinbase_stack_data.push t.Poly.data cb in

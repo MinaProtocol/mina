@@ -132,6 +132,8 @@ module type S = sig
 
     val equal_data : t -> t -> bool
 
+    val equal_state_hash : t -> t -> bool
+
     val push : t -> Coinbase.t -> t
 
     module Checked : sig
