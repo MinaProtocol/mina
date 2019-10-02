@@ -7,14 +7,6 @@ let salt (s : t) = Snark_params.Tick.Pedersen.(State.salt (s :> string))
 
 let account = salt account
 
-let proof_of_work = salt proof_of_work
-
-let merge_snark = salt merge_snark
-
-let base_snark = salt base_snark
-
-let transition_system_snark = salt transition_system_snark
-
 let receipt_chain = salt receipt_chain
 
 let coinbase = salt coinbase
@@ -28,6 +20,10 @@ let coinbase_stack_state_hash = salt coinbase_stack_state_hash
 let coinbase_stack = salt coinbase_stack
 
 let checkpoint_list = salt checkpoint_list
+
+let merge_snark = salt merge_snark
+
+let base_snark = salt base_snark
 
 module Random_oracle = struct
   let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
@@ -50,4 +46,6 @@ module Random_oracle = struct
   let vrf_output = salt vrf_output
 
   let epoch_seed = salt epoch_seed
+
+  let transition_system_snark = salt transition_system_snark
 end

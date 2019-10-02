@@ -32,8 +32,6 @@ let merkle_tree i = create (Printf.sprintf "CodaMklTree%03d" i)
 
 let coinbase_merkle_tree i = create (Printf.sprintf "CodaCbMklTree%03d" i)
 
-let proof_of_work = create "CodaPoW"
-
 let merge_snark = create "CodaMergeSnark"
 
 let base_snark = create "CodaBaseSnark"
