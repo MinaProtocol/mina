@@ -67,6 +67,9 @@ jobs:
                   curl -L https://github.com/docker/compose/releases/download/1.19.0/docker-compose-`uname -s`-`uname -m` > ~/docker-compose && chmod +x ~/docker-compose && sudo mv ~/docker-compose /usr/local/bin/docker-compose
             - setup_remote_docker:   
                   docker_layer_caching: true
+            -run:
+                name: Build Docker Containers
+                command: docker-compose build
             - run:
                   name: Setup Postgres and Hasura docker containers
                   command: cd scripts/archive && docker-compose -f docker-compose.yml -f docker-compose.override.yml run configuration
