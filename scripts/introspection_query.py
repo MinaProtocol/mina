@@ -112,7 +112,7 @@ def print_schema(port, uri, extra_headers):
     data = response.read()
     conn.close()
 
-    parsed = json.loads(data)
+    parsed = json.loads(data.decode('utf-8'))
     print(json.dumps(parsed, indent=2))
 
 
