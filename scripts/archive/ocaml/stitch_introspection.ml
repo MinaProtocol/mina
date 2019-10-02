@@ -55,7 +55,7 @@ let read_json json_string =
 
 let read_from_standard_input () =
   (* There is only one async call in this entire program so it's okay to make this synchronous call *)
-  let json_string = Core.In_channel.input_all Core.In_channel.stdin in
+  let json_string = Core.In_channel.input_all Core.In_channel.stdin in  
   let json = Yojson.Basic.from_string json_string
     |> remove_user_commands_input_commands |> change_constraint  in
     Core.print_string @@ Yojson.Basic.prettify @@ Yojson.Basic.to_string json ;

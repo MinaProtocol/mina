@@ -58,13 +58,6 @@ jobs:
     build-archive:
         docker:
             - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
-            - image: postgres:12
-              environment:
-                POSTGRES_PASSWORD: codarules
-                POSTGRES_USER: admin
-                POSTGRES_DB: archiver
-              ports: 
-                "5432:5432"
             - image: hasura/graphql-engine:v1.0.0-beta.6
               environment:
                 HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@postgres:5432/archiver
@@ -72,6 +65,13 @@ jobs:
                 HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
               ports: 
                 "9000:8080"
+            - image: postgres:12
+              environment:
+                POSTGRES_PASSWORD: codarules
+                POSTGRES_USER: admin
+                POSTGRES_DB: archiver
+              ports: 
+                "5432:5432"
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
