@@ -1,6 +1,8 @@
 (* exit_handlers -- code to call at daemon exit *)
 
 open Core_kernel
+open Async_kernel
+open Async_unix
 
 (* register a thunk to be called at exit; log registration and execution *)
 let register_handler ~logger ~description (f : unit -> unit) =
@@ -21,3 +23,30 @@ let register_handler ~logger ~description (f : unit -> unit) =
           ; ("exn", `String (Exn.to_string exn)) ]
   in
   Stdlib.at_exit logging_thunk
+
+(* register a Deferred.t thunk to be called at Async shutdown; log registration and execution *)
+let register_async_shutdown_handler ~logger ~description
+    (f : unit -> unit Deferred.t) =
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "Registering async shutdown handler: $description"
+    ~metadata:[("description", `String description)] ;
+  let logging_thunk () =
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Running async shutdown handler: $description"
+      ~metadata:[("description", `String description)] ;
+    let open Deferred.Let_syntax in
+    let%map () =
+      match%map Monitor.try_with ~extract_exn:true f with
+      | Ok () ->
+          ()
+      | Error exn ->
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            "When running async shutdown handler: $description, got exception \
+             $exn"
+            ~metadata:
+              [ ("description", `String description)
+              ; ("exn", `String (Exn.to_string exn)) ]
+    in
+    ()
+  in
+  Shutdown.at_shutdown logging_thunk

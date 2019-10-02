@@ -161,19 +161,20 @@ let daemon logger =
        flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
      and libp2p_port =
        flag "libp2p-port" (optional int)
-         ~doc:"Port to use for libp2p (default: 28675)"
+         ~doc:"PORT Port to use for libp2p (default: 28675)"
      and disable_haskell =
        flag "disable-old-discovery" no_arg
          ~doc:"Disable the old discovery mechanism"
      and libp2p_keypair =
        flag "libp2p-keypair" (optional string)
          ~doc:
-           "Keypair (generated from `coda advanced generate-libp2p-keypair`) \
-            to use with libp2p (default: generate new keypair)"
+           "KEYPAIR Keypair (generated from `coda advanced \
+            generate-libp2p-keypair`) to use with libp2p (default: generate \
+            new keypair)"
      and libp2p_peers_raw =
        flag "libp2p-peer"
          ~doc:
-           "/ip4/HOST/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
+           "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             libp2p discovery"
          (listed string)
      in
@@ -416,13 +417,9 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "rest-port"
              ~default:Port.default_rest rest_server_port
          in
-         ignore libp2p_port ;
-         (* FIXME HACK: make this configurable when we can pass the port in the CLI *)
          let libp2p_port =
-           (*
            or_from_config YJ.Util.to_int_option "libp2p-port"
-             ~default:Port.default_libp2p libp2p_port *)
-           Port.default_libp2p
+             ~default:Port.default_libp2p libp2p_port
          in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
@@ -550,24 +547,12 @@ let daemon logger =
              [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
            >>| Or_error.ok
          in
-         Async_kernel.Async_kernel_scheduler.(
-           set_record_backtraces (t ()) true) ;
          Stream.iter
-           (Async_kernel.Async_kernel_scheduler.(
-              long_cycles_with_context @@ t ())
+           (Async.Scheduler.long_cycles
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
-           ~f:(fun (span, ctx) ->
-             let tm = Time_ns.Span.to_string span in
-             (* see if backtraces reveal anything about long async cycles *)
-             let metadata =
-               [ ("tm", `String tm)
-               ; ( "backtraces"
-                 , `List
-                     (List.map ctx.backtrace_history ~f:(fun bt ->
-                          `String (Backtrace.to_string bt) )) ) ]
-             in
-             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-               "Long async cycle %s" tm ~metadata ) ;
+           ~f:(fun span ->
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               "Long async cycle, %0.01f seconds" (Time_ns.Span.to_sec span) ) ;
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
              ~location typ

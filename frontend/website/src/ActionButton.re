@@ -45,6 +45,8 @@ module Styles = {
       textAlign(`left),
       marginTop(`rem(0.3125)),
     ]);
+
+  let ctaIcon = style([minWidth(`px(29)), flexShrink(0)]);
 };
 
 [@react.component]
@@ -52,7 +54,7 @@ let make = (~icon, ~heading, ~text, ~href) => {
   <a href>
     <button className=Styles.ctaButton>
       <div className=Styles.ctaContent>
-        <p> icon </p>
+        <p className=Styles.ctaIcon> icon </p>
         <div className=Styles.ctaText>
           <h2 className=Styles.ctaHeading> heading </h2>
           <h4 className=Styles.ctaBody> text </h4>
