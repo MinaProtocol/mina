@@ -12,4 +12,10 @@ COPY ./src ./src
 
 RUN yarn build-without-copy
 
-ENTRYPOINT ["yarn", "start" ]
+
+ENV CODA_GRAPHQL_HOST=localhost
+ENV CODA_GRAPHQL_PORT=8304
+ADD wait-for-it.sh wait-for-it.sh
+
+ENTRYPOINT ["bash", "-c"]
+CMD ["./wait-for-it.sh --host=$CODA_GRAPHQL_HOST --port=$CODA_GRAPHQL_PORT --timeout=90 --strict -- yarn start" ]

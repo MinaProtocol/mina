@@ -8,6 +8,7 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
+module Scan_state_constants = Scan_state_constants
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -781,11 +782,10 @@ let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 [%%inject
 "ledger_depth", ledger_depth]
 
-[%%inject
-"scan_state_transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
+let scan_state_transaction_capacity_log_2 =
+  Scan_state_constants.transaction_capacity_log_2
 
-[%%inject
-"scan_state_work_delay", scan_state_work_delay]
+let scan_state_work_delay = Scan_state_constants.work_delay
 
 (*Log of maximum number of trees in the parallel scan state*)
 let pending_coinbase_depth =
