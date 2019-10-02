@@ -357,6 +357,10 @@ end
 module Transition_frontier = struct
   let subsystem = "Transition_frontier"
 
+  let max_blocklength_observed : Gauge.t =
+    let help = "max blocklength observed by the system" in
+    Gauge.v "max_blocklength_observed" ~help ~namespace ~subsystem
+
   let slot_fill_rate : Gauge.t =
     let help = "number of blocks / total slots since genesis" in
     Gauge.v "slot_fill_rate" ~help ~namespace ~subsystem
