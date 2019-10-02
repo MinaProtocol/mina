@@ -6,7 +6,7 @@ open Coda_transition
 open Coda_state
 open O1trace
 module Graphql_cohttp_async =
-  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Io)
+  Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
 
 let snark_job_list_json t =
@@ -482,4 +482,5 @@ You might be trying to connect to a different network version, or need to troubl
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           !"Coda process was interrupted by $signal"
           ~metadata:[("signal", `String (to_string signal))] ;
-        Stdlib.exit 130 ))
+        (* causes async shutdown and at_exit handlers to run *)
+        Async.shutdown 130 ))
