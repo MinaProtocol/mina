@@ -93,15 +93,46 @@ module type S = sig
   end
 
   and Stack : sig
-    include Data_hash_binable_intf
+    type t [@@deriving yojson, sexp, eq]
+
+    module Stable : sig
+      module V1 : sig
+        type nonrec t = t
+        [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
+      end
+
+      module Latest = V1
+    end
+
+    type var
 
     val data_hash : t -> Hash.t
 
-    val push : t -> Coinbase.t -> t
+    val var_of_t : t -> var
+
+    val typ : (var, t) Typ.t
+
+    val gen : t Quickcheck.Generator.t
+
+    val fold : t -> bool Triple.t Fold.t
+
+    val to_bits : t -> bool list
+
+    val length_in_bits : int
+
+    val to_bytes : t -> string
+
+    val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
+
+    val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
+
+    val length_in_triples : int
 
     val empty : t
 
-    val length_in_bits : int
+    val equal_data : t -> t -> bool
+
+    val push : t -> Coinbase.t -> t
 
     module Checked : sig
       type t = var

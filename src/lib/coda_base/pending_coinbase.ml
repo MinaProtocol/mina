@@ -184,7 +184,11 @@ module Data_hash_binable = struct
   include Data_hash.Make_full_size ()
 end
 
-module type Pushable = sig
+(* a coinbase stack has two components, data and a state_hash
+   we create modules for each component
+*)
+
+module type Var_for_checked_push = sig
   open Tick0
 
   type var
@@ -194,29 +198,35 @@ module type Pushable = sig
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 end
 
-let push_var (type var) (module M : Pushable with type var = var)
-    hash_prefix_acc t (var : var) =
+module type T_for_checked_push = sig
+  include Var_for_checked_push
+
+  val var_of_hash_packed : Field.Var.t -> var
+end
+
+(* abstract over checked "push" for data, state hash components of stack *)
+
+let checked_push (type t var)
+    (module M_t : T_for_checked_push with type var = t)
+    (module M_var : Var_for_checked_push with type var = var) hash_prefix_acc t
+    (var : var) =
   let init =
     Pedersen.Checked.Section.create ~acc:(`Value hash_prefix_acc)
       ~support:(Interval_union.of_interval (0, Hash_prefix.length_in_triples))
   in
   let start = Hash_prefix.length_in_triples in
   let%bind section =
-    let%bind bs = M.var_to_triples var in
+    let%bind bs = M_var.var_to_triples var in
     Pedersen.Checked.Section.extend init bs ~start
   in
-  let start = start + M.length_in_triples in
+  let start = start + M_var.length_in_triples in
   let%bind with_t =
-    let%bind bs = Data_hash_binable.var_to_triples t in
+    let%bind bs = M_t.var_to_triples t in
     Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs ~start
   in
   let%map s = Pedersen.Checked.Section.disjoint_union_exn section with_t in
   let digest, _ = Pedersen.Checked.Section.to_initial_segment_digest_exn s in
-  Data_hash_binable.var_of_hash_packed digest
-
-(* a coinbase stack has two components, data and a state_hash
-   we create modules for each component
-*)
+  M_t.var_of_hash_packed digest
 
 module Coinbase_stack_data = struct
   include Data_hash_binable
@@ -237,7 +247,8 @@ module Coinbase_stack_data = struct
 
     let push (t : t) (coinbase : Coinbase_data.var) =
       (*Prefix+Coinbase+Current-stack*)
-      push_var
+      checked_push
+        (module Data_hash_binable)
         (module Coinbase_data)
         Hash_prefix.coinbase_stack_data.acc t coinbase
 
@@ -286,8 +297,7 @@ module Coinbase_stack_state_hash = struct
     , equal_var
     , typ
     , if_
-    , var_of_t
-    , var_of_hash_packed )]
+    , var_of_t )]
 
   let push t cb =
     let _, _, state_body_hash = Coinbase_data.of_coinbase cb in
@@ -303,52 +313,12 @@ module Coinbase_stack_state_hash = struct
   module Checked = struct
     type t = var
 
-    let update_state_hash ~(state_hash : State_hash.var)
-        ~(state_body_hash : State_body_hash.var) =
-      (* THIS IS BROKEN NOW *)
-      let%bind state_hash_triples = State_hash.var_to_triples state_hash in
-      let%bind state_body_hash_triples =
-        State_body_hash.var_to_triples state_body_hash
-      in
-      let triples = state_hash_triples @ state_body_hash_triples in
-      let%map digest =
-        Snark_params.Tick.Pedersen.Checked.digest_triples
-          ~init:Hash_prefix.protocol_state triples
-      in
-      State_hash.var_of_hash_packed digest
-
     let push (t : t) ((_, _, state_body_hash) : Coinbase_data.var) =
       (*Prefix+State-hash+Current-stack*)
-      push_var
+      checked_push
+        (module State_hash)
         (module State_body_hash)
         Hash_prefix.coinbase_stack_state_hash.acc t state_body_hash
-
-    (*
-    let init =
-        Pedersen.Checked.Section.create
-          ~acc:(`Value Hash_prefix.coinbase_stack_state_hash.acc)
-          ~support:
-            (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
-      in
-      let%bind state_hash = update_state_hash ~state_hash:t ~state_body_hash in
-      let start = Hash_prefix.length_in_triples in
-      let%bind state_hash_section =
-        let%bind triples = var_to_triples state_hash in
-        Pedersen.Checked.Section.extend init triples ~start
-      in
-      let start = start + length_in_triples in
-      let%bind with_t =
-        let%bind triples = var_to_triples t in
-        Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty triples
-          ~start
-      in
-      let%map s =
-        Pedersen.Checked.Section.disjoint_union_exn state_hash_section with_t
-      in
-      let digest, _ =
-        Pedersen.Checked.Section.to_initial_segment_digest_exn s
-      in
-      var_of_hash_packed digest *)
   end
 end
 
