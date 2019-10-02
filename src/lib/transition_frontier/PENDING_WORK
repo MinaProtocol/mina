@@ -5,8 +5,8 @@
   - https://circleci.com/gh/CodaProtocol/coda/227853?utm_campaign=vcs-integration-link&utm_medium=referral&utm_source=github-build-link
 + busy diff buffer worker
 + frontier hash mismatch
-- crash on startup with old config
-  - valid database
++ crash on startup with old config
+  + valid database
   - corrupted database
 
 # Features
@@ -21,7 +21,7 @@
 + implement persistent frontier database destruction
 + audit persistent root state management (updates, resets)
 + audit persistent frontier sync vs instance resource management
-- diff buffer flush on interval
++ diff buffer flush on interval
 
 # Regressions
 
@@ -32,20 +32,19 @@
 # Refactors
 
 + defunctor transition frontier
-- defunctor transition frontier components
-- create reusable pattern for singleton factories
-- singleton factory instance reuse after destruction prevention
 - persistent frontier worker open anonymous variants
-- remove identity pipe and extension
 + better encapsulate transition frontier sub libraries using top level interfaces
 + improved error handling in persistent frontier instance entrypoints
 + extensions refactor (multiple files)
 + invert broadcastable extensions functor (include functor in definition, don't pass definition to functor)
-- convert persistent frontier sync into an extension?
++ extensions full diffs
 
 # External
 
+- create reusable pattern for singleton factories
+- singleton factory instance reuse after destruction prevention
+- remove identity pipe and extension
+- convert persistent frontier sync into an extension?
 - transition frontier graceful shutdown
 - improved persistent frontier database batched requests
-+ extensions full diffs
-- dynamic extensions? (probably just open an issue for this)
+- defunctor transition frontier components
