@@ -3,7 +3,7 @@ services:
   configuration:
     image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
     network_mode: host
-    command: ["/bin/sh", "scripts/archive/make_hasura_configurations.sh"]
+    command: ["ls"]
     depends_on:
     - "hasura"
     volumes:
