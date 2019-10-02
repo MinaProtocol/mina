@@ -184,6 +184,36 @@ module Data_hash_binable = struct
   include Data_hash.Make_full_size ()
 end
 
+module type Pushable = sig
+  open Tick0
+
+  type var
+
+  val length_in_triples : int
+
+  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+end
+
+let push_var (type var) (module M : Pushable with type var = var)
+    hash_prefix_acc t (var : var) =
+  let init =
+    Pedersen.Checked.Section.create ~acc:(`Value hash_prefix_acc)
+      ~support:(Interval_union.of_interval (0, Hash_prefix.length_in_triples))
+  in
+  let start = Hash_prefix.length_in_triples in
+  let%bind section =
+    let%bind bs = M.var_to_triples var in
+    Pedersen.Checked.Section.extend init bs ~start
+  in
+  let start = start + M.length_in_triples in
+  let%bind with_t =
+    let%bind bs = Data_hash_binable.var_to_triples t in
+    Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs ~start
+  in
+  let%map s = Pedersen.Checked.Section.disjoint_union_exn section with_t in
+  let digest, _ = Pedersen.Checked.Section.to_initial_segment_digest_exn s in
+  Data_hash_binable.var_of_hash_packed digest
+
 (* a coinbase stack has two components, data and a state_hash
    we create modules for each component
 *)
@@ -207,30 +237,9 @@ module Coinbase_stack_data = struct
 
     let push (t : t) (coinbase : Coinbase_data.var) =
       (*Prefix+Coinbase+Current-stack*)
-      let init =
-        Pedersen.Checked.Section.create
-          ~acc:(`Value Hash_prefix.coinbase_stack_data.acc)
-          ~support:
-            (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
-      in
-      let start = Hash_prefix.length_in_triples in
-      let%bind coinbase_section =
-        let%bind bs = Coinbase_data.var_to_triples coinbase in
-        Pedersen.Checked.Section.extend init bs ~start
-      in
-      let start = start + Coinbase_data.length_in_triples in
-      let%bind with_t =
-        let%bind bs = var_to_triples t in
-        Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
-          ~start
-      in
-      let%map s =
-        Pedersen.Checked.Section.disjoint_union_exn coinbase_section with_t
-      in
-      let digest, _ =
-        Pedersen.Checked.Section.to_initial_segment_digest_exn s
-      in
-      var_of_hash_packed digest
+      push_var
+        (module Coinbase_data)
+        Hash_prefix.coinbase_stack_data.acc t coinbase
 
     let if_ = if_
   end
@@ -255,14 +264,14 @@ module Coinbase_stack_state_hash = struct
 
   type var = State_hash.var
 
-  let update_state_hash ~state_hash ~state_body_hash =
+  let update_state_hash ~(state_hash : State_hash.t)
+      ~(state_body_hash : State_body_hash.t) =
     (* this is the same computation for combining state hashes and state body hashes as
        `Protocol_state.hash_abstract', not available here because it would create
        a module dependency cycle
      *)
-    let open Fold in
-    Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state
-      (State_hash.fold state_hash +> State_body_hash.fold state_body_hash)
+    Random_oracle.hash ~init:Hash_prefix.Random_oracle.protocol_state
+      [|(state_hash :> Field.t); (state_body_hash :> Field.t)|]
     |> State_hash.of_hash
 
   [%%define_locally
@@ -296,6 +305,7 @@ module Coinbase_stack_state_hash = struct
 
     let update_state_hash ~(state_hash : State_hash.var)
         ~(state_body_hash : State_body_hash.var) =
+      (* THIS IS BROKEN NOW *)
       let%bind state_hash_triples = State_hash.var_to_triples state_hash in
       let%bind state_body_hash_triples =
         State_body_hash.var_to_triples state_body_hash
@@ -309,7 +319,12 @@ module Coinbase_stack_state_hash = struct
 
     let push (t : t) ((_, _, state_body_hash) : Coinbase_data.var) =
       (*Prefix+State-hash+Current-stack*)
-      let init =
+      push_var
+        (module State_body_hash)
+        Hash_prefix.coinbase_stack_state_hash.acc t state_body_hash
+
+    (*
+    let init =
         Pedersen.Checked.Section.create
           ~acc:(`Value Hash_prefix.coinbase_stack_state_hash.acc)
           ~support:
@@ -333,7 +348,7 @@ module Coinbase_stack_state_hash = struct
       let digest, _ =
         Pedersen.Checked.Section.to_initial_segment_digest_exn s
       in
-      var_of_hash_packed digest
+      var_of_hash_packed digest *)
   end
 end
 
