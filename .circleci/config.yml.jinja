@@ -69,13 +69,7 @@ jobs:
                   docker_layer_caching: true
             - run:
                   name: Setup Postgres and Hasura docker containers
-                  command: cd scripts/archive && docker-compose -f docker-compose.yml up -d
-            - run:
-                  name: Get Generated introspections
-                  command: ./scripts/archive/make_hasura_configurations.sh
-            - run:
-                  name: Check Introspection Queries are produced correctly
-                  command: cd scripts/archive && ./check_introspection_queries.sh
+                  command: cd scripts/archive && docker-compose -f docker-compose.yml -f docker-compose.override.yml run configuration
             - run:
                   name: Build Archive Process
                   command: make build_archive       
