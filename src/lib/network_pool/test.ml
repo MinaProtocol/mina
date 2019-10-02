@@ -6,7 +6,12 @@ let%test_module "network pool test" =
   ( module struct
     let trust_system = Mocks.trust_system
 
+    let logger = Logger.null ()
+
     module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
+
+    let config verifier =
+      Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
@@ -24,12 +29,16 @@ let%test_module "network pool test" =
             { fee= Currency.Fee.of_int 0
             ; prover= Signature_lib.Public_key.Compressed.empty } }
       in
-      let network_pool =
-        Mock_snark_pool.create ~logger:(Logger.null ()) ~trust_system
-          ~incoming_diffs:pool_reader
-          ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-      in
       Async.Thread_safe.block_on_async_exn (fun () ->
+          let%bind verifier =
+            Verifier.create ~logger
+              ~pids:(Child_processes.Termination.create_pid_set ())
+          in
+          let config = config verifier in
+          let network_pool =
+            Mock_snark_pool.create ~config ~logger ~incoming_diffs:pool_reader
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+          in
           let command =
             Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
               (work, priced_proof)
@@ -75,9 +84,13 @@ let%test_module "network pool test" =
         let frontier_broadcast_pipe_r, _ =
           Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
         in
+        let%bind verifier =
+          Verifier.create ~logger
+            ~pids:(Child_processes.Termination.create_pid_set ())
+        in
+        let config = config verifier in
         let network_pool =
-          Mock_snark_pool.create ~logger:(Logger.null ()) ~trust_system
-            ~incoming_diffs:work_diffs
+          Mock_snark_pool.create ~config ~logger ~incoming_diffs:work_diffs
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         don't_wait_for

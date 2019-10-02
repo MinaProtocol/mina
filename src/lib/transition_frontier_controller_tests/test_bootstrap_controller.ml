@@ -31,8 +31,14 @@ end)
 
 let%test_module "Bootstrap Controller" =
   ( module struct
-    let f_with_verifier ~f ~logger ~trust_system =
-      let%map verifier = Verifier.create () in
+    let hb_logger = Logger.create ()
+
+    let logger = Logger.null ()
+
+    let trust_system = Trust_system.null ()
+
+    let f_with_verifier ~f ~logger ~pids ~trust_system =
+      let%map verifier = Verifier.create ~logger ~pids in
       f ~logger ~trust_system ~verifier
 
     let%test "`bootstrap_controller` caches all transitions it is passed \
@@ -41,16 +47,17 @@ let%test_module "Bootstrap Controller" =
         Bootstrap_controller.For_tests.Transition_cache.create ()
       in
       let num_breadcrumbs = (Transition_frontier.max_length * 2) + 2 in
-      let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
+      let pids = Child_processes.Termination.create_pid_set () in
       let network =
         Network.create_stub ~logger
           ~ip_table:(Hashtbl.create (module Unix.Inet_addr))
           ~peers:(Hash_set.create (module Network_peer.Peer) ())
       in
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
-            create_root_frontier ~logger Genesis_ledger.accounts
+            create_root_frontier ~logger ~pids Genesis_ledger.accounts
           in
           let genesis_root =
             Transition_frontier.root frontier
@@ -58,7 +65,7 @@ let%test_module "Bootstrap Controller" =
           in
           let%bind make_bootstrap =
             f_with_verifier ~f:Bootstrap_controller.For_tests.make_bootstrap
-              ~logger ~trust_system
+              ~logger ~pids ~trust_system
           in
           let bootstrap = make_bootstrap ~genesis_root ~network in
           let ledger_db =
@@ -69,7 +76,8 @@ let%test_module "Bootstrap Controller" =
           in
           let parent_breadcrumb = Transition_frontier.best_tip frontier in
           let breadcrumbs_gen =
-            gen_linear_breadcrumbs ~logger ~trust_system ~size:num_breadcrumbs
+            gen_linear_breadcrumbs ~logger ~pids ~trust_system
+              ~size:num_breadcrumbs
               ~accounts_with_secret_keys:Genesis_ledger.accounts
               parent_breadcrumb
             |> Quickcheck.Generator.with_size ~size:num_breadcrumbs
@@ -125,6 +133,7 @@ let%test_module "Bootstrap Controller" =
                    Envelope.Incoming.data enveloped_transition
                    |> fst |> With_hash.data )
           in
+          heartbeat_flag := false ;
           External_transition.Set.(
             equal
               (of_list
@@ -153,16 +162,17 @@ let%test_module "Bootstrap Controller" =
 
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
-      let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
+      let pids = Child_processes.Termination.create_pid_set () in
       let num_breadcrumbs = 10 in
       let accounts = Genesis_ledger.accounts in
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger accounts in
+          print_heartbeat hb_logger |> don't_wait_for ;
+          let%bind frontier = create_root_frontier ~logger ~pids accounts in
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~trust_system
+                (gen_linear_breadcrumbs ~logger ~pids ~trust_system
                    ~size:num_breadcrumbs ~accounts_with_secret_keys:accounts)
           in
           Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
@@ -180,7 +190,7 @@ let%test_module "Bootstrap Controller" =
               let pending_coinbases =
                 Staged_ledger.pending_coinbase_collection staged_ledger
               in
-              let%bind verifier = Verifier.create () in
+              let%bind verifier = Verifier.create ~logger ~pids in
               let%map actual_staged_ledger =
                 Staged_ledger
                 .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
@@ -188,6 +198,7 @@ let%test_module "Bootstrap Controller" =
                   ~pending_coinbases
                 |> Deferred.Or_error.ok_exn
               in
+              heartbeat_flag := false ;
               assert (
                 Staged_ledger_hash.equal
                   (Staged_ledger.hash staged_ledger)
@@ -195,8 +206,7 @@ let%test_module "Bootstrap Controller" =
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions :
-          External_transition.with_initial_validation Envelope.Incoming.t list)
-        =
+          External_transition.Initial_validated.t Envelope.Incoming.t list) =
       let root =
         With_hash.data @@ fst
         @@ Transition_frontier.Breadcrumb.validated_transition root
@@ -224,13 +234,14 @@ let%test_module "Bootstrap Controller" =
 
     let%test "sync with one node after receiving a transition" =
       Backtrace.elide := false ;
+      heartbeat_flag := true ;
       Printexc.record_backtrace true ;
-      let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
+      let pids = Child_processes.Termination.create_pid_set () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind syncing_frontier, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+            Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
               ~num_breadcrumbs
               ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
               ~target_accounts:Genesis_ledger.accounts
@@ -243,17 +254,18 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
           let%bind run =
-            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger ~pids
               ~trust_system
           in
           let%map ( new_frontier
                   , (sorted_external_transitions :
-                      External_transition.with_initial_validation
+                      External_transition.Initial_validated.t
                       Envelope.Incoming.t
                       list) ) =
             run ~network ~frontier:syncing_frontier ~ledger_db
               ~transition_reader ~should_ask_best_tip:false
           in
+          heartbeat_flag := false ;
           assert_transitions_increasingly_sorted
             ~root:(Transition_frontier.root new_frontier)
             sorted_external_transitions ;
@@ -262,13 +274,14 @@ let%test_module "Bootstrap Controller" =
 
     let%test "sync with one node eagerly" =
       Backtrace.elide := false ;
+      heartbeat_flag := true ;
       Printexc.record_backtrace true ;
-      let logger = Logger.create () in
-      let trust_system = Trust_system.null () in
+      let pids = Child_processes.Termination.create_pid_set () in
       let num_breadcrumbs = (2 * max_length) + Consensus.Constants.delta + 2 in
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind syncing_frontier, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+            Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
               ~num_breadcrumbs
               ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
               ~target_accounts:Genesis_ledger.accounts
@@ -278,12 +291,12 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
           let%bind run =
-            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger ~pids
               ~trust_system
           in
           let%map ( new_frontier
                   , (sorted_transitions :
-                      External_transition.with_initial_validation
+                      External_transition.Initial_validated.t
                       Envelope.Incoming.t
                       list) ) =
             run ~network ~frontier:syncing_frontier ~ledger_db
@@ -291,13 +304,14 @@ let%test_module "Bootstrap Controller" =
           in
           let root = Transition_frontier.(root new_frontier) in
           assert_transitions_increasingly_sorted ~root sorted_transitions ;
+          heartbeat_flag := false ;
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
       )
 
     let%test "when eagerly syncing to multiple nodes, you should sync to the \
               node with the highest transition_frontier" =
-      let logger = Logger.create () in
-      let trust_system = Trust_system.null () in
+      heartbeat_flag := true ;
+      let pids = Child_processes.Termination.create_pid_set () in
       let unsynced_peer_num_breadcrumbs = 6 in
       let unsynced_peers_accounts =
         List.take Genesis_ledger.accounts
@@ -306,8 +320,9 @@ let%test_module "Bootstrap Controller" =
       let synced_peer_num_breadcrumbs = unsynced_peer_num_breadcrumbs * 2 in
       let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind {me; peers; network} =
-            Network_builder.setup ~source_accounts ~logger ~trust_system
+            Network_builder.setup ~source_accounts ~logger ~pids ~trust_system
               [ { num_breadcrumbs= unsynced_peer_num_breadcrumbs
                 ; accounts= unsynced_peers_accounts }
               ; { num_breadcrumbs= synced_peer_num_breadcrumbs
@@ -319,12 +334,12 @@ let%test_module "Bootstrap Controller" =
           in
           let synced_peer = List.nth_exn peers 1 in
           let%bind run =
-            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger ~pids
               ~trust_system
           in
           let%map ( new_frontier
                   , (sorted_external_transitions :
-                      External_transition.with_initial_validation
+                      External_transition.Initial_validated.t
                       Envelope.Incoming.t
                       list) ) =
             run ~network ~frontier:me ~ledger_db ~transition_reader
@@ -333,6 +348,7 @@ let%test_module "Bootstrap Controller" =
           assert_transitions_increasingly_sorted
             ~root:(Transition_frontier.root new_frontier)
             sorted_external_transitions ;
+          heartbeat_flag := false ;
           Ledger_hash.equal (root_hash new_frontier)
             (root_hash synced_peer.frontier) )
 
@@ -340,8 +356,8 @@ let%test_module "Bootstrap Controller" =
               that we are syncing from, than we should retarget our root" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
-      let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
+      heartbeat_flag := true ;
+      let pids = Child_processes.Termination.create_pid_set () in
       let small_peer_num_breadcrumbs = 6 in
       let large_peer_num_breadcrumbs = small_peer_num_breadcrumbs * 2 in
       let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
@@ -350,9 +366,10 @@ let%test_module "Bootstrap Controller" =
           (List.length Genesis_ledger.accounts / 2)
       in
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let large_peer_accounts = Genesis_ledger.accounts in
           let%bind {me; peers; network} =
-            Network_builder.setup ~source_accounts ~logger ~trust_system
+            Network_builder.setup ~source_accounts ~logger ~pids ~trust_system
               [ { num_breadcrumbs= small_peer_num_breadcrumbs
                 ; accounts= small_peer_accounts }
               ; { num_breadcrumbs= large_peer_num_breadcrumbs
@@ -377,17 +394,18 @@ let%test_module "Bootstrap Controller" =
               (get_best_tip_hash large_peer)
           in
           let%bind run =
-            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger
+            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger ~pids
               ~trust_system
           in
           let%map ( new_frontier
                   , (sorted_external_transitions :
-                      External_transition.with_initial_validation
+                      External_transition.Initial_validated.t
                       Envelope.Incoming.t
                       list) ) =
             run ~network ~frontier:me ~ledger_db ~transition_reader
               ~should_ask_best_tip:false
           in
+          heartbeat_flag := false ;
           assert_transitions_increasingly_sorted
             ~root:(Transition_frontier.root new_frontier)
             sorted_external_transitions ;
@@ -395,12 +413,13 @@ let%test_module "Bootstrap Controller" =
             (root_hash large_peer.frontier) )
 
     let%test "`on_transition` should deny outdated transitions" =
-      let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
+      heartbeat_flag := true ;
+      let pids = Child_processes.Termination.create_pid_set () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind syncing_frontier, peer_with_frontier, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+            Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
               ~num_breadcrumbs ~source_accounts:Genesis_ledger.accounts
               ~target_accounts:Genesis_ledger.accounts
           in
@@ -421,7 +440,7 @@ let%test_module "Bootstrap Controller" =
           in
           let open Bootstrap_controller.For_tests in
           let%bind make =
-            f_with_verifier ~f:make_bootstrap ~logger ~trust_system
+            f_with_verifier ~f:make_bootstrap ~logger ~pids ~trust_system
           in
           let bootstrap = make ~genesis_root ~network in
           let best_transition =
@@ -445,5 +464,6 @@ let%test_module "Bootstrap Controller" =
               ~root_sync_ledger ~sender:peer_with_frontier.peer.host
               outdated_transition
           in
+          heartbeat_flag := false ;
           should_not_sync = `Ignored )
   end )

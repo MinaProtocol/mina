@@ -48,7 +48,7 @@ module type S = sig
   end
 
   module type Data_hash_binable_intf = sig
-    type t [@@deriving sexp, compare, eq, yojson, hash]
+    type t = private Field.t [@@deriving sexp, compare, eq, yojson, hash]
 
     module Stable : sig
       module V1 : sig
@@ -66,6 +66,8 @@ module type S = sig
     val typ : (var, t) Typ.t
 
     val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
+
+    val var_to_hash_packed : var -> Field.Var.t
 
     val length_in_triples : int
 

@@ -66,14 +66,13 @@ module Make (Inputs : Inputs_intf) : sig
       -> frontier:Transition_frontier.t
       -> ledger_db:Ledger.Db.t
       -> transition_reader:( [< `Transition of
-                                External_transition.with_initial_validation
+                                External_transition.Initial_validated.t
                                 Envelope.Incoming.t ]
                            * [< `Time_received of Block_time.t] )
                            Pipe_lib.Strict_pipe.Reader.t
       -> should_ask_best_tip:bool
       -> ( Transition_frontier.t
-         * External_transition.with_initial_validation Envelope.Incoming.t list
-         )
+         * External_transition.Initial_validated.t Envelope.Incoming.t list )
          Deferred.t
 
     module Transition_cache :
@@ -87,7 +86,7 @@ module Make (Inputs : Inputs_intf) : sig
                           Root_sync_ledger.t
       -> transition_graph:Transition_cache.t
       -> sync_ledger_reader:( [< `Transition of
-                                 External_transition.with_initial_validation
+                                 External_transition.Initial_validated.t
                                  Envelope.Incoming.t ]
                             * [< `Time_received of 'a] )
                             Pipe_lib.Strict_pipe.Reader.t
@@ -100,8 +99,8 @@ end = struct
     { logger: Logger.t
     ; trust_system: Trust_system.t
     ; verifier: Verifier.t
-    ; mutable best_seen_transition: External_transition.with_initial_validation
-    ; mutable current_root: External_transition.with_initial_validation
+    ; mutable best_seen_transition: External_transition.Initial_validated.t
+    ; mutable current_root: External_transition.Initial_validated.t
     ; network: Network.t }
 
   module Transition_cache = Transition_cache.Make (Inputs)
@@ -114,9 +113,8 @@ end = struct
              [ ( "selection_context"
                , `String "Bootstrap_controller.worth_getting_root" ) ])
         ~existing:
-          ( t.best_seen_transition |> fst |> With_hash.data
-          |> External_transition.protocol_state
-          |> Protocol_state.consensus_state )
+          ( t.best_seen_transition
+          |> External_transition.Initial_validated.consensus_state )
         ~candidate
 
   let received_bad_proof t sender_host e =
@@ -147,8 +145,7 @@ end = struct
     t.best_seen_transition <- peer_best_tip ;
     t.current_root <- peer_root ;
     let blockchain_state =
-      t.current_root |> fst |> With_hash.data
-      |> External_transition.protocol_state |> Protocol_state.blockchain_state
+      t.current_root |> External_transition.Initial_validated.blockchain_state
     in
     let expected_staged_ledger_hash =
       blockchain_state |> Blockchain_state.staged_ledger_hash
@@ -162,7 +159,7 @@ end = struct
       Root_sync_ledger.new_goal root_sync_ledger
         (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
         ~data:
-          ( With_hash.hash (fst t.current_root)
+          ( External_transition.Initial_validated.state_hash t.current_root
           , sender
           , expected_staged_ledger_hash )
         ~equal:(fun (hash1, _, _) (hash2, _, _) -> State_hash.equal hash1 hash2)
@@ -210,13 +207,10 @@ end = struct
     Reader.iter sync_ledger_reader
       ~f:(fun (`Transition incoming_transition, `Time_received _) ->
         let ({With_hash.data= transition; hash}, _)
-              : External_transition.with_initial_validation =
+              : External_transition.Initial_validated.t =
           Envelope.Incoming.data incoming_transition
         in
-        let protocol_state = External_transition.protocol_state transition in
-        let previous_state_hash =
-          Protocol_state.previous_state_hash protocol_state
-        in
+        let previous_state_hash = External_transition.parent_hash transition in
         let sender =
           match Envelope.Incoming.sender incoming_transition with
           | Envelope.Sender.Local ->
@@ -393,17 +387,24 @@ end = struct
               , Staged_ledger_hash.to_yojson received_staged_ledger_hash ) ]
           "Comparing $expected_staged_ledger_hash to \
            $received_staged_ledger_hash" ;
-        let%bind () =
-          Staged_ledger_hash.equal expected_staged_ledger_hash
-            received_staged_ledger_hash
-          |> Result.ok_if_true
-               ~error:(Error.of_string "received faulty scan state from peer")
+        let%bind new_root =
+          t.current_root
+          |> External_transition.skip_frontier_dependencies_validation
+               `This_transition_belongs_to_a_detached_subtree
+          |> External_transition.validate_staged_ledger_hash
+               (`Staged_ledger_already_materialized
+                 received_staged_ledger_hash)
+          |> Result.map_error ~f:(fun _ ->
+                 Error.of_string "received faulty scan state from peer" )
           |> Deferred.return
         in
-        Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-          ~logger ~verifier ~scan_state
-          ~snarked_ledger:(Ledger.of_database synced_db)
-          ~expected_merkle_root ~pending_coinbases
+        let%map root_staged_ledger =
+          Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
+            ~logger ~verifier ~scan_state
+            ~snarked_ledger:(Ledger.of_database synced_db)
+            ~expected_merkle_root ~pending_coinbases
+        in
+        (root_staged_ledger, new_root)
       with
       | Error e ->
           let%bind () =
@@ -427,24 +428,13 @@ end = struct
              Retry bootstrap" ;
           Writer.close sync_ledger_writer ;
           loop ()
-      | Ok root_staged_ledger -> (
+      | Ok (root_staged_ledger, new_root) -> (
           let%bind () =
             Trust_system.(
               record t.trust_system t.logger sender
                 Actions.
                   ( Fulfilled_request
                   , Some ("Received valid scan state from peer", []) ))
-          in
-          let new_root =
-            let root_transition =
-              External_transition.Validation.forget_validation t.current_root
-            in
-            (* TODO: review the correctness of this action #2480 *)
-            let (`I_swear_this_is_safe_see_my_comment
-                  validated_root_transition) =
-              External_transition.Validated.create_unsafe root_transition
-            in
-            validated_root_transition
           in
           let consensus_state =
             new_root |> External_transition.Validated.consensus_state

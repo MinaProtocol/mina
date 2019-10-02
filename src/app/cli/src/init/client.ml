@@ -108,6 +108,30 @@ let get_balance =
            (or_error_str res ~f_ok:balance_str ~error:"Failed to get balance")
      ))
 
+let get_balance_graphql =
+  let open Command.Param in
+  let pk_flag =
+    flag "public-key"
+      ~doc:"KEY Public key for which you want to check the balance"
+      (required Cli_lib.Arg_type.public_key_compressed)
+  in
+  Command.async ~summary:"Get balance associated with a public key"
+    (Cli_lib.Background_daemon.init ~rest:true pk_flag
+       ~f:(fun port public_key ->
+         let%map response =
+           Graphql_client.query
+             (Graphql_queries.Get_wallet.make
+                ~public_key:(Graphql_client.Encoders.public_key public_key)
+                ())
+             port
+         in
+         match response#wallet with
+         | Some wallet ->
+             printf "Balance: %s coda\n"
+               (Currency.Balance.to_string (wallet#balance)#total)
+         | None ->
+             printf "There are no funds in this account\n" ))
+
 let print_trust_status status json =
   if json then
     printf "%s\n"
@@ -557,6 +581,65 @@ let send_payment =
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
 
+let send_payment_graphql =
+  let open Command.Param in
+  let open Cli_lib.Arg_type in
+  let receiver_flag =
+    flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
+      (required public_key_compressed)
+  in
+  let amount_flag =
+    flag "amount" ~doc:"VALUE Payment amount you want to send"
+      (required txn_amount)
+  in
+  let args =
+    Args.zip3 Cli_lib.Flag.user_command_common receiver_flag amount_flag
+  in
+  Command.async ~summary:"Send payment to an address"
+    (Cli_lib.Background_daemon.init ~rest:true args
+       ~f:(fun rest_port
+          ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, amount)
+          ->
+         let%map response =
+           Graphql_client.(
+             query
+               (Graphql_queries.Send_payment.make
+                  ~receiver:(Encoders.public_key receiver)
+                  ~sender:(Encoders.public_key sender)
+                  ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
+                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                  ?memo ()))
+             rest_port
+         in
+         printf "Dispatched payment with ID %s\n"
+           ((response#sendPayment)#payment)#id ))
+
+let delegate_stake_graphql =
+  let open Command.Param in
+  let open Cli_lib.Arg_type in
+  let receiver_flag =
+    flag "receiver"
+      ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
+      (required public_key_compressed)
+  in
+  let args = Args.zip2 Cli_lib.Flag.user_command_common receiver_flag in
+  Command.async ~summary:"Delegate your stake to another public key"
+    (Cli_lib.Background_daemon.init ~rest:true args
+       ~f:(fun rest_port ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver) ->
+         let%map response =
+           Graphql_client.(
+             query
+               (Graphql_queries.Send_delegation.make
+                  ~receiver:(Encoders.public_key receiver)
+                  ~sender:(Encoders.public_key sender)
+                  ~fee:(Encoders.fee fee)
+                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                  ?memo ()))
+             rest_port
+         in
+         printf "Dispatched stake delegation with ID %s\n"
+           ((response#sendDelegation)#delegation)#id ))
+
 let cancel_transaction =
   let txn_id_flag =
     Command.Param.(
@@ -643,6 +726,80 @@ let cancel_transaction =
              eprintf "could not deserialize user command\n" ;
              exit 16 ))
 
+let cancel_transaction_graphql =
+  let txn_id_flag =
+    Command.Param.(
+      flag "id" ~doc:"ID Transaction ID to be cancelled"
+        (required Cli_lib.Arg_type.user_command))
+  in
+  Command.async
+    ~summary:
+      "Cancel a transaction -- this submits a replacement transaction with a \
+       fee larger than the cancelled transaction."
+    (Cli_lib.Background_daemon.init ~rest:true txn_id_flag
+       ~f:(fun rest_port user_command ->
+         let receiver =
+           match
+             User_command.Payload.body (User_command.payload user_command)
+           with
+           | Payment payment ->
+               payment.receiver
+           | Stake_delegation (Set_delegate {new_delegate}) ->
+               new_delegate
+         in
+         let open Deferred.Let_syntax in
+         let%bind nonce_response =
+           let open Graphql_client.Encoders in
+           Graphql_client.query
+             (Graphql_queries.Get_inferred_nonce.make
+                ~public_key:(public_key (User_command.sender user_command))
+                ())
+             rest_port
+         in
+         let maybe_inferred_nonce =
+           let open Option.Let_syntax in
+           let%bind wallet = nonce_response#wallet in
+           let%map nonce = wallet#inferredNonce in
+           int_of_string nonce
+         in
+         let cancelled_nonce =
+           Coda_numbers.Account_nonce.to_int (User_command.nonce user_command)
+         in
+         let inferred_nonce =
+           Option.value maybe_inferred_nonce ~default:cancelled_nonce
+         in
+         let cancel_fee =
+           let diff =
+             Unsigned.UInt64.of_int (inferred_nonce - cancelled_nonce)
+           in
+           let fee = Currency.Fee.to_uint64 (User_command.fee user_command) in
+           let replace_fee =
+             Currency.Fee.to_uint64 Network_pool.Indexed_pool.replace_fee
+           in
+           let open Unsigned.UInt64.Infix in
+           (* fee amount "inspired by" network_pool/indexed_pool.ml *)
+           Currency.Fee.of_uint64 (fee + (replace_fee * diff))
+         in
+         printf "Fee to cancel transaction is %s coda.\n"
+           (Currency.Fee.to_string cancel_fee) ;
+         let cancel_query =
+           let open Graphql_client.Encoders in
+           Graphql_queries.Send_payment.make
+             ~sender:(public_key (User_command.sender user_command))
+             ~receiver:(public_key receiver) ~fee:(fee cancel_fee)
+             ~amount:(amount Currency.Amount.zero)
+             ~nonce:
+               (uint32
+                  (Coda_numbers.Account_nonce.to_uint32
+                     (User_command.nonce user_command)))
+             ()
+         in
+         let%map cancel_response =
+           Graphql_client.query cancel_query rest_port
+         in
+         printf "🛑 Cancelled transaction! Cancel ID: %s\n"
+           ((cancel_response#sendPayment)#payment)#id ))
+
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
     (Cli_lib.Background_daemon.init
@@ -690,10 +847,7 @@ let wrap_key =
     let%bind privkey =
       Secrets.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
     in
-    let pk =
-      Private_key.of_base58_check_exn
-        (privkey |> Or_error.ok_exn |> Bytes.to_string)
-    in
+    let pk = Private_key.of_base58_check_exn (Bytes.to_string privkey) in
     let kp = Keypair.of_private_key_exn pk in
     Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path)
 
@@ -790,7 +944,7 @@ let snark_pool_list =
   Command.async ~summary:"List of snark works in the snark pool in JSON format"
     (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
          Deferred.map
-           (Graphql_client.query (Graphql_client.Snark_pool.make ()) port)
+           (Graphql_client.query (Graphql_queries.Snark_pool.make ()) port)
            ~f:(fun response ->
              let lst =
                [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
@@ -843,6 +997,28 @@ let set_staking =
                (Public_key.Compressed.to_base58_check
                   (Public_key.compress public_key)) ))
 
+let set_staking_graphql =
+  let open Command.Param in
+  let open Cli_lib.Arg_type in
+  let pk_flag =
+    flag "public-key"
+      ~doc:"PUBLICKEY Public key of account with which to produce blocks"
+      (required public_key_compressed)
+  in
+  Command.async ~summary:"Start producing blocks"
+    (Cli_lib.Background_daemon.init ~rest:true pk_flag
+       ~f:(fun rest_port public_key ->
+         let%map _ =
+           Graphql_client.(
+             query
+               (Graphql_queries.Set_staking.make
+                  ~public_key:(Encoders.public_key public_key)
+                  ()))
+             rest_port
+         in
+         printf "New block producer public key: %s\n"
+           (Public_key.Compressed.to_base58_check public_key) ))
+
 let set_snark_worker =
   let open Command.Param in
   let public_key_flag =
@@ -858,7 +1034,7 @@ let set_snark_worker =
        ~f:(fun port optional_public_key ->
          let open Graphql_client in
          let graphql =
-           Set_snark_worker.make
+           Graphql_queries.Set_snark_worker.make
              ~wallet:Encoders.(optional optional_public_key ~f:public_key)
              ()
          in
@@ -882,7 +1058,7 @@ let set_snark_work_fee =
        ~f:(fun port fee ->
          let open Graphql_client in
          let graphql =
-           Set_snark_work_fee.make
+           Graphql_queries.Set_snark_work_fee.make
              ~fee:(Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
              ()
          in
@@ -919,7 +1095,7 @@ let unsafe_import =
         Secrets.Wallets.load ~logger:(Logger.create ())
           ~disk_location:wallets_disk_location
       in
-      let password = lazy (Deferred.Or_error.return (Bytes.create 0)) in
+      let password = lazy (Deferred.return (Bytes.create 0)) in
       (* Either we already are tracking it *)
       match Secrets.Wallets.check_locked wallets ~needle:pk with
       | Some _ ->
@@ -939,59 +1115,164 @@ let unsafe_import =
                (Public_key.compress public_key)))
 
 let import_key =
+  (* We'll do this entirely without talking to the daemon for now, though in the future this may change *)
+  let privkey_path = Cli_lib.Flag.privkey_read_path in
+  let conf_dir = Cli_lib.Flag.conf_dir in
+  let flags = Args.zip2 privkey_path conf_dir in
   Command.async
     ~summary:
       "Import a password protected private key to be tracked by the daemon."
-    (let open Command.Let_syntax in
-    (* We'll do this entirely without talking to the daemon for now, though in the future this may change *)
-    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path
-    and conf_dir = Cli_lib.Flag.conf_dir in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let%bind home = Sys.home_directory () in
-      let conf_dir =
-        Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
-      in
-      let wallets_disk_location = conf_dir ^/ "wallets" in
-      let%bind ({Keypair.public_key; _} as keypair) =
-        Secrets.Keypair.Terminal_stdin.read_exn privkey_path
-      in
-      let pk = Public_key.compress public_key in
-      let%bind wallets =
-        Secrets.Wallets.load ~logger:(Logger.create ())
-          ~disk_location:wallets_disk_location
-      in
-      (* Either we already are tracking it *)
-      match Secrets.Wallets.check_locked wallets ~needle:pk with
-      | Some _ ->
-          printf
-            !"Key already present, no need to import : %s\n"
-            (Public_key.Compressed.to_base58_check
-               (Public_key.compress public_key)) ;
-          Deferred.unit
-      | None ->
-          (* Or we import it *)
-          let%map _ =
-            Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
-          in
-          printf
-            !"Key imported successfully : %s\n"
-            (Public_key.Compressed.to_base58_check
-               (Public_key.compress public_key)))
+    (Cli_lib.Background_daemon.init ~rest:true flags
+       ~f:(fun port (privkey_path, conf_dir) ->
+         let open Deferred.Let_syntax in
+         let%bind home = Sys.home_directory () in
+         let conf_dir =
+           Option.value
+             ~default:(home ^/ Cli_lib.Default.conf_dir_name)
+             conf_dir
+         in
+         let wallets_disk_location = conf_dir ^/ "wallets" in
+         let%bind ({Keypair.public_key; _} as keypair) =
+           Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+         in
+         let pk = Public_key.compress public_key in
+         let%bind wallets =
+           Secrets.Wallets.load ~logger:(Logger.create ())
+             ~disk_location:wallets_disk_location
+         in
+         (* Either we already are tracking it *)
+         match Secrets.Wallets.check_locked wallets ~needle:pk with
+         | Some _ ->
+             printf
+               !"Key already present, no need to import : %s\n"
+               (Public_key.Compressed.to_base58_check
+                  (Public_key.compress public_key)) ;
+             Deferred.unit
+         | None ->
+             (* Or we import it *)
+             let%bind _ =
+               Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
+             in
+             let%map _response =
+               Graphql_client.query_or_error
+                 (Graphql_queries.Reload_wallets.make ())
+                 port
+             in
+             printf
+               !"\n😄 Imported account!\nPublic key: %s\n"
+               (Public_key.Compressed.to_base58_check
+                  (Public_key.compress public_key)) ))
 
 let list_accounts =
   let open Command.Param in
   Command.async ~summary:"List all owned accounts"
     (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
-         Deferred.map
-           (Graphql_client.query (Graphql_client.Get_wallet.make ()) port)
-           ~f:(fun response ->
-             Array.iteri
-               ~f:(fun i w ->
-                 printf "Wallet #%d:\n  Public key: %s\n  Balance: %s\n" (i + 1)
+         let%map response =
+           Graphql_client.query (Graphql_queries.Get_wallets.make ()) port
+         in
+         match response#ownedWallets with
+         | [||] ->
+             printf
+               "😢 You have no wallets!\n\
+                You can make a new one using `coda accounts create`\n"
+         | wallets ->
+             Array.iteri wallets ~f:(fun i w ->
+                 printf
+                   "Wallet #%d:\n\
+                   \  Public key: %s\n\
+                   \  Balance: %s\n\
+                   \  Locked: %b\n"
+                   (i + 1)
                    (Public_key.Compressed.to_base58_check w#public_key)
-                   (Unsigned.UInt64.to_string (w#balance)#total) )
-               response#ownedWallets ) ))
+                   (Unsigned.UInt64.to_string (w#balance)#total)
+                   (Option.value ~default:true w#locked) ) ))
+
+let create_account =
+  let open Command.Param in
+  Command.async ~summary:"Create new account"
+    (Cli_lib.Background_daemon.init ~rest:true (return ()) ~f:(fun port () ->
+         let%bind password =
+           Secrets.Keypair.prompt_password "Password for new account: "
+         in
+         let%map response =
+           Graphql_client.query
+             (Graphql_queries.Add_wallet.make
+                ~password:(Bytes.to_string password) ())
+             port
+         in
+         let pk_string =
+           Public_key.Compressed.to_base58_check
+             (response#addWallet)#public_key
+         in
+         printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ))
+
+let unlock_account =
+  let open Command.Param in
+  let public_key =
+    flag "public-key" ~doc:"KEY Public key of account to be unlocked"
+      (required string)
+  in
+  Command.async ~summary:"Unlock a tracked account"
+    (Cli_lib.Background_daemon.init ~rest:true public_key
+       ~f:(fun port pk_str ->
+         let args =
+           let open Deferred.Or_error.Let_syntax in
+           let%bind pk =
+             Deferred.return (Public_key.Compressed.of_base58_check pk_str)
+           in
+           let%map password =
+             Deferred.map ~f:Or_error.return
+               (Secrets.Password.read "Password to unlock account: ")
+           in
+           (pk, password)
+         in
+         match%bind args with
+         | Ok (pk, password_bytes) ->
+             let%map response =
+               Graphql_client.query
+                 (Graphql_queries.Unlock_wallet.make
+                    ~public_key:(Graphql_client.Encoders.public_key pk)
+                    ~password:(Bytes.to_string password_bytes)
+                    ())
+                 port
+             in
+             let pk_string =
+               Public_key.Compressed.to_base58_check
+                 (response#unlockWallet)#public_key
+             in
+             printf "\n🔓 Unlocked account!\nPublic key: %s\n" pk_string
+         | Error e ->
+             Deferred.return
+               (printf "❌ Error unlocking account: %s"
+                  (Error.to_string_hum e)) ))
+
+let lock_account =
+  let open Command.Param in
+  let public_key =
+    flag "public-key" ~doc:"KEY Public key of account to be locked"
+      (required string)
+  in
+  Command.async ~summary:"Lock a tracked account"
+    (Cli_lib.Background_daemon.init ~rest:true public_key
+       ~f:(fun port pk_str ->
+         match Public_key.Compressed.of_base58_check pk_str with
+         | Ok pk ->
+             let%map response =
+               Graphql_client.query
+                 (Graphql_queries.Lock_wallet.make
+                    ~public_key:(Graphql_client.Encoders.public_key pk)
+                    ())
+                 port
+             in
+             let pk_string =
+               Public_key.Compressed.to_base58_check
+                 (response#lockWallet)#public_key
+             in
+             printf "🔒 Locked account!\nPublic key: %s\n" pk_string
+         | Error e ->
+             Deferred.return
+               (printf "❌ Error locking account: %s" (Error.to_string_hum e))
+     ))
 
 let generate_libp2p_keypair =
   Command.async
@@ -1003,19 +1284,22 @@ let generate_libp2p_keypair =
        @@ fun () ->
        Deferred.ignore
          (let open Deferred.Let_syntax in
-         let logger = Logger.create () in
+         (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
+         let logger = Logger.null () in
          (* Using the helper only for keypair generation requires no state. *)
-         match%map Coda_net2.create ~logger ~conf_dir:"/dev/null" with
-         | Ok net ->
-             let%bind me = Coda_net2.Keypair.random net in
-             let%map () = Coda_net2.shutdown net in
-             printf "libp2p keypair: %s" (Coda_net2.Keypair.to_string me) ;
-             exit 0
-         | Error e ->
-             Logger.fatal logger "failed to generate libp2p keypair: $err"
-               ~module_:__MODULE__ ~location:__LOC__
-               ~metadata:[("err", `String (Error.to_string_hum e))] ;
-             exit 20) ))
+         File_system.with_temp_dir "coda-generate-libp2p-keypair"
+           ~f:(fun tmpd ->
+             match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
+             | Ok net ->
+                 let%bind me = Coda_net2.Keypair.random net in
+                 let%map () = Coda_net2.shutdown net in
+                 printf "libp2p keypair:\n%s\n"
+                   (Coda_net2.Keypair.to_string me)
+             | Error e ->
+                 Logger.fatal logger "failed to generate libp2p keypair: $err"
+                   ~module_:__MODULE__ ~location:__LOC__
+                   ~metadata:[("err", `String (Error.to_string_hum e))] ;
+                 exit 20 )) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -1063,7 +1347,20 @@ end
 
 let accounts =
   Command.group ~summary:"Client commands concerning account management"
-    ~preserve_subcommand_order:() [("list", list_accounts)]
+    ~preserve_subcommand_order:()
+    [ ("list", list_accounts)
+    ; ("create", create_account)
+    ; ("import", import_key)
+    ; ("unlock", unlock_account)
+    ; ("lock", lock_account) ]
+
+let client =
+  Command.group ~summary:"Simple client commands" ~preserve_subcommand_order:()
+    [ ("get-balance", get_balance_graphql)
+    ; ("send-payment", send_payment_graphql)
+    ; ("delegate-stake", delegate_stake_graphql)
+    ; ("cancel-transaction", cancel_transaction_graphql)
+    ; ("set-staking", set_staking_graphql) ]
 
 let command =
   Command.group ~summary:"Lightweight client commands"

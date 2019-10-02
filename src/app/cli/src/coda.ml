@@ -157,28 +157,24 @@ let daemon logger =
            "true|false Log transaction-pool diff received from peers \
             (default: false)"
          (optional bool)
-     and no_bans =
-       let module Expiration = struct
-         [%%expires_after "20190914"]
-       end in
-       flag "no-bans" no_arg ~doc:"don't ban peers (**TEMPORARY FOR TESTNET**)"
      and enable_libp2p =
        flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
      and libp2p_port =
        flag "libp2p-port" (optional int)
-         ~doc:"Port to use for libp2p (default: 28675)"
+         ~doc:"PORT Port to use for libp2p (default: 28675)"
      and disable_haskell =
        flag "disable-old-discovery" no_arg
          ~doc:"Disable the old discovery mechanism"
      and libp2p_keypair =
        flag "libp2p-keypair" (optional string)
          ~doc:
-           "Keypair (generated from `coda advanced generate-libp2p-keypair`) \
-            to use with libp2p (default: generate new keypair)"
+           "KEYPAIR Keypair (generated from `coda advanced \
+            generate-libp2p-keypair`) to use with libp2p (default: generate \
+            new keypair)"
      and libp2p_peers_raw =
        flag "libp2p-peer"
          ~doc:
-           "/ip4/HOST/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
+           "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             libp2p discovery"
          (listed string)
      in
@@ -205,7 +201,6 @@ let daemon logger =
              | Ok ll ->
                  Deferred.return ll )
        in
-       if no_bans then Trust_system.disable_bans () ;
        let%bind conf_dir =
          if is_background then
            let home = Core.Sys.home_directory () in
@@ -351,7 +346,7 @@ let daemon logger =
          (let bytes_per_word = Sys.word_size / 8 in
           let rec loop () =
             let stat = Gc.stat () in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "OCaml memory statistics"
               ~metadata:
                 [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
@@ -422,13 +417,9 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "rest-port"
              ~default:Port.default_rest rest_server_port
          in
-         ignore libp2p_port ;
-         (* FIXME HACK: make this configurable when we can pass the port in the CLI *)
          let libp2p_port =
-           (*
            or_from_config YJ.Util.to_int_option "libp2p-port"
-             ~default:Port.default_libp2p libp2p_port *)
-           Port.default_libp2p
+             ~default:Port.default_libp2p libp2p_port
          in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
@@ -560,9 +551,8 @@ let daemon logger =
            (Async.Scheduler.long_cycles
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
-             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-               "long async cycle %s"
-               (Time_ns.Span.to_string span) ) ;
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               "Long async cycle, %0.01f seconds" (Time_ns.Span.to_sec span) ) ;
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
              ~location typ
@@ -638,9 +628,59 @@ let daemon logger =
            Auxiliary_database.External_transition_database.create ~logger
              external_transition_database_dir
          in
+         (* log terminated child processes *)
+         let pids = Child_processes.Termination.create_pid_set () in
+         let rec terminated_child_loop () =
+           match
+             try Unix.wait_nohang `Any
+             with
+             | Unix.Unix_error (errno, _, _)
+             when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
+                  (* no child processes exist *)
+             ->
+               None
+           with
+           | None ->
+               (* no children have terminated, wait to check again *)
+               let%bind () = Async.after (Time.Span.of_min 1.) in
+               terminated_child_loop ()
+           | Some (child_pid, exit_or_signal) ->
+               let child_pid_metadata =
+                 [("child_pid", `Int (Pid.to_int child_pid))]
+               in
+               ( match exit_or_signal with
+               | Ok () ->
+                   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                     "Daemon child process $child_pid terminated with exit \
+                      code 0"
+                     ~metadata:child_pid_metadata
+               | Error err -> (
+                 match err with
+                 | `Signal signal ->
+                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                       "Daemon child process $child_pid terminated after \
+                        receiving signal $signal"
+                       ~metadata:
+                         ( ("signal", `String (Signal.to_string signal))
+                         :: child_pid_metadata )
+                 | `Exit_non_zero exit_code ->
+                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                       "Daemon child process $child_pid terminated with \
+                        nonzero exit code $exit_code"
+                       ~metadata:
+                         (("exit_code", `Int exit_code) :: child_pid_metadata)
+                 ) ) ;
+               (* terminate daemon if children registered *)
+               Child_processes.Termination.check_terminated_child pids
+                 child_pid logger ;
+               (* check for other terminated children, without waiting *)
+               terminated_child_loop ()
+         in
+         Deferred.don't_wait_for @@ terminated_child_loop () ;
          let%map coda =
            Coda_lib.create
-             (Coda_lib.Config.make ~logger ~trust_system ~conf_dir ~net_config
+             (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+                ~net_config
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
@@ -786,7 +826,8 @@ let coda_commands logger =
 new_cli]
 
 let coda_commands logger =
-  ("accounts", Client.accounts) :: coda_commands logger
+  ("accounts", Client.accounts)
+  :: ("client2", Client.client) :: coda_commands logger
 
 [%%endif]
 
