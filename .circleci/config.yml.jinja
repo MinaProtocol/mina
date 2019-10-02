@@ -61,7 +61,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-2abfa8025cea87a52f6c1c3e1e2a376d488f19e0
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
@@ -236,7 +236,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-2abfa8025cea87a52f6c1c3e1e2a376d488f19e0
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
@@ -294,7 +294,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-2abfa8025cea87a52f6c1c3e1e2a376d488f19e0
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -335,7 +335,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-2abfa8025cea87a52f6c1c3e1e2a376d488f19e0
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -354,7 +354,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-2abfa8025cea87a52f6c1c3e1e2a376d488f19e0
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
@@ -373,7 +373,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-2abfa8025cea87a52f6c1c3e1e2a376d488f19e0
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
