@@ -180,7 +180,7 @@ module Stable = struct
         ; fee_excess: Amount.Signed.Stable.V1.t
         ; sok_digest: Sok_message.Digest.Stable.V1.t
         ; proof: Proof.Stable.V1.t }
-      [@@deriving fields, sexp, bin_io, yojson, version]
+      [@@deriving bin_io, compare, fields, sexp, version, yojson]
     end
 
     include T
