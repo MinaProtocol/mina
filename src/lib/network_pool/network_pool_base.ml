@@ -10,7 +10,8 @@ end)
   Intf.Network_pool_base_intf
   with type resource_pool := Resource_pool.t
    and type resource_pool_diff := Resource_pool.Diff.t
-   and type transition_frontier := Transition_frontier.t = struct
+   and type transition_frontier := Transition_frontier.t
+   and type config := Resource_pool.Config.t = struct
   type t =
     { resource_pool: Resource_pool.t
     ; logger: Logger.t
@@ -43,10 +44,8 @@ end)
     |> ignore ;
     network_pool
 
-  let create ~logger ~pids ~trust_system ~incoming_diffs
-      ~frontier_broadcast_pipe =
+  let create ~config ~incoming_diffs ~frontier_broadcast_pipe ~logger =
     of_resource_pool_and_diffs
-      (Resource_pool.create ~logger ~pids ~trust_system
-         ~frontier_broadcast_pipe)
-      ~logger ~incoming_diffs
+      (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe)
+      ~incoming_diffs ~logger
 end

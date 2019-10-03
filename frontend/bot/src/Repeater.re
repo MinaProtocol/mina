@@ -24,7 +24,7 @@ let start = (~fromKey, ~toKey, ~amount, ~fee, ~timeout) => {
                "Send failed (from %s to %s), error: %s",
                fromKey,
                toKey,
-               Js.String.make(e),
+               Graphql.combinedErrorToString(e),
              )
            | NotFound =>
              // Shouldn't happen

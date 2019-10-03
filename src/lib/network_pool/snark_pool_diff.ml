@@ -83,24 +83,25 @@ end)
     let data = Envelope.Incoming.data t in
     let to_or_error = function
       | `Don't_rebroadcast ->
-          Or_error.error_string "Worse fee or already in pool"
+          Or_error.error_string "Already in pool"
       | `Rebroadcast ->
           Ok data
     in
     match data with
-    | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) ->
-        let%bind () =
-          let check () =
+    | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (
+        let check_and_add () =
+          let%bind () =
             Pool.verify_and_act pool ~work:(work, p)
               ~sender:(Envelope.Incoming.sender t)
           in
-          match Pool.request_proof pool work with
-          | None ->
-              check ()
-          | Some {fee= {fee= prev; _}; _} ->
-              if Currency.Fee.( <= ) prev fee.fee then
-                Deferred.Or_error.return ()
-              else check ()
+          Pool.add_snark pool ~work ~proof ~fee
+          |> to_or_error |> Deferred.return
         in
-        Pool.add_snark pool ~work ~proof ~fee |> to_or_error |> Deferred.return
+        match Pool.request_proof pool work with
+        | None ->
+            check_and_add ()
+        | Some {fee= {fee= prev; _}; _} ->
+            if Currency.Fee.( <= ) prev fee.fee then
+              Deferred.return (Or_error.error_string "Worse fee")
+            else check_and_add () )
 end

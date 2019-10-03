@@ -48,7 +48,7 @@ let sendEcho = (echoKey, fee, {from: userKey, amount}) =>
              Int64.to_string(amount),
              echoKey,
              userKey,
-             Js.String.make(e),
+             Graphql.combinedErrorToString(e),
            )
          | NotFound =>
            // Shouldn't happen
@@ -103,7 +103,7 @@ let start = (echoKey, fee) => {
          log(
            `Error,
            "Error retrieving new block. Message: %s",
-           Js.String.make(e),
+           Graphql.combinedErrorToString(e),
          )
        | NotFound =>
          // Shouldn't happen

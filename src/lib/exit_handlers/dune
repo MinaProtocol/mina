@@ -1,0 +1,7 @@
+(library
+ (name exit_handlers)
+ (public_name exit_handlers)
+ (library_flags -linkall)
+ (libraries core_kernel async_kernel async_unix logger)
+ (preprocess (pps ppx_let))
+ (synopsis "Exit handlers"))

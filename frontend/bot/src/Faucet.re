@@ -32,13 +32,9 @@ let sendFaucetCoda = (userId, msg, pk) => {
            log(`Info, "Sent (to %s): %s", pk, id);
            Messages.faucetSentNotification(~id);
          | Error(error) =>
-           log(
-             `Error,
-             "Send failed (to %s), error: %s",
-             pk,
-             Js.String.make(error),
-           );
-           Messages.faucetFailNotification(~error);
+           let msg = Graphql.combinedErrorToString(error);
+           log(`Error, "Send failed (to %s), error: %s", pk, msg);
+           Messages.faucetFailNotification(~error=msg);
          | NotFound =>
            // Shouldn't happen
            log(`Error, "Got 'NotFound' sending to %s", pk);
