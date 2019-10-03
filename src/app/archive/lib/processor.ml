@@ -12,7 +12,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
   module Client = Graphql_client_lib.Make (Config)
 
   let added_transactions {port} added =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Result.Let_syntax in
     let user_commands_with_times = Map.to_alist added in
     let user_commands_with_hashes_and_times =
       List.map user_commands_with_times ~f:(fun (user_command, times) ->
@@ -25,7 +25,6 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         ~f:(fun ({With_hash.hash; _}, _) -> hash)
     in
     let%bind queried_existing_user_commands =
-      let open Deferred.Or_error.Let_syntax in
       let graphql =
         Graphql_query.User_commands.Query_first_seen.make
           ~hashes:
@@ -147,8 +146,12 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
       | Diff.Transition_frontier _ ->
           (* TODO: Implement *)
           Deferred.return ()
-      | Transaction_pool {added; removed= _} ->
-          Deferred.Or_error.ok_exn (added_transactions t added) )
+      | Transaction_pool {added; removed= _} -> (
+          match%bind added_transactions t added with
+          | Ok result ->
+              Deferred.return result
+          | Error e ->
+              Graphql_client_lib.Connection_error.ok_exn e ) )
 end
 
 let%test_module "Processor" =
@@ -186,7 +189,7 @@ let%test_module "Processor" =
            ; Result.map_error clear_action ~f:(fun error ->
                  Error.createf
                    !"Issue clearing data in database: %{sexp:Error.t}"
-                   error )
+                 @@ Graphql_client_lib.Connection_error.to_error error )
              |> Result.ignore ]
 
     let assert_user_command

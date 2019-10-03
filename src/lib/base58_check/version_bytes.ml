@@ -14,9 +14,9 @@ let proof : t = '\x70'
 
 let signature : t = '\x9A'
 
-let non_zero_curve_point : t = '\xCD'
+let non_zero_curve_point : t = '\xCE'
 
-let non_zero_curve_point_compressed : t = '\xCA'
+let non_zero_curve_point_compressed : t = '\xCB'
 
 let random_oracle_base : t = '\x03'
 

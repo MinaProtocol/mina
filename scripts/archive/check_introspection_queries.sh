@@ -1,5 +1,5 @@
-SOURCE_INTROSPECTION_FILE_PATH=../../src/app/archive/archive_graphql_schema.json
-GENERTATED_INTROSPECTION_FILE_PATH=output/graphql_schema.json
+SOURCE_INTROSPECTION_FILE_PATH=src/app/archive/archive_graphql_schema.json
+GENERTATED_INTROSPECTION_FILE_PATH=scripts/archive/output/graphql_schema.json
 
 SOURCE_INTROSPECTION_CONTENTS=$(cat $SOURCE_INTROSPECTION_FILE_PATH)
 
