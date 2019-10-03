@@ -8,9 +8,6 @@ ARG OCAML_VERSION=4.07.1
 ARG OPAMKEEPBUILDDIR=false
 ARG OPAMREUSEBUILDDIR=false
 
-# for scripts to be run only in Docker
-ENV CODA_DOCKER=true
-
 # OS package dependencies
 RUN sudo apt-get update && sudo apt-get install --yes \
     cmake \
