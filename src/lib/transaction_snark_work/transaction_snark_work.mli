@@ -3,14 +3,14 @@ open Currency
 open Signature_lib
 
 module Statement : sig
-  type t = Transaction_snark.Statement.t One_or_two.t [@@deriving yojson, sexp]
+  type t = Transaction_snark.Statement.t One_or_two.t [@@deriving sexp, yojson]
 
   include Hashable.S with type t := t
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving yojson, version, sexp, bin_io]
+        type t [@@deriving bin_io, compare, sexp, version, yojson]
 
         include Hashable.S_binable with type t := t
       end

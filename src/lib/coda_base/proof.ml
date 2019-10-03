@@ -12,6 +12,8 @@ module Stable = struct
 
       let of_string = Binable.of_string (module Tock_backend.Proof)
 
+      let compare a b = String.compare (to_string a) (to_string b)
+
       let version_byte = Base58_check.Version_bytes.proof
 
       let description = "Tock proof"
