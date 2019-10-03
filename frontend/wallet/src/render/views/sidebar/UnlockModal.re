@@ -35,12 +35,7 @@ let make = (~wallet, ~onClose) => {
         type_="password"
         onChange={value => setPassword(_ => value)}
         value=password
-        error={
-          switch (error) {
-          | Some(error) => React.string(error)
-          | None => React.null
-          }
-        }
+        ?error
       />
       <Spacer height=1.5 />
       <div className=Css.(style([display(`flex)]))>

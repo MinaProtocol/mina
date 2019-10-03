@@ -212,7 +212,8 @@ let make =
       button
     </label>
     {switch (error) {
-     | Some(error) => <div className=Styles.errorText> error </div>
+     | Some(error) =>
+       <div className=Styles.errorText> {React.string(error)} </div>
      | None => React.null
      }}
   </div>;
