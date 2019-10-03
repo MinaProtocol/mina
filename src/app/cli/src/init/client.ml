@@ -476,7 +476,7 @@ let batch_send_payments =
           ( Account.Nonce.succ nonce
           , User_command.sign keypair
               (User_command_payload.create ~fee ~nonce
-                 ~memo:User_command_memo.dummy
+                 ~memo:User_command_memo.empty
                  ~body:
                    (Payment
                       { receiver=
@@ -549,7 +549,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
          in
          let memo =
-           Option.value_map memo_opt ~default:User_command_memo.dummy
+           Option.value_map memo_opt ~default:User_command_memo.empty
              ~f:User_command_memo.create_from_string_exn
          in
          let command =
@@ -707,7 +707,7 @@ let cancel_transaction =
              in
              let command =
                Coda_commands.setup_user_command ~fee:cancel_fee
-                 ~nonce:cancelled_nonce ~memo:User_command_memo.dummy
+                 ~nonce:cancelled_nonce ~memo:User_command_memo.empty
                  ~sender_kp body
              in
              dispatch_with_message Daemon_rpcs.Send_user_command.rpc command
