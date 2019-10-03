@@ -1,7 +1,7 @@
 open Coda_base
 
 module type S = sig
-  type t [@@deriving eq]
+  type t
 
   val find_exn : t -> State_hash.t -> Breadcrumb.t
 

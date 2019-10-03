@@ -1,0 +1,12 @@
+digraph G {
+  Full_frontier -> {Breadcrumb, Diff, Hash, Root_ledger};
+  Diff -> Breadcrumb;
+  Persistent_frontier -> {Database, Hash, Sync};
+  Sync -> {Diff_buffer, Worker};
+  Worker -> Database;
+  Diff_buffer -> {Diff, Hash, Worker};
+  Worker -> Diff;
+  Extensions -> {Diff, Full_frontier, Persistent_frontier, Persistent_root}
+  Persistent_root -> Hash
+  Transition_frontier -> {Extensions, Full_frontier, Persistent_frontier, Persistent_root};
+}

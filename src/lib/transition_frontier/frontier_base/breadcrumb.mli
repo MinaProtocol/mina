@@ -16,9 +16,6 @@ type display =
 
 val create : External_transition.Validated.t -> Staged_ledger.t -> t
 
-(** The copied breadcrumb delegates to [Staged_ledger.copy], the other fields are already immutable *)
-val copy : t -> t
-
 val build :
      logger:Logger.t
   -> verifier:Verifier.t

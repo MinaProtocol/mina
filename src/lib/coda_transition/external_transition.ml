@@ -593,9 +593,9 @@ module Validated = struct
           With_hash.to_yojson to_yojson State_hash.to_yojson
             transition_with_hash
 
-        let create_unsafe t =
+        let create_unsafe_pre_hashed t =
           `I_swear_this_is_safe_see_my_comment
-            ( Validation.wrap (With_hash.of_data t ~hash_data:state_hash)
+            ( Validation.wrap t
             |> skip_time_received_validation
                  `This_transition_was_not_received_via_gossip
             |> skip_proof_validation `This_transition_was_generated_internally
@@ -605,6 +605,9 @@ module Validated = struct
                  `This_transition_belongs_to_a_detached_subtree
             |> skip_staged_ledger_diff_validation
                  `This_transition_has_a_trusted_staged_ledger )
+
+        let create_unsafe t =
+          create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hash)
 
         include With_validation
       end
@@ -632,6 +635,7 @@ module Validated = struct
   Stable.Latest.
     ( sexp_of_t
     , t_of_sexp
+    , create_unsafe_pre_hashed
     , create_unsafe
     , protocol_state
     , delta_transition_chain_proof
@@ -651,29 +655,28 @@ module Validated = struct
 end
 
 let genesis =
-  lazy
-    (let genesis_protocol_state =
-       With_hash.data @@ Lazy.force Genesis_protocol_state.t
-     in
-     let empty_diff =
-       { Staged_ledger_diff.diff=
-           ( { completed_works= []
-             ; user_commands= []
-             ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-           , None )
-       ; creator=
-           Account.public_key (snd (List.hd_exn Genesis_ledger.accounts)) }
-     in
-     (* the genesis transition is assumed to be valid *)
-     let (`I_swear_this_is_safe_see_my_comment transition) =
-       Validated.create_unsafe
-         (create ~protocol_state:genesis_protocol_state
-            ~protocol_state_proof:Precomputed_values.base_proof
-            ~staged_ledger_diff:empty_diff
-            ~delta_transition_chain_proof:
-              (Protocol_state.previous_state_hash genesis_protocol_state, []))
-     in
-     transition)
+  let open Lazy.Let_syntax in
+  let%map genesis_protocol_state = Genesis_protocol_state.t in
+  let empty_diff =
+    { Staged_ledger_diff.diff=
+        ( { completed_works= []
+          ; user_commands= []
+          ; coinbase= Staged_ledger_diff.At_most_two.Zero }
+        , None )
+    ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
+    }
+  in
+  (* the genesis transition is assumed to be valid *)
+  let (`I_swear_this_is_safe_see_my_comment transition) =
+    Validated.create_unsafe_pre_hashed
+      (With_hash.map genesis_protocol_state ~f:(fun protocol_state ->
+           create ~protocol_state
+             ~protocol_state_proof:Precomputed_values.base_proof
+             ~staged_ledger_diff:empty_diff
+             ~delta_transition_chain_proof:
+               (Protocol_state.previous_state_hash protocol_state, []) ))
+  in
+  transition
 
 module Transition_frontier_validation (Transition_frontier : sig
   type t

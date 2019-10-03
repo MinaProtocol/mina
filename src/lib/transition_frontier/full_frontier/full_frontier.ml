@@ -119,28 +119,6 @@ let root_data t =
   { transition= Breadcrumb.validated_transition root
   ; staged_ledger= Breadcrumb.staged_ledger root }
 
-let equal t1 t2 =
-  let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in
-  let equal_breadcrumb breadcrumb1 breadcrumb2 =
-    let open Breadcrumb in
-    let open Option.Let_syntax in
-    let get_successor_nodes frontier breadcrumb =
-      let%map node = Hashtbl.find frontier.table @@ state_hash breadcrumb in
-      Node.successor_hashes node
-    in
-    equal breadcrumb1 breadcrumb2
-    && State_hash.equal (parent_hash breadcrumb1) (parent_hash breadcrumb2)
-    && (let%bind successors1 = get_successor_nodes t1 breadcrumb1 in
-        let%map successors2 = get_successor_nodes t2 breadcrumb2 in
-        List.equal State_hash.equal
-          (successors1 |> List.sort ~compare:State_hash.compare)
-          (successors2 |> List.sort ~compare:State_hash.compare))
-       |> Option.value_map ~default:false ~f:Fn.id
-  in
-  List.equal equal_breadcrumb
-    (all_breadcrumbs t1 |> sort_breadcrumbs)
-    (all_breadcrumbs t2 |> sort_breadcrumbs)
-
 let max_length {max_length; _} = max_length
 
 let root_length t = (Hashtbl.find_exn t.table t.root).length
@@ -445,6 +423,22 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
         (Breadcrumb.consensus_state old_root_node.breadcrumb)
         (Breadcrumb.consensus_state new_root_node.breadcrumb)
         ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger ;
+      (Breadcrumb.state_hash old_root_node.breadcrumb, Some new_root_hash)
+  (* These are invalid inhabitants for the type signature of this function,
+   * but the OCaml compiler isn't smart enough to realize this. *)
+  | Root_transitioned {garbage= Lite _; _} ->
+      failwith "impossible"
+  | New_node (Lite _) ->
+      failwith "impossible"
+
+let update_metrics_with_diff (type mutant) t
+    (diff : (Diff.full, mutant) Diff.t) : unit =
+  match diff with
+  | New_node _ ->
+      Coda_metrics.(Gauge.inc_one Transition_frontier.active_breadcrumbs) ;
+      Coda_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs)
+  | Root_transitioned {garbage= Full garbage_breadcrumbs; _} ->
+      let new_root_breadcrumb = root t in
       let consensus_state = Breadcrumb.consensus_state new_root_breadcrumb in
       let blockchain_length =
         Int.to_float
@@ -488,14 +482,9 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
           root_snarked_ledger_total_currency ;
         Counter.inc_one Transition_frontier.root_transitions ;
         Gauge.set Transition_frontier.slot_fill_rate
-          (blockchain_length /. global_slot)) ;
-      (Breadcrumb.state_hash old_root_node.breadcrumb, Some new_root_hash)
-  (* These are invalid inhabitants for the type signature of this function,
-   * but the OCaml compiler isn't smart enough to realize this. *)
-  | Root_transitioned {garbage= Lite _; _} ->
-      failwith "impossible"
-  | New_node (Lite _) ->
-      failwith "impossible"
+          (blockchain_length /. global_slot))
+  | _ ->
+      ()
 
 let apply_diffs t diffs =
   let open Root_identifier.Stable.Latest in
@@ -512,6 +501,7 @@ let apply_diffs t diffs =
     List.fold diffs ~init:None ~f:(fun prev_root (Diff.Full.E.E diff) ->
         let mutant, new_root = apply_diff t diff in
         t.hash <- Frontier_hash.merge_diff t.hash (Diff.to_lite diff) mutant ;
+        update_metrics_with_diff t diff ;
         match new_root with
         | None ->
             prev_root
@@ -551,3 +541,27 @@ let apply_diffs t diffs =
       | None ->
           () ) ;
   `New_root new_root
+
+module For_tests = struct
+  let equal t1 t2 =
+    let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in
+    let equal_breadcrumb breadcrumb1 breadcrumb2 =
+      let open Breadcrumb in
+      let open Option.Let_syntax in
+      let get_successor_nodes frontier breadcrumb =
+        let%map node = Hashtbl.find frontier.table @@ state_hash breadcrumb in
+        Node.successor_hashes node
+      in
+      equal breadcrumb1 breadcrumb2
+      && State_hash.equal (parent_hash breadcrumb1) (parent_hash breadcrumb2)
+      && (let%bind successors1 = get_successor_nodes t1 breadcrumb1 in
+          let%map successors2 = get_successor_nodes t2 breadcrumb2 in
+          List.equal State_hash.equal
+            (successors1 |> List.sort ~compare:State_hash.compare)
+            (successors2 |> List.sort ~compare:State_hash.compare))
+         |> Option.value_map ~default:false ~f:Fn.id
+    in
+    List.equal equal_breadcrumb
+      (all_breadcrumbs t1 |> sort_breadcrumbs)
+      (all_breadcrumbs t2 |> sort_breadcrumbs)
+end

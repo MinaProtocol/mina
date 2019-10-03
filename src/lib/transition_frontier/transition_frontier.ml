@@ -299,8 +299,6 @@ include struct
 
   let proxy1 f {full_frontier; _} = f full_frontier
 
-  let proxy2 f {full_frontier= x; _} {full_frontier= y; _} = f x y
-
   let max_length = proxy1 max_length
 
   let consensus_local_state = proxy1 consensus_local_state
@@ -343,9 +341,6 @@ include struct
 
   let best_tip_path_length_exn = proxy1 best_tip_path_length_exn
 
-  (* TODO: should this be nested under For_tests? should never be used in production *)
-  let equal = proxy2 equal
-
   (* why can't this one be proxied? *)
   let path_map {full_frontier; _} breadcrumb ~f =
     path_map full_frontier breadcrumb ~f
@@ -354,6 +349,11 @@ end
 module For_tests = struct
   open Signature_lib
   module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
+  open Full_frontier.For_tests
+
+  let proxy2 f {full_frontier= x; _} {full_frontier= y; _} = f x y
+
+  let equal = proxy2 equal
 
   let load_with_max_length = load_with_max_length
 
@@ -534,4 +534,26 @@ module For_tests = struct
         Deferred.List.iter ~how:`Sequential branches
           ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) ) ;
     frontier
+
+  let gen_with_branch ?logger ?verifier ?trust_system ?consensus_local_state
+      ?(root_ledger_and_accounts =
+        (Lazy.force Genesis_ledger.t, Genesis_ledger.accounts))
+      ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
+      ~branch_size () =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind frontier =
+      gen ?logger ?verifier ?trust_system ?consensus_local_state
+        ?gen_root_breadcrumb ~root_ledger_and_accounts ~max_length
+        ~size:frontier_size ()
+    in
+    let%map make_branch =
+      Breadcrumb.For_tests.gen_seq ?logger ?verifier ?trust_system
+        ~accounts_with_secret_keys:(snd root_ledger_and_accounts)
+        branch_size
+    in
+    let branch =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          make_branch (get_branch_root frontier) )
+    in
+    (frontier, branch)
 end

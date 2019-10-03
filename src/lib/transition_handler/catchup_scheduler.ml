@@ -283,33 +283,6 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let create = create ~logger ~trust_system ~time_controller
 
-    (*
-    let rec print_rose_tree ?(whitespace = 0) (Rose_tree.T (root, branches)) =
-      Printf.printf "%s- %s\n"
-        (String.make whitespace ' ')
-        (State_hash.to_string (Transition_frontier.Breadcrumb.state_hash (Cached.peek root)));
-      List.iter branches ~f:(print_rose_tree ~whitespace:(whitespace+2))
-    *)
-
-    let gen_frontier_and_branch ?(get_branch_root = Transition_frontier.root)
-        ?verifier ~frontier_size ~branch_size () =
-      let open Quickcheck.Generator.Let_syntax in
-      let%bind frontier =
-        Transition_frontier.For_tests.gen ?verifier
-          ~root_ledger_and_accounts:
-            (Lazy.force Genesis_ledger.t, Genesis_ledger.accounts)
-          ~max_length ~size:frontier_size ()
-      in
-      let%map make_branch =
-        Transition_frontier.Breadcrumb.For_tests.gen_seq ~logger ~trust_system
-          ~accounts_with_secret_keys:Genesis_ledger.accounts branch_size
-      in
-      let branch =
-        Async.Thread_safe.block_on_async_exn (fun () ->
-            make_branch (get_branch_root frontier) )
-      in
-      (frontier, branch)
-
     (* cast a breadcrumb into a cached, enveloped, partially validated transition *)
     let downcast_breadcrumb breadcrumb =
       let transition =
@@ -320,17 +293,6 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
 
-    let wait_with_timeout ~timeout_duration deferred =
-      let timeout =
-        Deferred.create (fun ivar ->
-            ignore
-              (Block_time.Timeout.create time_controller timeout_duration
-                 ~f:(Ivar.fill ivar)) )
-      in
-      Deferred.(
-        choose
-          [choice deferred (fun x -> `Ok x); choice timeout (Fn.const `Timeout)])
-
     let%test_unit "catchup jobs fire after the timeout" =
       let timeout_duration = Block_time.Span.of_ms 200L in
       let test_delta = Block_time.Span.of_ms 100L in
@@ -339,8 +301,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Verifier.create ~logger ~pids )
       in
       Quickcheck.test ~trials:3
-        (gen_frontier_and_branch ~verifier ~frontier_size:1 ~branch_size:2 ())
-        ~f:(fun (frontier, branch) ->
+        (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
+           ~frontier_size:1 ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
@@ -359,15 +321,16 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               (Cached.pure @@ downcast_breadcrumb disjoint_breadcrumb) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               match%map
-                wait_with_timeout
+                Block_time.Timeout.await
                   ~timeout_duration:
                     Block_time.Span.(timeout_duration + test_delta)
+                  time_controller
                   (Strict_pipe.Reader.read catchup_job_reader)
               with
               | `Timeout ->
                   failwith "test timed out"
               | `Ok `Eof ->
-                  failwith "pipe closed unexpectadly"
+                  failwith "pipe closed unexpectedly"
               | `Ok (`Ok (job_state_hash, _)) ->
                   [%test_eq: State_hash.t]
                     (Transition_frontier.Breadcrumb.parent_hash
@@ -391,8 +354,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Verifier.create ~logger ~pids )
       in
       Quickcheck.test ~trials:3
-        (gen_frontier_and_branch ~verifier ~frontier_size:1 ~branch_size:2 ())
-        ~f:(fun (frontier, branch) ->
+        (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
+           ~frontier_size:1 ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
           let cache = Unprocessed_transition_cache.create ~logger in
           let register_breadcrumb breadcrumb =
             Unprocessed_transition_cache.register_exn cache
@@ -427,28 +390,30 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                     (Cached.peek breadcrumb_1))) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               match%map
-                wait_with_timeout
+                Block_time.Timeout.await
                   ~timeout_duration:
                     Block_time.Span.(timeout_duration + test_delta)
+                  time_controller
                   (Strict_pipe.Reader.read catchup_job_reader)
               with
               | `Timeout ->
                   ()
               | `Ok `Eof ->
-                  failwith "pipe closed unexpectadly"
+                  failwith "pipe closed unexpectedly"
               | `Ok (`Ok _) ->
                   failwith
                     "job was emitted from the catchup scheduler even though \
                      the job was invalidated" ) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               match%map
-                wait_with_timeout ~timeout_duration:test_delta
+                Block_time.Timeout.await ~timeout_duration:test_delta
+                  time_controller
                   (Strict_pipe.Reader.read catchup_breadcrumbs_reader)
               with
               | `Timeout ->
                   failwith "timed out waiting for catchup breadcrumbs"
               | `Ok `Eof ->
-                  failwith "pipe closed unexpectadly"
+                  failwith "pipe closed unexpectedly"
               | `Ok
                   (`Ok
                     ( [Rose_tree.T (received_breadcrumb, [])]
@@ -473,8 +438,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Verifier.create ~logger ~pids )
       in
       Quickcheck.test ~trials:3
-        (gen_frontier_and_branch ~verifier ~frontier_size:1 ~branch_size:5 ())
-        ~f:(fun (frontier, branch) ->
+        (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
+           ~frontier_size:1 ~branch_size:5 ()) ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
@@ -514,5 +479,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                  curr_breadcrumb ) ;
           ignore
           @@ Async.Thread_safe.block_on_async_exn (fun () ->
-                 Strict_pipe.Reader.read catchup_job_reader ) )
+                 match%map Strict_pipe.Reader.read catchup_job_reader with
+                 | `Eof ->
+                     failwith "pipe closed unexpectedly"
+                 | `Ok (job_hash, _) ->
+                     [%test_eq: State_hash.t] job_hash
+                       ( Transition_frontier.Breadcrumb.parent_hash
+                       @@ List.hd_exn branch ) ) )
   end )

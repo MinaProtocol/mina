@@ -20,8 +20,6 @@ let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof} =
 let create validated_transition staged_ledger =
   {validated_transition; staged_ledger; just_emitted_a_proof= false}
 
-let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
-
 let build ~logger ~verifier ~trust_system ~parent
     ~transition:transition_with_validation ~sender =
   O1trace.measure "Breadcrumb.build" (fun () ->

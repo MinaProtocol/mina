@@ -125,7 +125,7 @@ module Root_transition = struct
   end
 end
 
-type (_, _) t =
+type ('repr, 'mutant) t =
   | New_node : 'repr Node.t -> ('repr, unit) t
   | Root_transitioned : 'repr Root_transition.t -> ('repr, State_hash.t) t
   | Best_tip_changed : State_hash.t -> (_, State_hash.t) t

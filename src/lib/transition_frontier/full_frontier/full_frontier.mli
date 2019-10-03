@@ -24,3 +24,7 @@ val calculate_diffs : t -> Breadcrumb.t -> Diff.Full.E.t list
 
 val apply_diffs :
   t -> Diff.Full.E.t list -> [`New_root of Root_identifier.t option]
+
+module For_tests : sig
+  val equal : t -> t -> bool
+end

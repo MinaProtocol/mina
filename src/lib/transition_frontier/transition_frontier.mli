@@ -45,6 +45,8 @@ val extensions : t -> Extensions.t
 module For_tests : sig
   open Signature_lib
 
+  val equal : t -> t -> bool
+
   val load_with_max_length :
        max_length:int
     -> ?retry_with_fresh_db:bool
@@ -78,4 +80,19 @@ module For_tests : sig
     -> size:int
     -> unit
     -> t Quickcheck.Generator.t
+
+  val gen_with_branch :
+       ?logger:Logger.t
+    -> ?verifier:Verifier.t
+    -> ?trust_system:Trust_system.t
+    -> ?consensus_local_state:Consensus.Data.Local_state.t
+    -> ?root_ledger_and_accounts:Ledger.t
+                                 * (Private_key.t option * Account.t) list
+    -> ?gen_root_breadcrumb:Breadcrumb.t Quickcheck.Generator.t
+    -> ?get_branch_root:(t -> Breadcrumb.t)
+    -> max_length:int
+    -> frontier_size:int
+    -> branch_size:int
+    -> unit
+    -> (t * Breadcrumb.t list) Quickcheck.Generator.t
 end
