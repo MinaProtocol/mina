@@ -1,6 +1,5 @@
 open Core_kernel
 open Snark_params.Tick
-open Fold_lib
 open Module_version
 module Account_nonce = Coda_numbers.Account_nonce
 module Memo = User_command_memo
@@ -55,19 +54,11 @@ module Common = struct
   (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
-  let to_input ({fee; nonce; memo} : t) : _ Random_oracle.Input.t =
-    { field_elements= [||]
-    ; bitstrings=
-        [| Currency.Fee.to_bits fee
-         ; Account_nonce.Bits.to_bits nonce
-         ; Memo.to_bits memo |] }
-
-  let fold ({fee; nonce; memo} : t) =
-    Fold.(Currency.Fee.fold fee +> Account_nonce.fold nonce +> Memo.fold memo)
-
-  let length_in_triples =
-    Currency.Fee.length_in_triples + Account_nonce.length_in_triples
-    + Memo.length_in_triples
+  let to_input ({fee; nonce; memo} : t) =
+    Random_oracle.Input.bitstrings
+      [| Currency.Fee.to_bits fee
+       ; Account_nonce.Bits.to_bits nonce
+       ; Memo.to_bits memo |]
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
@@ -109,11 +100,10 @@ module Common = struct
     let to_input ({fee; nonce; memo} : var) =
       let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
       let%map nonce = Account_nonce.Checked.to_bits nonce in
-      { Random_oracle.Input.field_elements= [||]
-      ; bitstrings=
-          [| s (Currency.Fee.var_to_bits fee)
-           ; s nonce
-           ; Array.to_list (memo :> Boolean.var array) |] }
+      Random_oracle.Input.bitstrings
+        [| s (Currency.Fee.var_to_bits fee)
+         ; s nonce
+         ; Array.to_list (memo :> Boolean.var array) |]
 
     let to_triples ({fee; nonce; memo} : var) =
       let%map nonce = Account_nonce.Checked.to_triples nonce in
@@ -153,22 +143,7 @@ module Body = struct
     | Stake_delegation of Stake_delegation.Stable.V1.t
   [@@deriving eq, sexp, hash, yojson]
 
-  let max_variant_size =
-    List.reduce_exn ~f:Int.max
-      [Payment_payload.length_in_triples; Stake_delegation.length_in_triples]
-
   module Tag = Transaction_union_tag
-
-  let fold = function
-    | Payment p ->
-        Fold.(Tag.fold Payment +> Payment_payload.fold p)
-    | Stake_delegation d ->
-        Fold.(
-          Tag.fold Stake_delegation +> Stake_delegation.fold d
-          +> Fold.init (max_variant_size - Stake_delegation.length_in_triples)
-               ~f:(fun _ -> (false, false, false)))
-
-  let length_in_triples = Tag.length_in_triples + max_variant_size
 
   let gen ~max_amount =
     let open Quickcheck.Generator in
@@ -223,10 +198,6 @@ end
 type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
 let create ~fee ~nonce ~memo ~body : t = {common= {fee; nonce; memo}; body}
-
-let fold ({common; body} : t) = Fold.(Common.fold common +> Body.fold body)
-
-let length_in_triples = Common.length_in_triples + Body.length_in_triples
 
 let fee (t : t) = t.common.fee
 

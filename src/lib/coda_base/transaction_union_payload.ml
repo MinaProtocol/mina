@@ -1,6 +1,4 @@
 open Core_kernel
-open Fold_lib
-open Tuple_lib
 open Signature_lib
 open Snark_params.Tick
 open Currency
@@ -15,17 +13,15 @@ module Body = struct
   type t = (Tag.t, Public_key.Compressed.t, Currency.Amount.t) t_
   [@@deriving sexp]
 
-  let to_input ~tag ~amount t =
-    let t1, t2 = tag t.tag in
-    let {Public_key.Compressed.Poly.x; is_odd} = t.public_key in
-    { Random_oracle.Input.bitstrings= [|[t1; t2]; amount t.amount; [is_odd]|]
-    ; field_elements= [|x|] }
-
-  let fold ({tag; public_key; amount} : t) =
-    Fold.(
-      Tag.fold tag
-      +> Public_key.Compressed.fold public_key
-      +> Currency.Amount.fold amount)
+  let to_input {tag; public_key; amount} tag_to_bits public_key_to_input
+      amount_to_input =
+    let open Random_oracle.Input in
+    List.reduce_exn ~f:append
+      [ bitstring
+          (let x, y = tag_to_bits tag in
+           [x; y])
+      ; public_key_to_input public_key
+      ; bitstring (amount_to_input amount) ]
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -84,17 +80,13 @@ module Body = struct
       ; amount= Currency.Amount.var_of_t amount }
 
     let to_input t =
-      to_input t ~tag:Fn.id ~amount:(fun x ->
+      to_input t Fn.id Public_key.Compressed.Checked.to_input (fun x ->
           (Currency.Amount.var_to_bits x :> Boolean.var list) )
-
-    let to_triples ({tag; public_key; amount} : var) =
-      let%map public_key = Public_key.Compressed.var_to_triples public_key in
-      Tag.Checked.to_triples tag @ public_key
-      @ Currency.Amount.var_to_triples amount
   end
 
   let to_input (t : t) =
-    to_input t ~tag:Tag.to_bits ~amount:Currency.Amount.to_bits
+    to_input t Tag.to_bits Public_key.Compressed.to_input
+      Currency.Amount.to_bits
 end
 
 type t = (User_command_payload.Common.t, Body.t) User_command_payload.Poly.t
@@ -128,9 +120,6 @@ let typ : (var, t) Typ.t =
 
 let of_user_command_payload ({common; body} : User_command_payload.t) : t =
   {common; body= Body.of_user_command_payload_body body}
-
-let fold ({common; body} : t) =
-  Fold.(User_command_payload.Common.fold common +> Body.fold body)
 
 let payload_typ = typ
 
@@ -302,11 +291,6 @@ module Changes = struct
 end
 
 module Checked = struct
-  let to_triples ({common; body} : var) =
-    let%map common = User_command_payload.Common.Checked.to_triples common
-    and body = Body.Checked.to_triples body in
-    common @ body
-
   let to_input ({common; body} : var) =
     let%map common = User_command_payload.Common.Checked.to_input common in
     Random_oracle.Input.append common (Body.Checked.to_input body)
@@ -343,9 +327,3 @@ let supply_increase (payload : payload) =
       payload.body.amount
   | Payment | Stake_delegation | Fee_transfer ->
       Amount.zero
-
-let%test_unit "fold_compatibility" =
-  Quickcheck.test User_command_payload.gen ~f:(fun t ->
-      [%test_eq: bool Triple.t list]
-        (Fold.to_list (User_command_payload.fold t))
-        (Fold.to_list (fold (of_user_command_payload t))) )

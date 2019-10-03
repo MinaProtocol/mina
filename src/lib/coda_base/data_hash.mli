@@ -1,8 +1,6 @@
 open Core
 open Snark_params.Tick
 open Snark_bits
-open Tuple_lib
-open Fold_lib
 
 module type Basic = sig
   type t = private Pedersen.Digest.t
@@ -37,7 +35,7 @@ module type Basic = sig
 
   val var_to_hash_packed : var -> Pedersen.Checked.Digest.var
 
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+  val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
   val typ : (var, t) Typ.t
 
@@ -51,7 +49,7 @@ module type Basic = sig
 
   include Hashable with type t := t
 
-  val fold : t -> bool Triple.t Fold.t
+  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 end
 
 module type Full_size = sig

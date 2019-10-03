@@ -3,11 +3,10 @@ open Import
 open Snarky
 open Snark_params
 open Snark_params.Tick
-open Tuple_lib
 open Let_syntax
 open Currency
-open Fold_lib
 open Module_version
+open Bitstring_lib
 
 module Coinbase_data = struct
   type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
@@ -19,20 +18,22 @@ module Coinbase_data = struct
 
   type value = t [@@deriving bin_io, sexp]
 
-  let length_in_triples =
-    Public_key.Compressed.length_in_triples + Amount.length_in_triples
+  let to_input (pk, amount) =
+    Random_oracle.Input.(
+      append
+        (Public_key.Compressed.to_input pk)
+        (bitstring (Amount.to_bits amount)))
 
-  let var_of_t ((public_key, amount) : value) =
-    (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
+  module Checked = struct
+    let constant ((public_key, amount) : value) =
+      (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
 
-  let var_to_triples (public_key, amount) =
-    let%map public_key = Public_key.Compressed.var_to_triples public_key in
-    let amount = Amount.var_to_triples amount in
-    public_key @ amount
-
-  let fold ((public_key, amount) : t) =
-    let open Fold in
-    Public_key.Compressed.fold public_key +> Amount.fold amount
+    let to_input (public_key, amount) =
+      Random_oracle.Input.(
+        append
+          (Public_key.Compressed.Checked.to_input public_key)
+          (bitstring (Bitstring.Lsb_first.to_list (Amount.var_to_bits amount))))
+  end
 
   let typ : (var, value) Typ.t =
     let spec =
@@ -126,7 +127,7 @@ module type Data_hash_binable_intf = sig
 
   val typ : (var, t) Typ.t
 
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
+  val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
   val var_to_hash_packed : var -> Field.Var.t
 
@@ -134,7 +135,7 @@ module type Data_hash_binable_intf = sig
 
   val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
 
-  val fold : t -> bool Triple.t Fold.t
+  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
   val to_bytes : t -> string
 
@@ -153,8 +154,10 @@ module Coinbase_stack = struct
 
     let push (h : t) cb =
       let coinbase = Coinbase_data.of_coinbase cb in
-      Pedersen.digest_fold Hash_prefix.coinbase_stack
-        Fold.(Coinbase_data.fold coinbase +> fold h)
+      let open Random_oracle in
+      hash ~init:Hash_prefix.Random_oracle.coinbase_stack
+        (pack_input
+           (Input.append (Coinbase_data.to_input coinbase) (to_input h)))
       |> of_hash
 
     let empty =
@@ -165,30 +168,15 @@ module Coinbase_stack = struct
 
       let push (t : t) (coinbase : Coinbase_data.var) =
         (*Prefix+Coinbase+Current-stack*)
-        let init =
-          Pedersen.Checked.Section.create
-            ~acc:(`Value Hash_prefix.coinbase_stack.acc)
-            ~support:
-              (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
-        in
-        let%bind coinbase_section =
-          let%bind bs = Coinbase_data.var_to_triples coinbase in
-          Pedersen.Checked.Section.extend init bs
-            ~start:Hash_prefix.length_in_triples
-        in
-        let%bind with_t =
-          let%bind bs = var_to_triples t in
-          Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
-            ~start:
-              (Hash_prefix.length_in_triples + Coinbase_data.length_in_triples)
-        in
-        let%map s =
-          Pedersen.Checked.Section.disjoint_union_exn coinbase_section with_t
-        in
-        let digest, _ =
-          Pedersen.Checked.Section.to_initial_segment_digest_exn s
-        in
-        var_of_hash_packed digest
+        let open Random_oracle in
+        let open Checked in
+        make_checked (fun () ->
+            hash ~init:Hash_prefix.Random_oracle.coinbase_stack
+              (pack_input
+                 (Input.append
+                    (Coinbase_data.Checked.to_input coinbase)
+                    (var_to_input t)))
+            |> var_of_hash_packed )
 
       let if_ = if_
 
@@ -210,7 +198,7 @@ module Hash_builder = struct
   let empty_hash =
     let open Tick.Pedersen in
     digest_fold (State.create ())
-      (Fold.string_triples "Pending coinbases merkle tree")
+      (Fold_lib.Fold.string_triples "Pending coinbases merkle tree")
     |> of_hash
 
   let of_digest = Fn.compose Fn.id of_hash
@@ -271,11 +259,11 @@ struct
     Stack_builder.
       ( to_bits
       , to_bytes
-      , fold
+      , to_input
       , equal_var
       , length_in_triples
-      , var_to_triples
       , var_to_hash_packed
+      , var_to_input
       , hash_fold_t
       , empty
       , push
@@ -329,10 +317,10 @@ struct
       , gen
       , to_bits
       , to_bytes
-      , fold
+      , to_input
       , equal_var
       , length_in_triples
-      , var_to_triples
+      , var_to_input
       , var_of_t
       , var_of_hash_packed
       , var_to_hash_packed
@@ -761,7 +749,7 @@ let%test_unit "Checked_stack = Unchecked_stack" =
       let checked =
         let comp =
           let open Snark_params.Tick in
-          let cb_var = Coinbase_data.(var_of_t coinbase_data) in
+          let cb_var = Coinbase_data.Checked.constant coinbase_data in
           let%map res = Stack.Checked.push (Stack.var_of_t base) cb_var in
           As_prover.read Stack.typ res
         in
@@ -800,7 +788,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
       let checked =
         let comp =
           let open Snark_params.Tick in
-          let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
+          let coinbase_var = Coinbase_data.Checked.constant coinbase_data in
           let%map res =
             handle
               (f_add_coinbase

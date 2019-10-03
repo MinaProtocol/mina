@@ -5,7 +5,6 @@ open Util
 open Snark_params.Tick
 open Snark_bits
 open Bitstring_lib
-open Tuple_lib
 open Fold_lib
 open Module_version
 
@@ -42,7 +41,7 @@ module type Basic = sig
 
   val var_to_hash_packed : var -> Pedersen.Checked.Digest.var
 
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+  val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
   val typ : (var, t) Typ.t
 
@@ -56,7 +55,7 @@ module type Basic = sig
 
   include Hashable with type t := t
 
-  val fold : t -> bool Triple.t Fold.t
+  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 end
 
 module type Full_size = sig
@@ -113,8 +112,7 @@ struct
 
   include Hashable.Make (Stable.Latest)
 
-  let to_bytes t =
-    Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
+  let to_bytes t = Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
 
   let length_in_bits = M.length_in_bits
 
@@ -163,7 +161,7 @@ struct
       >>| fun x -> (x :> Boolean.var list)
     else Field.Checked.unpack ~length:length_in_bits
 
-  let%snarkydef var_to_bits t =
+  let%snarkydef _var_to_bits t =
     match t.bits with
     | Some bits ->
         return (bits :> Boolean.var list)
@@ -172,12 +170,11 @@ struct
         t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
         bits
 
-  let var_to_triples t =
-    var_to_bits t >>| Bitstring.pad_to_triple_list ~default:Boolean.false_
+  let var_to_input (t : var) = Random_oracle.Input.field t.digest
 
   include Pedersen.Digest.Bits
 
-  let fold = Pedersen.Digest.fold
+  let to_input (t : t) = Random_oracle.Input.field t
 
   let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
 
