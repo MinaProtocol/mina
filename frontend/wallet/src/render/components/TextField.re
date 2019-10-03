@@ -13,6 +13,11 @@ module Styles = {
       border(`px(1), `solid, Theme.Colors.marineAlpha(0.3)),
       borderRadius(`rem(0.25)),
       flexGrow(1.),
+      hover([border(`px(1), `solid, Theme.Colors.hyperlink)]),
+      selector(
+        ":focus-within",
+        [border(`px(2), `solid, Theme.Colors.hyperlink)],
+      ),
     ]);
 
   let label =
