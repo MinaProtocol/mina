@@ -29,7 +29,9 @@ type client = {
   [@bs.meth]
   "request":
     UrqlClient.UrqlExchanges.subscriptionOperation =>
-    UrqlClient.UrqlExchanges.observableLike(UrqlClient.Types.executionResult),
+    UrqlClient.UrqlExchanges.observableLike(
+      UrqlClient.ClientTypes.executionResult,
+    ),
 };
 
 [@bs.new] [@bs.module "subscriptions-transport-ws"]
