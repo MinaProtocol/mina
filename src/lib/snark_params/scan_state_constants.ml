@@ -10,8 +10,6 @@
    use the config boolean scan_state_with_tps_goal to distinguish those cases
 *)
 
-open Core_kernel
-
 module type S = Scan_state_constants_intf.S
 
 [%%inject
@@ -19,6 +17,8 @@ module type S = Scan_state_constants_intf.S
 
 [%%if
 scan_state_with_tps_goal]
+
+open Core_kernel
 
 [%%inject
 "tps_goal_x10", scan_state_tps_goal_x10]
