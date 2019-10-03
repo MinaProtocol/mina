@@ -16,8 +16,8 @@ module Styles = {
         cursor(`pointer),
       ]),
       media(
-        "(min-width: 69rem) and (max-width: 83.9375rem)",
-        [maxWidth(`rem(15.75))],
+        "(min-width: 70rem) and (max-width: 83.9375rem)",
+        [maxWidth(`rem(15.3)), height(`rem(6.9))],
       ),
     ]);
 
@@ -38,8 +38,8 @@ module Styles = {
       color(Style.Colors.teal),
       textAlign(`left),
       media(
-        "(min-width: 69rem) and (max-width: 83.9375rem)",
-        [fontSize(`rem(1.25))],
+        "(min-width: 70rem) and (max-width: 83.9375rem)",
+        [fontSize(`rem(1.2))],
       ),
     ]);
 
@@ -53,8 +53,8 @@ module Styles = {
       textAlign(`left),
       marginTop(`rem(0.3125)),
       media(
-        "(min-width: 69rem) and (max-width: 83.9375rem)",
-        [fontSize(`px(11))],
+        "(min-width: 70rem) and (max-width: 83.9375rem)",
+        [fontSize(`px(12))],
       ),
     ]);
 
