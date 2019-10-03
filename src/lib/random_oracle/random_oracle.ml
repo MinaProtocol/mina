@@ -1,5 +1,11 @@
 open Core
-module State = Array
+
+module State = struct
+  include Array
+
+  let map2 = map2_exn
+end
+
 module Input = Input
 open Curve_choice
 
