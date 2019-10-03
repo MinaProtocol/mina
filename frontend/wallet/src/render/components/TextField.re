@@ -18,6 +18,8 @@ module Styles = {
       border(`px(1), `solid, Theme.Colors.marineAlpha(0.3)),
       borderRadius(`rem(0.25)),
       flexGrow(1.),
+      hover([border(`px(1), `solid, Theme.Colors.hyperlink)]),
+      focus([border(`px(2), `solid, Theme.Colors.hyperlink)]),
     ]);
   let error =
     style([
@@ -155,7 +157,7 @@ module Button = {
 module Currency = {
   [@react.component]
   let make = (~onChange, ~value, ~label, ~placeholder=?) =>
-    <label className=Styles.container>
+    <label className=Styles.labelContainer>
       <span className=Styles.label> {React.string(label ++ ":")} </span>
       <Spacer width=0.5 />
       <span className={Styles.square(value != "")}>
