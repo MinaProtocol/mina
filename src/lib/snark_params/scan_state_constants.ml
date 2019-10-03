@@ -28,7 +28,7 @@ let max_coinbases = 2
 let max_user_commands_per_block = tps_goal * block_window_duration / 1000
 
 let transaction_capacity_log_2 =
-  1 + Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
+  1 + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
 
 [%%else]
 
