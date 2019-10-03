@@ -4,7 +4,6 @@ open Coda_base
 open Coda_state
 open Blockchain_snark
 open Snark_params
-open Fold_lib
 
 type ledger_proof = Ledger_proof.Prod.t
 
@@ -24,22 +23,18 @@ module Worker_state = struct
     Deferred.return
       (let%map bc_vk = Snark_keys.blockchain_verification ()
        and tx_vk = Snark_keys.transaction_verification () in
-       let self_wrap = tock_vk_to_bool_list bc_vk.wrap in
        let module T = Transaction_snark.Verification.Make (struct
          let keys = tx_vk
        end) in
        let module B = Blockchain_transition.Make (T) in
        let module M = struct
+         let instance_hash =
+           unstage (Blockchain_transition.instance_hash bc_vk.wrap)
+
          let verify_wrap state proof =
-           let instance_hash =
-             Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
-               Fold.(
-                 group3 ~default:false (of_list self_wrap)
-                 +> State_hash.fold (Protocol_state.hash state))
-           in
            Tock.verify proof bc_vk.wrap
              Tock.Data_spec.[Wrap_input.typ]
-             (Wrap_input.of_tick_field instance_hash)
+             (Wrap_input.of_tick_field (instance_hash state))
 
          let verify_transaction_snark = T.verify
        end in
