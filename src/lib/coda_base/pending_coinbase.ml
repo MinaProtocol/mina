@@ -482,9 +482,6 @@ struct
       Coinbase_stack_data.length_in_triples
       + Coinbase_stack_state_hash.length_in_triples
 
-    (* Coda_base_util.bit_length_to_triple_length 596 *)
-    (* TODO: express in terms of stack components *)
-
     let empty =
       { Poly.data= Coinbase_stack_data.empty
       ; state_hash= Coinbase_stack_state_hash.empty }

@@ -261,7 +261,7 @@ let get' (t : With_valid_signatures.t) =
           `Two x
     in
     get_individual_info coinbase_parts t.creator t1.user_commands
-      t1.completed_works
+      t1.completed_works t.state_body_hash
   in
   let apply_pre_diff_with_at_most_one
       (t2 : With_valid_signatures.pre_diff_with_at_most_one_coinbase) =
@@ -272,9 +272,7 @@ let get' (t : With_valid_signatures.t) =
       t2.completed_works t.state_body_hash
   in
   let open Result.Let_syntax in
-  let%bind p1 =
-    apply_pre_diff_with_at_most_two (fst t.diff) t.state_body_hash
-  in
+  let%bind p1 = apply_pre_diff_with_at_most_two (fst t.diff) in
   let%map p2 =
     Option.value_map
       ~f:(fun d -> apply_pre_diff_with_at_most_one d)
