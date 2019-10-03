@@ -815,21 +815,14 @@ let internal_commands =
   ; ("snark-hashes", snark_hashes) ]
 
 let coda_commands logger =
-  [ ("daemon", daemon logger)
+  [ ("accounts", Client.accounts)
+  ; ("daemon", daemon logger)
   ; ("client", Client.command)
+  ; ("client2", Client.client)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
-
-[%%if
-new_cli]
-
-let coda_commands logger =
-  ("accounts", Client.accounts)
-  :: ("client2", Client.client) :: coda_commands logger
-
-[%%endif]
 
 [%%if
 integration_tests]
