@@ -1,6 +1,6 @@
 (library
  (name coda_net2)
  (public_name coda_net2)
- (libraries core async network_peer file_system yojson digestif.ocaml pipe_lib envelope logger base58)
+ (libraries core async network_peer file_system yojson coda_digestif pipe_lib envelope logger base58)
  (inline_tests)
  (preprocess (pps ppx_jane ppx_let ppx_deriving_yojson)))
