@@ -125,9 +125,7 @@ module type Signed_intf = sig
 
   val zero : t
 
-  val fold : t -> bool Triple.t Fold.t
-
-  val to_triples : t -> bool Triple.t list
+  val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val add : t -> t -> t option
 
@@ -144,7 +142,7 @@ module type Signed_intf = sig
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-    val to_triples : var -> Boolean.var Triple.t list
+    val to_input : var -> (_, Boolean.var) Random_oracle.Input.t
 
     val add : var -> var -> (var, _) Checked.t
 
@@ -429,10 +427,8 @@ end = struct
             let init = (fold_bits magnitude).fold ~init ~f in
             f init (sgn_to_bool sgn) ) }
 
-    let fold t = Fold.group3 ~default:false (fold_bits t)
-
-    let to_triples t =
-      List.rev ((fold t).fold ~init:[] ~f:(fun acc x -> x :: acc))
+    let to_input t =
+      Random_oracle.Input.bitstring (Fold_lib.Fold.to_list (fold_bits t))
 
     let add (x : t) (y : t) : t option =
       match (x.sgn, y.sgn) with
@@ -474,8 +470,7 @@ end = struct
           in
           {sgn; magnitude})
 
-      let to_triples t =
-        Bitstring.pad_to_triple_list ~default:Boolean.false_ (to_bits t)
+      let to_input t = Random_oracle.Input.bitstring (to_bits t)
 
       let to_field_var ({magnitude; sgn} : var) =
         Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Var.t)

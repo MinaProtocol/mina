@@ -149,9 +149,7 @@ module type Signed_intf = sig
 
   val zero : t
 
-  val fold : t -> bool Triple.t Fold.t
-
-  val to_triples : t -> bool Triple.t list
+  val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val add : t -> t -> t option
 
@@ -168,7 +166,7 @@ module type Signed_intf = sig
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-    val to_triples : var -> Boolean.var Triple.t list
+    val to_input : var -> (_, Boolean.var) Random_oracle.Input.t
 
     val add : var -> var -> (var, _) Checked.t
 
