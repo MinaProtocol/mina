@@ -4,6 +4,7 @@ open Async
 open Currency
 open Signature_lib
 open Coda_base
+open Snark_params.Tick
 
 (** Constants are defined with a single letter (latin or greek) based on
  * their usage in the Ouroboros suite of papers *)
@@ -243,9 +244,7 @@ module type State_hooks_intf = sig
     -> prev_state_hash:Coda_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
-    -> ( [`Success of Snark_params.Tick.Boolean.var] * consensus_state_var
-       , _ )
-       Snark_params.Tick.Checked.t
+    -> ([`Success of Boolean.var] * consensus_state_var, _) Checked.t
 
   module For_tests : sig
     val gen_consensus_state :
@@ -319,12 +318,10 @@ module type S = sig
         end
         with type V1.t = t
 
-      val precomputed_handler : Snark_params.Tick.Handler.t Lazy.t
+      val precomputed_handler : Handler.t Lazy.t
 
       val handler :
-           t
-        -> pending_coinbase:Coda_base.Pending_coinbase_witness.t
-        -> Snark_params.Tick.Handler.t
+        t -> pending_coinbase:Coda_base.Pending_coinbase_witness.t -> Handler.t
     end
 
     module Consensus_transition : sig
@@ -338,7 +335,7 @@ module type S = sig
         type t = Stable.V1.t [@@deriving to_yojson, sexp]
       end
 
-      include Snark_params.Tick.Snarkable.S with type value := Value.t
+      include Snarkable.S with type value := Value.t
 
       val genesis : Value.t
     end
@@ -360,7 +357,7 @@ module type S = sig
 
       type display [@@deriving yojson]
 
-      include Snark_params.Tick.Snarkable.S with type value := Value.t
+      include Snarkable.S with type value := Value.t
 
       val negative_one : Value.t Lazy.t
 
@@ -371,10 +368,6 @@ module type S = sig
 
       val create_genesis :
         negative_one_protocol_state_hash:Coda_base.State_hash.t -> Value.t
-
-      val length_in_triples : int
-
-      open Snark_params.Tick
 
       val var_to_input :
         var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
