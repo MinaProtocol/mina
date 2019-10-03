@@ -62,8 +62,6 @@ val create_value :
   -> timestamp:Block_time.t
   -> Value.t
 
-val length_in_triples : int
-
 val negative_one : Value.t Lazy.t
 
 val genesis : Value.t Lazy.t

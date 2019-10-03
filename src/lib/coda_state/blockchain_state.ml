@@ -104,10 +104,6 @@ let to_input ({staged_ledger_hash; snarked_ledger_hash; timestamp} : Value.t) =
     ; field (snarked_ledger_hash :> Field.t)
     ; bitstring (Block_time.Bits.to_bits timestamp) ]
 
-let length_in_triples =
-  Staged_ledger_hash.length_in_triples + Frozen_ledger_hash.length_in_triples
-  + Block_time.length_in_triples
-
 let set_timestamp t timestamp = {t with Poly.timestamp}
 
 let negative_one =
