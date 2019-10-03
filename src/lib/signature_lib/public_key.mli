@@ -1,8 +1,6 @@
 open Core
 open Snark_params
 open Tick
-open Tuple_lib
-open Fold_lib
 
 type t = Field.t * Field.t [@@deriving sexp, hash]
 
@@ -74,9 +72,7 @@ module Compressed : sig
 
   include Hashable.S_binable with type t := t
 
-  val fold : t -> bool Triple.t Fold.t
-
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
   val to_string : t -> string
 
@@ -88,6 +84,8 @@ module Compressed : sig
 
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t
+
+    val to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
