@@ -674,15 +674,15 @@ let%test_module _ =
 
     let mk_account i balance nonce =
       ( i
-      , Account.Poly.Stable.Latest.
-          { public_key= Public_key.compress @@ test_keys.(i).public_key
-          ; balance= Currency.Balance.of_int balance
-          ; nonce= Account.Nonce.of_int nonce
-          ; receipt_chain_hash= Receipt.Chain_hash.empty
-          ; delegate= Public_key.Compressed.empty
-          ; voting_for=
-              Quickcheck.random_value ~seed:(`Deterministic "constant")
-                State_hash.gen } )
+      , { Account.Poly.Stable.Latest.public_key=
+            Public_key.compress @@ test_keys.(i).public_key
+        ; balance= Currency.Balance.of_int balance
+        ; nonce= Account.Nonce.of_int nonce
+        ; receipt_chain_hash= Receipt.Chain_hash.empty
+        ; delegate= Public_key.Compressed.empty
+        ; voting_for=
+            Quickcheck.random_value ~seed:(`Deterministic "constant")
+              State_hash.gen } )
 
     let%test_unit "Transactions are removed and added back in fork changes" =
       Thread_safe.block_on_async_exn (fun () ->
