@@ -52,7 +52,7 @@ let of_transaction : Transaction.t -> t = function
           { common=
               { fee= other_amount
               ; nonce= Account.Nonce.zero
-              ; memo= User_command_memo.dummy }
+              ; memo= User_command_memo.empty }
           ; body= {public_key= proposer; amount; tag= Tag.Coinbase} }
       ; sender= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
@@ -62,7 +62,7 @@ let of_transaction : Transaction.t -> t = function
             { common=
                 { fee= fee2
                 ; nonce= Account.Nonce.zero
-                ; memo= User_command_memo.dummy }
+                ; memo= User_command_memo.empty }
             ; body=
                 { public_key= pk1
                 ; amount= Amount.of_fee fee1
