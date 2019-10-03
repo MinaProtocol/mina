@@ -66,7 +66,6 @@ let root t = find_exn t t.root
 let best_tip t = find_exn t t.best_tip
 
 let close t =
-  Printf.printf "%s\n" Backtrace.(to_string @@ get ()) ;
   Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
   ignore
     (Ledger.Maskable.unregister_mask_exn ~grandchildren:`Recursive

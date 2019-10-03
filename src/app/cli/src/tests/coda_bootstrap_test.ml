@@ -39,7 +39,6 @@ let main () =
   let%bind () = after (Time.Span.of_sec 180.) in
   (* TODO: one of the previous_statuses should be `Bootstrap. The broadcast pip 
     coda.transition_frontier never gets set to None *)
-  Core.Printf.printf !"size: %d\n%!" (Hash_set.length previous_status) ;
   assert (Hash_set.mem previous_status `Synced) ;
   Coda_worker_testnet.Api.teardown testnet
 
