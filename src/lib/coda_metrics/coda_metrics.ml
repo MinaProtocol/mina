@@ -100,11 +100,7 @@ module Runtime = struct
   let update () = current := Gc.stat ()
 
   let simple_metric ~metric_type ~help name fn =
-    let add_underscore () v = v ^ "_" in
-    let name =
-      Printf.sprintf "%a%a%s" add_underscore namespace add_underscore subsystem
-        name
-    in
+    let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
     let info =
       {MetricInfo.name= MetricName.v name; help; metric_type; label_names= []}
     in
