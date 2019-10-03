@@ -92,6 +92,8 @@ module TextFormat_0_0_4 = struct
 end
 
 module Runtime = struct
+  let subsystem = "Runtime"
+
   let start_time = Core.Time.now ()
 
   let current = ref (Gc.stat ())
@@ -99,6 +101,7 @@ module Runtime = struct
   let update () = current := Gc.stat ()
 
   let simple_metric ~metric_type ~help name fn =
+    let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
     let info =
       {MetricInfo.name= MetricName.v name; help; metric_type; label_names= []}
     in
@@ -198,8 +201,8 @@ module Runtime = struct
         register default info collector )
 end
 
-module Proving_time = struct
-  let subsystem = "Proving_time"
+module Cryptography = struct
+  let subsystem = "Cryptography"
 
   let blockchain_proving_time_ms =
     let help =
@@ -207,11 +210,23 @@ module Proving_time = struct
     in
     Gauge.v "blockchain_proving_time_ms" ~help ~namespace ~subsystem
 
+  let total_pedersen_hashes_computed =
+    let help = "# of pedersen hashes computed" in
+    Counter.v "total_pedersen_hash_computed" ~help ~namespace ~subsystem
+
   (* TODO:
   let transaction_proving_time_ms =
     let help = "time elapsed while proving most recently generated transaction snark" in
     Gauge.v "transaction_proving_time_ms" ~help ~namespace ~subsystem
   *)
+end
+
+module Bootstrap = struct
+  let subsystem = "Bootstrap"
+
+  let bootstrap_time_ms =
+    let help = "time elapsed while bootstrapping" in
+    Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
 end
 
 (* TODO:
@@ -235,7 +250,25 @@ module Network = struct
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
-  (* TODO: track non gossip RPC messages as well *)
+  module Rpc_map = Hashtbl.Make (String)
+
+  module Rpc_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 500. 2. 7
+  end)
+
+  let rpc_table = Rpc_map.of_alist_exn []
+
+  let rpc_latency_ms ~name : Gauge.t =
+    if Rpc_map.mem rpc_table name then Rpc_map.find_exn rpc_table name
+    else
+      let help = "time elapsed while doing rpc calls in ms" in
+      let rpc_gauge = Gauge.v name ~help ~namespace ~subsystem in
+      Rpc_map.add_exn rpc_table ~key:name ~data:rpc_gauge ;
+      rpc_gauge
+
+  let rpc_latency_ms_summary : Rpc_histogram.t =
+    let help = "A histogram for all rpc call latencies" in
+    Rpc_histogram.v "rpc_latency_ms_summary" ~help ~namespace ~subsystem
 end
 
 module Snark_work = struct
@@ -328,6 +361,14 @@ end
 module Transition_frontier = struct
   let subsystem = "Transition_frontier"
 
+  let max_blocklength_observed : Gauge.t =
+    let help = "max blocklength observed by the system" in
+    Gauge.v "max_blocklength_observed" ~help ~namespace ~subsystem
+
+  let slot_fill_rate : Gauge.t =
+    let help = "number of blocks / total slots since genesis" in
+    Gauge.v "slot_fill_rate" ~help ~namespace ~subsystem
+
   let active_breadcrumbs : Gauge.t =
     let help = "current # of breadcrumbs in the transition frontier" in
     Gauge.v "active_breadcrumbs" ~help ~namespace ~subsystem
@@ -394,13 +435,17 @@ module Transition_frontier_controller = struct
     in
     Gauge.v "transitions_being_processed" ~help ~namespace ~subsystem
 
-  (* TODO:
   let transitions_in_catchup_scheduler =
-    Counter.v_label "transitions_in_catchup_scheduler" ~namespace ~subsystem
+    let help = "transitions stored inside catchup scheduler" in
+    Gauge.v "transitions_in_catchup_scheduler" ~help ~namespace ~subsystem
+
+  let catchup_time_ms =
+    let help = "time elapsed while doing catchup" in
+    Gauge.v "catchup_time_ms" ~help ~namespace ~subsystem
 
   let transitions_downloaded_from_catchup =
-    Counter.v_label "transitions_downloaded_from_catchup" ~namespace ~subsystem
-  *)
+    let help = "# of transitions downloaded by ledger_catchup" in
+    Gauge.v "transitions_downloaded_from_catchup" ~help ~namespace ~subsystem
 
   let breadcrumbs_built_by_processor : Counter.t =
     let help = "breadcrumbs built by the processor" in

@@ -17,7 +17,11 @@ let%test_module "transaction_status" =
       module Transaction_pool = Transaction_pool
     end)
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let hb_logger = Logger.create ()
+
+    let pids = Child_processes.Termination.create_pid_set ()
 
     let trust_system = Trust_system.null ()
 
@@ -36,8 +40,9 @@ let%test_module "transaction_status" =
 
     let create_pool ~frontier_broadcast_pipe =
       let incoming_diffs, _ = Linear_pipe.create () in
+      let config = Transaction_pool.Resource_pool.make_config ~trust_system in
       let transaction_pool =
-        Transaction_pool.create ~logger ~trust_system ~incoming_diffs
+        Transaction_pool.create ~config ~incoming_diffs ~logger
           ~frontier_broadcast_pipe
       in
       don't_wait_for
@@ -57,7 +62,9 @@ let%test_module "transaction_status" =
       transaction_pool
 
     let single_async_test ~f gen =
+      heartbeat_flag := true ;
       Async.Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           Quickcheck.async_test ~trials:1 gen ~f )
 
     let get_status_exn ~frontier_broadcast_pipe ~transaction_pool user_command
@@ -73,6 +80,7 @@ let%test_module "transaction_status" =
           let%bind transaction_pool = create_pool ~frontier_broadcast_pipe in
           let%map () = Transaction_pool.add transaction_pool user_command in
           Logger.info logger "Hello" ~module_:__MODULE__ ~location:__LOC__ ;
+          heartbeat_flag := false ;
           [%test_eq: Transaction_status.State.t]
             ~equal:Transaction_status.State.equal
             Transaction_status.State.Unknown
@@ -84,7 +92,7 @@ let%test_module "transaction_status" =
                    transition frontier" =
       single_async_test user_command_gen ~f:(fun user_command ->
           let%bind frontier =
-            create_root_frontier ~logger Genesis_ledger.accounts
+            create_root_frontier ~logger ~pids Genesis_ledger.accounts
           in
           let frontier_broadcast_pipe, _ =
             Broadcast_pipe.create (Some frontier)
@@ -93,6 +101,7 @@ let%test_module "transaction_status" =
           let%map () = Transaction_pool.add transaction_pool user_command in
           Logger.info logger "Computing status" ~module_:__MODULE__
             ~location:__LOC__ ;
+          heartbeat_flag := false ;
           [%test_eq: Transaction_status.State.t]
             ~equal:Transaction_status.State.equal
             Transaction_status.State.Pending
@@ -112,7 +121,7 @@ let%test_module "transaction_status" =
       in
       single_async_test user_commands_generator ~f:(fun user_commands ->
           let%bind frontier =
-            create_root_frontier ~logger Genesis_ledger.accounts
+            create_root_frontier ~logger ~pids Genesis_ledger.accounts
           in
           let frontier_broadcast_pipe, _ =
             Broadcast_pipe.create (Some frontier)
@@ -127,6 +136,7 @@ let%test_module "transaction_status" =
           in
           Logger.info logger "Computing status" ~module_:__MODULE__
             ~location:__LOC__ ;
+          heartbeat_flag := false ;
           [%test_eq: Transaction_status.State.t]
             ~equal:Transaction_status.State.equal
             Transaction_status.State.Unknown

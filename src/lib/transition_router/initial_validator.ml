@@ -4,9 +4,10 @@ open Pipe_lib.Strict_pipe
 open Coda_base
 open Coda_state
 open Signature_lib
+open Coda_transition
 
 module Make (Inputs : Transition_frontier.Inputs_intf) = struct
-  open Inputs
+  let max_blocklength_observed = ref 0
 
   type validation_error =
     [ `Invalid_time_received of [`Too_early | `Too_late of int64]
@@ -171,6 +172,17 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
             >>= Fn.compose Deferred.return validate_delta_transition_chain)
         with
         | Ok verified_transition ->
+            let blockchain_length =
+              External_transition.Initial_validated.consensus_state
+                verified_transition
+              |> Consensus.Data.Consensus_state.blockchain_length
+              |> Coda_numbers.Length.to_int
+            in
+            if blockchain_length > !max_blocklength_observed then (
+              Coda_metrics.(
+                Gauge.set Transition_frontier.max_blocklength_observed
+                @@ Int.to_float blockchain_length) ;
+              max_blocklength_observed := blockchain_length ) ;
             ( `Transition
                 (Envelope.Incoming.wrap ~data:verified_transition ~sender)
             , `Time_received time_received )

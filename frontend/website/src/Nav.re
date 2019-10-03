@@ -348,8 +348,7 @@ module SimpleButton = {
               textDecoration(`none),
               whiteSpace(`nowrap),
               color(Colors.hyperlink),
-              activePage
-                ? color(Colors.hyperlink) : color(Colors.metallicBlue),
+              activePage ? color(Colors.hyperlink) : color(Colors.saville),
               hover([color(Style.Colors.hyperlink)]),
               media(NavStyle.MediaQuery.menuMax, menuStyle),
             ],
@@ -380,6 +379,11 @@ let make = (~page) => {
         name="GitHub"
         link="https://github.com/CodaProtocol/coda"
         activePage=false
+      />,
+      <SimpleButton
+        name="Testnet"
+        link="/testnet.html"
+        activePage={page == `Testnet}
       />,
     |]
   </NavWrapper>;

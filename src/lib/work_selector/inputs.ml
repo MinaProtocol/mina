@@ -29,7 +29,8 @@ module Test_inputs = struct
 
   module Snark_pool = struct
     module T = struct
-      type t = Transaction_snark.Statement.Stable.Latest.t list
+      type t =
+        Transaction_snark.Statement.Stable.Latest.t One_or_two.Stable.Latest.t
       [@@deriving bin_io, hash, compare, sexp]
     end
 
@@ -56,20 +57,7 @@ module Test_inputs = struct
 
     let work = Fn.id
 
-    let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
-
-    let paired ls =
-      let pairs = chunks_of ls ~n:2 in
-      List.map pairs ~f:(fun js ->
-          match js with
-          | [j] ->
-              (work j, None)
-          | [j1; j2] ->
-              (work j1, Some (work j2))
-          | _ ->
-              failwith "error pairing jobs" )
-
-    let all_work_pairs_exn (t : t) = paired t
+    let all_work_pairs_exn = One_or_two.group_list
   end
 end
 

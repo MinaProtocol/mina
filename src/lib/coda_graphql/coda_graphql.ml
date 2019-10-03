@@ -217,7 +217,7 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-               ~blockchain_length:int ~uptime_secs:nn_int
+               ~next_proposal:string ~blockchain_length:int ~uptime_secs:nn_int
                ~ledger_merkle_root:string ~state_hash:string
                ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
@@ -332,8 +332,8 @@ module Types = struct
             ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
         ] )
 
-  let snark_jobs =
-    obj "SnarkJobs" ~doc:"Snark works purchased" ~fields:(fun _ ->
+  let completed_work =
+    obj "CompletedWork" ~doc:"Completed snark works" ~fields:(fun _ ->
         [ field "prover"
             ~args:Arg.[]
             ~doc:"Public key of the prover" ~typ:(non_null public_key)
@@ -347,7 +347,7 @@ module Types = struct
             ~typ:(non_null @@ list @@ non_null int)
             ~args:Arg.[]
             ~resolve:(fun _ {Transaction_snark_work.Info.work_ids; _} ->
-              work_ids ) ] )
+              One_or_two.to_list work_ids ) ] )
 
   let blockchain_state =
     obj "BlockchainState" ~fields:(fun _ ->
@@ -406,7 +406,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.transactions)
         ; field "snarkJobs"
-            ~typ:(non_null @@ list @@ non_null snark_jobs)
+            ~typ:(non_null @@ list @@ non_null completed_work)
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.snark_jobs) ] )
 
@@ -449,6 +449,7 @@ module Types = struct
           , Receipt.Chain_hash.t option
           , State_hash.t option )
           Account.Poly.t
+      ; locked: bool option
       ; is_actively_staking: bool
       ; path: string }
 
@@ -473,6 +474,24 @@ module Types = struct
               ~resolve:(fun _ {account; _} ->
                 Option.map ~f:Account.Nonce.to_string
                   account.Account.Poly.nonce )
+          ; field "inferredNonce" ~typ:string
+              ~doc:
+                "Like the `nonce` field, except it includes the scheduled \
+                 transactions (transactions not yet included in a block) \
+                 (stringified uint32)"
+              ~args:Arg.[]
+              ~resolve:(fun {ctx= coda; _} {account; _} ->
+                let open Option.Let_syntax in
+                let%bind public_key = account.Account.Poly.public_key in
+                match
+                  Coda_commands
+                  .get_inferred_nonce_from_transaction_pool_and_ledger coda
+                    public_key
+                with
+                | `Active (Some nonce) ->
+                    Some (Account.Nonce.to_string nonce)
+                | `Active None | `Bootstrapping ->
+                    None )
           ; field "receiptChainHash" ~typ:string
               ~doc:"Top hash of the receipt chain merkle-list"
               ~args:Arg.[]
@@ -495,15 +514,21 @@ module Types = struct
                   account.Account.Poly.voting_for )
           ; field "stakingActive" ~typ:(non_null bool)
               ~doc:
-                "True if you are actively staking with this account - this \
-                 may not yet have been updated if the staking key was changed \
-                 recently"
+                "True if you are actively staking with this account on the \
+                 current daemon - this may not yet have been updated if the \
+                 staking key was changed recently"
               ~args:Arg.[]
               ~resolve:(fun _ {is_actively_staking; _} -> is_actively_staking)
           ; field "privateKeyPath" ~typ:(non_null string)
               ~doc:"Path of the private key file for this account"
               ~args:Arg.[]
-              ~resolve:(fun _ {path; _} -> path) ] )
+              ~resolve:(fun _ {path; _} -> path)
+          ; field "locked" ~typ:bool
+              ~doc:
+                "True if locked, false if unlocked, null if the account isn't \
+                 tracked by the queried daemon"
+              ~args:Arg.[]
+              ~resolve:(fun _ {locked; _} -> locked) ] )
   end
 
   let snark_worker =
@@ -526,10 +551,31 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
+    let unlock_wallet : (Coda_lib.t, Account.key option) typ =
+      obj "UnlockPayload" ~fields:(fun _ ->
+          [ field "publicKey" ~typ:(non_null public_key)
+              ~doc:"Public key of the unlocked account"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
+    let lock_wallet : (Coda_lib.t, Account.key option) typ =
+      obj "LockPayload" ~fields:(fun _ ->
+          [ field "publicKey" ~typ:(non_null public_key)
+              ~doc:"Public key of the unlocked account"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
     let delete_wallet =
       obj "DeleteWalletPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
               ~doc:"Public key of the deleted wallet"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
+    let reload_wallets =
+      obj "ReloadWalletsPayload" ~fields:(fun _ ->
+          [ field "success" ~typ:(non_null bool)
+              ~doc:"True when the reload was successful"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
@@ -685,6 +731,28 @@ module Types = struct
           ; fee ~doc:"Fee amount in order to send a stake delegation"
           ; memo ~doc:"Short arbitrary message provided by the sender"
           ; nonce ~doc:"Desired nonce for delegating state" ]
+
+    let add_wallet =
+      obj "AddWalletInput" ~coerce:Fn.id
+        ~fields:
+          [ arg "password" ~doc:"Password used to encrypt the new account"
+              ~typ:(non_null string) ]
+
+    let unlock_wallet =
+      obj "UnlockInput"
+        ~coerce:(fun password pk -> (password, pk))
+        ~fields:
+          [ arg "password" ~doc:"Password for the account to be unlocked"
+              ~typ:(non_null string)
+          ; arg "publicKey"
+              ~doc:"Public key specifying which account to unlock"
+              ~typ:(non_null public_key_arg) ]
+
+    let lock_wallet =
+      obj "LockInput" ~coerce:Fn.id
+        ~fields:
+          [ arg "publicKey" ~doc:"Public key specifying which account to lock"
+              ~typ:(non_null public_key_arg) ]
 
     let delete_wallet =
       obj "DeleteWalletInput" ~coerce:Fn.id
@@ -1145,14 +1213,42 @@ module Mutations = struct
       ~doc:
         "Add a wallet - this will create a new keypair and store it in the \
          daemon"
-      ~typ:
-        (non_null Types.Payload.add_wallet)
-        (* TODO: For now, not including add wallet input *)
-      ~args:Arg.[]
-      ~resolve:(fun {ctx= t; _} () ->
-        let open Deferred.Let_syntax in
-        let%map pk = Coda_lib.wallets t |> Secrets.Wallets.generate_new in
+      ~typ:(non_null Types.Payload.add_wallet)
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.add_wallet)]
+      ~resolve:(fun {ctx= t; _} () password ->
+        let password = lazy (return (Bytes.of_string password)) in
+        let%map pk =
+          Coda_lib.wallets t |> Secrets.Wallets.generate_new ~password
+        in
         Result.return pk )
+
+  let unlock_wallet =
+    io_field "unlockWallet"
+      ~doc:"Allow transactions to be sent from the unlocked account"
+      ~typ:(non_null Types.Payload.unlock_wallet)
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.unlock_wallet)]
+      ~resolve:(fun {ctx= t; _} () (password, pk) ->
+        let password = lazy (return (Bytes.of_string password)) in
+        match%map
+          Coda_lib.wallets t |> Secrets.Wallets.unlock ~needle:pk ~password
+        with
+        | Error `Not_found ->
+            Error "Could not find owned account associated with provided key"
+        | Error `Bad_password ->
+            Error "Wrong password provided"
+        | Ok () ->
+            Ok pk )
+
+  let lock_wallet =
+    field "lockWallet"
+      ~doc:"Lock an unlocked account to prevent transaction being sent from it"
+      ~typ:
+        (non_null Types.Payload.lock_wallet)
+        (* TODO: For now, not including add wallet input *)
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.lock_wallet)]
+      ~resolve:(fun {ctx= t; _} () pk ->
+        Coda_lib.wallets t |> Secrets.Wallets.lock ~needle:pk ;
+        pk )
 
   let delete_wallet =
     io_field "deleteWallet"
@@ -1169,6 +1265,17 @@ module Mutations = struct
             (Secrets.Wallets.delete wallets public_key)
         in
         public_key )
+
+  let reload_wallets =
+    io_field "reloadWallets" ~doc:"Reload wallet information from disk"
+      ~typ:(non_null Types.Payload.reload_wallets)
+      ~args:Arg.[]
+      ~resolve:(fun {ctx= coda; _} () ->
+        let%map _ =
+          Secrets.Wallets.reload ~logger:(Logger.create ())
+            (Coda_lib.wallets coda)
+        in
+        Ok true )
 
   let reset_trust_status =
     io_field "resetTrustStatus"
@@ -1219,17 +1326,17 @@ module Mutations = struct
     in
     let%bind sender_kp =
       Result.of_option
-        (Secrets.Wallets.find (Coda_lib.wallets coda) ~needle:from)
+        (Secrets.Wallets.find_unlocked (Coda_lib.wallets coda) ~needle:from)
         ~error:
           (sprintf
-             "Couldn't find the private key for specified `sender`. Do you \
-              own the wallet you're making a %s from?"
+             "Couldn't find an unlocked key for specified `sender`. Did you \
+              unlock the wallet you're making a %s from?"
              kind)
     in
     let%map memo =
-      Option.value_map maybe_memo ~default:(Ok User_command_memo.dummy)
+      Option.value_map maybe_memo ~default:(Ok User_command_memo.empty)
         ~f:(fun memo ->
-          result_of_exn User_command_memo.create_by_digesting_string_exn memo
+          result_of_exn User_command_memo.create_from_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
     (sender_nonce, sender_kp, memo, to_, fee)
@@ -1304,7 +1411,7 @@ module Mutations = struct
     field "setStaking"
       ~doc:
         "Set keys you wish to stake with - silently fails if you pass keys \
-         not tracked in ownedWallets"
+         not unlocked and tracked in ownedWallets"
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_staking)]
       ~typ:(non_null Types.Payload.set_staking)
       ~resolve:(fun {ctx= coda; _} () pks ->
@@ -1340,7 +1447,10 @@ module Mutations = struct
 
   let commands =
     [ add_wallet
+    ; unlock_wallet
+    ; lock_wallet
     ; delete_wallet
+    ; reload_wallets
     ; send_payment
     ; send_delegation
     ; add_payment_receipt
@@ -1354,7 +1464,9 @@ module Queries = struct
 
   let pooled_user_commands =
     field "pooledUserCommands"
-      ~doc:"Retrieve all the user commands sent by a public key"
+      ~doc:
+        "Retrieve all the user commands submitted by the current daemon that \
+         are pending inclusion"
       ~typ:(non_null @@ list @@ non_null Types.user_command)
       ~args:
         Arg.
@@ -1416,6 +1528,7 @@ module Queries = struct
         wallets |> Secrets.Wallets.pks
         |> List.map ~f:(fun pk ->
                { Types.Wallet.account= Partial_account.of_pk coda pk
+               ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
                ; is_actively_staking=
                    Public_key.Compressed.Set.mem propose_public_keys pk
                ; path= Secrets.Wallets.get_path wallets pk } ) )
@@ -1429,11 +1542,13 @@ module Queries = struct
               ~typ:(non_null Types.Input.public_key_arg) ]
       ~resolve:(fun {ctx= coda; _} () pk ->
         let propose_public_keys = Coda_lib.propose_public_keys coda in
+        let wallets = Coda_lib.wallets coda in
         Some
           { Types.Wallet.account= Partial_account.of_pk coda pk
+          ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
           ; is_actively_staking=
               Public_key.Compressed.Set.mem propose_public_keys pk
-          ; path= Secrets.Wallets.get_path (Coda_lib.wallets coda) pk } )
+          ; path= Secrets.Wallets.get_path wallets pk } )
 
   let transaction_status =
     result_field "transactionStatus" ~doc:"Get the status of a transaction"
@@ -1473,6 +1588,15 @@ module Queries = struct
         List.map (Coda_lib.initial_peers coda)
           ~f:(fun {Host_and_port.host; port} -> sprintf !"%s:%i" host port) )
 
+  let snark_pool =
+    field "snarkPool"
+      ~doc:"List of completed snark works that have the lowest fee so far"
+      ~args:Arg.[]
+      ~typ:(non_null @@ list @@ non_null Types.completed_work)
+      ~resolve:(fun {ctx= coda; _} () ->
+        Coda_lib.snark_pool coda |> Network_pool.Snark_pool.resource_pool
+        |> Network_pool.Snark_pool.Resource_pool.all_completed_work )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -1483,7 +1607,10 @@ module Queries = struct
     ; blocks
     ; initial_peers
     ; pooled_user_commands
-    ; transaction_status ]
+    ; transaction_status
+    ; trust_status
+    ; trust_status_all
+    ; snark_pool ]
 end
 
 let schema =

@@ -159,7 +159,8 @@ module Ledger_inner = struct
       result
     with exn ->
       let (_ : Mask.t) =
-        Maskable.unregister_mask_exn base_ledger masked_ledger
+        Maskable.unregister_mask_exn ~grandchildren:`Recursive base_ledger
+          masked_ledger
       in
       raise exn
 
@@ -253,7 +254,7 @@ let gen_initial_ledger_state :
   let%bind keypairs = Quickcheck_lib.replicate_gen Keypair.gen n_accounts in
   let%bind balances =
     Quickcheck_lib.replicate_gen
-      Currency.Amount.(gen_incl (of_int 200_000) (of_int 100_000_000))
+      Currency.Amount.(gen_incl (of_int 500_000_000) (of_int 1_000_000_000))
       n_accounts
   in
   let%bind nonces =

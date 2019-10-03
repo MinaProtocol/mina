@@ -1,163 +1,138 @@
 open Core_kernel
-open Async_kernel
 open Module_version
 open Currency
 open Signature_lib
 
-module Make (Ledger_proof : sig
-  type t [@@deriving sexp, to_yojson]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving sexp, bin_io, to_yojson, version]
+module Statement = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
+        [@@deriving bin_io, compare, hash, sexp, version, yojson]
       end
 
-      module Latest = V1
-    end
-    with type V1.t = t
-
-  val statement : t -> Transaction_snark.Statement.t
-end) :
-  Coda_intf.Transaction_snark_work_intf
-  with type ledger_proof := Ledger_proof.t = struct
-  let ledger_proof_to_yojson = Ledger_proof.to_yojson
-
-  let compressed_public_key_to_yojson = Public_key.Compressed.to_yojson
-
-  let proofs_length = 2
-
-  module Statement = struct
-    module Stable = struct
-      module V1 = struct
-        module T = struct
-          type t = Transaction_snark.Statement.Stable.V1.t list
-          [@@deriving bin_io, sexp, hash, compare, yojson, version]
-        end
-
-        include T
-        include Registration.Make_latest_version (T)
-        include Hashable.Make_binable (T)
-
-        let compact_json t =
-          `List
-            (List.map
-               ~f:(fun s -> `Int (Transaction_snark.Statement.Stable.V1.hash s))
-               t)
-      end
-
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "transaction_snark_work_statement"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
+      include T
+      include Registration.Make_latest_version (T)
+      include Hashable.Make_binable (T)
     end
 
-    (* bin_io omitted *)
-    type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
+    module Latest = V1
 
-    include Hashable.Make (Stable.Latest)
+    module Module_decl = struct
+      let name = "transaction_snark_work_statement"
 
-    let gen =
-      Quickcheck.Generator.list_with_length proofs_length
-        Transaction_snark.Statement.gen
-  end
-
-  module Info = struct
-    module Stable = struct
-      module V1 = struct
-        module T = struct
-          type t =
-            { statements: Statement.Stable.V1.t
-            ; work_ids: int list
-            ; fee: Fee.Stable.V1.t
-            ; prover: Public_key.Compressed.Stable.V1.t }
-          [@@deriving sexp, to_yojson, bin_io, version]
-        end
-
-        include T
-        include Registration.Make_latest_version (T)
-      end
-
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "transaction_snark_work"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
+      type latest = Latest.t
     end
 
-    (* bin_io omitted *)
-    type t = Stable.Latest.t =
-      { statements: Statement.Stable.V1.t
-      ; work_ids: int list
-      ; fee: Fee.Stable.V1.t
-      ; prover: Public_key.Compressed.Stable.V1.t }
-    [@@deriving to_yojson, sexp]
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  module T = struct
-    module Stable = struct
-      module V1 = struct
-        module T = struct
-          type t =
-            { fee: Fee.Stable.V1.t
-            ; proofs: Ledger_proof.Stable.V1.t list
-            ; prover: Public_key.Compressed.Stable.V1.t }
-          [@@deriving sexp, to_yojson, bin_io, version]
-        end
+  (* bin_io omitted *)
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 
-        include T
-        include Registration.Make_latest_version (T)
-      end
+  include Hashable.Make (Stable.Latest)
 
-      module Latest = V1
+  let gen = One_or_two.gen Transaction_snark.Statement.gen
 
-      module Module_decl = struct
-        let name = "transaction_snark_work"
+  let compact_json t =
+    `List
+      ( One_or_two.map ~f:(fun s -> `Int (Transaction_snark.Statement.hash s)) t
+      |> One_or_two.to_list )
 
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
-
-    (* bin_io omitted *)
-    type t = Stable.Latest.t =
-      {fee: Fee.t; proofs: Ledger_proof.t list; prover: Public_key.Compressed.t}
-    [@@deriving to_yojson, sexp]
-
-    let info t =
-      let statements = List.map t.proofs ~f:Ledger_proof.statement in
-      { Info.statements
-      ; work_ids= List.map statements ~f:Transaction_snark.Statement.hash
-      ; fee= t.fee
-      ; prover= t.prover }
-  end
-
-  include T
-
-  type unchecked = t
-
-  module Checked = struct
-    include T
-
-    let create_unsafe = Fn.id
-  end
-
-  let forget = Fn.id
-
-  let fee {fee; _} = fee
+  let work_ids t : int One_or_two.t =
+    One_or_two.map t ~f:Transaction_snark.Statement.hash
 end
 
-include Make (Ledger_proof)
+module Info = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t =
+          { statements: Statement.Stable.V1.t
+          ; work_ids: int One_or_two.Stable.V1.t
+          ; fee: Fee.Stable.V1.t
+          ; prover: Public_key.Compressed.Stable.V1.t }
+        [@@deriving sexp, to_yojson, bin_io, version]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "transaction_snark_work"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  (* bin_io omitted *)
+  type t = Stable.Latest.t =
+    { statements: Statement.Stable.V1.t
+    ; work_ids: int One_or_two.t
+    ; fee: Fee.Stable.V1.t
+    ; prover: Public_key.Compressed.Stable.V1.t }
+  [@@deriving to_yojson, sexp, compare]
+end
+
+module T = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t =
+          { fee: Fee.Stable.V1.t
+          ; proofs: Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+          ; prover: Public_key.Compressed.Stable.V1.t }
+        [@@deriving sexp, to_yojson, bin_io, version]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "transaction_snark_work"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  (* bin_io omitted *)
+  type t = Stable.Latest.t =
+    { fee: Fee.t
+    ; proofs: Ledger_proof.t One_or_two.t
+    ; prover: Public_key.Compressed.t }
+  [@@deriving to_yojson, sexp]
+
+  let info t =
+    let statements = One_or_two.map t.proofs ~f:Ledger_proof.statement in
+    { Info.statements
+    ; work_ids= One_or_two.map statements ~f:Transaction_snark.Statement.hash
+    ; fee= t.fee
+    ; prover= t.prover }
+end
+
+include T
+
+type unchecked = t
+
+module Checked = struct
+  include T
+
+  let create_unsafe = Fn.id
+end
+
+let forget = Fn.id
+
+let fee {fee; _} = fee

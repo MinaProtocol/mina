@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Coda_state
 open Pipe_lib
+open Coda_transition
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -14,39 +15,18 @@ module type Inputs_intf = sig
     val peers : t -> Network_peer.Peer.t list
   end
 
-  module Transition_frontier :
-    Coda_intf.Transition_frontier_intf
-    with type external_transition_validated := External_transition.Validated.t
-     and type mostly_validated_external_transition :=
-                ( [`Time_received] * unit Truth.true_t
-                , [`Proof] * unit Truth.true_t
-                , [`Delta_transition_chain]
-                  * Coda_base.State_hash.t Non_empty_list.t Truth.true_t
-                , [`Frontier_dependencies] * unit Truth.true_t
-                , [`Staged_ledger_diff] * unit Truth.false_t )
-                External_transition.Validation.with_transition
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type staged_ledger := Staged_ledger.t
-     and type verifier := Verifier.t
+  module Transition_frontier : Coda_intf.Transition_frontier_intf
 
   module Transition_frontier_controller :
     Coda_intf.Transition_frontier_controller_intf
-    with type external_transition_validated := External_transition.Validated.t
-     and type external_transition_with_initial_validation :=
-                External_transition.with_initial_validation
-     and type transition_frontier := Transition_frontier.t
+    with type transition_frontier := Transition_frontier.t
      and type breadcrumb := Transition_frontier.Breadcrumb.t
      and type network := Network.t
-     and type verifier := Verifier.t
 
   module Bootstrap_controller :
     Coda_intf.Bootstrap_controller_intf
     with type network := Network.t
-     and type verifier := Verifier.t
      and type transition_frontier := Transition_frontier.t
-     and type external_transition_with_initial_validation :=
-                External_transition.with_initial_validation
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -57,8 +37,9 @@ module Make (Inputs : Inputs_intf) = struct
     Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
   let is_transition_for_bootstrap ~logger root_state new_transition =
-    let open External_transition in
-    let new_state = protocol_state new_transition in
+    let new_state =
+      External_transition.Initial_validated.protocol_state new_transition
+    in
     Consensus.Hooks.should_bootstrap
       ~existing:(Protocol_state.consensus_state root_state)
       ~candidate:(Protocol_state.consensus_state new_state)
@@ -217,28 +198,27 @@ module Make (Inputs : Inputs_intf) = struct
     Strict_pipe.Reader.iter valid_transition_reader
       ~f:(fun transition_with_time ->
         let `Transition enveloped_transition, _ = transition_with_time in
-        let transition =
-          Envelope.Incoming.data enveloped_transition |> fst |> With_hash.data
-        in
+        let transition = Envelope.Incoming.data enveloped_transition in
         let current_consensus_state =
           External_transition.consensus_state
             (Broadcast_pipe.Reader.peek most_recent_valid_block_reader)
         in
         if
           Consensus.Hooks.select ~existing:current_consensus_state
-            ~candidate:External_transition.(consensus_state transition)
+            ~candidate:
+              External_transition.Initial_validated.(
+                consensus_state transition)
             ~logger
           = `Take
         then
-          Broadcast_pipe.Writer.write most_recent_valid_block_writer transition
+          Broadcast_pipe.Writer.write most_recent_valid_block_writer
+            (External_transition.Validation.forget_validation transition)
         else Deferred.unit )
     |> don't_wait_for ;
     Strict_pipe.Reader.iter_without_pushback
       valid_protocol_state_transition_reader ~f:(fun transition_with_time ->
         let `Transition enveloped_transition, _ = transition_with_time in
-        let transition =
-          Envelope.Incoming.data enveloped_transition |> fst |> With_hash.data
-        in
+        let transition = Envelope.Incoming.data enveloped_transition in
         ( match Broadcast_pipe.Reader.peek frontier_r with
         | Some frontier ->
             if

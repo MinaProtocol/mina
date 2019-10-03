@@ -6,15 +6,18 @@ This module implements SSH-style "private key files", ensuring that the files ar
 *)
 
 open Core
+open Async
 
-type password = Bytes.t Async.Deferred.Or_error.t Lazy.t
+type password = Bytes.t Deferred.t Lazy.t
 
 (** Read from the secure file [path], using [password] to decrypt if the file permissions are OK. This means that the file itself has permissions 0600 and the directory containing it has permissions 0700.
 
 [password] is only forced if the file has secure permissions.
 *)
 val read :
-  path:string -> password:password -> Bytes.t Async.Deferred.Or_error.t
+     path:string
+  -> password:password
+  -> (Bytes.t, Privkey_error.t) Deferred.Result.t
 
 (** Write [contents] to [path], after wrapping it in a [Secret_box] with [password].
 
@@ -29,4 +32,4 @@ val write :
   -> mkdir:bool
   -> password:password
   -> plaintext:Bytes.t
-  -> unit Async.Deferred.Or_error.t
+  -> (unit, Privkey_error.t) Deferred.Result.t

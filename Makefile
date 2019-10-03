@@ -10,6 +10,7 @@ DOCKERNAME = codabuilder-$(MYUID)
 
 # Unique signature of kademlia code tree
 KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
+LIBP2P_HELPER_SIG = $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
@@ -18,6 +19,7 @@ endif
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
+ WRAPAPP = docker exec --workdir /home/opam/app -t $(DOCKERNAME)
  WRAPSRC = docker exec --workdir /home/opam/app/src -t $(DOCKERNAME)
 else
  $(info INFO Not using Docker)
@@ -62,8 +64,11 @@ kademlia:
 	@# FIXME: Bash wrap here is awkward but required to get nix-env
 	bash -c "source ~/.profile && cd src/app/kademlia-haskell && nix-build release2.nix"
 
+libp2p_helper:
+	bash -c "source ~/.profile && cd src/app/libp2p_helper && nix-build default.nix"
+
 # Alias
-dht: kademlia
+dht: kademlia libp2p_helper
 
 build: git_hooks reformat-diff
 	$(info Starting Build)
@@ -71,6 +76,10 @@ build: git_hooks reformat-diff
 	$(info Build complete)
 
 dev: codabuilder containerstart build
+
+# update OPAM, pinned packages in Docker
+update-opam:
+	$(WRAPAPP) ./scripts/update-opam-in-docker.sh
 
 macos-portable:
 	@rm -rf _build/coda-daemon-macos/
@@ -113,13 +122,14 @@ endif
 ## Environment setup
 
 macos-setup-download:
-	./scripts/macos-setup.sh download
+	./scripts/macos-setup-brew.sh
 
 macos-setup-compile:
-	./scripts/macos-setup.sh compile
+	./scripts/macos-setup-opam.sh
 
 macos-setup:
-	./scripts/macos-setup.sh all
+	./scripts/macos-setup-brew.sh
+	./scripts/macos-setup-opam.sh
 
 ########################################
 ## Containers and container management
@@ -154,7 +164,14 @@ docker-toolchain-haskell:
     mkdir -p src/_build ;\
     docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-kademlia.deb > src/_build/coda-kademlia.deb
 
-toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell
+docker-toolchain-libp2p:
+	@echo "Building codaprotocol/coda:toolchain-libp2p-$(LIBP2P_HELPER_SIG)" ;\
+    docker build --file dockerfiles/Dockerfile-toolchain-libp2p --tag codaprotocol/coda:toolchain-libp2p-$(LIBP2P_HELPER_SIG) . ;\
+    echo  'Extracting deb package' ;\
+    mkdir -p src/_build ;\
+    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-libp2p-$(LIBP2P_HELPER_SIG) /src/coda-libp2p_helper.deb > src/_build/coda-libp2p-$(LIBP2P_HELPER_SIG).deb
+
+toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell docker-toolchain-libp2p
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
