@@ -14,11 +14,9 @@ val var_of_t : t -> var
 
 val typ : (var, t) Typ.t
 
-val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
-
-val length_in_triples : int
-
 val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
+val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
 val genesis : t Lazy.t
 

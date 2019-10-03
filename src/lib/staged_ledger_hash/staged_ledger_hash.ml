@@ -159,8 +159,6 @@ module Non_snark = struct
 
   let length_in_bits = 256
 
-  let length_in_triples = (length_in_bits + 2) / 3
-
   let digest ({ledger_hash; aux_hash; pending_coinbase_aux} : t) =
     let h = Digestif.SHA256.init () in
     let h = Digestif.SHA256.feed_string h (Ledger_hash.to_bytes ledger_hash) in
@@ -168,9 +166,11 @@ module Non_snark = struct
     let h = Digestif.SHA256.feed_string h pending_coinbase_aux in
     Digestif.SHA256.(get h |> to_raw_string)
 
-  let fold t = Fold.string_bits (digest t)
+  let to_list t = Fold.(to_list (string_bits (digest t)))
 
-  let to_input t = Random_oracle.Input.bitstring (Fold.to_list (fold t))
+  let to_input t = Random_oracle.Input.bitstring (to_list t)
+
+  let var_to_input t = Random_oracle.Input.bitstring t
 
   let ledger_hash ({ledger_hash; _} : t) = ledger_hash
 
@@ -180,14 +180,11 @@ module Non_snark = struct
       =
     {aux_hash; ledger_hash; pending_coinbase_aux}
 
-  let var_to_input = Random_oracle.Input.bitstring
-
-  let var_of_t t : var =
-    List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
+  let var_of_t t : var = List.map (to_list t) ~f:Boolean.var_of_value
 
   let typ : (var, value) Typ.t =
-    Typ.transport (Typ.list ~length:length_in_bits Boolean.typ)
-      ~there:(Fn.compose Fold.to_list fold) ~back:(fun _ ->
+    Typ.transport (Typ.list ~length:length_in_bits Boolean.typ) ~there:to_list
+      ~back:(fun _ ->
         (* If we put a failwith here, we lose the ability to printf-inspect
         * anything that uses staged-ledger-hashes from within Checked
         * computations. It's useful when debugging to dump the protocol state
@@ -290,20 +287,15 @@ let var_of_t ({pending_coinbase_hash; non_snark} : t) : var =
   in
   {non_snark; pending_coinbase_hash}
 
-let to_input ({non_snark; pending_coinbase_hash} : t) =
-  Random_oracle.Input.(
-    append
-      (Non_snark.to_input non_snark)
-      (field (pending_coinbase_hash :> Field.t)))
+let to_input (t : t) =
+  Random_oracle.Input.append
+    (Non_snark.to_input t.non_snark)
+    (Pending_coinbase.Hash.to_input t.pending_coinbase_hash)
 
-let length_in_triples =
-  Non_snark.length_in_triples + Pending_coinbase.Hash.length_in_triples
-
-let var_to_input ({non_snark; pending_coinbase_hash} : var) =
-  Random_oracle.Input.(
-    append
-      (Non_snark.var_to_input non_snark)
-      (field (Pending_coinbase.Hash.var_to_hash_packed pending_coinbase_hash)))
+let var_to_input (t : var) =
+  Random_oracle.Input.append
+    (Non_snark.var_to_input t.non_snark)
+    (Pending_coinbase.Hash.var_to_input t.pending_coinbase_hash)
 
 let to_hlist : ('lx, 'ph) t_ -> (unit, 'lx -> 'ph -> unit) H_list.t =
  fun {non_snark; pending_coinbase_hash} ->
