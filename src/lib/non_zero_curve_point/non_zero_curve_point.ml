@@ -1,6 +1,5 @@
 open Core_kernel
 open Snark_params
-open Fold_lib
 open Module_version
 
 let parity y = Tick.Bigint.(test_bit (of_field y) 0)
@@ -122,26 +121,16 @@ module Compressed = struct
     and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
     ()
 
-  let fold_bits Poly.{is_odd; x} =
-    {Fold.fold= (fun ~init ~f -> f ((Field.Bits.fold x).fold ~init ~f) is_odd)}
-
-  let fold t = Fold.group3 ~default:false (fold_bits t)
-
-  (* TODO: Right now everyone could switch to using the other unpacking...
-   Either decide this is ok or assert bitstring lt field size *)
-  let var_to_triples ({x; is_odd} : var) =
-    let%map x_bits =
-      Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
-    in
-    Bitstring_lib.Bitstring.pad_to_triple_list
-      (x_bits @ [is_odd])
-      ~default:Boolean.false_
+  let to_input {Poly.x; is_odd} =
+    {Random_oracle.Input.field_elements= [|x|]; bitstrings= [|[is_odd]|]}
 
   module Checked = struct
     let equal t1 t2 =
       let%bind x_eq = Field.Checked.equal t1.Poly.x t2.Poly.x in
       let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in
       Boolean.(x_eq && odd_eq)
+
+    let to_input = to_input
 
     let if_ cond ~then_:t1 ~else_:t2 =
       let%map x = Field.Checked.if_ cond ~then_:t1.Poly.x ~else_:t2.Poly.x
