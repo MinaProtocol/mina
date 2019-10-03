@@ -373,25 +373,6 @@ jobs:
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
-<<<<<<< HEAD
-    test-unit--test_postake_snarkless_medium_curves_unit_test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
-        steps:
-            - checkout
-            - run: ulimit -c unlimited
-            - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_medium_curves_unit_test -j8 && (dune runtest src/lib --profile=test_postake_snarkless_medium_curves_unit_test -j8 || (./scripts/link-coredumps.sh && false))'
-                  no_output_timeout: 1h
-            - store_artifacts:
-                path: core_dumps
-=======
->>>>>>> develop
     test-unit--dev_medium_curves:
         resource_class: xlarge
         docker:
