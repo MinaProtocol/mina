@@ -155,6 +155,24 @@ module Text = {
         lineHeight(`rem(1.5)),
         letterSpacing(`rem(-0.0125)),
       ]);
+
+    let smallCaps =
+      style([
+        Typeface.plex,
+        fontWeight(`semiBold),
+        fontSize(`rem(0.75)),
+        lineHeight(`rem(1.0)),
+        letterSpacing(`rem(0.0875)),
+        textTransform(`uppercase),
+      ]);
+    let error =
+      style([
+        Typeface.plex,
+        fontWeight(`semiBold),
+        fontSize(`rem(1.)),
+        letterSpacing(`rem(-0.0125)),
+        color(Colors.roseBud),
+      ]);
   };
 
   module Header = {

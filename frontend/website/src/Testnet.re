@@ -157,7 +157,6 @@ module Styles = {
       background(Style.Colors.hyperlinkAlpha(0.15)),
       width(`percent(100.)),
       height(`rem(60.)),
-      overflow(`scroll),
       maxWidth(rem(41.)),
       borderRadius(px(3)),
       padding2(~v=`rem(1.), ~h=`zero),
@@ -296,8 +295,8 @@ module Styles = {
       justifyContent(`spaceBetween),
       alignItems(`center),
       flexDirection(`column),
-      maxWidth(`rem(43.75)),
-      media("(min-width: 86rem)", [maxWidth(`percent(100.))]),
+      maxWidth(`rem(44.)),
+      media("(min-width: 70rem)", [maxWidth(`percent(100.))]),
       media(Style.MediaQuery.notMobile, [flexDirection(`row)]),
     ]);
 

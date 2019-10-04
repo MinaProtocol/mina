@@ -44,6 +44,16 @@ module Styles = {
       height(`percent(100.)),
       backgroundColor(Theme.Colors.modalDisableBgAlpha(0.67)),
     ]);
+
+  let default =
+    style([
+      margin(`auto),
+      width(`rem(22.)),
+      display(`flex),
+      flexDirection(`column),
+      alignItems(`center),
+      justifyContent(`center),
+    ]);
 };
 
 module Binding = {
