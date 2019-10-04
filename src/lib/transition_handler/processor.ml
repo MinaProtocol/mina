@@ -270,3 +270,96 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
                      Transition_frontier_controller.transitions_being_processed)
              | `Partially_valid_transition transition ->
                  process_transition ~transition ) ))
+
+let%test_module "Transition_handler.Processor tests" =
+  ( module struct
+    open Async
+    open Pipe_lib
+
+    let () =
+      Backtrace.elide := false ;
+      Printexc.record_backtrace true ;
+      Async.Scheduler.set_record_backtraces true
+
+    let logger = Logger.null ()
+
+    let time_controller = Block_time.Controller.basic ~logger
+
+    let trust_system = Trust_system.null ()
+
+    let downcast_breadcrumb breadcrumb =
+      let transition =
+        Transition_frontier.Breadcrumb.validated_transition breadcrumb
+        |> External_transition.Validation
+           .reset_frontier_dependencies_validation
+        |> External_transition.Validation.reset_staged_ledger_diff_validation
+      in
+      Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
+
+    let%test_unit "adding transitions whose parents are in the frontier" =
+      let frontier_size = 1 in
+      let branch_size = 10 in
+      let max_length = frontier_size + branch_size in
+      Quickcheck.test ~trials:4
+        (Transition_frontier.For_tests.gen_with_branch ~max_length
+           ~frontier_size ~branch_size ()) ~f:(fun (frontier, branch) ->
+          assert (
+            Thread_safe.block_on_async_exn (fun () ->
+                let pids = Child_processes.Termination.create_pid_set () in
+                let%bind verifier = Verifier.create ~logger ~pids in
+                let valid_transition_reader, valid_transition_writer =
+                  Strict_pipe.create
+                    (Buffered (`Capacity branch_size, `Overflow Drop_head))
+                in
+                let proposer_transition_reader, _ =
+                  Strict_pipe.create
+                    (Buffered (`Capacity branch_size, `Overflow Drop_head))
+                in
+                let _, catchup_job_writer =
+                  Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
+                in
+                let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
+                  Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
+                in
+                let processed_transition_reader, processed_transition_writer =
+                  Strict_pipe.create
+                    (Buffered (`Capacity branch_size, `Overflow Drop_head))
+                in
+                let clean_up_catchup_scheduler = Ivar.create () in
+                let cache = Unprocessed_transition_cache.create ~logger in
+                run ~logger ~time_controller ~verifier ~trust_system
+                  ~clean_up_catchup_scheduler ~frontier
+                  ~primary_transition_reader:valid_transition_reader
+                  ~proposer_transition_reader ~catchup_job_writer
+                  ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
+                  ~processed_transition_writer ;
+                List.iter branch ~f:(fun breadcrumb ->
+                    downcast_breadcrumb breadcrumb
+                    |> Unprocessed_transition_cache.register_exn cache
+                    |> Strict_pipe.Writer.write valid_transition_writer ) ;
+                match%map
+                  Block_time.Timeout.await
+                    ~timeout_duration:(Block_time.Span.of_ms 2000L)
+                    time_controller
+                    (Strict_pipe.Reader.fold_until processed_transition_reader
+                       ~init:branch
+                       ~f:(fun remaining_breadcrumbs newly_added_transition ->
+                         Deferred.return
+                           ( match remaining_breadcrumbs with
+                           | next_expected_breadcrumb :: tail ->
+                               [%test_eq: State_hash.t]
+                                 (Transition_frontier.Breadcrumb.state_hash
+                                    next_expected_breadcrumb)
+                                 (External_transition.Validated.state_hash
+                                    newly_added_transition) ;
+                               if tail = [] then `Stop true else `Continue tail
+                           | [] ->
+                               `Stop false ) ))
+                with
+                | `Timeout ->
+                    failwith "test timed out"
+                | `Ok (`Eof _) ->
+                    failwith "pipe closed unexpectedly"
+                | `Ok (`Terminated x) ->
+                    x ) ) )
+  end )
