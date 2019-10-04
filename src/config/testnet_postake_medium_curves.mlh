@@ -19,7 +19,7 @@
 
 [%%define genesis_ledger "testnet_filet_mignon"]
 
-[%%define genesis_state_timestamp "2019-10-02T00:37:47+00:00"]
+[%%define genesis_state_timestamp "2019-10-04T03:33:21+00:00"]
 [%%define block_window_duration 360000]
 
 [%%define integration_tests false]
