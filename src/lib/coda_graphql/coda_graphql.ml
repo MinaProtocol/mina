@@ -1334,9 +1334,9 @@ module Mutations = struct
              kind)
     in
     let%map memo =
-      Option.value_map maybe_memo ~default:(Ok User_command_memo.dummy)
+      Option.value_map maybe_memo ~default:(Ok User_command_memo.empty)
         ~f:(fun memo ->
-          result_of_exn User_command_memo.create_by_digesting_string_exn memo
+          result_of_exn User_command_memo.create_from_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
     (sender_nonce, sender_kp, memo, to_, fee)
