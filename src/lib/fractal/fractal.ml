@@ -186,180 +186,177 @@ struct
       | Free (Eval (c, k)) -> Free  (Eval (c,  fun y -> circuit (k y)))
   end
 
-  module Verifier = struct
+  module Batch_AHP_arithmetic = struct
+    module F = struct
+      type ('k, _) t =
+        | Arithmetic :
+            ('k, 'field) Arithmetic_computation.F.t
+            -> ('k, < field: 'field ; .. >) t
+        | Query :
+            (('poly, 'n) Vector.t * 'field * (('field, 'n) Vector.t -> 'k))
+            -> ('k, < poly: 'poly ; field: 'field ; .. >) t
 
-    module AHP_query = struct
-      module Interaction = struct
-        type (_, _) t =
-          | Query :
-              (('poly, 'n) Vector.t * 'field * (('field, 'n) Vector.t -> 'k))
-              -> ('k, < poly: 'poly ; field: 'field ; .. >) t
-
-        let map : type a b s. (a, s) t -> f:(a -> b) -> (b, s) t =
-         fun t ~f ->
-          match t with
-          | Query (ps, x, k) ->
-              Query (ps, x, fun res -> f (k res))
-      end
-
-      include Free_monad.Make2(Interaction)
-
-      let query ps x = Free (Query (ps, x, return))
-    end
-
-    module Batch_AHP_arithmetic = struct
-      module F = struct
-        type ('k, _) t =
-          | Arithmetic :
-              ('k, 'field) Arithmetic_computation.F.t
-              -> ('k, < field: 'field ; .. >) t
-          | Query :
-              (('poly, 'n) Vector.t * 'field * (('field, 'n) Vector.t -> 'k))
-              -> ('k, < poly: 'poly ; field: 'field ; .. >) t
-
-        let map : type a b s. (a, s) t -> f:(a -> b) -> (b, s) t =
-         fun t ~f ->
-          match t with
-          | Arithmetic a ->
-              Arithmetic (Arithmetic_computation.F.map a ~f)
-          | Query (ps, x, k) ->
-              Query (ps, x, fun res -> f (k res))
-      end
-
-      include Free_monad.Make2 (F)
-
-      let query ps x = Free (Query (ps, x, return))
-
-      let eval x = Free (Arithmetic (Eval (x, return)))
-
-      let ( = ) x y = Free (Arithmetic (Assert_equal (x, y, return ())))
-
-      let rec circuit : type a f.
-          (a, f) Arithmetic_circuit.t -> (a, < field: f ; .. >) t =
-       fun t ->
+      let map : type a b s. (a, s) t -> f:(a -> b) -> (b, s) t =
+        fun t ~f ->
         match t with
-        | Pure x ->
-            Pure x
-        | Free (Eval (c, k)) ->
-            Free (Arithmetic (Eval (c, fun y -> circuit (k y))))
+        | Arithmetic a ->
+            Arithmetic (Arithmetic_computation.F.map a ~f)
+        | Query (ps, x, k) ->
+            Query (ps, x, fun res -> f (k res))
     end
 
-    module PCS_IP = struct
-      module Interaction = struct
-        module Message = struct
-          type (_, _) t =
-            | Evals :
-                ('poly, 'n) Vector.t * 'field 
-                -> (('field, 'n) Vector.t, < poly: 'poly; field: 'field; ..>) t
-            | Proof :
-                'poly * 'field * 'field
-                -> ('pi, < poly: 'poly ; field: 'field; proof: 'pi; .. >) t
-        end
+    include Free_monad.Make2 (F)
 
+    let query ps x = Free (Query (ps, x, return))
+
+    let eval x = Free (Arithmetic (Eval (x, return)))
+
+    let ( = ) x y = Free (Arithmetic (Assert_equal (x, y, return ())))
+
+    let rec circuit : type a f.
+        (a, f) Arithmetic_circuit.t -> (a, < field: f ; .. >) t =
+      fun t ->
+      match t with
+      | Pure x ->
+          Pure x
+      | Free (Eval (c, k)) ->
+          Free (Arithmetic (Eval (c, fun y -> circuit (k y))))
+  end
+
+  module AHP_query = struct
+    module Interaction = struct
+      type (_, _) t =
+        | Query :
+            (('poly, 'n) Vector.t * 'field * (('field, 'n) Vector.t -> 'k))
+            -> ('k, < poly: 'poly ; field: 'field ; .. >) t
+
+      let map : type a b s. (a, s) t -> f:(a -> b) -> (b, s) t =
+        fun t ~f ->
+        match t with
+        | Query (ps, x, k) ->
+            Query (ps, x, fun res -> f (k res))
+    end
+
+    include Free_monad.Make2(Interaction)
+
+    let query ps x = Free (Query (ps, x, return))
+  end
+
+  module PCS_IP = struct
+    module Interaction = struct
+      module Message = struct
         type (_, _) t =
-          | Receive : ('a, 'e) Message.t * ('a -> 'k) -> ('k, 'e) t
-
-        let map : type a b s. (a, s) t -> f:(a -> b) -> (b, s) t =
-          fun t ~f ->
-          let cont k x = f (k x) in
-          match t with
-          | Receive (m, k) -> Receive (m, cont k)
+          | Evals :
+              ('poly, 'n) Vector.t * 'field 
+              -> (('field, 'n) Vector.t, < poly: 'poly; field: 'field; ..>) t
+          | Proof :
+              'poly * 'field * 'field
+              -> ('pi, < poly: 'poly ; field: 'field; proof: 'pi; .. >) t
       end
 
-      module Computation = struct
-        type ('k, _) t =
-          | Arithmetic :
-              ('k, 'field) Arithmetic_computation.F.t
-              -> ('k, < field: 'field ; .. >) t
-          | Scale_poly :
-              'field * 'poly * ('poly -> 'k)
-              -> ('k, < poly: 'poly ; field: 'field ; .. >) t
-          | Add_poly :
-              'poly * 'poly * ('poly -> 'k)
-              -> ('k, < poly: 'poly ; .. >) t
-          | Check_proof :
-              'poly * 'field * 'field * 'pi * 'k
-              -> ('k, < poly: 'poly ; field: 'field; proof: 'pi; .. >) t
+      type (_, _) t =
+        | Receive : ('a, 'e) Message.t * ('a -> 'k) -> ('k, 'e) t
 
-        let map : type a b s. (a, s) t -> f:(a -> b) -> (b, s) t =
-          fun t ~f ->
-          let cont k x = f (k x) in
-          match t with
-          | Arithmetic a ->
-              Arithmetic (Arithmetic_computation.F.map a ~f)
-          | Check_proof (poly, x, y, pi, k) ->
-              Check_proof (poly, x, y, pi, f k)
-          | Scale_poly (x, p, k) ->
-              Scale_poly (x, p, cont k)
-          | Add_poly (p, q, k) ->
-              Add_poly (p, q, cont k)
-      end
-      include IP (Interaction)(Computation)
-
-      let eval ps x = 
-        interact (Receive (Evals (ps, x), return))
-
-      let scale_poly x p = 
-        compute (Scale_poly (x, p, return))
-
-      let add_poly x y =
-          compute (Add_poly (x, y, return))
-
-      let field_op o x y =
-        compute
-          ((Arithmetic
-              (Arithmetic_computation.F.Eval (Arithmetic_expression.(op o !x !y), return))))
-
-      let add_field x y = field_op `Add x y
-
-      let scale_field x y = field_op `Mul x y
-
-      let get_and_check_proof poly ~input:x ~output:y =
-        let%bind pi =
-          interact (Receive (Proof (poly, x, y), return))
-        in
-        compute
-          (Check_proof (poly, x, y, pi, return ()))
-
-      let scaling ~scale ~add xi =
-        let open Let_syntax in
-        let rec go acc = function
-          | [] ->
-              return acc
-          | p :: ps ->
-              let%bind acc = scale xi acc >>= add p in
-              go acc ps
-        in
-        function [] -> assert false | p :: ps -> go p ps
-
-      (* TODO: Cata *)
-      let rec ahp_compiler : type a.
-        (a, < field: 'field ; poly: 'poly >) 
-          AHP_query.t
-        -> (a, < field: 'field ; poly: 'poly; proof: 'pi >) t =
-        fun v ->
-        match v with
-        | Pure x ->
-            Pure x
-        | Free v -> (
-          match v with
-          | Query (ps, x, k) ->
-              let open Let_syntax in
-              let%bind vs = eval ps x in
-              let%bind xi = sample in
-              let%bind p =
-                scaling ~scale:scale_poly ~add:add_poly xi
-                  (Vector.to_list ps)
-              and v =
-                scaling ~scale:scale_field ~add:add_field xi
-                  (Vector.to_list vs)
-              in
-              let%bind () = get_and_check_proof p ~input:x ~output:v in
-              ahp_compiler (k vs) 
-        )
+      let map : type a b s. (a, s) t -> f:(a -> b) -> (b, s) t =
+        fun t ~f ->
+        let cont k x = f (k x) in
+        match t with
+        | Receive (m, k) -> Receive (m, cont k)
     end
 
+    module Computation = struct
+      type ('k, _) t =
+        | Arithmetic :
+            ('k, 'field) Arithmetic_computation.F.t
+            -> ('k, < field: 'field ; .. >) t
+        | Scale_poly :
+            'field * 'poly * ('poly -> 'k)
+            -> ('k, < poly: 'poly ; field: 'field ; .. >) t
+        | Add_poly :
+            'poly * 'poly * ('poly -> 'k)
+            -> ('k, < poly: 'poly ; .. >) t
+        | Check_proof :
+            'poly * 'field * 'field * 'pi * 'k
+            -> ('k, < poly: 'poly ; field: 'field; proof: 'pi; .. >) t
 
+      let map : type a b s. (a, s) t -> f:(a -> b) -> (b, s) t =
+        fun t ~f ->
+        let cont k x = f (k x) in
+        match t with
+        | Arithmetic a ->
+            Arithmetic (Arithmetic_computation.F.map a ~f)
+        | Check_proof (poly, x, y, pi, k) ->
+            Check_proof (poly, x, y, pi, f k)
+        | Scale_poly (x, p, k) ->
+            Scale_poly (x, p, cont k)
+        | Add_poly (p, q, k) ->
+            Add_poly (p, q, cont k)
+    end
+    include IP (Interaction)(Computation)
+
+    let eval ps x = 
+      interact (Receive (Evals (ps, x), return))
+
+    let scale_poly x p = 
+      compute (Scale_poly (x, p, return))
+
+    let add_poly x y =
+        compute (Add_poly (x, y, return))
+
+    let field_op o x y =
+      compute
+        ((Arithmetic
+            (Arithmetic_computation.F.Eval (Arithmetic_expression.(op o !x !y), return))))
+
+    let add_field x y = field_op `Add x y
+
+    let scale_field x y = field_op `Mul x y
+
+    let get_and_check_proof poly ~input:x ~output:y =
+      let%bind pi =
+        interact (Receive (Proof (poly, x, y), return))
+      in
+      compute
+        (Check_proof (poly, x, y, pi, return ()))
+
+    let scaling ~scale ~add xi =
+      let open Let_syntax in
+      let rec go acc = function
+        | [] ->
+            return acc
+        | p :: ps ->
+            let%bind acc = scale xi acc >>= add p in
+            go acc ps
+      in
+      function [] -> assert false | p :: ps -> go p ps
+
+    (* TODO: Cata *)
+    let rec ahp_compiler : type a.
+      (a, < field: 'field ; poly: 'poly >) 
+        AHP_query.t
+      -> (a, < field: 'field ; poly: 'poly; proof: 'pi >) t =
+      fun v ->
+      match v with
+      | Pure x ->
+          Pure x
+      | Free v -> (
+        match v with
+        | Query (ps, x, k) ->
+            let open Let_syntax in
+            let%bind vs = eval ps x in
+            let%bind xi = sample in
+            let%bind p =
+              scaling ~scale:scale_poly ~add:add_poly xi
+                (Vector.to_list ps)
+            and v =
+              scaling ~scale:scale_field ~add:add_field xi
+                (Vector.to_list vs)
+            in
+            let%bind () = get_and_check_proof p ~input:x ~output:v in
+            ahp_compiler (k vs) )
+  end
+
+  module Verifier = struct
     module Pairing = struct
       module F = struct
         type ('k, _) t =
@@ -489,7 +486,7 @@ struct
           Domain.t
           * ((('field, 'poly) basic as 'lit), 'lit) Arithmetic_circuit.t
           -> ('field, < field: 'field ; poly: 'poly ; .. >) t
-      | PCS : ('a, 'e) Verifier.PCS_arithmetic.Single.Interaction.Message.t
+      | PCS : ('a, 'e) PCS_IP.Interaction.Message.t
             -> ('a, 'e) t
       | Random_mask : int -> ('poly, < poly: 'poly ; .. >) t
       | W_hat :
@@ -807,7 +804,7 @@ negligible amount (which is fine), and lets us reduce argument size by 9 group e
   let protocol (type field poly) {Index.row; col; value} input :
       ( ( (unit, field) Arithmetic_computation.t
         , < field: field ; poly: poly ; .. > )
-        Verifier.AHP_query.t
+        AHP_query.t
       , < field: field ; poly: poly ; .. > )
       Basic_IP.t =
     let input_size = List.length input in
@@ -861,7 +858,7 @@ negligible amount (which is fine), and lets us reduce argument size by 9 group e
     let%bind g_3, h_3 = get (GH (domain_K, failwith "TOD")) in
     let%bind beta_3 = sample in
     return
-      (let open Verifier.AHP_query in
+      (let open AHP_query in
       let open Let_syntax in
       let%map [ h_3_beta_3
                ; g_3_beta_3
@@ -949,8 +946,18 @@ negligible amount (which is fine), and lets us reduce argument size by 9 group e
   module S = SNARK(Trivial_computation)
 
   let p  = protocol (failwith "TODO") []
-  let p  = Basic_IP.map p
-      ~f:Verifier.PCS_arithmetic.Single.ahp_compiler
+  let p  = Basic_IP.map p ~f:PCS_IP.ahp_compiler
+
+  let p =
+    let module Expand_outer_computation =
+      Map_computation(Basic_IP.Interaction)(Basic_IP.Computation)
+        (PCS_IP.Computation)
+        (struct 
+          let f (Nop k) = return k
+        end)
+    in
+    ()
+
   let _ = p
   let _ = p
 (*   let p = S.fiat_shamir [(* Input goes here *)] p *)
