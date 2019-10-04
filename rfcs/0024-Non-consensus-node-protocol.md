@@ -65,36 +65,44 @@ An NC node can delegate an account's state using the existing command `coda clie
 
 ##### Block header at some block k (root of the transition frontier)
 
-For wallets to be able to show if transactions are finalized, non-consensus nodes will need to track the state of block at some length `k` such that the probablity of a fork of length `k` is extremely low.
+For wallets to be able to show if transactions are finalized with a reasonable probability, non-consensus nodes will need to track the state of block at some length `v` such that the probablity of a fork of length `v` is extremely low.
 
 On startup, a non-consensus node will request from its peers the block header at root and subsequent changes in the root need to be gossiped (layer 2). Given the root and the best tip, NC nodes should be able to verify that they are indeed on the same chain. This is currently done using a merkle list of state hashes between the root and the best tip and the same can be used for non-consensus nodes as well.
 
 With the block header at the root, NC nodes can query the account state from the staged ledger materialized from the snarked ledger.
 
-The current value of k is 2160 which means for a transaction to be finalized, it would take 10 days. That does not seem like a good user experience. Transactions on Bitcoin and Ethereum are finalized after 6 (~an hour) and 30 (~7mins) block respectively.
+The value `v` in full nodes (called `k`) and is currently 2160 which means for a transaction to be finalized with a really really high probability, it would take 10 days. That does not seem like a good user experience. Transactions on Bitcoin and Ethereum are finalized after 6 (~an hour) and 30 (~7mins) block respectively.
 
-The probability that there will be a fork of length k:
+Here's probability that there will be a fork of length `v` and `b` block_window_duration and assuming 40% of adversarial stake (\(\epsilon\)):
 
-| k | fork probability | duration (hrs) (block_window_duration = 6mins)|
-|---|----------|----------|
-| 5 | 0.49024 | 0.5|
-| 30| 0.313376 | 3|
-| 100| 0.110262|10|
-| 200| 0.0273769 | 20 |
-| 300| 0.00697404 | 30 |
-| 400| 0.00179144 | 40 |
-| 500| 0.000461763 | 50 |
-| 600| 0.000119216 | 60 |
-| 700| 3.0803e-05 | 70 |
-| 800| 7.96218e-06 | 80 |
-| 900| 2.05858e-06 | 90 |
-| 1000| 5.32297e-07|100 |
+| v | fork probability ||| wait-time||||
+|---|----------|--------|----------|----------|------|-----|-----|
+||**$\epsilon =0.4$**|**$\epsilon =0.34$**|**$\epsilon =0.1$**(bitcoin)| **$b = 6 mins$**(current) | **$b = 2 mins$** | **$b = 1 min$** | **$b = 30 secs$** |
+| 5 | 0.49024 |0.386024|0.04501 |30m| 10m| 5m|2.5m|
+| 30| 0.313376 |0.127204|2.3263e-06 |3h| 1 | 30m |15m|
+| 50| 0.228895 |0.057254|1.04804e-09|5h| 1h 40m | 50m| 25m|
+| 80| 0.146897 |0.0179358|1.01212e-14 |8h | 2h 40m | 1h 20m|40m|
+| 100| 0.110262|0.00835778|4.59285e-18 |10h| 3h 20m |1h 40m |50m|
+| 200| 0.0273769 |0.00019081|8.84e-35 |20h | 6h 40m |3h 20m|1h 40m|
+| 300| 0.00697404 |4.43371e-06|1.70148e-51 |30h | 10h |5h|2h 30m|
+| 400| 0.00179144 |1.0336e-07|3.27493e-68 |40h | 13h 20m |6h 40m|3h 20m|
+| 500| 0.000461763 |2.4114e-09|6.30342e-85 |50h | 16h 40m |8h 20m|4h 10m|
+<!--| 600| 0.000119216 |5.62686e-11|1.21325e-101 |60h | 20h |10h|5h|
+| 700| 3.0803e-05 |1.31306e-12 |2.33521e-118 |70h | 23h 20m |11h 40m|5h 50m|
+| 800| 7.96218e-06 |3.06414e-14 |4.49469e-135 |80h |26h 40m |13m 20m|6h 40m|
+| 900| 2.05858e-06 | 8.00374e-16|8.65116e-152 |90h |30h |15h|7h 30m|
+| 1000| 5.32297e-07|1.66863e-17|1.66513e-168 |100h | 33h 20m |16h 40m|8h 20m|-->
 
-(\(\epsilon\) = 0.4)
+For whatever value of `v` we choose, the selection mechanism between the two blocks is still using the `k` defined for full nodes and therefore, the fork resolution rules will not be affected even in the case of forks of length > `v`.
+Also, the above probabilities are for forks that are caused by adversarial behaviou. There can be forks due to random network partitions as well but gets subsumed by the high value of `k`. However, since `v` is going to very small compared to `k` we have to consider forks due to short network partitions and determine their frequency/length in some heuristic way.
 
-k (for non-consensus nodes) = 100?
+There is an assumption that within a partition, all the nodes will resolve any fork of length 1 i.e., every node will be in sync on the best chain within `2*delta` slots. So `v` should be at least `2*delta` blocks (not using slots here to avoid cases when there are no blocks at all within this period since delta is small enough for that to be possible). The value of delta we want is ~4 therefore `v` >= 8 blocks. With the above probabilities for $\epsilon =0.34$ (which is the lowest Vanishree would like it to be), `v` = 50 seems like a good option.
 
-The block window duration would change with the hash function change which would reduce the wait time for finalization?
+Food for thought:
+Knowing finality is important for a non-consensus node because (Writing this so that I don't forget the scenario) in a scenario where there is a network parition and if an attacker controls one partition, the attacker could pay honest nodes in that partition for services only to be discarded after the reorg. (what happens if the partition lasts longer than k? we would still discard the transactions when the best chain wins (voting?). So is there a point in knowing k? If it is an adversarial scenario, knowing or not knowing k will not help the honest nodes in the above described scenario. We need to think of ways to mitigate these attacks). But if it is really about forking due to paritions then what's the lowest value of k that we can select that has lower probability of fork due to an attack, longest partitions we want to tolerate and encompass any message propogation delays so that there are less fluctuations with the finality and not too much wait time ultimately leading to a better user experience.  . We already have in place a mechanism to accept blocks within `2*delta` slots from when it was produced and assume that all the nodes within `2*delta` in a partition would sync on the best chain. So the k value has should at least be `2*delta` blocks (not slots because then we'd eliminate cases when many producers get unlucky causing `2*delta` slots to have a few or no blocks. In such cases )  Also, we we don't have data But we already have delta (2*delta) slots to  So we might as well have k=delta and wait for shorter forks of length delta that can happen due to network delays and/or multiple block producers producing blocks on the same slot
+
+I'm full!
+
 
 ### Gossip layer
 
