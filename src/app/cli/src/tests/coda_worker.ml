@@ -397,7 +397,7 @@ module T = struct
             ; ("port", `Int addrs_and_ports.communication_port) ]
           ()
       in
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
         Option.value_map trace_dir
           ~f:(fun d ->
