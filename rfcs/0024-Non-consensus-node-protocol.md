@@ -27,7 +27,7 @@ Coda daemon can currently run the following nodes that are able to fully verify 
     1. Block producer
     2. Full node (does not produce blocks) (can be a seed node, a snark worker, an archive node etc)
 
-A non-consensus (call it NC?) node is a full node but with just enough state to perform the above listed requirements. Let's call this a block header (similar to the what light clients require in other blockchains)? Block headers are gossiped to the non-consensus nodes by block producers, full nodes, and other non-consesus nodes. With these block headers an NC node can:
+A non-consensus node is a full node but with just enough state to perform the above listed requirements. Let's call this a block header (similar to the what light clients require in other blockchains)? Block headers are gossiped to the non-consensus nodes by block producers, full nodes, and other non-consesus nodes. With these block headers a non-consensus node can:
     1) Verify that the received block is valid in itself and represents a valid state of a chain
     2) determine the stronger block between two blocks, either (current and new / two new blocks heard)
 
@@ -50,30 +50,30 @@ For a non-consensus node, the two main pieces of information that need to be tra
 
 ##### Block header at the best tip
 
-An NC node needs a block header at the best tip to validate the account state and the status of transactions users are concerned with.
+A non-consensus node needs a block header at the best tip to validate the account state and the status of transactions users are concerned with.
 The ledger hash in staged ledger hash is the merkle root of the latest state of the ledger that has all the transactions on that chain applied to it.
-A block header also has a snarked ledger hash which is for the ledger for which there is a SNARK that proves all the transactions claimed to be applied is indeed applied. By verfifying the blockchain snark, NC node also verifies this other snark also called a transaction snark without having to apply it themselves(recursive composition of zkSNARKS, wohoo!). A Snarked ledger is always behind the latest state at least by one block (in the case of max throughput during the steady state of the network ) and so wouldn't reflect the account state at the best tip. Hence we need to use staged ledger to look up the account state. However, unlike snarked ledger, the staged ledger does not have the SNARK that includes all the transactions generated yet. The blockchain snark currently does not guarantee anything about the staged ledger hash except that it exists and the transactions applied to it. [Here's](#Staged-ledger-validity) what we could do to change that <!-- and so we will need to do some work in this regard (explain having staged ledger hash in pending coinbase) to provide the assurance of a full node. -->
+A block header also has a snarked ledger hash which is for the ledger for which there is a SNARK that proves all the transactions claimed to be applied is indeed applied. By verfifying the blockchain snark, the non-consensus node also verifies this other snark also called a transaction snark without having to apply it themselves(recursive composition of zkSNARKS, wohoo!). A Snarked ledger is always behind the latest state at least by one block (in the case of max throughput during the steady state of the network ) and so wouldn't reflect the account state at the best tip. Hence we need to use staged ledger to look up the account state. However, unlike snarked ledger, the staged ledger does not have the SNARK that includes all the transactions generated yet. The blockchain snark currently does not guarantee anything about the staged ledger hash except that it exists and the transactions applied to it. [Here's](#Staged-ledger-validity) what we could do to change that.
 
-Now that NC nodes have the merkle root of the latest ledger, they can request merkle paths to their accounts from peers that store the full state and verify it agaisnt the staged ledger hash. With the account state from peers, an NC node can:
+Now that non-consensus nodes have the merkle root of the latest ledger, they can request merkle paths to their accounts from peers that store the full state and verify it agaisnt the staged ledger hash. With the account state from peers, a non-consensus node can:
 
 1. Check the balance
 2. Get the latest account nonce and use it to send transactions.(Also, infer the latest nonce from local transaction pool)
 3. Check the status of sent transactions.This is achieved by comparing the receipt-chain hash from the account state.
-For example if an NC node sends transactions t1, t2, and t3 in that order and the reciept chain hashes are r1, r2, and r3 and if the account receipt-chain hash is r2 it would mean that t1 and t2 were included in the block and t3 is still pending.
+For example if a non-consensus node sends transactions t1, t2, and t3 in that order and the reciept chain hashes are r1, r2, and r3 and if the account receipt-chain hash is r2 it would mean that t1 and t2 were included in the block and t3 is still pending.
 
-An NC node can delegate an account's state using the existing command `coda client delegate-stake`
+An non-consensus node can delegate an account's state using the existing command `coda client delegate-stake`
 
 ##### Block header at some block k (root of the transition frontier)
 
 For wallets to be able to show if transactions are finalized with a reasonable probability, non-consensus nodes will need to track the state of block at some length `v` such that the probablity of a fork of length `v` is extremely low.
 
-On startup, a non-consensus node will request from its peers the block header at root and subsequent changes in the root need to be gossiped (layer 2). Given the root and the best tip, NC nodes should be able to verify that they are indeed on the same chain. This is currently done using a merkle list of state hashes between the root and the best tip and the same can be used for non-consensus nodes as well.
+On startup, a non-consensus node will request from its peers the block header at root and subsequent changes in the root need to be gossiped (layer 2). Given the root and the best tip, non-consensus nodes should be able to verify that they are indeed on the same chain. This is currently done using a merkle list of state hashes between the root and the best tip and the same can be used for non-consensus nodes as well.
 
-With the block header at the root, NC nodes can query the account state from the staged ledger materialized from the snarked ledger.
+With the block header at the root, non-consensus nodes can query the account state from the staged ledger materialized from the snarked ledger.
 
-The value `v` in full nodes (called `k`) and is currently 2160 which means for a transaction to be finalized with a really really high probability, it would take 10 days. That does not seem like a good user experience. Transactions on Bitcoin and Ethereum are finalized after 6 (~an hour) and 30 (~7mins) block respectively.
+The value `v` in full nodes (called `k`) is currently 2160 which means, for a transaction to be finalized with a really high probability, it would take 10 days. That does not seem like a good user experience. Transactions on Bitcoin and Ethereum are finalized after 6 (~an hour) and 30 (~7mins) block respectively.
 
-Here's probability that there will be a fork of length `v` and `b` block_window_duration and assuming 40% of adversarial stake (\(\epsilon\)):
+Here are the probabilities that there will be a fork of length `v` assuming 40% of adversarial stake (\(\epsilon\)). `b` is the block_window_duration :
 
 | v | fork probability ||| wait-time||||
 |---|----------|--------|----------|----------|------|-----|-----|
@@ -93,27 +93,19 @@ Here's probability that there will be a fork of length `v` and `b` block_window_
 | 900| 2.05858e-06 | 8.00374e-16|8.65116e-152 |90h |30h |15h|7h 30m|
 | 1000| 5.32297e-07|1.66863e-17|1.66513e-168 |100h | 33h 20m |16h 40m|8h 20m|-->
 
-For whatever value of `v` we choose, the selection mechanism between the two blocks is still using the `k` defined for full nodes and therefore, the fork resolution rules will not be affected even in the case of forks of length > `v`.
-Also, the above probabilities are for forks that are caused by adversarial behaviou. There can be forks due to random network partitions as well but gets subsumed by the high value of `k`. However, since `v` is going to very small compared to `k` we have to consider forks due to short network partitions and determine their frequency/length in some heuristic way.
+Whatever value of `v` we choose, the selection mechanism between the two blocks would still use the `k` defined for full nodes and therefore, the fork resolution rules will not be affected even in the case of forks of length greater than `v`.
+Also, the above probabilities are for forks that are caused by adversarial behaviors. There can be forks due to random network partitions and since `v` is going to very small compared to `k` we have to consider forks due to short network partitions and determine their frequency/length in some heuristic way.
 
-There is an assumption that within a partition, all the nodes will resolve any fork of length 1 i.e., every node will be in sync on the best chain within `2*delta` slots. So `v` should be at least `2*delta` blocks (not using slots here to avoid cases when there are no blocks at all within this period since delta is small enough for that to be possible). The value of delta we want is ~4 therefore `v` >= 8 blocks. With the above probabilities for $\epsilon =0.34$ (which is the lowest Vanishree would like it to be), `v` = 50 seems like a good option.
-
-Food for thought:
-Knowing finality is important for a non-consensus node because (Writing this so that I don't forget the scenario) in a scenario where there is a network parition and if an attacker controls one partition, the attacker could pay honest nodes in that partition for services only to be discarded after the reorg. (what happens if the partition lasts longer than k? we would still discard the transactions when the best chain wins (voting?). So is there a point in knowing k? If it is an adversarial scenario, knowing or not knowing k will not help the honest nodes in the above described scenario. We need to think of ways to mitigate these attacks). But if it is really about forking due to paritions then what's the lowest value of k that we can select that has lower probability of fork due to an attack, longest partitions we want to tolerate and encompass any message propogation delays so that there are less fluctuations with the finality and not too much wait time ultimately leading to a better user experience.  . We already have in place a mechanism to accept blocks within `2*delta` slots from when it was produced and assume that all the nodes within `2*delta` in a partition would sync on the best chain. So the k value has should at least be `2*delta` blocks (not slots because then we'd eliminate cases when many producers get unlucky causing `2*delta` slots to have a few or no blocks. In such cases )  Also, we we don't have data But we already have delta (2*delta) slots to  So we might as well have k=delta and wait for shorter forks of length delta that can happen due to network delays and/or multiple block producers producing blocks on the same slot
-
-I'm full!
-
+But within a parition, there is an assumption that all the nodes will resolve any fork of length 1 i.e., every node will be in sync on the best chain within `2*delta` slots if they hear about it. So `v` should be at least `2*delta` blocks (not using slots here to avoid cases when there are no blocks at all within this period since delta is small enough for that to be possible). The value of delta we want is ~4 therefore `v` >= 8 blocks. With the above probabilities for $\epsilon =0.34$ (which is the lowest Vanishree would like it to be), `v` = 50 seems good enough.
 
 ### Gossip layer
 
-The gossip protocol for non-ceonsensus nodes should be separated from the one for full nodes because messages like blocks, transactions, and snark works are not required and having a different gossip layer for messages pertaining to the non-consensus nodes will reduce the bandwidth usage significantly.
+The gossip protocol for non-consensus nodes should be separated from the one for full nodes because messages like blocks, transactions, and snark works are not required and having a different gossip layer for messages pertaining to the non-consensus nodes will reduce the bandwidth usage significantly.
 
-    1. Layer 1: Existing gossip layer that includes broadcasting blocks, transaction pool diffs, and snark pool diffs.
+    1. Layer 1: Existing gossip layer that includes broadcasting blocks and snark pool diffs.
     2. Layer 2: New layer for gossiping information needed by non-consensus nodes- 
         a) Block headers
-        b) transactions (Maybe have this as a different layer in general so that archive nodes/snark workers don't have to hear any transaction-pool diffs? which means you could have one for snark-works as well to which snark workers would publish and block-producers would subscribe. This basically translates to a map of list of IPs for each topic string, overkill?)
-Here's network state that shows messages that would be gossiped
-![](../docs/res/non_consensus_gossip.png) (Too many edges :/)
+    3 Layer 3: For transactions that nodes can send. This is a separate layer because we don't want non-consensus nodes (or archive nodes/snark workers) to receive any.
 
 We can achieve this using the Publish/Subscribe mechanism implemented in libp2p.
 Publish/Subscribe mechanism basically allows for sending and receiving messages corresponging to a specific `topic`. The interface for that is defined in `coda_net2.mli`:
@@ -169,7 +161,12 @@ Full nodes would then `Pubsub.publish` the block-header (A block without the sta
 
 Full nodes will not subscribe to `block-headers` but would only publish to it. [Why would they?](#Incentivizing-full-nodes)
 
-Similarly there can be another topic string for non-consensus nodes to broadcast transactions to block producers.
+Similarly there can be another topic string for non-consensus nodes to broadcast transactions to block producers. Non-consensus nodes would only publish to this topic and full-nodes would publish and subscribe to the topic. Snark workers or archive nodes can choose to not subscribe to this topic since they don't produce blocks.
+
+We could also have another topic for gossipping snark work since only block producers and snark workers would want to subscribe and publish to it respectively.
+
+Here's a network state that shows messages that would be gossiped
+![](../docs/res/non_consensus_gossip.png)
 
 [TODO: We first have to implement gossip using libp2p]
 
@@ -216,7 +213,7 @@ Binary for non-consensus nodes can share the following libraries with the one fo
 
 ### Incentivizing-full-nodes
 
-The aim is to run NC nodes natively, on browsers and on mobile platforms using much less resources compared to full nodes. This makes it much more accessible for users to interact with the blockchain. However, NC nodes don't participate in the consensus and full nodes have no direct incentive to gossip block headers or respond to other requests-
+The aim is to run non-consensus nodes natively, on browsers and on mobile platforms using much less resources compared to full nodes. This makes it much more accessible for users to interact with the blockchain. However, non-consensus nodes don't participate in the consensus and full nodes have no direct incentive to gossip block headers or respond to other requests-
 
     1. Gossip block headers of root and the best tip along with the merkle-list of state hashes. These can be generated without any extra computational cost though
     2. Respond to merkle-path requests for every new block and new root
@@ -224,4 +221,4 @@ The aim is to run NC nodes natively, on browsers and on mobile platforms using m
 So, we need to think about ways to incentivize full nodes. Maybe-
 
  1. Pay a full node for fulfilling a request?
- 2. Some sort of periodic fee for being an NC node by associating it with an account?
+ 2. Some sort of periodic fee for being a non-consensus node by associating it with an account?
