@@ -23,34 +23,30 @@ module Styles = {
     ]);
 };
 
-let onboardingSteps = [
-  <p className=Styles.body> {React.string("Step 1")} </p>,
-  <p className=Styles.body> {React.string("Step 2")} </p>,
-];
-
 [@react.component]
 let make = () => {
   let (showOnboarding, closeOnboarding) =
     React.useContext(OnboardingProvider.context);
   let (onboardingStep, setOnboardingStep) = React.useState(() => 0);
-  let prevStep = () =>
-    if (onboardingStep > 0) {
-      setOnboardingStep(currentStep => currentStep - 1);
-    };
+  let prevStep = () => {
+    setOnboardingStep(currentStep => currentStep - 1);
+  };
 
-  let nextStep = () =>
-    if (onboardingStep >= List.length(onboardingSteps) - 1) {
-      closeOnboarding();
-    } else {
-      setOnboardingStep(currentStep => currentStep + 1);
-    };
+  let nextStep = () => {
+    setOnboardingStep(currentStep => currentStep + 1);
+  };
 
+  let onboardingSteps = [
+    <OnboardingStep1 nextStep />,
+    <OnboardingStep2 nextStep prevStep />,
+    <OnboardingStep3 nextStep prevStep />,
+    <OnboardingStep3 nextStep prevStep />,
+    <OnboardingStep4 closeOnboarding prevStep />,
+  ];
   showOnboarding
     ? <div className=Styles.main>
         <Header />
         {Array.of_list(onboardingSteps)[onboardingStep]}
-        <Button label="Continue" onClick={_ => nextStep()} />
-        <Button label="Previous Step" onClick={_ => prevStep()} />
       </div>
     : React.null;
 };

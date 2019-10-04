@@ -220,3 +220,20 @@ let codaLogoCurrent =
     backgroundColor(`hex("516679")),
     margin(`em(0.5)),
   ]);
+
+module Onboarding = {
+  let main =
+    style([
+      position(`absolute),
+      top(`zero),
+      left(`zero),
+      background(white),
+      zIndex(100),
+      display(`flex),
+      flexDirection(`row),
+      paddingTop(Spacing.headerHeight),
+      paddingBottom(Spacing.footerHeight),
+      height(`vh(100.)),
+      width(`vw(100.)),
+    ]);
+};
