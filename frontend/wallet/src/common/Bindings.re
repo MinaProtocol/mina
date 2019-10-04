@@ -202,7 +202,10 @@ module LocalStorage = {
   external getItem:
     (
     [@bs.string]
-    [ | [@bs.as "network"] `Network | [@bs.as "addressbook"] `AddressBook]
+    [
+      | [@bs.as "network"] `Network
+      | [@bs.as "addressbook"] `AddressBook
+    ]
     ) =>
     Js.nullable(string) =
     "";
