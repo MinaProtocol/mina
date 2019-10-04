@@ -131,8 +131,20 @@ let create ~logger ~pids =
     "Daemon started verifier process with pid $verifier_pid"
     ~metadata:[("verifier_pid", `Int (Process.pid process |> Pid.to_int))] ;
   Child_processes.Termination.register_process pids process ;
-  File_system.dup_stdout process ;
-  File_system.dup_stderr process ;
+  don't_wait_for
+  @@ Pipe.iter
+       (Process.stdout process |> Reader.pipe)
+       ~f:(fun stdout ->
+         return
+         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              ~id:"verifier" "%s" stdout ) ;
+  don't_wait_for
+  @@ Pipe.iter
+       (Process.stderr process |> Reader.pipe)
+       ~f:(fun stderr ->
+         return
+         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              ~id:"verifier" "%s" stderr ) ;
   connection
 
 let verify_blockchain_snark t chain =

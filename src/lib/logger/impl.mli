@@ -65,7 +65,8 @@ module Transport : sig
      *  before writing to it. When the logs reach max
      *  size, the old log is deleted and a new log is
      *  started. *)
-    val dumb_logrotate : directory:string -> max_size:int -> t
+    val dumb_logrotate :
+      directory:string -> log_name:string -> max_size:int -> t
   end
 end
 
@@ -78,10 +79,8 @@ end
  *  ensure the code does not accidentally attach the same
  *  consumer multiple times. *)
 module Consumer_registry : sig
-  type id = string
-
   val register :
-    id:id -> processor:Processor.t -> transport:Transport.t -> unit
+    id:string -> processor:Processor.t -> transport:Transport.t -> unit
 end
 
 type 'a log_function =
@@ -89,14 +88,11 @@ type 'a log_function =
   -> module_:string
   -> location:string
   -> ?metadata:(string, Yojson.Safe.json) List.Assoc.t
+  -> ?id:string
   -> ('a, unit, string, unit) format4
   -> 'a
 
-val create :
-     ?metadata:(string, Yojson.Safe.json) List.Assoc.t
-  -> ?initialize_default_consumer:bool
-  -> unit
-  -> t
+val create : ?metadata:(string, Yojson.Safe.json) List.Assoc.t -> unit -> t
 
 val null : unit -> t
 

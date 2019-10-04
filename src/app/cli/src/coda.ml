@@ -237,11 +237,27 @@ let daemon logger =
          ~transport:(Logger.Transport.stdout ()) ;
        (* 512MB logrotate max size = 1GB max filesystem usage *)
        let logrotate_max_size = 1024 * 1024 * 512 in
-       Logger.Consumer_registry.register ~id:"raw_persistent"
+       Logger.Consumer_registry.register ~id:"default"
          ~processor:(Logger.Processor.raw ())
          ~transport:
            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-              ~max_size:logrotate_max_size) ;
+              ~log_name:"coda.log" ~max_size:logrotate_max_size) ;
+       Logger.Consumer_registry.register ~id:"prover"
+         ~processor:stdout_log_processor
+         ~transport:(Logger.Transport.stdout ()) ;
+       Logger.Consumer_registry.register ~id:"prover"
+         ~processor:(Logger.Processor.raw ())
+         ~transport:
+           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+              ~log_name:"coda-prover.log" ~max_size:logrotate_max_size) ;
+       Logger.Consumer_registry.register ~id:"verifier"
+         ~processor:stdout_log_processor
+         ~transport:(Logger.Transport.stdout ()) ;
+       Logger.Consumer_registry.register ~id:"verifier"
+         ~processor:(Logger.Processor.raw ())
+         ~transport:
+           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+              ~log_name:"coda-verifier.log" ~max_size:logrotate_max_size) ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Coda daemon is booting up; built with commit $commit on branch \
           $branch"
@@ -892,7 +908,7 @@ let print_version_info () =
 
 let () =
   Random.self_init () ;
-  let logger = Logger.create ~initialize_default_consumer:false () in
+  let logger = Logger.create () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
