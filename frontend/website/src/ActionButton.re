@@ -57,7 +57,6 @@ module Styles = {
         [fontSize(`px(12))],
       ),
     ]);
-
   let ctaIcon =
     style([minWidth(`px(29)), maxHeight(`px(29)), flexShrink(0)]);
 };

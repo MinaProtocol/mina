@@ -63,7 +63,7 @@ module Decoders = {
     if (s == "string" && isFaker) {
       Js.Date.fromFloat(Js.Date.now());
     } else {
-      Js.Date.fromString(s);
+      Js.Date.fromFloat(float_of_string(s));
     };
 
   let optDate = Option.map(~f=date);

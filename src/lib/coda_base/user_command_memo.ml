@@ -128,6 +128,8 @@ let create_from_string s =
 
 let dummy = (create_by_digesting_string_exn "" :> t)
 
+let empty = create_from_string_exn ""
+
 module Boolean = Tick0.Boolean
 module Typ = Tick0.Typ
 

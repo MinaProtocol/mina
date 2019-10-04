@@ -5,7 +5,7 @@ module type Inputs_intf = sig
   include Inputs.S
 
   val hash :
-       ?message:Impl.Boolean.var array
+       ?message:Impl.Field.Var.t array
     -> a:G1.t
     -> b:G2.t
     -> c:G1.t
@@ -36,6 +36,13 @@ module Make (Inputs : Inputs_intf) = struct
       in
       Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+    let to_field_elements {query_base; query; delta; alpha_beta} =
+      let g1 (x, y) = [|x; y|] in
+      let g2 (x, y) = List.concat_map ~f:Fqe.to_list [x; y] |> Array.of_list in
+      let fqk = g2 in
+      Array.concat
+        (List.map ~f:g1 (query_base :: query) @ [g2 delta; fqk alpha_beta])
 
     include Summary.Make (Inputs)
 

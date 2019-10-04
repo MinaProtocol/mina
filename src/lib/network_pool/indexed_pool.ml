@@ -342,11 +342,17 @@ let revalidate :
             , Sequence.append dropped_acc to_drop ) )
 
 let handle_committed_txn :
-    t -> Public_key.Compressed.t -> Account_nonce.t -> Currency.Amount.t -> t =
- fun t sender nonce_to_remove current_balance ->
+       t
+    -> User_command.With_valid_signature.t
+    -> Currency.Amount.t
+    -> t * User_command.With_valid_signature.t Sequence.t =
+ fun t committed current_balance ->
+  let committed' = (committed :> User_command.t) in
+  let sender = User_command.sender committed' in
+  let nonce_to_remove = User_command.nonce committed' in
   match Map.find t.all_by_sender sender with
   | None ->
-      t
+      (t, Sequence.empty)
   | Some (cmds, currency_reserved) ->
       let first_cmd, rest_cmds = Option.value_exn (F_sequence.uncons cmds) in
       let first_nonce =
@@ -363,7 +369,7 @@ let handle_committed_txn :
         in
         let currency_reserved' =
           (* safe since the sum reserved must be >= reserved by any individual
-           command *)
+             command *)
           Option.value_exn
             Currency.Amount.(currency_reserved - first_cmd_consumed)
         in
@@ -380,23 +386,28 @@ let handle_committed_txn :
         let t'' =
           Sequence.fold dropped_cmds ~init:t' ~f:remove_all_by_fee_exn
         in
-        { t'' with
-          all_by_sender=
-            ( if F_sequence.is_empty new_queued_cmds then
-              Map.remove t.all_by_sender sender
-            else
-              Map.set t.all_by_sender ~key:sender
-                ~data:(new_queued_cmds, currency_reserved'') )
-        ; applicable_by_fee=
-            ( match F_sequence.uncons new_queued_cmds with
-            | None ->
-                t''.applicable_by_fee
-            | Some (head_cmd, _) ->
-                Map_set.insert
-                  (module User_command.With_valid_signature)
+        ( { t'' with
+            all_by_sender=
+              ( if F_sequence.is_empty new_queued_cmds then
+                Map.remove t.all_by_sender sender
+              else
+                Map.set t.all_by_sender ~key:sender
+                  ~data:(new_queued_cmds, currency_reserved'') )
+          ; applicable_by_fee=
+              ( match F_sequence.uncons new_queued_cmds with
+              | None ->
                   t''.applicable_by_fee
-                  (head_cmd |> User_command.forget_check |> User_command.fee)
-                  head_cmd ) }
+              | Some (head_cmd, _) ->
+                  Map_set.insert
+                    (module User_command.With_valid_signature)
+                    t''.applicable_by_fee
+                    (head_cmd |> User_command.forget_check |> User_command.fee)
+                    head_cmd ) }
+        , Sequence.append
+            ( if User_command.With_valid_signature.equal committed first_cmd
+            then Sequence.empty
+            else Sequence.singleton first_cmd )
+            dropped_cmds )
 
 let remove_lowest_fee : t -> User_command.With_valid_signature.t Sequence.t * t
     =
