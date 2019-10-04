@@ -33,10 +33,9 @@ module Styles = {
   };
 
   let heroBody = {
-    style([
-      marginTop(`rem(2.)),
-      marginBottom(`rem(3.)),
-      maxWidth(`rem(21.5)),
+    merge([
+      Theme.Text.Body.regular,
+      style([maxWidth(`rem(21.5)), color(Theme.Colors.midnightBlue)]),
     ]);
   };
   let buttonRow = {
@@ -54,26 +53,32 @@ let make = (~nextStep, ~prevStep) => {
   <div className=Theme.Onboarding.main>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
-        <h1> {React.string("Create Your Account")} </h1>
+        <h1 className=Theme.Text.Header.h1>
+          {React.string("Create Your Account")}
+        </h1>
+        <Spacer height=1. />
         <p className=Styles.heroBody>
           {React.string(
              "Create your first account to complete setting up Coda Wallet. Please be sure to choose a secure password.",
            )}
         </p>
-        <Spacer height=1. />
-        <TextField
-          label="Name"
-          onChange={value => setName(_ => value)}
-          value=walletName
-        />
-        <Spacer height=0.5 />
-        <TextField
-          label="Pass"
-          type_="password"
-          onChange={value => setPassword(_ => value)}
-          value=password
-        />
-        <div className=Css.(style([display(`flex)]))>
+        <div>
+          <Spacer height=1. />
+          <TextField
+            label="Account Name"
+            onChange={value => setName(_ => value)}
+            value=walletName
+          />
+          <Spacer height=0.5 />
+          <TextField
+            label="Password"
+            type_="password"
+            onChange={value => setPassword(_ => value)}
+            value=password
+          />
+          <Spacer height=1. />
+        </div>
+        <div>
           <AddWalletMutation>
             {(mutation, _) =>
                <Button
@@ -105,6 +110,7 @@ let make = (~nextStep, ~prevStep) => {
                  }}
                />}
           </AddWalletMutation>
+          <Spacer height=1. />
         </div>
         <div className=Styles.buttonRow>
           <Button label="Go Back" onClick={_ => prevStep()} />
