@@ -6,7 +6,7 @@ The GUI Wallet is the easiest way to connect to the Coda network and run a node.
 
 ## Installation
 
-Download the latest build from Github releases [here](Carey TODO).
+Download the latest build from Github releases [here](https://s3-us-west-2.amazonaws.com/wallet.o1test.net/branch/develop/wallet.dmg).
 
 ### MacOS
 - Open the DMG file and drag the wallet into your Applications folder
