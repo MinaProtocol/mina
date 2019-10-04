@@ -45,7 +45,6 @@ let make = () => {
   ];
   showOnboarding
     ? <div className=Styles.main>
-        <Header />
         {Array.of_list(onboardingSteps)[onboardingStep]}
       </div>
     : React.null;
