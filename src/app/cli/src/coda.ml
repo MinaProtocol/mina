@@ -343,16 +343,21 @@ let daemon logger =
        in
        don't_wait_for
          (let bytes_per_word = Sys.word_size / 8 in
-          let rec loop () =
+          let log_stats suffix =
             let stat = Gc.stat () in
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "OCaml memory statistics"
+              "OCaml memory statistics, %s" suffix
               ~metadata:
                 [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
                 ; ("heap_chunks", `Int stat.heap_chunks)
                 ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
                 ; ("live_size", `Int (stat.live_words * bytes_per_word))
-                ; ("live_blocks", `Int stat.live_blocks) ] ;
+                ; ("live_blocks", `Int stat.live_blocks) ] in
+          let rec loop () =
+            (* FIXME document this awful hack *)
+            log_stats "before major gc";
+            Gc.major ();
+            log_stats "after major gc";
             let%bind () = after @@ Time.Span.of_min 10. in
             loop ()
           in
