@@ -16,7 +16,7 @@ module Styles = {
         cursor(`pointer),
       ]),
       media(
-        "(min-width: 70rem) and (max-width: 83.9375rem)",
+        "(min-width: 70rem) and (max-width: 84rem)",
         [maxWidth(`rem(15.3)), height(`rem(6.9))],
       ),
     ]);
