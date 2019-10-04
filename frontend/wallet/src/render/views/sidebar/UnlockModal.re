@@ -13,7 +13,7 @@ module UnlockMutation = ReasonApollo.CreateMutation(UnlockWallet);
 type modalState = {error: option(string)};
 
 [@react.component]
-let make = (~wallet, ~onClose) => {
+let make = (~wallet, ~onClose, ~onSuccess) => {
   let (error, setError) = React.useState(() => None);
   let (password, setPassword) = React.useState(() => "");
   let variables =
@@ -59,7 +59,7 @@ let make = (~wallet, ~onClose) => {
               {switch (result) {
                | NotCalled => React.null
                | Data(_) =>
-                 onClose();
+                 onSuccess();
                  React.null;
                | Error(err) =>
                  let message =

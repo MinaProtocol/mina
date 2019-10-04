@@ -119,8 +119,9 @@ let make = (~wallet: Wallet.t) => {
     </LockWalletMutation>
     {showModal
        ? <UnlockModal
-           onClose={() => setModalOpen(_ => false)}
            wallet={wallet.publicKey}
+           onClose={() => setModalOpen(_ => false)}
+           onSuccess={() => setModalOpen(_ => false)}
          />
        : React.null}
   </div>;

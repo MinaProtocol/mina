@@ -192,7 +192,6 @@ module LocalStorage = {
       ~key: [@bs.string] [
               | [@bs.as "network"] `Network
               | [@bs.as "addressbook"] `AddressBook
-              | [@bs.as "onboarding"] `Onboarding
             ],
       ~value: string
     ) =>
@@ -206,7 +205,6 @@ module LocalStorage = {
     [
       | [@bs.as "network"] `Network
       | [@bs.as "addressbook"] `AddressBook
-      | [@bs.as "onboarding"] `Onboarding
     ]
     ) =>
     Js.nullable(string) =

@@ -1,5 +1,6 @@
 open Tc;
 
+// Only use the getExn on ownedWallets
 module WalletLocked = [%graphql
   {|
     query walletLocked ($publicKey: PublicKey!) @bsRecord {
@@ -21,7 +22,6 @@ let make = () => {
       label="Send"
       onClick={_ => setModalOpen(_ => true)}
       disabled={!Option.isSome(activeWallet)}
-      // onClick={_ => setModalState(_ => Some(emptyModal(activeWallet)))}
     />
     {switch (activeWallet) {
      | None => React.null
@@ -43,6 +43,7 @@ let make = () => {
                    ? <UnlockModal
                        wallet=pubkey
                        onClose={() => setModalOpen(_ => false)}
+                       onSuccess={() => ()}
                      />
                    : <SendModal onClose={() => setModalOpen(_ => false)} />
                }
