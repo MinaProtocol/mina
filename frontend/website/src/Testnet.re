@@ -292,7 +292,7 @@ module Styles = {
       marginRight(`auto),
       marginTop(rem(3.)),
       marginBottom(rem(3.)),
-      justifyContent(`spaceAround),
+      justifyContent(`spaceBetween),
       alignItems(`center),
       flexDirection(`column),
       maxWidth(`rem(44.)),

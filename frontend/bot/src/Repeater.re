@@ -13,7 +13,7 @@ let start = (~fromKey, ~toKey, ~amount, ~fee, ~timeout) => {
   Js.Global.setInterval(
     () =>
       Coda.sendPayment(~from=fromKey, ~to_=toKey, ~amount, ~fee)
-      |> Wonka.forEach((. {ReasonUrql.Client.Types.response}) =>
+      |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) =>
            switch (response) {
            | Data(data) =>
              let payment = data##sendPayment##payment;
@@ -24,7 +24,7 @@ let start = (~fromKey, ~toKey, ~amount, ~fee, ~timeout) => {
                "Send failed (from %s to %s), error: %s",
                fromKey,
                toKey,
-               Js.String.make(e),
+               e.message,
              )
            | NotFound =>
              // Shouldn't happen

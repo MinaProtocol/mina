@@ -7,7 +7,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Build trace-tool
                   command: cd src/app/trace-tool && cargo build --frozen
@@ -17,7 +19,9 @@ jobs:
             xcode: "10.2.0"
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run: cd frontend/wallet && yarn
             - run:
                   name: Lint wallet
@@ -57,12 +61,12 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
@@ -117,8 +121,8 @@ jobs:
                     sudo rm /tmp/workspace/coda*.bz2
             - checkout
             - run:
-                name: Update git submodules
-                command: git submodule sync && git submodule update --init --recursive
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
@@ -232,9 +236,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
-        environment:
-            DUNE_PROFILE: {{profile}}
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
@@ -243,20 +245,29 @@ jobs:
                       mkdir -p /tmp/artifacts
                       touch /tmp/artifacts/coda_pvkeys_dummy
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
             - run:
                   name: Download candidate stable PV keys
+                  environment:
+                    DUNE_PROFILE: {{profile}}
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  environment:
+                    DUNE_PROFILE: {{profile}}
                   {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
+                  environment:
+                    DUNE_PROFILE: {{profile}}
                   {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
@@ -283,13 +294,13 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
           # Uncomment if you want to try debugging why this install breaks
           # some unit tests:
           # 1. The command_line_tests
@@ -322,15 +333,15 @@ jobs:
 
     {%- for profile in unit_test_profiles_medium_curves %}
     test-unit--{{profile}}:
-        resource_class: large
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
@@ -343,12 +354,12 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
@@ -360,14 +371,14 @@ jobs:
 
     {%- for profile in medium_curves_tests.keys() | sort %}
     test--{{profile}}:
-        resource_class: large
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-bac894a089c02852067dac428c0c6a57ff15b4f3
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             {%- for test in medium_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
@@ -404,6 +415,7 @@ workflows:
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
+
     daily:
         triggers:
           - schedule:

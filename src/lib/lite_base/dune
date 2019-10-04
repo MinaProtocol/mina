@@ -5,10 +5,12 @@
   (libraries
     base
     bowe_gabizon_hash
+    sponge
     coda_digestif
     hash_prefixes
     pedersen_lib
     fold_lib
+    group_map
     sparse_ledger_lib
     snarkette
     bin_prot
