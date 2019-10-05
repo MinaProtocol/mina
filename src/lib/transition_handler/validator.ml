@@ -52,7 +52,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     Unprocessed_transition_cache.register_exn unprocessed_transition_cache
       enveloped_transition
 
-  let run ~logger ~trust_system ~frontier ~transition_reader
+  let run ~logger ~trust_system ~time_controller ~frontier ~transition_reader
       ~(valid_transition_writer :
          ( ( External_transition.Initial_validated.t Envelope.Incoming.t
            , State_hash.t )
@@ -89,7 +89,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                in
                Perf_histograms.add_span
                  ~name:"accepted_transition_remote_latency"
-                 (Core_kernel.Time.diff (Core_kernel.Time.now ())
+                 (Core_kernel.Time.diff
+                    Block_time.(now time_controller |> to_time)
                     transition_time) ;
                Writer.write valid_transition_writer cached_transition
            | Error (`In_frontier _) | Error (`In_process _) ->

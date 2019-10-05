@@ -259,7 +259,8 @@ module Make (Inputs : Inputs.S) :
                    in
                    Perf_histograms.add_span
                      ~name:"accepted_transition_local_latency"
-                     (Core_kernel.Time.diff (Core_kernel.Time.now ())
+                     (Core_kernel.Time.diff
+                        Block_time.(now time_controller |> to_time)
                         transition_time) ;
                    let%map () =
                      match%map

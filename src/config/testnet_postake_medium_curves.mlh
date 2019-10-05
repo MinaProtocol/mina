@@ -11,7 +11,7 @@
 [%%define consensus_mechanism "proof_of_stake"]
 [%%define k 10]
 [%%define c 8]
-[%%define delta 2]
+[%%define delta 3]
 
 [%%define time_offsets true]
 [%%define cache_exceptions false]
@@ -19,8 +19,8 @@
 
 [%%define genesis_ledger "testnet_postake"]
 
-[%%define genesis_state_timestamp "2019-10-04 14:30:00-07:00"]
-[%%define block_window_duration 360000]
+[%%define genesis_state_timestamp "2019-10-04 18:00:00-07:00"]
+[%%define block_window_duration 180000]
 
 [%%define integration_tests false]
 [%%define force_updates false]
