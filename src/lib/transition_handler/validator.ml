@@ -87,14 +87,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                  |> Protocol_state.blockchain_state
                  |> Blockchain_state.timestamp |> Block_time.to_time
                in
-               let hist_name =
-                 match sender with
-                 | Envelope.Sender.Local ->
-                     "accepted_transition_local_latency"
-                 | Envelope.Sender.Remote _ ->
-                     "accepted_transition_remote_latency"
-               in
-               Perf_histograms.add_span ~name:hist_name
+               Perf_histograms.add_span
+                 ~name:"accepted_transition_remote_latency"
                  (Core_kernel.Time.diff (Core_kernel.Time.now ())
                     transition_time) ;
                Writer.write valid_transition_writer cached_transition

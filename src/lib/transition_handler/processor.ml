@@ -250,6 +250,16 @@ module Make (Inputs : Inputs.S) :
                    | `Catchup_scheduler ->
                        () )
                | `Proposed_breadcrumb breadcrumb ->
+                   let transition_time =
+                     Breadcrumb.validated_transition breadcrumb
+                     |> External_transition.Validated.protocol_state
+                     |> Protocol_state.blockchain_state
+                     |> Blockchain_state.timestamp |> Block_time.to_time
+                   in
+                   Perf_histograms.add_span
+                     ~name:"accepted_transition_local_latency"
+                     (Core_kernel.Time.diff (Core_kernel.Time.now ())
+                        transition_time) ;
                    let%map () =
                      match%map
                        add_and_finalize ~only_if_present:false breadcrumb
