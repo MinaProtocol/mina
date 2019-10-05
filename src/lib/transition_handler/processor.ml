@@ -251,7 +251,8 @@ module Make (Inputs : Inputs.S) :
                        () )
                | `Proposed_breadcrumb breadcrumb ->
                    let transition_time =
-                     Breadcrumb.validated_transition breadcrumb
+                     Transition_frontier.Breadcrumb.validated_transition
+                       (Cached.peek breadcrumb)
                      |> External_transition.Validated.protocol_state
                      |> Protocol_state.blockchain_state
                      |> Blockchain_state.timestamp |> Block_time.to_time
