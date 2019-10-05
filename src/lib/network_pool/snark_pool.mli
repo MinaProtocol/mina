@@ -32,11 +32,19 @@ module type S = sig
        and type resource_pool := t
   end
 
+  module For_tests : sig
+    val get_rebroadcastable :
+         Resource_pool.t
+      -> is_expired:(Time.t -> [`Expired | `Ok])
+      -> Resource_pool.Diff.t list
+  end
+
   include
     Intf.Network_pool_base_intf
     with type resource_pool := Resource_pool.t
      and type resource_pool_diff := Resource_pool.Diff.t
      and type transition_frontier := transition_frontier
+     and type config := Resource_pool.Config.t
 
   val get_completed_work :
        t
@@ -44,8 +52,8 @@ module type S = sig
     -> transaction_snark_work_checked option
 
   val load :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
+       config:Resource_pool.Config.t
+    -> logger:Logger.t
     -> disk_location:string
     -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
                       Linear_pipe.Reader.t

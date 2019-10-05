@@ -1035,9 +1035,9 @@ bs-css@^8.0.2:
   dependencies:
     emotion "^9.2.12"
 
-"bs-electron@github:Schmavery/bs-electron#ae44a7a509cbed92c032be2302a4e9cf12c11797":
+"bs-electron@github:Schmavery/bs-electron#0cf39124417bc3157b7a675154f591bf6e4b79ba":
   version "0.1.0"
-  resolved "https://codeload.github.com/Schmavery/bs-electron/tar.gz/ae44a7a509cbed92c032be2302a4e9cf12c11797"
+  resolved "https://codeload.github.com/Schmavery/bs-electron/tar.gz/0cf39124417bc3157b7a675154f591bf6e4b79ba"
   dependencies:
     electron "^4.0.4"
 

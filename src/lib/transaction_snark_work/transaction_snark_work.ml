@@ -8,7 +8,7 @@ module Statement = struct
     module V1 = struct
       module T = struct
         type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
-        [@@deriving bin_io, sexp, hash, compare, yojson, version]
+        [@@deriving bin_io, compare, hash, sexp, version, yojson]
       end
 
       include T
@@ -78,7 +78,7 @@ module Info = struct
     ; work_ids: int One_or_two.t
     ; fee: Fee.Stable.V1.t
     ; prover: Public_key.Compressed.Stable.V1.t }
-  [@@deriving to_yojson, sexp]
+  [@@deriving to_yojson, sexp, compare]
 end
 
 module T = struct

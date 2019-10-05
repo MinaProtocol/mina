@@ -469,7 +469,17 @@ let skip_frontier_dependencies_validation
     `This_transition_belongs_to_a_detached_subtree (t, validation) =
   (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
 
-let skip_staged_ledger_diff_validation `This_is_unsafe (t, validation) =
+let validate_staged_ledger_hash
+    (`Staged_ledger_already_materialized staged_ledger_hash) (t, validation) =
+  if
+    Staged_ledger_hash.equal staged_ledger_hash
+      (Blockchain_state.staged_ledger_hash
+         (blockchain_state (With_hash.data t)))
+  then Ok (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
+  else Error `Staged_ledger_hash_mismatch
+
+let skip_staged_ledger_diff_validation
+    `This_transition_has_a_trusted_staged_ledger (t, validation) =
   (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
 
 module With_validation = struct
@@ -517,22 +527,19 @@ module Validated = struct
     module V1 = struct
       module T = struct
         type t =
-          ( Stable.Latest.t
-          , State_hash.Stable.Latest.t )
-          With_hash.Stable.Latest.t
+          (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
           * ( [`Time_received]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t
-            , [`Proof]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t
+              * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
+            , [`Proof] * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
             , [`Delta_transition_chain]
-              * ( State_hash.Stable.Latest.t Non_empty_list.Stable.Latest.t
-                , Truth.True.Stable.Latest.t )
-                Truth.Stable.Latest.t
+              * ( State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
+                , Truth.True.Stable.V1.t )
+                Truth.Stable.V1.t
             , [`Frontier_dependencies]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t
+              * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
             , [`Staged_ledger_diff]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t )
-            Validation.Stable.Latest.t
+              * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t )
+            Validation.Stable.V1.t
         [@@deriving version]
 
         type erased =
@@ -594,7 +601,8 @@ module Validated = struct
                  `This_transition_was_not_received_via_gossip
             |> skip_frontier_dependencies_validation
                  `This_transition_belongs_to_a_detached_subtree
-            |> skip_staged_ledger_diff_validation `This_is_unsafe )
+            |> skip_staged_ledger_diff_validation
+                 `This_transition_has_a_trusted_staged_ledger )
 
         include With_validation
       end

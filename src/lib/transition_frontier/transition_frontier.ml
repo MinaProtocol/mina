@@ -599,6 +599,18 @@ struct
              ~f:(fun sum account ->
                sum + Currency.Balance.to_int account.balance ) )) ;
     Coda_metrics.(Counter.inc_one Transition_frontier.root_transitions) ;
+    let consensus_state = Breadcrumb.consensus_state new_root in
+    let blockchain_length =
+      consensus_state |> Consensus.Data.Consensus_state.blockchain_length
+      |> Coda_numbers.Length.to_int |> Float.of_int
+    in
+    let global_slot =
+      consensus_state |> Consensus.Data.Consensus_state.global_slot
+      |> Float.of_int
+    in
+    Coda_metrics.(
+      Gauge.set Transition_frontier.slot_fill_rate
+        (blockchain_length /. global_slot)) ;
     new_root_node
 
   let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :

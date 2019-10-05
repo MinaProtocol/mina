@@ -1,6 +1,5 @@
 open Core_kernel
 open Snark_params
-open Fold_lib
 open Signature_lib
 
 module Scalar = struct
@@ -52,7 +51,8 @@ module Message = struct
 
   let hash_to_group msg =
     let msg_hash_state =
-      Snark_params.Tick.Pedersen.hash_fold Coda_base.Hash_prefix.vrf_message
+      Snark_params.Tick.Pedersen.hash_fold
+        (Snark_params.Tick.Pedersen.State.create ())
         (fold msg)
     in
     msg_hash_state.acc
@@ -64,43 +64,29 @@ module Message = struct
     let hash_to_group msg =
       let open Snark_params.Tick in
       let%bind msg_triples = var_to_triples msg in
-      Pedersen.Checked.hash_triples ~init:Coda_base.Hash_prefix.vrf_message
+      Pedersen.Checked.hash_triples
+        ~init:(Snark_params.Tick.Pedersen.State.create ())
         msg_triples
   end
 end
 
 module Output_hash = struct
-  type value = Random_oracle.Digest.t [@@deriving eq, sexp]
+  type value = Snark_params.Tick.Field.t [@@deriving eq, sexp]
 
-  type var = Random_oracle.Digest.Checked.t
+  type var = Random_oracle.Checked.Digest.t
 
-  let typ : (var, value) Snark_params.Tick.Typ.t = Random_oracle.Digest.typ
+  let typ : (var, value) Snark_params.Tick.Typ.t = Snark_params.Tick.Field.typ
 
-  let hash msg g =
-    let open Fold in
-    let compressed_g =
-      Non_zero_curve_point.(g |> of_inner_curve_exn |> compress)
-    in
-    let digest =
-      Snark_params.Tick.Pedersen.digest_fold Coda_base.Hash_prefix.vrf_output
-        (Message.fold msg +> Non_zero_curve_point.Compressed.fold compressed_g)
-    in
-    Random_oracle.digest_field digest
+  let hash ({Message.state_hash} : Message.value) g =
+    let x, y = Snark_params.Tick.Inner_curve.to_affine_exn g in
+    Random_oracle.hash [|(state_hash :> Snark_params.Tick.Field.t); x; y|]
 
   module Checked = struct
-    let hash msg g =
-      let open Snark_params.Tick.Checked in
-      let%bind msg_triples = Message.Checked.var_to_triples msg in
-      let%bind g_triples =
-        Non_zero_curve_point.(compress_var g >>= Compressed.var_to_triples)
-      in
-      let%bind pedersen_digest =
-        Snark_params.Tick.Pedersen.Checked.digest_triples
-          ~init:Coda_base.Hash_prefix.vrf_output (msg_triples @ g_triples)
-        >>= Snark_params.Tick.Pedersen.Checked.Digest.choose_preimage
-      in
-      Random_oracle.Checked.digest_bits
-        (pedersen_digest :> Snark_params.Tick.Boolean.var list)
+    let hash ({state_hash} : Message.var) g =
+      Snark_params.Tick.make_checked (fun () ->
+          let x, y = g in
+          Random_oracle.Checked.hash
+            [|Coda_base.State_hash.var_to_hash_packed state_hash; x; y|] )
   end
 end
 

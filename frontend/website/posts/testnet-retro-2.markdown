@@ -31,7 +31,7 @@ Send as many transactions as you can! We’ll link the public key to a discord a
 
 - 1000 Testnet points* for sending 20 transactions
 - Bonus: 1st place +3000, 2nd place +2000, 3rd place +1000 for 1st, 2nd, and 3rd place winners respectively for most transactions sent over the week!
-If you’re just joining now, check out past challenges and point values in [our docs](https://codaprotocol.com/docs/coda-testnet/).
+If you’re just joining now, check out past challenges and point values in [our docs](https://codaprotocol.com/testnet.html).
 
 ## Week 2 Retrospective & Week 3 Details
 
