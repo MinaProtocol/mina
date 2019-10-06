@@ -1,5 +1,74 @@
 open Core_kernel
 
+type name = string
+[@@deriving eq, compare, sexp, hash]
+
+type m = A | B| C
+
+(* b from the paper *)
+let zk_margin = 1
+
+let gen_name =
+  let r = ref (-1) in
+  fun () ->
+    incr r;
+    sprintf "a%d" !r
+
+module Expr = struct
+  module T = struct
+    type t =
+      | Var of name
+      | Fun_call of name * t list
+      | Array of t list
+      | Struct of (string * t) list
+    [@@deriving eq, compare, sexp, hash]
+  end
+  include T
+  include Hashable.Make(T)
+
+  let rec to_ocaml = 
+    let seq = String.concat ~sep:"; " in
+    function
+    | Var name -> name
+    | Fun_call (name, args) ->
+      sprintf "(%s %s)"
+        name
+        (String.concat ~sep:" " (List.map args ~f:to_ocaml))
+    | Array ts ->
+      sprintf "[|%s|]"
+      (seq (List.map ts ~f:to_ocaml))
+    | Struct xs ->
+      sprintf "{ %s }"
+        (seq (List.map xs ~f:(fun (name, t) ->
+              sprintf "%s= %s" name (to_ocaml t))))
+end
+
+module Statement = struct
+  type t =
+    | Proc_call of name * Expr.t list
+    | Assign of name * Expr.t
+    | Return of Expr.t
+end
+
+module Program = struct
+  type t = Statement.t list
+    
+  open Statement
+
+  let rec to_ocaml = function
+    | [] -> ""
+    | Assign (name, e) :: ss ->
+      sprintf "let %s = %s in\n%s"
+        name (Expr.to_ocaml e)
+        (to_ocaml ss)
+    | [ Return e ] -> Expr.to_ocaml e
+    | Proc_call (name, args) :: ss ->
+      sprintf "%s; %s"
+        (Expr.to_ocaml (Fun_call (name, args)))
+        (to_ocaml ss)
+    | Return _ :: _ :: _ -> failwith "Return should be the last statement"
+end
+
 module Domain = struct
   type t = Binary_roots_of_unity of int
 
@@ -23,16 +92,22 @@ module C
     | Inner y -> Inner(G.map y ~f)
 end
 
+module Trivial = struct
+  type (_, _) t =
+    | Nop : 'k -> ('k, _) t
+
+  let map (Nop k) ~f = Nop (f k)
+end
+
 module type F2 = Free_monad.Functor.S2
 
-module IP
-    (Interaction : Free_monad.Functor.S2)
-    (Computation : Free_monad.Functor.S2) = struct
-  module F = struct
-    type ('a, 'e) t =
-      | Sample : ('field -> 'k) -> ('k, < field: 'field; ..>) t
-      | Interact : ('a, 'e) Interaction.t -> ('a, 'e) t
-      | Compute : ('a, 'e) Computation.t -> ('a, 'e) t
+module IP_F
+    (Interaction : F2)
+    (Computation : F2) = struct
+  type ('a, 'e) t =
+    | Sample : ('field -> 'k) -> ('k, < field: 'field; ..>) t
+    | Interact : ('a, 'e) Interaction.t -> ('a, 'e) t
+    | Compute : ('a, 'e) Computation.t -> ('a, 'e) t
 
   let map : type a b s. (a, s) t -> f:(a -> b) -> (b, s) t =
     fun t ~f ->
@@ -40,32 +115,46 @@ module IP
     | Sample k -> Sample (fun x -> f (k x))
     | Interact x -> Interact (Interaction.map x ~f)
     | Compute x -> Compute (Computation.map x ~f)
-  end
+end
 
-  include Free_monad.Make2(F)
+module type IP = sig
+  module Interaction : F2
+  module Computation : F2
+
+  type ('a, 'x) t = ('a, 'x) Free_monad.Make2(IP_F(Interaction)(Computation)).t
+    = Pure of 'a
+    | Free of (('a, 'x) t, 'x) IP_F(Interaction)(Computation).t
+
+  include Monad_let.S2 with
+    type ('a, 'b) t := ('a, 'b) t
+
+  val interact : (('a, 'e) t, 'e) Interaction.t -> ('a, 'e) t
+  val compute : (('a, 'e) t, 'e) Computation.t -> ('a, 'e) t
+
+  val sample : ('field, < field: 'field; ..>) t
+end
+
+module IP
+    (Interaction : Free_monad.Functor.S2)
+    (Computation : Free_monad.Functor.S2)
+  : IP with module Interaction := Interaction
+        and module Computation := Computation
+= struct
+  include Free_monad.Make2(IP_F(Interaction)(Computation))
 
   let interact x = Free (Interact x)
   let compute x = Free (Compute x)
   let sample = Free (Sample return)
 end
 
-module Map_computation (I : F2) (C1 : F2) (C2 : F2) (Eta : sig
+module Bind_computation (I : F2) (C1 : F2) (C2 : F2) (Eta : sig
     val f : ('a, 'e) C1.t -> ('a, 'e) IP(I)(C2).t
-  end) = struct
+  end) : sig
+  
+  val f : ('a, 'e) IP(I)(C1).t -> ('a, 'e) IP(I)(C2).t
+end = struct
 
-  (* TODO: Not sure why I have to redefine this. *)
-  let rec bind : type a b e.
-    (a, e) IP(I)(C2).t -> f:(a -> (b, e) IP(I)(C2).t) -> (b, e) IP(I)(C2).t
-      =
-    fun t ~f ->
-      match t with
-      | Pure x -> f x
-      | Free t ->
-        Free (
-        match t with
-        | Sample k -> Sample (fun x -> bind ~f (k x))
-        | Interact x -> Interact (I.map x ~f:(bind ~f))
-        | Compute x -> Compute (C2.map x ~f:(bind ~f)))
+  module IP2 = IP(I)(C2)
 
   let rec f : type a e. (a, e) IP(I)(C1).t -> (a, e) IP(I)(C2).t =
     fun t ->
@@ -77,7 +166,7 @@ module Map_computation (I : F2) (C1 : F2) (C2 : F2) (Eta : sig
         | Interact i -> Free (Interact (I.map i ~f))
         | Compute c ->  
           let ip =  (Eta.f c) in
-          bind ip ~f 
+          IP2.bind ip ~f 
 end
 
 module Map_interaction (C : F2) (I1 : F2) (I2 : F2) (Eta : sig
@@ -122,6 +211,16 @@ struct
     let int x = Int x
 
     let ( ! ) = constant
+
+    let to_expr ~constant ~int ~op t =
+      let rec go =
+        function
+        | Op (o, x, y) ->
+          Expr.Fun_call (op o, [ go x; go y ])
+        | Constant x -> constant x
+        | Int n -> int n
+      in
+      go t
   end
 
   module Arithmetic_circuit = struct
@@ -170,9 +269,49 @@ struct
             Eval (x, cont k)
         | Assert_equal (x, y, k) ->
             Assert_equal (x, y, f k)
+
+      let to_statement
+          ~assert_equal
+          ~constant ~int ~op
+        = 
+        let expr =
+          Arithmetic_expression.to_expr
+            ~constant ~int ~op
+        in
+        function
+        | Eval (e, k) ->
+          let name = gen_name () in
+          ( Statement.Assign (name, expr e), k (Expr.Var name) )
+        | Assert_equal (x, y, k) ->
+          ( assert_equal (expr x) (expr y), k )
+
+      let to_program 
+          ~assert_equal
+          ~constant ~int ~op t =
+        let s, k = to_statement ~assert_equal ~constant ~int ~op t in
+        ( [ s ], k )
     end
 
     include Free_monad.Make2 (F)
+
+    let to_program
+        ~assert_equal
+        ~constant
+        ~int
+        ~op
+      =
+      let rec go : type a. (a, 'f) t -> Program.t -> Program.t * a =
+        fun t acc ->
+          match t with
+          | Pure x ->
+            (List.rev acc, x)
+          | Free f ->
+            let s, k =
+              F.to_statement f ~assert_equal ~constant ~int ~op
+            in
+            go k (s :: acc)
+      in
+      fun t -> go t []
 
     let eval x = Free (Eval (x, return))
 
@@ -223,7 +362,7 @@ struct
           Free (Arithmetic (Eval (c, fun y -> circuit (k y))))
   end
 
-  module AHP_query = struct
+  module AHP = struct
     module Interaction = struct
       type (_, _) t =
         | Query :
@@ -240,6 +379,9 @@ struct
     include Free_monad.Make2(Interaction)
 
     let query ps x = Free (Query (ps, x, return))
+
+    let query ps x =
+      (query ps x >>| Vector.map ~f:Arithmetic_expression.constant)
   end
 
   module PCS_IP = struct
@@ -333,7 +475,7 @@ struct
     (* TODO: Cata *)
     let rec ahp_compiler : type a.
       (a, < field: 'field ; poly: 'poly >) 
-        AHP_query.t
+        AHP.t
       -> (a, < field: 'field ; poly: 'poly; proof: 'pi >) t =
       fun v ->
       match v with
@@ -472,11 +614,7 @@ struct
     let field = Field
   end
 
-  let b = 1
-
   module Prover_message = struct
-    type m = [`A | `B | `C]
-
     type ('field, 'poly) basic =
       [`Field of 'field | `X | `Poly of 'poly | `M_hat of m * 'field]
 
@@ -513,20 +651,20 @@ struct
       | W_hat { degree; _ } ->
         Polynomial degree
       | Mz_hat { domain; _ } ->
-        Polynomial (Domain.size domain + b)
+        Polynomial (Domain.size domain + zk_margin)
       | PCS (Evals (v, _)) ->
          Vector (Field, Vector.length v)
       | PCS (Proof  _) -> Proof
 
     let zk_only = function Random_mask _ -> true | _ -> false
 
-    let sum dom e = Sum (dom, e)
+    let domain_sum dom e = Sum (dom, e)
 
     let random_mask d = Random_mask d
 
     let w_hat degree domain input_size = W_hat {degree; domain; input_size}
 
-    let mz_hat ~b domain m = Mz_hat {domain; m; b}
+    let mz_hat domain m = Mz_hat {domain; m; b = zk_margin}
   end
 
   (*
@@ -546,13 +684,6 @@ struct
       | Check : unit Verifier.t * ('k, [ `P ]) t -> ('k, [`V]) t
 *)
 
-  module Trivial_computation = struct
-    type (_, _) t =
-      | Nop : 'k -> ('k, _) t
-
-    let map (Nop k) ~f = Nop (f k)
-  end
-
   module Basic_IP = struct
     module Interaction = struct
       type ('k, 'env) t =
@@ -569,9 +700,9 @@ struct
             Send_and_receive (t_q, q, t_r, cont k)
     end
 
-    module Computation = Trivial_computation
+    module Computation = Trivial
 
-    include IP(Interaction)(Computation)
+    include IP(Interaction)(Trivial)
 
     let send t_q q t_r =
       interact (Send_and_receive (t_q, q, t_r, return))
@@ -587,18 +718,7 @@ struct
   end
 
   module SNARK (Computation : F2) = struct
-    module Proof_component = struct
-      type (_, _) t =
-        | Poly_eval :
-            ('poly, 'n) Vector.t * 'field
-            -> (('field, 'n) Vector.t, < poly: 'poly ; field: 'field ; .. >) t
-        | Evaluation_proof :
-            'poly * 'field * 'field
-            -> ('pi, < pcs_proof: 'pi ; poly: 'poly ; field: 'field ; .. >) t
-        | Prover_message
-          : ('a, 'e) Prover_message.t
-              -> ('a, 'e) t
-    end
+    module Proof_component = Prover_message
 
     module Hash_input = struct
       type 'e t =
@@ -667,6 +787,202 @@ struct
         in
         go t x
 
+    type field = Expr.t
+
+    module Poly = struct
+      type basic =
+        | Evaluations of name
+        | Coefficients of name
+
+      type 'poly expr =
+        [ `Scale of field * 'poly
+        | `Add of 'poly * 'poly
+        | `Constant of basic
+        ]
+
+      type t =
+        { expr : t expr
+        ; commitment : Expr.t Lazy.t
+        ; evaluations : Expr.t Expr.Table.t
+        }
+
+      let commitment t =
+        (Lazy.force t.commitment)
+
+      let add ~append_lines ~add_commitment t1 t2 =
+        { expr = `Add (t1, t2)
+        ; commitment = lazy (
+            let c1 = Lazy.force t1.commitment in
+            let c2 = Lazy.force t2.commitment in
+            let name = gen_name () in
+            append_lines
+              [ Statement.Assign (name, add_commitment c1 c2)
+              ] ;
+            Var name )
+        ; evaluations = Expr.Table.create ()
+        }
+
+      let scale ~append_lines ~scale_commitment x t =
+        { expr = `Scale (x, t)
+        ; commitment = lazy (
+            let name = gen_name () in
+            append_lines
+              [ Statement.Assign (
+                    name,
+                    scale_commitment x (Lazy.force t.commitment) ) ];
+            Var name )
+        ; evaluations = Expr.Table.create ()
+        }
+
+(* This isn't necessarily the most efficient way to evaluate things, 
+   but probably it is negligible compared to the cost of e.g., doing
+   mulit-exps. *)
+      let eval ~eval_poly ~add_field ~mul_field =
+        let rec eval t x =
+          Hashtbl.find_or_add t.evaluations x ~default:(fun () ->
+              match t.expr with
+              | `Constant p -> 
+                eval_poly p x
+              | `Add (t1, t2) ->
+                add_field (eval t1 x) (eval t2 x)
+              | `Scale (s, t) ->
+                mul_field s (eval t x) )
+        in
+        eval
+    end
+
+    type env = < field: field; poly : Poly.t; proof : Expr.t >
+
+    module Compiler (F : sig type (_, _) t end) = struct
+      type t = 
+        { f : 'a. append_lines:(Program.t -> unit) ->
+                ('a, env) F.t -> Program.t *  'a }
+    end
+
+    type compute = Compiler(Computation).t
+
+    module Proof = struct
+      type t =
+        { field_elements : Expr.t list
+        ; polynomials : Expr.t list
+        ; pcs_proofs : Expr.t list
+        }
+      [@@deriving fields]
+
+      let to_expr { field_elements; polynomials; pcs_proofs } =
+        Expr.Struct
+          [ "field_elements", Array field_elements
+          ; "polynomials", Array polynomials
+          ; "pcs_proofs", Array pcs_proofs
+          ]
+
+      let empty =
+        { field_elements =[]
+        ; polynomials =[]
+        ; pcs_proofs  =[]
+        }
+
+      let rev_append t1 t2 =
+        let a f = List.rev_append
+            (Field.get f t1) 
+            (Field.get f t2)
+        in
+        Fields.map
+          ~field_elements:a
+          ~polynomials:a
+          ~pcs_proofs:a
+
+      let rev (t:t) =
+        let r f = List.rev (Field.get f t) in
+        Fields.map
+          ~field_elements:r
+          ~polynomials:r
+          ~pcs_proofs:r
+
+      let rec cons
+        : 
+          type a.
+          ((a, env) Type.t * a)
+          -> t -> t
+        =
+        fun (ty, x) t ->
+        let field = Fields.field_elements in
+        let poly = Fields.polynomials in
+        let proof = Fields.pcs_proofs in
+        let fcons f x = Field.map f t ~f:(List.cons x) in
+        match ty with
+        | Vector (ty, _) ->
+          List.fold (Vector.to_list x)
+            ~f:(fun acc x ->
+                cons (ty, x) acc)
+            ~init:t
+        | Field -> fcons field x
+        | Polynomial _ -> fcons poly (Poly.commitment x)
+        | Proof -> fcons proof x
+        | Pair (ty1, ty2) ->
+          let x1, x2 = x in
+          cons (ty1, x1) t
+          |> cons (ty2, x2)
+        | Hlist ts  ->
+          let rec go
+            : type xs. (xs, env) Type.Hlist.t
+              -> xs HlistId.t -> t -> t
+            =
+            fun tys xs t ->
+              match tys, xs with
+              | [], [] -> t
+              | ty :: tys, x :: xs ->
+                go tys xs (cons (ty, x) t)
+          in
+          go ts x t
+
+      let cons (c, x) t =
+        cons (Proof_component.type_ c, x) t
+    end
+
+    let prover
+        ~(compute : compute) 
+        ~(prove : Compiler(Proof_component).t)
+        ~absorb 
+        ~squeeze
+        ~initialize
+      =
+      let acc = ref [] in
+      let append_lines lines = 
+        acc := List.rev_append lines !acc
+      in
+      let rec go
+          proof
+          t
+        =
+        match t with
+        | Pure _ -> proof
+        | Free (Compute c) ->
+          let (lines, k) = compute.f c ~append_lines in
+          append_lines lines;
+          go proof k
+        | Free (Absorb (x, k)) ->
+          append_lines (absorb x);
+          go proof k
+        | Free (Proof_component (c, k)) ->
+          let lines, pi = prove.f c ~append_lines in
+          append_lines lines ;
+          go
+            (Proof.cons (c, pi) proof)
+            (k pi)
+        | Free (Squeeze k) ->
+          let lines, challenge = squeeze () in
+          append_lines lines ;
+          go 
+            proof
+            (k challenge)
+      in
+      fun t ->
+        acc := [ initialize ] ;
+        let proof = go Proof.empty t in
+        let proof = Proof.rev proof in
+        List.rev (Statement.Return (Proof.to_expr proof) :: !acc)
+
     type 'e pending_absorptions = (unit, 'e) t list
 
     let rec fiat_shamir
@@ -687,7 +1003,7 @@ struct
         in
         Free (
           Proof_component
-            (Prover_message m, fun r ->
+            (m, fun r ->
                 fiat_shamir
                   ((absorb_value (Prover_message.type_ m) r) :: pending_absorptions)
                   (k r)))
@@ -776,7 +1092,6 @@ negligible amount (which is fine), and lets us reduce argument size by 9 group e
   let all_but x0 = List.filter ~f:(fun x -> x <> x0)
 
   module Index = struct
-    type m = [`A | `B | `C]
 
     type 'poly t = {row: m -> 'poly; col: m -> 'poly; value: m -> 'poly}
   end
@@ -785,7 +1100,7 @@ negligible amount (which is fine), and lets us reduce argument size by 9 group e
 
   let domain_K = failwith "TODO"
 
-  let get t =
+  let receive t =
     let%map x = send (Hlist []) [] t in
     x
 
@@ -799,67 +1114,75 @@ negligible amount (which is fine), and lets us reduce argument size by 9 group e
       let%map v_H_y = v_H y in
       (!v_H_alpha - !v_H_y) / (!alpha - y)
 
-  let ms : _ list = [`A; `B; `C]
+  let vanishing_polynomial d x =
+    let open Arithmetic_expression in
+    Arithmetic_computation.(
+      circuit (Domain.vanishing d !x)
+      >>| constant)
+
+  (* Radically fair environment *)
+
+  let sum xs f = reduce xs Arithmetic_expression.(+) f
+  let product xs f = reduce xs Arithmetic_expression.( * ) f
+
+  let abc a b c = function A -> a | B -> b | C -> c
+
+  let interact ~send:q ~receive =
+    let n = Vector.length q in
+    send (Type.Vector (Field, n)) q receive
+
+  let (@->) send receive = interact ~send ~receive
+
+  let (!<-) = receive
 
   let protocol (type field poly) {Index.row; col; value} input :
       ( ( (unit, field) Arithmetic_computation.t
         , < field: field ; poly: poly ; .. > )
-        AHP_query.t
+        AHP.t
       , < field: field ; poly: poly ; .. > )
       Basic_IP.t =
-    let input_size = List.length input in
-    let open Let_syntax in
     let open Prover_message in
-    let van d x =
-      Arithmetic_computation.circuit (Domain.vanishing d x)
-    in
-    let v_K = van domain_K in
-    let v_H = van domain_H in
-    let f = Type.field in
     let open Arithmetic_expression in
+    let input_size = List.length input in
+    let v_K = vanishing_polynomial domain_K in
+    let v_H = vanishing_polynomial domain_H in
     (* s can be ignored if we don't need zero knowledge *)
     (* z_C = z_A z_B + something v_H *)
-    let%bind (s : poly) = get (random_mask Int.((2 * h) + b - 1)) in
-    let%bind (sigma_1 : field) =
-      get (sum domain_H (Arithmetic_circuit.eval !(`Poly s)))
-    and w_hat = get (w_hat Int.(w + b) domain_H input_size)
-    and z_A = get (mz_hat ~b domain_H `A)
-    and z_B = get (mz_hat ~b domain_H `B) in
-    let%bind (alpha : field) = sample
+    let%bind s = receive (random_mask Int.((2 * h) + zk_margin - 1)) in
+    let%bind sigma_1 = receive (domain_sum domain_H (Arithmetic_circuit.eval !(`Poly s)))
+    and w_hat = receive (w_hat Int.(w + zk_margin) domain_H input_size)
+    and z_A = receive (mz_hat domain_H A)
+    and z_B = receive (mz_hat domain_H B) in
+    let%bind alpha = sample
     and eta_A = sample
     and eta_B = sample
     and eta_C = sample in
-    let eta = function `A -> eta_A | `B -> eta_B | `C -> eta_C in
+    let eta = abc eta_A eta_B eta_C in
     let%bind g_1, h_1 =
-      send
-        (Hlist [f; f; f; f])
-        [alpha; eta_A; eta_B; eta_C]
-        (GH (domain_H, failwith "TOD"))
+      interact
+        ~send:[alpha; eta_A; eta_B; eta_C]
+        ~receive:(GH (domain_H, failwith "TOD"))
     in
     let%bind beta_1 = sample in
-    let%bind (sigma_2 : field) =
-      get
+    let%bind sigma_2 =
+      receive
         (let summand =
            let open Arithmetic_circuit in
-           let open Let_syntax in
-           let alpha = `Field alpha in
-           let%bind r_alpha = r domain_H alpha in
+           let%bind r_alpha = r domain_H (`Field alpha) in
            let%bind r_alpha_x = r_alpha !`X in
            eval
              ( r_alpha_x
-             * reduce ms ( + ) (fun m ->
+               * sum [A;B;C] (fun m ->
                    !(`Field (eta m)) * !(`M_hat (m, beta_1)) ) )
          in
-         sum domain_H summand)
+         domain_sum domain_H summand)
     in
-    let%bind g_2, h_2 = send Field beta_1 (GH (domain_H, failwith "TODO")) in
+    let%bind g_2, h_2 = interact ~send:[beta_1] ~receive:(GH (domain_H, failwith "TODO")) in
     let%bind beta_2 = sample in
-    let%bind sigma_3 = send Field beta_2 (sum domain_K (failwith "TOD")) in
-    let%bind g_3, h_3 = get (GH (domain_K, failwith "TOD")) in
+    let%bind sigma_3 = interact ~send:[beta_2] ~receive:(domain_sum domain_K (failwith "TOD")) in
+    let%bind g_3, h_3 = receive (GH (domain_K, failwith "TOD")) in
     let%bind beta_3 = sample in
-    return
-      (let open AHP_query in
-      let open Let_syntax in
+    return AHP.(
       let%map [ h_3_beta_3
                ; g_3_beta_3
                ; row_A_beta_3
@@ -874,15 +1197,15 @@ negligible amount (which is fine), and lets us reduce argument size by 9 group e
         query
           [ h_3
           ; g_3
-          ; row `A
-          ; row `B
-          ; row `C
-          ; col `A
-          ; col `B
-          ; col `C
-          ; value `A
-          ; value `B
-          ; value `C ]
+          ; row A
+          ; row B
+          ; row C
+          ; col A
+          ; col B
+          ; col C
+          ; value A
+          ; value B
+          ; value C ]
           beta_3
       and [h_2_beta_2; g_2_beta_2] = query [h_2; g_2] beta_2
       and [ h_1_beta_1
@@ -894,72 +1217,149 @@ negligible amount (which is fine), and lets us reduce argument size by 9 group e
         query [h_1; g_1; z_B; z_A; w_hat; s] beta_1
       in
       let open Arithmetic_computation in
-      let open Let_syntax in
       let%bind r_alpha =
         let%map f = circuit (r domain_H alpha) in
-        fun y -> (f y)
+        fun y -> circuit (f y)
       in
+      let eta x = !(eta x) in
       let%bind a_beta_3, b_beta_3 =
-        let abc a b c = function `A -> !a | `B -> !b | `C -> !c in
         let row = abc row_A_beta_3 row_B_beta_3 row_C_beta_3
         and col = abc col_A_beta_3 col_B_beta_3 col_C_beta_3
         and value = abc value_A_beta_3 value_B_beta_3 value_C_beta_3 in
         let%map a =
-          let%map v_H_beta_2 = v_H !beta_2 and v_H_beta_1 = v_H !beta_1 in
-          reduce ms ( + ) (fun m ->
-              !(eta m)
-              * !v_H_beta_2 * !v_H_beta_1 * value m
-              * reduce (all_but m ms) ( * ) (fun n ->
+          let%map v_H_beta_2 = v_H beta_2 and v_H_beta_1 = v_H beta_1 in
+          sum [A;B;C] (fun m ->
+              eta m
+              * v_H_beta_2 * v_H_beta_1 * value m
+              * product (all_but m [A;B;C]) (fun n ->
                     (!beta_2 - row n) * (!beta_1 * col n) ) )
         in
         let b =
-          reduce ms ( * ) (fun m -> (!beta_2 - row m) * (!beta_1 - col m))
+          product [A;B;C]  (fun m -> (!beta_2 - row m) * (!beta_1 - col m))
         in
         (a, b)
       in
-      let%bind v_K_beta_3 = v_K !beta_3
-      and v_H_beta_1 = v_H !beta_1
-      and v_H_beta_2 = v_H !beta_2 in
-      let%bind r_alpha_beta_1 = circuit (r_alpha !beta_1)
-      and r_alpha_beta_2 = circuit (r_alpha !beta_2) in
-      let z_hat_beta_1 =
-        z_hat Sequence.empty (* TODO *) input !w_hat_beta1 !beta_1
+      let%bind v_K_beta_3 = v_K beta_3
+      and v_H_beta_1 = v_H beta_1
+      and v_H_beta_2 = v_H beta_2
+      and r_alpha_beta_1 = r_alpha !beta_1
+      and r_alpha_beta_2 = r_alpha !beta_2
       in
-      let z_C_beta_1 = !z_A_beta_1 * !z_B_beta_1 in
+      let z_hat_beta_1 =
+        z_hat Sequence.empty (* TODO *) input w_hat_beta1 !beta_1
+      in
+      let z_C_beta_1 = z_A_beta_1 * z_B_beta_1 in
       all_unit
-        [ !h_3_beta_3 * !v_K_beta_3
+        [ h_3_beta_3 * v_K_beta_3
           = a_beta_3
-            - (b_beta_3 * ((!beta_3 * !g_3_beta_3) + (!sigma_3 / int k)))
+            - (b_beta_3 * ((!beta_3 * g_3_beta_3) + (!sigma_3 / int k)))
         ; r_alpha_beta_2 * !sigma_3
-          = (!h_2_beta_2 * !v_H_beta_2)
-            + (!beta_2 * !g_2_beta_2)
+          = (h_2_beta_2 * v_H_beta_2)
+            + (!beta_2 * g_2_beta_2)
             + (!sigma_2 / int h)
-        ; !s_beta_1
+        ; s_beta_1
           + r_alpha_beta_1
-            * ( (!eta_A * !z_A_beta_1) + (!eta_B * !z_B_beta_1)
-              + (!eta_C * z_C_beta_1) )
+            * ( (eta A * z_A_beta_1) + (eta B * z_B_beta_1)
+              + (eta C * z_C_beta_1) )
           - (!sigma_2 * z_hat_beta_1)
-          = (!h_1_beta_1 * !v_H_beta_1)
-            + (!beta_1 * !g_1_beta_1)
+          = (h_1_beta_1 * v_H_beta_1)
+            + (!beta_1 * g_1_beta_1)
             + (!sigma_1 / int h) ])
 
-  module S = SNARK(Trivial_computation)
+  module S = SNARK(PCS_IP.Computation)
 
-  let p  = protocol (failwith "TODO") []
-  let p  = Basic_IP.map p ~f:PCS_IP.ahp_compiler
+  let p = protocol (failwith "TODO") []
+  let p = Basic_IP.map p ~f:PCS_IP.ahp_compiler
 
-  let p =
+  (* Everything after this essentially only concerns the verifier *)
+  let p_for_prover =
+    let open Basic_IP in
+    let module IP1 = IP(Basic_IP.Interaction)(PCS_IP.Computation) in
     let module Expand_outer_computation =
-      Map_computation(Basic_IP.Interaction)(Basic_IP.Computation)
+      Bind_computation(Interaction)(Computation)
         (PCS_IP.Computation)
         (struct 
-          let f (Nop k) = return k
+          let f (Computation.Nop k) = IP1.Pure k
         end)
     in
-    ()
+    let module Expand_inner_interaction =
+      Map_interaction(PCS_IP.Computation)
+        (PCS_IP.Interaction)
+        (Basic_IP.Interaction)
+        (struct
+          let f (PCS_IP.Interaction.Receive (pcs, k)) =
+            Basic_IP.Interaction.Send_and_receive (Hlist [], [], PCS pcs, k)
+        end)
+    in
+    IP1.bind
+      (Expand_outer_computation.f p)
+      ~f:Expand_inner_interaction.f
 
+  let p = S.fiat_shamir [] p_for_prover
   let _ = p
   let _ = p
+
+  let ocaml_prover =
+    let assert_equal x y = failwith "" in
+    let op o = failwith "" in
+    let int _ = failwith "" in
+    let constant _ = failwith "" in
+    let scale_commitment _ _ = failwith "" in
+    let add_commitment _ _ = failwith "" in
+    let add_field _ _ = failwith "" in
+    let mul_field _ _ = failwith "" in
+    let open_commitment _ _ _ = failwith "" in
+    let compute : S.compute =
+      { f = 
+          fun ~append_lines c ->
+            match c with
+            | Arithmetic c ->
+              Arithmetic_computation.F.to_program c
+                ~assert_equal
+                ~constant
+                ~int
+                ~op
+            | Scale_poly (x, p, k) ->
+              let xp = S.Poly.scale ~append_lines ~scale_commitment x p in
+              ( [], k xp)
+            | Add_poly (p1, p2, k) ->
+              let p = S.Poly.add ~append_lines ~add_commitment p1 p2 in
+              ( [], k p )
+            | Check_proof (_p, _x, _y, _pi, k) ->
+              ( [] , k)
+      }
+    in
+    let prove : S.Compiler(S.Proof_component).t =
+      let f : type a. append_lines:(Program.t -> unit) -> (a, S.env) S.Proof_component.t ->
+        Program.t * a
+        =
+        fun ~append_lines c ->
+            match c with
+            | PCS Proof (p, x, y) ->
+              open_commitment p x y
+            | PCS Evals (ps, pt) ->
+              let eval_poly (p : S.Poly.basic) x =
+                match p with
+                | Coefficients name ->
+                  let r = gen_name () in
+                  append_lines [
+                    Statement.Assign (r, Fun_call ("eval_poly", [x])) ];
+                  Expr.Var r
+                | Evaluations _ ->
+                  failwith ""
+              in
+              ( [],
+              Vector.map ps ~f:(fun p ->
+                S.Poly.eval ~eval_poly
+                  ~add_field
+                  ~mul_field
+                  p pt) )
+      in
+      { f
+      }
+    in
+    S.prover ~compute ~prove
+
 (*   let p = S.fiat_shamir [(* Input goes here *)] p *)
 end
 
