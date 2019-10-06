@@ -177,6 +177,10 @@ update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
 	make render-circleci
 
+update-rust-deps:
+	./scripts/update-rust-toolchain-references.sh $(GITLONGHASH)
+	make render-circleci
+
 # Local 'codabuilder' docker image (based off docker-toolchain)
 codabuilder: git_hooks
 	docker build --file dockerfiles/Dockerfile --tag codabuilder .
