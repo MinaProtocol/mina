@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core_kernel
 open Snark_params
 open Fold_lib
@@ -62,6 +65,11 @@ module Compressed = struct
       let sexp_of_t t = to_base58_check t |> Sexp.of_string
 
       let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
+
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%map x = Field.gen and is_odd = Bool.quickcheck_generator in
+        Poly.{x; is_odd}
     end
 
     module Latest = V1
@@ -74,6 +82,44 @@ module Compressed = struct
 
     module Registrar = Registration.Make (Module_decl)
     module Registered_V1 = Registrar.Register (V1)
+
+    module For_tests = struct
+      (* if this test fails, it means the type has changed; in that case, create a new version for the type,
+	 and a new serialization test for the new version; delete the old version and its test
+       *)
+
+      [%%if
+      curve_size = 298]
+
+      let%test "nonzero_curve_point_compressed v1" =
+        let point =
+          Quickcheck.random_value
+            ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
+        in
+        let known_good_hash =
+          "\x20\x1E\xC9\xEC\x67\x5E\x76\x79\x18\xBB\x28\x2C\x51\x5B\x36\x37\x5B\x5F\x39\x18\x21\x3A\x33\x4C\x69\x4B\x8C\xC6\x09\x24\xAD\xE7"
+        in
+        Serialization.check_serialization (module V1) point known_good_hash
+
+      [%%elif
+      curve_size = 753]
+
+      let%test "nonzero_curve_point_compressed v1" =
+        let point =
+          Quickcheck.random_value
+            ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
+        in
+        let known_good_hash =
+          "\x20\x1E\xC9\xEC\x67\x5E\x76\x79\x18\xBB\x28\x2C\x51\x5B\x36\x37\x5B\x5F\x39\x18\x21\x3A\x33\x4C\x69\x4B\x8C\xC6\x09\x24\xAD\xE7"
+        in
+        Serialization.check_serialization (module V1) point known_good_hash
+
+      [%%else]
+
+      let%test "nonzero_curve_point_v1" = failwith "Unknown curve size"
+
+      [%%endif]
+    end
   end
 
   (* bin_io, sexp omitted *)
@@ -84,18 +130,13 @@ module Compressed = struct
   include Codable.Make_base58_check (Stable.Latest)
 
   [%%define_locally
-  Stable.Latest.(sexp_of_t, t_of_sexp)]
+  Stable.Latest.(sexp_of_t, t_of_sexp, gen)]
 
   let compress (x, y) : t = {x; is_odd= parity y}
 
   let to_string = to_base58_check
 
   let empty = Poly.{x= Field.zero; is_odd= false}
-
-  let gen =
-    let open Quickcheck.Generator.Let_syntax in
-    let%map x = Field.gen and is_odd = Bool.quickcheck_generator in
-    Poly.{x; is_odd}
 
   let bit_length_to_triple_length n = (n + 2) / 3
 
@@ -189,6 +230,12 @@ module Stable = struct
     include T
     include Registration.Make_latest_version (T)
 
+    let gen : t Quickcheck.Generator.t =
+      Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
+          let open Option.Let_syntax in
+          let%map y = Tick.Inner_curve.find_y x in
+          (x, y) )
+
     let of_bigstring bs =
       let open Or_error.Let_syntax in
       let%map elem, _ = Bigstring.read_bin_prot bs bin_reader_t in
@@ -229,6 +276,44 @@ module Stable = struct
 
   module Registrar = Registration.Make (Module_decl)
   module Registered_V1 = Registrar.Register (V1)
+
+  module For_tests = struct
+    (* if this test fails, it means the type has changed; in that case, create a new version for the type,
+	 and a new serialization test for the new version; delete the old version and its test
+       *)
+
+    [%%if
+    curve_size = 298]
+
+    let%test "nonzero_curve_point v1" =
+      let point =
+        Quickcheck.random_value
+          ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
+      in
+      let known_good_hash =
+        "\x47\xCA\x5D\x76\x2C\xBF\xC0\xF1\x11\x9F\x56\x6A\x79\x03\x77\x4C\xC4\x2F\x6D\xB8\x3F\xC3\x0E\x03\x99\x71\x1B\xF3\x54\xDD\x84\xFA"
+      in
+      Serialization.check_serialization (module V1) point known_good_hash
+
+    [%%elif
+    curve_size = 753]
+
+    let%test "nonzero_curve_point v1" =
+      let point =
+        Quickcheck.random_value
+          ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
+      in
+      let known_good_hash =
+        "\x47\xCA\x5D\x76\x2C\xBF\xC0\xF1\x11\x9F\x56\x6A\x79\x03\x77\x4C\xC4\x2F\x6D\xB8\x3F\xC3\x0E\x03\x99\x71\x1B\xF3\x54\xDD\x84\xFA"
+      in
+      Serialization.check_serialization (module V1) point known_good_hash
+
+    [%%else]
+
+    let%test "nonzero_curve_point_v1" = failwith "Unknown curve size"
+
+    [%%endif]
+  end
 end
 
 (* bin_io omitted *)
@@ -238,6 +323,9 @@ type t = Stable.Latest.t [@@deriving compare, hash, yojson]
 include Comparable.Make_binable (Stable.Latest)
 
 type var = Tick.Field.Var.t * Tick.Field.Var.t
+
+[%%define_locally
+Stable.Latest.(gen)]
 
 let assert_equal var1 var2 =
   let open Tick0.Checked.Let_syntax in
@@ -257,12 +345,6 @@ let ( = ) = equal
 let of_inner_curve_exn = Tick.Inner_curve.to_affine_exn
 
 let to_inner_curve = Tick.Inner_curve.of_affine
-
-let gen : t Quickcheck.Generator.t =
-  Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
-      let open Option.Let_syntax in
-      let%map y = Tick.Inner_curve.find_y x in
-      (x, y) )
 
 open Tick
 open Let_syntax

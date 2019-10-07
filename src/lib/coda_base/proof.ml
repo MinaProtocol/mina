@@ -65,7 +65,6 @@ module Stable = struct
   module Registrar = Registration.Make (Module_decl)
   module Registered_V1 = Registrar.Register (V1)
 
-  (* we've asserted the versioning of this type, make sure the serialization hasn't changed *)
   module For_tests = struct
     (* if this test fails, it means the type has changed; in that case, create a new version for the type,
        and a new serialization test for the new version; delete the old version and its test
