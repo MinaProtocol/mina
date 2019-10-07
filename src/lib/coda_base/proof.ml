@@ -74,6 +74,7 @@ module Stable = struct
     curve_size = 298]
 
     let%test "proof serialization v1" =
+      (* TODO get stable value *)
       let proof = Tock.Proof.dummy in
       let known_good_hash =
         "\xA1\xD0\xF3\x3C\x58\x60\xB1\x3F\xE2\xCD\x56\x89\x01\x2F\xE7\xF1\x8E\x5E\x7B\xA9\x4F\x21\x4C\xEC\x29\x79\x72\x95\x9A\x2E\x16\x33"
