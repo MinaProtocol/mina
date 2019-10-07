@@ -17,6 +17,7 @@ module Styles = {
 
 type ownedWallets =
   Wallet.t = {
+    locked: option(bool),
     publicKey: PublicKey.t,
     balance: {. "total": int64},
   };
@@ -24,6 +25,7 @@ type ownedWallets =
 module Wallets = [%graphql
   {| query getWallets { ownedWallets @bsRecord {
       publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+      locked
       balance {
           total @bsDecoder(fn: "Apollo.Decoders.int64")
       }
