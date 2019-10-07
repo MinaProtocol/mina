@@ -168,6 +168,14 @@ module Text = {
         letterSpacing(`rem(0.0875)),
         textTransform(`uppercase),
       ]);
+    let error =
+      style([
+        Typeface.plex,
+        fontWeight(`semiBold),
+        fontSize(`rem(1.)),
+        letterSpacing(`rem(-0.0125)),
+        color(Colors.roseBud),
+      ]);
   };
 
   module Header = {

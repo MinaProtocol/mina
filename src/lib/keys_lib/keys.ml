@@ -1,7 +1,6 @@
 open Core
 open Snark_params
 open Coda_state
-open Fold_lib
 
 module type S = sig
   module Step_prover_state : sig
@@ -109,18 +108,9 @@ let create () : (module S) Async.Deferred.t =
           end
 
           let instance_hash =
-            let open Coda_base in
-            let s =
-              let wrap_vk = Tock.Keypair.vk Wrap.keys in
-              Tick.Pedersen.State.update_fold
-                Hash_prefix.transition_system_snark
-                Fold.(
-                  Verification_key.to_bool_list wrap_vk
-                  |> of_list |> group3 ~default:false)
-            in
-            fun state ->
-              Tick.Pedersen.digest_fold s
-                (State_hash.fold (Protocol_state.hash state))
+            unstage
+              (Blockchain_snark.Blockchain_transition.instance_hash
+                 (Tock.Keypair.vk Wrap.keys))
 
           let main x =
             let there

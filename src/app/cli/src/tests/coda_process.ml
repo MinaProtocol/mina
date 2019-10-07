@@ -147,8 +147,11 @@ let stop_snark_worker (conn, _, _) =
     ~f:Coda_worker.functions.stop_snark_worker ~arg:()
 
 let disconnect ((conn, proc, _) as t) =
-  (* This kills any strangling snark worker process *)
+  (* This kills any straggling snark worker process *)
   let%bind () = stop_snark_worker t in
   let%bind () = Coda_worker.Connection.close conn in
-  let%map (_ : Unix.Exit_or_signal.t) = Process.wait proc in
-  ()
+  match%map Monitor.try_with (fun () -> Process.wait proc) with
+  | Ok _exit_or_signal ->
+      ()
+  | Error _exn ->
+      ()

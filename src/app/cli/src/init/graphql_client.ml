@@ -77,11 +77,19 @@ let query query_obj port =
       Deferred.return r
   | Error (`Failed_request e) ->
       eprintf
-        "❌ Error connecting to daemon. You might need to start it, or \
-         specify a custom --rest-port if it's already started.\n\
+        "Error: Unable to connect to Coda daemon.\n\
+         - The daemon might not be running. See logs (in \
+         `~/.coda-config/coda.log`) for details.\n\
+        \  Run `coda daemon -help` to see how to start daemon.\n\
+         - If you just started the daemon, wait a minute for the GraphQL \
+         server to start.\n\
+         - Alternatively, the daemon may not be running the GraphQL server on \
+         port %d.\n\
+        \  If so, add flag `-rest-port` with correct port when running this \
+         command.\n\
          Error message: %s\n\
          %!"
-        e ;
+        port e ;
       exit 17
   | Error (`Graphql_error e) ->
       eprintf "❌ Error: %s\n" e ;

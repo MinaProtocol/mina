@@ -24,17 +24,16 @@ let sendFaucetCoda = (userId, msg, pk) => {
     ~amount=Constants.faucetAmount,
     ~fee=Constants.feeAmount,
   )
-  |> Wonka.forEach((. {ReasonUrql.Client.Types.response}) => {
+  |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) => {
        let replyText =
          switch (response) {
          | Data(data) =>
            let id = data##sendPayment##payment##id;
            log(`Info, "Sent (to %s): %s", pk, id);
            Messages.faucetSentNotification(~id);
-         | Error(error) =>
-           let msg = Graphql.combinedErrorToString(error);
-           log(`Error, "Send failed (to %s), error: %s", pk, msg);
-           Messages.faucetFailNotification(~error=msg);
+         | Error(e) =>
+           log(`Error, "Send failed (to %s), error: %s", pk, e.message);
+           Messages.faucetFailNotification(~error=e.message);
          | NotFound =>
            // Shouldn't happen
            log(`Error, "Got 'NotFound' sending to %s", pk);

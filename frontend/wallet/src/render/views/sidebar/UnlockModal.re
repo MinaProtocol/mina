@@ -13,9 +13,15 @@ module UnlockMutation = ReasonApollo.CreateMutation(UnlockWallet);
 type modalState = {error: option(string)};
 
 [@react.component]
-let make = (~wallet, ~onClose) => {
+let make = (~wallet, ~onClose, ~onSuccess) => {
   let (error, setError) = React.useState(() => None);
   let (password, setPassword) = React.useState(() => "");
+  let variables =
+    UnlockWallet.make(
+      ~password,
+      ~publicKey=Apollo.Encoders.publicKey(wallet),
+      (),
+    )##variables;
   <Modal title="Unlock Wallet" onRequestClose=onClose>
     <div className=Modal.Styles.default>
       <p className=Theme.Text.Body.regular>
@@ -29,52 +35,46 @@ let make = (~wallet, ~onClose) => {
         type_="password"
         onChange={value => setPassword(_ => value)}
         value=password
+        ?error
       />
-      {switch (error) {
-       | Some(error) => <Alert kind=`Danger message=error />
-       | None => React.null
-       }}
       <Spacer height=1.5 />
       <div className=Css.(style([display(`flex)]))>
         <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
         <Spacer width=1. />
         <UnlockMutation>
-          {(mutation, _) =>
-             <Button
-               label="Unlock"
-               style=Button.Green
-               onClick={_ => {
-                 let variables =
-                   UnlockWallet.make(
-                     ~password,
-                     ~publicKey=Apollo.Encoders.publicKey(wallet),
-                     (),
-                   )##variables;
-                 let performMutation =
-                   Task.liftPromise(() =>
-                     mutation(
-                       ~variables,
-                       ~refetchQueries=[|"getWallets", "walletLocked"|],
-                       (),
-                     )
-                   );
-                 Task.perform(
-                   performMutation,
-                   ~f=
-                     fun
-                     | EmptyResponse => ()
-                     | Data(_) => onClose()
-                     | Errors(err) => {
-                         let message =
-                           err
-                           |> Array.get(~index=0)
-                           |> Option.map(~f=e => e##message)
-                           |> Option.withDefault(~default="Server error");
-                         setError(_ => Some(message));
-                       },
-                 );
+          ...{(mutation, {result}) =>
+            <>
+              <Button
+                label="Unlock"
+                style=Button.Green
+                onClick={_ =>
+                  mutation(
+                    ~variables,
+                    ~refetchQueries=[|"getWallets", "walletLocked"|],
+                    (),
+                  )
+                  |> ignore
+                }
+              />
+              {switch (result) {
+               | NotCalled => React.null
+               | Data(_) =>
+                 onSuccess();
+                 React.null;
+               | Error(err) =>
+                 let message =
+                   err##graphQLErrors
+                   |> Js.Nullable.toOption
+                   |> Option.withDefault(~default=Array.empty)
+                   |> Array.get(~index=0)
+                   |> Option.map(~f=e => e##message)
+                   |> Option.withDefault(~default="Server error");
+                 setError(_ => Some(message));
+                 React.null;
+               | Loading => React.null
                }}
-             />}
+            </>
+          }
         </UnlockMutation>
       </div>
     </div>
