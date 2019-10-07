@@ -1,19 +1,10 @@
 ---
-title:  O(1) Labs Announces Formation of Testnet Advisory Board for Coda Protocol, adds leaders of Cosmos, Tezos testnets
+title:  O(1) Labs Announces Formation of Testnet Advisory Board
 date: 2019-10-07
 author: O(1) Labs
 ---
 
 ![](/static/blog/testnet-press-release/testnet-advisors.jpg)
-
-**Highlights:**
-
-- O(1) Labs has formed a Testnet Advisory Board to advance the development of Coda Protocol
-- Zaki Manian and Luke Youngblood will join the board as technical advisors
-- Manian and Youngblood, two of the most respected individuals in the Proof of Stake community, will advise the O(1) Labs team as they advanced towards a mainnet candidate for Coda Protocol. They have prior experience as principal contributors to the Cosmos and Tezos testnet, respectively.
-- The Coda Protocol Public Testnet [Beta] was released on July 24, 2019 and has achieved a number of firsts in the blockchain industry which will greatly reduce the tradeoff between decentralization and scale.
-
-_________________
 
 San Francisco, CA - [O(1) Labs](https://o1labs.org/), the software development company building [Coda Protocol](https://codaprotocol.com/), announced that it has established a Testnet Advisory Board, and will welcome two industry leaders, Zaki Manian and Luke Youngblood, as technical advisors.
 
