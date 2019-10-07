@@ -65,7 +65,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         list)
       (sender_receipt_chains_from_parent_ledger :
         Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
-    (* The user commands should be sorted by nonces  *)
+    (* The user commands should be sorted by nonces *)
     let sorted_user_commands =
       List.sort user_commands
         ~compare:
@@ -170,6 +170,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
       Types.Blocks.serialize block_with_hash
         (compute_with_receipt_chains user_commands_with_time
            sender_receipt_chains_from_parent_ledger)
+        (failwith "Need to implement")
     in
     let graphql =
       Graphql_query.Blocks.Insert.make
@@ -359,12 +360,6 @@ let%test_module "Processor" =
                 (user_command2, Some block_time2)
                 decoded_user_command2 ) )
 
-    (* let%test_unit "a block should be added to postgres" = 
-      Async.Thread_safe.block_on_async_exn @@ fun () -> 
-      let%bind frontier = 
-        Stubs.create_root_frontier ~logger ~pids:(Pid.Hash_set.of_list []) Genesis_ledger.accounts in
-      let root_breadcrumb = Transition_frontier.root frontier in
-      Deferred.unit *)
     open Stubs
 
     let pids = Child_processes.Termination.create_pid_set ()

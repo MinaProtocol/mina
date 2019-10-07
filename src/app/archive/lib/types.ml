@@ -299,9 +299,51 @@ module User_command = struct
     , obj#first_seen )
 end
 
+module With_on_conflict = struct
+  type ('constraint_, 'update_columns) on_conflict =
+    < constraint_: 'constraint_ ; update_columns: 'update_columns array >
+
+  type ('data, 'constraint_, 'update_columns) t =
+    < data: 'data
+    ; on_conflict: ('constraint_, 'update_columns) on_conflict option >
+
+  type nonrec ('data, 'constraint_, 'update_columns) array =
+    ('data array, 'constraint_, 'update_columns) t
+end
+
 module Fee_transfer = struct
+  (* type ('block, 'm1, 'fee_transfer) t =
+    (< data:
+         < block:
+             'block
+             option
+         ; block_id: int option
+         ; fee_transfer:'fee_transfer array
+     ; on_conflict:
+         < constraint_: [< `blocks_fee_transfers_block_id_fee_transfer_id_key]
+         ; update_columns: [< `block_id | `fee_transfer_id] array
+         ; .. >
+         option
+     ; .. >
+     )
+    option *)
+
+  type ('blocks_fee_transfer, 'public_key) insert_input =
+    < blocks_fee_transfers: 'blocks_fee_transfer option
+    ; fee: Yojson.Basic.json option
+    ; first_seen: Yojson.Basic.json option
+    ; hash: string option
+    ; public_key: 'public_key option
+    ; receiver: int option >
+
+  type ('blocks_fee_transfer, 'public_key) rel_insert_input =
+    ( ('blocks_fee_transfer, 'public_key) insert_input
+    , [`fee_transfers_hash_key]
+    , [`first_seen] )
+    With_on_conflict.t
+
   let encode {With_hash.data: Fee_transfer.Single.t = (receiver, fee); hash}
-      first_seen =
+      first_seen : ('blocks_fee_transfer, 'public_key) insert_input =
     let open Option in
     object
       method hash = some @@ Transaction_hash.to_base58_check hash
@@ -310,25 +352,20 @@ module Fee_transfer = struct
 
       method first_seen = Option.map first_seen ~f:Block_time.serialize
 
-      method public_key = None
+      method public_key =
+        some @@ Public_key.encode_as_insert_input
+        @@ Signature_lib.Public_key.Compressed.to_base58_check receiver
 
-      method receiver = some @@ Public_key.encode_as_insert_input receiver
+      method receiver = None
 
       method blocks_fee_transfers = None
     end
 
-  let encode_as_insert_input fee_transfer_with_hash first_seen =
-    object
-      method data = encode fee_transfer_with_hash first_seen
-
-      method on_conflict =
-        Option.some
-        @@ object
-             method constraint_ = `user_commands_hash_key
-
-             method update_columns = Array.of_list [`first_seen]
-           end
-    end
+  let encode_as_insert_input fee_transfer_with_hash first_seen :
+      ('blocks_fee_transfer, 'public_key) rel_insert_input =
+    encode_as_insert_input ~constraint_name:`fee_transfers_hash_key
+      ~updated_columns:[`first_seen]
+      (encode fee_transfer_with_hash first_seen)
 end
 
 module Receipt_chain_hash = struct
@@ -403,10 +440,8 @@ end
 module Blocks_user_commands = struct
   let encode user_command_with_hash first_seen receipt_chain_opt =
     object
-      (* TODO: Might have to remove block *)
       method block = None
 
-      (* TODO: fill in the receipt chain hash *)
       method receipt_chain_hash =
         Option.map receipt_chain_opt ~f:Receipt_chain_hash.encode
 
@@ -427,6 +462,43 @@ module Blocks_user_commands = struct
              encode user_command_with_hash first_seen receipt_chain ) )
 end
 
+module Blocks_fee_transfers = struct
+  (* blocks_fee_transfers_arr_rel_insert_input *)
+  type ('block, 'fee_transfer) insert_input =
+    < block: 'block option
+    ; block_id: int option
+    ; fee_transfer: 'fee_transfer option
+    ; fee_transfer_id: int option >
+
+  type ('block, 'fee_transfer) rel_insert_input =
+    ( ('block, 'fee_transfer) insert_input
+    , [`blocks_fee_transfers_block_id_fee_transfer_id_key]
+    , [`block_id | `fee_transfer_id] )
+    With_on_conflict.array
+
+  let encode fee_transfer first_seen =
+    object
+      method block = None
+
+      method block_id = None
+
+      method fee_transfer =
+        Some (Fee_transfer.encode_as_insert_input fee_transfer first_seen)
+
+      method fee_transfer_id = None
+    end
+
+  let encode_as_insert_input fee_transfers :
+      ('block, 'fee_transfer) rel_insert_input =
+    encode_as_insert_input
+      ~constraint_name:`blocks_fee_transfers_block_id_fee_transfer_id_key
+      ~updated_columns:[`block_id; `fee_transfer_id]
+      ( Array.of_list
+      @@ List.map fee_transfers
+           ~f:(fun (fee_transfers_with_hash, first_seen) ->
+             encode fee_transfers_with_hash first_seen ) )
+end
+
 module Blocks = struct
   let serialize
       (With_hash.{hash; data= external_transition} :
@@ -435,6 +507,10 @@ module Blocks = struct
         ( (Coda_base.User_command.t, Transaction_hash.t) With_hash.t
         * Coda_base.Block_time.t option
         * Receipt_chain_hash.t option )
+        list)
+      (fee_transfers :
+        ( (Coda_base.Fee_transfer.Single.t, Transaction_hash.t) With_hash.t
+        * Coda_base.Block_time.t option )
         list) =
     let blockchain_state =
       External_transition.blockchain_state external_transition
@@ -478,7 +554,8 @@ module Blocks = struct
         some @@ Block_time.serialize
         @@ External_transition.timestamp external_transition
 
-      method blocks_fee_transfers = None
+      method blocks_fee_transfers =
+        some @@ Blocks_fee_transfers.encode_as_insert_input fee_transfers
 
       method blocks_snark_jobs = None
 

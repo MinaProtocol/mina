@@ -4,9 +4,9 @@ open Core
 
 let deserialize_optional_block_time = Option.map ~f:Types.Bitstring.of_yojson
 
-module User_commands = struct
-  let decode_optional_block_time = Option.map ~f:Types.Block_time.deserialize
+let decode_optional_block_time = Option.map ~f:Types.Block_time.deserialize
 
+module User_commands = struct
   module Query_first_seen =
   [%graphql
   {|
@@ -16,7 +16,7 @@ module User_commands = struct
             first_seen @bsDecoder(fn: "decode_optional_block_time")
         }
     }
-|}]
+  |}]
 
   let bitstring_block_time = Option.map ~f:Types.Bitstring.of_yojson
 
@@ -86,6 +86,23 @@ module Fee_transfer = struct
         }
     }
     |}]
+
+  module Query_first_seen =
+  [%graphql
+  {|
+    query query_first_seen ($hashes: [String!]!) {
+        fee_transfers(where: {hash: {_in: $hashes}} ) {
+            hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
+            first_seen @bsDecoder(fn: "decode_optional_block_time")
+        }
+    }
+  |}]
+
+  let fee_transfer =
+    Insert.json_of_fee_transfers_obj_rel_insert_input
+      (Types.Fee_transfer.encode_as_insert_input
+         (failwith "need to implement")
+         (failwith "Need to implement"))
 end
 
 module Blocks = struct
