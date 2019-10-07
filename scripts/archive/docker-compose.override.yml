@@ -9,5 +9,4 @@ services:
     volumes:
       - .:/home/opam/opam-repository/scripts/archive
       - ../introspection_query.py:/home/opam/opam-repository/scripts/introspection_query.py
-      - ./output:/home/opam/opam-repository/output
       - ../../src/app/archive/archive_graphql_schema.json:/home/opam/opam-repository/src/app/archive/archive_graphql_schema.json

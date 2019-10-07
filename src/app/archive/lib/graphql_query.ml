@@ -105,7 +105,7 @@ module Blocks = struct
     mutation insert(
         $blocks: [blocks_insert_input!]!
         ) {
-        insert_blocks(objects: $blocks, on_conflict: {constraint: blocks_pkey, update_columns: state_hash}) {
+        insert_blocks(objects: $blocks, on_conflict: {constraint: blocks_state_hash_key, update_columns: state_hash}) {
             returning {
                 id
                 state_hash @bsDecoder(fn: "State_hash.of_base58_check_exn")
@@ -134,7 +134,20 @@ module Clear_data =
 [%graphql
 {|
   mutation clear  {
+
+    delete_blocks_user_commands (where: {}) {
+      affected_rows
+    }
+
+    delete_receipt_chain_hashes(where: {}) {
+      affected_rows
+    }
+
     delete_user_commands(where: {}) {
+      affected_rows
+    }
+
+    delete_blocks(where: {}) {
       affected_rows
     }
       

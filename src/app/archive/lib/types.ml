@@ -265,10 +265,6 @@ module User_command = struct
       method publicKeyByReceiver =
         some @@ Public_key.encode_as_insert_input receiver
 
-      method sender = None
-
-      method receiver = None
-
       method typ =
         some
         @@ User_command_type.encode
@@ -336,116 +332,109 @@ module Fee_transfer = struct
 end
 
 module Receipt_chain_hash = struct
-  let encode hash previous_hash =
-    let open Option in
+  type t = {value: Receipt.Chain_hash.t; parent: Receipt.Chain_hash.t}
+
+  let to_obj value parent =
     object
-      (* May have to cut id *)
       method blocks_user_commands = None
 
-      method hash = some @@ Receipt.Chain_hash.to_bytes @@ hash
-
-      method parent_id = None
+      method hash = value
 
       method receipt_chain_hash = None
 
-      (* TODO: check if this is correct *)
-      method receipt_chain_hashes =
-        some
-        @@ object
-             method data =
-               some
-               @@ object
-                    method blocks_user_commands = None
+      method receipt_chain_hashes = parent
+    end
 
-                    method hash =
-                      some @@ Receipt.Chain_hash.to_bytes @@ previous_hash
+  (* HACK: An indication of what the type of receipt chain object input should be *)
+  type ('f, 'g) obj_input =
+    < data:
+        (< blocks_user_commands: 'f option
+         ; hash: string option
+         ; receipt_chain_hash: 'g option
+         ; receipt_chain_hashes:
+             < data: 'h array
+             ; on_conflict:
+                 < constraint_:
+                     [< `receipt_chain_hashes_hash_key
+                     | `receipt_chain_hashes_pkey ]
+                 ; update_columns: [< `hash | `parent_id] array >
+                 option
+             ; .. >
+             option
+         ; .. >
+         as
+         'h)
+    ; on_conflict:
+        < constraint_:
+            [< `receipt_chain_hashes_hash_key | `receipt_chain_hashes_pkey]
+        ; update_columns: [< `hash | `parent_id] array >
+        option
+    ; .. >
+    as
+    'g
 
-                    method parent_id = None
+  let encode t : ('f, 'g) obj_input =
+    let open Option in
+    let on_conflict =
+      object
+        method constraint_ = `receipt_chain_hashes_hash_key
 
-                    method receipt_chain_hash = None
+        method update_columns = Array.of_list [`hash]
+      end
+    in
+    let parent =
+      to_obj (some @@ Receipt.Chain_hash.to_string @@ t.parent) None
+    in
+    object
+      method data =
+        to_obj
+          (some @@ Receipt.Chain_hash.to_string @@ t.value)
+          ( some
+          @@ object
+               method data = Array.of_list [parent]
 
-                    method receipt_chain_hashes = None
-                  end
+               method on_conflict = some on_conflict
+             end )
 
-             method on_conflict =
-               some
-               @@ object
-                    method constraint_ = `receipt_chain_hashes_hash_key
-
-                    method update_columns = Array.of_list [`hash]
-                  end
-           end
+      method on_conflict = some on_conflict
     end
 end
 
-(* module Snark_job = struct
-  let encode (snark_job_ids) =
-
-end *)
-
 module Blocks_user_commands = struct
-  let encode user_command_with_hash first_seen =
+  let encode user_command_with_hash first_seen receipt_chain_opt =
     object
       (* TODO: Might have to remove block *)
       method block = None
 
-      method block_id = None
-
       (* TODO: fill in the receipt chain hash *)
-      method receipt_chain_hash = None
-
-      method receipt_chain_hash_id = None
+      method receipt_chain_hash =
+        Option.map receipt_chain_opt ~f:Receipt_chain_hash.encode
 
       method user_command =
         Some
           (User_command.encode_as_insert_input user_command_with_hash
              first_seen)
-
-      method user_command_id = None
     end
 
-  let encode_as_insert_input user_commands_with_hashes_and_time =
+  let encode_as_insert_input user_commands =
     encode_as_insert_input
       ~constraint_name:
         `blocks_user_commands_block_id_user_command_id_receipt_chain_has
       ~updated_columns:[`block_id; `user_command_id; `receipt_chain_hash_id]
       ( Array.of_list
-      @@ List.map user_commands_with_hashes_and_time
-           ~f:(fun (user_command_with_hash, first_seen) ->
-             encode user_command_with_hash first_seen ) )
+      @@ List.map user_commands
+           ~f:(fun (user_command_with_hash, first_seen, receipt_chain) ->
+             encode user_command_with_hash first_seen receipt_chain ) )
 end
-
-let create_blocks_user_commands user_commands_with_hashes_and_time =
-  let open Option in
-  Array.of_list
-  @@ List.map user_commands_with_hashes_and_time
-       ~f:(fun (user_command_with_hash, first_seen) ->
-         object
-           (* TODO: Might have to remove block *)
-           method block = None
-
-           method block_id = None
-
-           (* TODO: fill in the receipt chain hash *)
-           method receipt_chain_hash = None
-
-           method receipt_chain_hash_id = None
-
-           method user_command =
-             some
-             @@ User_command.encode_as_insert_input user_command_with_hash
-                  first_seen
-
-           method user_command_id = None
-         end )
 
 module Blocks = struct
   let serialize
       (With_hash.{hash; data= external_transition} :
         (External_transition.t, State_hash.t) With_hash.t)
-      (user_commands_with_hashes_and_time :
+      (user_commands :
         ( (Coda_base.User_command.t, Transaction_hash.t) With_hash.t
-        * Coda_base.Block_time.t option )
+        * Coda_base.Block_time.t option
+        * Receipt_chain_hash.t option )
         list) =
     let blockchain_state =
       External_transition.blockchain_state external_transition
@@ -456,12 +445,6 @@ module Blocks = struct
     let global_slot =
       Consensus.Data.Consensus_state.global_slot consensus_state
     in
-    (* let staged_ledger_diff = External_transition.staged_ledger_diff external_transition in
-    let snark_jobs =
-        List.map
-          (Staged_ledger_diff.completed_works staged_ledger_diff)
-          ~f:Transaction_snark_work.info
-    in *)
     let open Option in
     object
       method state_hash = some @@ State_hash.to_base58_check hash
@@ -499,10 +482,7 @@ module Blocks = struct
 
       method blocks_snark_jobs = None
 
-      (* some @@ User_command.encode_as_insert_input user_commands *)
       method blocks_user_commands =
-        some
-        @@ Blocks_user_commands.encode_as_insert_input
-             user_commands_with_hashes_and_time
+        some @@ Blocks_user_commands.encode_as_insert_input user_commands
     end
 end

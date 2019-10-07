@@ -59,13 +59,56 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
     let%map _result = Client.query_or_error graphql port in
     ()
 
+  let compute_with_receipt_chains
+      (user_commands :
+        ((User_command.t, Transaction_hash.t) With_hash.t * Block_time.t option)
+        list)
+      (sender_receipt_chains_from_parent_ledger :
+        Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
+    (* The user commands should be sorted by nonces  *)
+    let sorted_user_commands =
+      List.sort user_commands
+        ~compare:
+          (Comparable.lift Account.Nonce.compare
+             ~f:(fun ({With_hash.data= user_command; _}, _) ->
+               User_command.nonce user_command ))
+    in
+    List.folding_map sorted_user_commands
+      ~init:sender_receipt_chains_from_parent_ledger
+      ~f:(fun acc_sender_receipt_chains
+         ( ({With_hash.data= user_command; _} as user_command_with_hash)
+         , block_time )
+         ->
+        let user_command_payload = User_command.payload user_command in
+        let sender = User_command.sender user_command in
+        let udpated_sender_receipt_chain, new_receipt_chain =
+          Option.value_map ~default:(acc_sender_receipt_chains, None)
+            (Map.find acc_sender_receipt_chains sender)
+            ~f:(fun previous_receipt_chain ->
+              let new_receipt_chain =
+                Receipt.Chain_hash.cons user_command_payload
+                  previous_receipt_chain
+              in
+              let updated_receipt_chain_hash =
+                Map.set acc_sender_receipt_chains ~key:sender
+                  ~data:new_receipt_chain
+              in
+              let receipt_chain_input =
+                Types.
+                  { Receipt_chain_hash.value= new_receipt_chain
+                  ; parent= previous_receipt_chain }
+              in
+              (updated_receipt_chain_hash, Some receipt_chain_input) )
+        in
+        ( udpated_sender_receipt_chain
+        , (user_command_with_hash, block_time, new_receipt_chain) ) )
+
   let added_transition {port}
       ({With_hash.data= block; _} as block_with_hash :
         (External_transition.t, State_hash.t) With_hash.t)
-      (* (_sender_receipt_chains_from_parent_ledger :
-        Receipt.Chain_hash.t Public_key.Compressed.Map.t)  *)
-      =
-    let open Deferred.Or_error.Let_syntax in
+      (sender_receipt_chains_from_parent_ledger :
+        Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
+    let open Deferred.Result.Let_syntax in
     let transactions =
       List.bind (External_transition.transactions block) ~f:(function
         | User_command checked_user_command ->
@@ -124,25 +167,32 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
               ~f:Option.some ) )
     in
     let encoded_block =
-      Types.Blocks.serialize block_with_hash user_commands_with_time
+      Types.Blocks.serialize block_with_hash
+        (compute_with_receipt_chains user_commands_with_time
+           sender_receipt_chains_from_parent_ledger)
     in
-    (* Array.of_list [encoded_block] *)
     let graphql =
       Graphql_query.Blocks.Insert.make
         ~blocks:(Array.of_list [encoded_block])
         ()
     in
     let%bind _ = Client.query_or_error graphql port in
-    Deferred.Or_error.return ()
+    Deferred.Result.return ()
 
   let create port = {port}
 
   let run t reader =
     Strict_pipe.Reader.iter reader ~f:(function
       | Diff.Transition_frontier
-          (Breadcrumb_added
-            {block; sender_receipt_chains_from_parent_ledger= _}) ->
-          Deferred.Or_error.ok_exn (added_transition t block)
+          (Breadcrumb_added {block; sender_receipt_chains_from_parent_ledger})
+        -> (
+          match%bind
+            added_transition t block sender_receipt_chains_from_parent_ledger
+          with
+          | Error e ->
+              Graphql_client_lib.Connection_error.ok_exn e
+          | Ok () ->
+              Deferred.return () )
       | Diff.Transition_frontier _ ->
           (* TODO: Implement *)
           Deferred.return ()
@@ -170,7 +220,7 @@ let%test_module "Processor" =
           ~with_:{|"constraint"|}
     end)
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
 
     let t = {Processor.port= 9000}
 
@@ -315,4 +365,73 @@ let%test_module "Processor" =
         Stubs.create_root_frontier ~logger ~pids:(Pid.Hash_set.of_list []) Genesis_ledger.accounts in
       let root_breadcrumb = Transition_frontier.root frontier in
       Deferred.unit *)
+    open Stubs
+
+    let pids = Child_processes.Termination.create_pid_set ()
+
+    let trust_system = Trust_system.null ()
+
+    let create_added_breadcrumb_diff breadcrumb =
+      let ((block, _) as validated_block) =
+        Transition_frontier.Breadcrumb.validated_transition breadcrumb
+      in
+      let user_commands =
+        External_transition.Validated.user_commands validated_block
+      in
+      let sender_receipt_chains_from_parent_ledger =
+        let user_commands = User_command.Set.of_list user_commands in
+        let senders =
+          Public_key.Compressed.Set.map user_commands ~f:User_command.sender
+        in
+        let ledger =
+          Staged_ledger.ledger
+          @@ Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+        in
+        Set.to_map senders ~f:(fun sender ->
+            Option.value_exn
+              (let open Option.Let_syntax in
+              let%bind ledger_location =
+                Ledger.location_of_key ledger sender
+              in
+              let%map {receipt_chain_hash; _} =
+                Ledger.get ledger ledger_location
+              in
+              receipt_chain_hash) )
+      in
+      Diff.Transition_frontier.Breadcrumb_added
+        {block; sender_receipt_chains_from_parent_ledger}
+
+    let%test_unit "Processing an external transition diff" =
+      Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let%bind frontier =
+        Stubs.create_root_frontier ~logger ~pids Genesis_ledger.accounts
+      in
+      let root_breadcrumb = Transition_frontier.root frontier in
+      let%bind () =
+        Stubs.add_linear_breadcrumbs ~logger ~pids ~trust_system ~size:1
+          ~accounts_with_secret_keys:Genesis_ledger.accounts ~frontier
+          ~parent:root_breadcrumb
+      in
+      let successors =
+        Transition_frontier.successors_rec frontier root_breadcrumb
+      in
+      try_with ~f:(fun () ->
+          let reader, writer =
+            Strict_pipe.create ~name:"archive"
+              (Buffered (`Capacity 10, `Overflow Crash))
+          in
+          let processing_deferred_job = Processor.run t reader in
+          let diffs =
+            List.map
+              ~f:(fun breadcrumb ->
+                Diff.Transition_frontier
+                  (create_added_breadcrumb_diff breadcrumb) )
+              (root_breadcrumb :: successors)
+          in
+          List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
+          Strict_pipe.Writer.close writer ;
+          processing_deferred_job )
   end )
