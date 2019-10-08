@@ -4,7 +4,7 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      (* TODO: there's no Time.Stable.Vn, how to version this? *)
+      (* there's no Time.Stable.Vn, assert version and test for changes in serialization *)
       type t = Unbanned | Banned_until of Time.t
       [@@deriving bin_io, version {asserted}]
     end
@@ -33,7 +33,7 @@ module Stable = struct
   module Latest = V1
 
   module Module_decl = struct
-    let name = "coda_base_proof"
+    let name = "banned_status"
 
     type latest = Latest.t
   end
@@ -42,7 +42,17 @@ module Stable = struct
   module Registered_V1 = Registrar.Register (V1)
 
   module For_tests = struct
-    (* TODO *)
+    (* if this test fails, it means the type has changed; in that case, create a new version for the type,
+       and a new serialization test for the new version; delete the old version and its test
+     *)
+
+    let%test "banned status serialization v1" =
+      let tm = Time.of_string "2019-10-08 17:51:23.050849Z" in
+      let status = V1.Banned_until tm in
+      let known_good_hash =
+        "\x52\x14\x64\x6A\xB0\x37\x7A\x62\x8D\x28\x6A\x3F\x02\xB8\xE8\xDE\x24\x5B\xED\xBA\x74\x72\xF0\xD3\xFE\x59\x09\x18\xCC\x8C\x0E\x31"
+      in
+      Serialization.check_serialization (module V1) status known_good_hash
   end
 end
 
