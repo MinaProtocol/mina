@@ -38,7 +38,7 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~children, ~onClick=?, ~kind=Blue) =>
+let make = (~children, ~onClick=?, ~kind=Blue, ~href=?) =>
   <a
     className={
       switch (kind) {
@@ -47,6 +47,8 @@ let make = (~children, ~onClick=?, ~kind=Blue) =>
       | Grey => Styles.greyLink
       }
     }
-    ?onClick>
+    ?onClick
+    ?href
+    target="_blank">
     children
   </a>;

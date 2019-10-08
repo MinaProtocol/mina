@@ -12,7 +12,7 @@ module Styles = {
     style([
       transition(~duration=200, "background"),
       background(`url("bg-texture.png")),
-      backgroundColor(`hex("f4f4f4")),
+      backgroundColor(`hex("f2f2f2")),
     ]);
 
   let window =
