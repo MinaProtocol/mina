@@ -106,13 +106,17 @@ let generate_next_state ~previous_protocol_state ~time_controller
     ~(keypair : Keypair.t) ~proposal_data ~scheduled_time =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
+  let previous_protocol_state_body_hash =
+    Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
+  in
   let%bind res =
     Interruptible.uninterruptible
       (let open Deferred.Let_syntax in
       let diff =
         measure "create_diff" (fun () ->
             Staged_ledger.create_diff staged_ledger ~self ~logger
-              ~transactions_by_fee:transactions ~get_completed_work )
+              ~transactions_by_fee:transactions ~get_completed_work
+              ~state_body_hash:previous_protocol_state_body_hash )
       in
       match%map Staged_ledger.apply_diff_unchecked staged_ledger diff with
       | Ok
@@ -218,7 +222,9 @@ let generate_next_state ~previous_protocol_state ~time_controller
                   ~blockchain_state:
                     (Protocol_state.blockchain_state protocol_state)
                   ~consensus_transition:consensus_transition_data
-                  ~proposer:self ~coinbase:coinbase_amount ()
+                  ~proposer:self ~coinbase_amount
+                  ~coinbase_state_body_hash:previous_protocol_state_body_hash
+                  ()
               in
               let internal_transition =
                 Internal_transition.create ~snark_transition

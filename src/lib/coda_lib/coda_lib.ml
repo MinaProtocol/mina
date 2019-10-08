@@ -515,7 +515,7 @@ let create_genesis_frontier (config : Config.t) ~verifier =
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
     ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
-    }
+    ; state_body_hash= State_body_hash.dummy }
   in
   let genesis_protocol_state =
     With_hash.data (Lazy.force Genesis_protocol_state.t)

@@ -783,7 +783,7 @@ let%test_module _ =
             in
             let modified_payload : User_command.Payload.t =
               match cmd.payload.body with
-              | Payment {receiver; _} ->
+              | Payment {receiver; amount= _amount_unused} ->
                   { common=
                       {cmd.payload.common with fee= Currency.Amount.to_fee fee}
                   ; body= User_command.Payload.Body.Payment {receiver; amount}
