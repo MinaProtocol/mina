@@ -46,6 +46,9 @@ struct
           match%bind
             Staged_ledger_validation.validate_staged_ledger_diff ~logger
               ~verifier ~parent_staged_ledger:parent.staged_ledger
+              ~parent_protocol_state:
+                (External_transition.Validated.protocol_state
+                   parent.validated_transition)
               transition_with_validation
           with
           | Ok
@@ -65,7 +68,9 @@ struct
                     | `Incorrect_target_staged_ledger_hash ->
                         "staged ledger hash"
                     | `Incorrect_target_snarked_ledger_hash ->
-                        "snarked ledger hash" ))
+                        "snarked ledger hash"
+                    | `Incorrect_staged_ledger_diff_state_body_hash ->
+                        "state body hash" ))
               in
               let message =
                 "invalid staged ledger diff: incorrect " ^ reasons

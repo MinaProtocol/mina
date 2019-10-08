@@ -50,6 +50,11 @@ let vrf_output = create "CodaVrfOutput"
 
 let pending_coinbases = create "PendingCoinbases"
 
+let coinbase_stack_data = create "CoinbaseStackData"
+
+(* length is limited, so we drop some characters here *)
+let coinbase_stack_state_hash = create "CoinbaseStackStaHash"
+
 let coinbase_stack = create "CoinbaseStack"
 
 let coinbase = create "Coinbase"

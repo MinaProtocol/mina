@@ -31,11 +31,12 @@ module type S = sig
   end
 
   module Coinbase_data : sig
-    type t = Public_key.Compressed.t * Amount.t [@@deriving bin_io, sexp]
+    type t = Public_key.Compressed.t * Amount.t * State_body_hash.t
+    [@@deriving bin_io, sexp]
 
     type value [@@deriving bin_io, sexp]
 
-    type var = Public_key.Compressed.var * Amount.var
+    type var = Public_key.Compressed.var * Amount.var * State_body_hash.var
 
     val typ : (var, t) Typ.t
 
@@ -92,13 +93,48 @@ module type S = sig
   end
 
   and Stack : sig
-    include Data_hash_binable_intf
+    type t [@@deriving yojson, sexp, eq]
+
+    module Stable : sig
+      module V1 : sig
+        type nonrec t = t
+        [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
+      end
+
+      module Latest = V1
+    end
+
+    type var
 
     val data_hash : t -> Hash.t
 
-    val push : t -> Coinbase.t -> t
+    val var_of_t : t -> var
+
+    val typ : (var, t) Typ.t
+
+    val gen : t Quickcheck.Generator.t
+
+    val fold : t -> bool Triple.t Fold.t
+
+    val to_bits : t -> bool list
+
+    val length_in_bits : int
+
+    val to_bytes : t -> string
+
+    val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
+
+    val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
+
+    val length_in_triples : int
 
     val empty : t
+
+    val equal_data : t -> t -> bool
+
+    val equal_state_hash : t -> t -> bool
+
+    val push : t -> Coinbase.t -> t
 
     module Checked : sig
       type t = var
@@ -140,17 +176,28 @@ module type S = sig
       val typ : (var, value) Typ.t
     end
 
+    module Newest_stack_info : sig
+      (* address of stack; pending coinbase previous state hash; is new stack *)
+      type t = Address.value * State_hash.t * bool
+
+      type value = t
+
+      type var = Address.var * State_hash.var * Boolean.var
+
+      val typ : (var, value) Typ.t
+    end
+
     type _ Request.t +=
       | Coinbase_stack_path : Address.value -> path Request.t
       | Get_coinbase_stack : Address.value -> (Stack.t * path) Request.t
       | Set_coinbase_stack : Address.value * Stack.t -> unit Request.t
-      | Find_index_of_newest_stack : Address.value Request.t
+      | Find_index_of_newest_stack : Newest_stack_info.t Request.t
       | Find_index_of_oldest_stack : Address.value Request.t
 
     val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
     (**
-       [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
+       [update_stack t ~is_new_stack updated_stack] implements the following spec:
        - gets the address[addr] of the latest stack or a new stack
        - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
        - returns a root [t'] of the tree
