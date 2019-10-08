@@ -32,7 +32,7 @@ end
 module type Resource_pool_diff_intf = sig
   type pool
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, to_yojson]
 
   val summary : t -> string
 
@@ -45,6 +45,17 @@ module type Resource_pool_intf = sig
   include Resource_pool_base_intf
 
   module Diff : Resource_pool_diff_intf with type pool := t
+
+  (** Locally generated items (user commands and snarks) should be periodically
+      rebroadcast, to ensure network unreliability doesn't mean they're never
+      included in a block. This function gets the locally generated items that
+      are currently rebroadcastable. [is_expired] is a function that returns
+      true if an item that was added at a given time should not be rebroadcast
+      anymore. If it does, the implementation should not return that item, and
+      remove it from the set of potentially-rebroadcastable item.
+  *)
+  val get_rebroadcastable :
+    t -> is_expired:(Time.t -> [`Expired | `Ok]) -> Diff.t list
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -113,11 +124,12 @@ module type Snark_resource_pool_intf = sig
   val of_serializable : serializable -> config:Config.t -> logger:Logger.t -> t
 
   val add_snark :
-       t
+       ?is_local:bool
+    -> t
     -> work:work
     -> proof:ledger_proof One_or_two.t
     -> fee:Fee_with_prover.t
-    -> [`Rebroadcast | `Don't_rebroadcast]
+    -> [`Added | `Statement_not_referenced]
 
   val verify_and_act :
        t
@@ -131,6 +143,8 @@ module type Snark_resource_pool_intf = sig
   val snark_pool_json : t -> Yojson.Safe.json
 
   val all_completed_work : t -> work_info list
+
+  val get_logger : t -> Logger.t
 end
 
 (** A [Snark_pool_diff_intf] is the resource pool diff for
@@ -147,13 +161,13 @@ module type Snark_pool_diff_intf = sig
       type t =
         | Add_solved_work of
             work * ledger_proof One_or_two.Stable.V1.t Priced_proof.Stable.V1.t
-      [@@deriving sexp, to_yojson, bin_io, version]
+      [@@deriving bin_io, compare, sexp, to_yojson, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+  type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson]
 
   val summary : t -> string
 

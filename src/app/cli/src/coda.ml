@@ -360,17 +360,55 @@ let daemon logger =
        in
        don't_wait_for
          (let bytes_per_word = Sys.word_size / 8 in
-          let rec loop () =
+          (* Curve points are allocated in C++ and deallocated with finalizers.
+             The points on the C++ heap are much bigger than the OCaml heap
+             objects that point to them, which makes the GC underestimate how
+             much memory has been allocated since the last collection and not
+             run major GCs often enough, which means the finalizers don't run
+             and we use way too much memory. As a band-aid solution, we run a
+             major GC cycle every ten minutes.
+          *)
+          let gc_method =
+            Option.value ~default:"full" @@ Unix.getenv "CODA_GC_HACK_MODE"
+          in
+          (* Doing Gc.major is known to work, but takes quite a bit of time.
+             Running a single slice might be sufficient, but I haven't tested it
+             and the documentation isn't super clear. *)
+          let gc_fun =
+            match gc_method with
+            | "full" ->
+                Gc.major
+            | "slice" ->
+                fun () -> ignore (Gc.major_slice 0)
+            | other ->
+                failwithf
+                  "CODA_GC_HACK_MODE was %s, it should be full or slice. \
+                   Default is full."
+                  other
+          in
+          let interval =
+            Time.Span.of_sec
+            @@ Option.(
+                 value ~default:600.
+                   ( map ~f:Float.of_string
+                   @@ Unix.getenv "CODA_GC_HACK_INTERVAL" ))
+          in
+          let log_stats suffix =
             let stat = Gc.stat () in
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "OCaml memory statistics"
+              "OCaml memory statistics, %s" suffix
               ~metadata:
                 [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
                 ; ("heap_chunks", `Int stat.heap_chunks)
                 ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
                 ; ("live_size", `Int (stat.live_words * bytes_per_word))
-                ; ("live_blocks", `Int stat.live_blocks) ] ;
-            let%bind () = after @@ Time.Span.of_min 10. in
+                ; ("live_blocks", `Int stat.live_blocks) ]
+          in
+          let rec loop () =
+            log_stats "before major gc" ;
+            gc_fun () ;
+            log_stats "after major gc" ;
+            let%bind () = after interval in
             loop ()
           in
           loop ()) ;
@@ -645,7 +683,7 @@ let daemon logger =
              external_transition_database_dir
          in
          (* log terminated child processes *)
-         let pids = Child_processes.Termination.create_pid_set () in
+         let pids = Child_processes.Termination.create_pid_table () in
          let rec terminated_child_loop () =
            match
              try Unix.wait_nohang `Any
@@ -831,21 +869,14 @@ let internal_commands =
   ; ("snark-hashes", snark_hashes) ]
 
 let coda_commands logger =
-  [ ("daemon", daemon logger)
+  [ ("accounts", Client.accounts)
+  ; ("daemon", daemon logger)
   ; ("client", Client.command)
+  ; ("client2", Client.client)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
-
-[%%if
-new_cli]
-
-let coda_commands logger =
-  ("accounts", Client.accounts)
-  :: ("client2", Client.client) :: coda_commands logger
-
-[%%endif]
 
 [%%if
 integration_tests]

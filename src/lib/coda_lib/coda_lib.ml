@@ -100,22 +100,33 @@ module Snark_worker = struct
                ~shutdown_on_disconnect:false )
     in
     don't_wait_for
-      ( match%bind Process.wait snark_worker_process with
-      | Ok () ->
-          Logger.info logger "Snark worker process died" ~module_:__MODULE__
-            ~location:__LOC__ ;
-          Ivar.fill kill_ivar () ;
-          Deferred.unit
-      | Error (`Exit_non_zero non_zero_error) ->
-          Logger.fatal logger
-            !"Snark worker process died with a nonzero error %i"
-            non_zero_error ~module_:__MODULE__ ~location:__LOC__ ;
-          raise (Snark_worker_error non_zero_error)
-      | Error (`Signal signal) ->
+      ( match%bind
+          Monitor.try_with (fun () -> Process.wait snark_worker_process)
+        with
+      | Ok signal_or_error -> (
+        match signal_or_error with
+        | Ok () ->
+            Logger.info logger "Snark worker process died" ~module_:__MODULE__
+              ~location:__LOC__ ;
+            Ivar.fill kill_ivar () ;
+            Deferred.unit
+        | Error (`Exit_non_zero non_zero_error) ->
+            Logger.fatal logger
+              !"Snark worker process died with a nonzero error %i"
+              non_zero_error ~module_:__MODULE__ ~location:__LOC__ ;
+            raise (Snark_worker_error non_zero_error)
+        | Error (`Signal signal) ->
+            Logger.info logger
+              !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
+              signal ~module_:__MODULE__ ~location:__LOC__ ;
+            raise (Snark_worker_signal_interrupt signal) )
+      | Error exn ->
           Logger.info logger
-            !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
-            signal ~module_:__MODULE__ ~location:__LOC__ ;
-          raise (Snark_worker_signal_interrupt signal) ) ;
+            !"Exception when waiting for snark worker process to terminate: \
+              $exn"
+            ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("exn", `String (Exn.to_string exn))] ;
+          Deferred.unit ) ;
     Logger.trace logger
       !"Created snark worker with pid: %i"
       ~module_:__MODULE__ ~location:__LOC__
@@ -504,7 +515,7 @@ let create_genesis_frontier (config : Config.t) ~verifier =
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
     ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
-    }
+    ; state_body_hash= State_body_hash.dummy }
   in
   let genesis_protocol_state =
     With_hash.data (Lazy.force Genesis_protocol_state.t)

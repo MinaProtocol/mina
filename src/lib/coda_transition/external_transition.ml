@@ -715,6 +715,7 @@ module Staged_ledger_validation = struct
       -> logger:Logger.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
+      -> parent_protocol_state:Protocol_state.value
       -> ( [`Just_emitted_a_proof of bool]
            * [ `External_transition_with_validation of
                ( 'time_received
@@ -726,18 +727,26 @@ module Staged_ledger_validation = struct
            * [`Staged_ledger of Staged_ledger.t]
          , [ `Invalid_staged_ledger_diff of
              [ `Incorrect_target_staged_ledger_hash
-             | `Incorrect_target_snarked_ledger_hash ]
+             | `Incorrect_target_snarked_ledger_hash
+             | `Incorrect_staged_ledger_diff_state_body_hash ]
              list
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~verifier ~parent_staged_ledger ->
+   fun (t, validation) ~logger ~verifier ~parent_staged_ledger
+       ~parent_protocol_state ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
     let blockchain_state =
       Protocol_state.blockchain_state (protocol_state transition)
     in
     let staged_ledger_diff = staged_ledger_diff transition in
+    let diff_state_body_hash =
+      Staged_ledger_diff.state_body_hash staged_ledger_diff
+    in
+    let parent_state_body_hash =
+      Protocol_state.(Body.hash @@ body parent_protocol_state)
+    in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
@@ -770,7 +779,10 @@ module Staged_ledger_validation = struct
             (not
                (Frozen_ledger_hash.equal target_ledger_hash
                   (Blockchain_state.snarked_ledger_hash blockchain_state)))
-            `Incorrect_target_snarked_ledger_hash ]
+            `Incorrect_target_snarked_ledger_hash
+        ; Option.some_if
+            (State_body_hash.equal diff_state_body_hash parent_state_body_hash)
+            `Incorrect_staged_ledger_diff_state_body_hash ]
     in
     Deferred.return
       ( match maybe_errors with

@@ -194,7 +194,9 @@ module Stable = struct
   module V1 = struct
     module T = struct
       type t =
-        {diff: Diff.Stable.V1.t; creator: Public_key.Compressed.Stable.V1.t}
+        { diff: Diff.Stable.V1.t
+        ; creator: Public_key.Compressed.Stable.V1.t
+        ; state_body_hash: State_body_hash.Stable.V1.t }
       [@@deriving sexp, to_yojson, bin_io, version]
     end
 
@@ -215,7 +217,9 @@ module Stable = struct
 end
 
 type t = Stable.Latest.t =
-  {diff: Diff.Stable.V1.t; creator: Public_key.Compressed.Stable.V1.t}
+  { diff: Diff.Stable.V1.t
+  ; creator: Public_key.Compressed.Stable.V1.t
+  ; state_body_hash: State_body_hash.Stable.V1.t }
 [@@deriving sexp, to_yojson, fields]
 
 module With_valid_signatures_and_proofs = struct
@@ -236,7 +240,10 @@ module With_valid_signatures_and_proofs = struct
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t = {diff: diff; creator: Public_key.Compressed.t}
+  type t =
+    { diff: diff
+    ; creator: Public_key.Compressed.t
+    ; state_body_hash: State_body_hash.t }
   [@@deriving sexp, to_yojson]
 
   let user_commands t =
@@ -264,7 +271,10 @@ module With_valid_signatures = struct
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t = {diff: diff; creator: Public_key.Compressed.t}
+  type t =
+    { diff: diff
+    ; creator: Public_key.Compressed.t
+    ; state_body_hash: State_body_hash.t }
   [@@deriving sexp, to_yojson]
 end
 
@@ -301,7 +311,8 @@ let validate_user_commands (t : t)
           ; user_commands
           ; coinbase= d2.coinbase } )
   in
-  ({creator= t.creator; diff= (p1, p2)} : With_valid_signatures.t)
+  ( {creator= t.creator; diff= (p1, p2); state_body_hash= t.state_body_hash}
+    : With_valid_signatures.t )
 
 let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
     With_valid_signatures.t =
@@ -318,7 +329,7 @@ let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
           ; coinbase= d2.coinbase }
           : With_valid_signatures.pre_diff_with_at_most_one_coinbase ) )
   in
-  {creator= d.creator; diff= (p1, p2)}
+  {creator= d.creator; diff= (p1, p2); state_body_hash= d.state_body_hash}
 
 let forget_pre_diff_with_at_most_two
     (pre_diff :
@@ -339,7 +350,8 @@ let forget (t : With_valid_signatures_and_proofs.t) =
   { diff=
       ( forget_pre_diff_with_at_most_two (fst t.diff)
       , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one )
-  ; creator= t.creator }
+  ; creator= t.creator
+  ; state_body_hash= t.state_body_hash }
 
 let user_commands (t : t) =
   (fst t.diff).user_commands

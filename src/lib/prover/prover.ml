@@ -270,9 +270,13 @@ let create ~logger ~pids =
       ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:() ()
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Daemon started prover process with pid $prover_pid"
-    ~metadata:[("prover_pid", `Int (Process.pid process |> Pid.to_int))] ;
-  Child_processes.Termination.register_process pids process ;
+    "Daemon started process of kind $process_kind with pid $prover_pid"
+    ~metadata:
+      [ ("prover_pid", `Int (Process.pid process |> Pid.to_int))
+      ; ( "process_kind"
+        , `String Child_processes.Termination.(show_process_kind Prover) ) ] ;
+  Child_processes.Termination.register_process pids process
+    Child_processes.Termination.Prover ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stdout process |> Reader.pipe)
