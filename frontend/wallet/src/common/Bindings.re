@@ -137,18 +137,18 @@ module ChildProcess = {
   let pipe = makeIOTriple(`Pipe, `Pipe, `Pipe);
   let ignore = makeIOTriple(`Ignore, `Ignore, `Ignore);
 
+  [@bs.deriving abstract]
+  type spawnOptions = {
+    [@bs.optional]
+    env: Js.Dict.t(string),
+    [@bs.optional]
+    shell: string,
+    [@bs.optional]
+    stdio: (io, io, io),
+  };
+
   [@bs.val] [@bs.module "child_process"]
-  external spawn:
-    (
-      string,
-      array(string),
-      {
-        .
-        "env": Js.Dict.t(string),
-        "stdio": (io, io, io),
-      }
-    ) =>
-    Process.t =
+  external spawn: (string, array(string), spawnOptions) => Process.t =
     "spawn";
 
   [@bs.val] [@bs.module "child_process"]
@@ -192,6 +192,7 @@ module LocalStorage = {
       ~key: [@bs.string] [
               | [@bs.as "network"] `Network
               | [@bs.as "addressbook"] `AddressBook
+              | [@bs.as "onboarding"] `Onboarding
             ],
       ~value: string
     ) =>
@@ -202,7 +203,11 @@ module LocalStorage = {
   external getItem:
     (
     [@bs.string]
-    [ | [@bs.as "network"] `Network | [@bs.as "addressbook"] `AddressBook]
+    [
+      | [@bs.as "network"] `Network
+      | [@bs.as "addressbook"] `AddressBook
+      | [@bs.as "onboarding"] `Onboarding
+    ]
     ) =>
     Js.nullable(string) =
     "";

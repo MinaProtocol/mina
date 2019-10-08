@@ -5,7 +5,7 @@ open Core_kernel
 open Coda_base
 open Module_version
 
-module type S = Coda_intf.Ledger_proof_intf
+module type S = Ledger_proof_intf.S
 
 let to_signed_amount signed_fee =
   let magnitude =
@@ -13,12 +13,12 @@ let to_signed_amount signed_fee =
   and sgn = Currency.Fee.Signed.sgn signed_fee in
   Currency.Amount.Signed.create ~magnitude ~sgn
 
-module Prod : S with type t = Transaction_snark.t = struct
+module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
   module Stable = struct
     module V1 = struct
       module T = struct
         type t = Transaction_snark.Stable.V1.t
-        [@@deriving bin_io, sexp, yojson, version]
+        [@@deriving bin_io, compare, sexp, version, yojson]
       end
 
       include T
@@ -39,9 +39,9 @@ module Prod : S with type t = Transaction_snark.t = struct
 
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
-  let sok_digest = Transaction_snark.sok_digest
+  let statement (t : t) = Transaction_snark.statement t
 
-  let statement = Transaction_snark.statement
+  let sok_digest = Transaction_snark.sok_digest
 
   let statement_target (t : Transaction_snark.Statement.t) = t.target
 
@@ -61,7 +61,7 @@ module Prod : S with type t = Transaction_snark.t = struct
 end
 
 module Debug :
-  S
+  Ledger_proof_intf.S
   with type t = Transaction_snark.Statement.t * Sok_message.Digest.Stable.V1.t =
 struct
   module Stable = struct
@@ -70,7 +70,7 @@ struct
         type t =
           Transaction_snark.Statement.Stable.V1.t
           * Sok_message.Digest.Stable.V1.t
-        [@@deriving sexp, bin_io, yojson, version]
+        [@@deriving bin_io, compare, hash, sexp, version, yojson]
       end
 
       include T
@@ -91,9 +91,9 @@ struct
 
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
-  let underlying_proof (_ : t) = Proof.dummy
-
   let statement ((t, _) : t) : Transaction_snark.Statement.t = t
+
+  let underlying_proof (_ : t) = Proof.dummy
 
   let statement_target (t : Transaction_snark.Statement.t) = t.target
 
@@ -114,3 +114,8 @@ include Prod
 include Debug
 
 [%%endif]
+
+module For_tests = struct
+  let mk_dummy_proof statement =
+    create ~statement ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
+end

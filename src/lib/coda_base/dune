@@ -8,6 +8,7 @@
     outside_pedersen_image
     linked_tree
     hash_prefixes
+    hash_prefix_states
     syncable_ledger
     base58_check
     fold_lib
@@ -41,7 +42,8 @@
     visualization
     coda_compile_config
     quickcheck_lib
-    sexp_diff_kernel)
+    sexp_diff_kernel
+    )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_snarky ppx_coda ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord

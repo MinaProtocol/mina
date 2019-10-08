@@ -342,11 +342,17 @@ let revalidate :
             , Sequence.append dropped_acc to_drop ) )
 
 let handle_committed_txn :
-    t -> Public_key.Compressed.t -> Account_nonce.t -> Currency.Amount.t -> t =
- fun t sender nonce_to_remove current_balance ->
+       t
+    -> User_command.With_valid_signature.t
+    -> Currency.Amount.t
+    -> t * User_command.With_valid_signature.t Sequence.t =
+ fun t committed current_balance ->
+  let committed' = (committed :> User_command.t) in
+  let sender = User_command.sender committed' in
+  let nonce_to_remove = User_command.nonce committed' in
   match Map.find t.all_by_sender sender with
   | None ->
-      t
+      (t, Sequence.empty)
   | Some (cmds, currency_reserved) ->
       let first_cmd, rest_cmds = Option.value_exn (F_sequence.uncons cmds) in
       let first_nonce =
@@ -363,7 +369,7 @@ let handle_committed_txn :
         in
         let currency_reserved' =
           (* safe since the sum reserved must be >= reserved by any individual
-           command *)
+             command *)
           Option.value_exn
             Currency.Amount.(currency_reserved - first_cmd_consumed)
         in
@@ -380,23 +386,28 @@ let handle_committed_txn :
         let t'' =
           Sequence.fold dropped_cmds ~init:t' ~f:remove_all_by_fee_exn
         in
-        { t'' with
-          all_by_sender=
-            ( if F_sequence.is_empty new_queued_cmds then
-              Map.remove t.all_by_sender sender
-            else
-              Map.set t.all_by_sender ~key:sender
-                ~data:(new_queued_cmds, currency_reserved'') )
-        ; applicable_by_fee=
-            ( match F_sequence.uncons new_queued_cmds with
-            | None ->
-                t''.applicable_by_fee
-            | Some (head_cmd, _) ->
-                Map_set.insert
-                  (module User_command.With_valid_signature)
+        ( { t'' with
+            all_by_sender=
+              ( if F_sequence.is_empty new_queued_cmds then
+                Map.remove t.all_by_sender sender
+              else
+                Map.set t.all_by_sender ~key:sender
+                  ~data:(new_queued_cmds, currency_reserved'') )
+          ; applicable_by_fee=
+              ( match F_sequence.uncons new_queued_cmds with
+              | None ->
                   t''.applicable_by_fee
-                  (head_cmd |> User_command.forget_check |> User_command.fee)
-                  head_cmd ) }
+              | Some (head_cmd, _) ->
+                  Map_set.insert
+                    (module User_command.With_valid_signature)
+                    t''.applicable_by_fee
+                    (head_cmd |> User_command.forget_check |> User_command.fee)
+                    head_cmd ) }
+        , Sequence.append
+            ( if User_command.With_valid_signature.equal committed first_cmd
+            then Sequence.empty
+            else Sequence.singleton first_cmd )
+            dropped_cmds )
 
 let remove_lowest_fee : t -> User_command.With_valid_signature.t Sequence.t * t
     =
@@ -639,51 +650,6 @@ let%test_module _ =
       User_command.With_valid_signature.Gen.payment_with_random_participants
         ~keys:test_keys ~max_amount:1000 ~max_fee:10
 
-    module Array_m (M : Monad.S) = struct
-      (** Array.init but parameterized over a monad. *)
-      let init : int -> f:(int -> 'a M.t) -> 'a array M.t =
-       fun n ~f ->
-        let rec go : 'a list -> int -> 'a list M.t =
-         fun xs n' ->
-          if n' > 0 then M.(f n' >>= fun x -> go (x :: xs) (n' - 1))
-          else M.return @@ List.rev xs
-        in
-        M.map (go [] n) ~f:Array.of_list
-    end
-
-    module Generator_array = Array_m (Quickcheck.Generator)
-
-    (* Generate an array with a Dirichlet distribution, used for coming up with
-       random splits of a quantity. Symmetric Dirichlet distribution with alpha
-       = 1.
-    *)
-    let gen_division : int -> float array Quickcheck.Generator.t =
-     fun n ->
-      let open Quickcheck.Generator.Let_syntax in
-      let%map gammas =
-        Generator_array.init n ~f:(fun _ ->
-            let open Quickcheck.Generator.Let_syntax in
-            (* technically this should be (0, 1] and not (0, 1) but I expect it
-               doesn't matter for our purposes. *)
-            let%map uniform = Float.gen_uniform_excl 0. 1. in
-            Float.log uniform )
-      in
-      let sum = Array.fold gammas ~init:0. ~f:(fun x y -> x +. y) in
-      Array.map gammas ~f:(fun gamma -> gamma /. sum)
-
-    let gen_currency_division :
-           int
-        -> Currency.Amount.t
-        -> Currency.Amount.t array Quickcheck.Generator.t =
-     fun n total_currency ->
-      let total_float =
-        Float.of_int @@ Currency.Amount.to_int total_currency
-      in
-      Quickcheck.Generator.map (gen_division n) ~f:(fun prop_array ->
-          Array.map prop_array ~f:(fun proportion ->
-              Currency.Amount.of_int @@ Float.iround_down_exn
-              @@ (proportion *. total_float) ) )
-
     let%test_unit "empty invariants" = assert_invariants empty
 
     let%test_unit "singleton properties" =
@@ -719,104 +685,46 @@ let%test_module _ =
 
     let%test_unit "sequential adds (all valid)" =
       let gen :
-          ( Account_nonce.t list
-          * Currency.Amount.t list
-          * (int * User_command.With_valid_signature.t) list )
+          (Ledger.init_state * User_command.With_valid_signature.t list)
           Quickcheck.Generator.t =
         let open Quickcheck.Generator.Let_syntax in
-        let%bind initial_balances =
-          List.gen_with_length 10
-          @@ Currency.Amount.(gen_incl zero @@ of_int 10_000)
+        let%bind ledger_init = Ledger.gen_initial_ledger_state in
+        let%map cmds =
+          User_command.With_valid_signature.Gen.sequence ledger_init
         in
-        let current_balances = Array.of_list initial_balances in
-        let%bind initial_nonces =
-          Quickcheck.Generator.map ~f:(List.map ~f:Account_nonce.of_int)
-          @@ List.gen_with_length 10 @@ Int.gen_incl 0 100
-        in
-        let current_nonces = Array.of_list initial_nonces in
-        let%bind size = Quickcheck.Generator.size in
-        let rec go n =
-          if n > 0 then (
-            let%bind sender =
-              Quickcheck.Generator.filter ~f:(fun idx ->
-                  current_balances.(idx) > Currency.Amount.of_int 10 )
-              @@ Int.gen_incl 0 9
-            in
-            let%bind fee = Currency.Fee.(gen_incl zero (of_int 10)) in
-            let%bind amount =
-              Currency.Amount.(
-                gen_incl zero
-                  (Option.value_exn (current_balances.(sender) - of_fee fee)))
-            in
-            let nonce = current_nonces.(sender) in
-            current_nonces.(sender)
-            <- Account_nonce.succ current_nonces.(sender) ;
-            current_balances.(sender)
-            <- Option.value_exn
-                 Currency.Amount.(
-                   Option.value_exn (current_balances.(sender) - amount)
-                   - of_fee fee) ;
-            let%bind memo = String.quickcheck_generator in
-            let%bind receiver =
-              Quickcheck.Generator.filter (Int.gen_incl 0 9) ~f:(fun idx ->
-                  idx <> sender )
-            in
-            let receiver_pk =
-              Public_key.compress test_keys.(receiver).public_key
-            in
-            let cmd_payload =
-              User_command.Payload.create ~fee ~nonce
-                ~memo:(User_command_memo.create_by_digesting_string_exn memo)
-                ~body:
-                  (User_command.Payload.Body.Payment
-                     {receiver= receiver_pk; amount})
-            in
-            let cmd =
-              User_command.For_tests.fake_sign test_keys.(sender) cmd_payload
-            in
-            let%bind rest = go (n - 1) in
-            return ((sender, cmd) :: rest) )
-          else return []
-        in
-        let%map cmds = go size in
-        (initial_nonces, initial_balances, cmds)
+        (ledger_init, cmds)
       in
       let shrinker :
-          ( Account_nonce.t list
-          * Currency.Amount.t list
-          * (int * User_command.With_valid_signature.t) list )
+          (Ledger.init_state * User_command.With_valid_signature.t list)
           Quickcheck.Shrinker.t =
-        Quickcheck.Shrinker.create
-          (fun (initial_nonces, initial_balances, cmds) ->
+        Quickcheck.Shrinker.create (fun (init_state, cmds) ->
             Sequence.singleton
-              ( initial_nonces
-              , initial_balances
-              , List.take cmds (List.length cmds - 1) ) )
+              (init_state, List.take cmds (List.length cmds - 1)) )
       in
       Quickcheck.test gen
         ~sexp_of:
           [%sexp_of:
-            Account_nonce.t list
-            * Currency.Amount.t list
-            * (int * User_command.With_valid_signature.t) list] ~shrinker
-        ~shrink_attempts:`Exhaustive ~seed:(`Deterministic "d")
-        ~sizes:(Sequence.repeat 10)
-        ~f:(fun (initial_nonces, initial_balances, cmds) ->
-          let balances = Array.of_list initial_balances in
-          let nonces = Array.of_list initial_nonces in
+            Ledger.init_state * User_command.With_valid_signature.t list]
+        ~shrinker ~shrink_attempts:`Exhaustive ~seed:(`Deterministic "d")
+        ~sizes:(Sequence.repeat 10) ~f:(fun (ledger_init, cmds) ->
+          let account_init_states_seq = Array.to_sequence ledger_init in
+          let balances = Hashtbl.create (module Public_key.Compressed) in
+          let nonces = Hashtbl.create (module Public_key.Compressed) in
+          Sequence.iter account_init_states_seq ~f:(fun (kp, balance, nonce) ->
+              let compressed = Public_key.compress kp.public_key in
+              Hashtbl.add_exn balances ~key:compressed ~data:balance ;
+              Hashtbl.add_exn nonces ~key:compressed ~data:nonce ) ;
           let pool = ref empty in
           let rec go cmds_acc =
             match cmds_acc with
             | [] ->
                 ()
-            | (sender, cmd) :: rest -> (
-                (* sanity check for the generator *)
-                [%test_eq: Public_key.Compressed.t]
-                  (Public_key.compress @@ test_keys.(sender).public_key)
-                  (cmd |> User_command.forget_check |> User_command.sender) ;
+            | cmd :: rest -> (
+                let unchecked = User_command.forget_check cmd in
                 let add_res =
-                  add_from_gossip_exn !pool cmd nonces.(sender)
-                    balances.(sender)
+                  add_from_gossip_exn !pool cmd
+                    (Hashtbl.find_exn nonces (User_command.sender unchecked))
+                    (Hashtbl.find_exn balances (User_command.sender unchecked))
                 in
                 match add_res with
                 | Ok (pool', dropped) ->
@@ -852,7 +760,10 @@ let%test_module _ =
         in
         let init_balance = Currency.Amount.of_int 100_000 in
         let%bind size = Quickcheck.Generator.size in
-        let%bind amounts = gen_currency_division (size + 1) init_balance in
+        let%bind amounts =
+          Quickcheck.Generator.map ~f:Array.of_list
+          @@ Quickcheck_lib.gen_division_currency init_balance (size + 1)
+        in
         let rec go current_nonce current_balance n =
           if n > 0 then
             let%bind cmd =
@@ -872,7 +783,7 @@ let%test_module _ =
             in
             let modified_payload : User_command.Payload.t =
               match cmd.payload.body with
-              | Payment {receiver; _} ->
+              | Payment {receiver; amount= _amount_unused} ->
                   { common=
                       {cmd.payload.common with fee= Currency.Amount.to_fee fee}
                   ; body= User_command.Payload.Body.Payment {receiver; amount}

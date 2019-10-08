@@ -1,51 +1,6 @@
 open Core_kernel
 open Snark_params
-
-type uint64 = Unsigned.uint64
-
-module type S = sig
-  type t [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
-
-  val length_in_bits : int
-
-  include Hashable.S with type t := t
-
-  include Unsigned.S with type t := t
-
-  val to_uint64 : t -> uint64
-
-  val of_uint64 : uint64 -> t
-
-  val ( < ) : t -> t -> bool
-
-  val ( > ) : t -> t -> bool
-
-  val ( = ) : t -> t -> bool
-
-  val ( <= ) : t -> t -> bool
-
-  val ( >= ) : t -> t -> bool
-end
-
-module type F = functor
-  (Unsigned : Unsigned.S)
-  (Signed :sig
-           
-           type t [@@deriving bin_io]
-         end)
-  (M :sig
-      
-      val to_signed : Unsigned.t -> Signed.t
-
-      val of_signed : Signed.t -> Unsigned.t
-
-      val to_uint64 : Unsigned.t -> uint64
-
-      val of_uint64 : uint64 -> Unsigned.t
-
-      val length : int
-    end)
-  -> S with type t = Unsigned.t
+include Intf
 
 module type Unsigned_intf = Unsigned.S
 
@@ -56,10 +11,6 @@ module Extend
       val to_signed : Unsigned.t -> Signed.t
 
       val of_signed : Signed.t -> Unsigned.t
-
-      val to_uint64 : Unsigned.t -> uint64
-
-      val of_uint64 : uint64 -> Unsigned.t
 
       val length : int
     end) : S with type t = Unsigned.t = struct
@@ -99,7 +50,7 @@ module Extend
     we assert versioning here, and use tests to assure the serialization
     doesn't change
   *)
-  let __versioned__ = true
+  let __versioned__ = ()
 
   include (Unsigned : Unsigned_intf with type t := t)
 
@@ -112,10 +63,6 @@ module Extend
     | _ ->
         Error "expected string"
 
-  let to_uint64 = M.to_uint64
-
-  let of_uint64 = M.of_uint64
-
   let ( < ) x y = compare x y < 0
 
   let ( > ) x y = compare x y > 0
@@ -127,35 +74,35 @@ module Extend
   let ( >= ) x y = compare x y >= 0
 end
 
-module UInt64 =
-  Extend (Unsigned.UInt64) (Int64)
-    (struct
-      let length = 64
+module UInt64 = struct
+  include Extend (Unsigned.UInt64) (Int64)
+            (struct
+              let length = 64
 
-      let to_signed = Unsigned.UInt64.to_int64
+              let to_signed = Unsigned.UInt64.to_int64
 
-      let of_signed = Unsigned.UInt64.of_int64
+              let of_signed = Unsigned.UInt64.of_int64
+            end)
 
-      let to_uint64 = Fn.id
+  let to_uint64 : t -> uint64 = Fn.id
 
-      let of_uint64 = Fn.id
-    end)
+  let of_uint64 : uint64 -> t = Fn.id
+end
 
-module UInt32 =
-  Extend (Unsigned.UInt32) (Int32)
-    (struct
-      let length = 32
+module UInt32 = struct
+  include Extend (Unsigned.UInt32) (Int32)
+            (struct
+              let length = 32
 
-      let to_signed = Unsigned.UInt32.to_int32
+              let to_signed = Unsigned.UInt32.to_int32
 
-      let of_signed = Unsigned.UInt32.of_int32
+              let of_signed = Unsigned.UInt32.of_int32
+            end)
 
-      let to_uint64 =
-        Fn.compose Unsigned.UInt64.of_int64 Unsigned.UInt32.to_int64
+  let to_uint32 : t -> uint32 = Fn.id
 
-      let of_uint64 =
-        Fn.compose Unsigned.UInt32.of_int64 Unsigned.UInt64.to_int64
-    end)
+  let of_uint32 : uint32 -> t = Fn.id
+end
 
 (* since we don't have real versioning, check that serialization don't change *)
 let%test_module "Unsigned serializations" =

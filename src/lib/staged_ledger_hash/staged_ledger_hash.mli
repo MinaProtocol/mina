@@ -1,7 +1,5 @@
 open Core
 open Coda_base
-open Fold_lib
-open Tuple_lib
 open Snark_params.Tick
 
 type t [@@deriving sexp, eq, compare, hash, yojson]
@@ -16,13 +14,13 @@ val var_of_t : t -> var
 
 val typ : (var, t) Typ.t
 
-val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
 val length_in_triples : int
 
-val fold : t -> bool Triple.t Fold.t
+val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
-val genesis : t
+val genesis : t Lazy.t
 
 module Stable : sig
   module V1 : sig

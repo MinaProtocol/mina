@@ -5,6 +5,8 @@ module Stable = struct
   module V1 = struct
     module T = struct
       module Base58_check = Base58_check.Make (struct
+        let description = "User command memo"
+
         let version_byte = Base58_check.Version_bytes.user_command_memo
       end)
 
@@ -47,7 +49,7 @@ let tag_index = 0
 
 let length_index = 1
 
-let digest_length = Random_oracle.Digest.length_in_bytes
+let digest_length = Blake2.digest_size_in_bytes
 
 let digest_length_byte = Char.of_int_exn digest_length
 
@@ -79,7 +81,7 @@ let is_valid memo =
 let create_by_digesting_string_exn s =
   if Int.(String.length s > max_digestible_string_length) then
     raise Too_long_digestible_string ;
-  let digest = (Random_oracle.digest_string s :> t) in
+  let digest = Blake2.(to_raw_string (digest_string s)) in
   String.init memo_length ~f:(fun ndx ->
       if Int.(ndx = tag_index) then digest_tag
       else if Int.(ndx = length_index) then digest_length_byte
@@ -126,6 +128,8 @@ let create_from_string s =
 
 let dummy = (create_by_digesting_string_exn "" :> t)
 
+let empty = create_from_string_exn ""
+
 module Boolean = Tick0.Boolean
 module Typ = Tick0.Typ
 
@@ -163,6 +167,8 @@ let fold_bits t =
             go (f acc b) (i + 1)
         in
         go init 0 ) }
+
+let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
 
 let fold t = Fold_lib.Fold.group3 ~default:false (fold_bits t)
 

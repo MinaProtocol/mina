@@ -5,6 +5,7 @@
 2. Navigate into `coda/frontend/website`
 3. Run `yarn` to install dependencies (alternatively `npm install`)
 4. Install [pandoc](https://pandoc.org/) via `brew install pandoc` or similar.
+5. Install [mkdocs](https://mkdocs.org) via `pip install mkdocs` or similar.
 
 **Develop:**
 
@@ -15,7 +16,7 @@
 
 1. Make sure you have the latest `master` branch and that code is stable.
 2. If you've changed any static assets, first run `./deploy-cdn.sh` - this will update the S3 bucket with latest assets.
-3. Run `./deploy-website.sh staging` and make sure that the staging build is stable (visit https://coda-staging-84430.firebaseapp.com/).
+3. Run `./deploy-website.sh staging` and make sure that the staging build is stable (visit https://proof-of-steak-7ab54.firebaseapp.com/).
 4. Run `./deploy-website.sh prod`.
 
 - NOTE: this will require Firebase and AWS credentials

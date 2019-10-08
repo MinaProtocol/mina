@@ -10,15 +10,16 @@ import time
 from itertools import chain
 
 build_artifact_profiles = [
-    'testnet_postake',
-    'testnet_postake_many_proposers',
-    'testnet_postake_snarkless_fake_hash',
-    'testnet_postake_medium_curves',
+    'testnet_postake_medium_curves'
 ]
 
 unit_test_profiles = [
-    'test_postake_snarkless',
+    'test_postake_snarkless_unittest',
     'dev'
+]
+
+unit_test_profiles_medium_curves = [
+    'dev_medium_curves'
 ]
 
 simple_tests = [
@@ -33,12 +34,14 @@ integration_tests = [
     'coda-shared-prefix-test -who-proposes 0',
     'coda-shared-prefix-test -who-proposes 1',
     'coda-restart-node-test',
+    'coda-change-snark-worker-test',
+    'coda-archive-node-test'
 ]
 
 all_tests = simple_tests + integration_tests
 
 # dictionary mapping configs to lists of tests
-test_permutations = {
+small_curves_tests = {
     'fake_hash': ['full-test'],
     'test_postake_snarkless': simple_tests,
     'test_postake_split_snarkless': integration_tests,
@@ -46,12 +49,24 @@ test_permutations = {
     'test_postake': simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap': ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
+    'test_postake_three_proposers': ['coda-txns-and-restart-non-proposers'],    
     'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5', 'coda-long-fork -num-proposers 5'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
     'test_postake_five_even_snarkless': ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
     'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
 }
+
+medium_curves_tests = {
+    'test_postake_medium_curves': simple_tests,
+    'test_postake_snarkless_medium_curves': simple_tests,
+    'test_postake_split_medium_curves': ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
+}
+
+medium_curve_profiles_full = [
+    'test_postake_medium_curves',
+    'testnet_postake_medium_curves',
+    'testnet_postake_many_proposers_medium_curves']
 
 ci_blacklist = []
 
@@ -66,12 +81,13 @@ required_blacklist = [
 extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
-    "ci/circleci: build-wallet",
+    # "ci/circleci: build-wallet",
 ]
 
 # these are full status check names. they will not be required to succeed.
 not_required_status_checks = [
     "ci/circleci: build-macos",
+    "ci/circleci: build-wallet",
 ]
 
 
@@ -99,9 +115,9 @@ def parse_filter(pattern_src):
         [profile, test] = parts
         return (profile, test)
 
-def filter_test_permutations(whitelist_filters, blacklist_filters, permutations=None):
+def filter_tests(tests, whitelist_filters, blacklist_filters, permutations=None):
     if permutations is None:
-        permutations = test_permutations
+        permutations = tests
 
     whitelist_patterns = list(map(parse_filter, whitelist_filters))
     blacklist_patterns = list(map(parse_filter, blacklist_filters))
@@ -155,8 +171,10 @@ def run(args):
             logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
             build_targets = '%s %s' % (coda_exe, logproc_exe)
 
-    test_permutations = filter_test_permutations(args.whitelist_patterns, args.blacklist_patterns)
-    if len(test_permutations) == 0:
+    all_tests = small_curves_tests
+    all_tests.update(medium_curves_tests)
+    all_tests = filter_tests(all_tests, args.whitelist_patterns, args.blacklist_patterns)
+    if len(all_tests) == 0:
         # TODO: support direct test dispatching
         if args.whitelist_patterns != ['*']:
             fail('no tests were selected -- whitelist pattern did not match any known tests')
@@ -164,7 +182,7 @@ def run(args):
             fail('no tests were selected -- blacklist is too restrictive')
 
     print('Preparing to run the following tests:')
-    for (profile, tests) in test_permutations.items():
+    for (profile, tests) in all_tests.items():
         print('- %s:' % profile)
         for test in tests:
             print('  - %s' % test)
@@ -181,7 +199,7 @@ def run(args):
         os.makedirs(log_dir)
     wet('make new directory: ' + log_dir, make_log_dir)
 
-    for profile in test_permutations.keys():
+    for profile in all_tests.keys():
         profile_dir = os.path.join(log_dir, profile)
         wet('make directory: ' + profile_dir, lambda: os.mkdir(profile_dir))
 
@@ -193,7 +211,7 @@ def run(args):
             lambda: fail_with_log('building %s failed' % profile, build_log)
         )
 
-        for test in test_permutations[profile]:
+        for test in all_tests[profile]:
             print('  - %s' % test)
             log = os.path.join(profile_dir, '%s.log' % test)
             cmd = 'set -o pipefail && %s integration-test %s 2>&1 ' % (coda_exe, test)
@@ -205,11 +223,11 @@ def run(args):
 
 
 def get_required_status():
-    test_permutations = filter_test_permutations(['*'], required_blacklist, permutations=filter_test_permutations(['*'], ci_blacklist))
+    tests = filter_tests(small_curves_tests, ['*'], required_blacklist, permutations=filter_tests(small_curves_tests, ['*'], ci_blacklist))
     return list(filter(lambda el: el not in not_required_status_checks,
             chain(
             ("ci/circleci: %s" % job for job in
-                chain(("test--%s" % profile for profile in test_permutations.keys()),
+                chain(("test--%s" % profile for profile in tests.keys()),
                       ("test-unit--%s" % profile for profile in unit_test_profiles),
                       ("build-artifacts--%s" % profile for profile in build_artifact_profiles))),
             extra_required_status_checks
@@ -225,14 +243,17 @@ def render(args):
     (output_file, ext) = os.path.splitext(args.circle_jinja_file)
     assert ext == '.jinja'
 
-    test_permutations = filter_test_permutations(['*'], ci_blacklist)
+    tests = filter_tests(small_curves_tests, ['*'], ci_blacklist)
 
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(circle_ci_conf_dir), autoescape=False)
     template = env.get_template(jinja_file_basename)
     rendered = template.render(
         build_artifact_profiles=build_artifact_profiles,
         unit_test_profiles=unit_test_profiles,
-        test_permutations=test_permutations
+        unit_test_profiles_medium_curves=unit_test_profiles_medium_curves,
+        small_curves_tests=tests,
+        medium_curves_tests=medium_curves_tests,
+        medium_curve_profiles=medium_curve_profiles_full
     )
 
     if args.check:
@@ -265,9 +286,11 @@ def render(args):
             file.write(rendered)
 
 def list_tests(_args):
-    for profile in test_permutations.keys():
+    all_tests = small_curves_tests
+    all_tests.update(medium_curves_tests)
+    for profile in all_tests.keys():
         print('- ' + profile)
-        for test in test_permutations[profile]:
+        for test in small_curves_tests[profile]:
             print('  - ' + test)
 
 def main():

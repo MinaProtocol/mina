@@ -4,7 +4,7 @@ type t = char
 
 (* each of the following values should be distinct *)
 
-let graphql : t = '\x17'
+let user_command : t = '\x17'
 
 let web_pipe : t = '\x41'
 
@@ -14,9 +14,9 @@ let proof : t = '\x70'
 
 let signature : t = '\x9A'
 
-let non_zero_curve_point : t = '\xCD'
+let non_zero_curve_point : t = '\xCE'
 
-let non_zero_curve_point_compressed : t = '\xCA'
+let non_zero_curve_point_compressed : t = '\xCB'
 
 let random_oracle_base : t = '\x03'
 

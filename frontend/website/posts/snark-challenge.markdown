@@ -1,5 +1,5 @@
 ---
-title: Coda + Dekrypt: The SNARK Challenge
+title: Coda + Dekrypt&#58; The SNARK Challenge
 subtitle: A global competition to speed up the SNARK prover
 date: 2019-05-09
 author: Coda

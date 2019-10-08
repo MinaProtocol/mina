@@ -54,7 +54,8 @@ module Make (Action : Action_intf) : sig
       proactively disconnect from peers when they're banned. You *must* consume
       this, otherwise the program will block indefinitely when a peer is
       banned. *)
-  val ban_pipe : t -> Unix.Inet_addr.Blocking_sexp.t Strict_pipe.Reader.t
+  val ban_pipe :
+    t -> (Unix.Inet_addr.Blocking_sexp.t * Time.t) Strict_pipe.Reader.t
 
   (** Record an action a peer took. This may result in a ban event being
       emitted *)

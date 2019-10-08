@@ -12,7 +12,11 @@ module Stable = struct
 
       let of_string = Binable.of_string (module Tock_backend.Proof)
 
+      let compare a b = String.compare (to_string a) (to_string b)
+
       let version_byte = Base58_check.Version_bytes.proof
+
+      let description = "Tock proof"
     end
 
     include T
@@ -23,14 +27,15 @@ module Stable = struct
 
     let of_yojson = function
       | `String s -> (
-        try
-          let decoded = Base58_check.decode_exn s in
-          Ok (of_string decoded)
-        with exn ->
-          Error (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn))
-        )
+        match Base58_check.decode s with
+        | Ok decoded ->
+            Ok (of_string decoded)
+        | Error e ->
+            Error
+              (sprintf "Proof.of_yojson, bad Base58Check: %s"
+                 (Error.to_string_hum e)) )
       | _ ->
-          Error "expected `String"
+          Error "Proof.of_yojson expected `String"
 
     (* TODO: Figure out what the right thing to do is for conversion failures *)
     let ( { Bin_prot.Type_class.reader= bin_reader_t

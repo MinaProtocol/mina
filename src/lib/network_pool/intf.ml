@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Coda_base
 open Pipe_lib
+open Signature_lib
 
 (** A [Resource_pool_base_intf] is a mutable pool of resources that supports
  *  mutation via some [Resource_pool_diff_intf]. A [Resource_pool_base_intf]
@@ -12,11 +13,15 @@ module type Resource_pool_base_intf = sig
 
   type transition_frontier
 
+  module Config : sig
+    type t [@@deriving sexp_of]
+  end
+
   val create :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> frontier_broadcast_pipe:transition_frontier Option.t
+       frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
+    -> config:Config.t
+    -> logger:Logger.t
     -> t
 end
 
@@ -27,7 +32,7 @@ end
 module type Resource_pool_diff_intf = sig
   type pool
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, to_yojson]
 
   val summary : t -> string
 
@@ -40,6 +45,17 @@ module type Resource_pool_intf = sig
   include Resource_pool_base_intf
 
   module Diff : Resource_pool_diff_intf with type pool := t
+
+  (** Locally generated items (user commands and snarks) should be periodically
+      rebroadcast, to ensure network unreliability doesn't mean they're never
+      included in a block. This function gets the locally generated items that
+      are currently rebroadcastable. [is_expired] is a function that returns
+      true if an item that was added at a given time should not be rebroadcast
+      anymore. If it does, the implementation should not return that item, and
+      remove it from the set of potentially-rebroadcastable item.
+  *)
+  val get_rebroadcastable :
+    t -> is_expired:(Time.t -> [`Expired | `Ok]) -> Diff.t list
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -57,15 +73,17 @@ module type Network_pool_base_intf = sig
 
   type resource_pool_diff
 
+  type config
+
   type transition_frontier
 
   val create :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
+       config:config
     -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
                       Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
+    -> logger:Logger.t
     -> t
 
   val of_resource_pool_and_diffs :
@@ -92,20 +110,41 @@ module type Snark_resource_pool_intf = sig
 
   type transition_frontier
 
+  type work_info
+
   include
     Resource_pool_base_intf
     with type transition_frontier := transition_frontier
 
-  val bin_writer_t : t Bin_prot.Writer.t
+  val make_config :
+    trust_system:Trust_system.t -> verifier:Verifier.t -> Config.t
+
+  type serializable [@@deriving bin_io]
+
+  val of_serializable : serializable -> config:Config.t -> logger:Logger.t -> t
 
   val add_snark :
-       t
+       ?is_local:bool
+    -> t
     -> work:work
-    -> proof:ledger_proof list
+    -> proof:ledger_proof One_or_two.t
     -> fee:Fee_with_prover.t
-    -> [`Rebroadcast | `Don't_rebroadcast]
+    -> [`Added | `Statement_not_referenced]
 
-  val request_proof : t -> work -> ledger_proof list Priced_proof.t option
+  val verify_and_act :
+       t
+    -> work:work * ledger_proof One_or_two.t Priced_proof.t
+    -> sender:Envelope.Sender.t
+    -> unit Deferred.Or_error.t
+
+  val request_proof :
+    t -> work -> ledger_proof One_or_two.t Priced_proof.t option
+
+  val snark_pool_json : t -> Yojson.Safe.json
+
+  val all_completed_work : t -> work_info list
+
+  val get_logger : t -> Logger.t
 end
 
 (** A [Snark_pool_diff_intf] is the resource pool diff for
@@ -120,16 +159,54 @@ module type Snark_pool_diff_intf = sig
   module Stable : sig
     module V1 : sig
       type t =
-        | Add_solved_work of work * ledger_proof list Priced_proof.Stable.V1.t
-      [@@deriving sexp, yojson, bin_io, version]
+        | Add_solved_work of
+            work * ledger_proof One_or_two.Stable.V1.t Priced_proof.Stable.V1.t
+      [@@deriving bin_io, compare, sexp, to_yojson, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, yojson]
+  type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson]
 
   val summary : t -> string
 
+  val compact_json : t -> Yojson.Safe.json
+
   val apply : resource_pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
+end
+
+module type Transaction_pool_diff_intf = sig
+  module Stable : sig
+    module V1 : sig
+      type t = User_command.Stable.V1.t list
+      [@@deriving sexp, to_yojson, bin_io, version]
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+end
+
+module type Transaction_resource_pool_intf = sig
+  type t
+
+  type best_tip_diff
+
+  type transition_frontier
+
+  include
+    Resource_pool_base_intf
+    with type transition_frontier := transition_frontier
+     and type t := t
+
+  val make_config : trust_system:Trust_system.t -> Config.t
+
+  val member : t -> User_command.With_valid_signature.t -> bool
+
+  val transactions : t -> User_command.With_valid_signature.t Sequence.t
+
+  val all_from_user :
+    t -> Public_key.Compressed.t -> User_command.With_valid_signature.t list
 end

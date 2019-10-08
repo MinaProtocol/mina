@@ -2,4 +2,19 @@
   (name ledger_catchup)
   (public_name ledger_catchup)
   (preprocess (pps ppx_jane) )
-  (libraries async_kernel non_empty_list transition_frontier transition_handler consensus core_kernel coda_intf pipe_lib syncable_ledger merkle_address coda_base kademlia coda_networking))
+  (libraries
+    async_kernel
+    non_empty_list 
+    transition_frontier 
+    transition_handler 
+    consensus 
+    core_kernel 
+    coda_intf 
+    pipe_lib 
+    syncable_ledger 
+    merkle_address 
+    coda_base 
+    coda_metrics
+    kademlia
+    transition_chain_verifier
+    coda_networking))

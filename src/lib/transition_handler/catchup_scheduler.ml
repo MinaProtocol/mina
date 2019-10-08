@@ -15,6 +15,7 @@ open Pipe_lib.Strict_pipe
 open Cache_lib
 open Otp_lib
 open Coda_base
+open Coda_transition
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
@@ -25,7 +26,7 @@ module Make (Inputs : Inputs.S) = struct
     ; time_controller: Block_time.Controller.t
     ; catchup_job_writer:
         ( State_hash.t
-          * ( External_transition.with_initial_validation Envelope.Incoming.t
+          * ( External_transition.Initial_validated.t Envelope.Incoming.t
             , State_hash.t )
             Cached.t
             Rose_tree.t
@@ -40,7 +41,7 @@ module Make (Inputs : Inputs.S) = struct
               its corresponding value in the hash table would just be an empty
               list. *)
     ; collected_transitions:
-        ( External_transition.with_initial_validation Envelope.Incoming.t
+        ( External_transition.Initial_validated.t Envelope.Incoming.t
         , State_hash.t )
         Cached.t
         list
@@ -51,7 +52,7 @@ module Make (Inputs : Inputs.S) = struct
     ; parent_root_timeouts: unit Block_time.Timeout.t State_hash.Table.t
     ; breadcrumb_builder_supervisor:
         ( State_hash.t
-        * ( External_transition.with_initial_validation Envelope.Incoming.t
+        * ( External_transition.Initial_validated.t Envelope.Incoming.t
           , State_hash.t )
           Cached.t
           Rose_tree.t
@@ -61,7 +62,7 @@ module Make (Inputs : Inputs.S) = struct
   let create ~logger ~verifier ~trust_system ~frontier ~time_controller
       ~(catchup_job_writer :
          ( State_hash.t
-           * ( External_transition.with_initial_validation Envelope.Incoming.t
+           * ( External_transition.Initial_validated.t Envelope.Incoming.t
              , State_hash.t )
              Cached.t
              Rose_tree.t
@@ -72,6 +73,7 @@ module Make (Inputs : Inputs.S) = struct
       ~(catchup_breadcrumbs_writer :
          ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
            list
+           * [`Ledger_catchup of unit Ivar.t | `Catchup_scheduler]
          , crash buffered
          , unit )
          Writer.t) ~clean_up_signal =
@@ -91,7 +93,8 @@ module Make (Inputs : Inputs.S) = struct
               ~trust_system ~frontier ~initial_hash transition_branches
           with
           | Ok trees_of_breadcrumbs ->
-              Writer.write catchup_breadcrumbs_writer trees_of_breadcrumbs
+              Writer.write catchup_breadcrumbs_writer
+                (trees_of_breadcrumbs, `Catchup_scheduler)
           | Error err ->
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                 !"Error during buildup breadcrumbs inside catchup_scheduler: %s"
@@ -154,6 +157,9 @@ module Make (Inputs : Inputs.S) = struct
         (Hashtbl.find t.collected_transitions parent_hash)
     in
     Hashtbl.remove t.collected_transitions parent_hash ;
+    Coda_metrics.(
+      Gauge.dec_one
+        Transition_frontier_controller.transitions_in_catchup_scheduler) ;
     List.iter children ~f:(fun child ->
         let {With_hash.hash; _}, _ =
           Envelope.Incoming.data (Cached.peek child)
@@ -172,6 +178,9 @@ module Make (Inputs : Inputs.S) = struct
       Block_time.Timeout.create t.time_controller duration ~f:(fun _ ->
           let forest = extract_forest t parent_hash in
           Hashtbl.remove t.parent_root_timeouts parent_hash ;
+          Coda_metrics.(
+            Gauge.dec_one
+              Transition_frontier_controller.transitions_in_catchup_scheduler) ;
           remove_tree t parent_hash ;
           Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
@@ -181,8 +190,8 @@ module Make (Inputs : Inputs.S) = struct
                 )
               ; ( "cached_transition"
                 , With_hash.data transition_with_hash
-                  |> Inputs.External_transition.to_yojson ) ]
-            "timed out waiting for the parent of $cached_transition after \
+                  |> External_transition.to_yojson ) ]
+            "Timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
           if Writer.is_closed t.catchup_job_writer then
@@ -200,8 +209,13 @@ module Make (Inputs : Inputs.S) = struct
         Hashtbl.add t.parent_root_timeouts ~key:parent_hash
           ~data:
             (make_timeout
-               (Option.value remaining_time ~default:timeout_duration))
-        |> ignore
+               (Option.fold remaining_time ~init:timeout_duration
+                  ~f:(fun _ remaining_time ->
+                    Block_time.Span.min remaining_time timeout_duration )))
+        |> ignore ;
+        Coda_metrics.(
+          Gauge.inc_one
+            Transition_frontier_controller.transitions_in_catchup_scheduler)
     | Some cached_sibling_transitions ->
         if
           List.exists cached_sibling_transitions
@@ -211,16 +225,19 @@ module Make (Inputs : Inputs.S) = struct
               in
               State_hash.equal hash sibling_hash )
         then
-          Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+          Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("state_hash", State_hash.to_yojson hash)]
-            "Received request to watch transition for catchup that already \
-             was being watched: $state_hash"
+            "Received request to watch transition for catchup that already is \
+             being watched: $state_hash"
         else
           let (_ : Block_time.Span.t option) = cancel_timeout t hash in
           Hashtbl.set t.collected_transitions ~key:parent_hash
             ~data:(cached_transition :: cached_sibling_transitions) ;
           Hashtbl.update t.collected_transitions hash
-            ~f:(Option.value ~default:[])
+            ~f:(Option.value ~default:[]) ;
+          Coda_metrics.(
+            Gauge.inc_one
+              Transition_frontier_controller.transitions_in_catchup_scheduler)
 
   let notify t ~hash =
     if

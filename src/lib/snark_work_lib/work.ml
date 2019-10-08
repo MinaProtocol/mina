@@ -7,9 +7,15 @@ module Single = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          type ('statement, 'transition, 'witness, 'ledger_proof) t =
-            | Transition of 'statement * 'transition * 'witness
-            | Merge of 'statement * 'ledger_proof * 'ledger_proof
+          type ('transition, 'witness, 'ledger_proof) t =
+            | Transition of
+                Transaction_snark.Statement.Stable.V1.t
+                * 'transition
+                * 'witness
+            | Merge of
+                Transaction_snark.Statement.Stable.V1.t
+                * 'ledger_proof
+                * 'ledger_proof
           [@@deriving bin_io, sexp, version]
         end
 
@@ -19,14 +25,37 @@ module Single = struct
       module Latest = V1
     end
 
-    type ('statement, 'transition, 'witness, 'ledger_proof) t =
-          ('statement, 'transition, 'witness, 'ledger_proof) Stable.Latest.t =
-      | Transition of 'statement * 'transition * 'witness
+    type ('transition, 'witness, 'ledger_proof) t =
+          ('transition, 'witness, 'ledger_proof) Stable.Latest.t =
+      | Transition of Transaction_snark.Statement.t * 'transition * 'witness
       | Merge of
-          'statement * 'ledger_proof sexp_opaque * 'ledger_proof sexp_opaque
+          Transaction_snark.Statement.t
+          * 'ledger_proof sexp_opaque
+          * 'ledger_proof sexp_opaque
     [@@deriving sexp]
 
     let statement = function Transition (s, _, _) -> s | Merge (s, _, _) -> s
+
+    let gen :
+           'transition Quickcheck.Generator.t
+        -> 'witness Quickcheck.Generator.t
+        -> 'ledger_proof Quickcheck.Generator.t
+        -> ('transition, 'witness, 'ledger_proof) t Quickcheck.Generator.t =
+     fun gen_trans gen_witness gen_proof ->
+      let open Quickcheck.Generator in
+      let gen_transition =
+        let open Let_syntax in
+        let%bind statement = Transaction_snark.Statement.gen in
+        let%map transition, witness = tuple2 gen_trans gen_witness in
+        Transition (statement, transition, witness)
+      in
+      let gen_merge =
+        let open Let_syntax in
+        let%bind statement = Transaction_snark.Statement.gen in
+        let%map p1, p2 = tuple2 gen_proof gen_proof in
+        Merge (statement, p1, p2)
+      in
+      union [gen_transition; gen_merge]
   end
 end
 
@@ -35,7 +64,8 @@ module Spec = struct
     module V1 = struct
       module T = struct
         type 'single t =
-          {instances: 'single list; fee: Currency.Fee.Stable.V1.t}
+          { instances: 'single One_or_two.Stable.V1.t
+          ; fee: Currency.Fee.Stable.V1.t }
         [@@deriving bin_io, fields, sexp, version]
       end
 
@@ -46,7 +76,7 @@ module Spec = struct
   end
 
   type 'single t = 'single Stable.Latest.t =
-    {instances: 'single list; fee: Currency.Fee.t}
+    {instances: 'single One_or_two.t; fee: Currency.Fee.t}
   [@@deriving fields, sexp]
 end
 
@@ -55,8 +85,10 @@ module Result = struct
     module V1 = struct
       module T = struct
         type ('spec, 'single) t =
-          { proofs: 'single list
-          ; metrics: (Core.Time.Stable.Span.V1.t * [`Transition | `Merge]) list
+          { proofs: 'single One_or_two.Stable.V1.t
+          ; metrics:
+              (Core.Time.Stable.Span.V1.t * [`Transition | `Merge])
+              One_or_two.Stable.V1.t
           ; spec: 'spec
           ; prover: Signature_lib.Public_key.Compressed.Stable.V1.t }
         [@@deriving bin_io, fields, version]
@@ -69,11 +101,9 @@ module Result = struct
   end
 
   type ('spec, 'single) t = ('spec, 'single) Stable.Latest.t =
-    { proofs: 'single list
-    ; metrics: (Time.Span.t * [`Transition | `Merge]) list
+    { proofs: 'single One_or_two.t
+    ; metrics: (Time.Span.t * [`Transition | `Merge]) One_or_two.t
     ; spec: 'spec
     ; prover: Signature_lib.Public_key.Compressed.t }
   [@@deriving fields]
 end
-
-let proofs_per_work = 2

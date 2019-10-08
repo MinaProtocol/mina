@@ -52,7 +52,7 @@ module Styles = {
 
 module DeleteWallet = [%graphql
   {|
-    mutation deleteWallet($key: String!) {
+    mutation deleteWallet($key: PublicKey!) {
       deleteWallet(input: {publicKey: $key}) {
         publicKey
       }
@@ -128,7 +128,7 @@ module DeleteButton = {
                        onClick={_ => {
                          let variables =
                            DeleteWallet.make(
-                             ~key=PublicKey.toString(publicKey),
+                             ~key=Apollo.Encoders.publicKey(publicKey),
                              (),
                            )##variables;
                          let performMutation =
@@ -185,7 +185,7 @@ module DeleteButton = {
 
 module KeypathQueryString = [%graphql
   {|
-    query ($publicKey: String!)  {
+    query ($publicKey: PublicKey!)  {
       wallet(publicKey: $publicKey) {
         privateKeyPath
       }
@@ -254,7 +254,7 @@ let make = (~publicKey) => {
       <KeypathQuery
         variables=
           {KeypathQueryString.make(
-             ~publicKey=PublicKey.toString(publicKey),
+             ~publicKey=Apollo.Encoders.publicKey(publicKey),
              (),
            )##variables}>
         {({result}) => {

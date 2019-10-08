@@ -46,17 +46,17 @@ let useHook = () => {
   let (_state, dispatch) =
     Hooks.Reducer.useReducer(reduce, {State.args: [], mode: Stable});
 
-  let () =
-    React.useEffect0(() => {
-      let token = MainCommunication.listen();
-      let args =
-        switch (getLocalStorageNetwork()) {
-        | "" => []
-        | s => ["-peer", s]
-        };
-      dispatch(Action.StartCoda(args));
-      Some(() => MainCommunication.stopListening(token));
-    });
+  // let () ÷=
+  // React.useEffect0(() => {
+  // let token = MainCommunication.listen();
+  // let args = None;
+  //   switch (getLocalStorageNetwork()) {
+  //   | "" => []
+  //   | s => ["-peer", s]
+  //   };
+  // dispatch(Action.StartCoda(args));
+  // Some(() => MainCommunication.stopListening(token));
+  // });
 
   dispatch;
 };

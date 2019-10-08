@@ -55,16 +55,21 @@ module Common : sig
 
   type var =
     ( Currency.Fee.var
-    , Coda_numbers.Account_nonce.Unpacked.var
+    , Coda_numbers.Account_nonce.Checked.t
     , User_command_memo.Checked.t )
     Poly.t
 
   val typ : (var, t) Typ.t
 
+  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
   val fold : t -> bool Triple.t Fold.t
 
   module Checked : sig
-    val to_triples : var -> Boolean.var Triple.t list
+    val to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+
+    val to_input :
+      var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
 
     val constant : t -> var
   end

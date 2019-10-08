@@ -4,6 +4,7 @@ open Snark_params
 open Snark_bits
 open Coda_state
 open Fold_lib
+open Bitstring_lib
 module Digest = Tick.Pedersen.Digest
 module Storage = Storage.List.Make (Storage.Disk)
 
@@ -68,8 +69,12 @@ module Keys = struct
     type t = {step: Tick.Verification_key.t; wrap: Tock.Verification_key.t}
 
     let dummy =
-      { step= Dummy_values.Tick.Groth16.verification_key
-      ; wrap= Dummy_values.Tock.Bowe_gabizon18.verification_key }
+      { step=
+          Tick_backend.Verification_key.dummy
+            ~input_size:Coda_base.Transition_system.step_input_size
+      ; wrap=
+          Tock_backend.Bowe_gabizon.Verification_key.dummy
+            ~input_size:Wrap_input.size }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
@@ -138,7 +143,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
 
       include (U : module type of U with module Checked := U.Checked)
 
-      module Hash = Coda_base.State_hash
+      module Hash = struct
+        include Coda_base.State_hash
+
+        let var_to_field = var_to_hash_packed
+      end
 
       module Checked = struct
         include Blockchain_snark_state.Checked
@@ -171,6 +180,8 @@ module Make (T : Transaction_snark.Verification.S) = struct
                     Bitstring_lib.Bitstring.Lsb_first.of_list
                       (x :> Tick.Boolean.var list)
 
+                  let var_of_bits = Fn.id
+
                   let var_to_triples xs =
                     let open Fold in
                     to_list
@@ -181,11 +192,13 @@ module Make (T : Transaction_snark.Verification.S) = struct
                     Tick.Pedersen.Checked.Digest.Unpacked.constant
                 end
 
-                let project_value = Tick.Field.project
+                let project_value =
+                  Fn.compose Tick.Field.project Bitstring.Lsb_first.to_list
 
                 let project_var = Tick.Pedersen.Checked.Digest.Unpacked.project
 
-                let unpack_value = Tick.Field.unpack
+                let unpack_value =
+                  Fn.compose Bitstring.Lsb_first.of_list Tick.Field.unpack
 
                 let choose_preimage_var =
                   Tick.Pedersen.Checked.Digest.choose_preimage
@@ -213,6 +226,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
       Cached.Spec.create ~load ~name:"blockchain-snark step keys"
         ~autogen_path:Cache_dir.autogen_path
         ~manual_install_path:Cache_dir.manual_install_path
+        ~brew_install_path:Cache_dir.brew_install_path
         ~digest_input:
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
         ~create_env:Tick.Keypair.generate
@@ -241,10 +255,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
         Cached.Spec.create ~load ~name:"blockchain-snark wrap keys"
           ~autogen_path:Cache_dir.autogen_path
           ~manual_install_path:Cache_dir.manual_install_path
-          ~digest_input:
-            (Fn.compose Md5.to_hex Tock.R1CS_constraint_system.digest)
-          ~create_env:Tock.Keypair.generate
-          ~input:(Tock.constraint_system ~exposing:Wrap.input Wrap.main)
+          ~brew_install_path:Cache_dir.brew_install_path
+          ~digest_input:(fun x ->
+            Md5.to_hex (Tock.R1CS_constraint_system.digest (Lazy.force x)) )
+          ~input:(lazy (Tock.constraint_system ~exposing:Wrap.input Wrap.main))
+          ~create_env:(fun x -> Tock.Keypair.generate (Lazy.force x))
       in
       let%map wrap_vk, wrap_pk = Cached.run wrap_cached in
       let location : Location.t =
@@ -263,12 +278,31 @@ module Make (T : Transaction_snark.Verification.S) = struct
   end
 end
 
+let instance_hash wrap_vk =
+  let open Coda_base in
+  let init =
+    Random_oracle.update
+      ~state:Hash_prefix.Random_oracle.transition_system_snark
+      Snark_params.Tick.Verifier.(
+        let vk = vk_of_backend_vk wrap_vk in
+        let g1 = Tick.Inner_curve.to_affine_exn in
+        let g2 = Tick.Pairing.G2.Unchecked.to_affine_exn in
+        Verification_key.to_field_elements
+          { vk with
+            query_base= g1 vk.query_base
+          ; query= List.map ~f:g1 vk.query
+          ; delta= g2 vk.delta })
+  in
+  stage (fun state ->
+      Random_oracle.hash ~init [|(Protocol_state.hash state :> Tick.Field.t)|]
+  )
+
 let constraint_system_digests () =
   let module M = Make (Transaction_snark.Verification.Make (struct
     let keys = Transaction_snark.Keys.Verification.dummy
   end)) in
   let module W = M.Wrap_base (struct
-    let verification_key = Dummy_values.Tick.Groth16.verification_key
+    let verification_key = Keys.Verification.dummy.step
   end) in
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in

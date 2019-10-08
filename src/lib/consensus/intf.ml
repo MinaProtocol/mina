@@ -2,8 +2,6 @@ open Core_kernel
 open Coda_numbers
 open Async
 open Currency
-open Fold_lib
-open Tuple_lib
 open Signature_lib
 open Coda_base
 
@@ -32,7 +30,10 @@ module type Constants_intf = sig
    * block. In sig, it's exactly 1 as blocks should be produced every slot. *)
   val c : int
 
-  val inactivity_secs : int
+  val inactivity_ms : int
+
+  (** Number of slots in one epoch *)
+  val slots_per_epoch : Unsigned.UInt32.t
 end
 
 module type Blockchain_state_intf = sig
@@ -178,6 +179,7 @@ module type Snark_transition_intf = sig
          , 'consensus_transition
          , 'sok_digest
          , 'amount
+         , 'state_body_hash
          , 'public_key )
          t
     [@@deriving sexp]
@@ -192,11 +194,12 @@ module type Snark_transition_intf = sig
     , consensus_transition_var
     , Sok_message.Digest.Checked.t
     , Amount.var
+    , State_body_hash.var
     , Public_key.Compressed.var )
     Poly.t
 
   val consensus_transition :
-    (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
+    (_, 'consensus_transition, _, _, _, _) Poly.t -> 'consensus_transition
 end
 
 module type State_hooks_intf = sig
@@ -225,7 +228,7 @@ module type State_hooks_intf = sig
   val generate_transition :
        previous_protocol_state:protocol_state
     -> blockchain_state:blockchain_state
-    -> time:Unix_timestamp.t
+    -> current_time:Unix_timestamp.t
     -> proposal_data:proposal_data
     -> transactions:Coda_base.User_command.t list
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
@@ -266,7 +269,7 @@ module type S = sig
     * This is mostly useful for PoStake and other consensus mechanisms that have their own
     * notions of time.
   *)
-  val time_hum : Time.t -> string
+  val time_hum : Coda_base.Block_time.t -> string
 
   module Constants : Constants_intf
 
@@ -306,19 +309,19 @@ module type S = sig
     end
 
     module Prover_state : sig
-      type t [@@deriving sexp]
+      type t [@@deriving to_yojson, sexp]
 
       module Stable :
         sig
           module V1 : sig
-            type t [@@deriving bin_io, sexp, version]
+            type t [@@deriving bin_io, sexp, to_yojson, version]
           end
 
           module Latest = V1
         end
         with type V1.t = t
 
-      val precomputed_handler : Snark_params.Tick.Handler.t
+      val precomputed_handler : Snark_params.Tick.Handler.t Lazy.t
 
       val handler :
            t
@@ -330,11 +333,11 @@ module type S = sig
       module Value : sig
         module Stable : sig
           module V1 : sig
-            type t [@@deriving sexp, bin_io, version]
+            type t [@@deriving sexp, bin_io, to_yojson, version]
           end
         end
 
-        type t = Stable.V1.t [@@deriving sexp]
+        type t = Stable.V1.t [@@deriving to_yojson, sexp]
       end
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
@@ -361,7 +364,7 @@ module type S = sig
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
 
-      val negative_one : Value.t
+      val negative_one : Value.t Lazy.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
@@ -373,13 +376,12 @@ module type S = sig
 
       val length_in_triples : int
 
-      val var_to_triples :
-           var
-        -> ( Snark_params.Tick.Boolean.var Triple.t list
-           , _ )
-           Snark_params.Tick.Checked.t
+      open Snark_params.Tick
 
-      val fold : Value.t -> bool Triple.t Fold.t
+      val var_to_input :
+        var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+
+      val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
       val blockchain_length : Value.t -> Length.t
 
@@ -391,9 +393,11 @@ module type S = sig
 
       val network_delay : Configuration.t -> int
 
-      val curr_epoch : Value.t -> int
+      val curr_epoch : Value.t -> Epoch.t
 
-      val curr_slot : Value.t -> int
+      val curr_slot : Value.t -> Slot.t
+
+      val global_slot : Value.t -> int
     end
 
     module Proposal_data : sig
@@ -412,6 +416,9 @@ module type S = sig
         -> local_state:Local_state.t
         -> Host_and_port.t Rpc.Implementation.t list
     end
+
+    (* Check whether we are in the genesis epoch *)
+    val is_genesis : Coda_base.Block_time.t -> bool
 
     (**
      * Check that a consensus state was received at a valid time.
@@ -432,6 +439,12 @@ module type S = sig
       -> logger:Logger.t
       -> [`Keep | `Take]
 
+    type proposal =
+      [ `Check_again of Unix_timestamp.t
+      | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
+      | `Propose of
+        Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t ]
+
     (**
      * Determine if and when to perform the next transition proposal. Either
      * informs the callee to check again at some time in the future, or to
@@ -445,10 +458,7 @@ module type S = sig
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
-      -> [ `Check_again of Unix_timestamp.t
-         | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
-         | `Propose of
-           Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t ]
+      -> proposal
 
     (**
      * A hook for managing local state when the locked tip is updated.

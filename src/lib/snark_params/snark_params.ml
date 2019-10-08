@@ -8,6 +8,7 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
+module Scan_state_constants = Scan_state_constants
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -303,7 +304,9 @@ module Tock = struct
   module Groth_verifier = struct
     include Snarky_verifier.Groth.Make (Pairing)
 
-    let conv_fqe v = Field.Vector.(get v 0, get v 1)
+    let conv_fqe v =
+      let v = Tick_backend.Full.Fqe.to_vector v in
+      Field.Vector.(get v 0, get v 1)
 
     let conv_g2 p =
       let x, y = Tock_backend.Inner_twisted_curve.to_affine_exn p in
@@ -398,7 +401,9 @@ module Tick = struct
 
     module Checked = struct
       include Snarky.Pedersen.Make (Tick0) (Inner_curve)
-                (Crypto_params.Pedersen_params)
+                (struct
+                  let params = Crypto_params.Pedersen_params.affine
+                end)
 
       let hash_prefix (p : State.t) =
         Section.create ~acc:(`Value p.acc)
@@ -668,30 +673,51 @@ module Tick = struct
     let final_exponentiation = FE.final_exponentiation6
   end
 
-  module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
+  module Run = Crypto_params.Runners.Tick
+
+  let m : Run.field Snarky.Snark.m = (module Run)
+
+  let make_checked c = with_state (As_prover.return ()) (Run.make_checked c)
 
   module Verifier = struct
     include Snarky_verifier.Bowe_gabizon.Make (struct
       include Pairing
 
-      module H =
-        Snarky_bowe_gabizon_hash.Make (Run) (Tick0)
-          (struct
-            module Fqe = Pairing.Fqe
+      module H = Bowe_gabizon_hash.Make (struct
+        open Run
+        module Field = Field
+        module Fqe = Pairing.Fqe
 
-            let init =
-              Pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string)
+        module G1 = struct
+          type t = Field.t * Field.t
 
-            let pedersen x =
-              Pedersen.Checked.digest_triples ~init (Fold_lib.Fold.to_list x)
+          let to_affine_exn = Fn.id
 
-            let params = Tock_backend.bg_params
-          end)
+          let of_affine = Fn.id
+        end
 
-      let hash = H.hash
+        module G2 = struct
+          type t = Fqe.t * Fqe.t
+
+          let to_affine_exn = Fn.id
+        end
+
+        let hash xs =
+          Random_oracle.Checked.hash ~init:(Lazy.force Tock_backend.bg_salt) xs
+
+        let group_map =
+          Snarky_group_map.Checked.to_group
+            (module Run)
+            ~params:Tock_backend.bg_params
+      end)
+
+      let hash ?message ~a ~b ~c ~delta_prime =
+        make_checked (fun () -> H.hash ?message ~a ~b ~c ~delta_prime)
     end)
 
-    let conv_fqe v = Field.Vector.(get v 0, get v 1, get v 2)
+    let conv_fqe v =
+      let v = Tock_backend.Full.Fqe.to_vector v in
+      Field.Vector.(get v 0, get v 1, get v 2)
 
     let conv_g2 p =
       let x, y = Tick_backend.Inner_twisted_curve.to_affine_exn p in
@@ -711,62 +737,6 @@ module Tick = struct
 
     let vk_of_backend_vk (vk : Tock_backend.Verification_key.t) =
       let open Tock_backend.Verification_key in
-      let open Inner_curve.Vector in
-      let q = query vk in
-      { Verification_key.query_base= get q 0
-      ; query= List.init (length q - 1) ~f:(fun i -> get q (i + 1))
-      ; delta= conv_g2 (delta vk)
-      ; alpha_beta= conv_fqk (alpha_beta vk) }
-
-    let constant_vk vk =
-      let open Verification_key in
-      { query_base= Inner_curve.Checked.constant vk.query_base
-      ; query= List.map ~f:Inner_curve.Checked.constant vk.query
-      ; delta= Pairing.G2.constant vk.delta
-      ; alpha_beta= Pairing.Fqk.constant vk.alpha_beta }
-  end
-
-  module Bowe_gabizon_verifier = struct
-    include Snarky_verifier.Bowe_gabizon.Make (struct
-      include Pairing
-
-      module H =
-        Snarky_bowe_gabizon_hash.Make (Run) (Tick0)
-          (struct
-            module Fqe = Pairing.Fqe
-
-            let init =
-              Pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string)
-
-            let pedersen x =
-              Pedersen.Checked.digest_triples ~init (Fold_lib.Fold.to_list x)
-
-            let params = Tock_backend.Bowe_gabizon.bg_params
-          end)
-
-      let hash = H.hash
-    end)
-
-    let conv_fqe v = Field.Vector.(get v 0, get v 1, get v 2)
-
-    let conv_g2 p =
-      let x, y = Tick_backend.Inner_twisted_curve.to_affine_exn p in
-      Pairing.G2.Unchecked.of_affine (conv_fqe x, conv_fqe y)
-
-    let conv_fqk (p : Tock_backend.Full.Fqk.t) =
-      let v = Tock_backend.Full.Fqk.to_elts p in
-      let f i =
-        let x j = Tick0.Field.Vector.get v ((3 * i) + j) in
-        (x 0, x 1, x 2)
-      in
-      (f 0, f 1)
-
-    let proof_of_backend_proof
-        ({a; b; c; delta_prime; z} : Tock_backend.Bowe_gabizon.Proof.t) =
-      {Proof.a; b= conv_g2 b; c; delta_prime= conv_g2 delta_prime; z}
-
-    let vk_of_backend_vk (vk : Tock_backend.Bowe_gabizon.Verification_key.t) =
-      let open Tock_backend.Bowe_gabizon.Verification_key in
       let open Inner_curve.Vector in
       let q = query vk in
       { Verification_key.query_base= get q 0
@@ -812,23 +782,17 @@ let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 [%%inject
 "ledger_depth", ledger_depth]
 
-[%%inject
-"scan_state_transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
+let scan_state_transaction_capacity_log_2 =
+  Scan_state_constants.transaction_capacity_log_2
 
-[%%inject
-"scan_state_work_delay_factor", scan_state_work_delay_factor]
+let scan_state_work_delay = Scan_state_constants.work_delay
 
-[%%inject
-"scan_state_latency_factor", scan_state_latency_factor]
-
+(*Log of maximum number of trees in the parallel scan state*)
 let pending_coinbase_depth =
-  let working_levels =
-    scan_state_transaction_capacity_log_2 + scan_state_work_delay_factor
-    - scan_state_latency_factor + 1
-  in
-  let root_nodes = Int.pow 2 scan_state_latency_factor in
-  let total_stacks = working_levels * root_nodes in
-  Int.ceil_log2 total_stacks
+  Int.ceil_log2
+    ( (scan_state_transaction_capacity_log_2 + 1)
+      * (scan_state_work_delay + 1)
+    + 1 )
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.
@@ -843,3 +807,15 @@ let pending_coinbase_depth =
 let target_bit_length = Tick.Field.size_in_bits - 8
 
 module type Snark_intf = Snark_intf.S
+
+module Group_map = struct
+  let to_group =
+    Group_map.to_group (module Tick.Field) ~params:Tock_backend.bg_params
+
+  module Checked = struct
+    let to_group =
+      Snarky_group_map.Checked.to_group
+        (module Tick.Run)
+        ~params:Tock_backend.bg_params
+  end
+end

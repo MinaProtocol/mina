@@ -1,7 +1,6 @@
 open Core_kernel
 open Util
 open Snark_params
-open Tuple_lib
 
 module type S = sig
   open Tick
@@ -16,7 +15,7 @@ module type S = sig
 
       val typ : (var, t) Typ.t
 
-      val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+      val var_to_field : var -> Field.Var.t
     end
 
     type var
@@ -46,6 +45,10 @@ module type Tock_keypair_intf = sig
   val keys : Tock.Keypair.t
 end
 
+let step_input () = Tick.Data_spec.[Tick.Field.typ]
+
+let step_input_size = Tick.Data_spec.size (step_input ())
+
 (* Someday:
    Tighten this up. Doing this with all these equalities is kind of a hack, but
    doing it right required an annoying change to the bits intf. *)
@@ -57,10 +60,6 @@ module Make (Digest : sig
 end)
 (System : S) =
 struct
-  let step_input () = Tick.Data_spec.[Tick.Field.typ]
-
-  let step_input_size = Tick.Data_spec.size (step_input ())
-
   module Step_base = struct
     open System
 
@@ -93,30 +92,26 @@ struct
       |> bit_length_to_triple_length
 
     let hash_vk vk =
-      let%bind bs =
-        Verifier.Verification_key.(summary (summary_input vk))
-        >>| Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
-      in
-      Pedersen.Checked.Section.extend
-        (Pedersen.Checked.hash_prefix Hash_prefix.transition_system_snark)
-        ~start:Hash_prefix.length_in_triples bs
+      make_checked (fun () ->
+          Random_oracle.Checked.update
+            ~state:
+              (Random_oracle.State.map
+                 Hash_prefix.Random_oracle.transition_system_snark
+                 ~f:Snark_params.Tick.Field.Var.constant)
+            (Verifier.Verification_key.to_field_elements vk) )
 
-    let compute_top_hash wrap_vk_section state_hash_trips =
-      Tick.Pedersen.Checked.Section.extend wrap_vk_section
-        ~start:(Hash_prefix.length_in_triples + wrap_vk_triple_length)
-        state_hash_trips
-      >>| Tick.Pedersen.Checked.Section.to_initial_segment_digest
-      >>| Or_error.ok_exn >>| fst
+    let compute_top_hash wrap_vk_state state_hash =
+      make_checked (fun () ->
+          Random_oracle.Checked.(
+            update ~state:wrap_vk_state [|State.Hash.var_to_field state_hash|]
+            |> digest) )
 
     let%snarkydef prev_state_valid wrap_vk_section wrap_vk prev_state_hash =
       match Coda_compile_config.proof_level with
       | "full" ->
           (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
-          let%bind prev_state_hash_trips =
-            State.Hash.var_to_triples prev_state_hash
-          in
           let%bind prev_top_hash =
-            compute_top_hash wrap_vk_section prev_state_hash_trips
+            compute_top_hash wrap_vk_section prev_state_hash
             >>= Wrap_input.Checked.tick_field_to_scalars
           in
           let%bind precomp =
@@ -157,10 +152,9 @@ struct
       let%bind wrap_vk_section = hash_vk wrap_vk in
       let%bind next_top_hash =
         with_label __LOC__
-          (let%bind sh = State.Hash.var_to_triples next_state_hash in
-           (* We could be reusing the intermediate state of the hash on sh here instead of
+          ((* We could be reusing the intermediate state of the hash on sh here instead of
                hashing anew *)
-           compute_top_hash wrap_vk_section sh)
+           compute_top_hash wrap_vk_section next_state_hash)
       in
       let%bind () =
         as_prover
@@ -179,8 +173,8 @@ struct
                       Sexp_diff_kernel.Algo.diff ~original ~updated ()
                     in
                     Logger.fatal logger
-                      "Out-of-snark (left) and in-snark (right) disagree on \
-                       what the next top_hash should be."
+                      "Out-of-SNARK and in-SNARK calculations of the next top \
+                       hash differ"
                       ~metadata:
                         [ ( "state_sexp_diff"
                           , `String
@@ -190,8 +184,9 @@ struct
                   return ()
               | None ->
                   Logger.error logger
-                    "expected_next_state is empty; this should only be true \
-                     during precomputed_values"
+                    "From the current prover state, got None for the expected \
+                     next state, which should be true only when calculating \
+                     precomputed values"
                     ~location:__LOC__ ~module_:__MODULE__ ;
                   return ()))
       in
@@ -234,16 +229,8 @@ struct
     let step_vk_precomp =
       Verifier.Verification_key.Precomputation.create_constant step_vk
 
-    let step_vk_constant =
-      let open Verifier.Verification_key in
-      let {query_base; query; delta; alpha_beta} = step_vk in
-      { Verifier.Verification_key.query_base=
-          Inner_curve.Checked.constant query_base
-      ; query= List.map ~f:Inner_curve.Checked.constant query
-      ; delta= Pairing.G2.constant delta
-      ; alpha_beta= Pairing.Fqk.constant alpha_beta }
+    let step_vk_constant = Verifier.constant_vk step_vk
 
-    (* TODO: Use an online verifier here *)
     let%snarkydef main (input : Wrap_input.var) =
       let%bind result =
         (* The use of choose_preimage here is justified since we feed it to the verifier, which doesn't

@@ -3,78 +3,6 @@ open Snark_params
 open Fold_lib
 open Module_version
 
-module Stable = struct
-  module V1 = struct
-    module T = struct
-      type t = Tick.Field.t * Tick.Field.t
-      [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
-
-      let version_byte = Base58_check.Version_bytes.non_zero_curve_point
-    end
-
-    include T
-    include Registration.Make_latest_version (T)
-
-    let of_bigstring bs =
-      let open Or_error.Let_syntax in
-      let%map elem, _ = Bigstring.read_bin_prot bs bin_reader_t in
-      elem
-
-    let to_bigstring elem =
-      let bs =
-        Bigstring.create (bin_size_t elem + Bin_prot.Utils.size_header_length)
-      in
-      let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
-      bs
-
-    include Codable.Make_base58_check (T)
-  end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "non_zero_curve_point"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
-
-(* bin_io omitted *)
-type t = Stable.Latest.t [@@deriving sexp, compare, hash]
-
-(* so we can make sets of public keys *)
-include Comparable.Make_binable (Stable.Latest)
-
-type var = Tick.Field.Var.t * Tick.Field.Var.t
-
-let assert_equal var1 var2 =
-  let open Tick0.Checked.Let_syntax in
-  let open Tick.Field.Checked.Assert in
-  let v1_f1, v1_f2 = var1 in
-  let v2_f1, v2_f2 = var2 in
-  let%bind () = equal v1_f1 v2_f1 in
-  let%bind () = equal v1_f2 v2_f2 in
-  return ()
-
-let var_of_t (x, y) = (Tick.Field.Var.constant x, Tick.Field.Var.constant y)
-
-let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
-
-let ( = ) = equal
-
-let of_inner_curve_exn = Tick.Inner_curve.to_affine_exn
-
-let to_inner_curve = Tick.Inner_curve.of_affine
-
-let gen : t Quickcheck.Generator.t =
-  Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
-      let open Option.Let_syntax in
-      let%map y = Tick.Inner_curve.find_y x in
-      (x, y) )
-
 let parity y = Tick.Bigint.(test_bit (of_field y) 0)
 
 module Compressed = struct
@@ -85,7 +13,7 @@ module Compressed = struct
       module V1 = struct
         module T = struct
           type ('field, 'boolean) t = {x: 'field; is_odd: 'boolean}
-          [@@deriving bin_io, sexp, compare, eq, hash, version]
+          [@@deriving bin_io, compare, eq, hash, version]
         end
 
         include T
@@ -96,22 +24,44 @@ module Compressed = struct
 
     type ('field, 'boolean) t = ('field, 'boolean) Stable.Latest.t =
       {x: 'field; is_odd: 'boolean}
-    [@@deriving sexp, compare, eq, hash]
+    [@@deriving compare, eq, hash]
   end
 
   module Stable = struct
     module V1 = struct
       module T = struct
+        (* we define sexp operations manually, don't derive them *)
         type t = (Field.t, bool) Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
-
-        let version_byte =
-          Base58_check.Version_bytes.non_zero_curve_point_compressed
+        [@@deriving bin_io, eq, compare, hash, version {asserted}]
       end
 
       include T
-      include Registration.Make_latest_version (T)
-      include Codable.Make_base58_check (T)
+      module Registered = Registration.Make_latest_version (T)
+      include Registered
+
+      let description = "Non zero curve point compressed"
+
+      let version_byte =
+        Base58_check.Version_bytes.non_zero_curve_point_compressed
+
+      (* Registered contains shadowed versions of bin_io functions in T;
+	 we call the same functor below with Stable.Latest, which also has
+	 the shadowed versions
+       *)
+      include Codable.Make_base58_check (struct
+        type nonrec t = t
+
+        include Registered
+
+        let description = description
+
+        let version_byte = version_byte
+      end)
+
+      (* sexp representation is a Base58Check string, like the yojson representation *)
+      let sexp_of_t t = to_base58_check t |> Sexp.of_string
+
+      let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
     end
 
     module Latest = V1
@@ -126,12 +76,15 @@ module Compressed = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  (* bin_io omitted *)
-  type t = (Field.t, bool) Poly.t [@@deriving sexp, compare, hash]
+  (* bin_io, sexp omitted *)
+  type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving compare, hash]
 
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
   include Codable.Make_base58_check (Stable.Latest)
+
+  [%%define_locally
+  Stable.Latest.(sexp_of_t, t_of_sexp)]
 
   let compress (x, y) : t = {x; is_odd= parity y}
 
@@ -204,16 +157,115 @@ module Compressed = struct
   end
 end
 
-open Tick
-open Let_syntax
-
 let decompress ({x; is_odd} : Compressed.t) =
   Option.map (Tick.Inner_curve.find_y x) ~f:(fun y ->
       let y_parity = parity y in
-      let y = if Bool.(is_odd = y_parity) then y else Field.negate y in
+      let y = if Bool.(is_odd = y_parity) then y else Tick.Field.negate y in
       (x, y) )
 
+let compress = Compressed.compress
+
 let decompress_exn t = Option.value_exn (decompress t)
+
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t =
+        Tick.Field.t * Tick.Field.t
+        (* sexp operations written manually, don't derive them *)
+      [@@deriving eq, compare, hash, version {asserted}]
+
+      include Binable.Of_binable
+                (Compressed.Stable.V1)
+                (struct
+                  type nonrec t = t
+
+                  let of_binable = decompress_exn
+
+                  let to_binable = compress
+                end)
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
+
+    let of_bigstring bs =
+      let open Or_error.Let_syntax in
+      let%map elem, _ = Bigstring.read_bin_prot bs bin_reader_t in
+      elem
+
+    let to_bigstring elem =
+      let bs =
+        Bigstring.create (bin_size_t elem + Bin_prot.Utils.size_header_length)
+      in
+      let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
+      bs
+
+    (* We reuse the Base58check-based yojson (de)serialization from the
+       compressed representation. *)
+    let of_yojson json =
+      let open Result in
+      Compressed.of_yojson json
+      >>= fun compressed ->
+      Result.of_option ~error:"couldn't decompress, curve point invalid"
+        (decompress compressed)
+
+    let to_yojson t = Compressed.to_yojson @@ compress t
+
+    (* as for yojson, use the Base58check-based sexps from the compressed representation *)
+    let sexp_of_t t = Compressed.sexp_of_t @@ compress t
+
+    let t_of_sexp sexp =
+      Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
+  end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "non_zero_curve_point"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
+end
+
+(* bin_io omitted *)
+type t = Stable.Latest.t [@@deriving compare, hash, yojson]
+
+(* so we can make sets of public keys *)
+include Comparable.Make_binable (Stable.Latest)
+
+type var = Tick.Field.Var.t * Tick.Field.Var.t
+
+let assert_equal var1 var2 =
+  let open Tick0.Checked.Let_syntax in
+  let open Tick.Field.Checked.Assert in
+  let v1_f1, v1_f2 = var1 in
+  let v2_f1, v2_f2 = var2 in
+  let%bind () = equal v1_f1 v2_f1 in
+  let%bind () = equal v1_f2 v2_f2 in
+  return ()
+
+let var_of_t (x, y) = (Tick.Field.Var.constant x, Tick.Field.Var.constant y)
+
+let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
+
+let ( = ) = equal
+
+let of_inner_curve_exn = Tick.Inner_curve.to_affine_exn
+
+let to_inner_curve = Tick.Inner_curve.of_affine
+
+let gen : t Quickcheck.Generator.t =
+  Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
+      let open Option.Let_syntax in
+      let%map y = Tick.Inner_curve.find_y x in
+      (x, y) )
+
+open Tick
+open Let_syntax
 
 let parity_var y =
   let%map bs = Field.Checked.unpack_full y in
@@ -230,14 +282,12 @@ let decompress_var ({x; is_odd} as c : Compressed.var) =
   and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in
   (x, y)
 
-let compress : t -> Compressed.t = Compressed.compress
-
 let%snarkydef compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   let%map is_odd = parity_var y in
   {Compressed.Poly.x; is_odd}
 
 [%%define_locally
-Stable.Latest.(of_bigstring, to_bigstring)]
+Stable.Latest.(of_bigstring, to_bigstring, sexp_of_t, t_of_sexp)]
 
 let%test_unit "point-compression: decompress . compress = id" =
   Quickcheck.test gen ~f:(fun pk ->

@@ -21,7 +21,6 @@ let create a =
   in
   don't_wait_for
     (Pipe.iter ~flushed:(Consumer consumer) root_r ~f:(fun v ->
-         t.cache <- v ;
          downstream_flushed_v := Ivar.create () ;
          let inner_pipes = Int.Table.data t.pipes in
          let%bind () =
@@ -105,6 +104,7 @@ module Writer = struct
 
   let write t x =
     guard_already_closed t (fun () ->
+        t.cache <- x ;
         let%bind () = Pipe.write t.root_pipe x in
         let%bind _ = Pipe.downstream_flushed t.root_pipe in
         Deferred.unit )

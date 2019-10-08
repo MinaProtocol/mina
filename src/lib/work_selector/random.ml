@@ -4,16 +4,19 @@ module Make
     (Inputs : Intf.Inputs_intf)
     (Lib : Intf.Lib_intf with module Inputs := Inputs) =
 struct
-  let work ~snark_pool ~fee (staged_ledger : Inputs.Staged_ledger.t)
+  let work ~snark_pool ~fee ~logger (staged_ledger : Inputs.Staged_ledger.t)
       (state : Lib.State.t) =
+    let state = Lib.State.remove_old_assignments state ~logger in
     let unseen_jobs = Lib.all_works staged_ledger state in
     match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
     | [] ->
-        ([], state)
-    | _ ->
-        let i = Random.int (List.length unseen_jobs) in
-        let x = List.nth_exn unseen_jobs i in
-        (Lib.pair_to_list x, Lib.State.set state x)
+        (None, state)
+    | expensive_work ->
+        let i = Random.int (List.length expensive_work) in
+        let x = List.nth_exn expensive_work i in
+        (Some x, Lib.State.set state x)
+
+  let remove = Lib.State.remove
 end
 
 let%test_module "test" =

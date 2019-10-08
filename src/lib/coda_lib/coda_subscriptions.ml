@@ -17,7 +17,7 @@ type t =
   ; mutable reorganization_subscription: [`Changed] reader_and_writer list }
 
 let create ~logger ~wallets ~time_controller ~external_transition_database
-    ~new_blocks ~transition_frontier =
+    ~new_blocks ~transition_frontier ~is_storing_all =
   let subscribed_block_users =
     Public_key.Compressed.Table.of_alist_exn
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
@@ -30,15 +30,21 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
            let reader, writer = Pipe.create () in
            (wallet, (reader, writer)) )
   in
-  Strict_pipe.Reader.iter new_blocks
-    ~f:(fun ({With_hash.data= _; hash} as new_block_with_hash) ->
-      match
-        Filtered_external_transition.of_transition
-          ~tracked_participants:
-            ( Public_key.Compressed.Set.of_list
-            @@ Hashtbl.keys subscribed_block_users )
-          new_block_with_hash
-      with
+  Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
+      let hash =
+        new_block |> Coda_transition.External_transition.Validated.state_hash
+      in
+      let filtered_external_transition_result =
+        if is_storing_all then
+          Filtered_external_transition.of_transition `All new_block
+        else
+          Filtered_external_transition.of_transition
+            (`Some
+              ( Public_key.Compressed.Set.of_list
+              @@ Hashtbl.keys subscribed_block_users ))
+            new_block
+      in
+      match filtered_external_transition_result with
       | Ok filtered_external_transition ->
           let block_time = Block_time.now time_controller in
           let filtered_external_transition_with_hash =
@@ -72,11 +78,13 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
           Deferred.unit
       | Error e ->
           Logger.error logger
-            "Could not process transactions in valid external_transition "
+            "Staged ledger had error with transactions in block for state \
+             $state_hash: $error"
             ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ( "error"
-                , `String (Staged_ledger.Pre_diff_info.Error.to_string e) ) ] ;
+                , `String (Staged_ledger.Pre_diff_info.Error.to_string e) )
+              ; ("state_hash", State_hash.to_yojson hash) ] ;
           Deferred.unit )
   |> don't_wait_for ;
   let reorganization_subscription = [] in

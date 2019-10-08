@@ -26,7 +26,18 @@ let titleColor = c => Css.unsafe("--title-color", Style.Colors.string(c));
 let readMoreColor = c =>
   Css.unsafe("--read-more-color", Style.Colors.string(c));
 
-let component = ReasonReact.statelessComponent("Blog");
+// Truncate HTML
+let rec truncate = (index, counter, html) =>
+  if (counter == 0) {
+    Js.String.substring(~from=0, html, ~to_=index + 4);
+  } else {
+    let indexOf = Js.String.indexOfFrom("</p>", index, html);
+    if (indexOf !== (-1)) {
+      truncate(indexOf + 1, counter - 1, html);
+    } else {
+      html;
+    };
+  };
 
 // Need to dangerouslySetInnerHTML to handle html entities in the markdown
 let createPostHeader = metadata =>
@@ -47,7 +58,7 @@ let createPostHeader = metadata =>
       dangerouslySetInnerHTML={"__html": metadata.BlogPost.title}
     />
     {switch (metadata.subtitle) {
-     | None => ReasonReact.null
+     | None => React.null
      | Some(subtitle) =>
        <h2
          className=Css.(
@@ -71,7 +82,7 @@ let createPostHeader = metadata =>
           textTransform(`uppercase),
         ])
       )>
-      {ReasonReact.string("by " ++ metadata.author ++ " ")}
+      {React.string("by " ++ metadata.author ++ " ")}
     </h3>
     <h3
       className=Css.(
@@ -83,7 +94,7 @@ let createPostHeader = metadata =>
           color(Style.Colors.slateAlpha(0.5)),
         ])
       )>
-      {ReasonReact.string(metadata.date)}
+      {React.string(metadata.date)}
     </h3>
   </div>;
 
@@ -134,14 +145,14 @@ let createPostFadedContents = html =>
                ])
              )
         }
-        dangerouslySetInnerHTML={"__html": html}
+        dangerouslySetInnerHTML={"__html": truncate(0, 5, html)} //set to truncated html to save rendering time
       />
     </div>
   </div>;
 
 // Uses an overlay link to avoid nesting anchor tags
 let createPostSummary = ((name, html, metadata)) => {
-  <div className=Css.(style([position(`relative)]))>
+  <div key=name className=Css.(style([position(`relative)]))>
     <A
       name={"blog-" ++ name}
       href={"/blog/" ++ name ++ ".html"}
@@ -191,28 +202,29 @@ let createPostSummary = ((name, html, metadata)) => {
             unsafe("color", "var(--read-more-color)"),
           ])
         )>
-        {ReasonReact.string({js|Read more →|js})}
+        {React.string({js|Read more →|js})}
       </div>
     </div>
   </div>;
 };
 
-let make = (~posts, _children) => {
-  ...component,
-  render: _self =>
-    <div
-      className=Css.(
-        style([
-          display(`flex),
-          flexDirection(`column),
-          alignItems(`stretch),
-          maxWidth(`rem(43.)),
-          marginLeft(`auto),
-          marginRight(`auto),
-          media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
-        ])
-      )>
-      <div> ...{Array.of_list(List.map(createPostSummary, posts))} </div>
-      BlogPost.renderKatex
-    </div>,
+[@react.component]
+let make = (~posts) => {
+  <div
+    className=Css.(
+      style([
+        display(`flex),
+        flexDirection(`column),
+        alignItems(`stretch),
+        maxWidth(`rem(43.)),
+        marginLeft(`auto),
+        marginRight(`auto),
+        media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
+      ])
+    )>
+    <div>
+      {React.array(Array.of_list(List.map(createPostSummary, posts)))}
+    </div>
+    BlogPost.renderKatex
+  </div>;
 };

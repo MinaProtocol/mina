@@ -4,7 +4,7 @@ Coda is a new cryptocurrency protocol with a lightweight, constant sized blockch
 
 The Coda Wallet desktop app allows you to manage your wallets, send and receive transactions, and stake your Coda for coinbase rewards.
 
-We have a [Discord server]( https://discord.gg/ShKhA7J)! Please come by if you
+We have a [Discord server](https://bit.ly/CodaDiscord)! Please come by if you
 need help or have questions. You might also be interested in the [OCaml
 Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
 
@@ -25,13 +25,13 @@ Download and build the app:
 1. Clone the repo via SSH: `git clone git@github.com:CodaProtocol/coda.git`
 2. Navigate into coda/frontend/wallet
 3. Update submodules: `git submodule update --init`
-4. `yarn install` to install dependencies
-5. `yarn pull-macos-binary` to grab the latest coda.exe (macOS only for now)
-6. `yarn run query-fake` to generate graphql_schema.json
+4. `yarn` to install dependencies
+5. [Install coda](https://codaprotocol.com/docs/getting-started/)
 7. `yarn build` to build app
 
 Run locally with hot reloading:
-1. `yarn dev` to start dev server
+1. `yarn dev` to start dev server with fake data
+1. `yarn dev-real` to start dev server with real coda daemon
 
 ### Common Issues
 
@@ -44,7 +44,7 @@ Run locally with hot reloading:
    up before you pulled the code. Make sure you ran `git lfs install` and then
    run `git lfs pull` to download files.
 
-### Repackaging coda.exe
+### Repackaging coda.exe [Needs work]
 
 1. cd to root of repo
 2. `make build`

@@ -1,0 +1,9 @@
+(library
+  (name coda_graphql)
+  (public_name coda_graphql)
+  (libraries 
+    ; opam deps
+    async core cohttp graphql-async graphql-cohttp
+    ; libs
+    auxiliary_database coda_base coda_commands coda_lib)
+  (preprocess (pps ppx_jane)))

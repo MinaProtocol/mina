@@ -63,7 +63,7 @@ module Stable = struct
         ; receipt_chain_hash: Receipt.Chain_hash.t
         ; delegate: Public_key.Compressed.Stable.V1.t
         ; voting_for: State_hash.t }
-      [@@deriving bin_io, sexp, eq, version {asserted}]
+      [@@deriving bin_io, sexp, to_yojson, eq, version {asserted}]
     end
 
     include T
@@ -72,7 +72,7 @@ module Stable = struct
   module Latest = V1
 end
 
-type t = Stable.Latest.t [@@deriving sexp, eq]
+type t = Stable.Latest.t [@@deriving sexp, to_yojson, eq]
 
 let fold
     { Stable.Latest.public_key

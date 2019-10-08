@@ -14,7 +14,8 @@ let (^/) = Filename.concat;
 let codaPath = "_build/coda-daemon-macos";
 let codaCommand = (~port, ~extraArgs) => {
   {
-    Command.executable: ProjectRoot.resource ^/ codaPath ^/ "coda.exe",
+    // Assume coda is installed globally
+    Command.executable: "coda",
     args:
       Js.Array.concat(
         extraArgs,
@@ -26,18 +27,7 @@ let codaCommand = (~port, ~extraArgs) => {
           ProjectRoot.resource ^/ codaPath ^/ "config",
         |],
       ),
-    env:
-      Js.Dict.fromArray(
-        Js.Array.concat(
-          [|
-            (
-              "CODA_KADEMLIA_PATH",
-              ProjectRoot.resource ^/ codaPath ^/ "kademlia",
-            ),
-          |],
-          Js.Dict.entries(ChildProcess.Process.env),
-        ),
-      ),
+    env: ChildProcess.Process.env,
   };
 };
 
@@ -85,11 +75,12 @@ module Process = {
       ChildProcess.spawn(
         command.executable,
         command.args,
-        {
-          "env": command.env,
-          "stdio":
+        ChildProcess.spawnOptions(
+          ~env=command.env,
+          ~stdio=
             ChildProcess.makeIOTriple(`Ignore, `Stream(log), `Stream(log)),
-        },
+          (),
+        ),
       );
 
     ChildProcess.Process.onError(process, e =>
@@ -142,7 +133,7 @@ module CodaProcess = {
 
   let kill: t => unit = t => ChildProcess.Process.kill(t, "SIGINT");
 
-  let port = 0xc0da;
+  let port = 0xc0d;
 
   let start: list(string) => t =
     args => {

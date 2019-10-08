@@ -46,9 +46,22 @@ module Colors = {
   let tealAlpha = a => `rgba((71, 130, 160, a));
 
   let rosebud = `rgb((163, 83, 111));
+  let rosebudAlpha = a => `rgba((163, 83, 111, a));
 
   let blueBlue = `rgb((42, 81, 224));
   let midnight = `rgb((31, 45, 61));
+
+  let india = `rgb((242, 183, 5));
+  let indiaAlpha = a => `rgba((242, 183, 5, a));
+
+  let amber = `rgb((242, 149, 68));
+  let amberAlpha = a => `rgba((242, 149, 68, a));
+
+  let marine = `rgb((51, 104, 151));
+  let marineAlpha = a => `rgba((51, 104, 151, a));
+
+  let jungleAlpha = a => `rgba((47, 172, 70, a));
+  let jungle = jungleAlpha(1.);
 };
 
 module Typeface = {
@@ -124,6 +137,47 @@ module Typeface = {
         ),
       );
     ();
+
+    // Workaround to allow the website to be build for dev
+    // without needing the pragmatapro font.
+    // If you have the font asset, it will be used.
+    if (Node.Fs.existsSync(
+          Links.Cdn.localAssetPath(
+            "/static/font/Essential-PragmataPro-Regular.woff2",
+          ),
+        )
+        || Config.isProd) {
+      let _ =
+        fontFamily(
+          fontFace(
+            ~fontFamily="PragmataPro",
+            ~src=[
+              cdnUrl("/static/font/Essential-PragmataPro-Regular.woff2"),
+              cdnUrl("/static/font/Essential-PragmataPro-Regular.woff"),
+            ],
+            ~fontStyle=`normal,
+            ~fontWeight=`medium,
+            (),
+          ),
+        );
+
+      let _ =
+        fontFamily(
+          fontFace(
+            ~fontFamily="PragmataPro",
+            ~src=[
+              cdnUrl("/static/font/Essential-PragmataPro-Bold.woff2"),
+              cdnUrl("/static/font/Essential-PragmataPro-Bold.woff"),
+            ],
+            ~fontStyle=`normal,
+            ~fontWeight=`bold,
+            (),
+          ),
+        );
+      ();
+    } else {
+      print_endline("Warning: building without PragmataPro fonts");
+    };
   };
 
   let ibmplexserif = fontFamily("IBM Plex Serif, serif");
@@ -144,7 +198,7 @@ module MediaQuery = {
   let veryVeryLarge = "(min-width: 77rem)";
   let veryLarge = "(min-width: 70.8125rem)";
   let somewhatLarge = "(min-width: 65.5rem)";
-  let full = "(min-width: 48rem)";
+  let full = "(min-width: 54rem)";
   let notMobile = "(min-width: 32rem)";
   let notSmallMobile = "(min-width: 25rem)";
   let statusLiftAlways = "(min-width: 38rem)";
@@ -161,11 +215,13 @@ let paddingX = m => Css.[paddingLeft(m), paddingRight(m)];
 /** sets both paddingTop and paddingBottom, as one should */
 let paddingY = m => Css.[paddingTop(m), paddingBottom(m)];
 
+let generateStyles = rules => (Css.style(rules), rules);
+
 module Link = {
   open Css;
 
-  let init =
-    style([
+  let (init, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       color(Colors.hyperlink),
       textDecoration(`none),
@@ -186,8 +242,8 @@ module Link = {
 module H1 = {
   open Css;
 
-  let hero =
-    style([
+  let (hero, heroStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       fontWeight(`light),
       fontSize(`rem(2.25)),
@@ -207,8 +263,8 @@ module H1 = {
 module H2 = {
   open Css;
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       fontWeight(`normal),
       fontSize(`rem(2.25)),
@@ -234,8 +290,8 @@ module Technical = {
 module H3 = {
   open Css;
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       fontSize(`rem(1.25)),
       textAlign(`center),
@@ -311,8 +367,8 @@ module H3 = {
 module H4 = {
   open Css;
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       textAlign(`center),
       fontSize(`rem(1.0625)),
@@ -324,9 +380,8 @@ module H4 = {
       color(Colors.greyishBrown),
     ]);
 
-  let wide =
-    style([
-      whiteSpace(`nowrap),
+  let (wide, wideStyles) =
+    generateStyles([
       fontSize(`rem(0.75)),
       letterSpacing(`rem(0.125)),
       Typeface.aktivgrotesk,
@@ -334,6 +389,7 @@ module H4 = {
       fontStyle(`normal),
       textAlign(`center),
       textTransform(`uppercase),
+      media(MediaQuery.notMobile, [whiteSpace(`nowrap)]),
     ]);
 };
 
@@ -359,8 +415,8 @@ module Body = {
   open Css;
 
   module Technical = {
-    let basic =
-      style([
+    let (basic, basicStyles) =
+      generateStyles([
         Typeface.pragmataPro,
         color(Css.white),
         fontSize(`rem(1.)),
@@ -369,13 +425,22 @@ module Body = {
       ]);
   };
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
-      color(Colors.metallicBlue),
-      fontSize(`rem(1.0)),
-      lineHeight(`rem(1.5)),
+      color(Colors.saville),
+      fontSize(`rem(1.125)),
+      lineHeight(`rem(1.625)),
       fontWeight(`normal),
+      letterSpacing(`rem(0.016)),
+      media(
+        MediaQuery.notMobile,
+        [
+          fontSize(`rem(1.0)),
+          lineHeight(`rem(1.5)),
+          letterSpacing(`rem(0.01)),
+        ],
+      ),
     ]);
 
   let basic_semibold = merge([basic, style([fontWeight(`semiBold)])]);

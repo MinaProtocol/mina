@@ -167,7 +167,7 @@ module Digit = struct
       removable_elim
         (fun t' ->
           let head, Mk_any_r tail = uncons t' in
-          if acc + measure' head > target then
+          if acc + measure' head >= target then
             (None, head, Some (Mk_any_r tail))
           else
             match split_addable (acc + measure' head) tail with
@@ -186,7 +186,7 @@ module Digit = struct
             | None, m, rhs ->
                 (Some (Mk_any_r (One head)), m, rhs) )
         (fun (One a) ->
-          if acc + measure' a > target then (None, a, None)
+          if acc + measure' a >= target then (None, a, None)
           else failwith "Digit.split index out of bounds" )
         t
     in
@@ -197,7 +197,8 @@ module Digit = struct
         )
       (fun t' ->
         let head, Mk_any_r tail = uncons t' in
-        if acc + measure' head > target then (None, head, Some (Mk_any_ar tail))
+        if acc + measure' head >= target then
+          (None, head, Some (Mk_any_ar tail))
         else
           let lhs, m, rhs = split_addable (acc + measure' head) tail in
           match lhs with
@@ -219,7 +220,7 @@ module Digit = struct
     Quickcheck.test
       (let open Quickcheck.Generator.Let_syntax in
       let%bind (Mk_any_ar dig as dig') = gen_any_ar in
-      let%bind idx = Int.gen_incl 0 ((List.length @@ to_list dig) - 1) in
+      let%bind idx = Int.gen_incl 1 (List.length @@ to_list dig) in
       return (dig', idx))
       ~f:(fun (Mk_any_ar dig, target) ->
         let lhs_opt, m, rhs_opt = split Fn.id target 0 dig in
@@ -233,28 +234,15 @@ module Digit = struct
           (List.sexp_of_t Int.sexp_of_t)
           Int.sexp_of_t
           (to_list dig, idx) )
-      ~shrinker:
-        (Quickcheck.Shrinker.create (fun (Mk_any_ar dig, idx) ->
-             removable_elim
-               (fun t ->
-                 let len = List.length @@ to_list t in
-                 Sequence.of_list
-                   ( (if idx > 0 then [(Mk_any_ar dig, idx - 1)] else [])
-                   @ [ ( broaden_any_r (Tuple2.get2 @@ uncons t)
-                       , Int.max (len - 2) idx ) ] ) )
-               (fun t ->
-                 if idx = 1 then Sequence.singleton (Mk_any_ar t, idx - 1)
-                 else Sequence.empty )
-               dig ))
       (let open Quickcheck.Generator.Let_syntax in
       let%bind (Mk_any_ar dig) = gen_any_ar in
-      let%bind idx = Int.gen_incl 0 ((List.length @@ to_list dig) - 1) in
+      let%bind idx = Int.gen_incl 1 (List.length @@ to_list dig) in
       return (Mk_any_ar dig, idx))
       ~f:(fun (Mk_any_ar dig, idx) ->
         let as_list = to_list dig in
-        let lhs_list = List.take as_list idx in
-        let m_list = List.nth_exn as_list idx in
-        let rhs_list = List.drop as_list (idx + 1) in
+        let lhs_list = List.take as_list (idx - 1) in
+        let m_list = List.nth_exn as_list (idx - 1) in
+        let rhs_list = List.drop as_list idx in
         [%test_eq: int list] (lhs_list @ (m_list :: rhs_list)) as_list ;
         let lhs_fseq, m_fseq, rhs_fseq = split (Fn.const 1) idx 0 dig in
         let lhs_fseq', rhs_fseq' =
@@ -264,12 +252,26 @@ module Digit = struct
         [%test_eq: int list] lhs_list lhs_fseq' ;
         [%test_eq: int] m_list m_fseq ;
         [%test_eq: int list] rhs_list rhs_fseq' ;
-        [%test_eq: int] (List.length lhs_fseq') idx ;
-        [%test_eq: int] (List.length rhs_fseq') (List.length as_list - idx - 1)
-        )
+        [%test_eq: int] (List.length lhs_fseq') (idx - 1) ;
+        [%test_eq: int] (List.length rhs_fseq') (List.length as_list - idx) )
+
+  (* See comment below about measures for why index 0 is an edge case. *)
+  let%test_unit "Digit.split with index 0 is trivial" =
+    Quickcheck.test
+      (Quickcheck.Generator.tuple2 gen_any_ar (Int.gen_incl 0 200))
+      ~f:(fun (Mk_any_ar dig, acc) ->
+        let as_list = to_list dig in
+        let lhs, m, rhs = split Fn.id acc acc dig in
+        assert (Option.is_none lhs) ;
+        [%test_eq: int] m (List.hd_exn as_list) ;
+        match rhs with
+        | None ->
+            [%test_eq: int list] [] (List.tl_exn as_list)
+        | Some (Mk_any_ar rhs') ->
+            [%test_eq: int list] (to_list rhs') (List.tl_exn as_list) )
 
   let%test _ =
-    match split Fn.id 0 0 (One 1) with None, 1, None -> true | _ -> false
+    match split Fn.id 1 0 (One 1) with None, 1, None -> true | _ -> false
 
   let%test _ =
     match split Fn.id 5 0 (Three (0, 2, 4)) with
@@ -280,7 +282,7 @@ module Digit = struct
 
   let%test _ =
     match split Fn.id 10 0 (Four (2, 3, 5, 1)) with
-    | Some (Mk_any_ar (Three (2, 3, 5))), 1, None ->
+    | Some (Mk_any_ar (Two (2, 3))), 5, Some (Mk_any_ar (One 1)) ->
         true
     | _ ->
         false
@@ -348,10 +350,16 @@ type 'e t =
    this implementation. Given a monoid m, a measurement function for elements
    e -> m, and "monotonic" predicates on m, if you cache the measure of subtrees
    you can index into and split finger trees at the transition point of the
-   predicates in log time. In this implementation the monoid is natural numbers
-   under summation, the measurement is 'Fn.const 1' and the predicates are
-   (fun x -> x > idx). So the measure of a tree is how many elements are in it
-   and the transition point is where there are idx elements to the left.
+   predicates in log time. The output of any of the split functions is a triple
+   of the longest subsequence starting from the beginning where the predicate is
+   false, the element that flips it to true, and the subsequence after that up
+   to the end. In this implementation the monoid is natural numbers under
+   summation, the measurement is 'Fn.const 1' and the predicates are
+   (fun x -> x >= idx). So the measure of a tree is how many elements are in it
+   and the transition point is where there are >= idx elements. Index 0 is a
+   special case, since forall x : ℕ. x >= 0. In that case the first subsequence
+   is empty, the transition point is the first element, and the second
+   subsequence is the rest of the input sequence.
 
    You'll see many functions take a parameter measure' to compute measures of
    elements with. This is always either Node.measure or 'Fn.const 1' depending
@@ -550,17 +558,22 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
   | Empty ->
       failwith "FSequence.split index out of bounds (1)"
   | Single x ->
-      if acc + measure' x > target then (Empty, x, Empty)
+      if acc + measure' x >= target then (Empty, x, Empty)
       else failwith "FSequence.split index out of bounds (2)"
   | Deep (_m, prefix, middle, suffix) ->
       let acc_p = acc + Digit.measure measure' prefix in
-      if acc_p > target then
+      if acc_p >= target then
         (* split point is in left finger *)
         let dl, m, dr = Digit.split measure' target acc prefix in
-        ( Digit.opt_to_list dl |> of_list (* left part of digit split *)
-        , m (* middle of digit split *)
-        , match dr with
-          (* right part of digit split + subtree + suffix *)
+        ( (* left part of digit split *)
+          ( match dl with
+          | None ->
+              Empty
+          | Some (Mk_any_ar dig) ->
+              tree_of_digit measure' dig )
+        , (* middle of digit split *) m
+        , (* right part of digit split + subtree + suffix *)
+          match dr with
           | None -> (
             match uncons' Node.measure @@ force middle with
             | None ->
@@ -571,7 +584,7 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
               deep measure' dig (force middle) suffix )
       else
         let acc_m = acc_p + measure Node.measure (force middle) in
-        if acc_m > target then
+        if acc_m >= target then
           (* split point is in subtree *)
           let lhs, m, rhs = split Node.measure (force middle) target acc_p in
           (* The subtree is made of nodes, so the midpoint we got from the
@@ -607,7 +620,7 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
                 deep measure' dig rhs suffix )
         else
           let acc_s = acc_m + Digit.measure measure' suffix in
-          if acc_s > target then
+          if acc_s >= target then
             (* split point is in right finger *)
             let dl, m, dr = Digit.split measure' target acc_m suffix in
             ( (* prefix + subtree + left part of digit split *)
@@ -633,37 +646,73 @@ let rec split : 'e. ('e -> int) -> 'e t -> int -> int -> 'e t * 'e * 'e t =
 (* Split a tree into the elements before some index and the elements >= that
    index. split_at works when the index is out of range and returns a pair while
    split throws an exception if the index is out of range and returns a triple.
+   The contract is that split_at xs i = take i xs, drop i xs.
 *)
 let split_at : 'e t -> int -> 'e t * 'e t =
  fun t idx ->
-  if measure (Fn.const 1) t > idx then
-    match split (Fn.const 1) t idx 0 with lhs, m, rhs -> (lhs, cons m rhs)
-  else (t, empty)
+  match t with
+  | Empty ->
+      (empty, empty)
+  | _ ->
+      if idx = 0 then (empty, t)
+      else if measure (Fn.const 1) t >= idx then
+        match split (Fn.const 1) t idx 0 with lhs, m, rhs -> (snoc lhs m, rhs)
+      else (t, empty)
 
 let singleton : 'e -> 'e t = fun v -> Single v
 
+(* Assert that the cached measures match the actual ones. *)
+let rec assert_measure : type e. (e -> int) -> e t -> unit =
+ fun measure' -> function
+  | Empty ->
+      ()
+  | Single _ ->
+      ()
+  | Deep (cached_measure, prefix, middle, suffix) ->
+      let measure_node_with_assert node =
+        let expected = Node.measure node in
+        let contents = node |> Node.to_digit |> Digit.to_list in
+        [%test_eq: int] expected (List.sum (module Int) ~f:measure' contents) ;
+        expected
+      in
+      let middle' = Lazy.force middle in
+      assert_measure measure_node_with_assert middle' ;
+      [%test_eq: int] cached_measure
+        ( Digit.measure measure' prefix
+        + measure Node.measure middle'
+        + Digit.measure measure' suffix )
+
+(* Quickcheck.Generator.list generates pretty small lists, which are not big
+   enough to exercise multiple levels of the tree. So we use this instead. *)
+let big_list : 'a Quickcheck.Generator.t -> 'a list Quickcheck.Generator.t =
+ fun gen ->
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind len = Int.gen_incl 0 1000 in
+  Quickcheck.Generator.list_with_length len gen
+
 let%test_unit "list isomorphism - cons" =
-  Quickcheck.test (Quickcheck.Generator.list Int.quickcheck_generator)
-    ~f:(fun xs ->
+  Quickcheck.test (big_list Int.quickcheck_generator) ~f:(fun xs ->
       let xs_fseq = List.fold_right xs ~f:cons ~init:empty in
+      assert_measure (Fn.const 1) xs_fseq ;
       [%test_eq: int list] xs (to_list xs_fseq) ;
       [%test_eq: int] (List.length xs) (length xs_fseq) )
 
 let%test_unit "list isomorphism - snoc" =
-  Quickcheck.test (Quickcheck.Generator.list Int.quickcheck_generator)
-    ~f:(fun xs ->
+  Quickcheck.test (big_list Int.quickcheck_generator) ~f:(fun xs ->
       let xs_fseq = List.fold_left xs ~init:empty ~f:snoc in
+      assert_measure (Fn.const 1) xs_fseq ;
       [%test_eq: int list] xs (to_list xs_fseq) ;
       [%test_eq: int] (List.length xs) (length xs_fseq) )
 
 let%test_unit "alternating cons/snoc" =
   Quickcheck.test
     Quickcheck.Generator.(
-      list @@ variant2 (Int.gen_incl 0 500) (Int.gen_incl 0 500))
+      big_list @@ variant2 (Int.gen_incl 0 500) (Int.gen_incl 0 500))
     ~f:(fun cmds ->
       let rec go list fseq cmds_acc =
         match cmds_acc with
         | [] ->
+            assert_measure (Fn.const 1) fseq ;
             [%test_eq: int list] list (to_list fseq) ;
             [%test_eq: int] (List.length list) (length fseq)
         | `A x :: rest ->
@@ -675,10 +724,9 @@ let%test_unit "alternating cons/snoc" =
 
 let%test_unit "split properties" =
   let gen =
-    let open Quickcheck.Generator in
     let open Quickcheck.Generator.Let_syntax in
-    let%bind xs = list (Int.gen_incl 0 500) in
-    let%bind idx = Int.gen_incl 0 (max (List.length xs - 1) 0) in
+    let%bind xs = big_list (Int.gen_incl 0 500) in
+    let%bind idx = Int.gen_incl 0 (List.length xs) in
     return (xs, idx)
   in
   let shrinker =
@@ -702,9 +750,81 @@ let%test_unit "split properties" =
       let split_l_fseq', split_r_fseq' =
         (to_list split_l_fseq, to_list split_r_fseq)
       in
+      assert_measure (Fn.const 1) split_l_fseq ;
+      assert_measure (Fn.const 1) split_r_fseq ;
       [%test_eq: int] (List.length split_l_list + List.length split_r_list) len ;
       [%test_eq: int list] split_l_list split_l_fseq' ;
       [%test_eq: int list] split_r_list split_r_fseq' ;
       [%test_eq: int] (List.length split_l_fseq') (length split_l_fseq) ;
       [%test_eq: int] (List.length split_r_fseq') (length split_r_fseq) ;
       [%test_eq: int] (length split_l_fseq + length split_r_fseq) len )
+
+(* Exercise all the functions that generate sequences, in random combinations. *)
+let%test_module "random sequence generation, with splits" =
+  ( module struct
+    type action =
+      [ `Cons of int
+      | `Snoc of int
+      | `Split_take_left of int
+      | `Split_take_right of int ]
+    [@@deriving sexp_of]
+
+    let%test_unit _ =
+      let rec gen_actions xs len n =
+        let open Quickcheck.Generator in
+        let open Quickcheck.Generator.Let_syntax in
+        if n = 0 then return @@ List.rev xs
+        else
+          match%bind
+            variant3 (Int.gen_incl 0 500) (Int.gen_incl 0 500)
+              (Int.gen_uniform_incl 0 len)
+          with
+          | `A v ->
+              gen_actions (`Cons v :: xs) (len + 1) (n - 1)
+          | `B v ->
+              gen_actions (`Snoc v :: xs) (len + 1) (n - 1)
+          | `C idx -> (
+              match%bind bool with
+              | true ->
+                  gen_actions (`Split_take_left idx :: xs) idx (n - 1)
+              | false ->
+                  gen_actions (`Split_take_right idx :: xs) (len - idx) (n - 1)
+              )
+      in
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind len = Int.gen_incl 0 50 in
+        gen_actions [] 0 len
+      in
+      let shrinker =
+        Quickcheck.Shrinker.create (function
+          | [] ->
+              Sequence.empty
+          | _ :: _ as acts ->
+              Sequence.of_list
+                [ List.take acts (List.length acts / 2)
+                ; List.take acts (List.length acts - 1)
+                ; List.map acts ~f:(function `Snoc x -> `Cons x | x -> x)
+                ; List.map acts ~f:(function `Cons x -> `Snoc x | x -> x) ] )
+      in
+      Quickcheck.test gen ~trials:100_000 ~shrinker
+        ~sexp_of:(List.sexp_of_t sexp_of_action) ~f:(fun acts ->
+          let rec go fseq =
+            let assert_m fseq' =
+              assert_measure (Fn.const 1) fseq' ;
+              fseq'
+            in
+            function
+            | [] ->
+                ()
+            | `Cons x :: acts_rest ->
+                go (assert_m @@ cons x fseq) acts_rest
+            | `Snoc x :: acts_rest ->
+                go (assert_m @@ snoc fseq x) acts_rest
+            | `Split_take_left idx :: acts_rest ->
+                go (assert_m @@ Tuple2.get1 @@ split_at fseq idx) acts_rest
+            | `Split_take_right idx :: acts_rest ->
+                go (assert_m @@ Tuple2.get2 @@ split_at fseq idx) acts_rest
+          in
+          go empty acts )
+  end )

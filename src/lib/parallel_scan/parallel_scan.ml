@@ -2,925 +2,1694 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib
 
-module Direction = struct
-  type t = Left | Right [@@deriving sexp, bin_io]
+(*Glossary of type variables used in this file:
+  1. 'base: polymorphic type for jobs in the leaves of the scan state tree
+  2. 'merge: polymorphic type for jobs in the intermediate nodes of the scan state tree
+  3. 'base_t: 'base Base.t
+  4. 'merge_t: 'merge Merge.t
+  5. 'base_job: Base.Job.t
+  6. 'merge_job: Merge.Job.t
+  *)
+
+(*Note:  Prefixing some of the general purpose functions that could be used in the future with an "_" to not cause "unused function" error*)
+
+(**Sequence number for jobs in the scan state that corresponds to the order in 
+which they were added*)
+module Sequence_number = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int [@@deriving sexp, bin_io, version {unnumbered}]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp]
 end
 
-module Ring_buffer = Ring_buffer
-module Queue = Queue
+(**Each node on the tree is viewed as a job that needs to be completed. When a 
+job is completed, it creates a new "Todo" job and marks the old job as "Done"*)
+module Job_status = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Todo | Done [@@deriving sexp, bin_io, version {unnumbered}]
+      end
 
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t = Todo | Done [@@deriving sexp]
+
+  let to_string = function Todo -> "Todo" | Done -> "Done"
+end
+
+(**The number of new jobs- base and merge that can be added to this tree.
+ * Each node has a weight associated to it and the 
+ * new jobs received are distributed across the tree based on this number. *)
+module Weight = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = {base: int; merge: int}
+        [@@deriving sexp, bin_io, version {unnumbered}]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t = {base: int; merge: int} [@@deriving sexp, lens]
+end
+
+(**For base proofs (Proving new transactions)*)
+module Base = struct
+  module Record = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type 'base t =
+            { job: 'base
+            ; seq_no: Sequence_number.Stable.V1.t
+            ; status: Job_status.Stable.V1.t }
+          [@@deriving sexp, bin_io, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type 'base t = 'base Stable.Latest.t [@@deriving sexp]
+  end
+
+  module Job = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type 'base t = Empty | Full of 'base Record.Stable.V1.t
+          [@@deriving sexp, bin_io, version]
+        end
+
+        include T
+
+        let job_str = function Empty -> "Base.Empty" | Full _ -> "Base.Full"
+      end
+
+      module Latest = V1
+    end
+
+    type 'base t = 'base Stable.Latest.t =
+      | Empty
+      | Full of 'base Record.Stable.V1.t
+    [@@deriving sexp]
+
+    let job_str = Stable.Latest.job_str
+  end
+
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type 'base t = Weight.Stable.V1.t * 'base Job.Stable.V1.t
+        [@@deriving sexp, bin_io, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type 'base t = 'base Stable.Latest.t [@@deriving sexp]
+end
+
+(** For merge proofs: Merging two base proofs or two merge proofs*)
+module Merge = struct
+  module Record = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type 'merge t =
+            { left: 'merge
+            ; right: 'merge
+            ; seq_no: Sequence_number.Stable.V1.t
+            ; status: Job_status.Stable.V1.t }
+          [@@deriving sexp, bin_io, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type 'merge t = 'merge Stable.Latest.t [@@deriving sexp]
+  end
+
+  module Job = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type 'merge t =
+            | Empty
+            | Part of 'merge (*When only the left component of the job is available since we always complete the jobs from left to right*)
+            | Full of 'merge Record.Stable.V1.t
+          [@@deriving sexp, bin_io, version]
+        end
+
+        include T
+
+        let job_str = function
+          | Empty ->
+              "Merge.Empty"
+          | Full _ ->
+              "Merge.Full"
+          | Part _ ->
+              "Merge.Part"
+      end
+
+      module Latest = V1
+    end
+
+    type 'merge t = 'merge Stable.Latest.t =
+      | Empty
+      | Part of 'merge
+      | Full of 'merge Record.Stable.V1.t
+    [@@deriving sexp]
+
+    let job_str = Stable.Latest.job_str
+  end
+
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type 'merge t =
+          (Weight.Stable.V1.t * Weight.Stable.V1.t) * 'merge Job.Stable.V1.t
+        [@@deriving sexp, bin_io, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type 'merge t = 'merge Stable.Latest.t [@@deriving sexp]
+end
+
+(**All the jobs on a tree that can be done. Base.Full and Merge.Full*)
 module Available_job = struct
-  type sequence_no = int [@@deriving sexp]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('merge, 'base) t = Base of 'base | Merge of 'merge * 'merge
+        [@@deriving sexp]
+      end
 
-  type ('a, 'd) t = Base of 'd * sequence_no | Merge of 'a * 'a * sequence_no
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
+    | Base of 'base
+    | Merge of 'merge * 'merge
   [@@deriving sexp]
 end
 
-module Job_view = struct
-  type 'a node = Base of 'a option | Merge of 'a option * 'a option
-  [@@deriving sexp]
+(**New jobs to be added (including new transactions or new merge jobs)*)
+module Job = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('merge, 'base) t = Base of 'base | Merge of 'merge
+        [@@deriving sexp]
+      end
 
-  type 'a t = int * 'a node [@@deriving sexp]
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
+    | Base of 'base
+    | Merge of 'merge
+  [@@deriving sexp]
 end
 
+(**Space available and number of jobs required to enqueue data. 
+ first = space on the current tree and number of jobs required 
+ to be completed
+ second = If the current-tree space is less than <max_base_jobs> 
+ then remaining number of slots on a new tree and the corresponding
+ job count.*)
 module Space_partition = struct
-  type t = {first: int; second: int option} [@@deriving sexp]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = {first: int * int; second: (int * int) option}
+        [@@deriving sexp, bin_io, version {unnumbered}]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t = {first: int * int; second: (int * int) option}
+  [@@deriving sexp]
 end
 
-module State = struct
-  include State
+(**View of a job for json output*)
+module Job_view = struct
+  module Extra = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t =
+            { seq_no: Sequence_number.Stable.V1.t
+            ; status: Job_status.Stable.V1.t }
+          [@@deriving sexp, bin_io]
+        end
 
-  (* Creates state that placeholders-out all the right jobs in the right spot
-   * also we need to seed the buffer with exactly one piece of work
-  *)
-  let create : type a d. parallelism_log_2:int -> root_at_depth:int -> (a, d) t
-      =
-   fun ~parallelism_log_2 ~root_at_depth ->
-    let open Job in
-    let parallelism = Int.pow 2 parallelism_log_2 in
-    let jobs =
-      Ring_buffer.create ~len:((parallelism * 2) - 1) ~default:(Base None)
-    in
-    let repeat n x = List.init n ~f:(fun _ -> x) in
-    let merges1 = repeat (parallelism - 1) (Merge Empty) in
-    let bases1 = repeat parallelism (Base None) in
-    jobs.position <- -1 ;
-    List.iter [merges1; bases1] ~f:(Ring_buffer.add_many jobs) ;
-    let level_pointer =
-      Array.init (parallelism_log_2 + 1) ~f:(fun i -> Int.pow 2 i - 1)
-    in
-    assert (root_at_depth >= 0 && root_at_depth <= parallelism_log_2) ;
-    jobs.position <- 0 ;
-    { jobs
-    ; level_pointer
-    ; capacity= parallelism
-    ; acc= (0, None)
-    ; current_data_length= 0
-    ; base_none_pos= Some (parallelism - 1)
-    ; recent_tree_data= []
-    ; other_trees_data= []
-    ; stateful_work_order= Queue.create ()
-    ; curr_job_seq_no= 0
-    ; root_at_depth }
+        include T
+      end
 
-  let transactions {recent_tree_data; other_trees_data; _} =
-    List.(rev (concat (recent_tree_data :: other_trees_data)))
+      module Latest = V1
+    end
 
-  let next_leaf_pos p cur_pos =
-    if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
+    type t = Stable.Latest.t =
+      {seq_no: Sequence_number.Stable.V1.t; status: Job_status.Stable.V1.t}
+    [@@deriving sexp]
+  end
 
-  let is_at_root ~root_at_depth pos =
-    let root_starts = Int.pow 2 root_at_depth - 1 in
-    let root_ends = Int.pow 2 (root_at_depth + 1) - 2 in
-    root_starts <= pos && pos <= root_ends
+  module Node = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type 'a t =
+            | BEmpty
+            | BFull of ('a * Extra.Stable.V1.t)
+            | MEmpty
+            | MPart of 'a
+            | MFull of ('a * 'a * Extra.Stable.V1.t)
+          [@@deriving sexp, bin_io]
+        end
 
-  let slots_per_block state = parallelism state / Int.pow 2 state.root_at_depth
+        include T
+      end
 
-  (*A block is a set of leaves that correspond to a ledger proof. If
-  root_at_depth = 0 then there would be just one block with all the leaves in
-  it. No of blocks = 2^root_at_depth. This function returns the starting
-  position of the block containing pos *)
-  let block_of state pos =
-    let total_leaves = State.parallelism state in
-    let slots_per_block = slots_per_block state in
-    let offset = total_leaves - 1 in
-    let block_number = (pos - offset) / slots_per_block in
-    offset + (block_number * slots_per_block)
+      module Latest = V1
+    end
 
-  let%test_unit "multiple blocks" =
-    let parallelism_log_2 = 5 in
-    let of_root_at_depth x =
-      let state = create ~parallelism_log_2 ~root_at_depth:x in
-      let slots_per_block = slots_per_block state in
-      let total_leaves = parallelism state in
-      let offset = total_leaves - 1 in
-      let all_leaves_positions =
-        List.init total_leaves ~f:(fun x -> x + offset)
-      in
-      let total_blocks =
-        List.fold ~init:0 all_leaves_positions ~f:(fun block_no pos ->
-            let block_start = block_of state pos in
-            let cur_block_no = (block_start - offset) / slots_per_block in
-            if block_no = cur_block_no then block_no
-            else
-              let block_end =
-                offset + ((block_no + 1) * slots_per_block) - 1
-              in
-              assert (pos - 1 = block_end) ;
-              cur_block_no )
-      in
-      assert (total_blocks + 1 = Int.pow 2 x)
-    in
-    of_root_at_depth 0 ;
-    of_root_at_depth 1 ;
-    of_root_at_depth 2 ;
-    of_root_at_depth 3 ;
-    of_root_at_depth 4 ;
-    of_root_at_depth 5
+    type 'a t = 'a Stable.Latest.t =
+      | BEmpty
+      | BFull of ('a * Extra.Stable.V1.t)
+      | MEmpty
+      | MPart of 'a
+      | MFull of ('a * 'a * Extra.Stable.V1.t)
+    [@@deriving sexp]
+  end
 
-  (*Assuming that Base Somes are picked in the same order*)
-  let next_base_pos state cur_pos =
-    let p = parallelism state in
-    let next_pos = next_leaf_pos p cur_pos in
-    match Ring_buffer.read_i state.jobs next_pos with
-    | Base None ->
-        Some next_pos
-    | _ ->
-        None
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type 'a t = {position: int; value: 'a Node.Stable.V1.t}
+        [@@deriving sexp, bin_io]
+      end
 
-  let%test_unit "parallelism derived from jobs" =
-    let of_parallelism_log_2 x =
-      let s = create ~parallelism_log_2:x ~root_at_depth:1 in
-      assert (parallelism s = Int.pow 2 x)
-    in
-    of_parallelism_log_2 1 ;
-    of_parallelism_log_2 2 ;
-    of_parallelism_log_2 3 ;
-    of_parallelism_log_2 4 ;
-    of_parallelism_log_2 5 ;
-    of_parallelism_log_2 10
+      include T
+    end
 
-  let visualize state ~draw_a ~draw_d =
-    let none = "_" in
-    let print s1 s2 = Printf.sprintf "(%s,%s)" s1 s2 in
-    let draw_job = function
-      | Job.Merge Empty ->
-          print none none
-      | Job.Merge (Lcomp x) ->
-          print (draw_a x) none
-      | Job.Merge (Rcomp y) ->
-          print none (draw_a y)
-      | Job.Merge (Bcomp (x, y, _place)) ->
-          print (draw_a x) (draw_a y)
-      | Job.Base None ->
-          print none ""
-      | Job.Base (Some (d, _place)) ->
-          draw_d d
-    in
-    let jobs = jobs state in
-    let layers_rev =
-      Ring_buffer.fold jobs ~init:[[]] ~f:(fun layers job ->
-          let len = Int.pow 2 (List.length layers - 1) in
-          match layers with
-          | [] ->
-              failwith "impossible"
-          | hd :: rest ->
-              if List.length hd >= len then [job] :: layers
-              else (job :: hd) :: rest )
-      |> List.map ~f:List.rev
-    in
-    let to_draw_rev =
-      List.mapi layers_rev ~f:(fun i layer ->
-          let mould = Int.pow 2 (i + 1) in
-          let strs =
-            List.map layer ~f:(fun e ->
-                let job_str = draw_job e in
-                let job_out_len = Int.min (String.length job_str) mould in
-                let sliced = String.slice job_str 0 job_out_len in
-                let leftovers = mould - job_out_len in
-                let leftovers_2 = leftovers / 2 in
-                let spaces x = String.init x ~f:(Fn.const ' ') in
-                spaces leftovers_2 ^ sliced
-                ^ spaces (leftovers_2 + if leftovers mod 2 = 1 then 1 else 0)
-            )
-          in
-          String.concat strs )
-    in
-    String.concat ~sep:"\n" (List.rev to_draw_rev)
+    module Latest = V1
+  end
 
-  (**  A parallel scan state holds a sequence of jobs that needs to be completed.
-   *  A job can be a base job (Base d) or a merge job (Merge (a, a)).
-   *
-   *  The jobs are stored using a ring buffer impl of a breadth-first order
-   *  binary tree where the root node is at 0, it's left child is at 1, right
-   *  child at 2 and so on.
-   *
-   *  The leaves are at indices p-1 to 2p - 2 and the parent of each node is at
-   *  (node_index-1)/2. For example, with parallelism of size 8 (p=8) the tree
-   *  looks like this: (M = Merge, B = Base)
-   *
-   *                      0
-   *                      M
-   *             1                 2
-   *             M                 M
-   *         3        4        5        6
-   *         M        M        M        M
-   *      7    8   9    10  11   12  13   14
-   *      B    B   B    B   B    B   B    B
-   *
-   * When a job (base or merge) is completed, its result is put into a new merge
-   * job at it's parent index and a vacancy is created at the current job's
-   * position. New base jobs are added separately (by enqueue_data).
-   * Parallel scan starts at the root, traverses in the breadth-first order, and
-   * completes the jobs as and when they are available.
-   * When the merge job at the root node is completed, the result is returned.
-   *
-   * Think of the ring buffer's 2*n-1 elements as holding (almost) two steps of
-   * execution at parallelism of size n. Assume we're always working on the
-   * second step, and can refer to the work done at the prior step.
-   *
-   *
-   * Example trace: Jobs buffer at some state t
-   *                      0
-   *                   M(1,8)
-   *
-   *             1                 2
-   *           M(9,12)           M(13,16)
-   *
-   *         3        4        5        6
-   *     M(17,18)  M(19,20) M(21,22)  M(23,24)
-   *
-   *      7    8   9    10  11   12  13   14
-   *     B25  B26 B27   B28 B29  B30 B31  B32
-   *
-   * After one iteration (assuming all the available jobs from state t are
-   * completed):
-   *                      0
-   *                   M(9,16)
-   *
-   *             1                 2
-   *         M(17,20)           M(21,24)
-   *
-   *        3         4        5        6
-   *     M(25,26)  M(27,28) M(29,30)  M(31,32)
-   *
-   *      7    8   9    10  11   12  13   14
-   *    B()   B() B()   B() B()  B() B()  B()
-   *
-  *)
+  type 'a t = 'a Stable.Latest.t = {position: int; value: 'a Node.Stable.V1.t}
+  [@@deriving sexp]
+end
 
-  let dir c = if c mod 2 = 1 then `Left else `Right
+module Hash = struct
+  type t = Digestif.SHA256.t [@@deriving eq]
+end
 
-  let rec parent_empty (t : ('a, 'b) Job.t Ring_buffer.t) pos =
-    match pos with
-    | 0 ->
-        true
-    | pos -> (
-      match (dir pos, Ring_buffer.read_i t ((pos - 1) / 2)) with
-      | _, Merge Empty ->
-          true
-      | `Left, Merge (Rcomp _) ->
-          true
-      | `Right, Merge (Lcomp _) ->
-          true
-      | _, Merge (Bcomp _) ->
-          parent_empty t ((pos - 1) / 2)
-      | _, Base _ ->
-          failwith "This shouldn't have occured"
-      | _ ->
-          false )
+(**A single tree with number of leaves = max_base_jobs = 2**transaction_capacity_log_2 *)
+module Tree = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('merge_t, 'base_t) t =
+          | Leaf of 'base_t
+          | Node of
+              { depth: int
+              ; value: 'merge_t
+              ; sub_tree: ('merge_t * 'merge_t, 'base_t * 'base_t) t }
+        [@@deriving sexp, bin_io, version]
+      end
 
-  (*Level_pointer stores a start index for each level. These are, at first,
-    the indices of the first node on each level and get incremented when a job is
-    completed at the specific index. The tree is still traveresed breadth-first
-    but the order of nodes on each level is determined using the start index that
-    is kept track of in the level_pointer. if the cur_pos is the last node on the
-    current level then next node is the first node on the next level otherwise
-    return the next node on the same level*)
+      include T
+    end
 
-  let next_position_info parallelism level_pointer cur_pos =
-    let levels = Int.floor_log2 parallelism + 1 in
-    let cur_level = Int.floor_log2 (cur_pos + 1) in
-    let last_node = Int.pow 2 (cur_level + 1) - 2 in
-    let first_node = Int.pow 2 cur_level - 1 in
-    if
-      (level_pointer.(cur_level) = first_node && cur_pos = last_node)
-      || cur_pos = level_pointer.(cur_level) - 1
-    then `Next_level level_pointer.(Int.( % ) (cur_level + 1) levels)
-    else if cur_pos = last_node then `Same_level first_node
-    else `Same_level (cur_pos + 1)
+    module Latest = V1
+  end
 
-  let next_position parallelism level_pointer cur_pos =
-    match next_position_info parallelism level_pointer cur_pos with
-    | `Same_level pos ->
-        pos
-    | `Next_level pos ->
-        pos
+  type ('merge_t, 'base_t) t = ('merge_t, 'base_t) Stable.Latest.t =
+    | Leaf of 'base_t
+    | Node of
+        { depth: int
+        ; value: 'merge_t
+        ; sub_tree: ('merge_t * 'merge_t, 'base_t * 'base_t) t }
+  [@@deriving sexp]
 
-  (*On each level, the jobs are completed starting from a specific index that
-    is stored in levels_pointer. When a job at that index is completed, it points
-    to the next job on the same level. After the last node of the level, the
-    index is set back to first node*)
-  let incr_level_pointer t cur_pos =
-    let cur_level = Int.floor_log2 (cur_pos + 1) in
-    if t.level_pointer.(cur_level) = cur_pos then
-      let last_node = Int.pow 2 (cur_level + 1) - 2 in
-      let first_node = Int.pow 2 cur_level - 1 in
-      if cur_pos + 1 <= last_node then
-        t.level_pointer.(cur_level) <- cur_pos + 1
-      else t.level_pointer.(cur_level) <- first_node
-    else ()
+  (*Eg: Tree depth = 3
 
-  let job_ready job =
-    let module J = Job in
-    let module A = Available_job in
-    match job with
-    | J.Base (Some (d, o)) ->
-        Some (A.Base (d, o))
-    | J.Merge (Bcomp (a, b, o)) ->
-        Some (A.Merge (a, b, o))
-    | _ ->
-        None
+    Node M
+    |
+    Node (M,M)
+    |
+    Node ((M,M),(M,M))
+    |
+    Leaf (((B,B),(B,B)),((B,B),(B,B))) 
+   *)
 
-  let job state index =
-    match job_ready (Ring_buffer.read_i state.jobs index) with
-    | None ->
-        Or_error.errorf
-          "Invalid state of the scan: Found an un-Available_job.t at %d " index
-    | Some e ->
-        Ok e
+  (*mapi where i is the level of the tree*)
+  let rec map_depth : type a_merge b_merge c_base d_base.
+         f_merge:(int -> a_merge -> b_merge)
+      -> f_base:(c_base -> d_base)
+      -> (a_merge, c_base) t
+      -> (b_merge, d_base) t =
+   fun ~f_merge ~f_base tree ->
+    match tree with
+    | Leaf d ->
+        Leaf (f_base d)
+    | Node {depth; value; sub_tree} ->
+        Node
+          { depth
+          ; value= f_merge depth value
+          ; sub_tree=
+              map_depth
+                ~f_merge:(fun i (x, y) -> (f_merge i x, f_merge i y))
+                ~f_base:(fun (x, y) -> (f_base x, f_base y))
+                sub_tree }
 
-  let jobs_ready_sequence state =
-    let open Sequence in
-    let app elt elts = append elts (return elt) in
-    let open Or_error.Let_syntax in
-    Queue.fold state.stateful_work_order ~init:(Ok empty) ~f:(fun seq index ->
-        let%bind seq = seq in
-        let%map elt = job state index in
-        if parent_empty state.jobs index then app elt seq else seq )
+  let map : type a_merge b_merge c_base d_base.
+         f_merge:(a_merge -> b_merge)
+      -> f_base:(c_base -> d_base)
+      -> (a_merge, c_base) t
+      -> (b_merge, d_base) t =
+   fun ~f_merge ~f_base tree ->
+    map_depth tree ~f_base ~f_merge:(fun _ -> f_merge)
 
-  let jobs_ready state =
-    let open Or_error.Let_syntax in
-    let%map lst =
-      Queue.fold state.stateful_work_order ~init:(Ok []) ~f:(fun lst index ->
-          let%bind lst = lst in
-          let%map elt = job state index in
-          if parent_empty state.jobs index then elt :: lst else lst )
-    in
-    List.rev lst
-
-  let base_jobs_on_latest_tree (state : ('a, 'd) t) : 'd list =
-    let parallelism = parallelism state in
-    let leaves_start_at =
-      Option.value_map ~default:(parallelism - 1) state.base_none_pos
-        ~f:(block_of state)
-    in
-    let rec go pos jobs =
-      (*Get jobs from leaf-0 to the leaf at current enqueue position. The ones that are after base_pos are pending jobs from previous tree *)
-      if
-        Option.is_none state.base_none_pos
-        || pos >= Option.value_exn state.base_none_pos
-      then jobs
-      else
-        let jobs =
-          match Ring_buffer.read_i state.jobs pos with
-          | Job.Base (Some (j, _)) ->
-              j :: jobs
-          | _ ->
-              jobs
-        in
-        go (pos + 1) jobs
-    in
-    go leaves_start_at []
-
-  let update_new_job t z dir pos =
-    let new_job (cur_job : ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
-      match (dir, cur_job) with
-      | `Left, Merge Empty ->
-          Ok (Merge (Lcomp z))
-      | `Right, Merge Empty ->
-          Ok (Merge (Rcomp z))
-      | `Left, Merge (Rcomp a) ->
-          Ok (Merge (Bcomp (z, a, t.curr_job_seq_no)))
-      | `Right, Merge (Lcomp a) ->
-          Ok (Merge (Bcomp (a, z, t.curr_job_seq_no)))
-      | `Left, Merge (Lcomp _) | `Right, Merge (Rcomp _) | _, Merge (Bcomp _)
-        ->
-          (*TODO: punish the sender*)
-          Or_error.errorf
-            !"Impossible: the side of merge we want is not empty (loc: %d)"
-            pos
-      | _, Base _ ->
-          Error (Error.of_string "impossible: we never fill base")
-    in
-    Ring_buffer.direct_update t.jobs pos ~f:new_job
-
-  let update_cur_job t job pos : unit Or_error.t =
-    Ring_buffer.direct_update t.jobs pos ~f:(fun _ -> Ok job)
-
-  let work :
-         ('a, 'd) t
-      -> 'a Completed_job.t
-      -> ('a, 'b) Job.t Ring_buffer.t
-      -> int
-      -> unit Or_error.t =
-   fun t completed_job old_jobs cur_pos ->
-    let open Or_error.Let_syntax in
-    let cur_job = Ring_buffer.read_i t.jobs cur_pos in
-    match (parent_empty old_jobs cur_pos, cur_job, completed_job) with
-    | true, Merge (Bcomp _), Merged z ->
-        let%bind () =
-          if is_at_root ~root_at_depth:t.root_at_depth cur_pos then (
-            match List.rev t.other_trees_data with
-            | [] ->
-                failwith
-                  "Not possible, if we're emitting something, we have data"
-            | last :: rest ->
-                t.acc <- (fst t.acc |> Int.( + ) 1, Some (z, List.rev last)) ;
-                t.other_trees_data <- List.rev rest ;
-                Ok () )
-          else
-            let parent_pos = (cur_pos - 1) / 2 in
-            let%map () = update_new_job t z (dir cur_pos) parent_pos in
-            match Ring_buffer.read_i t.jobs parent_pos with
-            | Merge (Bcomp _) ->
-                Queue.enqueue t.stateful_work_order parent_pos
-            | _ ->
-                ()
-        in
-        let () = incr_level_pointer t cur_pos in
-        let%map () = update_cur_job t (Merge Empty) cur_pos in
-        ()
-    | true, Base (Some _), Lifted z ->
-        let parent_pos = (cur_pos - 1) / 2 in
-        let%bind () = update_new_job t z (dir cur_pos) parent_pos in
-        let%bind () = update_cur_job t (Base None) cur_pos in
-        let () = incr_level_pointer t cur_pos in
-        t.base_none_pos <- Some (Option.value t.base_none_pos ~default:cur_pos) ;
-        t.current_data_length <- t.current_data_length - 1 ;
-        let () =
-          match Ring_buffer.read_i t.jobs parent_pos with
-          | Merge (Bcomp _) ->
-              Queue.enqueue t.stateful_work_order parent_pos
-          | _ ->
-              ()
-        in
-        Ok ()
-    | false, _, _ ->
-        Or_error.errorf "Parent of Job at %d not empty" cur_pos
-    | _ ->
-        Or_error.errorf "Job-to-do and Job-done doesn't match (at pos %d)"
-          cur_pos
-
-  let rec consume : type a d.
-         (a, d) t
-      -> a State.Completed_job.t list
-      -> (a, d) Job.t Ring_buffer.t
-      -> unit Or_error.t =
-   fun t completed_jobs jobs_copy ->
-    let open Or_error.Let_syntax in
-    match completed_jobs with
-    | [] ->
-        Ok ()
-    | j :: js -> (
-      match Queue.dequeue t.stateful_work_order with
-      | None ->
-          Or_error.error_string "Work order state out of sync"
-      | Some pos ->
-          let%bind () = work t j jobs_copy pos in
-          consume t js jobs_copy )
-
-  let include_one_datum state value base_pos : unit Or_error.t =
-    let open Or_error.Let_syntax in
-    let f (job : ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
-      match job with
-      | Base None ->
-          Ok (Base (Some (value, state.curr_job_seq_no)))
-      | _ ->
-          Or_error.error_string "Invalid job encountered while enqueuing data"
-    in
-    let%map () = Ring_buffer.direct_update (State.jobs state) base_pos ~f in
-    let last_leaf_pos = block_of state base_pos + slots_per_block state - 1 in
-    if base_pos = last_leaf_pos then (
-      state.other_trees_data
-      <- (value :: state.recent_tree_data) :: state.other_trees_data ;
-      state.recent_tree_data <- [] )
-    else state.recent_tree_data <- value :: state.recent_tree_data
-
-  let include_many_data (state : ('a, 'd) State.t) data : unit Or_error.t =
-    List.fold ~init:(Ok ()) data ~f:(fun acc a ->
-        let open Or_error.Let_syntax in
-        let%bind () = acc in
-        match State.base_none_pos state with
-        | None ->
-            Or_error.error_string "No empty leaves"
-        | Some pos ->
-            let%map () = include_one_datum state a pos in
-            let () = Queue.enqueue state.stateful_work_order pos in
-            state.base_none_pos <- next_base_pos state pos )
-
+  (* foldi where i is the cur_level*)
   module Make_foldable (M : Monad.S) = struct
-    let fold_chronological_until t ~init ~f ~finish =
-      let n = Array.length t.jobs.data in
+    let rec fold_depth_until' : type merge_t accum base_t final.
+           f_merge:(   int
+                    -> accum
+                    -> merge_t
+                    -> (accum, final) Continue_or_stop.t M.t)
+        -> f_base:(accum -> base_t -> (accum, final) Continue_or_stop.t M.t)
+        -> init:accum
+        -> (merge_t, base_t) t
+        -> (accum, final) Continue_or_stop.t M.t =
+     fun ~f_merge ~f_base ~init:acc t ->
+      let open Container.Continue_or_stop in
       let open M.Let_syntax in
-      let rec go acc i pos =
-        let open Container.Continue_or_stop in
-        if Int.equal i n then M.return (Continue acc)
-        else
-          let x = t.jobs.data.(pos) in
-          match%bind f acc x with
-          | Continue subresult ->
-              go subresult (i + 1)
-                (next_position (parallelism t) t.level_pointer pos)
-          | Stop aborted_value ->
-              M.return (Stop aborted_value)
-      in
-      match%bind go init 0 0 with
+      match t with
+      | Leaf d ->
+          f_base acc d
+      | Node {depth; value; sub_tree} -> (
+          match%bind f_merge depth acc value with
+          | Continue acc' ->
+              fold_depth_until'
+                ~f_merge:(fun i acc (x, y) ->
+                  match%bind f_merge i acc x with
+                  | Continue r ->
+                      f_merge i r y
+                  | x ->
+                      M.return x )
+                ~f_base:(fun acc (x, y) ->
+                  match%bind f_base acc x with
+                  | Continue r ->
+                      f_base r y
+                  | x ->
+                      M.return x )
+                ~init:acc' sub_tree
+          | x ->
+              M.return x )
+
+    let fold_depth_until : type merge_t base_t accum final.
+           f_merge:(   int
+                    -> accum
+                    -> merge_t
+                    -> (accum, final) Continue_or_stop.t M.t)
+        -> f_base:(accum -> base_t -> (accum, final) Continue_or_stop.t M.t)
+        -> init:accum
+        -> finish:(accum -> final M.t)
+        -> (merge_t, base_t) t
+        -> final M.t =
+     fun ~f_merge ~f_base ~init ~finish t ->
+      let open M.Let_syntax in
+      match%bind fold_depth_until' ~f_merge ~f_base ~init t with
       | Continue result ->
           finish result
       | Stop e ->
-          return e
+          M.return e
   end
 
   module Foldable_ident = Make_foldable (Monad.Ident)
 
-  let fold_chronological t ~init ~f =
-    Foldable_ident.fold_chronological_until t ~init
-      ~f:(fun acc job -> Container.Continue_or_stop.Continue (f acc job))
-      ~finish:Fn.id
+  let fold_depth : type merge_t base_t accum.
+         f_merge:(int -> accum -> merge_t -> accum)
+      -> f_base:(accum -> base_t -> accum)
+      -> init:accum
+      -> (merge_t, base_t) t
+      -> accum =
+   fun ~f_merge ~f_base ~init t ->
+    Foldable_ident.fold_depth_until
+      ~f_merge:(fun i acc a -> Continue (f_merge i acc a))
+      ~f_base:(fun acc d -> Continue (f_base acc d))
+      ~init ~finish:Fn.id t
 
-  (* Reset the sequence number starting from 1
-     If [997;997;998;998;998;999;999] is sequence number of the current
-     available jobs
-     then [1;1;2;2;2;3;3] will be the new sequence numbers of the same jobs *)
-  let reset_seq_no t =
+  let fold : type merge_t base_t accum.
+         f_merge:(accum -> merge_t -> accum)
+      -> f_base:(accum -> base_t -> accum)
+      -> init:accum
+      -> (merge_t, base_t) t
+      -> accum =
+   fun ~f_merge ~f_base ~init t ->
+    fold_depth t ~init ~f_merge:(fun _ -> f_merge) ~f_base
+
+  let _fold_until : type merge_t base_t accum final.
+         f_merge:(accum -> merge_t -> (accum, final) Continue_or_stop.t)
+      -> f_base:(accum -> base_t -> (accum, final) Continue_or_stop.t)
+      -> init:accum
+      -> finish:(accum -> final)
+      -> (merge_t, base_t) t
+      -> final =
+   fun ~f_merge ~f_base ~init ~finish t ->
+    Foldable_ident.fold_depth_until
+      ~f_merge:(fun _ -> f_merge)
+      ~f_base ~init ~finish t
+
+  (*
+    result -> final proof
+    f_merge, f_base are to update the nodes with new jobs and mark old jobs as "Done"*)
+  let rec update_split : type merge_t base_t data weight result.
+         f_merge:(data -> int -> merge_t -> (merge_t * result option) Or_error.t)
+      -> f_base:(data -> base_t -> base_t Or_error.t)
+      -> weight_merge:(merge_t -> weight * weight)
+      -> jobs:data
+      -> update_level:int
+      -> jobs_split:(weight * weight -> data -> data * data)
+      -> (merge_t, base_t) t
+      -> ((merge_t, base_t) t * result option) Or_error.t =
+   fun ~f_merge ~f_base ~weight_merge ~jobs ~update_level ~jobs_split t ->
     let open Or_error.Let_syntax in
-    let seq_no_at x =
-      match Ring_buffer.read_i t.jobs x with
-      | Job.Base (Some (_, s)) ->
-          Ok s
-      | Merge (Bcomp (_, _, s)) ->
-          Ok s
-      | _ ->
-          Or_error.error_string (sprintf "Expecting a completed job at %d" x)
-    in
-    let job_with_new_seq x seq_no =
-      match Ring_buffer.read_i t.jobs x with
-      | Job.Base (Some (d, _)) ->
-          Ok (Job.Base (Some (d, seq_no)))
-      | Merge (Bcomp (a1, a2, _)) ->
-          Ok (Merge (Bcomp (a1, a2, seq_no)))
-      | _ ->
-          Or_error.error_string (sprintf "Expecting a completed job at %d" x)
-    in
-    let first_seq_no =
-      match Queue.peek t.stateful_work_order with
-      | None ->
-          Ok 1
-      | Some x ->
-          seq_no_at x
-    in
-    Queue.fold ~init:(Ok 0) t.stateful_work_order ~f:(fun cur_seq index ->
-        let%bind seq_no =
-          Or_error.bind cur_seq ~f:(fun _ -> seq_no_at index)
+    match t with
+    | Leaf d ->
+        let%map updated = f_base jobs d in
+        (Leaf updated, None)
+    | Node {depth; value; sub_tree} ->
+        let weight_left_subtree, weight_right_subtree = weight_merge value in
+        (*update the jobs at the current level*)
+        let%bind value', scan_result = f_merge jobs depth value in
+        (*get the updated subtree*)
+        let%map sub, _ =
+          if update_level = depth then Ok (sub_tree, None)
+          else
+            (*split the jobs for the next level*)
+            let new_jobs_list =
+              jobs_split (weight_left_subtree, weight_right_subtree) jobs
+            in
+            update_split
+              ~f_merge:(fun (b, b') i (x, y) ->
+                let%bind left = f_merge b i x in
+                let%map right = f_merge b' i y in
+                ((fst left, fst right), Option.both (snd left) (snd right)) )
+              ~f_base:(fun (b, b') (x, x') ->
+                let%bind left = f_base b x in
+                let%map right = f_base b' x' in
+                (left, right) )
+              ~weight_merge:(fun (a, b) -> (weight_merge a, weight_merge b))
+              ~update_level
+              ~jobs_split:(fun (x, y) (a, b) ->
+                (jobs_split x a, jobs_split y b) )
+              ~jobs:new_jobs_list sub_tree
         in
-        let%bind offset = first_seq_no in
-        let new_seq_no = seq_no - offset + 1 in
-        let%map () =
-          Or_error.bind (job_with_new_seq index new_seq_no)
-            ~f:(fun updated_job -> update_cur_job t updated_job index)
+        (Node {depth; value= value'; sub_tree= sub}, scan_result)
+
+  let rec update_accumulate : type merge_t base_t data.
+         f_merge:(data * data -> merge_t -> merge_t * data)
+      -> f_base:(base_t -> base_t * data)
+      -> (merge_t, base_t) t
+      -> (merge_t, base_t) t * data =
+   fun ~f_merge ~f_base t ->
+    let transpose ((x1, y1), (x2, y2)) = ((x1, x2), (y1, y2)) in
+    match t with
+    | Leaf d ->
+        let new_base, count_list = f_base d in
+        (Leaf new_base, count_list)
+    | Node {depth; value; sub_tree} ->
+        (*get the updated subtree*)
+        let sub, counts =
+          update_accumulate
+            ~f_merge:(fun (b1, b2) (x, y) ->
+              transpose (f_merge b1 x, f_merge b2 y) )
+            ~f_base:(fun (x, y) -> transpose (f_base x, f_base y))
+            sub_tree
         in
-        new_seq_no )
+        let value', count_list = f_merge counts value in
+        (Node {depth; value= value'; sub_tree= sub}, count_list)
+
+  let update :
+         ('merge_job, 'base_job) Job.t list
+      -> update_level:int
+      -> sequence_no:int
+      -> weight_lens:(Weight.t, int) Lens.t
+      -> ('merge_t, 'base_t) t
+      -> (('merge_t, 'base_t) t * 'b option) Or_error.t =
+   fun completed_jobs ~update_level ~sequence_no:seq_no ~weight_lens tree ->
+    let open Or_error.Let_syntax in
+    let add_merges (jobs : ('b, 'c) Job.t list) cur_level
+        (((w1, w2) as weight), m) =
+      let left, right = (weight_lens.get w1, weight_lens.get w2) in
+      if cur_level = update_level - 1 then
+        (*Create new jobs from the completed ones*)
+        let%map new_weight, m' =
+          match (jobs, m) with
+          | [], _ ->
+              Ok (weight, m)
+          | [Job.Merge a; Merge b], Merge.Job.Empty ->
+              Ok
+                ( ( weight_lens.set (left - 1) w1
+                  , weight_lens.set (right - 1) w2 )
+                , Full {left= a; right= b; seq_no; status= Job_status.Todo} )
+          | [Merge a], Empty ->
+              Ok
+                ( (weight_lens.set (left - 1) w1, weight_lens.set right w2)
+                , Part a )
+          | [Merge b], Part a ->
+              Ok
+                ( (weight_lens.set left w1, weight_lens.set (right - 1) w2)
+                , Full {left= a; right= b; seq_no; status= Job_status.Todo} )
+          | [Base _], Empty ->
+              (*Depending on whether this is the first or second of the two base jobs*)
+              let weight =
+                if left = 0 then
+                  (weight_lens.set left w1, weight_lens.set (right - 1) w2)
+                else (weight_lens.set (left - 1) w1, weight_lens.set right w2)
+              in
+              Ok (weight, m)
+          | [Base _; Base _], Empty ->
+              Ok
+                ( ( weight_lens.set (left - 1) w1
+                  , weight_lens.set (right - 1) w2 )
+                , m )
+          | xs, m ->
+              Or_error.errorf
+                "Got %d jobs when updating level %d and when one of the merge \
+                 nodes at level %d is %s"
+                (List.length xs) update_level cur_level (Merge.Job.job_str m)
+        in
+        ((new_weight, m'), None)
+      else if cur_level = update_level then
+        (*Mark completed jobs as Done*)
+        match (jobs, m) with
+        | [Merge a], Full ({status= Job_status.Todo; _} as x) ->
+            let new_job = Merge.Job.Full {x with status= Job_status.Done} in
+            let scan_result, weight' =
+              if cur_level = 0 then
+                (Some a, (weight_lens.set 0 w1, weight_lens.set 0 w2))
+              else (None, weight)
+            in
+            Ok ((weight', new_job), scan_result)
+        | [], m ->
+            Ok ((weight, m), None)
+        | xs, m ->
+            Or_error.errorf
+              "Got %d jobs when updating level %d and when one of the merge \
+               nodes at level %d is %s"
+              (List.length xs) update_level cur_level (Merge.Job.job_str m)
+      else if cur_level < update_level - 1 then
+        (*Update the job count for all the level above*)
+        match jobs with
+        | [] ->
+            Ok ((weight, m), None)
+        | _ ->
+            let jobs_sent_left = min (List.length jobs) left in
+            let jobs_sent_right =
+              min (List.length jobs - jobs_sent_left) right
+            in
+            let new_weight =
+              ( weight_lens.set (left - jobs_sent_left) w1
+              , weight_lens.set (right - jobs_sent_right) w2 )
+            in
+            Ok ((new_weight, m), None)
+      else Ok ((weight, m), None)
+    in
+    let add_bases jobs (w, d) =
+      let weight = weight_lens.get w in
+      match (jobs, d) with
+      | [], _ ->
+          Ok (w, d)
+      | [Job.Base d], Base.Job.Empty ->
+          Ok
+            ( weight_lens.set (weight - 1) w
+            , Base.Job.Full {job= d; seq_no; status= Job_status.Todo} )
+      | [Job.Merge _], Full b ->
+          Ok (w, Full {b with status= Job_status.Done})
+      | xs, _ ->
+          Or_error.errorf
+            "Got %d jobs when updating level %d and when one of the base \
+             nodes is %s"
+            (List.length xs) update_level (Base.Job.job_str d)
+    in
+    let jobs = completed_jobs in
+    update_split ~f_merge:add_merges ~f_base:add_bases tree ~weight_merge:fst
+      ~jobs ~update_level ~jobs_split:(fun (w1, w2) a ->
+        let l = weight_lens.get w1 in
+        let r = weight_lens.get w2 in
+        (List.take a l, List.take (List.drop a l) r) )
+
+  let reset_weights :
+         [`Base | `Merge | `Both]
+      -> ('merge_t, 'base_t) t
+      -> ('merge_t, 'base_t) t =
+   fun weight_type tree ->
+    let set_all_zero weight = Weight.base.set 0 (Weight.merge.set 0 weight) in
+    let f_base base =
+      let set_one (lens : (Weight.t, int) Lens.t) weight = lens.set 1 weight in
+      let set_zero (lens : (Weight.t, int) Lens.t) weight =
+        lens.set 0 weight
+      in
+      let update_merge_weight weight =
+        (*When updating the merge-weight of base nodes, only the nodes with
+        "Todo" status needs to be included*)
+        match snd base with
+        | Base.Job.Full {status= Job_status.Todo; _} ->
+            set_one Weight.merge weight
+        | _ ->
+            set_zero Weight.merge weight
+      in
+      let update_base_weight weight =
+        (*When updating the base-weight of base nodes, only the Empty nodes
+        need to be included*)
+        match snd base with
+        | Base.Job.Empty ->
+            set_one Weight.base weight
+        | _ ->
+            set_zero Weight.base weight
+      in
+      let new_weight, dummy_right_for_base_nodes =
+        match weight_type with
+        | `Merge ->
+            (update_merge_weight (fst base), set_zero Weight.merge (fst base))
+        | `Base ->
+            (update_base_weight (fst base), set_zero Weight.base (fst base))
+        | `Both ->
+            let w' = update_base_weight (fst base) in
+            (update_merge_weight w', set_all_zero w')
+      in
+      ((new_weight, snd base), (new_weight, dummy_right_for_base_nodes))
+    in
+    let f_merge lst m =
+      let (w1, w2), (w3, w4) = lst in
+      let reset (lens : (Weight.t, int) Lens.t) (w, w') =
+        (* Weights of all other jobs is sum of weights of its children*)
+        ( lens.set (lens.get w1 + lens.get w2) w
+        , lens.set (lens.get w3 + lens.get w4) w' )
+      in
+      let w' =
+        match weight_type with
+        | `Merge -> (
+            (*When updating the merge-weight of merge nodes, only the nodes
+            with "Todo" status needs to be included*)
+            let lens = Weight.merge in
+            match m with
+            | (w1', w2'), Merge.Job.Full {status= Job_status.Todo; _} ->
+                (lens.set 1 w1', lens.set 0 w2')
+            | w, _ ->
+                reset lens w )
+        | `Base ->
+            (* The base-weight of merge nodes is the sum of weights of its
+            children*)
+            reset Weight.base (fst m)
+        | `Both ->
+            reset Weight.merge (reset Weight.base (fst m))
+      in
+      ((w', snd m), w')
+    in
+    fst (update_accumulate ~f_merge ~f_base tree)
+
+  let jobs_on_level :
+         depth:int
+      -> level:int
+      -> ('merge_t, 'base_t) t
+      -> ('merge_job, 'base_job) Available_job.t list =
+   fun ~depth ~level tree ->
+    fold_depth ~init:[]
+      ~f_merge:(fun i acc a ->
+        match (i = level, a) with
+        | true, (_weight, Merge.Job.Full {left; right; status= Todo; _}) ->
+            Available_job.Merge (left, right) :: acc
+        | _ ->
+            acc )
+      ~f_base:(fun acc d ->
+        match (level = depth, d) with
+        | true, (_weight, Base.Job.Full {job; status= Todo; _}) ->
+            Available_job.Base job :: acc
+        | _ ->
+            acc )
+      tree
+    |> List.rev
+
+  let to_hashable_jobs :
+      ('merge_t, 'base_t) t -> ('merge_job, 'base_job) Job.t list =
+   fun tree ->
+    fold ~init:[]
+      ~f_merge:(fun acc a ->
+        match a with
+        | _, Merge.Job.Full {status= Job_status.Done; _} ->
+            acc
+        | _ ->
+            Job.Merge a :: acc )
+      ~f_base:(fun acc d ->
+        match d with
+        | _, Base.Job.Full {status= Job_status.Done; _} ->
+            acc
+        | _ ->
+            Job.Base d :: acc )
+      tree
+    |> List.rev
+
+  let jobs_records :
+      ('merge_t, 'base_t) t -> ('merge_job, 'base_job) Job.t list =
+   fun tree ->
+    fold ~init:[]
+      ~f_merge:(fun acc a ->
+        match a with
+        | _weight, Merge.Job.Full x ->
+            Job.Merge x :: acc
+        | _ ->
+            acc )
+      ~f_base:(fun acc d ->
+        match d with _weight, Base.Job.Full j -> Job.Base j :: acc | _ -> acc
+        )
+      tree
+    |> List.rev
+
+  let base_jobs : ('merge_t, _ * 'base_job Base.Job.t) t -> 'base_job list =
+   fun tree ->
+    fold_depth ~init:[]
+      ~f_merge:(fun _ _ _ -> [])
+      ~f_base:(fun acc d ->
+        match d with _, Base.Job.Full {job; _} -> job :: acc | _ -> acc )
+      tree
+    |> List.rev
+
+  let leaves : ('merge_t, 'base_t) t -> 'base_t list =
+   fun tree ->
+    fold_depth ~init:[]
+      ~f_merge:(fun _ _ _ -> [])
+      ~f_base:(fun acc d ->
+        match d with _, Base.Job.Full _ -> d :: acc | _ -> acc )
+      tree
+    |> List.rev
+
+  let rec _view_tree : type merge_t base_t.
+         (merge_t, base_t) t
+      -> show_merge:(merge_t -> string)
+      -> show_base:(base_t -> string)
+      -> string =
+   fun tree ~show_merge ~show_base ->
+    match tree with
+    | Leaf d ->
+        sprintf !"Leaf %s\n" (show_base d)
+    | Node {value; sub_tree; _} ->
+        let curr = sprintf !"Node %s\n" (show_merge value) in
+        let subtree =
+          _view_tree sub_tree
+            ~show_merge:(fun (x, y) ->
+              sprintf !"%s  %s" (show_merge x) (show_merge y) )
+            ~show_base:(fun (x, y) ->
+              sprintf !"%s  %s" (show_base x) (show_base y) )
+        in
+        curr ^ subtree
+
+  let required_job_count = function
+    | Node {value= (w1, w2), _; _} ->
+        Weight.merge.get w1 + Weight.merge.get w2
+    | Leaf (w, _) ->
+        Weight.merge.get w
+
+  let available_space = function
+    | Node {value= (w1, w2), _; _} ->
+        Weight.base.get w1 + Weight.base.get w2
+    | Leaf (w, _) ->
+        Weight.base.get w
+
+  let view_jobs_with_position (tree : ('a, 'd) t) fa fd : 'c Job_view.t list =
+    let f_merge acc a =
+      let view =
+        match snd a with
+        | Merge.Job.Empty ->
+            Job_view.Node.MEmpty
+        | Part a ->
+            MPart (fa a)
+        | Full {left; right; seq_no; status} ->
+            MFull (fa left, fa right, {Job_view.Extra.status; seq_no})
+      in
+      view :: acc
+    in
+    let f_base acc a =
+      let view =
+        match snd a with
+        | Base.Job.Empty ->
+            Job_view.Node.BEmpty
+        | Full {seq_no; status; job} ->
+            BFull (fd job, {seq_no; status})
+      in
+      view :: acc
+    in
+    let lst = fold ~f_merge ~f_base ~init:[] tree in
+    let len = List.length lst - 1 in
+    List.rev_mapi lst ~f:(fun i value -> {Job_view.position= len - i; value})
 end
 
-let view_jobs_with_position (t : ('a, 'd) State.t) fa fd =
-  Ring_buffer.foldi t.jobs ~init:[] ~f:(fun i jobs job ->
-      let job' =
-        match job with
-        | State.Job.Base x ->
-            Job_view.Base (Option.map ~f:(fun (d, _) -> fd d) x)
-        | Merge Empty ->
-            Merge (None, None)
-        | Merge (Lcomp x) ->
-            Merge (Some (fa x), None)
-        | Merge (Rcomp y) ->
-            Merge (None, Some (fa y))
-        | Merge (Bcomp (x, y, _)) ->
-            Merge (Some (fa x), Some (fa y))
-      in
-      (i, job') :: jobs )
-  |> List.rev
+(*This struture works well because we always complete all the nodes on a specific level before proceeding to the next level*)
+module T = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('merge, 'base) t =
+          { trees:
+              ( 'merge Merge.Stable.V1.t
+              , 'base Base.Stable.V1.t )
+              Tree.Stable.V1.t
+              Non_empty_list.Stable.V1.t
+                (*use non empty list*)
+          ; acc: ('merge * 'base list) option
+                (*last emitted proof and the corresponding transactions*)
+          ; curr_job_seq_no: int
+                (*Sequence number for the jobs added every block*)
+          ; max_base_jobs: int (*transaction_capacity_log_2*)
+          ; delay: int }
+        [@@deriving sexp, bin_io, version]
+      end
 
-let start : type a d.
-    parallelism_log_2:int -> root_at_depth:int -> (a, d) State.t =
-  State.create
+      include T
 
-let next_jobs :
-    state:('a, 'd) State.t -> ('a, 'd) Available_job.t list Or_error.t =
- fun ~state -> State.jobs_ready state
+      (*Delete all the completed jobs because
+        1. They are completed
+        2. They are not required to create new jobs anymore
+        3. We are not exposing these jobs for any sort of computation as of now*)
+      let with_leaner_trees ({trees; _} as t) =
+        let trees =
+          Non_empty_list.map trees ~f:(fun tree ->
+              Tree.map tree
+                ~f_merge:(fun merge_node ->
+                  match snd merge_node with
+                  | Merge.Job.Full {status= Job_status.Done; _} ->
+                      (fst merge_node, Merge.Job.Empty)
+                  | _ ->
+                      merge_node )
+                ~f_base:Fn.id )
+        in
+        {t with trees}
 
-let next_jobs_sequence :
-    state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t Or_error.t =
- fun ~state -> State.jobs_ready_sequence state
+      include Binable.Of_binable2
+                (T)
+                (struct
+                  type nonrec ('merge, 'base) t = ('merge, 'base) t
 
-let next_k_jobs :
-    state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
-    =
- fun ~state ~k ->
-  let open Or_error.Let_syntax in
-  if k > State.parallelism state then
-    Or_error.errorf "You asked for %d jobs, but it's only safe to ask for %d" k
-      (State.parallelism state)
-  else
-    let%bind jobs = next_jobs ~state in
-    let possible_jobs = List.take jobs k in
-    let len = List.length possible_jobs in
-    if Int.equal len k then Or_error.return possible_jobs
-    else
-      Or_error.errorf "You asked for %d jobs, but I only have %d available" k
-        len
+                  let to_binable = with_leaner_trees
 
-let free_space : state:('a, 'd) State.t -> int =
- fun ~state -> state.State.capacity - State.current_data_length state
+                  let of_binable = Fn.id
+                end)
+    end
 
-let enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t =
- fun ~state ~data ->
-  if free_space ~state < List.length data then
-    Or_error.error_string
-      (sprintf
-         "Data list too large. Max available is %d, current list length is %d"
-         (free_space ~state) (List.length data))
-  else (
-    state.current_data_length <- state.current_data_length + List.length data ;
-    State.include_many_data state data )
+    module Latest = V1
+  end
 
-let base_jobs_on_latest_tree = State.base_jobs_on_latest_tree
+  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
+    { trees:
+        ('merge Merge.Stable.V1.t, 'base Base.Stable.V1.t) Tree.Stable.V1.t
+        Non_empty_list.Stable.V1.t
+    ; acc: ('merge * 'base list) option
+          (*last emitted proof and the corresponding transactions*)
+    ; curr_job_seq_no: int
+    ; max_base_jobs: int
+    ; delay: int }
+  [@@deriving sexp]
 
-let is_valid t =
-  let p = State.parallelism t in
-  let validate_leaves =
-    let fold_over_leaves ~f ~init =
-      let rec go count pos acc =
-        if count = p then acc
-        else
-          let job = Ring_buffer.read_i t.jobs pos in
-          let acc' = f acc job in
-          go (count + 1) (State.next_leaf_pos p pos) acc'
-      in
-      go 0 (Option.value_exn (State.base_none_pos t)) init
-    in
-    let empty_leaves =
-      fold_over_leaves
-        ~f:(fun count job ->
-          match job with Base None -> count + 1 | _ -> count )
-        ~init:0
-    in
-    let continuous_empty_leaves =
-      fold_over_leaves
-        ~f:(fun (continue, count) job ->
-          if continue then
-            match job with
-            | State.Job.Base None ->
-                (continue, count + 1)
-            | _ ->
-                (false, count)
-          else (false, count) )
-        ~init:(true, 0)
-    in
-    free_space ~state:t = empty_leaves
-    && empty_leaves = snd continuous_empty_leaves
-  in
-  let validate_levels =
-    let fold_over_a_level ~f ~init level_start =
-      let rec go pos acc =
-        let job = Ring_buffer.read_i t.jobs pos in
-        let acc' = f acc job in
-        match State.next_position_info p t.level_pointer pos with
-        | `Same_level pos' ->
-            go pos' acc'
-        | `Next_level _ ->
-            acc'
-      in
-      go level_start init
-    in
-    let if_start_empty_all_empty level_start =
-      let is_empty = function
-        | State.Job.Base None ->
-            true
-        | Merge Empty ->
-            true
-        | _ ->
-            false
-      in
-      let first_job = Ring_buffer.read_i t.jobs level_start in
-      if is_empty first_job then
-        fold_over_a_level
-          ~f:(fun acc job -> acc && is_empty job)
-          ~init:true level_start
-      else true
-    in
-    let at_most_one_partial_job level_start =
-      let is_partial = function State.Job.Merge (Lcomp _) -> 1 | _ -> 0 in
-      let count =
-        fold_over_a_level ~init:0
-          ~f:(fun acc job -> acc + is_partial job)
-          level_start
-      in
-      count < 2
-    in
-    Array.fold t.level_pointer ~init:true ~f:(fun acc level_start ->
-        acc
-        && if_start_empty_all_empty level_start
-        && at_most_one_partial_job level_start )
-  in
-  let has_valid_merge_jobs =
-    State.fold_chronological t ~init:true ~f:(fun acc job ->
-        acc && match job with Merge (Rcomp _) -> false | _ -> acc )
-  in
-  let non_empty_tree =
-    State.fold_chronological t ~init:false ~f:(fun acc job ->
-        acc
-        ||
-        match job with
-        | Base (Some _) ->
-            true
-        | Merge (Lcomp _) | Merge (Bcomp _) ->
-            true
-        | _ ->
-            false )
-  in
-  Option.is_some (State.base_none_pos t)
-  && free_space ~state:t > 0
-  && has_valid_merge_jobs && non_empty_tree && validate_leaves
-  && validate_levels
+  let with_leaner_trees = Stable.V1.with_leaner_trees
 
-let fill_in_completed_jobs :
-       state:('a, 'd) State.t
-    -> completed_jobs:'a State.Completed_job.t list
-    -> ('a * 'd list) option Or_error.t =
- fun ~state ~completed_jobs ->
-  let open Or_error.Let_syntax in
-  let old_jobs = Ring_buffer.copy state.jobs in
-  let last_acc = state.acc in
-  let%map () = State.consume state completed_jobs old_jobs in
-  state.jobs.position <- 0 ;
-  if not (fst last_acc = fst state.acc) then snd state.acc else None
-
-let last_emitted_value (state : ('a, 'd) State.t) = snd state.acc
-
-let current_data (state : ('a, 'd) State.t) =
-  state.recent_tree_data @ List.concat state.other_trees_data
-
-let parallelism : state:('a, 'd) State.t -> int =
- fun ~state -> State.parallelism state
-
-let next_on_new_tree (state : ('a, 's) State.t) =
-  match state.base_none_pos with
-  | None ->
-      Or_error.error_string "Invalid position for the next base job"
-  | Some pos ->
-      let block_start = State.block_of state pos in
-      if block_start = pos then Ok true else Ok false
-
-let update_curr_job_seq_no : ('a, 'd) State.t -> unit Or_error.t =
- fun state ->
-  let open Or_error.Let_syntax in
-  if state.curr_job_seq_no + 1 = Int.max_value then
-    let%map latest_seq_no = State.reset_seq_no state in
-    state.curr_job_seq_no <- latest_seq_no
-  else Ok (state.curr_job_seq_no <- state.curr_job_seq_no + 1)
-
-let current_job_sequence_number : ('a, 'd) State.t -> int =
- fun state -> state.curr_job_seq_no
-
-let partition_if_overflowing ~max_slots state =
-  let n = min (free_space ~state) max_slots in
-  match State.base_none_pos state with
-  | None ->
-      {Space_partition.first= 0; second= None}
-  | Some start ->
-      let block_start = State.block_of state start in
-      let start_0 = start - block_start in
-      let slots_in_current_block = State.slots_per_block state - start_0 in
-      if n <= slots_in_current_block then
-        {Space_partition.first= n; second= None}
+  let create_tree_for_level ~level ~depth ~merge_job ~base_job =
+    let rec go : type merge_t base_t.
+        int -> (int -> merge_t) -> base_t -> (merge_t, base_t) Tree.t =
+     fun d fmerge base ->
+      if d >= depth then Tree.Leaf base
       else
-        { Space_partition.first= slots_in_current_block
-        ; second= Some (n - slots_in_current_block) }
+        let sub_tree =
+          go (d + 1) (fun i -> (fmerge i, fmerge i)) (base, base)
+        in
+        Node {depth= d; value= fmerge d; sub_tree}
+    in
+    let weight base merge = {Weight.base; merge} in
+    let base_weight = if level = -1 then weight 0 0 else weight 1 0 in
+    go 0
+      (fun d ->
+        let weight =
+          if level = -1 then (weight 0 0, weight 0 0)
+          else
+            let x = Int.pow 2 level / Int.pow 2 (d + 1) in
+            (weight x 0, weight x 0)
+        in
+        (weight, merge_job) )
+      (base_weight, base_job)
+
+  let create_tree ~depth =
+    create_tree_for_level ~level:depth ~depth ~merge_job:Merge.Job.Empty
+      ~base_job:Base.Job.Empty
+
+  let empty : type merge base.
+      max_base_jobs:int -> delay:int -> (merge, base) t =
+   fun ~max_base_jobs ~delay ->
+    let depth = Int.ceil_log2 max_base_jobs in
+    let first_tree :
+        ( (Weight.t * Weight.t) * merge Merge.Job.t
+        , Weight.t * base Base.Job.t )
+        Tree.t =
+      create_tree ~depth
+    in
+    { trees= Non_empty_list.singleton first_tree
+    ; acc= None
+    ; curr_job_seq_no= 0
+    ; max_base_jobs
+    ; delay }
+end
+
+module State = struct
+  include T
+  module Hash = Hash
+
+  let hash t f_merge f_base =
+    let {trees; acc; max_base_jobs; curr_job_seq_no; delay; _} =
+      with_leaner_trees t
+    in
+    let h = ref (Digestif.SHA256.init ()) in
+    let add_string s = h := Digestif.SHA256.feed_string !h s in
+    let () =
+      let tree_hash tree f_merge f_base =
+        List.iter (Tree.to_hashable_jobs tree) ~f:(fun job ->
+            match job with Job.Merge a -> f_merge a | Base d -> f_base d )
+      in
+      Non_empty_list.iter trees ~f:(fun tree ->
+          let w_to_string {Weight.base= b; merge= m} =
+            Int.to_string b ^ Int.to_string m
+          in
+          let w_to_string' (w1, w2) = w_to_string w1 ^ w_to_string w2 in
+          let f_merge = function
+            | w, Merge.Job.Empty ->
+                add_string (w_to_string' w ^ "Empty")
+            | w, Merge.Job.Full {left; right; status; seq_no} ->
+                add_string
+                  ( w_to_string' w ^ "Full" ^ Int.to_string seq_no
+                  ^ Job_status.to_string status ) ;
+                add_string (f_merge left) ;
+                add_string (f_merge right)
+            | w, Merge.Job.Part j ->
+                add_string (w_to_string' w ^ "Part") ;
+                add_string (f_merge j)
+          in
+          let f_base = function
+            | w, Base.Job.Empty ->
+                add_string (w_to_string w ^ "Empty")
+            | w, Base.Job.Full {job; status; seq_no} ->
+                add_string
+                  ( w_to_string w ^ "Full" ^ Int.to_string seq_no
+                  ^ Job_status.to_string status ) ;
+                add_string (f_base job)
+          in
+          tree_hash tree f_merge f_base )
+    in
+    let acc_string =
+      Option.value_map acc ~default:"None" ~f:(fun (a, d_lst) ->
+          f_merge a ^ List.fold ~init:"" d_lst ~f:(fun acc d -> acc ^ f_base d)
+      )
+    in
+    add_string acc_string ;
+    add_string (Int.to_string curr_job_seq_no) ;
+    add_string (Int.to_string max_base_jobs) ;
+    add_string (Int.to_string delay) ;
+    Digestif.SHA256.get !h
+
+  module Make_foldable (M : Monad.S) = struct
+    module Tree_foldable = Tree.Make_foldable (M)
+
+    let fold_chronological_until :
+           ('merge, 'base) t
+        -> init:'acc
+        -> f_merge:(   'acc
+                    -> 'merge Merge.t
+                    -> ('acc, 'final) Continue_or_stop.t M.t)
+        -> f_base:(   'acc
+                   -> 'base Base.t
+                   -> ('acc, 'final) Continue_or_stop.t M.t)
+        -> finish:('acc -> 'final M.t)
+        -> 'final M.t =
+     fun t ~init ~f_merge ~f_base ~finish ->
+      let open M.Let_syntax in
+      let open Container.Continue_or_stop in
+      let work_trees = Non_empty_list.rev t.trees |> Non_empty_list.to_list in
+      let rec go acc = function
+        | [] ->
+            M.return (Continue acc)
+        | tree :: trees -> (
+            match%bind
+              Tree_foldable.fold_depth_until'
+                ~f_merge:(fun _ -> f_merge)
+                ~f_base ~init:acc tree
+            with
+            | Continue r ->
+                go r trees
+            | Stop e ->
+                M.return (Stop e) )
+      in
+      match%bind go init work_trees with
+      | Continue r ->
+          finish r
+      | Stop e ->
+          M.return e
+  end
+
+  module Foldable_ident = Make_foldable (Monad.Ident)
+
+  let fold_chronological t ~init ~f_merge ~f_base =
+    let open Container.Continue_or_stop in
+    Foldable_ident.fold_chronological_until t ~init
+      ~f_merge:(fun acc a -> Continue (f_merge acc a))
+      ~f_base:(fun acc d -> Continue (f_base acc d))
+      ~finish:Fn.id
+end
+
+include T
+module State_or_error = State_or_error.Make3 (T)
+
+let check b ~message = State_or_error.error_if b ~message ~value:()
+
+let return_error e a =
+  State_or_error.error_if true ~message:(Error.to_string_hum e) ~value:a
+
+let max_trees : ('merge, 'base) t -> int =
+ fun t -> ((Int.ceil_log2 t.max_base_jobs + 1) * (t.delay + 1)) + 1
+
+let work_to_do : type merge base.
+       (merge Merge.t, base Base.t) Tree.t list
+    -> max_base_jobs:int
+    -> (merge, base) Available_job.t list =
+ fun trees ~max_base_jobs ->
+  let depth = Int.ceil_log2 max_base_jobs in
+  List.concat_mapi trees ~f:(fun i tree ->
+      Tree.jobs_on_level ~depth ~level:(depth - i) tree )
+
+let work : type merge base.
+       (merge Merge.t, base Base.t) Tree.t list
+    -> delay:int
+    -> max_base_jobs:int
+    -> (merge, base) Available_job.t list =
+ fun trees ~delay ~max_base_jobs ->
+  let depth = Int.ceil_log2 max_base_jobs in
+  let work_trees =
+    List.take
+      (List.filteri trees ~f:(fun i _ -> i % delay = delay - 1))
+      (depth + 1)
+  in
+  work_to_do work_trees ~max_base_jobs
+
+let work_for_tree t ~data_tree =
+  let delay = t.delay + 1 in
+  let trees =
+    match data_tree with
+    | `Current ->
+        Non_empty_list.tail t.trees
+    | `Next ->
+        Non_empty_list.to_list t.trees
+  in
+  work trees ~max_base_jobs:t.max_base_jobs ~delay
+
+(*work on all the level and all the trees*)
+let all_work : type merge base.
+    (merge, base) t -> (merge, base) Available_job.t list list =
+ fun t ->
+  let depth = Int.ceil_log2 t.max_base_jobs in
+  let set1 = work_for_tree t ~data_tree:`Current in
+  let _, other_sets =
+    List.fold ~init:(t, [])
+      (List.init ~f:Fn.id (t.delay + 1))
+      ~f:(fun (t, work_list) _ ->
+        let trees' = Non_empty_list.cons (create_tree ~depth) t.trees in
+        let t' = {t with trees= trees'} in
+        match work_for_tree t' ~data_tree:`Current with
+        | [] ->
+            (t', work_list)
+        | work ->
+            (t', work :: work_list) )
+  in
+  if List.is_empty set1 then List.rev other_sets
+  else set1 :: List.rev other_sets
+
+let work_for_next_update : type merge base.
+       (merge, base) t
+    -> data_count:int
+    -> (merge, base) Available_job.t list list =
+ fun t ~data_count ->
+  let delay = t.delay + 1 in
+  let current_tree_space =
+    Tree.available_space (Non_empty_list.head t.trees)
+  in
+  let set1 =
+    work (Non_empty_list.tail t.trees) ~max_base_jobs:t.max_base_jobs ~delay
+  in
+  let count = min data_count t.max_base_jobs in
+  if current_tree_space < count then
+    let set2 =
+      List.take
+        (work
+           (Non_empty_list.to_list t.trees)
+           ~max_base_jobs:t.max_base_jobs ~delay)
+        ((count - current_tree_space) * 2)
+    in
+    List.filter ~f:(Fn.compose not List.is_empty) [set1; set2]
+  else
+    let set = List.take set1 (2 * count) in
+    if List.is_empty set then [] else [set]
+
+let free_space_on_current_tree t =
+  let tree = Non_empty_list.head t.trees in
+  Tree.available_space tree
+
+let cons b bs =
+  Option.value_map (Non_empty_list.of_list_opt bs)
+    ~default:(Non_empty_list.singleton b) ~f:(fun bs ->
+      Non_empty_list.cons b bs )
+
+let append bs bs' =
+  Option.value_map (Non_empty_list.of_list_opt bs') ~default:bs ~f:(fun bs' ->
+      Non_empty_list.append bs bs' )
+
+let add_merge_jobs :
+    completed_jobs:'merge list -> ('base, 'merge, _) State_or_error.t =
+ fun ~completed_jobs ->
+  let open State_or_error.Let_syntax in
+  if List.length completed_jobs = 0 then return None
+  else
+    let%bind state = State_or_error.get in
+    let delay = state.delay + 1 in
+    let depth = Int.ceil_log2 state.max_base_jobs in
+    let merge_jobs = List.map completed_jobs ~f:(fun j -> Job.Merge j) in
+    let jobs_required = work_for_tree state ~data_tree:`Current in
+    let%bind () =
+      check
+        (List.length merge_jobs > List.length jobs_required)
+        ~message:
+          (sprintf
+             !"More work than required: Required- %d got- %d"
+             (List.length jobs_required)
+             (List.length merge_jobs))
+    in
+    let curr_tree, to_be_updated_trees =
+      (Non_empty_list.head state.trees, Non_empty_list.tail state.trees)
+    in
+    let%bind updated_trees, result_opt, _ =
+      let res =
+        List.foldi to_be_updated_trees
+          ~init:(Ok ([], None, merge_jobs))
+          ~f:(fun i acc tree ->
+            let open Or_error.Let_syntax in
+            let%bind trees, scan_result, jobs = acc in
+            if i % delay = delay - 1 && not (List.is_empty jobs) then
+              (*Every nth (n=delay) tree*)
+              match
+                Tree.update
+                  (List.take jobs (Tree.required_job_count tree))
+                  ~update_level:(depth - (i / delay))
+                  ~sequence_no:state.curr_job_seq_no ~weight_lens:Weight.merge
+                  tree
+              with
+              | Ok (tree', scan_result') ->
+                  Ok
+                    ( tree' :: trees
+                    , scan_result'
+                    , List.drop jobs (Tree.required_job_count tree) )
+              | Error e ->
+                  Or_error.errorf
+                    "Error while adding merge jobs to tree# %d: %s" i
+                    (Error.to_string_hum e)
+            else Ok (tree :: trees, scan_result, jobs) )
+      in
+      match res with
+      | Ok res ->
+          State_or_error.return res
+      | Error e ->
+          return_error e ([], None, [])
+    in
+    let updated_trees, result_opt =
+      let updated_trees, result_opt =
+        Option.value_map result_opt
+          ~default:(List.rev updated_trees, None)
+          ~f:(fun res ->
+            match updated_trees with
+            | [] ->
+                ([], None)
+            | t :: ts ->
+                let tree_data = Tree.base_jobs t in
+                (List.rev ts, Some (res, tree_data)) )
+      in
+      if
+        Option.is_some result_opt
+        || List.length (curr_tree :: updated_trees) < max_trees state
+           && List.length completed_jobs = List.length jobs_required
+        (*exact number of jobs*)
+      then (List.map updated_trees ~f:(Tree.reset_weights `Merge), result_opt)
+      else (updated_trees, result_opt)
+    in
+    let all_trees = cons curr_tree updated_trees in
+    let%map _ = State_or_error.put {state with trees= all_trees} in
+    result_opt
+
+let add_data : data:'base list -> (_, _, 'base) State_or_error.t =
+ fun ~data ->
+  let open State_or_error.Let_syntax in
+  if List.length data = 0 then return ()
+  else
+    let%bind state = State_or_error.get in
+    let depth = Int.ceil_log2 state.max_base_jobs in
+    let tree = Non_empty_list.head state.trees in
+    let base_jobs = List.map data ~f:(fun j -> Job.Base j) in
+    let available_space = Tree.available_space tree in
+    let%bind () =
+      check
+        (List.length data > available_space)
+        ~message:
+          (sprintf
+             !"Data count (%d) exceeded available space (%d)"
+             (List.length data) available_space)
+    in
+    let%bind tree, _ =
+      match
+        Tree.update base_jobs ~update_level:depth
+          ~sequence_no:state.curr_job_seq_no ~weight_lens:Weight.base tree
+      with
+      | Ok res ->
+          State_or_error.return res
+      | Error e ->
+          return_error
+            (Error.of_string
+               (sprintf "Error while adding base jobs to the tree: %s"
+                  (Error.to_string_hum e)))
+            (tree, None)
+    in
+    let updated_trees =
+      if List.length base_jobs = available_space then
+        cons (create_tree ~depth) [Tree.reset_weights `Both tree]
+      else Non_empty_list.singleton (Tree.reset_weights `Merge tree)
+    in
+    let%map _ =
+      State_or_error.put
+        { state with
+          trees= append updated_trees (Non_empty_list.tail state.trees) }
+    in
+    ()
+
+let reset_seq_no : type a b. (a, b) t -> (a, b) t =
+ fun state ->
+  let oldest_seq_no =
+    match List.hd @@ Tree.leaves (Non_empty_list.last state.trees) with
+    | Some (_, Base.Job.Full {seq_no; _}) ->
+        seq_no
+    | _ ->
+        0
+  in
+  let new_seq seq = seq - oldest_seq_no + 1 in
+  let f_merge (a : a Merge.t) : a Merge.t =
+    match a with
+    | w, Merge.Job.Full ({seq_no; _} as x) ->
+        (w, Merge.Job.Full {x with seq_no= new_seq seq_no})
+    | m ->
+        m
+  in
+  let f_base (b : b Base.t) : b Base.t =
+    match b with
+    | w, Base.Job.Full ({seq_no; _} as x) ->
+        (w, Base.Job.Full {x with seq_no= new_seq seq_no})
+    | b ->
+        b
+  in
+  let next_seq_no, updated_trees =
+    List.fold ~init:(0, []) (Non_empty_list.to_list state.trees)
+      ~f:(fun (max_seq, updated_trees) tree ->
+        let tree' = Tree.map ~f_base ~f_merge tree in
+        let seq_no =
+          match List.last @@ Tree.leaves tree' with
+          | Some (_, Base.Job.Full {seq_no; _}) ->
+              max seq_no max_seq
+          | _ ->
+              max_seq
+        in
+        (seq_no, tree' :: updated_trees) )
+  in
+  { state with
+    curr_job_seq_no= next_seq_no
+  ; trees=
+      Option.value_exn (Non_empty_list.of_list_opt (List.rev updated_trees)) }
+
+let incr_sequence_no : type a b. (a, b) t -> (unit, a, b) State_or_error.t =
+ fun state ->
+  let open State_or_error in
+  if state.curr_job_seq_no + 1 = Int.max_value then
+    let state = reset_seq_no state in
+    put state
+  else put {state with curr_job_seq_no= state.curr_job_seq_no + 1}
+
+let update_helper :
+       data:'base list
+    -> completed_jobs:'merge list
+    -> ('a, 'merge, 'base) State_or_error.t =
+ fun ~data ~completed_jobs ->
+  let open State_or_error in
+  let open State_or_error.Let_syntax in
+  let%bind t = get in
+  let data_count = List.length data in
+  let%bind () =
+    check
+      (data_count > t.max_base_jobs)
+      ~message:
+        (sprintf
+           !"Data count (%d) exceeded maximum (%d)"
+           data_count t.max_base_jobs)
+  in
+  let required_jobs = List.concat @@ work_for_next_update t ~data_count in
+  let%bind () =
+    let required = (List.length required_jobs + 1) / 2 in
+    let got = (List.length completed_jobs + 1) / 2 in
+    check
+      (got < required && List.length data > t.max_base_jobs - required + got)
+      ~message:
+        (sprintf
+           !"Insufficient jobs (Data count %d): Required- %d got- %d"
+           data_count required got)
+  in
+  let delay = t.delay + 1 in
+  (*Increment the sequence number*)
+  let%bind () = incr_sequence_no t in
+  let latest_tree = Non_empty_list.head t.trees in
+  let available_space = Tree.available_space latest_tree in
+  (*Possible that new base jobs is added to a new tree within an update i.e., part of it is added to the first tree and the rest of it to a new tree. This happens when the throughput is not max. This also requires merge jobs to be done on two different set of trees*)
+  let data1, data2 = List.split_n data available_space in
+  let required_jobs_for_current_tree =
+    work (Non_empty_list.tail t.trees) ~max_base_jobs:t.max_base_jobs ~delay
+    |> List.length
+  in
+  let jobs1, jobs2 =
+    List.split_n completed_jobs required_jobs_for_current_tree
+  in
+  (*update first set of jobs and data*)
+  let%bind result_opt = add_merge_jobs ~completed_jobs:jobs1 in
+  let%bind () = add_data ~data:data1 in
+  (*update second set of jobs and data. This will be empty if all the data fit in the current tree*)
+  let%bind _ = add_merge_jobs ~completed_jobs:jobs2 in
+  let%bind () = add_data ~data:data2 in
+  let%bind state = State_or_error.get in
+  (*update the latest emitted value *)
+  let%bind () =
+    State_or_error.put
+      {state with acc= Option.merge result_opt state.acc ~f:Fn.const}
+  in
+  (*Check the tree-list length is under max*)
+  let%map () =
+    check
+      (Non_empty_list.length state.trees > max_trees state)
+      ~message:
+        (sprintf
+           !"Tree list length (%d) exceeded maximum (%d)"
+           (Non_empty_list.length state.trees)
+           (max_trees state))
+  in
+  result_opt
+
+let update :
+       data:'base list
+    -> completed_jobs:'merge list
+    -> ('merge, 'base) t
+    -> (('merge * 'base list) option * ('merge, 'base) t) Or_error.t =
+ fun ~data ~completed_jobs state ->
+  State_or_error.run_state (update_helper ~data ~completed_jobs) ~state
+
+let all_jobs t = all_work t
+
+let jobs_for_next_update t = work_for_next_update t ~data_count:t.max_base_jobs
+
+let jobs_for_slots t ~slots = work_for_next_update t ~data_count:slots
+
+let free_space t = t.max_base_jobs
+
+let last_emitted_value t = t.acc
+
+let current_job_sequence_number t = t.curr_job_seq_no
+
+let base_jobs_on_latest_tree t =
+  let depth = Int.ceil_log2 t.max_base_jobs in
+  List.filter_map
+    (Tree.jobs_on_level ~depth ~level:depth (Non_empty_list.head t.trees))
+    ~f:(fun job -> match job with Base d -> Some d | Merge _ -> None)
+
+let partition_if_overflowing : ('merge, 'base) t -> Space_partition.t =
+ fun t ->
+  let cur_tree_space = free_space_on_current_tree t in
+  (*Check actual work count because it would be zero initially*)
+  let work_count = work_for_tree t ~data_tree:`Current |> List.length in
+  let work_count_new_tree = work_for_tree t ~data_tree:`Next |> List.length in
+  { first= (cur_tree_space, work_count)
+  ; second=
+      ( if cur_tree_space < t.max_base_jobs then
+        let slots = t.max_base_jobs - cur_tree_space in
+        Some (slots, min work_count_new_tree (2 * slots))
+      else None ) }
+
+let next_on_new_tree t =
+  let curr_tree_space = free_space_on_current_tree t in
+  curr_tree_space = t.max_base_jobs
+
+let pending_data t =
+  List.concat_map Non_empty_list.(to_list @@ rev t.trees) ~f:Tree.base_jobs
+
+let view_jobs_with_position (state : ('merge, 'base) State.t) fa fd =
+  List.fold ~init:[] (Non_empty_list.to_list state.trees) ~f:(fun acc tree ->
+      Tree.view_jobs_with_position tree fa fd :: acc )
+
+let job_count t =
+  State.fold_chronological t ~init:(0., 0.)
+    ~f_merge:(fun (c, c') merge_node ->
+      let count_todo, count_done =
+        match snd merge_node with
+        | Merge.Job.Part _ ->
+            (0.5, 0.)
+        | Full {status= Job_status.Todo; _} ->
+            (1., 0.)
+        | Full {status= Job_status.Done; _} ->
+            (0., 1.)
+        | Empty ->
+            (0., 0.)
+      in
+      (c +. count_todo, c' +. count_done) )
+    ~f_base:(fun (c, c') base_node ->
+      let count_todo, count_done =
+        match snd base_node with
+        | Base.Job.Empty ->
+            (0., 0.)
+        | Full {status= Job_status.Todo; _} ->
+            (1., 0.)
+        | Full {status= Job_status.Done; _} ->
+            (0., 1.)
+      in
+      (c +. count_todo, c' +. count_done) )
+
+let assert_job_count t t' ~completed_job_count ~base_job_count ~value_emitted =
+  let todo_before, done_before = job_count t in
+  let todo_after, done_after = job_count t' in
+  (*ordered list of jobs that is actually called when distributing work*)
+  let all_jobs = List.concat (all_jobs t') in
+  (*list of jobs*)
+  let all_jobs_expected =
+    List.fold ~init:[] (Non_empty_list.to_list t'.trees) ~f:(fun acc tree ->
+        Tree.jobs_records tree @ acc )
+    |> List.filter ~f:(fun job ->
+           match job with
+           | Job.Base {status= Job_status.Todo; _} | Job.Merge {status= Todo; _}
+             ->
+               true
+           | _ ->
+               false )
+  in
+  assert (List.length all_jobs = List.length all_jobs_expected) ;
+  let expected_todo_after =
+    let new_jobs =
+      if value_emitted then (completed_job_count -. 1.) /. 2.
+      else completed_job_count /. 2.
+    in
+    todo_before +. base_job_count -. completed_job_count +. new_jobs
+  in
+  let expected_done_after =
+    let jobs_from_delete_tree =
+      if value_emitted then Float.of_int @@ ((2 * t.max_base_jobs) - 1) else 0.
+    in
+    done_before +. completed_job_count -. jobs_from_delete_tree
+  in
+  assert (
+    todo_after =. expected_todo_after && done_after =. expected_done_after )
+
+let test_update t ~data ~completed_jobs =
+  let result_opt, t' = update ~data ~completed_jobs t |> Or_error.ok_exn in
+  assert_job_count t t'
+    ~base_job_count:(Float.of_int @@ List.length data)
+    ~completed_job_count:(Float.of_int @@ List.length completed_jobs)
+    ~value_emitted:(Option.is_some result_opt) ;
+  (result_opt, t')
+
+let%test_module "test" =
+  ( module struct
+    let%test_unit "always max base jobs" =
+      let max_base_jobs = 512 in
+      let state = empty ~max_base_jobs ~delay:3 in
+      let _t' =
+        List.foldi ~init:([], state) (List.init 100 ~f:Fn.id)
+          ~f:(fun i (expected_results, t) _ ->
+            let data = List.init max_base_jobs ~f:(fun j -> i + j) in
+            let expected_results = data :: expected_results in
+            let work =
+              work_for_next_update t ~data_count:(List.length data)
+              |> List.concat
+            in
+            let new_merges =
+              List.map work ~f:(fun job ->
+                  match job with Base i -> i | Merge (i, j) -> i + j )
+            in
+            let result_opt, t' =
+              test_update ~data ~completed_jobs:new_merges t
+            in
+            let expected_result, remaining_expected_results =
+              Option.value_map result_opt
+                ~default:((0, []), expected_results)
+                ~f:(fun _ ->
+                  match List.rev expected_results with
+                  | [] ->
+                      ((0, []), [])
+                  | x :: xs ->
+                      ((List.sum (module Int) x ~f:Fn.id, x), List.rev xs) )
+            in
+            assert (
+              Option.value ~default:expected_result result_opt
+              = expected_result ) ;
+            (remaining_expected_results, t') )
+      in
+      ()
+
+    let%test_unit "Random base jobs" =
+      let max_base_jobs = 512 in
+      let t = empty ~max_base_jobs ~delay:3 in
+      let state = ref t in
+      Quickcheck.test
+        (Quickcheck.Generator.list (Int.gen_incl 1 1))
+        ~f:(fun list ->
+          let t = !state in
+          let data = List.take list max_base_jobs in
+          let work =
+            List.take
+              ( work_for_next_update t ~data_count:(List.length data)
+              |> List.concat )
+              (List.length data * 2)
+          in
+          let new_merges =
+            List.map work ~f:(fun job ->
+                match job with Base i -> i | Merge (i, j) -> i + j )
+          in
+          let result_opt, t' =
+            test_update ~data ~completed_jobs:new_merges t
+          in
+          let expected_result =
+            (max_base_jobs, List.init max_base_jobs ~f:(fun _ -> 1))
+          in
+          assert (
+            Option.value ~default:expected_result result_opt = expected_result
+          ) ;
+          state := t' )
+  end )
 
 let gen :
        gen_data:'d Quickcheck.Generator.t
-    -> f_job_done:(('a, 'd) Available_job.t -> 'a State.Completed_job.t)
-    -> f_acc:(   int * ('a * 'd list) option
-              -> 'a * 'd list
-              -> ('a * 'd list) option)
+    -> f_job_done:(('a, 'd) Available_job.t -> 'a)
+    -> f_acc:(('a * 'd list) option -> 'a * 'd list -> ('a * 'd list) option)
     -> ('a, 'd) State.t Quickcheck.Generator.t =
  fun ~gen_data ~f_job_done ~f_acc ->
   let open Quickcheck.Generator.Let_syntax in
-  let%bind parallelism_log_2 = Int.gen_incl 2 7 in
-  let s = State.create ~parallelism_log_2 ~root_at_depth:1 in
-  let parallelism = State.parallelism s in
-  let%bind data_chunk_size =
-    Int.gen_incl ((parallelism / 2) - 1) (parallelism / 2)
+  let%bind depth, delay =
+    Quickcheck.Generator.tuple2 (Int.gen_incl 2 5) (Int.gen_incl 0 3)
   in
+  let max_base_jobs = Int.pow 2 depth in
+  let s = State.empty ~max_base_jobs ~delay in
   let%map datas =
-    Quickcheck.Generator.list_with_length ((parallelism * 2) + 3) gen_data
+    Quickcheck.Generator.(
+      list_non_empty (list_with_length max_base_jobs gen_data))
   in
-  let data_chunks =
-    let rec go datas chunks =
-      if List.length datas <= data_chunk_size then List.rev (datas :: chunks)
-      else
-        let chunk, rest = List.split_n datas data_chunk_size in
-        go rest (chunk :: chunks)
-    in
-    go datas []
-  in
-  List.fold data_chunks ~init:s ~f:(fun s chunk ->
-      let jobs = Or_error.ok_exn (next_jobs ~state:s) in
+  List.fold datas ~init:s ~f:(fun s chunk ->
+      let jobs =
+        List.concat (work_for_next_update s ~data_count:(List.length chunk))
+      in
       let jobs_done = List.map jobs ~f:f_job_done in
       let old_tuple = s.acc in
-      Option.iter
-        ( Or_error.ok_exn
-        @@ fill_in_completed_jobs ~state:s ~completed_jobs:jobs_done )
-        ~f:(fun x ->
-          let tuple =
-            if Option.is_some (snd old_tuple) then old_tuple else s.acc
-          in
-          s.acc <- (fst s.acc, f_acc tuple x) ) ;
-      Or_error.ok_exn @@ enqueue_data ~state:s ~data:chunk ;
-      assert (is_valid s) ;
-      s )
-
-let default_seq_no = 0
-
-let%test_module "scan latency" =
-  ( module struct
-    let job_done (job : (Int64.t, Int64.t) Available_job.t) :
-        Int64.t State.Completed_job.t =
-      match job with
-      | Base (x, _) ->
-          Lifted x
-      | Merge (x, y, _) ->
-          Merged (Int64.( + ) x y)
-
-    let step state data =
-      let jobs = Or_error.ok_exn (next_jobs ~state) in
-      let jobs_done = List.map jobs ~f:job_done in
-      let res_opt =
-        Or_error.ok_exn
-        @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done
+      let res_opt, s =
+        Or_error.ok_exn @@ update ~data:chunk s ~completed_jobs:jobs_done
       in
-      let () = Or_error.ok_exn @@ enqueue_data ~state ~data in
-      Option.value_map ~default:0 res_opt ~f:(fun _ -> 1)
-
-    let max_parallelism = 6
-
-    let max_data = 2
-
-    let%test_unit "test latency on multiple trees with different root_at_depth"
-        =
-      let depths = List.init 6 ~f:Fn.id in
-      let states =
-        List.map depths ~f:(fun i ->
-            State.create ~parallelism_log_2:max_parallelism ~root_at_depth:i )
-      in
-      let results_emitted = ref (List.init 6 ~f:(fun _ -> 0)) in
-      let data_length = Int.gen_incl 0 max_data in
-      let () =
-        Quickcheck.test data_length ~trials:1000 ~f:(fun i ->
-            let data = List.init i ~f:Int64.of_int in
-            let result_emitted = List.map states ~f:(fun s -> step s data) in
-            results_emitted :=
-              List.map2_exn result_emitted !results_emitted
-                ~f:(fun cur total -> cur + total) )
-      in
-      let of_depth_0 = List.hd_exn !results_emitted in
-      List.iteri (List.drop !results_emitted 1) ~f:(fun i depth_i_plus_one ->
-          (*Scan results when root_at_depth=i should be twice the number of results when root_at_depth= i-1*)
-          assert (depth_i_plus_one >= Int.pow 2 (i + 1) * of_depth_0) )
-  end )
+      Option.value_map ~default:s res_opt ~f:(fun x ->
+          let tuple = if Option.is_some old_tuple then old_tuple else s.acc in
+          {s with acc= f_acc tuple x} ) )
 
 let%test_module "scans" =
   ( module struct
     module Queue = Queue
 
-    let enqueue state ds =
-      let free_space = free_space ~state in
-      match free_space >= List.length ds with
-      | true ->
-          Or_error.ok_exn @@ enqueue_data ~state ~data:ds ;
-          []
-      | false ->
-          Or_error.ok_exn
-          @@ enqueue_data ~state ~data:(List.take ds free_space) ;
-          List.drop ds free_space
-
     let rec step_on_free_space state w ds f f_acc =
-      let enq ds' =
-        if List.length ds' > 0 then
-          let rem_ds = enqueue state ds' in
-          rem_ds
-        else []
+      let data = List.take ds state.max_base_jobs in
+      let jobs =
+        List.concat (work_for_next_update state ~data_count:(List.length data))
       in
-      let jobs = Or_error.ok_exn (next_jobs ~state) in
       let jobs_done = List.map jobs ~f in
       let old_tuple = state.acc in
-      let x' =
-        Option.bind
-          ( Or_error.ok_exn
-          @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done )
-          ~f:(fun x ->
-            let merged =
-              if Option.is_some (snd old_tuple) then f_acc old_tuple x
-              else snd state.acc
+      let res_opt, state = test_update ~data state ~completed_jobs:jobs_done in
+      let state =
+        Option.value_map ~default:state res_opt ~f:(fun x ->
+            let tuple =
+              if Option.is_some old_tuple then f_acc old_tuple x else state.acc
             in
-            state.acc <- (fst state.acc, merged) ;
-            merged )
+            {state with acc= tuple} )
       in
-      let%bind () = Linear_pipe.write w x' in
-      let rem_ds = enq ds in
+      let%bind () = Linear_pipe.write w state.acc in
+      let rem_ds = List.drop ds state.max_base_jobs in
       if List.length rem_ds > 0 then step_on_free_space state w rem_ds f f_acc
-      else return ()
+      else return state
 
     let do_steps ~state ~data ~f ~f_acc w =
       let rec go () =
@@ -929,15 +1698,15 @@ let%test_module "scans" =
             return ()
         | `Ok q ->
             let ds = Queue.to_list q in
-            let%bind () = step_on_free_space state w ds f f_acc in
-            assert (is_valid state) ;
+            let%bind s = step_on_free_space !state w ds f f_acc in
+            state := s ;
             go ()
       in
       go ()
 
-    let scan ~data ~parallelism_log_2 ~f ~f_acc =
+    let scan ~data ~depth ~f ~f_acc =
       Linear_pipe.create_reader ~close_on_exception:true (fun w ->
-          let s = start ~parallelism_log_2 ~root_at_depth:1 in
+          let s = ref (empty ~max_base_jobs:(Int.pow 2 depth) ~delay:1) in
           do_steps ~state:s ~data ~f w ~f_acc )
 
     let step_repeatedly ~state ~data ~f ~f_acc =
@@ -946,107 +1715,138 @@ let%test_module "scans" =
 
     let%test_module "scan (+) over ints" =
       ( module struct
-        let f_merge_up (state : int * (int64 * int64 list) option) x =
+        let f_merge_up (state : (int64 * int64 list) option) x =
           let open Option.Let_syntax in
-          let%map acc = snd state in
+          let%map acc = state in
           (Int64.( + ) (fst acc) (fst x), snd acc @ snd x)
 
-        let job_done (job : (Int64.t, Int64.t) Available_job.t) :
-            Int64.t State.Completed_job.t =
-          match job with
-          | Base (x, _) ->
-              Lifted x
-          | Merge (x, y, _) ->
-              Merged (Int64.( + ) x y)
+        let job_done (job : (Int64.t, Int64.t) Available_job.t) : Int64.t =
+          match job with Base x -> x | Merge (x, y) -> Int64.( + ) x y
 
         let%test_unit "Split only if enqueuing onto the next queue" =
           let p = 4 in
-          let max_slots = Int.pow 2 (p - 2) in
-          let g = Int.gen_incl 1 max_slots in
-          let state = State.create ~parallelism_log_2:p ~root_at_depth:1 in
+          let max_base_jobs = Int.pow 2 p in
+          let g = Int.gen_incl 0 max_base_jobs in
+          let state = State.empty ~max_base_jobs ~delay:1 in
           Quickcheck.test g ~trials:1000 ~f:(fun i ->
               let data = List.init i ~f:Int64.of_int in
-              let partition = partition_if_overflowing ~max_slots:i state in
-              let curr_head = Option.value_exn state.base_none_pos in
-              let curr_block_start =
-                State.block_of state (Option.value_exn state.base_none_pos)
+              let partition = partition_if_overflowing state in
+              let jobs =
+                List.concat
+                @@ work_for_next_update state ~data_count:(List.length data)
               in
-              let curr_block_end =
-                curr_block_start + State.slots_per_block state - 1
-              in
-              let jobs = Or_error.ok_exn (next_jobs ~state) in
               let jobs_done = List.map jobs ~f:job_done in
-              let _ =
-                Or_error.ok_exn
-                @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done
+              let tree_count_before = Non_empty_list.length state.trees in
+              let _, state =
+                test_update ~data state ~completed_jobs:jobs_done
               in
-              let () = Or_error.ok_exn @@ enqueue_data ~state ~data in
-              (*Check base position after enqueuing*)
               match partition.second with
               | None ->
-                  let new_block_start =
-                    State.block_of state (Option.value_exn state.base_none_pos)
+                  let tree_count_after = Non_empty_list.length state.trees in
+                  let expected_tree_count =
+                    if i = fst partition.first then tree_count_before + 1
+                    else tree_count_before
                   in
-                  let expected_base_pos =
-                    if curr_head + partition.first = curr_block_end + 1 then
-                      new_block_start
-                    else curr_head + partition.first
+                  assert (tree_count_after = expected_tree_count)
+              | Some _ ->
+                  let tree_count_after = Non_empty_list.length state.trees in
+                  let expected_tree_count =
+                    if i > fst partition.first then tree_count_before + 1
+                    else tree_count_before
                   in
-                  assert (
-                    Option.value_exn state.base_none_pos = expected_base_pos )
-              | Some y ->
-                  let new_block_start =
-                    State.block_of state (Option.value_exn state.base_none_pos)
-                  in
-                  assert (partition.first + y = i) ;
-                  assert (
-                    Option.value_exn state.base_none_pos = y + new_block_start
-                  ) )
+                  assert (tree_count_after = expected_tree_count) )
 
-        let%test_unit "non-emitted data tracking" =
-          (* After a random number of steps, check if acc = current_state - data list*)
-          let cur_value = ref 0 in
-          let parallelism_log_2 = 4 in
-          let one = Int64.of_int 1 in
-          let root_at_depth = 1 in
-          let state = State.create ~parallelism_log_2 ~root_at_depth in
-          let g = Int.gen_incl 1 (Int.pow 2 parallelism_log_2 / 2) in
-          let leaf_blocks = Int.pow 2 root_at_depth in
-          Quickcheck.test g ~trials:1000 ~f:(fun i ->
-              Async.Thread_safe.block_on_async_exn (fun () ->
-                  let data = List.init i ~f:(fun _ -> one) in
-                  let jobs = Or_error.ok_exn (next_jobs ~state) in
-                  let jobs_done = List.map jobs ~f:job_done in
-                  let old_tuple = state.acc in
-                  let _ =
-                    Option.bind
-                      ( Or_error.ok_exn
-                      @@ fill_in_completed_jobs ~state
-                           ~completed_jobs:jobs_done )
-                      ~f:(fun x ->
-                        let merged =
-                          if Option.is_some (snd old_tuple) then
-                            f_merge_up old_tuple x
-                          else snd state.acc
-                        in
-                        state.acc <- (fst state.acc, merged) ;
-                        merged )
-                  in
-                  let _ = Or_error.ok_exn @@ enqueue_data ~state ~data in
-                  cur_value := !cur_value + i ;
-                  let acc_data =
-                    List.sum (module Int64) (current_data state) ~f:Fn.id
-                  in
-                  let acc =
-                    Option.value_map (snd state.acc) ~default:(0, [])
-                      ~f:(fun (x, xs) -> (Int64.to_int_exn x, xs))
-                  in
-                  let expected = !cur_value - Int64.to_int_exn acc_data in
-                  assert (fst acc = expected) ;
-                  assert (
-                    List.length state.other_trees_data
-                    < (parallelism_log_2 - root_at_depth) * leaf_blocks ) ;
-                  return () ) )
+        let%test_unit "sequence number reset" =
+          (*create jobs with unique sequence numbers starting from 1. At any
+          point, after reset, the jobs should be labelled starting from 1.
+          *)
+          Backtrace.elide := false ;
+          let p = 3 in
+          let g = Int.gen_incl 0 (Int.pow 2 p) in
+          let max_base_jobs = Int.pow 2 p in
+          let jobs state =
+            List.fold ~init:[] (Non_empty_list.to_list state.trees)
+              ~f:(fun acc tree -> Tree.jobs_records tree :: acc)
+          in
+          let verify_sequence_number state =
+            let state = reset_seq_no state in
+            let jobs_list = jobs state in
+            let depth = Int.ceil_log2 max_base_jobs + 1 in
+            List.iteri jobs_list ~f:(fun i jobs ->
+                (*each tree has jobs up till a level below the older tree*)
+                (* and have the following sequence numbers after reset
+                *         4
+                *     3       3
+                *   2   2   2   2
+                *  1 1 1 1 1 1 1 1
+                *)
+                let cur_levels = depth - i in
+                let seq_sum =
+                  List.fold (List.init cur_levels ~f:Fn.id) ~init:0
+                    ~f:(fun acc j ->
+                      let j = j + i in
+                      acc + (Int.pow 2 j * (depth - j)) )
+                in
+                let offset = i in
+                let sum_of_all_seq_numbers =
+                  List.sum
+                    (module Int)
+                    ~f:
+                      (fun (job :
+                             (int64 Merge.Record.t, int64 Base.Record.t) Job.t) ->
+                      match job with
+                      | Job.Merge {seq_no; _} ->
+                          seq_no - offset
+                      | Base {seq_no; _} ->
+                          seq_no - offset )
+                    jobs
+                in
+                assert (sum_of_all_seq_numbers = seq_sum) )
+          in
+          let state = ref (State.empty ~max_base_jobs ~delay:0) in
+          let counter = ref 0 in
+          Quickcheck.test g ~trials:50 ~f:(fun _ ->
+              let jobs = List.concat (jobs_for_next_update !state) in
+              let jobs_done = List.map jobs ~f:job_done in
+              let data = List.init max_base_jobs ~f:Int64.of_int in
+              let res_opt, s =
+                test_update ~data !state ~completed_jobs:jobs_done
+              in
+              state := s ;
+              if Option.is_some res_opt then
+                (*start the rest after enough jobs are created*)
+                if !counter >= p + 1 then verify_sequence_number !state
+                else counter := !counter + 1
+              else () )
+
+        let%test_unit "serialize, deserialize scan state" =
+          Backtrace.elide := false ;
+          let g =
+            gen
+              ~gen_data:
+                Quickcheck.Generator.Let_syntax.(
+                  Int.quickcheck_generator >>| Int64.of_int)
+              ~f_job_done:job_done ~f_acc:f_merge_up
+          in
+          Quickcheck.test g ~sexp_of:[%sexp_of: (int64, int64) State.t]
+            ~trials:50 ~f:(fun s ->
+              let hash_s = State.hash s Int64.to_string Int64.to_string in
+              let sz =
+                State.Stable.Latest.bin_size_t Int64.bin_size_t
+                  Int64.bin_size_t s
+              in
+              let buf = Bin_prot.Common.create_buf sz in
+              ignore
+                (State.Stable.V1.bin_write_t Int64.bin_write_t
+                   Int64.bin_write_t buf ~pos:0 s) ;
+              let deserialized =
+                State.Stable.V1.bin_read_t Int64.bin_read_t Int64.bin_read_t
+                  ~pos_ref:(ref 0) buf
+              in
+              let new_hash =
+                State.hash deserialized Int64.to_string Int64.to_string
+              in
+              assert (Hash.equal hash_s new_hash) )
 
         let%test_unit "scan can be initialized from intermediate state" =
           Backtrace.elide := false ;
@@ -1059,10 +1859,10 @@ let%test_module "scans" =
           in
           Quickcheck.test g ~sexp_of:[%sexp_of: (int64, int64) State.t]
             ~trials:10 ~f:(fun s ->
+              let s = ref s in
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let do_one_next = ref false in
                   (* For any arbitrary intermediate state *)
-                  let parallelism = State.parallelism s in
                   (* if we then add 1 and a bunch of zeros *)
                   let one_then_zeros =
                     Linear_pipe.create_reader ~close_on_exception:true
@@ -1083,6 +1883,9 @@ let%test_module "scans" =
                     step_repeatedly ~state:s ~data:one_then_zeros ~f:job_done
                       ~f_acc:f_merge_up
                   in
+                  let parallelism =
+                    !s.max_base_jobs * Int.ceil_log2 !s.max_base_jobs
+                  in
                   let fill_some_zeros v s =
                     List.init (parallelism * parallelism) ~f:(fun _ -> ())
                     |> Deferred.List.fold ~init:v ~f:(fun v _ ->
@@ -1096,94 +1899,32 @@ let%test_module "scans" =
                   in
                   (* after we flush intermediate work *)
                   let old_acc =
-                    State.acc s |> Option.value ~default:Int64.(zero, [])
+                    !s.acc |> Option.value ~default:Int64.(zero, [])
                   in
                   let%bind v = fill_some_zeros Int64.zero s in
                   do_one_next := true ;
-                  let acc = State.acc s |> Option.value_exn in
+                  let acc = !s.acc |> Option.value_exn in
                   assert (fst acc <> fst old_acc) ;
                   (* eventually we'll emit the acc+1 element *)
                   let%map _ = fill_some_zeros v s in
-                  let acc_plus_one = State.acc s |> Option.value_exn in
+                  let acc_plus_one = !s.acc |> Option.value_exn in
                   assert (Int64.(equal (fst acc_plus_one) (fst acc + one))) )
           )
-
-        let%test_unit "sequence number reset" =
-          (*create jobs with unique sequence numbers starting from 1. At any
-          point, after reset, the jobs should be labelled starting from 1.
-          Therefore,  sum of those sequence numbers should be equal to sum of
-          first n (number of jobs) natural numbers*)
-          Backtrace.elide := false ;
-          let p = 3 in
-          let g = Int.gen_incl 0 (Int.pow 2 p) in
-          let jobs state = Or_error.ok_exn (next_jobs ~state) in
-          let verify_sequence_number state =
-            let state_copy = State.copy state in
-            let job_count = List.length (jobs state) in
-            let sum_of_n = job_count * (job_count + 1) / 2 in
-            let _ = State.reset_seq_no state_copy in
-            let sum_of_all_seq_numbers =
-              List.sum
-                (module Int)
-                ~f:(fun (job : (int64, int64) Available_job.t) ->
-                  match job with
-                  | Merge (_, _, seq) ->
-                      seq
-                  | Base (_, seq) ->
-                      seq )
-                (jobs state_copy)
-            in
-            assert (sum_of_all_seq_numbers = sum_of_n)
-          in
-          let state = State.create ~parallelism_log_2:p ~root_at_depth:0 in
-          Quickcheck.test g ~trials:50 ~f:(fun _ ->
-              if free_space ~state < Int.pow 2 p then
-                (*Work until all the leaves are empty*)
-                let jobs = Or_error.ok_exn (next_jobs ~state) in
-                let jobs_done = List.map (List.take jobs 2) ~f:job_done in
-                let () = Or_error.ok_exn (update_curr_job_seq_no state) in
-                let emitted_val_opt =
-                  Or_error.ok_exn
-                  @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done
-                in
-                let () =
-                  if Option.is_some emitted_val_opt then
-                    let jobs_done =
-                      List.map (List.take (List.drop jobs 1) 1) ~f:job_done
-                    in
-                    let _ =
-                      Or_error.ok_exn
-                      @@ fill_in_completed_jobs ~state
-                           ~completed_jobs:jobs_done
-                    in
-                    ()
-                in
-                verify_sequence_number state
-              else
-                (*Fill up the leaves*)
-                let data = List.init 8 ~f:Int64.of_int in
-                List.iter data ~f:(fun d ->
-                    let () = Or_error.ok_exn (update_curr_job_seq_no state) in
-                    let () =
-                      Or_error.ok_exn @@ enqueue_data ~state ~data:[d]
-                    in
-                    verify_sequence_number state ) )
       end )
 
     let%test_module "scan (+) over ints, map from string" =
       ( module struct
-        let f_merge_up (tuple : int * (int64 * string list) option) x =
+        let f_merge_up (tuple : (int64 * string list) option) x =
           let open Option.Let_syntax in
-          let%map acc = snd tuple in
+          let%map acc = tuple in
           (Int64.( + ) (fst acc) (fst x), snd acc @ snd x)
 
-        let job_done (job : (Int64.t, string) Available_job.t) :
-            Int64.t State.Completed_job.t =
+        let job_done (job : (Int64.t, string) Available_job.t) : Int64.t =
           match job with
-          | Base (x, _) ->
-              Lifted (Int64.of_string x)
-          | Merge (x, y, _) ->
-              Merged (Int64.( + ) x y)
+          | Base x ->
+              Int64.of_string x
+          | Merge (x, y) ->
+              Int64.( + ) x y
 
         let%test_unit "scan behaves like a fold long-term" =
           let a_bunch_of_ones_then_zeros x =
@@ -1195,16 +1936,16 @@ let%test_module "scans" =
                     return (Some (next, count - 1)) )
             ; has_reader= false }
           in
-          let parallelism = 7 in
+          let depth = 7 in
           let n = 1000 in
           let result =
             scan
               ~data:(a_bunch_of_ones_then_zeros n)
-              ~parallelism_log_2:parallelism ~f:job_done ~f_acc:f_merge_up
+              ~depth ~f:job_done ~f_acc:f_merge_up
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let%map after_3n =
-                List.init (3 * n) ~f:(fun _ -> ())
+                List.init (4 * n) ~f:(fun _ -> ())
                 |> Deferred.List.fold ~init:Int64.zero ~f:(fun acc _ ->
                        match%map Linear_pipe.read result with
                        | `Eof ->
@@ -1224,18 +1965,13 @@ let%test_module "scans" =
 
     let%test_module "scan (concat) over strings" =
       ( module struct
-        let f_merge_up (tuple : int * (string * string list) option) x =
+        let f_merge_up (tuple : (string * string list) option) x =
           let open Option.Let_syntax in
-          let%map acc = snd tuple in
+          let%map acc = tuple in
           (String.( ^ ) (fst acc) (fst x), snd acc @ snd x)
 
-        let job_done (job : (string, string) Available_job.t) :
-            string State.Completed_job.t =
-          match job with
-          | Base (x, _) ->
-              Lifted x
-          | Merge (x, y, _) ->
-              Merged (String.( ^ ) x y)
+        let job_done (job : (string, string) Available_job.t) : string =
+          match job with Base x -> x | Merge (x, y) -> String.( ^ ) x y
 
         let%test_unit "scan performs operation in correct order with \
                        non-commutative semigroup" =
@@ -1254,7 +1990,7 @@ let%test_module "scans" =
           let result =
             scan
               ~data:(a_bunch_of_nums_then_empties n)
-              ~parallelism_log_2:12 ~f:job_done ~f_acc:f_merge_up
+              ~depth:7 ~f:job_done ~f_acc:f_merge_up
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let%map after_42n =
@@ -1275,54 +2011,4 @@ let%test_module "scans" =
               in
               assert (after_42n = expected) )
       end )
-
-    let%test_unit "Test for invalid states" =
-      let exp = 3 in
-      let not_valid = Fn.compose not is_valid in
-      let ok = Or_error.ok_exn in
-      let create_job (s : ('a, 'd) State.t) pos job =
-        Ring_buffer.direct_update s.jobs pos ~f:(fun _ -> Ok job) |> ok
-      in
-      let empty_tree = State.create ~parallelism_log_2:exp ~root_at_depth:1 in
-      let p = State.parallelism empty_tree in
-      assert (not_valid empty_tree) ;
-      let level_i = Int.pow 2 (exp - 1) in
-      let empty_leaves = empty_tree in
-      let partial_jobs = State.copy empty_leaves in
-      let () =
-        List.fold ~init:() [level_i - 1; level_i + 1] ~f:(fun _ pos ->
-            create_job partial_jobs pos (State.Job.Merge (Lcomp 1)) )
-      in
-      assert (not_valid partial_jobs) ;
-      let invalid_job = State.copy empty_leaves in
-      let () =
-        create_job invalid_job (level_i - 1) (State.Job.Merge (Rcomp 1))
-      in
-      assert (not_valid invalid_job) ;
-      let empty_jobs = State.copy empty_tree in
-      let _ =
-        List.fold ~init:() [p - 1; p] ~f:(fun _ pos ->
-            create_job empty_jobs pos (Base (Some (1, default_seq_no))) )
-      in
-      let _ =
-        create_job empty_jobs level_i (Merge (Bcomp (1, 1, default_seq_no)))
-      in
-      assert (not_valid empty_jobs) ;
-      let incorrect_data_length = State.copy empty_leaves in
-      let incorrect_data_length =
-        {incorrect_data_length with State.current_data_length= 4}
-      in
-      let _ =
-        List.fold ~init:() [p - 1; p] ~f:(fun _ pos ->
-            create_job incorrect_data_length pos
-              (Base (Some (1, default_seq_no))) )
-      in
-      assert (not_valid incorrect_data_length) ;
-      let interspersed_data = State.copy incorrect_data_length in
-      let _ =
-        List.fold ~init:() [p + 2; p + 4] ~f:(fun _ pos ->
-            create_job interspersed_data pos (Base (Some (1, default_seq_no)))
-        )
-      in
-      assert (not_valid interspersed_data)
   end )

@@ -38,7 +38,7 @@ module Styles = {
 
 module TransactionsQueryString = [%graphql
   {|
-    query transactions($after: String, $publicKey: String!) {
+    query transactions($after: String, $publicKey: PublicKey!) {
       blocks(first: 5, after: $after, filter: { relatedTo: $publicKey }) {
         nodes {
           creator @bsDecoder(fn: "Apollo.Decoders.publicKey")
@@ -180,7 +180,7 @@ let make = () => {
      | Some(pubkey) =>
        let transactionQuery =
          TransactionsQueryString.make(
-           ~publicKey=PublicKey.toString(pubkey),
+           ~publicKey=Apollo.Encoders.publicKey(pubkey),
            (),
          );
        <TransactionsQuery variables=transactionQuery##variables>
@@ -192,6 +192,11 @@ let make = () => {
              | Data(data) =>
                let {blocks, pending} = extractTransactions(data);
                let transactions = Array.concatenate(blocks);
+               let lastCursor =
+                 Option.withDefault(
+                   ~default="",
+                   data##blocks##pageInfo##lastCursor,
+                 );
                switch (Array.length(transactions), Array.length(pending)) {
                | (0, 0) =>
                  <div className=Styles.alertContainer>
@@ -204,10 +209,12 @@ let make = () => {
                  <TransactionsList
                    pending
                    transactions
+                   hasNextPage=data##blocks##pageInfo##hasNextPage
                    onLoadMore={() => {
                      let moreTransactions =
                        TransactionsQueryString.make(
-                         ~publicKey=PublicKey.toString(pubkey),
+                         ~publicKey=Apollo.Encoders.publicKey(pubkey),
+                         ~after=lastCursor,
                          (),
                        );
 

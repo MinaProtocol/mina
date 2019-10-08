@@ -112,6 +112,8 @@ module Ledger_inner = struct
     include Inputs
     module Base = Any_ledger.M
     module Mask = Mask
+
+    let mask_to_base m = Any_ledger.cast (module Mask.Attached) m
   end)
 
   include Mask.Attached
@@ -151,12 +153,14 @@ module Ledger_inner = struct
     try
       let result = f masked_ledger in
       let (_ : Mask.t) =
-        Maskable.unregister_mask_exn base_ledger masked_ledger
+        Maskable.unregister_mask_exn ~grandchildren:`Recursive base_ledger
+          masked_ledger
       in
       result
     with exn ->
       let (_ : Mask.t) =
-        Maskable.unregister_mask_exn base_ledger masked_ledger
+        Maskable.unregister_mask_exn ~grandchildren:`Recursive base_ledger
+          masked_ledger
       in
       raise exn
 
@@ -166,15 +170,8 @@ module Ledger_inner = struct
 
   let unregister_mask_exn t mask = Maskable.unregister_mask_exn (packed t) mask
 
-  let remove_and_reparent_exn t t_as_mask ~children =
-    Maskable.remove_and_reparent_exn (packed t) t_as_mask ~children
-
-  (* TODO: Implement the serialization/deserialization *)
-  let unattached_mask_of_serializable _ = failwith "unimplmented"
-
-  let serializable_of_t _ = failwith "unimplented"
-
-  type serializable = int [@@deriving bin_io]
+  let remove_and_reparent_exn t t_as_mask =
+    Maskable.remove_and_reparent_exn (packed t) t_as_mask
 
   type unattached_mask = Mask.t
 
@@ -247,3 +244,49 @@ end
 
 include Ledger_inner
 include Transaction_logic.Make (Ledger_inner)
+
+let gen_initial_ledger_state :
+    (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+    array
+    Quickcheck.Generator.t =
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind n_accounts = Int.gen_incl 2 10 in
+  let%bind keypairs = Quickcheck_lib.replicate_gen Keypair.gen n_accounts in
+  let%bind balances =
+    Quickcheck_lib.replicate_gen
+      Currency.Amount.(gen_incl (of_int 500_000_000) (of_int 1_000_000_000))
+      n_accounts
+  in
+  let%bind nonces =
+    Quickcheck_lib.replicate_gen
+      ( Quickcheck.Generator.map ~f:Coda_numbers.Account_nonce.of_int
+      @@ Int.gen_incl 0 1000 )
+      n_accounts
+  in
+  let rec zip3_exn a b c =
+    match (a, b, c) with
+    | [], [], [] ->
+        []
+    | x :: xs, y :: ys, z :: zs ->
+        (x, y, z) :: zip3_exn xs ys zs
+    | _ ->
+        failwith "zip3 unequal lengths"
+  in
+  return @@ Array.of_list @@ zip3_exn keypairs balances nonces
+
+type init_state =
+  (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+  array
+[@@deriving sexp_of]
+
+let apply_initial_ledger_state : t -> init_state -> unit =
+ fun t accounts ->
+  Array.iter accounts ~f:(fun (kp, balance, nonce) ->
+      let pk_compressed = Public_key.compress kp.public_key in
+      let account = Account.initialize pk_compressed in
+      let account' =
+        { account with
+          balance= Currency.Balance.of_int (Currency.Amount.to_int balance)
+        ; nonce }
+      in
+      create_new_account_exn t pk_compressed account' )

@@ -2,6 +2,7 @@ open Core
 open Pipe_lib
 open Async
 open Coda_base
+open Coda_transition
 
 let max_length = 4
 
@@ -31,7 +32,26 @@ end)
 
 let%test_module "Ledger catchup" =
   ( module struct
-    let test_catchup ~logger ~trust_system ~network
+    let hb_logger = Logger.create ()
+
+    let logger = Logger.null ()
+
+    let trust_system = Trust_system.null ()
+
+    let run_ledger_catchup ~logger ~pids =
+      let%map verifier = Verifier.create ~logger ~pids in
+      Ledger_catchup.run ~verifier
+
+    let assert_catchup_jobs_are_flushed transition_frontier =
+      [%test_result: [`Normal | `Catchup]]
+        ~message:
+          "Transition_frontier should not have any more catchup jobs at the \
+           end of the test"
+        ~equal:( = ) ~expect:`Normal
+        ( Broadcast_pipe.Reader.peek
+        @@ Transition_frontier.catchup_signal transition_frontier )
+
+    let test_catchup ~logger ~pids ~trust_system ~network
         (me : Transition_frontier.t) transition expected_breadcrumbs =
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
@@ -54,86 +74,99 @@ let%test_module "Ledger catchup" =
       in
       Strict_pipe.Writer.write catchup_job_writer
         (parent_hash, [Rose_tree.T (cached_transition, [])]) ;
-      Ledger_catchup.run ~logger ~trust_system ~verifier:() ~network
-        ~frontier:me ~catchup_breadcrumbs_writer ~catchup_job_reader
+      let%bind run = run_ledger_catchup ~logger ~pids in
+      run ~logger ~trust_system ~network ~frontier:me
+        ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
       let result_ivar = Ivar.create () in
       (* TODO: expose Strict_pipe.read *)
       Strict_pipe.Reader.iter catchup_breadcrumbs_reader ~f:(fun rose_tree ->
           Deferred.return @@ Ivar.fill result_ivar rose_tree )
       |> don't_wait_for ;
-      let%map cached_catchup_breadcrumbs =
-        Ivar.read result_ivar >>| List.hd_exn
+      let%bind cached_catchup_breadcrumbs =
+        let%map breadcrumbs, catchup_signal = Ivar.read result_ivar in
+        ( match catchup_signal with
+        | `Catchup_scheduler ->
+            failwith "Did not expect a catchup scheduler action"
+        | `Ledger_catchup ivar ->
+            Ivar.fill ivar () ) ;
+        List.hd_exn breadcrumbs
       in
+      let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
       let catchup_breadcrumbs =
         Rose_tree.map cached_catchup_breadcrumbs
           ~f:Cache_lib.Cached.invalidate_with_success
       in
+      assert_catchup_jobs_are_flushed me ;
       Rose_tree.equal expected_breadcrumbs catchup_breadcrumbs
         ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
-          let to_transition =
-            Transition_frontier.(
-              Fn.compose With_hash.data Breadcrumb.transition_with_hash)
-          in
           External_transition.Validated.equal
-            (to_transition breadcrumb_tree1)
-            (to_transition breadcrumb_tree2) )
+            (Transition_frontier.Breadcrumb.validated_transition
+               breadcrumb_tree1)
+            (Transition_frontier.Breadcrumb.validated_transition
+               breadcrumb_tree2) )
 
     let%test "catchup to a peer" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
-      let logger = Logger.create () in
-      let trust_system = Trust_system.null () in
+      let pids = Child_processes.Termination.create_pid_table () in
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer
-              ~source_accounts:Genesis_ledger.accounts ~logger ~trust_system
-              ~target_accounts:Genesis_ledger.accounts
+              ~source_accounts:Genesis_ledger.accounts ~logger ~pids
+              ~trust_system ~target_accounts:Genesis_ledger.accounts
               ~num_breadcrumbs:(max_length / 2)
           in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
             let transition =
-              External_transition.Validation.lower
-                (Transition_frontier.Breadcrumb.transition_with_hash
-                   best_breadcrumb)
-                ( (`Time_received, Truth.True)
-                , (`Proof, Truth.True)
-                , (`Frontier_dependencies, Truth.False)
-                , (`Staged_ledger_diff, Truth.False) )
+              Transition_frontier.Breadcrumb.validated_transition
+                best_breadcrumb
+              |> External_transition.Validation
+                 .reset_frontier_dependencies_validation
+              |> External_transition.Validation
+                 .reset_staged_ledger_diff_validation
             in
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
           in
-          test_catchup ~logger ~trust_system ~network me best_transition
-            ( Transition_frontier.path_map peer.frontier best_breadcrumb
-                ~f:Fn.id
-            |> Rose_tree.of_list_exn ) )
+          let%map res =
+            test_catchup ~logger ~pids ~trust_system ~network me
+              best_transition
+              ( Transition_frontier.path_map peer.frontier best_breadcrumb
+                  ~f:Fn.id
+              |> Rose_tree.of_list_exn )
+          in
+          heartbeat_flag := false ;
+          res )
 
     let%test "peers can provide transitions with length between max_length to \
               2 * max_length" =
-      let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
+      let pids = Child_processes.Termination.create_pid_table () in
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let num_breadcrumbs =
             Int.gen_incl max_length (2 * max_length) |> Quickcheck.random_value
           in
           let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+            Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
               ~source_accounts:Genesis_ledger.accounts
               ~target_accounts:Genesis_ledger.accounts ~num_breadcrumbs
           in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
+            Transition_frontier.Breadcrumb.validated_transition best_breadcrumb
           in
           let best_transition_enveloped =
             let transition =
-              External_transition.Validation.lower best_transition
-                ( (`Time_received, Truth.True)
-                , (`Proof, Truth.True)
-                , (`Frontier_dependencies, Truth.False)
-                , (`Staged_ledger_diff, Truth.False) )
+              best_transition
+              |> External_transition.Validation
+                 .reset_frontier_dependencies_validation
+              |> External_transition.Validation
+                 .reset_staged_ledger_diff_validation
             in
             Envelope.Incoming.wrap ~data:transition
               ~sender:Envelope.Sender.Local
@@ -141,47 +174,58 @@ let%test_module "Ledger catchup" =
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ( "state_hash"
-                , State_hash.to_yojson (With_hash.hash best_transition) ) ]
+                , State_hash.to_yojson
+                    (External_transition.Validated.state_hash best_transition)
+                ) ]
             "Best transition of peer: $state_hash" ;
           let history =
             Transition_frontier.root_history_path_map peer.frontier
-              (With_hash.hash best_transition)
+              (External_transition.Validated.state_hash best_transition)
               ~f:Fn.id
             |> Option.value_exn
           in
-          test_catchup ~logger ~trust_system ~network me
-            best_transition_enveloped
-            (Rose_tree.of_list_exn @@ Non_empty_list.tail history) )
+          let%map res =
+            test_catchup ~logger ~pids ~trust_system ~network me
+              best_transition_enveloped
+              (Rose_tree.of_list_exn @@ Non_empty_list.tail history)
+          in
+          heartbeat_flag := false ;
+          res )
 
     let%test "catchup would be successful even if the parent transition is \
               already in the frontier" =
-      let logger = Logger.create () in
-      let trust_system = Trust_system.null () in
+      let pids = Child_processes.Termination.create_pid_table () in
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+            Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
               ~source_accounts:Genesis_ledger.accounts
               ~target_accounts:Genesis_ledger.accounts ~num_breadcrumbs:1
           in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
+            Transition_frontier.Breadcrumb.validated_transition best_breadcrumb
           in
-          test_catchup ~logger ~trust_system ~network me
-            (let transition =
-               External_transition.Validation.lower best_transition
-                 ( (`Time_received, Truth.True)
-                 , (`Proof, Truth.True)
-                 , (`Frontier_dependencies, Truth.False)
-                 , (`Staged_ledger_diff, Truth.False) )
-             in
-             Envelope.Incoming.wrap ~data:transition
-               ~sender:Envelope.Sender.Local)
-            (Rose_tree.of_list_exn [best_breadcrumb]) )
+          let%map res =
+            test_catchup ~logger ~pids ~trust_system ~network me
+              (let transition =
+                 best_transition
+                 |> External_transition.Validation
+                    .reset_frontier_dependencies_validation
+                 |> External_transition.Validation
+                    .reset_staged_ledger_diff_validation
+               in
+               Envelope.Incoming.wrap ~data:transition
+                 ~sender:Envelope.Sender.Local)
+              (Rose_tree.of_list_exn [best_breadcrumb])
+          in
+          heartbeat_flag := false ;
+          res )
 
     let%test "catchup would fail if one of the parent transition fails" =
-      let logger = Logger.create () in
-      let trust_system = Trust_system.null () in
+      let pids = Child_processes.Termination.create_pid_table () in
+      heartbeat_flag := true ;
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
       in
@@ -192,43 +236,43 @@ let%test_module "Ledger catchup" =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
       Thread_safe.block_on_async_exn (fun () ->
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+            Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
               ~source_accounts:Genesis_ledger.accounts
               ~target_accounts:Genesis_ledger.accounts
               ~num_breadcrumbs:max_length
           in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
+            Transition_frontier.Breadcrumb.validated_transition best_breadcrumb
           in
           let history =
             Transition_frontier.root_history_path_map peer.frontier
-              (With_hash.hash best_transition)
+              (External_transition.Validated.state_hash best_transition)
               ~f:Fn.id
             |> Option.value_exn
           in
           let missing_breadcrumbs = Non_empty_list.tail history in
           let missing_transitions =
             List.map missing_breadcrumbs
-              ~f:Transition_frontier.Breadcrumb.transition_with_hash
+              ~f:Transition_frontier.Breadcrumb.validated_transition
           in
           let cached_best_transition =
             Transition_handler.Unprocessed_transition_cache.register_exn
               unprocessed_transition_cache
               (let transition =
-                 External_transition.Validation.lower best_transition
-                   ( (`Time_received, Truth.True)
-                   , (`Proof, Truth.True)
-                   , (`Frontier_dependencies, Truth.False)
-                   , (`Staged_ledger_diff, Truth.False) )
+                 best_transition
+                 |> External_transition.Validation
+                    .reset_frontier_dependencies_validation
+                 |> External_transition.Validation
+                    .reset_staged_ledger_diff_validation
                in
                Envelope.Incoming.wrap ~data:transition
                  ~sender:Envelope.Sender.Local)
           in
           let parent_hash =
-            External_transition.Validated.parent_hash
-              (With_hash.data best_transition)
+            External_transition.Validated.parent_hash best_transition
           in
           Strict_pipe.Writer.write catchup_job_writer
             (parent_hash, [Rose_tree.T (cached_best_transition, [])]) ;
@@ -237,17 +281,18 @@ let%test_module "Ledger catchup" =
             Transition_handler.Unprocessed_transition_cache.register_exn
               unprocessed_transition_cache
               (let transition =
-                 External_transition.Validation.lower failing_transition
-                   ( (`Time_received, Truth.True)
-                   , (`Proof, Truth.True)
-                   , (`Frontier_dependencies, Truth.False)
-                   , (`Staged_ledger_diff, Truth.False) )
+                 failing_transition
+                 |> External_transition.Validation
+                    .reset_frontier_dependencies_validation
+                 |> External_transition.Validation
+                    .reset_staged_ledger_diff_validation
                in
                Envelope.Incoming.wrap ~data:transition
                  ~sender:Envelope.Sender.Local)
           in
-          Ledger_catchup.run ~logger ~trust_system ~verifier:() ~network
-            ~frontier:me ~catchup_breadcrumbs_writer ~catchup_job_reader
+          let%bind run = run_ledger_catchup ~logger ~pids in
+          run ~logger ~trust_system ~network ~frontier:me
+            ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
           let%bind () = after (Core.Time.Span.of_sec 1.) in
           Cache_lib.Cached.invalidate_with_failure cached_failing_transition
@@ -255,12 +300,13 @@ let%test_module "Ledger catchup" =
           let%map result =
             Ivar.read (Cache_lib.Cached.final_state cached_best_transition)
           in
+          heartbeat_flag := false ;
           result = `Failed )
 
     let%test_unit "catchup won't be blocked by transitions that are still \
                    under processing" =
-      let logger = Logger.create () in
-      let trust_system = Trust_system.null () in
+      let pids = Child_processes.Termination.create_pid_table () in
+      heartbeat_flag := true ;
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
       in
@@ -272,43 +318,42 @@ let%test_module "Ledger catchup" =
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
+          print_heartbeat hb_logger |> don't_wait_for ;
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer
-              ~source_accounts:Genesis_ledger.accounts ~logger ~trust_system
-              ~target_accounts:Genesis_ledger.accounts
+              ~source_accounts:Genesis_ledger.accounts ~logger ~pids
+              ~trust_system ~target_accounts:Genesis_ledger.accounts
               ~num_breadcrumbs:max_length
           in
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
+            Transition_frontier.Breadcrumb.validated_transition best_breadcrumb
           in
           let history =
             Transition_frontier.root_history_path_map peer.frontier
-              (With_hash.hash best_transition)
+              (External_transition.Validated.state_hash best_transition)
               ~f:Fn.id
             |> Option.value_exn
           in
           let missing_breadcrumbs = Non_empty_list.tail history in
           let missing_transitions =
             List.map missing_breadcrumbs
-              ~f:Transition_frontier.Breadcrumb.transition_with_hash
+              ~f:Transition_frontier.Breadcrumb.validated_transition
             |> List.rev
           in
           let last_breadcrumb = List.last_exn missing_breadcrumbs in
           let parent_hashes =
             List.map missing_transitions
-              ~f:
-                (Fn.compose External_transition.Validated.parent_hash
-                   With_hash.data)
+              ~f:External_transition.Validated.parent_hash
           in
           let cached_transitions =
             List.map missing_transitions ~f:(fun transition ->
                 let transition =
-                  External_transition.Validation.lower transition
-                    ( (`Time_received, Truth.True)
-                    , (`Proof, Truth.True)
-                    , (`Frontier_dependencies, Truth.False)
-                    , (`Staged_ledger_diff, Truth.False) )
+                  transition
+                  |> External_transition.Validation
+                     .reset_frontier_dependencies_validation
+                  |> External_transition.Validation
+                     .reset_staged_ledger_diff_validation
                 in
                 Envelope.Incoming.wrap ~data:transition
                   ~sender:Envelope.Sender.Local
@@ -325,8 +370,9 @@ let%test_module "Ledger catchup" =
                 (after (Core.Time.Span.of_ms 500.))
                 (fun () -> Strict_pipe.Writer.write catchup_job_writer forest)
           ) ;
-          Ledger_catchup.run ~logger ~trust_system ~verifier:() ~network
-            ~frontier:me ~catchup_breadcrumbs_writer ~catchup_job_reader
+          let%bind run = run_ledger_catchup ~logger ~pids in
+          run ~logger ~trust_system ~network ~frontier:me
+            ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
           let missing_breadcrumbs_queue =
             List.map missing_breadcrumbs ~f:(fun breadcrumb ->
@@ -335,7 +381,7 @@ let%test_module "Ledger catchup" =
           in
           let finished = Ivar.create () in
           Strict_pipe.Reader.iter catchup_breadcrumbs_reader
-            ~f:(fun rose_trees ->
+            ~f:(fun (rose_trees, catchup_signal) ->
               let catchup_breadcrumb_tree =
                 Rose_tree.map (List.hd_exn rose_trees)
                   ~f:Cache_lib.Cached.invalidate_with_success
@@ -354,11 +400,19 @@ let%test_module "Ledger catchup" =
                   catchup_breadcrumb ) ;
               Transition_frontier.add_breadcrumb_exn me expected_breadcrumb
               |> ignore ;
+              ( match catchup_signal with
+              | `Catchup_scheduler ->
+                  failwith "Did not expect a catchup scheduler action"
+              | `Ledger_catchup ivar ->
+                  Ivar.fill ivar () ) ;
               if
                 Transition_frontier.Breadcrumb.equal expected_breadcrumb
                   last_breadcrumb
               then Ivar.fill finished () ;
               Deferred.unit )
           |> don't_wait_for ;
-          Ivar.read finished )
+          let%bind () = Ivar.read finished in
+          let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
+          heartbeat_flag := false ;
+          assert_catchup_jobs_are_flushed me )
   end )

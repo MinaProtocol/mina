@@ -4,10 +4,12 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-8959b8dfda29263d2f88f13a284ef34c9da0a081
+            - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Build trace-tool
                   command: cd src/app/trace-tool && cargo build --frozen
@@ -17,7 +19,9 @@ jobs:
             xcode: "10.2.0"
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run: cd frontend/wallet && yarn
             - run:
                   name: Lint wallet
@@ -43,17 +47,26 @@ jobs:
                   command: cd frontend/website && yarn run reformat && git diff --exit-code src
             - run:
                   name: Build website
-                  command: cd frontend/website && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && yarn run build
+                  command: cd frontend/website && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && pip install mkdocs && yarn run build
             - run:
                   name: Deploy staging
-                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then yarn run deploy-ci; fi)
+                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "develop" ]; then yarn run deploy-ci; fi)
+            - run: cd frontend/bot && yarn
+            - run:
+                  name: Lint bot
+                  command: cd frontend/bot && yarn run reformat && git diff --exit-code src
+            - run:
+                  name: Build bot
+                  command: cd frontend/bot && yarn run build-ci
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
@@ -80,136 +93,299 @@ jobs:
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
     build-macos:
-       macos:
-           xcode: "10.1.0"
-       working_directory: /Users/distiller/coda
-       environment:
-           HOMEBREW_LOGS: /Users/distiller/homebrew.log
-           OPAMYES: 1
-       steps:
-           - run:
-               name: Make /nix paths
-               command: |
-                   sudo mkdir /nix
-                   sudo chown distiller /nix
-           - checkout
-           - restore_cache:
-                 keys:
-                     - homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
-                     - homebrew-v1-
-           - restore_cache:
-                 keys:
-                     - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-                     - opam-v3-
-           - run: git submodule sync && git submodule update --init --recursive
-           - run:
-                 name: Download Deps -- make macos-setup-download
-                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
-           - run:
-                 name: Compile Deps -- make macos-setup-compile
-                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
-           - save_cache:
-                 key: homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
-                 paths:
-                     - "/usr/local/Homebrew"
-                     - "/Users/distiller/Library/Caches/Homebrew"
-           - save_cache:
-                 key: opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-                 paths:
-                     - "/Users/distiller/.opam"
-           - run:
-                 name: Build OCaml
-                 command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
-           - run:
-                 name: Record Constraint System Digests
-                 command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
-           - run:
-                 name: Run all tests (on master)
-                 command: echo "FIXME Tests not yet working on mac"
-           - run: 
-                 name: Create Portable Binary
-                 command: ./scripts/skip_if_only_frontend.sh make macos-portable
-           # - run: 
-           #       name: Install JFrog CLI
-           #       command: ./scripts/skip_if_only_frontend.sh bash -c 'curl -fL https://getcli.jfrog.io | sh'
-           # - run: 
-           #       name: Configure JFrog CLI
-           #       command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt config --url $ARTIFACTORY_URL --user $ARTIFACTORY_USER --apikey $ARTIFACTORY_API_KEY --interactive=false'
-           # - run: 
-           #       name: Release Build to Artifactory
-           #       command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt u _build/coda-daemon-macos.zip macos-coda/coda-daemon-$CIRCLE_BUILD_NUM.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM'
+      # only run when there's a 'release' tag
+      # filters:
+      #   tags:
+      #      only: /^release.*/
+        macos:
+            xcode: "10.2.1"
+        resource_class: large
+        working_directory: /Users/distiller/coda
+        environment:
+            HOMEBREW_LOGS: /Users/distiller/homebrew.log
+            OPAMYES: 1
+        steps:
+            - run:
+                name: Delete xcode simulators (Free 10GB - unused)
+                command: |
+                    sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
+                    df -h
+            # Attach workspace from prior linux build
+            - attach_workspace:
+                at: /tmp/workspace
+            - run:
+                name: Unpack Workspace PV Keys
+                command: |
+                    sudo mkdir -p /var/lib/coda
+                    sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
+                    sudo rm /tmp/workspace/coda*.bz2
+            - checkout
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - restore_cache:
+                name: Restore cache - homebrew
+                keys:
+                    - homebrew-v6-{{'{{'}} checksum "scripts/macos-setup-brew.sh" {{'}}'}}
+                    - homebrew-v5-
+            - run:
+                name: Install macos dependencies - homebrew - make macos-setup-download
+                command: |
+                    ./scripts/skip_if_only_frontend.sh make macos-setup-download
+            - save_cache:
+                name: Save cache - homebrew
+                key: homebrew-v6-{{'{{'}} checksum "scripts/macos-setup-brew.sh" {{'}}'}}
+                paths:
+                    - "/usr/local/Homebrew"
+                    - "/Users/distiller/Library/Caches/Homebrew"
+
+            - run:
+                name: Create opam cache signature file
+                command: |
+                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat src/opam.export >> opam_ci_cache.sig
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    - opam-v6-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+                    - opam-v5-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                    - opam-v4-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                    - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+            - run:
+                name: Ensure/Fix opam permisssions
+                command: |
+                    set +e
+                    sudo mkdir -p /Users/distiller/.opam
+                    sudo chown -R distiller /Users/distiller/.opam | true
+                    sudo chmod -R u+w /Users/distiller/.opam | true
+            - run:
+                name: Install macos dependencies - opam -- make macos-setup-compile
+                command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
+            - save_cache:
+                name: Save cache - opam
+                key: opam-v6-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+                paths:
+                    - "/Users/distiller/.opam"
+                no_output_timeout: 1h
+            - run:
+                name: Install nix and cachix
+                command: |
+                    curl https://nixos.org/nix/install | sh
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build kademlia using cachix
+                command: |
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/kademlia-haskell
+                    nix-build release2.nix
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
+            - run:
+                name: Build ocaml
+                environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
+                command: |
+                    bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                no_output_timeout: 1h
+            - run:
+                name: Collect PV Keys
+                command: |
+                    mkdir -p package/keys
+                    cp /var/lib/coda/* package/keys/.
+            - run:
+                name: Collect and rewrite aux binaries (kademlia + logproc)
+                command: |
+                    cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
+                    chmod +w package/kademlia
+                    ./scripts/librewrite-macos.sh package/kademlia
+                    cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
+                    chmod +wx package/coda-logproc
+            - run:
+                name: Collect coda binary
+                command: |
+                    cp src/_build/default/app/cli/src/coda.exe package/coda
+            - run:
+                name: Build homebrew package
+                command: |
+                    tar czvf homebrew-coda.tar.gz package
+                    openssl dgst -sha256 homebrew-coda.tar.gz > homebrew-coda.tar.gz.sha256
+                    cp homebrew-coda.tar.gz* package/.
+            - run:
+                  name: Copy artifacts to cloud
+                  bsckground: true
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+            - store_artifacts:
+                  path: package
+            - run:
+                name: Publish to Artifactory
+                command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
+                when: on_success
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
-        {%- if profile == "testnet_postake_medium_curves" %}
+        {%- if profile in medium_curve_profiles %}
         resource_class: xlarge
         {%- else %}
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
-        environment:
-            DUNE_PROFILE: {{profile}}
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Download Stable Proving Keys
-                  command: ./scripts/skip_if_only_frontend.sh scripts/getkeys.sh
+                  name: Artifacts
+                  command: |
+                      mkdir -p /tmp/artifacts
+                      touch /tmp/artifacts/coda_pvkeys_dummy
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
+            - run:
+                  name: Download candidate stable PV keys
+                  environment:
+                    DUNE_PROFILE: {{profile}}
+                  command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  environment:
+                    DUNE_PROFILE: {{profile}}
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
             - run:
-                  name: Build deb Package with keys
+                  name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
+                  environment:
+                    DUNE_PROFILE: {{profile}}
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
             - run:
-                  name: Store Generated Proving and Verifying Keys
-                  command: ./scripts/skip_if_only_frontend.sh make provingkeys
-            - run:
-                  name: Store Genesis Public/Private Keypairs
+                  name: Store genesis public/private keypairs
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
+                  no_output_timeout: 20m
             - run:
-                  name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
+                  name: Copy artifacts to cloud
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+            {%- if profile in medium_curve_profiles %}
+            - persist_to_workspace:
+                root: /tmp/artifacts
+                paths: coda_pvkeys*
             - store_artifacts:
                   path: /tmp/artifacts
-            - run:
-                  name: Copy artifacts to Google Cloud
-                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+            {%- endif %}
     {%- endfor %}
 
     {%- for profile in unit_test_profiles %}
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+          # Uncomment if you want to try debugging why this install breaks
+          # some unit tests:
+          # 1. The command_line_tests
+          # 2. Kademlia tests
+          #
+             #I'm sorry for the mess, but somehow this actually works
+             #Derived from: https://github.com/NixOS/nix/issues/971
+            #- run:
+                #name: Install nix and cachix
+                #command: |
+                     #Make a nix user
+                    #sudo addgroup --system nixbld && sudo adduser --home /home/nix --disabled-password --gecos "" --shell /bin/bash nix && sudo adduser nix nixbld && sudo mkdir -m 0755 /nix && sudo chown nix /nix && sudo mkdir -p /etc/nix && sudo bash -c 'echo "sandbox = false" > /etc/nix/nix.conf'
+                     #Install nix and cachix with that user
+                    #sudo -H -u nix bash -c 'cd /home/nix && touch ~/.bash_profile && (curl https://nixos.org/nix/install | sh) && cd /home/nix && . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install'
+
+            #- run:
+                #name: Build libp2p_helper using cachix
+                #command: |
+                     #Make sure our nix user can write to libp2p_helper dir
+                    #chmod -R 777 src/app/libp2p_helper
+                     #Do the build
+                    #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
     {%- endfor %}
 
-    {%- for profile in test_permutations.keys() | sort %}
+    {%- for profile in unit_test_profiles_medium_curves %}
+    test-unit--{{profile}}:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
+        steps:
+            - checkout
+            - run: ulimit -c unlimited
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 1h
+            - store_artifacts:
+                path: core_dumps
+    {%- endfor %}
+
+    {%- for profile in small_curves_tests.keys() | sort %}
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            {%- for test in test_permutations[profile] %}
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+            {%- endfor %}
+            - store_artifacts:
+                  path: test_logs
+    {%- endfor %}
+
+    {%- for profile in medium_curves_tests.keys() | sort %}
+    test--{{profile}}:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
+        steps:
+            - checkout
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            {%- for test in medium_curves_tests[profile] %}
+            - run:
+                  name: Running test -- {{profile}}:{{test}}
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
             {%- endfor %}
             - store_artifacts:
                   path: test_logs
@@ -223,16 +399,36 @@ workflows:
             - update-branch-protection:
                 filters:
                   branches:
-                    only: master
+                    only: develop
             - tracetool
             - build-wallet
-            - build-macos
+            - build-macos:
+                # only run AFTER linux build
+                requires:
+                    - build-artifacts--testnet_postake_medium_curves
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}
             {%- for profile in unit_test_profiles %}
             - test-unit--{{profile}}
             {%- endfor %}
-            {%- for profile in test_permutations.keys() | sort %}
+            {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
+
+    daily:
+        triggers:
+          - schedule:
+              cron: "0 12 * * *"
+              filters:
+                branches:
+                  only:
+                    - develop
+                    - /release\/.*/
+        jobs:
+          {%- for profile in unit_test_profiles_medium_curves %}
+          - test-unit--{{profile}}
+          {%- endfor %}
+          {%- for profile in medium_curves_tests.keys() | sort %}
+          - test--{{profile}}
+          {%- endfor %}

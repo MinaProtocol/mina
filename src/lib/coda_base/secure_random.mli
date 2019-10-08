@@ -1,1 +1,0 @@
-val string : unit -> string

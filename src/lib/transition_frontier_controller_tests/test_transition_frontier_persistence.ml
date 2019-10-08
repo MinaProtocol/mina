@@ -1,6 +1,7 @@
 open Async
 open Core
 open Pipe_lib
+open Coda_transition
 
 module Stubs = Stubs.Make (struct
   let max_length = 4
@@ -20,18 +21,23 @@ end)
 
 let%test_module "Transition Frontier Persistence" =
   ( module struct
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let hb_logger = Logger.create ()
+
+    let pids = Child_processes.Termination.create_pid_table ()
 
     let trust_system = Trust_system.null ()
 
     let check_transitions transition_storage written_breadcrumbs =
       List.iter written_breadcrumbs ~f:(fun breadcrumb ->
-          let {With_hash.hash; data= expected_transition} =
-            Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
+          let expected_transition =
+            Transition_frontier.Breadcrumb.validated_transition breadcrumb
           in
           let queried_transition, _ =
             Transition_storage.get ~logger transition_storage
-              (Transition_storage.Schema.Transition hash)
+              (Transition_storage.Schema.Transition
+                 (External_transition.Validated.state_hash expected_transition))
           in
           [%test_eq: External_transition.Validated.t] expected_transition
             queried_transition )
@@ -44,9 +50,9 @@ let%test_module "Transition Frontier Persistence" =
       Deferred.List.iter breadcrumbs
         ~f:(Transition_frontier.add_breadcrumb_exn frontier)
 
-    let with_persistence ?directory_name ~logger ~f =
+    let with_persistence ?directory_name ~logger ~pids ~f =
       let%bind frontier =
-        create_root_frontier ~logger Genesis_ledger.accounts
+        create_root_frontier ~logger ~pids Genesis_ledger.accounts
       in
       Monitor.try_with (fun () ->
           let frontier_persistence = create_persistence ~directory_name in
@@ -59,14 +65,16 @@ let%test_module "Transition Frontier Persistence" =
       |> Deferred.map ~f:(function
            | Ok value ->
                value
-           | Error e ->
+           | Error exn ->
                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-                 "Encountered an error: Visualizing transition frontier" ;
+                 "Exception when persisting transition frontier: $exn. \
+                  Creating frontier visualization"
+                 ~metadata:[("exn", `String (Exn.to_string exn))] ;
                Transition_frontier.visualize ~filename:"frontier.dot" frontier ;
-               raise e )
+               raise exn )
 
     let generate_breadcrumbs ~gen_root_breadcrumb_builder frontier size =
-      gen_root_breadcrumb_builder ~logger ~trust_system ~size
+      gen_root_breadcrumb_builder ~logger ~pids ~trust_system ~size
         ~accounts_with_secret_keys:Genesis_ledger.accounts
         (Transition_frontier.root frontier)
       |> Quickcheck.random_value |> Deferred.all
@@ -74,9 +82,10 @@ let%test_module "Transition Frontier Persistence" =
     let test_breadcrumbs ~gen_root_breadcrumb_builder num_breadcrumbs =
       Thread_safe.block_on_async_exn
       @@ fun () ->
+      print_heartbeat hb_logger |> don't_wait_for ;
       let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%map breadcrumbs =
-        with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
+        with_persistence ~logger ~pids ~directory_name ~f:(fun (frontier, t) ->
             let%bind breadcrumbs =
               generate_breadcrumbs ~gen_root_breadcrumb_builder frontier
                 num_breadcrumbs
@@ -88,9 +97,13 @@ let%test_module "Transition Frontier Persistence" =
             let%map () = store_transitions frontier breadcrumbs in
             breadcrumbs )
       in
-      Transition_frontier_persistence.with_database ~directory_name
-        ~f:(fun transition_storage ->
-          return @@ check_transitions transition_storage breadcrumbs )
+      let res =
+        Transition_frontier_persistence.with_database ~directory_name
+          ~f:(fun transition_storage ->
+            return @@ check_transitions transition_storage breadcrumbs )
+      in
+      heartbeat_flag := false ;
+      res
 
     let test_linear_breadcrumbs =
       test_breadcrumbs ~gen_root_breadcrumb_builder:gen_linear_breadcrumbs
@@ -103,13 +116,15 @@ let%test_module "Transition Frontier Persistence" =
                    Add_transition diffs into the storage" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
+      print_heartbeat hb_logger |> don't_wait_for ;
       let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%bind root, next_breadcrumb =
-        with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
+        with_persistence ~logger ~pids ~directory_name ~f:(fun (frontier, t) ->
             let create_breadcrumb =
-              gen_breadcrumb ~logger ~trust_system
+              gen_breadcrumb ~logger ~pids ~trust_system
                 ~accounts_with_secret_keys:Genesis_ledger.accounts
               |> Quickcheck.random_value
             in
@@ -126,7 +141,7 @@ let%test_module "Transition Frontier Persistence" =
                  (New_frontier
                     Transition_frontier.Diff.Mutant.Root.Poly.
                       { root=
-                          Transition_frontier.Breadcrumb.transition_with_hash
+                          Transition_frontier.Breadcrumb.validated_transition
                             root
                       ; scan_state= Staged_ledger.scan_state staged_ledger
                       ; pending_coinbase=
@@ -137,25 +152,32 @@ let%test_module "Transition Frontier Persistence" =
               Transition_frontier.Diff.Hash.empty
               (E
                  (Add_transition
-                    (Transition_frontier.Breadcrumb.transition_with_hash
+                    (Transition_frontier.Breadcrumb.validated_transition
                        next_breadcrumb)))
             |> ignore ;
             (root, next_breadcrumb) )
       in
-      Transition_frontier_persistence.with_database ~directory_name
-        ~f:(fun storage ->
-          return @@ check_transitions storage [root; next_breadcrumb] )
+      let%map res =
+        Transition_frontier_persistence.with_database ~directory_name
+          ~f:(fun storage ->
+            return @@ check_transitions storage [root; next_breadcrumb] )
+      in
+      heartbeat_flag := false ;
+      res
 
     let%test_unit "Dump external transitions to disk" =
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
           test_linear_breadcrumbs (max_length - 1) )
 
     let%test_unit "Root changes multiple times" =
       Printexc.record_backtrace true ;
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
           test_linear_breadcrumbs (2 * max_length) )
 
     let%test_unit "Randomly generate a tree" =
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
           test_tree_breadcrumbs (2 * max_length) )
 
@@ -180,9 +202,10 @@ let%test_module "Transition Frontier Persistence" =
         Transition_frontier_persistence.close_and_finish_copy
           frontier_persistence
       in
+      let%bind verifier = Verifier.create ~logger ~pids in
       let%map deserialized_frontier =
         Transition_frontier_persistence.deserialize ~directory_name ~logger
-          ~trust_system ~verifier:() ~root_snarked_ledger
+          ~trust_system ~verifier ~root_snarked_ledger
           ~consensus_local_state:
             (Transition_frontier.consensus_local_state frontier)
       in
@@ -192,12 +215,16 @@ let%test_module "Transition Frontier Persistence" =
               same transition_frontier" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
+      heartbeat_flag := true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
+      print_heartbeat hb_logger |> don't_wait_for ;
       let%bind frontier =
-        create_root_frontier ~logger Genesis_ledger.accounts
+        create_root_frontier ~logger ~pids Genesis_ledger.accounts
       in
-      test_deserialization max_length frontier
+      let%map x = test_deserialization max_length frontier in
+      heartbeat_flag := true ;
+      x
 
     let%test_unit "Serializing a frontier and then deserializing it  from \
                    genesis should give us the same transition_frontier" =
@@ -205,11 +232,15 @@ let%test_module "Transition Frontier Persistence" =
       Async.Scheduler.set_record_backtraces true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      Stubs.with_genesis_frontier ~logger ~f:(fun frontier ->
-          let%map is_serialization_correct =
-            test_deserialization (max_length / 2) frontier
-          in
-          assert is_serialization_correct )
+      print_heartbeat hb_logger |> don't_wait_for ;
+      let%map () =
+        Stubs.with_genesis_frontier ~logger ~pids ~f:(fun frontier ->
+            let%map is_serialization_correct =
+              test_deserialization (max_length / 2) frontier
+            in
+            assert is_serialization_correct )
+      in
+      heartbeat_flag := false
 
     (* TODO: create a test where a batch of diffs are being applied, but the
        worker dies in the middle. The transition_frontier_database can be left

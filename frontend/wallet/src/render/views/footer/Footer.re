@@ -1,5 +1,3 @@
-open Tc;
-
 module Styles = {
   open Css;
 
@@ -30,13 +28,16 @@ module Styles = {
 module StakingSwitch = {
   [@react.component]
   let make = () => {
-    let (staking, setStaking) = React.useState(() => true);
+    let (staking, setStaking) = React.useState(() => false);
     <div
       className=Css.(
         style([
           color(Theme.Colors.serpentine),
           display(`flex),
           alignItems(`center),
+          // Disable the switch until it's functional
+          opacity(0.5),
+          pointerEvents(`none),
         ])
       )>
       <Toggle value=staking onChange=setStaking />
@@ -59,31 +60,24 @@ module StakingSwitch = {
   };
 };
 
+type ownedWallets =
+  Wallet.t = {
+    locked: option(bool),
+    publicKey: PublicKey.t,
+    balance: {. "total": int64},
+  };
+
 module Wallets = [%graphql
-  {| query getWallets { ownedWallets {publicKey, balance {total}} } |}
+  {| query getWallets { ownedWallets @bsRecord {
+      publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+      locked
+      balance {
+          total @bsDecoder(fn: "Apollo.Decoders.int64")
+      }
+    }} |}
 ];
 
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
-
-module SendPayment = [%graphql
-  {|
-    mutation (
-      $from: String!,
-      $to_: String!,
-      $amount: String!,
-      $fee: String!,
-      $memo: String) {
-      sendPayment(input:
-                    {from: $from, to: $to_, amount: $amount, fee: $fee, memo: $memo}) {
-        payment {
-          nonce
-        }
-      }
-    }
-  |}
-];
-
-module SendPaymentMutation = ReasonApollo.CreateMutation(SendPayment);
 
 [@react.component]
 let make = () => {
@@ -106,60 +100,10 @@ let make = () => {
                {switch (modalState) {
                 | false => React.null
                 | true =>
-                  <RequestCodaModal
-                    wallets={Array.map(
-                      ~f=Wallet.ofGraphqlExn,
-                      data##ownedWallets,
-                    )}
-                    setModalState
-                  />
+                  <RequestCodaModal wallets=data##ownedWallets setModalState />
                 }}
                <Spacer width=1. />
-               <SendPaymentMutation>
-                 (
-                   (mutation, _) =>
-                     <SendButton
-                       wallets={Array.map(
-                         ~f=Wallet.ofGraphqlExn,
-                         data##ownedWallets,
-                       )}
-                       onSubmit={(
-                         {from, to_, amount, fee, memoOpt}: SendButton.ModalState.Validated.t,
-                         afterSubmit,
-                       ) => {
-                         let variables =
-                           SendPayment.make(
-                             ~from=PublicKey.toString(from),
-                             ~to_=PublicKey.toString(to_),
-                             ~amount,
-                             ~fee,
-                             ~memo=?memoOpt,
-                             (),
-                           )##variables;
-                         let performMutation =
-                           Task.liftPromise(() => mutation(~variables, ()));
-                         Task.perform(
-                           performMutation,
-                           ~f=
-                             fun
-                             | Data(_)
-                             | EmptyResponse => afterSubmit(Belt.Result.Ok())
-                             | Errors(err) => {
-                                 /* TODO: Display more than first error? */
-                                 let message =
-                                   err
-                                   |> Array.get(~index=0)
-                                   |> Option.map(~f=e => e##message)
-                                   |> Option.withDefault(
-                                        ~default="Server error",
-                                      );
-                                 afterSubmit(Error(message));
-                               },
-                         );
-                       }}
-                     />
-                 )
-               </SendPaymentMutation>
+               <SendButton />
              </>
            }}
       </WalletQuery>

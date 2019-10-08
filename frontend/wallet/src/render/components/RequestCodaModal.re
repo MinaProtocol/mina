@@ -2,15 +2,7 @@ open Tc;
 
 module Styles = {
   open Css;
-    
-  let modalBody =
-    style([
-      display(`flex),
-      flexDirection(`column),
-      alignItems(`center),
-      justifyContent(`center),
-    ]);
-  
+
   let bodyMargin = style([margin(`rem(1.0)), width(`percent(100.))]);
 
   let publicKey =
@@ -23,6 +15,7 @@ module Styles = {
         backgroundColor(white),
         wordWrap(`breakWord),
         userSelect(`text),
+        color(Theme.Colors.midnightBlue),
       ]),
     ]);
 };
@@ -36,7 +29,7 @@ let make = (~wallets, ~setModalState) => {
     Bindings.Navigator.Clipboard.writeTextTask(PublicKey.toString(wallet))
     |> Task.perform(~f=() => setModalState(_ => false));
   <Modal title="Request Coda" onRequestClose={() => setModalState(_ => false)}>
-    <div className=Styles.modalBody>
+    <div className=Modal.Styles.default>
       <div className=Styles.bodyMargin>
         <Dropdown
           label="To"
@@ -47,22 +40,22 @@ let make = (~wallets, ~setModalState) => {
           options={
             wallets
             |> Array.map(~f=wallet =>
-                (
-                  PublicKey.toString(wallet.Wallet.key),
-                  <WalletDropdownItem wallet />
-                )
-              )
+                 (
+                   PublicKey.toString(wallet.Wallet.publicKey),
+                   <WalletDropdownItem wallet />,
+                 )
+               )
             |> Array.toList
           }
         />
         <Spacer height=1. />
         {switch (selectedWallet) {
-        | None => React.null
-        | Some(selectedWallet) =>
-          <div className=Styles.publicKey>
-            {React.string(PublicKey.toString(selectedWallet))}
-          </div>
-        }}
+         | None => React.null
+         | Some(selectedWallet) =>
+           <div className=Styles.publicKey>
+             {React.string(PublicKey.toString(selectedWallet))}
+           </div>
+         }}
       </div>
       <div className=Css.(style([display(`flex)]))>
         <Button

@@ -19,3 +19,6 @@
 [submodule "frontend/wallet/tablecloth"]
 	path = frontend/wallet/tablecloth
 	url = https://github.com/bkase/tablecloth
+[submodule "src/external/graphql_ppx"]
+	path = src/external/graphql_ppx
+	url = git@github.com:o1-labs/graphql_ppx.git

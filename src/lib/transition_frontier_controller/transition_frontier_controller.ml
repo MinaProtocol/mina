@@ -3,54 +3,37 @@ open Async_kernel
 open Pipe_lib
 
 module type Inputs_intf = sig
-  include Sync_handler.Inputs_intf
+  include Transition_frontier.Inputs_intf
+
+  module Transition_frontier : Coda_intf.Transition_frontier_intf
 
   module Sync_handler :
     Coda_intf.Sync_handler_intf
-    with type external_transition := External_transition.t
-     and type external_transition_validated := External_transition.Validated.t
-     and type transition_frontier := Transition_frontier.t
-     and type parallel_scan_state := Staged_ledger.Scan_state.t
+    with type transition_frontier := Transition_frontier.t
 
   module Transition_handler :
     Coda_intf.Transition_handler_intf
-    with type external_transition_with_initial_validation :=
-                External_transition.with_initial_validation
-     and type external_transition_validated := External_transition.Validated.t
-     and type staged_ledger := Staged_ledger.t
-     and type transition_frontier := Transition_frontier.t
-     and type verifier := Verifier.t
+    with type transition_frontier := Transition_frontier.t
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
 
-  module Network :
-    Coda_intf.Network_intf
-    with type external_transition := External_transition.t
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+  module Network : Coda_intf.Network_intf
 
   module Catchup :
     Coda_intf.Catchup_intf
-    with type external_transition_with_initial_validation :=
-                External_transition.with_initial_validation
-     and type unprocessed_transition_cache :=
+    with type unprocessed_transition_cache :=
                 Transition_handler.Unprocessed_transition_cache.t
      and type transition_frontier := Transition_frontier.t
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
      and type network := Network.t
-     and type verifier := Verifier.t
 end
 
 module Make (Inputs : Inputs_intf) :
   Coda_intf.Transition_frontier_controller_intf
-  with type external_transition_validated :=
-              Inputs.External_transition.Validated.t
-   and type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
-   and type transition_frontier := Inputs.Transition_frontier.t
+  with type transition_frontier := Inputs.Transition_frontier.t
    and type breadcrumb := Inputs.Transition_frontier.Breadcrumb.t
-   and type network := Inputs.Network.t
-   and type verifier := Inputs.Verifier.t = struct
+   and type network := Inputs.Network.t = struct
   open Inputs
 
   let run ~logger ~trust_system ~verifier ~network ~time_controller
@@ -81,7 +64,7 @@ module Make (Inputs : Inputs_intf) :
         (Buffered (`Capacity 30, `Overflow Crash))
     in
     let proposer_transition_reader_copy, proposer_transition_writer_copy =
-      Strict_pipe.create ~name:"proposer transition copy" Synchronous
+      Strict_pipe.create ~name:"block producer transition copy" Synchronous
     in
     Strict_pipe.transfer_while_writer_alive proposer_transition_reader
       proposer_transition_writer_copy ~f:Fn.id
@@ -96,9 +79,9 @@ module Make (Inputs : Inputs_intf) :
         Transition_handler.Unprocessed_transition_cache.register_exn
           unprocessed_transition_cache t
         |> Strict_pipe.Writer.write primary_transition_writer ) ;
-    Transition_handler.Validator.run ~logger ~trust_system ~frontier
-      ~transition_reader:network_transition_reader ~valid_transition_writer
-      ~unprocessed_transition_cache ;
+    Transition_handler.Validator.run ~logger ~trust_system ~time_controller
+      ~frontier ~transition_reader:network_transition_reader
+      ~valid_transition_writer ~unprocessed_transition_cache ;
     Strict_pipe.Reader.iter_without_pushback valid_transition_reader
       ~f:(Strict_pipe.Writer.write primary_transition_writer)
     |> don't_wait_for ;

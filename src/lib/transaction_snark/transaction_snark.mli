@@ -20,7 +20,7 @@ module Pending_coinbase_stack_state : sig
       type t =
         { source: Pending_coinbase.Stack.Stable.V1.t
         ; target: Pending_coinbase.Stack.Stable.V1.t }
-      [@@deriving sexp, bin_io, hash, compare, eq, fields, version]
+      [@@deriving bin_io, compare, eq, fields, hash, sexp, version, yojson]
     end
 
     module Latest = V1
@@ -40,7 +40,7 @@ module Statement : sig
     ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.Stable.V1.t }
-  [@@deriving sexp, hash, compare, yojson]
+  [@@deriving compare, equal, hash, sexp, yojson]
 
   module Stable :
     sig
@@ -52,7 +52,7 @@ module Statement : sig
           ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
           ; fee_excess: Currency.Fee.Signed.Stable.V1.t
           ; proof_type: Proof_type.Stable.V1.t }
-        [@@deriving sexp, bin_io, hash, compare, yojson, version]
+        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end
 
       module Latest = V1
@@ -73,7 +73,7 @@ type t [@@deriving sexp, yojson]
 module Stable :
   sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, yojson, version]
+      type t [@@deriving bin_io, compare, sexp, version, yojson]
     end
 
     module Latest = V1

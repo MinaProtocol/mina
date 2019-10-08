@@ -44,7 +44,7 @@
 
   Within signatures, the declaration
 
-    val __versioned__ : bool
+    val __versioned__ : unit
 
   is generated. If the "numbered" option is given, then
 
@@ -226,6 +226,28 @@ let whitelisted_prefix prefix ~loc =
       Ppx_deriving.raise_errorf ~loc
         "Type name contains unexpected application"
 
+(* disallow Stable.Latest types in versioned types *)
+
+let is_stable_latest =
+  let is_longident_with_id id = function
+    | Lident s when String.equal id s ->
+        true
+    | Ldot (_lident, s) when String.equal id s ->
+        true
+    | _ ->
+        false
+  in
+  let is_stable = is_longident_with_id "Stable" in
+  let is_latest = is_longident_with_id "Latest" in
+  fun prefix ->
+    is_latest prefix
+    &&
+    match prefix with
+    | Ldot (lident, _) when is_stable lident ->
+        true
+    | _ ->
+        false
+
 let rec generate_core_type_version_decls type_name core_type =
   match core_type.ptyp_desc with
   | Ptyp_constr ({txt; _}, core_types) -> (
@@ -256,7 +278,12 @@ let rec generate_core_type_version_decls type_name core_type =
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
            if prefix not whitelisted, generate: let _ = A.B.__versioned__
+           disallow Stable.Latest.t
         *)
+        if is_stable_latest prefix then
+          Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+            "Cannot use type of the form Stable.Latest.t within a versioned \
+             type" ;
         let core_type_decls =
           generate_version_lets_for_core_types type_name core_types
         in
@@ -296,16 +323,35 @@ let generate_version_lets_for_label_decls type_name label_decls =
     (List.map label_decls ~f:(fun lab_decl -> lab_decl.pld_type))
 
 let generate_constructor_decl_decls type_name ctor_decl =
-  match (ctor_decl.pcd_res, ctor_decl.pcd_args) with
-  | None, Pcstr_tuple core_types ->
-      (* C of T1 * ... * Tn *)
-      generate_version_lets_for_core_types type_name core_types
-  | None, Pcstr_record label_decls ->
-      (* C of { ... } *)
-      generate_version_lets_for_label_decls type_name label_decls
-  | _ ->
-      Ppx_deriving.raise_errorf ~loc:ctor_decl.pcd_loc
-        "Can't determine versioning for constructor declaration"
+  let result_lets =
+    match ctor_decl.pcd_res with
+    | None ->
+        []
+    | Some res ->
+        (* for GADTs, check versioned-ness of parameters to result type *)
+        let ty_params =
+          match res.ptyp_desc with
+          | Ptyp_constr (_, params) ->
+              params
+          | _ ->
+              failwith
+                "generate_constructor_decl_decls: expected type parameter list"
+        in
+        generate_version_lets_for_core_types type_name ty_params
+  in
+  match ctor_decl.pcd_args with
+  | Pcstr_tuple core_types ->
+      (* C of T1 * ... * Tn, or GADT C : T1 -> T2 *)
+      let arg_lets =
+        generate_version_lets_for_core_types type_name core_types
+      in
+      arg_lets @ result_lets
+  | Pcstr_record label_decls ->
+      (* C of { ... }, or GADT C : { ... } -> T *)
+      let arg_lets =
+        generate_version_lets_for_label_decls type_name label_decls
+      in
+      arg_lets @ result_lets
 
 let generate_contained_type_decls type_decl =
   let type_name = type_decl.ptype_name.txt in
@@ -331,7 +377,7 @@ let generate_versioned_decls ~asserted generation_kind type_decl =
     let loc = type_decl.ptype_loc
   end) in
   let open E in
-  let versioned_current = [%stri let __versioned__ = true] in
+  let versioned_current = [%stri let __versioned__ = ()] in
   if asserted then [versioned_current]
   else
     match generation_kind with
@@ -439,7 +485,7 @@ let generate_val_decls_for_type_decl type_decl ~numbered =
   (* the structure of the type doesn't affect what we generate for signatures *)
   | Ptype_abstract | Ptype_variant _ | Ptype_record _ ->
       let loc = type_decl.ptype_loc in
-      let versioned = [%sigi: val __versioned__ : bool] in
+      let versioned = [%sigi: val __versioned__ : unit] in
       if numbered then [[%sigi: val version : int]; versioned] else [versioned]
   | Ptype_open ->
       (* but the type can't be open, else it might vary over time *)

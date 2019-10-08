@@ -1,5 +1,5 @@
 [@bs.module "emotion-server"]
-external renderStylesToString: string => string = "";
+external renderStylesToString: string => string = "renderStylesToString";
 
 type critical = {
   .
@@ -8,36 +8,15 @@ type critical = {
 };
 
 [@bs.module "emotion-server"]
-external extractCritical: string => critical = "";
-
-module Fs = {
-  [@bs.val] [@bs.module "fs"]
-  external mkdirSync:
-    (
-      string,
-      {
-        .
-        "recursive": bool,
-        "mode": int,
-      }
-    ) =>
-    unit =
-    "";
-
-  [@bs.val] [@bs.module "fs"]
-  external symlinkSync: (string, string) => unit = "";
-};
+external extractCritical: string => critical = "extractCritical";
 
 module Rimraf = {
-  [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
+  [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "sync";
 };
 
-Array.length(Sys.argv) > 2
-&& (Sys.argv[2] == "prod" || Sys.argv[2] == "staging")
-  ? {
-    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v4";
-  }
-  : ();
+Links.Cdn.setPrefix(
+  Config.isProd ? "https://cdn.codaprotocol.com/website" : "",
+);
 
 Style.Typeface.load();
 
@@ -85,9 +64,34 @@ let posts = {
   );
 };
 
+module MoreFs = {
+  type stat;
+  [@bs.val] [@bs.module "fs"] external lstatSync: string => stat = "lstatSync";
+  [@bs.send] external isDirectory: stat => bool = "isDirectory";
+
+  [@bs.val] [@bs.module "fs"]
+  external copyFileSync: (string, string) => unit = "copyFileSync";
+
+  [@bs.val] [@bs.module "fs"]
+  external mkdirSync:
+    (
+      string,
+      {
+        .
+        "recursive": bool,
+        "mode": int,
+      }
+    ) =>
+    unit =
+    "mkdirSync";
+
+  [@bs.val] [@bs.module "fs"]
+  external symlinkSync: (string, string) => unit = "symlinkSync";
+};
+
 module Router = {
   type t =
-    | File(string, ReasonReact.reactElement)
+    | File(string, React.element)
     | Dir(string, array(t));
 
   let generateStatic = {
@@ -98,7 +102,7 @@ module Router = {
         }
       | Dir(name, routes) => {
           let path_ = path ++ "/" ++ name;
-          Fs.mkdirSync(path_, {"recursive": true, "mode": 0o755});
+          MoreFs.mkdirSync(path_, {"recursive": true, "mode": 0o755});
           routes |> Array.iter(helper(path_));
         };
 
@@ -114,8 +118,16 @@ let jobOpenings = [|
     "senior-frontend-engineer",
     "Senior Product Engineer (Frontend) (San Francisco).",
   ),
-  ("frontend-engineer", "Product Engineer (Frontend) (San Francisco)."),
+  (
+    "fullstack-engineer",
+    "Senior Product Engineer (Full-stack) (San Francisco).",
+  ),
+  (
+    "marketing-and-communications-manager",
+    "Marketing and Communications Manager (San Francisco).",
+  ),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
+  ("cryptography-engineer", "Cryptography Engineer (San Francisco)"),
 |];
 
 // GENERATE
@@ -187,10 +199,6 @@ Router.(
           </Page>,
         ),
         File(
-          "code",
-          <Page page=`Code name="code"> <Wrapped> <Code /> </Wrapped> </Page>,
-        ),
-        File(
           "testnet",
           <Page
             page=`Testnet name="testnet" extraHeaders={Testnet.extraHeaders()}>
@@ -212,4 +220,63 @@ Router.(
     ),
   )
 );
-Fs.symlinkSync(Node.Process.cwd() ++ "/static", "./site/static");
+
+Rimraf.sync("docs-theme");
+Router.(
+  generateStatic(
+    Dir(
+      "docs-theme",
+      [|
+        File(
+          "main",
+          <Page page=`Docs name="/docs/main">
+            <Wrapped> <Docs /> </Wrapped>
+          </Page>,
+        ),
+      |],
+    ),
+  )
+);
+
+let ignoreFiles = ["main.bc.js", "verifier_main.bc.js", ".DS_Store"];
+let rec copyFolder = path => {
+  MoreFs.mkdirSync("site/" ++ path, {"recursive": true, "mode": 0o755});
+  Array.iter(
+    s => {
+      let path = Filename.concat(path, s);
+      let isDir = MoreFs.lstatSync(path) |> MoreFs.isDirectory;
+      if (isDir) {
+        copyFolder(path);
+      } else if (!List.mem(s, ignoreFiles)) {
+        MoreFs.copyFileSync(
+          path,
+          "./site" ++ Links.Cdn.getHashedPath("/" ++ path),
+        );
+      };
+    },
+    Node.Fs.readdirSync(path),
+  );
+};
+
+let moveToSite = path =>
+  MoreFs.copyFileSync(path, Filename.concat("./site", path));
+
+copyFolder("static");
+
+// Special-case the jsoo-compiled files for now
+// They can't be loaded from cdn so they get copied to the site separately
+if (!Config.isProd) {
+  moveToSite("static/main.bc.js");
+  moveToSite("static/verifier_main.bc.js");
+};
+
+// Run mkdocs to generate static docs site
+Markdown.Child_process.execSync(
+  "mkdocs build -d site/docs",
+  Markdown.Child_process.option(),
+);
+
+MoreFs.symlinkSync(
+  Node.Process.cwd() ++ "/graphql-docs",
+  "./site/docs/graphql",
+);
