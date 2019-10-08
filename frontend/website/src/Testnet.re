@@ -156,7 +156,6 @@ module Styles = {
     style([
       background(Style.Colors.hyperlinkAlpha(0.15)),
       width(`percent(100.)),
-      height(`rem(60.)),
       maxWidth(rem(41.)),
       borderRadius(px(3)),
       padding2(~v=`rem(1.), ~h=`zero),
@@ -463,15 +462,17 @@ let make = () => {
         </a>
       </div>
       <div className=Styles.content>
-        <div id="testnet-leaderboard" className=Styles.leaderboard>
-          <div className=Styles.headerRow>
-            <span> {React.string("#")} </span>
-            <span> {React.string("Username")} </span>
-            <span id="leaderboard-current-week" />
-            <span> {React.string("Total")} </span>
+        <div>
+          <div id="testnet-leaderboard" className=Styles.leaderboard>
+            <div className=Styles.headerRow>
+              <span> {React.string("#")} </span>
+              <span> {React.string("Username")} </span>
+              <span id="leaderboard-current-week" />
+              <span> {React.string("Total")} </span>
+            </div>
+            <hr />
+            <div id="leaderboard-loading"> {React.string("Loading...")} </div>
           </div>
-          <hr />
-          <div id="leaderboard-loading"> {React.string("Loading...")} </div>
         </div>
         <div className=Styles.copy>
           <p>
