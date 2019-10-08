@@ -49,11 +49,15 @@ let make = (~closeOnboarding, ~prevStep) => {
           onClick={_ => openExternal("https://discord.gg/JN75xk")}>
           {React.string("Open Discord")}
         </Link>
-        <Spacer height=1.0 />
+        <Spacer height=2. />
         <div className=Styles.buttonRow>
-          <Button label="Go Back" onClick={_ => prevStep()} />
+          <Button
+            style=Button.Gray
+            label="Go Back"
+            onClick={_ => prevStep()}
+          />
           <Spacer width=0.5 />
-          <Button label="Skip" onClick={_ => closeOnboarding()} />
+          <Button label="Continue" onClick={_ => closeOnboarding()} />
         </div>
       </div>
       <div

@@ -86,6 +86,7 @@ let make = (~nextStep, ~prevStep) => {
           <Spacer width=0.5 />
           <Button
             label="Continue"
+            disabled={state == Loading}
             onClick={_ => {
               dispatchToMain(
                 CodaProcess.Action.StartCoda([

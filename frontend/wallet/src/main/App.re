@@ -124,6 +124,11 @@ let run = () =>
       createTray(dispatch);
       createApplicationMenu();
 
+      // Attempt to start the daemon on startup.
+      dispatch(
+        Action.ControlCoda(Some(["-peer", "filet-mignon.o1test.net:8303"])),
+      );
+
       AppWindow.deepLink({AppWindow.Input.path: Route.Home, dispatch});
     },
   );

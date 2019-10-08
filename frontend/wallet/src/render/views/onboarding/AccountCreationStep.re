@@ -80,7 +80,11 @@ let make = (~nextStep, ~prevStep) => {
           <Spacer height=2. />
         </div>
         <div className=Styles.buttonRow>
-          <Button label="Go Back" onClick={_ => prevStep()} />
+          <Button
+            style=Button.Gray
+            label="Go Back"
+            onClick={_ => prevStep()}
+          />
           <Spacer width=0.5 />
           <AddWalletMutation>
             {(mutation, {result}) =>
