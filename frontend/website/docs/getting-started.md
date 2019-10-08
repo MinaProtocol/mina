@@ -25,7 +25,7 @@ O(1) Labs has tested running nodes on several cloud providers, and recommends th
 - AWS - [c5.2xlarge](https://www.ec2instances.info/?filter=c5.2xl&region=us-west-2&cost_duration=daily&selected=c5.2xlarge)
 - GCP - [c2-standard-4](https://cloud.google.com/compute/docs/machine-types)
 - Azure - [Standard_F8s_v2](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/sizes-compute#fsv2-series-1)
-- Digital Ocean - [g-4vcpu-16gb](https://cloud.digitalocean.com/droplets/new?size=g-4vcpu-16gb)
+- Digital Ocean - [c-8-16gib](https://cloud.digitalocean.com/droplets/new?size=c-8-16gib)
 
 ## Installation
 
