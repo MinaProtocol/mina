@@ -133,7 +133,7 @@ module CodaProcess = {
 
   let kill: t => unit = t => ChildProcess.Process.kill(t, "SIGINT");
 
-  let port = 0xc0da;
+  let port = 3085;
 
   let start: list(string) => t =
     args => {

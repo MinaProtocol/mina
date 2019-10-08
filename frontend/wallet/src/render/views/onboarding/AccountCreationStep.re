@@ -1,6 +1,4 @@
-open Tc;
-
-let defaultName = "My Wallet";
+let defaultName = "Primary Account";
 
 module AddWallet = [%graphql
   {|
@@ -50,6 +48,9 @@ let make = (~nextStep, ~prevStep) => {
 
   let (_settings, updateAddressBook) =
     React.useContext(AddressBookProvider.context);
+
+  let mutationVariables = AddWallet.make(~password, ())##variables;
+
   <div className=Theme.Onboarding.main>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
@@ -65,7 +66,7 @@ let make = (~nextStep, ~prevStep) => {
         <div>
           <Spacer height=1. />
           <TextField
-            label="Account Name"
+            label="Name"
             onChange={value => setName(_ => value)}
             value=walletName
           />
@@ -76,46 +77,46 @@ let make = (~nextStep, ~prevStep) => {
             onChange={value => setPassword(_ => value)}
             value=password
           />
-          <Spacer height=1. />
-        </div>
-        <div>
-          <AddWalletMutation>
-            {(mutation, _) =>
-               <Button
-                 label="Create"
-                 style=Button.Green
-                 onClick={_ => {
-                   let variables = AddWallet.make(~password, ())##variables;
-                   let performMutation =
-                     Task.liftPromise(() =>
-                       mutation(
-                         ~variables,
-                         ~refetchQueries=[|"getWallets"|],
-                         (),
-                       )
-                     );
-                   Task.perform(
-                     performMutation,
-                     ~f=
-                       fun
-                       | EmptyResponse => ()
-                       | Errors(_) => print_endline("Error adding wallet")
-                       | Data(data) => {
-                           let key = data##addWallet##publicKey;
-                           updateAddressBook(
-                             AddressBook.set(~key, ~name=walletName),
-                           );
-                         },
-                   );
-                 }}
-               />}
-          </AddWalletMutation>
-          <Spacer height=1. />
+          <Spacer height=2. />
         </div>
         <div className=Styles.buttonRow>
           <Button label="Go Back" onClick={_ => prevStep()} />
           <Spacer width=0.5 />
-          <Button label="Continue" onClick={_ => nextStep()} />
+          <AddWalletMutation>
+            {(mutation, {result}) =>
+               <>
+                 <Button
+                   label="Create"
+                   disabled={
+                     switch (result) {
+                     | Loading => true
+                     | _ => false
+                     }
+                   }
+                   onClick={_ =>
+                     mutation(
+                       ~variables=mutationVariables,
+                       ~refetchQueries=[|"getWallets"|],
+                       (),
+                     )
+                     |> ignore
+                   }
+                 />
+                 {switch (result) {
+                  | Data(data) =>
+                    let key = data##addWallet##publicKey;
+                    updateAddressBook(
+                      AddressBook.set(~key, ~name=walletName),
+                    );
+                    ReasonReact.Router.push(
+                      "/wallet/" ++ PublicKey.uriEncode(key),
+                    );
+                    nextStep();
+                    React.null;
+                  | _ => React.null
+                  }}
+               </>}
+          </AddWalletMutation>
         </div>
       </div>
       <div

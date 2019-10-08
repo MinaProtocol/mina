@@ -20,7 +20,7 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`center),
       width(`percent(100.0)),
-      maxWidth(`rem(28.0)),
+      maxWidth(`rem(32.0)),
       marginLeft(`px(80)),
     ]);
   };
@@ -31,7 +31,7 @@ module Styles = {
       style([
         marginTop(`rem(2.)),
         marginBottom(`rem(3.)),
-        maxWidth(`rem(21.5)),
+        maxWidth(`rem(28.)),
         color(Theme.Colors.midnightBlue),
       ]),
     ]);
@@ -47,11 +47,11 @@ let make = (~nextStep) => {
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
         <h1 className=Theme.Text.Header.h1>
-          {React.string("Welcome to Coda Wallet.")}
+          {React.string("Welcome to Coda Wallet!")}
         </h1>
         <p className=Styles.heroBody>
           {React.string(
-             "Use the Coda Wallet to send and receive transactions, and run a full node on the Coda network.",
+             {|Coda swaps the traditional blockchain for a tiny cryptographic proof, enabling a cryptocurrency that stays the same size forever. With the Coda Wallet you can send, recieve and view transactions on the Coda network.|},
            )}
         </p>
         <div> <Button label="Continue" onClick={_ => nextStep()} /> </div>

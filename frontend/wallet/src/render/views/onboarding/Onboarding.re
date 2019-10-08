@@ -37,14 +37,14 @@ let make = () => {
   };
 
   let onboardingSteps = [
-    <OnboardingStep1 nextStep />,
-    <OnboardingStep2 nextStep prevStep />,
-    <OnboardingStep3 nextStep prevStep />,
-    <OnboardingStep3 nextStep prevStep />,
-    <OnboardingStep4 closeOnboarding prevStep />,
+    <WelcomeStep nextStep />,
+    <SetupNodeStep nextStep prevStep />,
+    <AccountCreationStep nextStep prevStep />,
+    <CompletionStep closeOnboarding prevStep />,
   ];
   showOnboarding
     ? <div className=Styles.main>
+        <OnboardingHeader />
         {Array.of_list(onboardingSteps)[onboardingStep]}
       </div>
     : React.null;

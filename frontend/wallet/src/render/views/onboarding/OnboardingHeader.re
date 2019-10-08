@@ -11,6 +11,7 @@ module Styles = {
         top(`px(0)),
         left(`px(0)),
         right(`px(0)),
+        zIndex(101),
         height(Spacing.headerHeight),
         maxHeight(Spacing.headerHeight),
         minHeight(Spacing.headerHeight),
@@ -20,14 +21,18 @@ module Styles = {
         color(black),
         fontFamily("IBM Plex Sans, Sans-Serif"),
         padding2(~v=`zero, ~h=Theme.Spacing.defaultSpacing),
-        borderBottom(`px(1), `solid, Colors.borderColor),
         CssElectron.appRegion(`drag),
       ]),
       notText,
     ]);
 
   let logo =
-    style([display(`flex), alignItems(`center), marginLeft(`px(4))]);
+    style([
+      display(`flex),
+      alignItems(`center),
+      marginLeft(`rem(4.)),
+      marginTop(`rem(4.5)),
+    ]);
 };
 
 [@react.component]
