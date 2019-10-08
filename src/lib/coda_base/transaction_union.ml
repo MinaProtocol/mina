@@ -44,7 +44,7 @@ let of_transaction : Transaction.t -> t = function
       { payload= Transaction_union_payload.of_user_command_payload payload
       ; sender
       ; signature }
-  | Coinbase {proposer; fee_transfer; amount} ->
+  | Coinbase {proposer; fee_transfer; amount; state_body_hash= _} ->
       let other_pk, other_amount =
         Option.value ~default:(proposer, Fee.zero) fee_transfer
       in

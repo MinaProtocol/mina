@@ -165,7 +165,8 @@ let apply_fee_transfer_exn =
     List.fold (Fee_transfer.to_list transfer) ~f:apply_single ~init:t
 
 let apply_coinbase_exn t
-    ({proposer; fee_transfer; amount= coinbase_amount} : Coinbase.t) =
+    ({proposer; fee_transfer; amount= coinbase_amount; state_body_hash= _} :
+      Coinbase.t) =
   let open Currency in
   let add_to_balance t pk amount =
     let idx = find_index_exn t pk in
