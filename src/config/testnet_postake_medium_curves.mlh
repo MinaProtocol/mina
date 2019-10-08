@@ -2,7 +2,7 @@
 [%%define fake_accounts_target 50]
 [%%import "config/curve/medium.mlh"]
 [%%import "config/coinbase/standard.mlh"]
-[%%import "config/scan_state/1tps.mlh"]
+[%%import "config/scan_state/point5tps.mlh"]
 [%%import "config/debug_level/some.mlh"]
 [%%import "config/proof_level/full.mlh"]
 [%%import "config/txpool_size.mlh"]
@@ -17,9 +17,9 @@
 [%%define cache_exceptions false]
 [%%define fake_hash false]
 
-[%%define genesis_ledger "testnet_postake"]
+[%%define genesis_ledger "seared_kobe"]
 
-[%%define genesis_state_timestamp "2019-10-04 18:00:00-07:00"]
+[%%define genesis_state_timestamp "2019-10-07 18:30:00-07:00"]
 [%%define block_window_duration 180000]
 
 [%%define integration_tests false]
