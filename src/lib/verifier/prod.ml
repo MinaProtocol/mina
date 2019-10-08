@@ -37,11 +37,34 @@ module Worker_state = struct
                  group3 ~default:false (of_list self_wrap)
                  +> State_hash.fold (Protocol_state.hash state))
            in
-           Tock.verify proof bc_vk.wrap
-             Tock.Data_spec.[Wrap_input.typ]
-             (Wrap_input.of_tick_field instance_hash)
+           match
+             Or_error.try_with (fun () ->
+                 Tock.verify proof bc_vk.wrap
+                   Tock.Data_spec.[Wrap_input.typ]
+                   (Wrap_input.of_tick_field instance_hash) )
+           with
+           | Ok result ->
+               result
+           | Error e ->
+               Logger.error (Logger.create ()) ~id:"verifier"
+                 ~module_:__MODULE__ ~location:__LOC__
+                 ~metadata:[("error", `String (Error.to_string_hum e))]
+                 "Verifier throws an exception while verifying blockchain snark" ;
+               failwith "verifier crashed"
 
-         let verify_transaction_snark = T.verify
+         let verify_transaction_snark ledger_proof ~message =
+           match
+             Or_error.try_with (fun () -> T.verify ledger_proof ~message)
+           with
+           | Ok result ->
+               result
+           | Error e ->
+               Logger.error (Logger.create ()) ~id:"verifier"
+                 ~module_:__MODULE__ ~location:__LOC__
+                 ~metadata:[("error", `String (Error.to_string_hum e))]
+                 "Verifier throws an exception while verifying transaction \
+                  snark" ;
+               failwith "verifier crashed"
        end in
        (module M : S))
 
