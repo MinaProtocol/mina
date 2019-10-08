@@ -221,7 +221,7 @@ let replace_snark_worker_key = Snark_worker.replace_key
 
 let snark_worker_key = Snark_worker.get_key
 
-let stop_snark_worker = Snark_worker.stop
+let stop_snark_worker = Snark_worker.stop ~should_wait_kill:true
 
 let best_tip_opt t =
   let open Option.Let_syntax in
