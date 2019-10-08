@@ -79,6 +79,7 @@ let make =
       ~disabled=false,
       ~width=10.5,
       ~height=3.,
+      ~icon=?,
     ) =>
   <button
     disabled
@@ -93,5 +94,9 @@ let make =
       | Gray => Styles.gray
       },
     ])}>
+    {switch (icon) {
+     | Some(kind) => <Icon kind />
+     | None => React.null
+     }}
     {React.string(label)}
   </button>;
