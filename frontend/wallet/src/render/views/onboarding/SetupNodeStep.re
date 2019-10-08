@@ -91,7 +91,7 @@ let make = (~nextStep, ~prevStep) => {
               dispatchToMain(
                 CodaProcess.Action.StartCoda([
                   "-peer",
-                  "filet-mignon.o1test.net:8303",
+                  "seared-kobe.o1test.net:8303",
                 ]),
               );
               setState(_ => Loading);

@@ -126,7 +126,7 @@ let run = () =>
 
       // Attempt to start the daemon on startup.
       dispatch(
-        Action.ControlCoda(Some(["-peer", "filet-mignon.o1test.net:8303"])),
+        Action.ControlCoda(Some(["-peer", "seared-kobe.o1test.net:8303"])),
       );
 
       AppWindow.deepLink({AppWindow.Input.path: Route.Home, dispatch});
