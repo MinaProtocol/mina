@@ -109,7 +109,7 @@ end = struct
 end
 
 module type Data_hash_binable_intf = sig
-  type t [@@deriving sexp, compare, eq, yojson, hash]
+  type t = private Field.t [@@deriving sexp, compare, eq, yojson, hash]
 
   module Stable : sig
     module V1 : sig
@@ -127,6 +127,8 @@ module type Data_hash_binable_intf = sig
   val typ : (var, t) Typ.t
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
+
+  val var_to_hash_packed : var -> Field.Var.t
 
   val length_in_triples : int
 
@@ -200,11 +202,9 @@ module Hash_builder = struct
   include Data_hash_binable
 
   let merge ~height (h1 : t) (h2 : t) =
-    let open Tick.Pedersen in
-    State.digest
-      (hash_fold
-         Hash_prefix.coinbase_merkle_tree.(height)
-         Fold.(Digest.fold (h1 :> field) +> Digest.fold (h2 :> field)))
+    Random_oracle.hash
+      ~init:Hash_prefix.Random_oracle.coinbase_merkle_tree.(height)
+      [|(h1 :> field); (h2 :> field)|]
     |> of_hash
 
   let empty_hash =
@@ -275,6 +275,7 @@ struct
       , equal_var
       , length_in_triples
       , var_to_triples
+      , var_to_hash_packed
       , hash_fold_t
       , empty
       , push
@@ -382,23 +383,17 @@ struct
       Snarky.Merkle_tree.Checked
         (Tick)
         (struct
-          type value = Pedersen.Checked.Digest.t
+          type value = Field.t
 
-          type var = Pedersen.Checked.Digest.var
+          type var = Field.Var.t
 
-          let typ = Pedersen.Checked.Digest.typ
+          let typ = Field.typ
 
           let merge ~height h1 h2 =
-            let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =
-              Bitstring_lib.Bitstring.pad_to_triple_list
-                ~default:Boolean.false_
-                (bs :> Boolean.var list)
-            in
-            let%bind h1 = Pedersen.Checked.Digest.choose_preimage h1
-            and h2 = Pedersen.Checked.Digest.choose_preimage h2 in
-            Pedersen.Checked.digest_triples
-              ~init:Hash_prefix.coinbase_merkle_tree.(height)
-              (to_triples h1 @ to_triples h2)
+            Tick.make_checked (fun () ->
+                Random_oracle.Checked.hash
+                  ~init:Hash_prefix.Random_oracle.coinbase_merkle_tree.(height)
+                  [|h1; h2|] )
 
           let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 

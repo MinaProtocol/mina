@@ -35,7 +35,7 @@ module type Backend_intf = sig
   end
 
   val hash :
-       ?message:bool array
+       ?message:Fq.t array
     -> a:G1.t
     -> b:G2.t
     -> c:G1.t

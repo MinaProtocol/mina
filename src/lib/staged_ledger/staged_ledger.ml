@@ -1535,16 +1535,17 @@ let%test_module "test" =
         -> User_command.With_valid_signature.t list
         -> int option list
         -> Sl.t ref
-        -> ?expected_proof_count:int (*Number of ledger proofs expected*)
+        -> ?expected_proof_count:int option
+           (*Number of ledger proofs expected*)
         -> Ledger.Mask.Attached.t
         -> [`One_prover | `Many_provers]
         -> (   Transaction_snark_work.Statement.t
             -> Transaction_snark_work.Checked.t option)
         -> unit Deferred.t =
-     fun init_state cmds cmd_iters sl ?(expected_proof_count = 0) test_mask
+     fun init_state cmds cmd_iters sl ?(expected_proof_count = None) test_mask
          provers stmt_to_work ->
       let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let%map total_ledger_proofs =
         iter_cmds_acc cmds cmd_iters 0
           (fun cmds_left count_opt cmds_this_iter proof_count ->
@@ -1583,7 +1584,8 @@ let%test_module "test" =
       in
       (*Should have enough blocks to generate at least expected_proof_count
       proofs*)
-      assert (total_ledger_proofs >= expected_proof_count)
+      if Option.is_some expected_proof_count then
+        assert (total_ledger_proofs = Option.value_exn expected_proof_count)
 
     (* We use first class modules to compute some derived constants that depend
        on the scan state constants. *)
@@ -1593,21 +1595,19 @@ let%test_module "test" =
       val work_delay : int
     end
 
-    let min_blocks_before_first_snarked_ledger_generic
-        (module C : Constants_intf) =
+    (* How many blocks do we need to fully exercise the ledger
+       behavior and produce one ledger proof *)
+    let min_blocks_for_first_snarked_ledger_generic (module C : Constants_intf)
+        =
       let open C in
-      (transaction_capacity_log_2 + 1) * (work_delay + 1)
+      ((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1
 
-    (* How many blocks to we need to produce to fully exercise the ledger
-       behavior? min_blocks_before_first_snarked_ledger_generic + 1*)
-    let max_blocks_for_coverage_generic (module C : Constants_intf) =
-      min_blocks_before_first_snarked_ledger_generic (module C) + 1
-
-    (* n extra blocks for n more ledger proofs *)
+    (* n-1 extra blocks for n ledger proofs since we are already producing one
+    proof *)
     let max_blocks_for_coverage n =
-      max_blocks_for_coverage_generic
+      min_blocks_for_first_snarked_ledger_generic
         (module Transaction_snark_scan_state.Constants)
-      + n
+      + n - 1
 
     (** Generator for when we always have enough commands to fill all slots. *)
     let gen_at_capacity :
@@ -1618,11 +1618,12 @@ let%test_module "test" =
       let open Quickcheck.Generator.Let_syntax in
       let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
       let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
+      let total_cmds = transaction_capacity * iters in
       let%bind cmds =
-        User_command.With_valid_signature.Gen.sequence
-          ~length:(transaction_capacity * iters)
+        User_command.With_valid_signature.Gen.sequence ~length:total_cmds
           ~sign_type:`Real ledger_init_state
       in
+      assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
     (*Same as gen_at_capacity except that the number of iterations[iters] is
@@ -1635,11 +1636,12 @@ let%test_module "test" =
       let open Quickcheck.Generator.Let_syntax in
       let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
       let iters = max_blocks_for_coverage extra_block_count in
+      let total_cmds = transaction_capacity * iters in
       let%bind cmds =
-        User_command.With_valid_signature.Gen.sequence
-          ~length:(transaction_capacity * iters)
+        User_command.With_valid_signature.Gen.sequence ~length:total_cmds
           ~sign_type:`Real ledger_init_state
       in
+      assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
     (* Generator for when we have less commands than needed to fill all slots. *)
@@ -1659,11 +1661,12 @@ let%test_module "test" =
         Quickcheck.Generator.list_with_length iters
           (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
       in
+      let total_cmds = List.sum (module Int) ~f:Fn.id cmds_per_iter in
       let%bind cmds =
-        User_command.With_valid_signature.Gen.sequence
-          ~length:(List.sum (module Int) ~f:Fn.id cmds_per_iter)
+        User_command.With_valid_signature.Gen.sequence ~length:total_cmds
           ~sign_type:`Real ledger_init_state
       in
+      assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.map ~f:Option.some cmds_per_iter)
 
     let%test_unit "Max throughput-ledger proof count-fixed blocks" =
@@ -1676,8 +1679,9 @@ let%test_module "test" =
             * int option list] ~trials:10
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
-              test_simple ledger_init_state cmds iters sl ~expected_proof_count
-                test_mask `Many_provers stmt_to_work_random_prover ) )
+              test_simple ledger_init_state cmds iters sl
+                ~expected_proof_count:(Some expected_proof_count) test_mask
+                `Many_provers stmt_to_work_random_prover ) )
 
     let%test_unit "Max throughput" =
       Quickcheck.test gen_at_capacity
@@ -1761,7 +1765,7 @@ let%test_module "test" =
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               let logger = Logger.null () in
-              let pids = Child_processes.Termination.create_pid_set () in
+              let pids = Child_processes.Termination.create_pid_table () in
               let%map checked =
                 iter_cmds_acc cmds iters true
                   (fun _cmds_left _count_opt cmds_this_iter checked ->
@@ -1811,7 +1815,7 @@ let%test_module "test" =
 
     let%test_unit "Snarked ledger" =
       let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       Quickcheck.test (gen_below_capacity ()) ~trials:20
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
@@ -1869,7 +1873,7 @@ let%test_module "test" =
         -> unit Deferred.t =
      fun init_state cmds cmd_iters proofs_available sl test_mask provers ->
       let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let%map proofs_available_left =
         iter_cmds_acc cmds cmd_iters proofs_available
           (fun cmds_left _count_opt cmds_this_iter proofs_available_left ->
