@@ -13,6 +13,10 @@ let coinbase = salt coinbase
 
 let pending_coinbases = salt pending_coinbases
 
+let coinbase_stack_data = salt coinbase_stack_data
+
+let coinbase_stack_state_hash = salt coinbase_stack_state_hash
+
 let coinbase_stack = salt coinbase_stack
 
 let checkpoint_list = salt checkpoint_list
