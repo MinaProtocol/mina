@@ -143,8 +143,8 @@ type configureMsg struct {
 	Statedir  string   `json:"statedir"`
 	Privk     string   `json:"privk"`
 	NetworkID string   `json:"network_id"`
-    ListenOn  []string `json:"ifaces"`
-    External  string   `json:"external_maddr"`
+	ListenOn  []string `json:"ifaces"`
+	External  string   `json:"external_maddr"`
 }
 
 type discoveredPeerUpcall struct {
