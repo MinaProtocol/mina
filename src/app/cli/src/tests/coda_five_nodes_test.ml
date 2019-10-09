@@ -19,7 +19,7 @@ let main () =
       Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
   let%bind () = after (Time.Span.of_min 10.) in
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async ~summary:"Test that five nodes work"
