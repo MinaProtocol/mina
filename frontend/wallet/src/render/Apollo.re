@@ -17,11 +17,11 @@ let client = {
     {|
       {delay: {
         initial: 300,
-        max: 500,
+        max: 2000,
         jitter: false
       },
       attempts: {
-        max: 60,
+        max: 120,
       }}
     |}
   ];

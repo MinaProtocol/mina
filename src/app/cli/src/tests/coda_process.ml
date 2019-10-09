@@ -146,12 +146,22 @@ let stop_snark_worker (conn, _, _) =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.stop_snark_worker ~arg:()
 
-let disconnect ((conn, proc, _) as t) =
+let disconnect ((conn, proc, _) as t) ~logger =
   (* This kills any straggling snark worker process *)
-  let%bind () = stop_snark_worker t in
+  let%bind () =
+    match%map Monitor.try_with (fun () -> stop_snark_worker t) with
+    | Ok () ->
+        ()
+    | Error exn ->
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Harmless error when stopping snark worker: $exn"
+          ~metadata:[("exn", `String (Exn.to_string exn))]
+  in
   let%bind () = Coda_worker.Connection.close conn in
   match%map Monitor.try_with (fun () -> Process.wait proc) with
   | Ok _exit_or_signal ->
       ()
-  | Error _exn ->
-      ()
+  | Error exn ->
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Harmless error when stopping test node: $exn"
+        ~metadata:[("exn", `String (Exn.to_string exn))]

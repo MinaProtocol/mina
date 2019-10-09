@@ -15,6 +15,7 @@ module Styles = {
         backgroundColor(white),
         wordWrap(`breakWord),
         userSelect(`text),
+        color(Theme.Colors.midnightBlue),
       ]),
     ]);
 };
