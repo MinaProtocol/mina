@@ -103,7 +103,7 @@ module Worker_state = struct
                      Logger.error logger ~id:"prover" ~module_:__MODULE__
                        ~location:__LOC__
                        ~metadata:[("error", `String (Error.to_string_hum e))]
-                       "Prover throws an error while extending block: $error" ;
+                       "Prover threw an error while extending block: $error" ;
                      Error e
 
                let verify state proof =
@@ -158,7 +158,7 @@ module Worker_state = struct
                      Logger.error logger ~id:"prover" ~module_:__MODULE__
                        ~location:__LOC__
                        ~metadata:[("error", `String (Error.to_string_hum e))]
-                       "Prover throws an error while extending block: $error" ;
+                       "Prover threw an error while extending block: $error" ;
                      Error e
 
                let verify _state _proof = true

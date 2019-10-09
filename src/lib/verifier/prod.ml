@@ -44,8 +44,8 @@ module Worker_state = struct
                Logger.error (Logger.create ()) ~id:"verifier"
                  ~module_:__MODULE__ ~location:__LOC__
                  ~metadata:[("error", `String (Error.to_string_hum e))]
-                 "Verifier throws an exception while verifying blockchain snark" ;
-               failwith "verifier crashed"
+                 "Verifier threw an exception while verifying blockchain snark" ;
+               failwith "Verifier crashed"
 
          let verify_transaction_snark ledger_proof ~message =
            match
@@ -57,9 +57,8 @@ module Worker_state = struct
                Logger.error (Logger.create ()) ~id:"verifier"
                  ~module_:__MODULE__ ~location:__LOC__
                  ~metadata:[("error", `String (Error.to_string_hum e))]
-                 "Verifier throws an exception while verifying transaction \
-                  snark" ;
-               failwith "verifier crashed"
+                 "Verifier threw an exception while verifying transaction snark" ;
+               failwith "Verifier crashed"
        end in
        (module M : S))
 
