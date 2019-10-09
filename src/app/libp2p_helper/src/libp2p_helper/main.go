@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -141,7 +143,8 @@ type configureMsg struct {
 	Statedir  string   `json:"statedir"`
 	Privk     string   `json:"privk"`
 	NetworkID string   `json:"network_id"`
-	ListenOn  []string `json:"ifaces"`
+    ListenOn  []string `json:"ifaces"`
+    External  string   `json:"external_maddr"`
 }
 
 type discoveredPeerUpcall struct {
@@ -167,7 +170,8 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		}
 		maddrs[i] = res
 	}
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, m.Statedir, privk, m.NetworkID)
+
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, multiaddr.NewMultiaddr(m.External), m.Statedir, privk, m.NetworkID)
 	if err != nil {
 		return nil, badHelper(err)
 	}
