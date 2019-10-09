@@ -81,10 +81,10 @@ bcrypt-pbkdf@^1.0.0:
   dependencies:
     tweetnacl "^0.14.3"
 
-bs-fetch@^0.3.0:
-  version "0.3.1"
-  resolved "https://registry.yarnpkg.com/bs-fetch/-/bs-fetch-0.3.1.tgz#9c7d074b27e6bb2b9f2ec985964f32bcac49f79e"
-  integrity sha512-MxwnuuXPldXnoCtlpeN5JNbbmb1tVgsqpLfVunvuMLAIQNyP0TqoImHiQRTz38PBSN8/iX+2yVlm+PFJfnHHiA==
+bs-fetch@^0.5.0:
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/bs-fetch/-/bs-fetch-0.5.0.tgz#6913b1d1ddfa0b0a4b832357854e9763d61d4b28"
+  integrity sha512-cGjwRpyNcIaX+p2ssy/38zs7BM/miKNgmOR3NEhxKFete5mR05JcvjuV4raG89oGCG281SU1b56TTAKmf9VCug==
 
 bs-platform@^5.0.6:
   version "5.0.6"
@@ -678,15 +678,14 @@ reason-react@^0.7.0:
     react ">=16.8.1"
     react-dom ">=16.8.1"
 
-reason-urql@^1.0.0-beta.3:
-  version "1.0.0-beta.3"
-  resolved "https://registry.yarnpkg.com/reason-urql/-/reason-urql-1.0.0-beta.3.tgz#d725063a4ea29a03ca323a8136896bdb2dd06bb9"
-  integrity sha512-KrdsG+iuqzVpPz+cijPri0r7NakTeTRt8WVD71itzkqPQHSW4w1RQOy7EtbLRpEFh8UpfuZSLJdXgvCjeY1jXQ==
+reason-urql@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/reason-urql/-/reason-urql-1.0.1.tgz#203914e9bd6d45f59425f7be87e3bac719ecc531"
+  integrity sha512-Ia28sK1NJH7GkbJ5MlpXdD8fqrsMnmADu7zQ2xp/1MRwMqu4TDWIQRW6AoiIQ5W+7U/giF6kTdGMIjYxuokdlw==
   dependencies:
-    bs-fetch "^0.3.0"
     graphql "^14.1.1"
     urql "1.0.5"
-    wonka "^2.0.1"
+    wonka "^3.1.0"
 
 request@^2.82.0:
   version "2.88.0"
@@ -922,6 +921,11 @@ wonka@^2.0.1:
   integrity sha512-xbWQpBlBOaNUeZj7IsgXMwE08HeomMQYkaUVoXIHgyAOk9bdfqOA9Ccw87cL1jgFbGOeXifO9OfgeL6vut9/8Q==
   dependencies:
     bs-rebel "^0.2.3"
+
+wonka@^3.1.0:
+  version "3.2.1"
+  resolved "https://registry.yarnpkg.com/wonka/-/wonka-3.2.1.tgz#f66123fabbb260f23a4e89f1526317169203e258"
+  integrity sha512-LpquZ9PJtYJ31AlMPp5tEba1y+S+wUmY7OyFLGZCmGSNO1ZOTTZGp/HbieFzP5fVJ9fWXCus3ecgDjwAssHSGg==
 
 wrap-ansi@^2.0.0:
   version "2.1.0"
