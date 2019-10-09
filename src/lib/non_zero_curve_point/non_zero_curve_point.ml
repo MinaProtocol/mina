@@ -8,6 +8,12 @@ open Module_version
 
 let parity y = Tick.Bigint.(test_bit (of_field y) 0)
 
+let gen_uncompressed =
+  Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
+      let open Option.Let_syntax in
+      let%map y = Tick.Inner_curve.find_y x in
+      (x, y) )
+
 module Compressed = struct
   open Tick
 
@@ -29,6 +35,8 @@ module Compressed = struct
       {x: 'field; is_odd: 'boolean}
     [@@deriving compare, eq, hash]
   end
+
+  let compress (x, y) = {Poly.x; is_odd= parity y}
 
   module Stable = struct
     module V1 = struct
@@ -68,8 +76,8 @@ module Compressed = struct
 
       let gen =
         let open Quickcheck.Generator.Let_syntax in
-        let%map x = Field.gen and is_odd = Bool.quickcheck_generator in
-        Poly.{x; is_odd}
+        let%map uncompressed = gen_uncompressed in
+        compress uncompressed
     end
 
     module Latest = V1
@@ -113,7 +121,8 @@ module Compressed = struct
 
       [%%else]
 
-      let%test "nonzero_curve_point_v1" = failwith "Unknown curve size"
+      let%test "nonzero_curve_point_compressed v1" =
+        failwith "Unknown curve size"
 
       [%%endif]
     end
@@ -128,8 +137,6 @@ module Compressed = struct
 
   [%%define_locally
   Stable.Latest.(sexp_of_t, t_of_sexp, gen)]
-
-  let compress (x, y) : t = {x; is_odd= parity y}
 
   let to_string = to_base58_check
 
@@ -227,11 +234,7 @@ module Stable = struct
     include T
     include Registration.Make_latest_version (T)
 
-    let gen : t Quickcheck.Generator.t =
-      Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
-          let open Option.Let_syntax in
-          let%map y = Tick.Inner_curve.find_y x in
-          (x, y) )
+    let gen : t Quickcheck.Generator.t = gen_uncompressed
 
     let of_bigstring bs =
       let open Or_error.Let_syntax in
