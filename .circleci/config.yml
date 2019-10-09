@@ -62,24 +62,33 @@ jobs:
     build-archive:
         docker:
             - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+              environment: 
+                CODA_DOCKER: true
+                HASURA_PORT: 8080
+            - image: postgres:12
+              environment: 
+                POSTGRES_PASSWORD: codarules
+                POSTGRES_USER: admin
+                POSTGRES_DB: archiver
+            - image: hasura/graphql-engine:v1.0.0-beta.6
+              environment: 
+                HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
+                HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+                HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Install Docker Compose
-                  command:
-                    curl -L https://github.com/docker/compose/releases/download/1.19.0/docker-compose-`uname -s`-`uname -m` > ~/docker-compose && chmod +x ~/docker-compose && sudo mv ~/docker-compose /usr/local/bin/docker-compose
-            - setup_remote_docker:   
-                  docker_layer_caching: true
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Build Docker Containers
-                  command: cd scripts/archive && docker-compose build
-            - run:
-                  name: Setup Postgres and Hasura docker containers
-                  command: cd scripts/archive && docker-compose -f docker-compose.yml -f docker-compose.override.yml run configuration
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Build Archive Process
-                  command: make build_archive       
+                  command:  bash -c 'eval `opam config env` && make build_archive'
+            - run: 
+                  name: Configure Hasura
+                  command: ls && ./scripts/archive/make_hasura_configurations.sh     
     lint:
         docker:
             - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50

@@ -2,7 +2,7 @@
 
 # update OPAM packages, including pinned ones
 
-if [ -z $CODA_DOCKER ] ; then
+if [ ! -f /.dockerenv ]; then
     echo `basename $0` "can run only inside Coda Docker image"
     exit 1
 fi

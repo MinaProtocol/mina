@@ -423,6 +423,7 @@ module type S = sig
       -> logger:Logger.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
+      -> parent_protocol_state:Protocol_state.value
       -> ( [`Just_emitted_a_proof of bool]
            * [ `External_transition_with_validation of
                ( 'time_received
@@ -434,7 +435,8 @@ module type S = sig
            * [`Staged_ledger of Staged_ledger.t]
          , [ `Invalid_staged_ledger_diff of
              [ `Incorrect_target_staged_ledger_hash
-             | `Incorrect_target_snarked_ledger_hash ]
+             | `Incorrect_target_snarked_ledger_hash
+             | `Incorrect_staged_ledger_diff_state_body_hash ]
              list
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )

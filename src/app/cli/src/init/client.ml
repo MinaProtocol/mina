@@ -488,7 +488,7 @@ let batch_send_payments =
           ( Account.Nonce.succ nonce
           , User_command.sign keypair
               (User_command_payload.create ~fee ~nonce
-                 ~memo:User_command_memo.dummy
+                 ~memo:User_command_memo.empty
                  ~body:
                    (Payment
                       { receiver=
@@ -561,7 +561,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
          in
          let memo =
-           Option.value_map memo_opt ~default:User_command_memo.dummy
+           Option.value_map memo_opt ~default:User_command_memo.empty
              ~f:User_command_memo.create_from_string_exn
          in
          let command =
@@ -719,7 +719,7 @@ let cancel_transaction =
              in
              let command =
                Coda_commands.setup_user_command ~fee:cancel_fee
-                 ~nonce:cancelled_nonce ~memo:User_command_memo.dummy
+                 ~nonce:cancelled_nonce ~memo:User_command_memo.empty
                  ~sender_kp body
              in
              dispatch_with_message Daemon_rpcs.Send_user_command.rpc command
@@ -1220,29 +1220,26 @@ let create_account =
 
 let unlock_account =
   let open Command.Param in
-  let public_key =
-    flag "public-key" ~doc:"KEY Public key of account to be unlocked"
-      (required string)
+  let pk_flag =
+    flag "public-key" ~doc:"KEY Public key to be unlocked"
+      (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Unlock a tracked account"
-    (Cli_lib.Background_daemon.graphql_init public_key ~f:(fun port pk_str ->
+    (Cli_lib.Background_daemon.graphql_init pk_flag ~f:(fun port pk_str ->
          let args =
            let open Deferred.Or_error.Let_syntax in
-           let%bind pk =
-             Deferred.return (Public_key.Compressed.of_base58_check pk_str)
-           in
            let%map password =
              Deferred.map ~f:Or_error.return
                (Secrets.Password.read "Password to unlock account: ")
            in
-           (pk, password)
+           password
          in
          match%bind args with
-         | Ok (pk, password_bytes) ->
+         | Ok password_bytes ->
              let%map response =
                Client.query
                  (Graphql_queries.Unlock_wallet.make
-                    ~public_key:(Graphql_client_lib.Encoders.public_key pk)
+                    ~public_key:(Graphql_client_lib.Encoders.public_key pk_str)
                     ~password:(Bytes.to_string password_bytes)
                     ())
                  port
@@ -1254,35 +1251,29 @@ let unlock_account =
              printf "\n🔓 Unlocked account!\nPublic key: %s\n" pk_string
          | Error e ->
              Deferred.return
-               (printf "❌ Error unlocking account: %s"
+               (printf "❌ Error unlocking account: %s\n"
                   (Error.to_string_hum e)) ))
 
 let lock_account =
   let open Command.Param in
-  let public_key =
+  let pk_flag =
     flag "public-key" ~doc:"KEY Public key of account to be locked"
-      (required string)
+      (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Lock a tracked account"
-    (Cli_lib.Background_daemon.graphql_init public_key ~f:(fun port pk_str ->
-         match Public_key.Compressed.of_base58_check pk_str with
-         | Ok pk ->
-             let%map response =
-               Client.query
-                 (Graphql_queries.Lock_wallet.make
-                    ~public_key:(Graphql_client_lib.Encoders.public_key pk)
-                    ())
-                 port
-             in
-             let pk_string =
-               Public_key.Compressed.to_base58_check
-                 (response#lockWallet)#public_key
-             in
-             printf "🔒 Locked account!\nPublic key: %s\n" pk_string
-         | Error e ->
-             Deferred.return
-               (printf "❌ Error locking account: %s" (Error.to_string_hum e))
-     ))
+    (Cli_lib.Background_daemon.graphql_init pk_flag ~f:(fun port pk ->
+         let%map response =
+           Client.query
+             (Graphql_queries.Lock_wallet.make
+                ~public_key:(Graphql_client.Encoders.public_key pk)
+                ())
+             port
+         in
+         let pk_string =
+           Public_key.Compressed.to_base58_check
+             (response#lockWallet)#public_key
+         in
+         printf "🔒 Locked account!\nPublic key: %s\n" pk_string ))
 
 let generate_libp2p_keypair =
   Command.async
