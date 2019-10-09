@@ -2112,6 +2112,8 @@ module Data = struct
     let curr_slot = curr_ Global_slot.slot
 
     let global_slot (t : Value.t) = Global_slot.to_int t.curr_global_slot
+
+    let total_currency (t : Value.t) : Amount.t = t.total_currency
   end
 
   module Prover_state = struct

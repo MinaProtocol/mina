@@ -34,6 +34,8 @@ module type Basic = sig
 
   val fold : t -> bool Triple.t Fold.t
 
+  val length_in_bits : int
+
   val length_in_triples : int
 
   val zero : t
