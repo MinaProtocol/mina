@@ -94,7 +94,7 @@ let main () =
     Option.value_exn opt
   in
   let%bind () = after (Time.Span.of_sec 30.) in
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async

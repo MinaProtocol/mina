@@ -22,7 +22,7 @@ let main () =
     Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
       ~keypairs ~n:3
   in
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async ~summary:"Test that workers share states"
