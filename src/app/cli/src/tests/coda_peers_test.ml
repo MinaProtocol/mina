@@ -41,7 +41,7 @@ let main () =
                   ))
                (S.of_list expected_peers) ) ))
   in
-  Deferred.List.iter workers ~f:Coda_process.disconnect
+  Deferred.List.iter workers ~f:(Coda_process.disconnect ~logger)
 
 let command =
   Command.async
