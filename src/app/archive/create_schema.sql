@@ -114,9 +114,10 @@ CREATE INDEX blocks_fee_transfers__fee_transfer_id ON blocks_fee_transfers (fee_
 CREATE TABLE snark_jobs (
   id serial PRIMARY KEY,
   prover int NOT NULL,
-  fee int NOT NULL,
+  fee bit(64) NOT NULL,
   job1 int,
-  job2 int
+  job2 int,
+  FOREIGN KEY (prover) REFERENCES public_keys (id)
 );
 
 CREATE INDEX snark_job_index ON snark_jobs (job1, job2);

@@ -97,12 +97,6 @@ module Fee_transfer = struct
         }
     }
   |}]
-
-  let fee_transfer =
-    Insert.json_of_fee_transfers_obj_rel_insert_input
-      (Types.Fee_transfer.encode_as_insert_input
-         (failwith "need to implement")
-         (failwith "Need to implement"))
 end
 
 module Blocks = struct

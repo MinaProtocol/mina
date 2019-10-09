@@ -64,7 +64,11 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         ((User_command.t, Transaction_hash.t) With_hash.t * Block_time.t option)
         list)
       (sender_receipt_chains_from_parent_ledger :
-        Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
+        Receipt.Chain_hash.t Public_key.Compressed.Map.t) :
+      ( (User_command.t, Transaction_hash.t) With_hash.t
+      * Block_time.t option
+      * Types.Receipt_chain_hash.t option )
+      list =
     (* The user commands should be sorted by nonces *)
     let sorted_user_commands =
       List.sort user_commands
@@ -103,6 +107,36 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         ( udpated_sender_receipt_chain
         , (user_command_with_hash, block_time, new_receipt_chain) ) )
 
+  type 'a graphql_result =
+    < parse: Yojson.Basic.json -> 'a
+    ; query: string
+    ; variables: Yojson.Basic.json >
+
+  let tag_with_first_seen
+      ~(get_first_seen : string array -> 'output graphql_result)
+      ~(get_obj :
+            'output
+         -> < hash: Transaction_hash.t ; first_seen: Block_time.t option ; .. >
+            array) transactions_with_hash default_block_time port =
+    let open Deferred.Result.Let_syntax in
+    let hashes =
+      List.map transactions_with_hash
+        ~f:(Fn.compose Transaction_hash.to_base58_check With_hash.hash)
+    in
+    let graphql = get_first_seen (Array.of_list hashes) in
+    let%map first_query_response =
+      let%map result = Client.query_or_error graphql port in
+      Array.to_list (get_obj result)
+      |> List.map ~f:(fun obj -> (obj#hash, obj#first_seen))
+    in
+    let map = Transaction_hash.Map.of_alist_exn first_query_response in
+    List.map transactions_with_hash
+      ~f:(fun ({With_hash.hash; _} as user_command_with_hash) ->
+        let first_seen_in_db = Option.join @@ Map.find map hash in
+        ( user_command_with_hash
+        , Option.value_map first_seen_in_db ~default:(Some default_block_time)
+            ~f:Option.some ) )
+
   let added_transition {port}
       ({With_hash.data= block; _} as block_with_hash :
         (External_transition.t, State_hash.t) With_hash.t)
@@ -122,7 +156,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         | Coinbase _ ->
             [] )
     in
-    let user_commands, _fee_transfers =
+    let user_commands, fee_transfers =
       List.fold transactions ~init:([], [])
         ~f:(fun (acc_user_commands, acc_fee_transfers) -> function
         | `User_command user_command ->
@@ -136,41 +170,28 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
                 ~hash_data:Transaction_hash.hash_fee_transfer
               :: acc_fee_transfers ) )
     in
-    let%bind first_seen_user_commands =
-      let user_command_hashes =
-        List.map user_commands
-          ~f:(Fn.compose Transaction_hash.to_base58_check With_hash.hash)
-      in
-      let graphql =
-        Graphql_query.User_commands.Query_first_seen.make
-          ~hashes:(Array.of_list user_command_hashes)
-          ()
-      in
-      let%map first_query_response =
-        let%map result = Client.query_or_error graphql port in
-        Array.to_list result#user_commands
-        |> List.map ~f:(fun obj -> (obj#hash, obj#first_seen))
-      in
-      Transaction_hash.Map.of_alist_exn first_query_response
-    in
     let block_time =
       Blockchain_state.timestamp @@ External_transition.blockchain_state block
     in
-    let user_commands_with_time =
-      List.map user_commands
-        ~f:(fun ({With_hash.hash; _} as user_command_with_hash) ->
-          let first_seen_in_db =
-            Option.join @@ Map.find first_seen_user_commands hash
-          in
-          ( user_command_with_hash
-          , Option.value_map first_seen_in_db ~default:(Some block_time)
-              ~f:Option.some ) )
+    let%bind user_commands_with_time =
+      tag_with_first_seen
+        ~get_first_seen:(fun hashes ->
+          Graphql_query.User_commands.Query_first_seen.make ~hashes () )
+        ~get_obj:(fun result -> result#user_commands)
+        user_commands block_time port
+    in
+    let%bind fee_transfers_with_time =
+      tag_with_first_seen
+        ~get_first_seen:(fun hashes ->
+          Graphql_query.Fee_transfer.Query_first_seen.make ~hashes () )
+        ~get_obj:(fun result -> result#fee_transfers)
+        fee_transfers block_time port
     in
     let encoded_block =
       Types.Blocks.serialize block_with_hash
         (compute_with_receipt_chains user_commands_with_time
            sender_receipt_chains_from_parent_ledger)
-        (failwith "Need to implement")
+        fee_transfers_with_time
     in
     let graphql =
       Graphql_query.Blocks.Insert.make

@@ -162,6 +162,22 @@ module Amount = Make_Bitstring_converters (Currency.Amount)
 module Nonce = Make_Bitstring_converters (Account.Nonce)
 module Length = Make_Bitstring_converters (Coda_numbers.Length)
 
+let encode_as_obj_rel_insert_input data
+    (on_conflict : ('constraint_, 'update_columns) Ast.On_conflict.t) =
+  object
+    method data = data
+
+    method on_conflict = Some on_conflict
+  end
+
+let encode_as_arr_rel_insert_input data
+    (on_conflict : ('constraint_, 'update_columns) Ast.On_conflict.t) =
+  object
+    method data = Array.of_list data
+
+    method on_conflict = Some on_conflict
+  end
+
 module Block_time = struct
   let serialize value =
     Bitstring.to_yojson
@@ -174,19 +190,6 @@ module Block_time = struct
     @@ Bitstring.of_yojson value
 end
 
-let encode_as_insert_input ~constraint_name ~updated_columns data =
-  object
-    method data = data
-
-    method on_conflict =
-      Option.some
-      @@ object
-           method constraint_ = constraint_name
-
-           method update_columns = Array.of_list updated_columns
-         end
-  end
-
 module Public_key = struct
   let encode public_key =
     object
@@ -194,25 +197,20 @@ module Public_key = struct
 
       method fee_transfers = None
 
+      method snark_jobs = None
+
       method userCommandsByReceiver = None
 
       method user_commands = None
 
-      method value = Some public_key
-    end
-
-  let encode_as_insert_input public_key =
-    object
-      method data = encode public_key
-
-      method on_conflict =
+      method value =
         Option.some
-        @@ object
-             method constraint_ = `public_keys_value_key
-
-             method update_columns = Array.of_list [`value]
-           end
+        @@ Signature_lib.Public_key.Compressed.to_base58_check public_key
     end
+
+  let encode_as_obj_rel_insert_input public_key =
+    encode_as_obj_rel_insert_input (encode public_key)
+      Ast.On_conflict.public_keys
 end
 
 module User_command = struct
@@ -226,14 +224,6 @@ module User_command = struct
   let encode {With_hash.data= user_command; hash} first_seen =
     let payload = User_command.payload user_command in
     let body = payload.body in
-    let sender =
-      Signature_lib.Public_key.Compressed.to_base58_check
-      @@ User_command.sender user_command
-    in
-    let receiver =
-      Signature_lib.Public_key.Compressed.to_base58_check
-      @@ receiver user_command
-    in
     let open Option in
     object
       method hash = some @@ Transaction_hash.to_base58_check hash
@@ -260,10 +250,13 @@ module User_command = struct
       method nonce =
         some @@ Nonce.serialize @@ User_command_payload.nonce payload
 
-      method public_key = some @@ Public_key.encode_as_insert_input sender
+      method public_key =
+        some @@ Public_key.encode_as_obj_rel_insert_input
+        @@ User_command.sender user_command
 
       method publicKeyByReceiver =
-        some @@ Public_key.encode_as_insert_input receiver
+        some @@ Public_key.encode_as_obj_rel_insert_input
+        @@ receiver user_command
 
       method typ =
         some
@@ -275,10 +268,10 @@ module User_command = struct
                  `Delegation )
     end
 
-  let encode_as_insert_input user_command_with_hash first_seen =
-    encode_as_insert_input ~constraint_name:`user_commands_hash_key
-      ~updated_columns:[`first_seen]
+  let encode_as_obj_rel_insert_input user_command_with_hash first_seen =
+    encode_as_obj_rel_insert_input
       (encode user_command_with_hash first_seen)
+      Ast.On_conflict.user_commands
 
   let decode obj =
     let receiver = (obj#publicKeyByReceiver)#value in
@@ -299,51 +292,9 @@ module User_command = struct
     , obj#first_seen )
 end
 
-module With_on_conflict = struct
-  type ('constraint_, 'update_columns) on_conflict =
-    < constraint_: 'constraint_ ; update_columns: 'update_columns array >
-
-  type ('data, 'constraint_, 'update_columns) t =
-    < data: 'data
-    ; on_conflict: ('constraint_, 'update_columns) on_conflict option >
-
-  type nonrec ('data, 'constraint_, 'update_columns) array =
-    ('data array, 'constraint_, 'update_columns) t
-end
-
 module Fee_transfer = struct
-  (* type ('block, 'm1, 'fee_transfer) t =
-    (< data:
-         < block:
-             'block
-             option
-         ; block_id: int option
-         ; fee_transfer:'fee_transfer array
-     ; on_conflict:
-         < constraint_: [< `blocks_fee_transfers_block_id_fee_transfer_id_key]
-         ; update_columns: [< `block_id | `fee_transfer_id] array
-         ; .. >
-         option
-     ; .. >
-     )
-    option *)
-
-  type ('blocks_fee_transfer, 'public_key) insert_input =
-    < blocks_fee_transfers: 'blocks_fee_transfer option
-    ; fee: Yojson.Basic.json option
-    ; first_seen: Yojson.Basic.json option
-    ; hash: string option
-    ; public_key: 'public_key option
-    ; receiver: int option >
-
-  type ('blocks_fee_transfer, 'public_key) rel_insert_input =
-    ( ('blocks_fee_transfer, 'public_key) insert_input
-    , [`fee_transfers_hash_key]
-    , [`first_seen] )
-    With_on_conflict.t
-
   let encode {With_hash.data: Fee_transfer.Single.t = (receiver, fee); hash}
-      first_seen : ('blocks_fee_transfer, 'public_key) insert_input =
+      first_seen =
     let open Option in
     object
       method hash = some @@ Transaction_hash.to_base58_check hash
@@ -353,19 +304,48 @@ module Fee_transfer = struct
       method first_seen = Option.map first_seen ~f:Block_time.serialize
 
       method public_key =
-        some @@ Public_key.encode_as_insert_input
-        @@ Signature_lib.Public_key.Compressed.to_base58_check receiver
+        some @@ Public_key.encode_as_obj_rel_insert_input receiver
 
       method receiver = None
 
       method blocks_fee_transfers = None
     end
 
-  let encode_as_insert_input fee_transfer_with_hash first_seen :
-      ('blocks_fee_transfer, 'public_key) rel_insert_input =
-    encode_as_insert_input ~constraint_name:`fee_transfers_hash_key
-      ~updated_columns:[`first_seen]
+  let encode_as_obj_rel_insert_input fee_transfer_with_hash first_seen =
+    encode_as_obj_rel_insert_input
       (encode fee_transfer_with_hash first_seen)
+      Ast.On_conflict.fee_transfers
+end
+
+module Snark_job = struct
+  let encode ({fee; prover; work_ids; _} : Transaction_snark_work.Info.t) =
+    let open Option in
+    let job1, job2 =
+      match work_ids with
+      | `One job1 ->
+          (Some job1, None)
+      | `Two (job1, job2) ->
+          (Some job1, Some job2)
+    in
+    object
+      method blocks_snark_jobs = None
+
+      method fee = some @@ Fee.serialize fee
+
+      method job1 = job1
+
+      method job2 = job2
+
+      method prover = None
+
+      method public_key =
+        some @@ Public_key.encode_as_obj_rel_insert_input prover
+    end
+
+  let encode_as_obj_rel_insert_input transaction_snark_work =
+    encode_as_obj_rel_insert_input
+      (encode transaction_snark_work)
+      Ast.On_conflict.snark_jobs
 end
 
 module Receipt_chain_hash = struct
@@ -382,59 +362,20 @@ module Receipt_chain_hash = struct
       method receipt_chain_hashes = parent
     end
 
-  (* HACK: An indication of what the type of receipt chain object input should be *)
-  type ('f, 'g) obj_input =
-    < data:
-        (< blocks_user_commands: 'f option
-         ; hash: string option
-         ; receipt_chain_hash: 'g option
-         ; receipt_chain_hashes:
-             < data: 'h array
-             ; on_conflict:
-                 < constraint_:
-                     [< `receipt_chain_hashes_hash_key
-                     | `receipt_chain_hashes_pkey ]
-                 ; update_columns: [< `hash | `parent_id] array >
-                 option
-             ; .. >
-             option
-         ; .. >
-         as
-         'h)
-    ; on_conflict:
-        < constraint_:
-            [< `receipt_chain_hashes_hash_key | `receipt_chain_hashes_pkey]
-        ; update_columns: [< `hash | `parent_id] array >
-        option
-    ; .. >
-    as
-    'g
-
-  let encode t : ('f, 'g) obj_input =
+  let encode t =
     let open Option in
-    let on_conflict =
-      object
-        method constraint_ = `receipt_chain_hashes_hash_key
-
-        method update_columns = Array.of_list [`hash]
-      end
-    in
     let parent =
       to_obj (some @@ Receipt.Chain_hash.to_string @@ t.parent) None
     in
-    object
-      method data =
-        to_obj
-          (some @@ Receipt.Chain_hash.to_string @@ t.value)
-          ( some
-          @@ object
-               method data = Array.of_list [parent]
-
-               method on_conflict = some on_conflict
-             end )
-
-      method on_conflict = some on_conflict
-    end
+    let value = some @@ Receipt.Chain_hash.to_string @@ t.value in
+    let encoded_receipt_chain =
+      to_obj value
+        ( some
+        @@ encode_as_arr_rel_insert_input [parent]
+             Ast.On_conflict.receipt_chain_hash )
+    in
+    encode_as_obj_rel_insert_input encoded_receipt_chain
+      Ast.On_conflict.receipt_chain_hash
 end
 
 module Blocks_user_commands = struct
@@ -447,35 +388,19 @@ module Blocks_user_commands = struct
 
       method user_command =
         Some
-          (User_command.encode_as_insert_input user_command_with_hash
+          (User_command.encode_as_obj_rel_insert_input user_command_with_hash
              first_seen)
     end
 
-  let encode_as_insert_input user_commands =
-    encode_as_insert_input
-      ~constraint_name:
-        `blocks_user_commands_block_id_user_command_id_receipt_chain_has
-      ~updated_columns:[`block_id; `user_command_id; `receipt_chain_hash_id]
-      ( Array.of_list
-      @@ List.map user_commands
-           ~f:(fun (user_command_with_hash, first_seen, receipt_chain) ->
-             encode user_command_with_hash first_seen receipt_chain ) )
+  let encode_as_arr_rel_insert_input user_commands =
+    encode_as_arr_rel_insert_input
+      (List.map user_commands
+         ~f:(fun (user_command_with_hash, first_seen, receipt_chain) ->
+           encode user_command_with_hash first_seen receipt_chain ))
+      Ast.On_conflict.blocks_user_commands
 end
 
 module Blocks_fee_transfers = struct
-  (* blocks_fee_transfers_arr_rel_insert_input *)
-  type ('block, 'fee_transfer) insert_input =
-    < block: 'block option
-    ; block_id: int option
-    ; fee_transfer: 'fee_transfer option
-    ; fee_transfer_id: int option >
-
-  type ('block, 'fee_transfer) rel_insert_input =
-    ( ('block, 'fee_transfer) insert_input
-    , [`blocks_fee_transfers_block_id_fee_transfer_id_key]
-    , [`block_id | `fee_transfer_id] )
-    With_on_conflict.array
-
   let encode fee_transfer first_seen =
     object
       method block = None
@@ -483,20 +408,39 @@ module Blocks_fee_transfers = struct
       method block_id = None
 
       method fee_transfer =
-        Some (Fee_transfer.encode_as_insert_input fee_transfer first_seen)
+        Some
+          (Fee_transfer.encode_as_obj_rel_insert_input fee_transfer first_seen)
 
       method fee_transfer_id = None
     end
 
-  let encode_as_insert_input fee_transfers :
-      ('block, 'fee_transfer) rel_insert_input =
-    encode_as_insert_input
-      ~constraint_name:`blocks_fee_transfers_block_id_fee_transfer_id_key
-      ~updated_columns:[`block_id; `fee_transfer_id]
-      ( Array.of_list
-      @@ List.map fee_transfers
-           ~f:(fun (fee_transfers_with_hash, first_seen) ->
-             encode fee_transfers_with_hash first_seen ) )
+  let encode_as_arr_rel_insert_input fee_transfers =
+    encode_as_arr_rel_insert_input
+      (List.map fee_transfers ~f:(fun (fee_transfers_with_hash, first_seen) ->
+           encode fee_transfers_with_hash first_seen ))
+      Ast.On_conflict.blocks_fee_transfers
+end
+
+module Blocks_snark_job = struct
+  let encode snark_job =
+    let obj =
+      object
+        method block = None
+
+        method block_id = None
+
+        method snark_job =
+          Option.some @@ Snark_job.encode_as_obj_rel_insert_input snark_job
+
+        method snark_job_id = None
+      end
+    in
+    obj
+
+  let encode_as_arr_rel_insert_input snark_jobs =
+    encode_as_arr_rel_insert_input
+      (List.map snark_jobs ~f:encode)
+      Ast.On_conflict.blocks_snark_jobs
 end
 
 module Blocks = struct
@@ -521,6 +465,14 @@ module Blocks = struct
     let global_slot =
       Consensus.Data.Consensus_state.global_slot consensus_state
     in
+    let staged_ledger_diff =
+      External_transition.staged_ledger_diff external_transition
+    in
+    let snark_jobs =
+      List.map
+        (Staged_ledger_diff.completed_works staged_ledger_diff)
+        ~f:Transaction_snark_work.info
+    in
     let open Option in
     object
       method state_hash = some @@ State_hash.to_base58_check hash
@@ -528,8 +480,7 @@ module Blocks = struct
       method creator = None
 
       method public_key =
-        some @@ Public_key.encode_as_insert_input
-        @@ Signature_lib.Public_key.Compressed.to_base58_check
+        some @@ Public_key.encode_as_obj_rel_insert_input
         @@ External_transition.proposer external_transition
 
       method parent_hash =
@@ -555,11 +506,14 @@ module Blocks = struct
         @@ External_transition.timestamp external_transition
 
       method blocks_fee_transfers =
-        some @@ Blocks_fee_transfers.encode_as_insert_input fee_transfers
+        some
+        @@ Blocks_fee_transfers.encode_as_arr_rel_insert_input fee_transfers
 
-      method blocks_snark_jobs = None
+      method blocks_snark_jobs =
+        some @@ Blocks_snark_job.encode_as_arr_rel_insert_input snark_jobs
 
       method blocks_user_commands =
-        some @@ Blocks_user_commands.encode_as_insert_input user_commands
+        some
+        @@ Blocks_user_commands.encode_as_arr_rel_insert_input user_commands
     end
 end
