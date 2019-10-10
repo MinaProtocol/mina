@@ -117,13 +117,23 @@ module Types = struct
     end)
   end
 
+  let unsigned_scalar_scalar ~to_string typ_name =
+    scalar typ_name
+      ~doc:
+        (Core.sprintf
+           !"String representing a %s number in base 10"
+           (String.lowercase typ_name))
+      ~coerce:(fun num -> `String (to_string num))
+
   let public_key =
     scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
       ~coerce:(fun key -> `String (Public_key.Compressed.to_base58_check key))
 
+  let uint32 =
+    unsigned_scalar_scalar ~to_string:Unsigned.UInt32.to_string "UInt32"
+
   let uint64 =
-    scalar "UInt64" ~doc:"String representing a uint64 number in base 10"
-      ~coerce:(fun num -> `String (Unsigned.UInt64.to_string num))
+    unsigned_scalar_scalar ~to_string:Unsigned.UInt64.to_string "UInt64"
 
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
@@ -378,30 +388,24 @@ module Types = struct
   let consensus_state =
     let open Consensus.Data.Consensus_state in
     obj "ConsensusState" ~fields:(fun _ ->
-        [ field "blockchainLength" ~typ:(non_null string)
-            ~doc:
-              (natural_number_desc "blockchain length"
-                 Coda_numbers.Length.length_in_bits)
+        [ field "blockchainLength" ~typ:(non_null uint32)
+            ~doc:"Length of the blockchain at this block"
             ~args:Arg.[]
             ~resolve:(fun _ (t : Value.t) ->
-              Coda_numbers.Length.to_string @@ blockchain_length t )
-        ; field "slot"
-            ~doc:(natural_number_desc "slot in a block" 32)
-            ~typ:(non_null string)
+              Coda_numbers.Length.to_uint32 @@ blockchain_length t )
+        ; field "slot" ~doc:"Slot in which this block was created"
+            ~typ:(non_null uint32)
             ~args:Arg.[]
-            ~resolve:(fun _ t -> Unsigned.UInt32.to_string @@ curr_epoch t)
-        ; field "epoch"
-            ~doc:(natural_number_desc "epoch in a block" 32)
-            ~typ:(non_null string)
+            ~resolve:(fun _ t -> curr_epoch t)
+        ; field "epoch" ~doc:"Epoch in which this block was created"
+            ~typ:(non_null uint32)
             ~args:Arg.[]
-            ~resolve:(fun _ t -> Unsigned.UInt32.to_string @@ curr_epoch t)
-        ; field "totalCurreny"
-            ~doc:
-              (natural_number_desc "total currency in a block"
-                 Amount.length_in_bits)
-            ~typ:(non_null string)
+            ~resolve:(fun _ t -> curr_epoch t)
+        ; field "totalCurrency"
+            ~doc:"Total currency in circulation at this block"
+            ~typ:(non_null uint64)
             ~args:Arg.[]
-            ~resolve:(fun _ t -> Amount.to_string @@ total_currency t) ] )
+            ~resolve:(fun _ t -> Amount.to_uint64 @@ total_currency t) ] )
 
   let protocol_state =
     let open Filtered_external_transition.Protocol_state in
@@ -412,16 +416,14 @@ module Types = struct
             ~resolve:(fun _ t ->
               Stringable.State_hash.to_base58_check t.previous_state_hash )
         ; field "blockchainState"
-            ~doc:
-              "Ledger merkle roots and the creation timestamp related to a \
-               block"
+            ~doc:"State which is agnostic of a particular consensus algorithm"
             ~typ:(non_null blockchain_state)
             ~args:Arg.[]
             ~resolve:(fun _ t -> t.blockchain_state)
         ; field "consensusState"
             ~doc:
-              "State used for using the consensus algorithm, Oroburous, to \
-               propose the block"
+              "State specific to the Codaboros Proof of Stake consensus \
+               algorithm"
             ~typ:(non_null consensus_state)
             ~args:Arg.[]
             ~resolve:(fun _ t -> t.consensus_state) ] )
