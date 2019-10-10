@@ -27,7 +27,7 @@
     "@2fd/graphdoc": "^2.4.0",
     "bs-platform": "^5.0.6",
     "concurrently": "^4.1.0",
-    "serve": "^11.1.0"
+    "serve": "^11.2.0"
   },
   "nodemonConfig": {
     "ignore": [
