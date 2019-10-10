@@ -15,6 +15,10 @@ module Styles = {
         border(`px(1), `solid, Style.Colors.hyperlinkHover),
         cursor(`pointer),
       ]),
+      media(
+        "(min-width: 70rem) and (max-width: 84rem)",
+        [maxWidth(`rem(15.3)), height(`rem(6.9))],
+      ),
     ]);
 
   let ctaContent =
@@ -33,6 +37,10 @@ module Styles = {
       lineHeight(`rem(2.1875)),
       color(Style.Colors.teal),
       textAlign(`left),
+      media(
+        "(min-width: 70rem) and (max-width: 83.9375rem)",
+        [fontSize(`rem(1.2))],
+      ),
     ]);
 
   let ctaBody =
@@ -44,7 +52,13 @@ module Styles = {
       color(Style.Colors.teal),
       textAlign(`left),
       marginTop(`rem(0.3125)),
+      media(
+        "(min-width: 70rem) and (max-width: 83.9375rem)",
+        [fontSize(`px(12))],
+      ),
     ]);
+  let ctaIcon =
+    style([minWidth(`px(29)), maxHeight(`px(29)), flexShrink(0)]);
 };
 
 [@react.component]
@@ -52,7 +66,7 @@ let make = (~icon, ~heading, ~text, ~href) => {
   <a href>
     <button className=Styles.ctaButton>
       <div className=Styles.ctaContent>
-        <p> icon </p>
+        <p className=Styles.ctaIcon> icon </p>
         <div className=Styles.ctaText>
           <h2 className=Styles.ctaHeading> heading </h2>
           <h4 className=Styles.ctaBody> text </h4>

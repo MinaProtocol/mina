@@ -65,7 +65,7 @@ let create_ledger_and_transactions num_transitions =
       let coinbase =
         Coinbase.create ~amount:Coda_compile_config.coinbase
           ~proposer:(Public_key.compress keys.(0).public_key)
-          ~fee_transfer:None
+          ~fee_transfer:None ~state_body_hash:State_body_hash.dummy
         |> Or_error.ok_exn
       in
       let transitions =

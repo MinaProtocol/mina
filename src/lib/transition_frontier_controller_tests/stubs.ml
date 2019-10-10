@@ -13,6 +13,19 @@ struct
   (** [Stubs] is a set of modules used for testing different components of tfc  *)
   let max_length = Inputs.max_length
 
+  let heartbeat_flag = ref true
+
+  let print_heartbeat logger =
+    let rec loop () =
+      if !heartbeat_flag then (
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          "Heartbeat for CI" ;
+        let%bind () = after (Time.Span.of_min 10.) in
+        loop () )
+      else return ()
+    in
+    loop ()
+
   module State_proof = struct
     include Proof
 
@@ -132,7 +145,7 @@ struct
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~self:largest_account_public_key ~transactions_by_fee:transactions
-          ~get_completed_work
+          ~get_completed_work ~state_body_hash:State_body_hash.dummy
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
@@ -257,7 +270,8 @@ struct
             ; user_commands= []
             ; coinbase= Staged_ledger_diff.At_most_two.Zero }
           , None )
-      ; creator }
+      ; creator
+      ; state_body_hash= State_body_hash.dummy }
     in
     (* the genesis transition is assumed to be valid *)
     let (`I_swear_this_is_safe_see_my_comment root_transition) =

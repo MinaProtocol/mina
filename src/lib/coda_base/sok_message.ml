@@ -100,6 +100,5 @@ module Digest = struct
 end
 
 let digest t =
-  Blake2.(
-    to_raw_string
-      (digest_string (Binable.to_string (module Stable.Latest.T) t)))
+  Blake2.to_raw_string
+    (Blake2.digest_string (Binable.to_string (module Stable.Latest) t))

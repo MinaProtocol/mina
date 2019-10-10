@@ -32,7 +32,7 @@ let%test_module "network pool test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind verifier =
             Verifier.create ~logger
-              ~pids:(Child_processes.Termination.create_pid_set ())
+              ~pids:(Child_processes.Termination.create_pid_table ())
           in
           let config = config verifier in
           let network_pool =
@@ -86,7 +86,7 @@ let%test_module "network pool test" =
         in
         let%bind verifier =
           Verifier.create ~logger
-            ~pids:(Child_processes.Termination.create_pid_set ())
+            ~pids:(Child_processes.Termination.create_pid_table ())
         in
         let config = config verifier in
         let network_pool =

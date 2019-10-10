@@ -1,4 +1,4 @@
-open Crypto_params.Tick0
+open Curve_choice.Tick0
 module Input = Input
 
 module State : sig
@@ -13,6 +13,8 @@ include
    and type field_constant := Field.t
    and type bool := bool
    and module State := State
+
+val salt : string -> Field.t State.t
 
 module Checked :
   Intf.S

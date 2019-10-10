@@ -42,7 +42,8 @@ module Index = struct
     let set v i b = if b then v lor (one lsl i) else v land lnot (one lsl i)
   end
 
-  include (Bits.Vector.Make (Vector) : Bits_intf.S with type t := t)
+  include (
+    Bits.Vector.Make (Vector) : Bits_intf.Convertable_bits with type t := t)
 
   let fold_bits = fold
 
@@ -158,7 +159,7 @@ let initialize public_key : t =
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate= public_key
-  ; voting_for= State_hash.of_hash Outside_pedersen_image.t }
+  ; voting_for= State_hash.dummy }
 
 let typ : (var, value) Typ.t =
   let spec =
@@ -230,7 +231,7 @@ let empty =
     ; nonce= Nonce.zero
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; delegate= Public_key.Compressed.empty
-    ; voting_for= State_hash.of_hash Outside_pedersen_image.t }
+    ; voting_for= State_hash.dummy }
 
 let digest t = Pedersen.State.digest (crypto_hash t)
 
@@ -241,7 +242,7 @@ let create public_key balance =
     ; nonce= Nonce.zero
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; delegate= public_key
-    ; voting_for= State_hash.of_hash Outside_pedersen_image.t }
+    ; voting_for= State_hash.dummy }
 
 let gen =
   let open Quickcheck.Let_syntax in

@@ -63,7 +63,7 @@ module Helper = struct
     ; subscriptions: (int, subscription) Hashtbl.t
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
-    ; mutable new_peer_callback: (string -> unit) option
+    ; mutable new_peer_callback: (string -> string list -> unit) option
     ; mutable finished: bool }
 
   and subscription =
@@ -173,6 +173,7 @@ module Helper = struct
         { privk: string
         ; statedir: string
         ; ifaces: string list
+        ; external_maddr: string
         ; network_id: string }
       [@@deriving yojson]
 
@@ -329,14 +330,26 @@ module Helper = struct
     let us_them_eq a b =
       match (a, b) with `Us, `Us | `Them, `Them -> true | _, _ -> false
     in
+    let release () =
+      match Hashtbl.find_and_remove net.streams stream.idx with
+      | Some _ ->
+          ()
+      | None ->
+          Logger.error net.logger
+            "tried to release stream $idx but it was already gone"
+            ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("idx", `Int stream.idx)]
+    in
     stream.state
     <- ( match (stream.state, who_closed) with
        | FullyOpen, _ ->
            HalfClosed who_closed
        | HalfClosed other, _ ->
-           if us_them_eq other who_closed then double_close () else FullyClosed
+           if us_them_eq other who_closed then double_close () else release () ;
+           FullyClosed
        | FullyClosed, _ ->
            double_close () ) ;
+    (* TODO: maybe we can check some invariants on the Go side too? *)
     assert (stream_state_invariant stream)
 
   (** Track a new stream.
@@ -470,7 +483,8 @@ module Helper = struct
     end
 
     module Discovered_peer = struct
-      type t = {peer_id: string; multiaddrs: string list} [@@deriving yojson]
+      type t = {upcall: string; peer_id: string; multiaddrs: string list}
+      [@@deriving yojson]
     end
 
     let or_error (t : ('a, string) Result.t) =
@@ -595,7 +609,7 @@ module Helper = struct
         )
     | "discoveredPeer" ->
         let%map p = Discovered_peer.of_yojson v |> or_error in
-        Option.iter t.new_peer_callback ~f:(fun cb -> cb p.peer_id)
+        Option.iter t.new_peer_callback ~f:(fun cb -> cb p.peer_id p.multiaddrs)
     (* Received a message on some stream *)
     | "incomingStreamMsg" -> (
         let%bind m = Incoming_stream_msg.of_yojson v |> or_error in
@@ -610,17 +624,11 @@ module Helper = struct
     | "streamLost" ->
         let%bind m = Stream_lost.of_yojson v |> or_error in
         let stream_idx = m.stream_idx in
-        Logger.warn t.logger "Encountered error while reading stream: $error"
+        Logger.warn t.logger
+          "Encountered error while reading stream $idx: $error"
           ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("error", `String m.reason)] ;
-        let ret =
-          if Hashtbl.mem t.streams stream_idx then Ok ()
-          else
-            Or_error.errorf "lost a stream we don't know about: %d" stream_idx
-        in
-        Hashtbl.remove t.streams stream_idx ;
-        (* TODO: leaking pipes *)
-        ret
+          ~metadata:[("error", `String m.reason); ("idx", `Int stream_idx)] ;
+        Ok ()
     (* The remote peer closed its write end of one of our streams *)
     | "streamReadComplete" -> (
         let%bind m = Stream_read_complete.of_yojson v |> or_error in
@@ -711,16 +719,14 @@ module Keypair = struct
   let secret_key_base58 {secret; _} = to_b58_data secret
 
   let to_string {secret; public; peer_id} =
-    String.concat ~sep:";"
-      [to_b58_data secret; to_b58_data public; to_b58_data peer_id]
+    String.concat ~sep:";" [to_b58_data secret; to_b58_data public; peer_id]
 
   let of_string s =
     match String.split s ~on:';' with
-    | [secret_b58; public_b58; peer_id_b58] ->
+    | [secret_b58; public_b58; peer_id] ->
         let open Or_error.Let_syntax in
         let%map secret = of_b58_data (`String secret_b58)
-        and public = of_b58_data (`String public_b58)
-        and peer_id = of_b58_data (`String peer_id_b58) in
+        and public = of_b58_data (`String public_b58) in
         {secret; public; peer_id}
     | _ ->
         Or_error.errorf "%s is not a valid Keypair.to_string output" s
@@ -743,6 +749,8 @@ module Multiaddr = struct
 
   let of_string t = t
 end
+
+type discovered_peer = {id: PeerID.t; maddrs: Multiaddr.t list}
 
 module Pubsub = struct
   let publish net ~topic ~data =
@@ -849,19 +857,24 @@ end
 
 let me (net : Helper.t) = net.me_keypair
 
-let configure net ~me ~maddrs ~network_id ~on_new_peer =
+let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
       { privk= Keypair.secret_key_base58 me
       ; statedir= net.conf_dir
       ; ifaces= List.map ~f:Multiaddr.to_string maddrs
+      ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id }
   with
   | Ok "configure success" ->
       net.me_keypair <- Some me ;
       net.new_peer_callback
-      <- Some (fun peer_id_string -> on_new_peer (peer_id_string :> PeerID.t)) ;
+      <- Some
+           (fun peer_id peer_addrs ->
+             on_new_peer
+               { id= (peer_id :> PeerID.t)
+               ; maddrs= List.map ~f:Multiaddr.of_string peer_addrs } ) ;
       Ok ()
   | Ok j ->
       failwithf "helper broke RPC protocol: configure got %s" j ()
@@ -1133,9 +1146,8 @@ let create ~logger ~conf_dir =
   | _ ->
       Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
-(* Temporarily commenting out while we figure out how to build libp2p_helper on CI
-       *
-       *
+(*  Temporarily commenting out while we figure out how to build libp2p_helper on CI
+
 let%test_module "coda network tests" =
   ( module struct
     let () = Backtrace.elide := false
@@ -1167,10 +1179,18 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~me:kp_a ~maddrs ~network_id ~on_new_peer:None >>| Or_error.ok_exn
-      and () = configure b ~me:kp_b ~maddrs ~network_id ~on_new_peer:None >>| Or_error.ok_exn in
+        configure a ~me:kp_a ~maddrs ~network_id ~on_new_peer:Fn.ignore
+        >>| Or_error.ok_exn
+      and () =
+        configure b ~me:kp_b ~maddrs ~network_id ~on_new_peer:Fn.ignore
+        >>| Or_error.ok_exn
+      in
+      let%bind a_advert = begin_advertising a
+      and b_advert = begin_advertising b in
+      Or_error.ok_exn a_advert ;
+      Or_error.ok_exn b_advert ;
       (* Give the helpers time to announce and discover each other on localhost *)
-      let%map () = after (Time.Span.of_sec 0.5) in
+      let%map () = after (Time.Span.of_sec 1.5) in
       let shutdown () =
         let%bind () = shutdown a in
         let%bind () = shutdown b in
@@ -1252,5 +1272,4 @@ let%test_module "coda network tests" =
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
   end )
-  
-  *)
+*)
