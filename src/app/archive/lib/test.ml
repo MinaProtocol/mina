@@ -196,7 +196,8 @@ let%test_module "Processor" =
       Diff.Transition_frontier.Breadcrumb_added
         {block; sender_receipt_chains_from_parent_ledger}
 
-    let%test_unit "Processing an external transition diff" =
+    (* TODO: make other tests that queries components of a block by testing other queries, such prove_receipt_chain and block pagination *)
+    let%test_unit "Write a external transition diff successfully" =
       Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       Thread_safe.block_on_async_exn

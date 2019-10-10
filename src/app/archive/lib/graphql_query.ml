@@ -2,9 +2,11 @@ open Signature_lib
 open Coda_base
 open Core
 
-let deserialize_optional_block_time = Option.map ~f:Types.Bitstring.of_yojson
+let deserialize_optional_block_time =
+  Option.map ~f:Base_types.Bitstring.of_yojson
 
-let decode_optional_block_time = Option.map ~f:Types.Block_time.deserialize
+let decode_optional_block_time =
+  Option.map ~f:Base_types.Block_time.deserialize
 
 module User_commands = struct
   module Query_first_seen =
@@ -18,7 +20,7 @@ module User_commands = struct
     }
   |}]
 
-  let bitstring_block_time = Option.map ~f:Types.Bitstring.of_yojson
+  let bitstring_block_time = Option.map ~f:Base_types.Bitstring.of_yojson
 
   (* TODO: replace this with pagination *)
   module Query =
@@ -26,18 +28,18 @@ module User_commands = struct
   {|
     query query_user_commands ($hash: String!) {
         user_commands(where: {hash: {_eq: $hash}} ) {
-            fee @bsDecoder (fn: "Types.Fee.deserialize")
+            fee @bsDecoder (fn: "Base_types.Fee.deserialize")
             hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
             memo @bsDecoder(fn: "User_command_memo.of_string")
-            nonce @bsDecoder (fn: "Types.Nonce.deserialize")
+            nonce @bsDecoder (fn: "Base_types.Nonce.deserialize")
             public_key {
                 value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
             }
             publicKeyByReceiver {
               value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
             } 
-            typ @bsDecoder (fn: "Types.User_command_type.decode")
-            amount @bsDecoder (fn: "Types.Amount.deserialize")
+            typ @bsDecoder (fn: "Base_types.User_command_type.decode")
+            amount @bsDecoder (fn: "Base_types.Amount.deserialize")
             first_seen @bsDecoder(fn: "decode_optional_block_time")
         }
     }
@@ -100,18 +102,6 @@ module Fee_transfer = struct
 end
 
 module Blocks = struct
-  module Get_existing =
-  [%graphql
-  {|
-    query get_existing ($hashes: [String!]!) {
-        blocks(where: {hash: {_in: $hashes}} ) {
-          stateHashByStateHash {
-            value @bsDecoder(fn: "State_hash.of_base58_check_exn")
-            }
-        }
-    } 
-    |}]
-
   module Insert =
   [%graphql
   {|
@@ -129,27 +119,20 @@ module Blocks = struct
     |}]
 end
 
-module Blocks_user_commands = struct
-  module Type_Test =
-  [%graphql
-  {|
-mutation insert($input: [blocks_user_commands_insert_input!]!) {
-  insert_blocks_user_commands(objects: $input, 
-    on_conflict: {constraint: blocks_user_commands_block_id_user_command_id_receipt_chain_has, 
-      update_columns: block_id}) {
-        affected_rows
-      }
-}
-
-|}]
-end
-
 module Clear_data =
 [%graphql
 {|
   mutation clear  {
 
     delete_blocks_user_commands (where: {}) {
+      affected_rows
+    }
+
+    delete_blocks_fee_transfers (where: {}) {
+      affected_rows
+    }
+    
+    delete_blocks_snark_jobs (where: {}) {
       affected_rows
     }
 
