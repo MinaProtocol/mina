@@ -275,7 +275,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let trust_system = Trust_system.null ()
 
-    let pids = Child_processes.Termination.create_pid_set ()
+    let pids = Child_processes.Termination.create_pid_table ()
 
     let time_controller = Block_time.Controller.basic ~logger
 

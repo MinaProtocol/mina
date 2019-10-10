@@ -394,7 +394,7 @@ module For_tests = struct
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               Verifier.create ~logger
-                ~pids:(Child_processes.Termination.create_pid_set ()) )
+                ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let genesis_transition = Lazy.force External_transition.genesis in
@@ -422,7 +422,7 @@ module For_tests = struct
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               Verifier.create ~logger
-                ~pids:(Child_processes.Termination.create_pid_set ()) )
+                ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let root_dir = "/tmp/coda_unit_test" in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
@@ -474,7 +474,7 @@ module For_tests = struct
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               Verifier.create ~logger
-                ~pids:(Child_processes.Termination.create_pid_set ()) )
+                ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let trust_system =
       Option.value trust_system ~default:(Trust_system.null ())

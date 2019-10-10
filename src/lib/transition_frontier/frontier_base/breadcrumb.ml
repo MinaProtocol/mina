@@ -29,8 +29,8 @@ let build ~logger ~verifier ~trust_system ~parent
         .validate_staged_ledger_diff ~logger ~verifier
           ~parent_staged_ledger:parent.staged_ledger
           ~parent_protocol_state:
-            (External_transition.Validate.protocol_state
-               parent.validate_transition)
+            (External_transition.Validated.protocol_state
+               parent.validated_transition)
           transition_with_validation
       with
       | Ok
@@ -216,7 +216,7 @@ module For_tests = struct
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               Verifier.create ~logger
-                ~pids:(Child_processes.Termination.create_pid_set ()) )
+                ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let gen_slot_advancement = Int.gen_incl 1 10 in
     let%map make_next_consensus_state =
@@ -251,6 +251,10 @@ module For_tests = struct
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~self:largest_account_public_key ~transactions_by_fee:transactions
           ~get_completed_work
+          ~state_body_hash:
+            ( validated_transition parent_breadcrumb
+            |> External_transition.Validated.protocol_state
+            |> Protocol_state.body |> Protocol_state.Body.hash )
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt

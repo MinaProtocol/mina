@@ -193,7 +193,8 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
              ~time_controller ~proposer_transition_reader
              ~verified_transition_writer ~clear_reader ~transition_reader_ref
              ~consensus_local_state ~transition_writer_ref ~frontier_w
-             ~persistent_root ~persistent_frontier ~initial_root_transition
+             ~initialization_finish_signal ~persistent_root
+             ~persistent_frontier ~initial_root_transition
      in
      let ( valid_protocol_state_transition_reader
          , valid_protocol_state_transition_writer ) =

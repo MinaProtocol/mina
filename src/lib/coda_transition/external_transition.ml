@@ -664,7 +664,9 @@ let genesis =
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
     ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
-    }
+    ; state_body_hash=
+        Protocol_state.body (With_hash.data genesis_protocol_state)
+        |> Protocol_state.Body.hash }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =

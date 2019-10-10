@@ -430,7 +430,7 @@ let%test_module "Ledger_catchup tests" =
       in
       Strict_pipe.Writer.write catchup_job_writer
         (parent_hash, [Rose_tree.T (target_transition, [])]) ;
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let%bind verifier = Verifier.create ~logger ~pids in
       run ~logger ~verifier ~trust_system ~network:my_net.network
         ~frontier:my_net.frontier ~catchup_breadcrumbs_writer

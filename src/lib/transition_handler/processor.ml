@@ -317,7 +317,7 @@ let%test_module "Transition_handler.Processor tests" =
            ~frontier_size ~branch_size ()) ~f:(fun (frontier, branch) ->
           assert (
             Thread_safe.block_on_async_exn (fun () ->
-                let pids = Child_processes.Termination.create_pid_set () in
+                let pids = Child_processes.Termination.create_pid_table () in
                 let%bind verifier = Verifier.create ~logger ~pids in
                 let valid_transition_reader, valid_transition_writer =
                   Strict_pipe.create
