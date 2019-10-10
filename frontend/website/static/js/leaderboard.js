@@ -75,7 +75,7 @@ function startLeaderboard() {
 function startChallenges() {
   return gapi.client.request({
     path:
-      "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/Challenges!B:M"
+      "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/Challenges!B:AZ"
   }).then(
     function (response) {
       const {
@@ -89,8 +89,8 @@ function startChallenges() {
       if (latestChallenges.length % 2 !== 0) {
         latestChallenges.pop();
       }
-      for (var i = 0; i < latestChallenges.length; i += 2) {
-        var challenge = {
+      for (let i = 0; i < latestChallenges.length; i += 2) {
+        const challenge = {
           name: latestChallenges[i],
           description: latestChallenges[i + 1]
         }

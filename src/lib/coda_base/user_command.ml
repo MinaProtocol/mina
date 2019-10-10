@@ -14,7 +14,7 @@ module Poly = struct
       module T = struct
         type ('payload, 'pk, 'signature) t =
           {payload: 'payload; sender: 'pk; signature: 'signature}
-        [@@deriving bin_io, compare, sexp, hash, yojson, version]
+        [@@deriving bin_io, compare, sexp, hash, yojson, version, eq]
       end
 
       include T
@@ -26,7 +26,7 @@ module Poly = struct
   type ('payload, 'pk, 'signature) t =
         ('payload, 'pk, 'signature) Stable.Latest.t =
     {payload: 'payload; sender: 'pk; signature: 'signature}
-  [@@deriving sexp, hash, yojson]
+  [@@deriving compare, eq, sexp, hash, yojson]
 end
 
 module Stable = struct

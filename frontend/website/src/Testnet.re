@@ -152,13 +152,19 @@ module Styles = {
 
   let row = style(rowStyles);
 
+  let leaderboardContainer =
+    style([
+      width(`percent(100.)),
+      maxWidth(rem(41.)),
+      margin2(~v=`zero, ~h=`auto),
+    ]);
+
   let leaderboard =
     style([
       background(Style.Colors.hyperlinkAlpha(0.15)),
       width(`percent(100.)),
-      maxWidth(rem(41.)),
       borderRadius(px(3)),
-      padding2(~v=`rem(1.), ~h=`zero),
+      paddingTop(`rem(1.)),
       Style.Typeface.pragmataPro,
       lineHeight(rem(1.5)),
       color(Style.Colors.midnight),
@@ -173,7 +179,7 @@ module Styles = {
         "#leaderboard-loading",
         [
           textAlign(`center),
-          marginTop(rem(2.)),
+          padding2(~v=`rem(2.), ~h=`zero),
           color(Style.Colors.slateAlpha(0.7)),
         ],
       ),
@@ -462,7 +468,7 @@ let make = () => {
         </a>
       </div>
       <div className=Styles.content>
-        <div>
+        <div className=Styles.leaderboardContainer>
           <div id="testnet-leaderboard" className=Styles.leaderboard>
             <div className=Styles.headerRow>
               <span> {React.string("#")} </span>

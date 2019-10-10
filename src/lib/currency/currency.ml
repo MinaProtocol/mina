@@ -30,7 +30,7 @@ module type Basic = sig
     module Latest = V1
   end
 
-  include Bits_intf.S with type t := t
+  include Bits_intf.Convertable_bits with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 
@@ -296,7 +296,8 @@ end = struct
       else Infix.(v land lognot (one lsl i))
   end
 
-  include (Bits.Vector.Make (Vector) : Bits_intf.S with type t := t)
+  include (
+    Bits.Vector.Make (Vector) : Bits_intf.Convertable_bits with type t := t)
 
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
   include Unpacked
