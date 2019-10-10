@@ -2244,8 +2244,31 @@ module Hooks = struct
             Ivar.fill ivar response )
     end
 
-    let implementations ~logger ~local_state =
-      Get_epoch_ledger.(implement_multi (implementation ~logger ~local_state))
+    open Coda_base.Rpc_intf
+
+    type ('query, 'response) rpc =
+      | Get_epoch_ledger
+          : (Get_epoch_ledger.query, Get_epoch_ledger.response) rpc
+
+    type rpc_handler =
+      | Rpc_handler : ('q, 'r) rpc * ('q, 'r) rpc_fn -> rpc_handler
+
+    let implementation_of_rpc : type q r.
+        (q, r) rpc -> (q, r) rpc_implementation = function
+      | Get_epoch_ledger ->
+          (module Get_epoch_ledger)
+
+    let match_handler : type q r.
+        rpc_handler -> (q, r) rpc -> do_:((q, r) rpc_fn -> 'a) -> 'a option =
+     fun handler rpc ~do_ ->
+      match (rpc, handler) with
+      | Get_epoch_ledger, Rpc_handler (Get_epoch_ledger, f) ->
+          Some (do_ f)
+
+    let rpc_handlers ~logger ~local_state =
+      [ Rpc_handler
+          ( Get_epoch_ledger
+          , Get_epoch_ledger.implementation ~logger ~local_state ) ]
   end
 
   let is_genesis time = Epoch.(equal (of_time_exn time) zero)

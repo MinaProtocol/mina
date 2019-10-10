@@ -5,47 +5,6 @@ open Cache_lib
 open Coda_base
 open Coda_transition
 
-module type Catchup_intf = sig
-  type unprocessed_transition_cache
-
-  type transition_frontier
-
-  type transition_frontier_breadcrumb
-
-  type network
-
-  module Catchup_jobs : sig
-    val reader : int Broadcast_pipe.Reader.t
-  end
-
-  val run :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> verifier:Verifier.t
-    -> network:network
-    -> frontier:transition_frontier
-    -> catchup_job_reader:( State_hash.t
-                          * ( External_transition.Initial_validated.t
-                              Envelope.Incoming.t
-                            , State_hash.t )
-                            Cached.t
-                            Rose_tree.t
-                            list )
-                          Strict_pipe.Reader.t
-    -> catchup_breadcrumbs_writer:( ( transition_frontier_breadcrumb
-                                    , State_hash.t )
-                                    Cached.t
-                                    Rose_tree.t
-                                    list
-                                    * [ `Ledger_catchup of unit Ivar.t
-                                      | `Catchup_scheduler ]
-                                  , Strict_pipe.crash Strict_pipe.buffered
-                                  , unit )
-                                  Strict_pipe.Writer.t
-    -> unprocessed_transition_cache:unprocessed_transition_cache
-    -> unit
-end
-
 module type Transition_handler_validator_intf = sig
   type unprocessed_transition_cache
 

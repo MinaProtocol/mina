@@ -277,10 +277,10 @@ let move_root t ~new_root ~garbage =
       Batch.set batch ~key:Root ~data:new_root ;
       List.iter (old_root.hash :: garbage) ~f:(fun node_hash ->
           (* because we are removing entire forks of the tree, there is
-       * no need to have extra logic to any remove arcs to the node
-       * we are deleting since there we are deleting all of a node's
-       * parents as well
-       *)
+           * no need to have extra logic to any remove arcs to the node
+           * we are deleting since there we are deleting all of a node's
+           * parents as well
+           *)
           Batch.remove batch ~key:(Transition node_hash) ;
           Batch.remove batch ~key:(Arcs node_hash) ) ) ;
   old_root.hash

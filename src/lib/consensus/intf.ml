@@ -409,10 +409,10 @@ module type S = sig
     open Data
 
     module Rpcs : sig
-      val implementations :
-           logger:Logger.t
-        -> local_state:Local_state.t
-        -> Host_and_port.t Rpc.Implementation.t list
+      include Rpc_intf.Rpc_interface_intf
+
+      val rpc_handlers :
+        logger:Logger.t -> local_state:Local_state.t -> rpc_handler list
     end
 
     (* Check whether we are in the genesis epoch *)
