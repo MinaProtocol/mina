@@ -1,0 +1,8 @@
+(executable
+  (package archive)
+  (name archive)
+  (public_name archive)
+  (modes native)
+  (libraries core async archive_lib)
+  (preprocess (pps ppx_jane))
+  )

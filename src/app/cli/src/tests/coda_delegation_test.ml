@@ -126,7 +126,7 @@ let main () =
     "Saw $delegatee_proposal_count blocks proposed by delegatee"
     ~metadata:[("delegatee_proposal_count", `Int !delegatee_proposal_count)] ;
   heartbeat_flag := false ;
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async
