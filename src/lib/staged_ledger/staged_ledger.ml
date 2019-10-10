@@ -1279,8 +1279,13 @@ module T = struct
             partitions )
     in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      "Number of proofs ready for purchase: $proof_count"
-      ~metadata:[("proof_count", `Int proof_count)] ;
+      "Create diff info: Number of proofs ready for purchase: $proof_count, \
+       Number of transactions retrieved from the pool: $txn_count, Number of \
+       valid transactions: $valid_txn_count"
+      ~metadata:
+        [ ("proof_count", `Int proof_count)
+        ; ("txn_count", `Int (Sequence.length transactions_by_fee))
+        ; ("valid_txn_count", `Int (Sequence.length valid_on_this_ledger)) ] ;
     trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self

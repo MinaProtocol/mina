@@ -67,7 +67,7 @@ module type S = sig
          Snark_work_lib.Work.Spec.t
        , ledger_proof )
        Snark_work_lib.Work.Result.t
-    -> unit Deferred.t
+    -> unit Deferred.Or_error.t
 end
 
 module type Transition_frontier_intf = sig

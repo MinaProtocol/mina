@@ -43,9 +43,10 @@ let%test_module "network pool test" =
             Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
               (work, priced_proof)
           in
-          don't_wait_for
-            (Mock_snark_pool.apply_and_broadcast network_pool
-               (Envelope.Incoming.local command)) ;
+          let%bind _ =
+            Mock_snark_pool.apply_and_broadcast network_pool
+              (Envelope.Incoming.local command)
+          in
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in

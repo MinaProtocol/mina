@@ -57,7 +57,7 @@ module type S = sig
      and type resource_pool_diff := Resource_pool.Diff.t
      and type config := Resource_pool.Config.t
 
-  val add : t -> User_command.t -> unit Deferred.t
+  val add : t -> User_command.t -> unit Deferred.Or_error.t
 end
 
 (* Functor over user command, base ledger and transaction validator for

@@ -23,16 +23,17 @@ end)
   let broadcasts {read_broadcasts; _} = read_broadcasts
 
   let apply_and_broadcast t pool_diff =
-    match%bind Resource_pool.Diff.apply t.resource_pool pool_diff with
+    match%map Resource_pool.Diff.apply t.resource_pool pool_diff with
     | Ok diff' ->
         Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
           "Broadcasting %s"
           (Resource_pool.Diff.summary diff') ;
-        Linear_pipe.write t.write_broadcasts diff'
+        don't_wait_for (Linear_pipe.write t.write_broadcasts diff') ;
+        Ok ()
     | Error e ->
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
           "Pool diff apply feedback: %s" (Error.to_string_hum e) ;
-        Deferred.unit
+        Error e
 
   let of_resource_pool_and_diffs resource_pool ~logger ~incoming_diffs =
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
@@ -40,7 +41,8 @@ end)
       {resource_pool; logger; read_broadcasts; write_broadcasts}
     in
     Linear_pipe.iter incoming_diffs ~f:(fun diff ->
-        apply_and_broadcast network_pool diff )
+        let%map _res = apply_and_broadcast network_pool diff in
+        () )
     |> ignore ;
     network_pool
 

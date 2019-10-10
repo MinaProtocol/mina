@@ -60,22 +60,27 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   in
   Option.is_some remainder
 
-let schedule_user_command t (txn : User_command.t) account_opt =
-  if not (is_valid_user_command t txn account_opt) then
-    Or_error.error_string "Invalid user command: account balance is too low"
-  else
-    let txn_pool = Coda_lib.transaction_pool t in
-    don't_wait_for (Network_pool.Transaction_pool.add txn_pool txn) ;
-    let logger =
-      Logger.extend
-        (Coda_lib.top_level_logger t)
-        [("coda_command", `String "scheduling a user command")]
-    in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("user_command", User_command.to_yojson txn)]
-      "Added transaction $user_command to transaction pool successfully" ;
-    txn_count := !txn_count + 1 ;
-    Or_error.return ()
+let schedule_user_command t (txn : User_command.t) =
+  let txn_pool = Coda_lib.transaction_pool t in
+  let logger =
+    Logger.extend
+      (Coda_lib.top_level_logger t)
+      [("coda_command", `String "scheduling a user command")]
+  in
+  match%map Network_pool.Transaction_pool.add txn_pool txn with
+  | Ok () ->
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("user_command", User_command.to_yojson txn)]
+        "Added transaction $user_command to transaction pool successfully" ;
+      txn_count := !txn_count + 1 ;
+      Ok ()
+  | Error e ->
+      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [ ("user_command", User_command.to_yojson txn)
+          ; ("error", `String (Error.to_string_hum e)) ]
+        "Error adding transaction $user_command: $error" ;
+      Error e
 
 let get_account t (addr : Public_key.Compressed.t) =
   let open Participating_state.Let_syntax in
@@ -135,14 +140,17 @@ let get_nonce t (addr : Public_key.Compressed.t) =
   account.Account.Poly.nonce
 
 let send_user_command t (txn : User_command.t) =
-  Deferred.return
-  @@
   let public_key = Public_key.compress txn.sender in
-  let open Participating_state.Let_syntax in
-  let%map account_opt = get_account t public_key in
-  let open Or_error.Let_syntax in
-  let%map () = schedule_user_command t txn account_opt in
-  record_payment t txn (Option.value_exn account_opt)
+  match get_account t public_key with
+  | `Bootstrapping ->
+      Deferred.return `Bootstrapping
+  | `Active account_opt -> (
+      match%map schedule_user_command t txn with
+      | Ok () ->
+          let receipt = record_payment t txn (Option.value_exn account_opt) in
+          `Active (Ok receipt)
+      | Error e ->
+          `Active (Error e) )
 
 let get_balance t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
@@ -214,25 +222,28 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let schedule_user_commands t txns =
-  List.map txns ~f:(fun (txn : User_command.t) ->
-      let public_key = Public_key.compress txn.sender in
-      let open Participating_state.Let_syntax in
-      let%map account_opt = get_account t public_key in
-      match schedule_user_command t txn account_opt with
-      | Ok () ->
-          ()
-      | Error err ->
-          let logger =
-            Logger.extend
-              (Coda_lib.top_level_logger t)
-              [("coda_command", `String "scheduling a user command")]
-          in
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:[("error", `String (Error.to_string_hum err))]
-            "Failure in schedule_user_commands: $error. This is not yet \
-             reported to the client, see #1143" )
-  |> Participating_state.sequence
-  |> Participating_state.map ~f:ignore
+  let%map lst =
+    Deferred.List.map txns ~f:(fun (txn : User_command.t) ->
+        (*let public_key = Public_key.compress txn.sender in
+      match get_account t public_key with
+      | Participating_state.`Bootstrapping -> Deferred.return (Participating_state.`Bootstrapping)
+      | `Active account_opt ->*)
+        match%map schedule_user_command t txn with
+        | Ok () ->
+            `Active ()
+        | Error err ->
+            let logger =
+              Logger.extend
+                (Coda_lib.top_level_logger t)
+                [("coda_command", `String "scheduling a user command")]
+            in
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:[("error", `String (Error.to_string_hum err))]
+              "Failure in schedule_user_commands: $error. This is not yet \
+               reported to the client, see #1143" ;
+            `Active () )
+  in
+  Participating_state.sequence lst |> Participating_state.map ~f:ignore
 
 let prove_receipt t ~proving_receipt ~resulting_receipt :
     Payment_proof.t Deferred.Or_error.t =

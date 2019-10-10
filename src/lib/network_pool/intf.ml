@@ -98,7 +98,7 @@ module type Network_pool_base_intf = sig
   val broadcasts : t -> resource_pool_diff Linear_pipe.Reader.t
 
   val apply_and_broadcast :
-    t -> resource_pool_diff Envelope.Incoming.t -> unit Deferred.t
+    t -> resource_pool_diff Envelope.Incoming.t -> unit Deferred.Or_error.t
 end
 
 (** A [Snark_resource_pool_intf] is a superset of a

@@ -67,7 +67,7 @@ module type S = sig
          Snark_work_lib.Work.Spec.t
        , ledger_proof )
        Snark_work_lib.Work.Result.t
-    -> unit Deferred.t
+    -> unit Deferred.Or_error.t
 end
 
 module type Transition_frontier_intf = sig
@@ -636,8 +636,11 @@ let%test_module "random set test" =
                  | None ->
                      failwith "There should have been a proof here" ) ;
                  Deferred.unit ) ;
-          Mock_snark_pool.apply_and_broadcast network_pool
-            (Envelope.Incoming.local command) )
+          let%map _res =
+            Mock_snark_pool.apply_and_broadcast network_pool
+              (Envelope.Incoming.local command)
+          in
+          () )
 
     let%test_unit "when creating a network, the incoming diffs in reader pipe \
                    will automatically get process" =

@@ -195,9 +195,8 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           let%map result = Coda_commands.send_user_command coda tx in
           result |> Participating_state.active_error |> Or_error.join )
     ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-          return
-            ( Coda_commands.schedule_user_commands coda ts
-            |> Participating_state.active_error ) )
+          let%map result = Coda_commands.schedule_user_commands coda ts in
+          Participating_state.active_error result )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
           return
             ( Coda_commands.get_balance coda pk
@@ -314,7 +313,8 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
               | `Transition ->
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
                     total ) ;
-          Coda_lib.add_work coda work ) ]
+          let%map _ = Coda_lib.add_work coda work in
+          () ) ]
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       trace_task "REST server" (fun () ->
