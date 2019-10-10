@@ -2,7 +2,7 @@ open Core
 open Coda_base
 open Coda_state
 open Coda_transition
-open Base_types
+open Graphql_query.Base_types
 
 (** Library used to encode and decode types to a graphql format.
 

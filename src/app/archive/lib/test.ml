@@ -32,7 +32,7 @@ let%test_module "Processor" =
          in
          let%map clear_action =
            Processor.Client.query_or_error
-             (Graphql_query.Clear_data.make ())
+             (Graphql_query.Clear_data.T.make ())
              t.port
          in
          Or_error.all_unit
@@ -114,7 +114,7 @@ let%test_module "Processor" =
               let%bind () = processing_deferred_job in
               let%bind public_keys =
                 Processor.Client.query
-                  (Graphql_query.Public_key.Query.make ())
+                  (Graphql_query.Public_keys.Query.make ())
                   t.port
               in
               let queried_public_keys =

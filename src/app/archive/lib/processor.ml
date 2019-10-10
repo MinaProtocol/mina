@@ -183,7 +183,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
     let%bind fee_transfers_with_time =
       tag_with_first_seen
         ~get_first_seen:(fun hashes ->
-          Graphql_query.Fee_transfer.Query_first_seen.make ~hashes () )
+          Graphql_query.Fee_transfers.Query_first_seen.make ~hashes () )
         ~get_obj:(fun result -> result#fee_transfers)
         fee_transfers block_time port
     in

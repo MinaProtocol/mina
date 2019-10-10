@@ -134,3 +134,7 @@ module Block_time = struct
     @@ Bitstring.to_numeric (module Int64)
     @@ Bitstring.of_yojson value
 end
+
+let deserialize_optional_block_time = Option.map ~f:Bitstring.of_yojson
+
+let decode_optional_block_time = Option.map ~f:Block_time.deserialize
