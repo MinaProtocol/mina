@@ -95,6 +95,8 @@ module Hash = struct
   module T = struct
     type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
 
+    let to_string = Md5.to_hex
+
     let to_yojson t = `String (Md5.to_hex t)
 
     let of_yojson = function
