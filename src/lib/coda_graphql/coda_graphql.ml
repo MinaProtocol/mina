@@ -380,11 +380,6 @@ module Types = struct
               Stringable.Ledger_hash.to_base58_check
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
 
-  let natural_number_desc field_name num_bits =
-    Core.sprintf
-      !"String encoded natural number of the %s (%i bits)"
-      field_name num_bits
-
   let consensus_state =
     let open Consensus.Data.Consensus_state in
     obj "ConsensusState" ~fields:(fun _ ->
