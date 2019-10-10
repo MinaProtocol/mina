@@ -117,7 +117,7 @@ module Api = struct
           in
           t.status.(i) <- `On (`Synced user_cmds_under_inspection) )
 
-  let stop t i =
+  let stop t i ~logger =
     ( match t.status.(i) with
     | `On (`Synced user_cmds_under_inspection) ->
         Hashtbl.iter user_cmds_under_inspection ~f:(fun {passed_root; _} ->
@@ -131,7 +131,7 @@ module Api = struct
       else Deferred.bind (Condition.wait lock) ~f:wait_for_no_rpcs
     in
     let%bind () = wait_for_no_rpcs () in
-    Coda_process.disconnect t.workers.(i)
+    Coda_process.disconnect t.workers.(i) ~logger
 
   let run_user_command t i (sk : Private_key.t) fee ~body =
     let open Deferred.Option.Let_syntax in
@@ -192,8 +192,9 @@ module Api = struct
     ignore @@ new_block t i key ;
     new_user_command t i key
 
-  let teardown t =
-    Deferred.Array.iteri ~how:`Parallel t.workers ~f:(fun i _ -> stop t i)
+  let teardown t ~logger =
+    Deferred.Array.iteri ~how:`Parallel t.workers ~f:(fun i _ ->
+        stop t i ~logger )
 
   let setup_bootstrap_signal t i =
     let signal = Ivar.create () in
@@ -652,7 +653,7 @@ end = struct
     let%bind () = after (Time.Span.of_sec 5.) in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
       node ;
-    let%bind () = Api.stop testnet node in
+    let%bind () = Api.stop testnet node ~logger in
     let%bind () = after duration in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Triggering restart on %d" node ;
@@ -662,7 +663,7 @@ end = struct
     let%bind () = after (Time.Span.of_sec 5.) in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
       node ;
-    let%bind () = Api.stop testnet node in
+    let%bind () = Api.stop testnet node ~logger in
     let signal = Api.setup_catchup_signal testnet node in
     let%bind () = Ivar.read signal in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -673,7 +674,7 @@ end = struct
     let%bind () = after (Time.Span.of_sec 5.) in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
       node ;
-    let%bind () = Api.stop testnet node in
+    let%bind () = Api.stop testnet node ~logger in
     let signal = Api.setup_bootstrap_signal testnet node in
     let%bind () = Ivar.read signal in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__

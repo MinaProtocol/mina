@@ -57,7 +57,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5`
+`docker pull codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50`
 
 * Create local builder image
 
@@ -66,6 +66,10 @@ of the repo.
 * Start developer container
 
 `make containerstart`
+
+* Update OPAM packages
+
+`make USEDOCKER=TRUE update-opam`
 
 * Start a build (go stretch your arms)
 
@@ -144,15 +148,7 @@ install them all in the container. To get all the opam dependencies
 you need, you run `opam switch import src/opam.export`.
 
 Some of our dependencies aren't taken from `opam`, and aren't integrated
-with `dune`, so you need to add them manually:
-
-* `opam pin add src/external/digestif`
-* `opam pin add src/external/async_kernel`
-* `opam pin add src/external/ocaml-sodium`
-* `opam pin add src/external/rpc_parallel`
-* `opam pin add src/external/ocaml-extlib`
-* `opam pin add src/external/coda_base58`
-* `opam pin add src/external/graphql_ppx`
+with `dune`, so you need to add them manually, by running `scripts/pin-external-packages.sh`.
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,

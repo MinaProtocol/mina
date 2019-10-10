@@ -130,6 +130,7 @@ val create_diff :
   -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
+  -> state_body_hash:State_body_hash.t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
 val statement_exn : t -> [`Non_empty of Transaction_snark.Statement.t | `Empty]

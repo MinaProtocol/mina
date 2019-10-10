@@ -27,7 +27,11 @@ let build ~logger ~verifier ~trust_system ~parent
       match%bind
         External_transition.Staged_ledger_validation
         .validate_staged_ledger_diff ~logger ~verifier
-          ~parent_staged_ledger:parent.staged_ledger transition_with_validation
+          ~parent_staged_ledger:parent.staged_ledger
+          ~parent_protocol_state:
+            (External_transition.Validate.protocol_state
+               parent.validate_transition)
+          transition_with_validation
       with
       | Ok
           ( `Just_emitted_a_proof just_emitted_a_proof
@@ -46,7 +50,9 @@ let build ~logger ~verifier ~trust_system ~parent
                 | `Incorrect_target_staged_ledger_hash ->
                     "staged ledger hash"
                 | `Incorrect_target_snarked_ledger_hash ->
-                    "snarked ledger hash" ))
+                    "snarked ledger hash"
+                | `Incorrect_staged_ledger_diff_state_body_hash ->
+                    "state body hash" ))
           in
           let message = "invalid staged ledger diff: incorrect " ^ reasons in
           let%map () =
@@ -131,7 +137,8 @@ let compare breadcrumb1 breadcrumb2 =
 let hash = Fn.compose State_hash.hash state_hash
 
 let name t =
-  Visualization.display_short_sexp (module State_hash) @@ state_hash t
+  Visualization.display_prefix_of_string @@ State_hash.to_base58_check
+  @@ state_hash t
 
 type display =
   { state_hash: string
@@ -144,7 +151,8 @@ let display t =
   let blockchain_state = Blockchain_state.display (blockchain_state t) in
   let consensus_state = consensus_state t in
   let parent =
-    Visualization.display_short_sexp (module State_hash) @@ parent_hash t
+    Visualization.display_prefix_of_string @@ State_hash.to_base58_check
+    @@ parent_hash t
   in
   { state_hash= name t
   ; blockchain_state

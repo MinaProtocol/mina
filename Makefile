@@ -19,6 +19,7 @@ endif
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
+ WRAPAPP = docker exec --workdir /home/opam/app -t $(DOCKERNAME)
  WRAPSRC = docker exec --workdir /home/opam/app/src -t $(DOCKERNAME)
 else
  $(info INFO Not using Docker)
@@ -74,7 +75,16 @@ build: git_hooks reformat-diff
 	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build app/logproc/logproc.exe app/cli/src/coda.exe  --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
+build_archive: git_hooks reformat-diff
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && dune build app/archive/archive.exe --profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
 dev: codabuilder containerstart build
+
+# update OPAM, pinned packages in Docker
+update-opam:
+	$(WRAPAPP) ./scripts/update-opam-in-docker.sh
 
 macos-portable:
 	@rm -rf _build/coda-daemon-macos/
@@ -170,6 +180,10 @@ toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell dock
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
+	make render-circleci
+
+update-rust-deps:
+	./scripts/update-rust-toolchain-references.sh $(GITLONGHASH)
 	make render-circleci
 
 # Local 'codabuilder' docker image (based off docker-toolchain)

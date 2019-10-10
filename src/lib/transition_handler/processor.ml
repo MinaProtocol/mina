@@ -251,6 +251,18 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
                  | `Catchup_scheduler ->
                      () )
              | `Proposed_breadcrumb breadcrumb ->
+                 let transition_time =
+                   Transition_frontier.Breadcrumb.validated_transition
+                     (Cached.peek breadcrumb)
+                   |> External_transition.Validated.protocol_state
+                   |> Protocol_state.blockchain_state
+                   |> Blockchain_state.timestamp |> Block_time.to_time
+                 in
+                 Perf_histograms.add_span
+                   ~name:"accepted_transition_local_latency"
+                   (Core_kernel.Time.diff
+                      Block_time.(now time_controller |> to_time)
+                      transition_time) ;
                  let%map () =
                    match%map
                      add_and_finalize ~logger ~only_if_present:false breadcrumb

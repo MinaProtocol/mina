@@ -6,6 +6,8 @@ open Coda_state
 open Signature_lib
 open Coda_transition
 
+let max_blocklength_observed = ref 0
+
 type validation_error =
   [ `Invalid_time_received of [`Too_early | `Too_late of int64]
   | `Invalid_proof
@@ -141,40 +143,42 @@ module Duplicate_proposal_detector = struct
 end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
-    ~valid_transition_writer =
+    ~valid_transition_writer ~initialization_finish_signal =
   let open Deferred.Let_syntax in
   let duplicate_checker = Duplicate_proposal_detector.create () in
   don't_wait_for
     (Reader.iter transition_reader ~f:(fun network_transition ->
-         let `Transition transition_env, `Time_received time_received =
-           network_transition
-         in
-         let transition_with_hash =
-           Envelope.Incoming.data transition_env
-           |> With_hash.of_data
-                ~hash_data:
-                  (Fn.compose Protocol_state.hash
-                     External_transition.protocol_state)
-         in
-         Duplicate_proposal_detector.check duplicate_checker logger
-           transition_with_hash ;
-         let sender = Envelope.Incoming.sender transition_env in
-         match%bind
-           let open Deferred.Result.Monad_infix in
-           External_transition.(
-             Validation.wrap transition_with_hash
-             |> Fn.compose Deferred.return
-                  (validate_time_received ~time_received)
-             >>= validate_proof ~verifier
-             >>= Fn.compose Deferred.return validate_delta_transition_chain)
-         with
-         | Ok verified_transition ->
-             ( `Transition
-                 (Envelope.Incoming.wrap ~data:verified_transition ~sender)
-             , `Time_received time_received )
-             |> Writer.write valid_transition_writer ;
-             return ()
-         | Error error ->
-             handle_validation_error ~logger ~trust_system ~sender
-               ~state_hash:(With_hash.hash transition_with_hash)
-               error ))
+         if Ivar.is_full initialization_finish_signal then (
+           let `Transition transition_env, `Time_received time_received =
+             network_transition
+           in
+           let transition_with_hash =
+             Envelope.Incoming.data transition_env
+             |> With_hash.of_data
+                  ~hash_data:
+                    (Fn.compose Protocol_state.hash
+                       External_transition.protocol_state)
+           in
+           Duplicate_proposal_detector.check duplicate_checker logger
+             transition_with_hash ;
+           let sender = Envelope.Incoming.sender transition_env in
+           match%bind
+             let open Deferred.Result.Monad_infix in
+             External_transition.(
+               Validation.wrap transition_with_hash
+               |> Fn.compose Deferred.return
+                    (validate_time_received ~time_received)
+               >>= validate_proof ~verifier
+               >>= Fn.compose Deferred.return validate_delta_transition_chain)
+           with
+           | Ok verified_transition ->
+               ( `Transition
+                   (Envelope.Incoming.wrap ~data:verified_transition ~sender)
+               , `Time_received time_received )
+               |> Writer.write valid_transition_writer ;
+               return ()
+           | Error error ->
+               handle_validation_error ~logger ~trust_system ~sender
+                 ~state_hash:(With_hash.hash transition_with_hash)
+                 error )
+         else Deferred.unit ))

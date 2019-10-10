@@ -15,6 +15,11 @@ external showItemInFolder: string => unit = "";
 
 let showItemInFolder = showItemInFolder;
 
+[@bs.module "electron"] [@bs.scope "shell"] [@bs.val]
+external openExternal: string => unit = "";
+
+let openExternal = openExternal;
+
 let isFaker =
   Js.Dict.get(Bindings.ChildProcess.Process.env, "GRAPHQL_BACKEND")
   == Some("faker");
@@ -22,3 +27,4 @@ let isFaker =
 [%bs.raw "window.isFaker = isFaker"];
 [%bs.raw "window.downloadKey = downloadKey"];
 [%bs.raw "window.showItemInFolder = showItemInFolder"];
+[%bs.raw "window.openExternal = openExternal"];

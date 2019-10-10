@@ -585,6 +585,12 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                     let open Deferred.Or_error.Let_syntax in
                     let%bind () =
                       configure net2 ~me ~maddrs:[]
+                        ~external_maddr:
+                          (Multiaddr.of_string
+                             (sprintf "/ip4/%s/tcp/%d"
+                                (Unix.Inet_addr.to_string
+                                   config.addrs_and_ports.external_ip)
+                                config.addrs_and_ports.libp2p_port))
                         ~network_id:"libp2p phase2 test network" ~on_new_peer
                     in
                     let%bind _disc_handler =

@@ -13,6 +13,7 @@ module type Transition_handler_validator_intf = sig
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
+    -> time_controller:Block_time.Controller.t
     -> frontier:transition_frontier
     -> transition_reader:( [ `Transition of
                              External_transition.Initial_validated.t

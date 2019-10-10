@@ -4,6 +4,8 @@ open Module_version
 module Hash = struct
   include Ledger_hash.Stable.V1
 
+  let to_string = Ledger_hash.to_string
+
   let merge = Ledger_hash.merge
 
   let hash_account = Fn.compose Ledger_hash.of_digest Account.digest

@@ -117,13 +117,23 @@ module Types = struct
     end)
   end
 
+  let unsigned_scalar_scalar ~to_string typ_name =
+    scalar typ_name
+      ~doc:
+        (Core.sprintf
+           !"String representing a %s number in base 10"
+           (String.lowercase typ_name))
+      ~coerce:(fun num -> `String (to_string num))
+
   let public_key =
     scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
       ~coerce:(fun key -> `String (Public_key.Compressed.to_base58_check key))
 
+  let uint32 =
+    unsigned_scalar_scalar ~to_string:Unsigned.UInt32.to_string "UInt32"
+
   let uint64 =
-    scalar "UInt64" ~doc:"String representing a uint64 number in base 10"
-      ~coerce:(fun num -> `String (Unsigned.UInt64.to_string num))
+    unsigned_scalar_scalar ~to_string:Unsigned.UInt64.to_string "UInt64"
 
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
@@ -370,6 +380,28 @@ module Types = struct
               Stringable.Ledger_hash.to_base58_check
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
 
+  let consensus_state =
+    let open Consensus.Data.Consensus_state in
+    obj "ConsensusState" ~fields:(fun _ ->
+        [ field "blockchainLength" ~typ:(non_null uint32)
+            ~doc:"Length of the blockchain at this block"
+            ~args:Arg.[]
+            ~resolve:(fun _ (t : Value.t) ->
+              Coda_numbers.Length.to_uint32 @@ blockchain_length t )
+        ; field "slot" ~doc:"Slot in which this block was created"
+            ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ t -> curr_slot t)
+        ; field "epoch" ~doc:"Epoch in which this block was created"
+            ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ t -> curr_epoch t)
+        ; field "totalCurrency"
+            ~doc:"Total currency in circulation at this block"
+            ~typ:(non_null uint64)
+            ~args:Arg.[]
+            ~resolve:(fun _ t -> Amount.to_uint64 @@ total_currency t) ] )
+
   let protocol_state =
     let open Filtered_external_transition.Protocol_state in
     obj "ProtocolState" ~fields:(fun _ ->
@@ -379,10 +411,17 @@ module Types = struct
             ~resolve:(fun _ t ->
               Stringable.State_hash.to_base58_check t.previous_state_hash )
         ; field "blockchainState"
-            ~doc:"State related to the succinct blockchain"
+            ~doc:"State which is agnostic of a particular consensus algorithm"
             ~typ:(non_null blockchain_state)
             ~args:Arg.[]
-            ~resolve:(fun _ t -> t.blockchain_state) ] )
+            ~resolve:(fun _ t -> t.blockchain_state)
+        ; field "consensusState"
+            ~doc:
+              "State specific to the Codaboros Proof of Stake consensus \
+               algorithm"
+            ~typ:(non_null consensus_state)
+            ~args:Arg.[]
+            ~resolve:(fun _ t -> t.consensus_state) ] )
 
   let block :
       ( Coda_lib.t
@@ -1334,9 +1373,9 @@ module Mutations = struct
              kind)
     in
     let%map memo =
-      Option.value_map maybe_memo ~default:(Ok User_command_memo.dummy)
+      Option.value_map maybe_memo ~default:(Ok User_command_memo.empty)
         ~f:(fun memo ->
-          result_of_exn User_command_memo.create_by_digesting_string_exn memo
+          result_of_exn User_command_memo.create_from_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
     (sender_nonce, sender_kp, memo, to_, fee)

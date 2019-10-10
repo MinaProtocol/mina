@@ -717,7 +717,8 @@ let create (config : Config.t)
         match Envelope.Incoming.data envelope with
         | New_state state ->
             Perf_histograms.add_span ~name:"external_transition_latency"
-              (Core.Time.abs_diff (Core.Time.now ())
+              (Core.Time.abs_diff
+                 Block_time.(now config.time_controller |> to_time)
                  ( External_transition.protocol_state state
                  |> Protocol_state.blockchain_state
                  |> Blockchain_state.timestamp |> Block_time.to_time )) ;

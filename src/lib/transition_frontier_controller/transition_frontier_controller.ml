@@ -45,9 +45,9 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       Transition_handler.Unprocessed_transition_cache.register_exn
         unprocessed_transition_cache t
       |> Strict_pipe.Writer.write primary_transition_writer ) ;
-  Transition_handler.Validator.run ~logger ~trust_system ~frontier
-    ~transition_reader:network_transition_reader ~valid_transition_writer
-    ~unprocessed_transition_cache ;
+  Transition_handler.Validator.run ~logger ~trust_system ~time_controller
+    ~frontier ~transition_reader:network_transition_reader
+    ~valid_transition_writer ~unprocessed_transition_cache ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
     ~f:(Strict_pipe.Writer.write primary_transition_writer)
   |> don't_wait_for ;

@@ -49,7 +49,7 @@ let main n () =
   in
   (* settle for a few more min *)
   let%bind () = after (Time.Span.of_min 1.) in
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   let open Command.Let_syntax in
