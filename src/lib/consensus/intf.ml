@@ -179,6 +179,7 @@ module type Snark_transition_intf = sig
          , 'consensus_transition
          , 'sok_digest
          , 'amount
+         , 'state_body_hash
          , 'public_key )
          t
     [@@deriving sexp]
@@ -193,11 +194,12 @@ module type Snark_transition_intf = sig
     , consensus_transition_var
     , Sok_message.Digest.Checked.t
     , Amount.var
+    , State_body_hash.var
     , Public_key.Compressed.var )
     Poly.t
 
   val consensus_transition :
-    (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
+    (_, 'consensus_transition, _, _, _, _) Poly.t -> 'consensus_transition
 end
 
 module type State_hooks_intf = sig

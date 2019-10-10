@@ -172,6 +172,7 @@ val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
 val configure :
      net
   -> me:Keypair.t
+  -> external_maddr:Multiaddr.t
   -> maddrs:Multiaddr.t list
   -> network_id:string
   -> on_new_peer:(discovered_peer -> unit)

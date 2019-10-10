@@ -36,7 +36,7 @@ let sendEcho = (echoKey, fee, {from: userKey, amount}) =>
       ~amount=Int64.sub(amount, fee),
       ~fee,
     )
-    |> Wonka.forEach((. {ReasonUrql.Client.Types.response}) =>
+    |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) =>
          switch (response) {
          | Data(data) =>
            let payment = data##sendPayment##payment;
@@ -48,7 +48,7 @@ let sendEcho = (echoKey, fee, {from: userKey, amount}) =>
              Int64.to_string(amount),
              echoKey,
              userKey,
-             Graphql.combinedErrorToString(e),
+             e.message,
            )
          | NotFound =>
            // Shouldn't happen
@@ -65,7 +65,7 @@ let sendEcho = (echoKey, fee, {from: userKey, amount}) =>
   };
 
 let checkAlreadyProcessed =
-  (. {ReasonUrql.Client.Types.response}) => {
+  (. {ReasonUrql.Client.ClientTypes.response}) => {
     switch (response) {
     | Data(data) =>
       let stateHash = data##newBlock##stateHash;
@@ -90,7 +90,7 @@ let start = (echoKey, fee) => {
     (),
   )
   |> Wonka.filter(checkAlreadyProcessed)
-  |> Wonka.forEach((. {ReasonUrql.Client.Types.response}) =>
+  |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) =>
        switch (response) {
        | Data(d) =>
          d##newBlock##transactions##userCommands
@@ -100,11 +100,7 @@ let start = (echoKey, fee) => {
             )
          |> List.iter(sendEcho(echoKey, fee))
        | Error(e) =>
-         log(
-           `Error,
-           "Error retrieving new block. Message: %s",
-           Graphql.combinedErrorToString(e),
-         )
+         log(`Error, "Error retrieving new block. Message: %s", e.message)
        | NotFound =>
          // Shouldn't happen
          log(`Error, "Got 'NotFound' while listening to blocks")

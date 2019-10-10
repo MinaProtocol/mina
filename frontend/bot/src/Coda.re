@@ -46,16 +46,11 @@ let unlock = (~publicKey, ~password) => {
       ),
     (),
   )
-  |> Wonka.forEach((. {ReasonUrql.Client.Types.response}) =>
+  |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) =>
        switch (response) {
        | Data(_) => log(`Info, "Unlock successful of %s", publicKey)
        | Error(e) =>
-         log(
-           `Error,
-           "Unlock failed for %s, error: %s",
-           publicKey,
-           Graphql.combinedErrorToString(e),
-         )
+         log(`Error, "Unlock failed for %s, error: %s", publicKey, e.message)
        | NotFound => log(`Error, "Got 'NotFound' unlocking %s", publicKey)
        }
      );

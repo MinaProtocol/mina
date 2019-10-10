@@ -59,20 +59,44 @@ jobs:
                   name: Build bot
                   command: cd frontend/bot && yarn run build-ci
 
-    lint:
+    build-archive:
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+              environment: 
+                CODA_DOCKER: true
+                HASURA_PORT: 8080
+            - image: postgres:12
+              environment: 
+                POSTGRES_PASSWORD: codarules
+                POSTGRES_USER: admin
+                POSTGRES_DB: archiver
+            - image: hasura/graphql-engine:v1.0.0-beta.6
+              environment: 
+                HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
+                HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+                HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Build Archive Process
+                  command:  bash -c 'eval `opam config env` && make build_archive'
+            - run: 
+                  name: Configure Hasura
+                  command: ls && ./scripts/archive/make_hasura_configurations.sh     
+    lint:
+        docker:
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
+        steps:
+            - checkout
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
@@ -236,7 +260,7 @@ jobs:
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
@@ -245,14 +269,11 @@ jobs:
                       mkdir -p /tmp/artifacts
                       touch /tmp/artifacts/coda_pvkeys_dummy
             - run:
-                  name: Update OPAM repo
-                  command: opam update
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
             - run:
                   name: Download candidate stable PV keys
                   environment:
@@ -288,19 +309,13 @@ jobs:
     test-unit--test_postake_snarkless_unittest:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
           # Uncomment if you want to try debugging why this install breaks
           # some unit tests:
           # 1. The command_line_tests
@@ -325,26 +340,20 @@ jobs:
                     #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest src/lib --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
     test-unit--dev:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
           # Uncomment if you want to try debugging why this install breaks
           # some unit tests:
           # 1. The command_line_tests
@@ -369,47 +378,35 @@ jobs:
                     #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
     test-unit--dev_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev_medium_curves -j8 && (dune runtest --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev_medium_curves -j8 && (dune runtest src/lib --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 1h
             - store_artifacts:
                 path: core_dumps
     test--fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- fake_hash:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test"'
@@ -418,18 +415,12 @@ jobs:
     test--test_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:full-test"'
@@ -441,18 +432,12 @@ jobs:
     test--test_postake_bootstrap:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-bootstrap-test"'
@@ -464,18 +449,12 @@ jobs:
     test--test_postake_catchup:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
@@ -484,18 +463,12 @@ jobs:
     test--test_postake_delegation:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_delegation:coda-delegation-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation:coda-delegation-test"'
@@ -504,18 +477,12 @@ jobs:
     test--test_postake_five_even_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5"'
@@ -524,18 +491,12 @@ jobs:
     test--test_postake_five_even_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments"'
@@ -544,18 +505,12 @@ jobs:
     test--test_postake_holy_grail:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5"'
@@ -567,18 +522,12 @@ jobs:
     test--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_snarkless:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:full-test"'
@@ -590,18 +539,12 @@ jobs:
     test--test_postake_split:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2"'
@@ -610,18 +553,12 @@ jobs:
     test--test_postake_split_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-peers-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-peers-test"'
@@ -651,18 +588,12 @@ jobs:
     test--test_postake_three_proposers:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_three_proposers:coda-txns-and-restart-non-proposers
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_three_proposers:coda-txns-and-restart-non-proposers"'
@@ -671,18 +602,12 @@ jobs:
     test--test_postake_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_txns:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-shared-state-test"'
@@ -694,18 +619,12 @@ jobs:
     test--test_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_medium_curves:full-test"'
@@ -719,18 +638,12 @@ jobs:
     test--test_postake_snarkless_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:full-test"'
@@ -742,18 +655,12 @@ jobs:
     test--test_postake_split_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-fcf228e223ff23a4f27e090e45720333414cf0b5
+            - image: codaprotocol/coda:toolchain-4af41bdd9146d5434fe86606d49eea0f9bbacc50
         steps:
             - checkout
             - run:
-                  name: Update OPAM repo
-                  command: opam update
-            - run:
-                  name: Update OPAM packages
-                  command: opam switch import src/opam.export
-            - run:
-                  name: Update and pin external submodules
-                  command: ./scripts/pin-external-submodules.sh
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2"'
@@ -771,6 +678,7 @@ workflows:
                     only: develop
             - tracetool
             - build-wallet
+            - build-archive
             - build-macos:
                 # only run AFTER linux build
                 requires:
