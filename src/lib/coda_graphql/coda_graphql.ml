@@ -391,7 +391,7 @@ module Types = struct
         ; field "slot" ~doc:"Slot in which this block was created"
             ~typ:(non_null uint32)
             ~args:Arg.[]
-            ~resolve:(fun _ t -> curr_epoch t)
+            ~resolve:(fun _ t -> curr_slot t)
         ; field "epoch" ~doc:"Epoch in which this block was created"
             ~typ:(non_null uint32)
             ~args:Arg.[]
