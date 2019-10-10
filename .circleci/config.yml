@@ -307,7 +307,7 @@ jobs:
             - store_artifacts:
                   path: /tmp/artifacts
     test-unit--test_postake_snarkless_unittest:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-843753c21e4a97f3d583f1cb251b50135f396d41
         steps:
@@ -345,7 +345,7 @@ jobs:
             - store_artifacts:
                 path: core_dumps
     test-unit--dev:
-        resource_class: large
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-843753c21e4a97f3d583f1cb251b50135f396d41
         steps:
