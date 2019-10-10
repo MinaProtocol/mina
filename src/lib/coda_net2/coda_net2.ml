@@ -1177,10 +1177,12 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~me:kp_a ~maddrs ~network_id ~on_new_peer:Fn.ignore
+        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
+          ~network_id ~on_new_peer:Fn.ignore
         >>| Or_error.ok_exn
       and () =
-        configure b ~me:kp_b ~maddrs ~network_id ~on_new_peer:Fn.ignore
+        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
+          ~network_id ~on_new_peer:Fn.ignore
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a
