@@ -443,6 +443,21 @@ module Blocks_snark_job = struct
       Ast.On_conflict.blocks_snark_jobs
 end
 
+module State_hashes = struct
+  let encode state_hash =
+    object
+      method block = None
+
+      method blocks = None
+
+      method value = Some (State_hash.to_base58_check state_hash)
+    end
+
+  let encode_as_obj_rel_insert_input state_hash =
+    encode_as_obj_rel_insert_input (encode state_hash)
+      Ast.On_conflict.state_hashes
+end
+
 module Blocks = struct
   let serialize
       (With_hash.{hash; data= external_transition} :
@@ -475,16 +490,15 @@ module Blocks = struct
     in
     let open Option in
     object
-      method state_hash = some @@ State_hash.to_base58_check hash
-
-      method creator = None
+      method stateHashByStateHash =
+        some @@ State_hashes.encode_as_obj_rel_insert_input hash
 
       method public_key =
         some @@ Public_key.encode_as_obj_rel_insert_input
         @@ External_transition.proposer external_transition
 
-      method parent_hash =
-        some @@ State_hash.to_base58_check
+      method stateHashByParentHash =
+        some @@ State_hashes.encode_as_obj_rel_insert_input
         @@ External_transition.parent_hash external_transition
 
       method ledger_hash =
@@ -493,8 +507,10 @@ module Blocks = struct
 
       method global_slot = some global_slot
 
+      (* TODO: Need to implement *)
       method ledger_proof_nonce = some 0
 
+      (* TODO: Need to implement *)
       method status = some 0
 
       method block_length =

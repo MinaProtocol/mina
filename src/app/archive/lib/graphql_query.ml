@@ -105,7 +105,9 @@ module Blocks = struct
   {|
     query get_existing ($hashes: [String!]!) {
         blocks(where: {hash: {_in: $hashes}} ) {
-            state_hash @bsDecoder(fn: "State_hash.of_base58_check_exn")
+          stateHashByStateHash {
+            value @bsDecoder(fn: "State_hash.of_base58_check_exn")
+            }
         }
     } 
     |}]
@@ -117,12 +119,13 @@ module Blocks = struct
         $blocks: [blocks_insert_input!]!
         ) {
         insert_blocks(objects: $blocks, on_conflict: {constraint: blocks_state_hash_key, update_columns: state_hash}) {
-            returning {
-                id
-                state_hash @bsDecoder(fn: "State_hash.of_base58_check_exn")
+          returning {
+            stateHashByStateHash {
+              value @bsDecoder(fn: "State_hash.of_base58_check_exn")
             }
+          }
         }
-        }
+      }
     |}]
 end
 

@@ -41,9 +41,13 @@ module On_conflict = struct
     , [`block_id | `snark_job_id] )
     t
 
+  type state_hashes = ([`state_hashes_value_key], [`value]) t
+
   type blocks = ([`blocks_state_hash_key], [`state_hash]) t
 
   let public_keys : public_keys = create `public_keys_value_key [`value]
+
+  let state_hashes : state_hashes = create `state_hashes_value_key [`value]
 
   let user_commands : user_commands =
     create `user_commands_hash_key [`first_seen]
@@ -103,7 +107,6 @@ and fee_transfers_arr_rel_insert_input =
 and receipt_chain_hashesh_insert_input =
   < blocks_user_commands: blocks_user_commands_arr_rel_insert_input option
   ; hash: string option
-  ; parent_id: int option
   ; receipt_chain_hash: receipt_chain_hashes_obj_rel_insert_input option
   ; receipt_chain_hashes: receipt_chain_hashes_arr_rel_insert_input option >
 
@@ -128,6 +131,14 @@ and user_commands_insert_input =
   ; publicKeyByReceiver: public_keys_obj_rel_insert_input option
   ; public_key: public_keys_obj_rel_insert_input option
   ; typ: user_command_type option >
+
+and state_hashes_insert_input =
+  < block: blocks_obj_rel_insert_input option
+  ; blocks: blocks_arr_rel_insert_input option
+  ; value: string option >
+
+and state_hashes_obj_rel_insert_input =
+  (state_hashes_insert_input, On_conflict.state_hashes) Rel_insert_input.t
 
 and user_commands_obj_rel_insert_input =
   (user_commands_insert_input, On_conflict.user_commands) Rel_insert_input.t
@@ -169,11 +180,8 @@ and blocks_fee_transfers_arr_rel_insert_input =
 
 and blocks_user_commands_insert =
   < block: blocks_obj_rel_insert_input option
-  ; block_id: int option
   ; receipt_chain_hash: receipt_chain_hashes_obj_rel_insert_input option
-  ; receipt_chain_hash_id: int option
-  ; user_command: user_commands_obj_rel_insert_input
-  ; user_command_id: int >
+  ; user_command: user_commands_obj_rel_insert_input option >
 
 and blocks_user_commands_arr_rel_insert_input =
   ( blocks_user_commands_insert
@@ -200,9 +208,9 @@ and blocks_insert_input =
   ; global_slot: int option
   ; ledger_hash: string option
   ; ledger_proof_nonce: int option
-  ; parent_hash: string option
   ; public_key: public_keys_obj_rel_insert_input option
-  ; state_hash: string option
+  ; stateHashByParentHash: state_hashes_obj_rel_insert_input option
+  ; stateHashByStateHash: state_hashes_obj_rel_insert_input option
   ; status: int option >
 
 and blocks_obj_rel_insert_input =

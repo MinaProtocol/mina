@@ -127,7 +127,7 @@ def main():
       '--uri', default='/graphql', type=str,
       help='The path to communicate to the graphql server')
 
-    parser.add_argument('--headers', nargs='*')
+    parser.add_argument('--headers', nargs='*', default=[])
 
     args = parser.parse_args()
     headers = [key_value.split(':') for key_value in args.headers]

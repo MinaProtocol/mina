@@ -2,6 +2,8 @@ version: '3.3'
 services:
   configuration:
     image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+    environment:
+      HASURA_PORT: 9000
     network_mode: host
     command: ["/bin/sh", "scripts/archive/make_and_check_hasura_configurations.sh"]
     depends_on:
