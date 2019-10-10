@@ -20,6 +20,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libffi-dev \
     libgmp-dev \
     libgmp3-dev \
+    libjemalloc-dev \
     libprocps-dev \
     libsodium-dev \
     libssl-dev \
