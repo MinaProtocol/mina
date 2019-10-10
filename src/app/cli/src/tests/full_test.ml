@@ -137,36 +137,42 @@ let run_test () : unit Deferred.t =
       let communication_port = 8000 in
       let client_port = 8123 in
       let libp2p_port = 8002 in
+      let gossip_net_params =
+        Gossip_net.Real.Config.
+          { timeout= Time.Span.of_sec 3.
+          ; logger
+          ; target_peer_count= 8
+          ; initial_peers= []
+          ; conf_dir= temp_conf_dir
+          ; chain_id= "bogus chain id for testing"
+          ; addrs_and_ports=
+              { external_ip= Unix.Inet_addr.localhost
+              ; bind_ip= Unix.Inet_addr.localhost
+              ; discovery_port
+              ; communication_port
+              ; libp2p_port
+              ; client_port }
+          ; trust_system
+          ; enable_libp2p= false
+          ; disable_haskell= false
+          ; libp2p_keypair= None
+          ; libp2p_peers= []
+          ; max_concurrent_connections= Some 10 }
+      in
       let net_config =
         Coda_networking.Config.
           { logger
           ; trust_system
           ; time_controller
           ; consensus_local_state
-          ; gossip_net_params=
-              { timeout= Time.Span.of_sec 3.
-              ; logger
-              ; target_peer_count= 8
-              ; initial_peers= []
-              ; conf_dir= temp_conf_dir
-              ; chain_id= "bogus chain id for testing"
-              ; addrs_and_ports=
-                  { external_ip= Unix.Inet_addr.localhost
-                  ; bind_ip= Unix.Inet_addr.localhost
-                  ; discovery_port
-                  ; communication_port
-                  ; libp2p_port
-                  ; client_port }
-              ; trust_system
-              ; enable_libp2p= false
-              ; disable_haskell= false
-              ; libp2p_keypair= None
-              ; libp2p_peers= []
-              ; max_concurrent_connections= Some 10
-              ; log_gossip_heard=
-                  { snark_pool_diff= false
-                  ; transaction_pool_diff= false
-                  ; new_state= false } } }
+          ; log_gossip_heard=
+              { snark_pool_diff= false
+              ; transaction_pool_diff= false
+              ; new_state= false }
+          ; creatable_gossip_net=
+              Coda_networking.Gossip_net.(
+                Any.Creatable ((module Real), Real.create gossip_net_params))
+          }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
@@ -180,7 +186,7 @@ let run_test () : unit Deferred.t =
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
-             ~conf_dir:temp_conf_dir
+             ~conf_dir:temp_conf_dir ~gossip_net_params
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_propose_keypairs:(Keypair.Set.singleton keypair)

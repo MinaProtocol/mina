@@ -1,4 +1,7 @@
 include Intf
+module Any = Any
+module Real = Real
+module Fake = Fake
 
 module type S = sig
   module Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf

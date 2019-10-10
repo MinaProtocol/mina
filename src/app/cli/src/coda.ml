@@ -460,7 +460,7 @@ let daemon logger =
              ~default:false log_transaction_pool_diff
          in
          let log_gossip_heard =
-           { Coda_networking.Gossip_net.Config.snark_pool_diff=
+           { Coda_networking.Config.snark_pool_diff=
                log_received_snark_pool_diff
            ; transaction_pool_diff= log_transaction_pool_diff
            ; new_state= log_received_blocks }
@@ -577,27 +577,33 @@ let daemon logger =
          in
          trace_database_initialization "consensus local state" __LOC__
            trust_dir ;
+         let gossip_net_params =
+           Gossip_net.Real.Config.
+             { timeout= Time.Span.of_sec 3.
+             ; logger
+             ; target_peer_count= 8
+             ; conf_dir
+             ; chain_id= Lazy.force chain_id
+             ; initial_peers= initial_peers_cleaned
+             ; addrs_and_ports
+             ; trust_system
+             ; enable_libp2p
+             ; disable_haskell
+             ; libp2p_keypair
+             ; libp2p_peers=
+                 List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+             ; max_concurrent_connections }
+         in
          let net_config =
            { Coda_networking.Config.logger
            ; trust_system
            ; time_controller
            ; consensus_local_state
-           ; gossip_net_params=
-               { timeout= Time.Span.of_sec 3.
-               ; logger
-               ; target_peer_count= 8
-               ; conf_dir
-               ; chain_id= Lazy.force chain_id
-               ; initial_peers= initial_peers_cleaned
-               ; addrs_and_ports
-               ; trust_system
-               ; log_gossip_heard
-               ; enable_libp2p
-               ; disable_haskell
-               ; libp2p_keypair
-               ; libp2p_peers=
-                   List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
-               ; max_concurrent_connections } }
+           ; log_gossip_heard
+           ; creatable_gossip_net=
+               Coda_networking.Gossip_net.(
+                 Any.Creatable ((module Real), Real.create gossip_net_params))
+           }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
@@ -677,7 +683,7 @@ let daemon logger =
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~net_config
+                ~net_config ~gossip_net_params
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)

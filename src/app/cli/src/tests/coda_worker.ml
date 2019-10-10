@@ -459,29 +459,35 @@ module T = struct
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_propose_keys
           in
+          let gossip_net_params =
+            Gossip_net.Real.Config.
+              { timeout= Time.Span.of_sec 3.
+              ; target_peer_count= 8
+              ; conf_dir
+              ; initial_peers= peers
+              ; chain_id= "bogus chain id for testing"
+              ; addrs_and_ports
+              ; logger
+              ; trust_system
+              ; enable_libp2p= false
+              ; disable_haskell= false
+              ; libp2p_keypair= None
+              ; libp2p_peers= []
+              ; max_concurrent_connections }
+          in
           let net_config =
             { Coda_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
-            ; gossip_net_params=
-                { Coda_networking.Gossip_net.Config.timeout= Time.Span.of_sec 3.
-                ; target_peer_count= 8
-                ; conf_dir
-                ; initial_peers= peers
-                ; chain_id= "bogus chain id for testing"
-                ; addrs_and_ports
-                ; logger
-                ; trust_system
-                ; enable_libp2p= false
-                ; disable_haskell= false
-                ; libp2p_keypair= None
-                ; libp2p_peers= []
-                ; max_concurrent_connections
-                ; log_gossip_heard=
-                    { snark_pool_diff= false
-                    ; transaction_pool_diff= false
-                    ; new_state= false } } }
+            ; log_gossip_heard=
+                { snark_pool_diff= false
+                ; transaction_pool_diff= false
+                ; new_state= false }
+            ; creatable_gossip_net=
+                Coda_networking.Gossip_net.(
+                  Any.Creatable ((module Real), Real.create gossip_net_params))
+            }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
@@ -490,7 +496,7 @@ module T = struct
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~net_config
+                 ~net_config ~gossip_net_params
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)

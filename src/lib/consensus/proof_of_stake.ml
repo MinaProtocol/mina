@@ -2253,6 +2253,11 @@ module Hooks = struct
     type rpc_handler =
       | Rpc_handler : ('q, 'r) rpc * ('q, 'r) rpc_fn -> rpc_handler
 
+    type query =
+      { query:
+          'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
+          -> 'r Deferred.Or_error.t }
+
     let implementation_of_rpc : type q r.
         (q, r) rpc -> (q, r) rpc_implementation = function
       | Get_epoch_ledger ->
@@ -2371,7 +2376,7 @@ module Hooks = struct
           Non_empty_list.of_list_opt ls )
 
   let sync_local_state ~logger ~trust_system ~local_state ~random_peers
-      ~(query_peer : Network_peer.query_peer) requested_syncs =
+      ~(query_peer : Rpcs.query) requested_syncs =
     let open Local_state in
     let open Snapshot in
     let open Deferred.Let_syntax in
@@ -2403,7 +2408,7 @@ module Hooks = struct
       else
         Deferred.List.exists (random_peers 3) ~f:(fun peer ->
             match%bind
-              query_peer.query peer Rpcs.Get_epoch_ledger.dispatch_multi
+              query_peer.query peer Rpcs.Get_epoch_ledger
                 (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
             with
             | Ok (Ok snapshot_ledger) ->

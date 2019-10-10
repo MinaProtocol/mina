@@ -74,7 +74,7 @@ let peek_frontier frontier_broadcast_pipe =
 
 let client_port t =
   let {Kademlia.Node_addrs_and_ports.client_port; _} =
-    t.config.net_config.gossip_net_params.addrs_and_ports
+    t.config.gossip_net_params.addrs_and_ports
   in
   client_port
 
@@ -137,8 +137,7 @@ module Snark_worker = struct
           ~module_:__MODULE__ ~location:__LOC__ ;
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
-            t.config.net_config.gossip_net_params.addrs_and_ports.client_port
-            kill_ivar
+            t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
         in
         Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
@@ -747,10 +746,9 @@ let create (config : Config.t) =
           don't_wait_for
             (Linear_pipe.iter (Coda_networking.ban_notification_reader net)
                ~f:(fun notification ->
-                 let peer = Coda_networking.banned_peer notification in
-                 let banned_until =
-                   Coda_networking.banned_until notification
-                 in
+                 let open Gossip_net in
+                 let peer = notification.banned_peer in
+                 let banned_until = notification.banned_until in
                  (* if RPC call fails, will be logged in gossip net code *)
                  let%map _ =
                    Coda_networking.ban_notify net peer banned_until
@@ -814,9 +812,11 @@ let create (config : Config.t) =
                 ( Var.watch @@ of_broadcast_pipe
                 @@ Coda_networking.online_status net )
               ~first_connection_incr:
-                (Var.watch @@ of_ivar @@ Coda_networking.first_connection net)
+                ( Var.watch @@ of_deferred
+                @@ Coda_networking.on_first_connect net ~f:Fn.id )
               ~first_message_incr:
-                (Var.watch @@ of_ivar @@ Coda_networking.first_message net)
+                ( Var.watch @@ of_deferred
+                @@ Coda_networking.on_first_received_message net ~f:Fn.id )
           in
           Deferred.return
             { config
