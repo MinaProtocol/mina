@@ -3,6 +3,7 @@ open Snark_bits
 open Fold_lib
 open Module_version
 include Intf
+module Intf = Intf
 
 let zero_checked =
   Snarky_integer.Integer.constant ~m:Snark_params.Tick.m Bigint.zero
