@@ -386,7 +386,17 @@ let daemon logger =
                 ; ("heap_chunks", `Int stat.heap_chunks)
                 ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
                 ; ("live_size", `Int (stat.live_words * bytes_per_word))
-                ; ("live_blocks", `Int stat.live_blocks) ]
+                ; ("live_blocks", `Int stat.live_blocks) ] ;
+            let {Jemalloc.active; resident; allocated; mapped} =
+              Jemalloc.get_memory_stats ()
+            in
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              "Jemalloc memory statistics"
+              ~metadata:
+                [ ("active", `Int active)
+                ; ("resident", `Int resident)
+                ; ("allocated", `Int allocated)
+                ; ("mapped", `Int mapped) ]
           in
           let rec loop () =
             log_stats "before major gc" ;
