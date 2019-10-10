@@ -20,11 +20,7 @@ module Stable = struct
     include Codable.Make_base58_check (T)
     include Registration.Make_latest_version (T)
 
-    let gen =
-      let open Quickcheck.Let_syntax in
-      let%bind field = Field.gen in
-      let%map scalar = Inner_curve.Scalar.gen in
-      (field, scalar)
+    let gen = Quickcheck.Generator.tuple2 Field.gen Inner_curve.Scalar.gen
   end
 
   module Latest = V1
