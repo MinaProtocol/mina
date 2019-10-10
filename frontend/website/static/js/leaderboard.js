@@ -83,7 +83,6 @@ function startChallenges() {
           values,
         }
       } = response;
-      console.log(values);
       const parentElem = document.getElementById("challenges-list");
       const latestChallenges = values[values.length - 1];
       // Pop extra challenge name if description is missing
