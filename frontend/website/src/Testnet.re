@@ -291,18 +291,41 @@ module Styles = {
 
   let buttonRow =
     style([
-      display(`flex),
-      flexWrap(`wrap),
+      display(`grid),
+      gridTemplateColumns([`rem(17.9)]),
+      gridRowGap(rem(0.6)),
+      gridTemplateRows([`repeat((`num(4), `rem(6.0)))]),
+      justifyContent(`center),
       marginLeft(`auto),
       marginRight(`auto),
       marginTop(rem(3.)),
       marginBottom(rem(3.)),
-      justifyContent(`spaceBetween),
-      alignItems(`center),
-      flexDirection(`column),
-      maxWidth(`rem(44.)),
-      media("(min-width: 70rem)", [maxWidth(`percent(100.))]),
-      media(Style.MediaQuery.notMobile, [flexDirection(`row)]),
+      media(
+        "(min-width: 45rem)",
+        [
+          gridTemplateColumns([`repeat((`num(2), `fr(1.0)))]),
+          gridTemplateRows([`repeat((`num(2), `rem(6.0)))]),
+          gridRowGap(rem(1.5)),
+          gridColumnGap(rem(1.5)),
+        ],
+      ),
+      media(
+        "(min-width: 65rem)",
+        [
+          gridTemplateColumns([`repeat((`num(2), `fr(1.0)))]),
+          gridTemplateRows([`repeat((`num(2), `rem(5.4)))]),
+          gridRowGap(rem(1.5)),
+          gridColumnGap(rem(1.5)),
+        ],
+      ),
+      media(
+        "(min-width: 70rem)",
+        [
+          gridTemplateColumns([`repeat((`num(4), `fr(1.0)))]),
+          gridTemplateRows([`repeat((`num(1), `rem(7.5)))]),
+          gridColumnGap(rem(1.4)),
+        ],
+      ),
     ]);
 
   let heroRow =
@@ -321,6 +344,7 @@ module Styles = {
     style([
       height(`rem(16.875)),
       marginLeft(`rem(1.875)),
+      marginRight(`rem(1.875)),
       fontSize(`rem(0.625)),
       media(
         Style.MediaQuery.notMobile,
@@ -446,9 +470,9 @@ let make = () => {
         />
         <ActionButton
           icon={React.string({js| 📬 |js})}
-          heading={React.string({js| Testnet Newsletter |js})}
+          heading={React.string({js| Newsletter |js})}
           text={React.string(
-            "Sign up for the newsletter to get weekly updates",
+            "Sign up for the Testnet newsletter to get weekly updates",
           )}
           href="https://docs.google.com/forms/d/e/1FAIpQLScQRGW0-xGattPmr5oT-yRb9aCkPE6yIKXSfw1LRmNx1oh6AA/viewform"
         />
