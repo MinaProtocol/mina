@@ -147,3 +147,20 @@ query nonce($public_key: PublicKey) {
   }
 }
 |}]
+
+module Pooled_user_commands =
+[%graphql
+{|
+query user_commands($public_key: PublicKey) {
+  pooledUserCommands(publicKey: $public_key) {
+    id
+    isDelegation
+    nonce
+    from
+    to
+    amount
+    fee
+    memo
+  }
+}
+|}]

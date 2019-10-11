@@ -71,7 +71,7 @@ end
 module Make (Config : Config_intf) = struct
   let local_uri port = make_local_uri port Config.address
 
-  let query_or_error query_obj port =
+  let query_raw query_obj port =
     let variables_string =
       Config.preprocess_variables_string
       @@ Yojson.Basic.to_string query_obj#variables
@@ -118,17 +118,30 @@ module Make (Config : Config_intf) = struct
     | error, `Null ->
         Error (`Graphql_error (graphql_error_to_string error))
     | _, data ->
-        Result.try_with (fun () -> query_obj#parse data)
-        |> Result.map_error ~f:(fun e ->
-               `Graphql_error
-                 (Printf.sprintf
-                    "Problem parsing graphql response\nError message: %s"
-                    (Exn.to_string e)) ) )
+        Ok data )
     |> Deferred.return
 
+  let query_raw_exn query_obj port =
+    match%bind query_raw query_obj port with
+    | Ok r ->
+        Deferred.return r
+    | Error error ->
+        Connection_error.ok_exn error
+
   let query query_obj port =
+    let open Deferred.Result.Let_syntax in
+    let%bind raw_json = query_raw query_obj port in
+    Result.try_with (fun () -> query_obj#parse raw_json)
+    |> Result.map_error ~f:(fun e ->
+           `Graphql_error
+             (Printf.sprintf
+                "Problem parsing graphql response\nError message: %s"
+                (Exn.to_string e)) )
+    |> Deferred.return
+
+  let query_exn query_obj port =
     let open Deferred.Let_syntax in
-    match%bind query_or_error query_obj port with
+    match%bind query query_obj port with
     | Ok r ->
         Deferred.return r
     | Error error ->

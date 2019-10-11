@@ -10,11 +10,8 @@ module Client = Graphql_client_lib.Make (struct
   let headers = String.Map.empty
 end)
 
-let query_or_error = Client.query_or_error
-
-let query query_obj port =
-  let open Deferred.Let_syntax in
-  match%bind query_or_error query_obj port with
+let run_exn ~f query_obj port =
+  match%bind f query_obj port with
   | Ok r ->
       Deferred.return r
   | Error (`Failed_request e) ->
@@ -36,6 +33,14 @@ let query query_obj port =
   | Error (`Graphql_error e) ->
       eprintf "❌ Error: %s\n" e ;
       exit 17
+
+let query = Client.query
+
+let query_raw = Client.query_raw
+
+let query_exn query_obj port = run_exn ~f:query query_obj port
+
+let query_raw_exn query_obj port = run_exn ~f:query_raw query_obj port
 
 module Encoders = struct
   let optional = Option.value_map ~default:`Null
