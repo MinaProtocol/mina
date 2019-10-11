@@ -232,8 +232,8 @@ module Styles = {
   let buttonRow =
     style([
       display(`grid),
-      gridTemplateColumns([`rem(17.9)]),
-      gridRowGap(rem(0.6)),
+      gridTemplateColumns([`fr(1.0)]),
+      gridRowGap(rem(1.5)),
       gridTemplateRows([`repeat((`num(4), `rem(6.0)))]),
       justifyContent(`center),
       marginLeft(`auto),
@@ -268,6 +268,8 @@ module Styles = {
       ),
     ]);
 
+  let discordIcon = style([marginTop(`px(-4))]);
+  let formIcon = style([marginTop(`px(3))]);
   let heroRow =
     style([
       display(`flex),
@@ -395,7 +397,12 @@ let make = () => {
           href="/docs/getting-started/"
         />
         <ActionButton
-          icon={<img src={Links.Cdn.url("/static/img/discord.svg")} />}
+          icon={
+            <img
+              className=Styles.discordIcon
+              src={Links.Cdn.url("/static/img/discord.svg")}
+            />
+          }
           heading={React.string({js| Discord |js})}
           text={React.string(
             "Connect with the community and participate in weekly challenges",

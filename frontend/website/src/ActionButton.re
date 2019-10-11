@@ -7,8 +7,8 @@ module Styles = {
       border(`px(1), `solid, Style.Colors.hyperlink),
       borderRadius(`px(6)),
       textDecoration(`none),
-      padding(`rem(1.1)),
-      paddingTop(`rem(0.6)),
+      padding(`rem(1.0)),
+      paddingTop(`rem(0.7)),
       minWidth(`rem(15.3)),
       hover([
         opacity(0.9),
@@ -23,7 +23,7 @@ module Styles = {
   let ctaContent =
     style([display(`flex), selector("p", [fontSize(`px(36))])]);
 
-  let ctaText = style([marginLeft(`rem(0.625))]);
+  let ctaText = style([marginLeft(`px(13))]);
 
   let ctaHeading =
     style([
@@ -44,7 +44,7 @@ module Styles = {
       fontSize(`rem(0.82)),
       color(Style.Colors.teal),
       textAlign(`left),
-      marginTop(`rem(0.3125)),
+      marginTop(`rem(0.1)),
       media(
         "(min-width: 70rem) and (max-width: 83.9375rem)",
         [fontSize(`px(13))],
