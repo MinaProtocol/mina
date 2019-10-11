@@ -20,17 +20,7 @@ module Worker_state = struct
 
   type t = (module S) Deferred.t
 
-  let create {conf_dir; logger} : t Deferred.t =
-    if Option.is_some conf_dir then (
-      let max_size = 256 * 1024 * 512 in
-      Logger.Consumer_registry.register ~id:"verifier"
-        ~processor:(Logger.Processor.raw ())
-        ~transport:
-          (Logger.Transport.File_system.dumb_logrotate
-             ~directory:(Option.value_exn conf_dir)
-             ~log_name:"coda-verifier.log" ~max_size) ;
-      Logger.info logger ~id:"verifier" ~module_:__MODULE__ ~location:__LOC__
-        "Verifier started" ) ;
+  let create {logger; _} : t Deferred.t =
     Deferred.return
       (let%map bc_vk = Snark_keys.blockchain_verification ()
        and tx_vk = Snark_keys.transaction_verification () in
@@ -52,8 +42,7 @@ module Worker_state = struct
            | Ok result ->
                result
            | Error e ->
-               Logger.error logger ~id:"verifier" ~module_:__MODULE__
-                 ~location:__LOC__
+               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                  ~metadata:[("error", `String (Error.to_string_hum e))]
                  "Verifier threw an exception while verifying blockchain snark" ;
                failwith "Verifier crashed"
@@ -65,8 +54,7 @@ module Worker_state = struct
            | Ok result ->
                result
            | Error e ->
-               Logger.error logger ~id:"verifier" ~module_:__MODULE__
-                 ~location:__LOC__
+               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                  ~metadata:[("error", `String (Error.to_string_hum e))]
                  "Verifier threw an exception while verifying transaction snark" ;
                failwith "Verifier crashed"
@@ -133,6 +121,16 @@ module Worker = struct
               , verify_transaction_snark ) }
 
       let init_worker_state Worker_state.{conf_dir; logger} =
+        ( if Option.is_some conf_dir then
+          let max_size = 256 * 1024 * 512 in
+          Logger.Consumer_registry.register ~id:"default"
+            ~processor:(Logger.Processor.raw ())
+            ~transport:
+              (Logger.Transport.File_system.dumb_logrotate
+                 ~directory:(Option.value_exn conf_dir)
+                 ~log_name:"coda-verifier.log" ~max_size) ) ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Verifier started" ;
         Worker_state.create {conf_dir; logger}
 
       let init_connection_state ~connection:_ ~worker_state:_ () =

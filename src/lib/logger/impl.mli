@@ -88,15 +88,17 @@ type 'a log_function =
   -> module_:string
   -> location:string
   -> ?metadata:(string, Yojson.Safe.json) List.Assoc.t
-  -> ?id:string
   -> ('a, unit, string, unit) format4
   -> 'a
 
-val create : ?metadata:(string, Yojson.Safe.json) List.Assoc.t -> unit -> t
+val create :
+  ?metadata:(string, Yojson.Safe.json) List.Assoc.t -> ?id:string -> unit -> t
 
 val null : unit -> t
 
 val extend : t -> (string, Yojson.Safe.json) List.Assoc.t -> t
+
+val change_id : t -> id:string -> t
 
 val trace : _ log_function
 

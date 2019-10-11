@@ -39,15 +39,7 @@ module Worker_state = struct
 
   type t = (module S) Deferred.t
 
-  let create {conf_dir; logger} : t Deferred.t =
-    let max_size = 256 * 1024 * 512 in
-    Logger.Consumer_registry.register ~id:"prover"
-      ~processor:(Logger.Processor.raw ())
-      ~transport:
-        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-           ~log_name:"coda-prover.log" ~max_size) ;
-    Logger.info logger ~id:"prover" ~module_:__MODULE__ ~location:__LOC__
-      "Prover started" ;
+  let create {logger; _} : t Deferred.t =
     Deferred.return
       (let%map (module Keys) = Keys_lib.Keys.create () in
        let module Transaction_snark =
@@ -106,8 +98,7 @@ module Worker_state = struct
                  | Ok result ->
                      Ok result
                  | Error e ->
-                     Logger.error logger ~id:"prover" ~module_:__MODULE__
-                       ~location:__LOC__
+                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                        ~metadata:[("error", `String (Error.to_string_hum e))]
                        "Prover threw an error while extending block: $error" ;
                      Error e
@@ -159,8 +150,7 @@ module Worker_state = struct
                  | Ok result ->
                      Ok result
                  | Error e ->
-                     Logger.error logger ~id:"prover" ~module_:__MODULE__
-                       ~location:__LOC__
+                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                        ~metadata:[("error", `String (Error.to_string_hum e))]
                        "Prover threw an error while extending block: $error" ;
                      Error e
@@ -251,6 +241,14 @@ module Worker = struct
         ; verify_blockchain= f verify_blockchain }
 
       let init_worker_state Worker_state.{conf_dir; logger} =
+        let max_size = 256 * 1024 * 512 in
+        Logger.Consumer_registry.register ~id:"default"
+          ~processor:(Logger.Processor.raw ())
+          ~transport:
+            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+               ~log_name:"coda-prover.log" ~max_size) ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Prover started" ;
         Worker_state.create {conf_dir; logger}
 
       let init_connection_state ~connection:_ ~worker_state:_ () =

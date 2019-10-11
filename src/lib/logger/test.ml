@@ -3,7 +3,7 @@ module Logger = Impl
 
 let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
   let max_size = 1024 * 2 (* 2KB *) in
-  let logger = Logger.create () in
+  let logger = Logger.create () ~id:"test" in
   let directory = Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
   let log_name = "coda.log" in
   let exists name =
@@ -13,7 +13,7 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
     Int64.to_int_exn (Unix.stat (Filename.concat directory name)).st_size
   in
   let rec run_test ~last_size ~rotations ~rotation_expected =
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ ~id:"test" "test" ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "test" ;
     let curr_size = get_size "coda.log" in
     if curr_size < last_size then (
       assert rotation_expected ;

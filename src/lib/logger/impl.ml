@@ -261,16 +261,18 @@ module Consumer_registry = struct
             () )
 end
 
-type t = {null: bool; metadata: Metadata.t} [@@deriving bin_io]
+type t = {null: bool; metadata: Metadata.t; id: string} [@@deriving bin_io]
 
-let create ?(metadata = []) () =
+let create ?(metadata = []) ?(id = "default") () =
   let pid = lazy (Unix.getpid () |> Pid.to_int) in
   let metadata' = ("pid", `Int (Lazy.force pid)) :: metadata in
-  {null= false; metadata= Metadata.extend Metadata.empty metadata'}
+  {null= false; metadata= Metadata.extend Metadata.empty metadata'; id}
 
-let null () = {null= true; metadata= Metadata.empty}
+let null () = {null= true; metadata= Metadata.empty; id= "default"}
 
 let extend t metadata = {t with metadata= Metadata.extend t.metadata metadata}
+
+let change_id {null; metadata; id= _} ~id = {null; metadata; id}
 
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   { Message.timestamp= Time.now ()
@@ -279,7 +281,7 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   ; message
   ; metadata= Metadata.extend t.metadata metadata }
 
-let log t ~level ~module_ ~location ?(metadata = []) ?(id = "default") fmt =
+let log ({id; _} as t) ~level ~module_ ~location ?(metadata = []) fmt =
   let f message =
     if t.null then ()
     else
@@ -297,7 +299,6 @@ type 'a log_function =
   -> module_:string
   -> location:string
   -> ?metadata:(string, Yojson.Safe.json) List.Assoc.t
-  -> ?id:string
   -> ('a, unit, string, unit) format4
   -> 'a
 
