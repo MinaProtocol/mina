@@ -111,7 +111,7 @@ module Version = {
   };
 };
 
-module WalletSettingsItem = {
+module AccountSettingsItem = {
   [@react.component]
   let make = (~publicKey) => {
     let keyStr = PublicKey.toString(publicKey);
@@ -155,7 +155,7 @@ let make = () => {
     <Spacer height=1. />
     <NetworkDropdown />
     <Spacer height=1. />
-    <div className=Styles.label> {React.string("Wallet Settings")} </div>
+    <div className=Styles.label> {React.string("Account Settings")} </div>
     <Spacer height=0.5 />
     <div className=Styles.walletItemContainer>
       <WalletsQuery>
@@ -166,7 +166,7 @@ let make = () => {
            | Data(data) =>
              data##ownedWallets
              |> Array.map(~f=w =>
-                  <WalletSettingsItem
+                  <AccountSettingsItem
                     key={PublicKey.toString(w##publicKey)}
                     publicKey=w##publicKey
                   />
