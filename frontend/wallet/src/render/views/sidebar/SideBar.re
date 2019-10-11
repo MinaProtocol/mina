@@ -39,7 +39,7 @@ let make = () => {
     <WalletList />
     <div className=Styles.footer>
       <a className=Styles.addWalletLink onClick={_ => setModalOpen(_ => true)}>
-        {React.string("+ New account")}
+        {React.string("+ New Account")}
       </a>
     </div>
     {switch (modalOpen) {
