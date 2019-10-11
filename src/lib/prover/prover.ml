@@ -35,11 +35,19 @@ module Worker_state = struct
     val verify : Protocol_state.Value.t -> Proof.t -> bool
   end
 
-  type init_arg = unit [@@deriving bin_io]
+  type init_arg = {conf_dir: string; logger: Logger.t} [@@deriving bin_io]
 
   type t = (module S) Deferred.t
 
-  let create () : t Deferred.t =
+  let create {conf_dir; logger} : t Deferred.t =
+    let max_size = 256 * 1024 * 512 in
+    Logger.Consumer_registry.register ~id:"prover"
+      ~processor:(Logger.Processor.raw ())
+      ~transport:
+        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+           ~log_name:"coda-prover.log" ~max_size) ;
+    Logger.info logger ~id:"prover" ~module_:__MODULE__ ~location:__LOC__
+      "Prover started" ;
     Deferred.return
       (let%map (module Keys) = Keys_lib.Keys.create () in
        let module Transaction_snark =
@@ -57,8 +65,6 @@ module Worker_state = struct
                module Blockchain_state = Blockchain_snark_state
                module State =
                  Blockchain_snark_state.Make_update (Transaction_snark)
-
-               let logger = Logger.create ()
 
                let wrap hash proof =
                  let module Wrap = Keys.Wrap in
@@ -121,8 +127,6 @@ module Worker_state = struct
                module Blockchain_state = Blockchain_snark_state
                module State =
                  Blockchain_snark_state.Make_update (Transaction_snark)
-
-               let logger = Logger.create ()
 
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
@@ -246,9 +250,11 @@ module Worker = struct
         ; extend_blockchain= f extend_blockchain
         ; verify_blockchain= f verify_blockchain }
 
-      let init_worker_state () = Worker_state.create ()
+      let init_worker_state Worker_state.{conf_dir; logger} =
+        Worker_state.create {conf_dir; logger}
 
-      let init_connection_state ~connection:_ ~worker_state:_ = return
+      let init_connection_state ~connection:_ ~worker_state:_ () =
+        Deferred.unit
     end
   end
 
@@ -257,7 +263,7 @@ end
 
 type t = {connection: Worker.Connection.t; process: Process.t}
 
-let create ~logger ~pids =
+let create ~logger ~pids ~conf_dir =
   let on_failure err =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Prover process failed with error $err"
@@ -267,7 +273,8 @@ let create ~logger ~pids =
   let%map connection, process =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:() ()
+      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
+      {conf_dir; logger}
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Daemon started process of kind $process_kind with pid $prover_pid"
@@ -282,22 +289,22 @@ let create ~logger ~pids =
        (Process.stdout process |> Reader.pipe)
        ~f:(fun stdout ->
          return
-         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              ~id:"prover" "%s" stdout ) ;
+         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+              stdout ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
-         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              ~id:"prover" "%s" stderr ) ;
+         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+              stderr ) ;
   {connection; process}
 
 let initialized {connection; _} =
   Worker.Connection.run connection ~f:Worker.functions.initialized ~arg:()
 
-let extend_blockchain {connection; _} chain next_state block prover_state
-    pending_coinbase =
+let extend_blockchain {connection; _} ~logger chain next_state block
+    prover_state pending_coinbase =
   let input =
     { Extend_blockchain_input.chain
     ; next_state
@@ -313,7 +320,7 @@ let extend_blockchain {connection; _} chain next_state block prover_state
   | Ok x ->
       Ok x
   | Error e ->
-      Logger.error (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
+      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
           [ ( "input-sexp"
             , `String
@@ -325,12 +332,12 @@ let extend_blockchain {connection; _} chain next_state block prover_state
         "Prover failed: $error" ;
       Error e
 
-let prove t ~prev_state ~prev_state_proof ~next_state
+let prove t ~logger ~prev_state ~prev_state_proof ~next_state
     (transition : Internal_transition.t) pending_coinbase =
   let open Deferred.Or_error.Let_syntax in
   let start_time = Core.Time.now () in
   let%map {Blockchain.proof; _} =
-    extend_blockchain t
+    extend_blockchain t ~logger
       (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
       next_state
       (Internal_transition.snark_transition transition)

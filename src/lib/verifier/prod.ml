@@ -15,11 +15,22 @@ module Worker_state = struct
       Transaction_snark.t -> message:Sok_message.t -> bool
   end
 
-  type init_arg = unit [@@deriving bin_io]
+  type init_arg = {conf_dir: string option; logger: Logger.t}
+  [@@deriving bin_io]
 
   type t = (module S) Deferred.t
 
-  let create () : t Deferred.t =
+  let create {conf_dir; logger} : t Deferred.t =
+    if Option.is_some conf_dir then (
+      let max_size = 256 * 1024 * 512 in
+      Logger.Consumer_registry.register ~id:"verifier"
+        ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.File_system.dumb_logrotate
+             ~directory:(Option.value_exn conf_dir)
+             ~log_name:"coda-verifier.log" ~max_size) ;
+      Logger.info logger ~id:"verifier" ~module_:__MODULE__ ~location:__LOC__
+        "Verifier started" ) ;
     Deferred.return
       (let%map bc_vk = Snark_keys.blockchain_verification ()
        and tx_vk = Snark_keys.transaction_verification () in
@@ -41,8 +52,8 @@ module Worker_state = struct
            | Ok result ->
                result
            | Error e ->
-               Logger.error (Logger.create ()) ~id:"verifier"
-                 ~module_:__MODULE__ ~location:__LOC__
+               Logger.error logger ~id:"verifier" ~module_:__MODULE__
+                 ~location:__LOC__
                  ~metadata:[("error", `String (Error.to_string_hum e))]
                  "Verifier threw an exception while verifying blockchain snark" ;
                failwith "Verifier crashed"
@@ -54,8 +65,8 @@ module Worker_state = struct
            | Ok result ->
                result
            | Error e ->
-               Logger.error (Logger.create ()) ~id:"verifier"
-                 ~module_:__MODULE__ ~location:__LOC__
+               Logger.error logger ~id:"verifier" ~module_:__MODULE__
+                 ~location:__LOC__
                  ~metadata:[("error", `String (Error.to_string_hum e))]
                  "Verifier threw an exception while verifying transaction snark" ;
                failwith "Verifier crashed"
@@ -121,9 +132,11 @@ module Worker = struct
               , Bool.bin_t
               , verify_transaction_snark ) }
 
-      let init_worker_state () = Worker_state.create ()
+      let init_worker_state Worker_state.{conf_dir; logger} =
+        Worker_state.create {conf_dir; logger}
 
-      let init_connection_state ~connection:_ ~worker_state:_ = return
+      let init_connection_state ~connection:_ ~worker_state:_ () =
+        Deferred.unit
     end
   end
 
@@ -133,7 +146,7 @@ end
 type t = Worker.Connection.t
 
 (* TODO: investigate why conf_dir wasn't being used *)
-let create ~logger ~pids =
+let create ~logger ~pids ~conf_dir =
   let on_failure err =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Verifier process failed with error $err"
@@ -142,7 +155,8 @@ let create ~logger ~pids =
   in
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:() ()
+      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
+      {conf_dir; logger}
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Daemon started process of kind $process_kind with pid $verifier_pid"
@@ -157,15 +171,15 @@ let create ~logger ~pids =
        (Process.stdout process |> Reader.pipe)
        ~f:(fun stdout ->
          return
-         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              ~id:"verifier" "%s" stdout ) ;
+         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+              stdout ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
-         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              ~id:"verifier" "%s" stderr ) ;
+         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+              stderr ) ;
   connection
 
 let verify_blockchain_snark t chain =

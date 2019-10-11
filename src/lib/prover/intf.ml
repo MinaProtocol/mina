@@ -8,18 +8,24 @@ module type S = sig
   module Worker_state : sig
     type t
 
-    val create : unit -> t Deferred.t
+    type init_arg
+
+    val create : init_arg -> t Deferred.t
   end
 
   type t
 
   val create :
-    logger:Logger.t -> pids:Child_processes.Termination.t -> t Deferred.t
+       logger:Logger.t
+    -> pids:Child_processes.Termination.t
+    -> conf_dir:string
+    -> t Deferred.t
 
   val initialized : t -> [`Initialized] Deferred.Or_error.t
 
   val extend_blockchain :
        t
+    -> logger:Logger.t
     -> Blockchain.t
     -> Protocol_state.Value.t
     -> Snark_transition.value
@@ -29,6 +35,7 @@ module type S = sig
 
   val prove :
        t
+    -> logger:Logger.t
     -> prev_state:Protocol_state.Value.t
     -> prev_state_proof:Proof.t
     -> next_state:Protocol_state.Value.t

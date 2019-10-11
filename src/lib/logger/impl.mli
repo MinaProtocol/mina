@@ -1,6 +1,6 @@
 open Core
 
-type t
+type t [@@deriving bin_io]
 
 module Level : sig
   type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
@@ -25,7 +25,7 @@ module Source : sig
 end
 
 module Metadata : sig
-  type t = Yojson.Safe.json String.Map.t [@@deriving yojson]
+  type t = Yojson.Safe.json String.Map.t [@@deriving yojson, bin_io]
 end
 
 module Message : sig

@@ -242,22 +242,6 @@ let daemon logger =
          ~transport:
            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
               ~log_name:"coda.log" ~max_size:logrotate_max_size) ;
-       Logger.Consumer_registry.register ~id:"prover"
-         ~processor:stdout_log_processor
-         ~transport:(Logger.Transport.stdout ()) ;
-       Logger.Consumer_registry.register ~id:"prover"
-         ~processor:(Logger.Processor.raw ())
-         ~transport:
-           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-              ~log_name:"coda-prover.log" ~max_size:logrotate_max_size) ;
-       Logger.Consumer_registry.register ~id:"verifier"
-         ~processor:stdout_log_processor
-         ~transport:(Logger.Transport.stdout ()) ;
-       Logger.Consumer_registry.register ~id:"verifier"
-         ~processor:(Logger.Processor.raw ())
-         ~transport:
-           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-              ~log_name:"coda-verifier.log" ~max_size:logrotate_max_size) ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Coda daemon is booting up; built with commit $commit on branch \
           $branch"

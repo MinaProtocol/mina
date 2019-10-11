@@ -44,6 +44,18 @@ module Metadata = struct
     | _ ->
         Error "expected object"
 
+  include Binable.Of_binable
+            (String)
+            (struct
+              type nonrec t = t
+
+              let to_binable t = to_yojson t |> Yojson.Safe.to_string
+
+              let of_binable (t : string) : t =
+                Yojson.Safe.from_string t |> of_yojson |> Result.ok
+                |> Option.value_exn
+            end)
+
   let mem = String.Map.mem
 
   let extend (t : t) alist =
@@ -249,7 +261,7 @@ module Consumer_registry = struct
             () )
 end
 
-type t = {null: bool; metadata: Metadata.t}
+type t = {null: bool; metadata: Metadata.t} [@@deriving bin_io]
 
 let create ?(metadata = []) () =
   let pid = lazy (Unix.getpid () |> Pid.to_int) in

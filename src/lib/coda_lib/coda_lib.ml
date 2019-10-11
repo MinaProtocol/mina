@@ -586,9 +586,11 @@ let create (config : Config.t) =
       trace_task "coda" (fun () ->
           let%bind prover =
             Prover.create ~logger:config.logger ~pids:config.pids
+              ~conf_dir:config.conf_dir
           in
           let%bind verifier =
             Verifier.create ~logger:config.logger ~pids:config.pids
+              ~conf_dir:(Some config.conf_dir)
           in
           let snark_worker =
             Option.value_map
