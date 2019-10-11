@@ -351,7 +351,7 @@ let%test_module "Transition_handler.Processor tests" =
                     |> Strict_pipe.Writer.write valid_transition_writer ) ;
                 match%map
                   Block_time.Timeout.await
-                    ~timeout_duration:(Block_time.Span.of_ms 2000L)
+                    ~timeout_duration:(Block_time.Span.of_ms 5000L)
                     time_controller
                     (Strict_pipe.Reader.fold_until processed_transition_reader
                        ~init:branch
