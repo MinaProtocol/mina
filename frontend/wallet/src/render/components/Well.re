@@ -9,10 +9,13 @@ module Styles = {
       borderRadius(`px(6)),
       width(`rem(32.)),
     ]);
+
+  let disabled = style([opacity(0.5), pointerEvents(`none)]);
 };
 
 [@react.component]
-let make = (~children) =>
-  <div className=Styles.container>
-  {children}
+let make = (~children, ~disabled=false) =>
+  <div
+    className={Css.merge([Styles.container, disabled ? Styles.disabled : ""])}>
+    children
   </div>;
