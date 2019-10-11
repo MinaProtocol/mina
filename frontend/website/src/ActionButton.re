@@ -17,7 +17,7 @@ module Styles = {
         cursor(`pointer),
       ]),
       media("(min-width: 70rem)", [height(`rem(6.875))]),
-      media("(min-width: 81rem)", [height(`rem(6.0))]),
+      media("(min-width: 82rem)", [height(`rem(6.0))]),
     ]);
 
   let ctaContent =
