@@ -7,7 +7,7 @@ module Styles = {
       border(`px(1), `solid, Style.Colors.hyperlink),
       borderRadius(`px(6)),
       textDecoration(`none),
-      padding(`rem(1.125)),
+      padding(`rem(1.1)),
       paddingTop(`rem(0.6)),
       minWidth(`rem(15.3)),
       hover([
@@ -17,14 +17,11 @@ module Styles = {
         cursor(`pointer),
       ]),
       media("(min-width: 70rem)", [height(`rem(6.875))]),
-      media("(min-width: 79rem)", [height(`rem(6.0))]),
+      media("(min-width: 81rem)", [height(`rem(6.0))]),
     ]);
 
   let ctaContent =
-    style([
-      display(`flex),
-      selector("p", [fontSize(`px(36)), marginTop(`rem(0.4375))]),
-    ]);
+    style([display(`flex), selector("p", [fontSize(`px(36))])]);
 
   let ctaText = style([marginLeft(`rem(0.625))]);
 
@@ -54,7 +51,12 @@ module Styles = {
       ),
     ]);
   let ctaIcon =
-    style([minWidth(`px(36)), maxHeight(`px(48)), flexShrink(0)]);
+    style([
+      marginTop(`px(2)),
+      minWidth(`px(36)),
+      maxHeight(`px(48)),
+      flexShrink(0),
+    ]);
 };
 
 [@react.component]
