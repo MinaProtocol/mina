@@ -93,7 +93,7 @@ let validate_rpc_type_decl inner3_modules type_decl =
 
 let validate_plain_type_decl inner3_modules type_decl =
   match inner3_modules with
-  | ["T"; module_version; "Stable"] ->
+  | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
       validate_module_version module_version type_decl.ptype_loc
   | _ ->
       Location.raise_errorf ~loc:type_decl.ptype_loc
@@ -143,7 +143,7 @@ let validate_type_decl inner3_modules generation_kind type_decl =
 
 let module_name_from_plain_path inner3_modules =
   match inner3_modules with
-  | ["T"; module_version; "Stable"] ->
+  | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
       module_version
   | _ ->
       failwith "module_name_from_plain_path: unexpected module path"
