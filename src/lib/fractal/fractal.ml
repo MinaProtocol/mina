@@ -378,7 +378,7 @@ module AHIOP = struct
 
     module Basic_IP = struct
       module Interaction = Messaging.F(Prover_message)
-      module Computation = Arithmetic_circuit.F
+      module Computation = Arithmetic_circuit.E.F
       include Ip.T (Interaction) (Computation)
 
       let send t_q q t_r = interact (Send_and_receive (t_q, q, t_r, return))
@@ -428,7 +428,7 @@ module AHIOP = struct
     let protocol (type poly field) { Index.row; col; value } b domain_H domain_K (input : field list) : ('a, < field: field; poly: poly; ..>) t =
       let%bind f_w = receive (F_w { input; h=domain_H })
       and f_ = abc (fun m ->receive (Mz_random_extension { m; h=domain_H; b}) )
-      and r = receive (Random_summing_to_zero { h=domain_H; degree=2 * Domain.size domain_H + b - 2 })
+      and (r : poly) = receive (Random_summing_to_zero { h=domain_H; degree=2 * Domain.size domain_H + b - 2 })
       in
       let%bind alpha = sample in
       let%bind eta = abc (fun _ -> sample) in
@@ -439,12 +439,12 @@ module AHIOP = struct
                 (eta m, `u (m, alpha)))))
       in
       let open Arithmetic_expression in
-      let%bind g_1 =
+      let%bind (g_1 : poly) =
         let f_x = failwith "TODO" in
         let u_H _ = failwith "TODO" in
         let f =
           !(`Poly r) - !(`Poly t) * f_x + sum [A;B;C] (fun m ->
-            !(`Field (eta m)) * u_H alpha * f_ m )
+            !(`Field (eta m)) * u_H alpha * !(`Poly(f_ m) ))
         in
         receive
           (Sigma_residue { f; q=Int 1; domain=domain_H })
@@ -458,7 +458,7 @@ module AHIOP = struct
       let%bind g_2 =
         let%bind v_H_alpha_v_H_beta =
           let v_H x = Domain.vanishing domain_H x in
-          lift_compute Arithmetic_circuit.(
+          lift_compute Arithmetic_circuit.E.(
               let%bind (a : field) = v_H (!alpha)
               and (b : field) = v_H (!beta)
               in
@@ -475,11 +475,12 @@ module AHIOP = struct
           in
           (Negate (! (`Field v_H_alpha_v_H_beta)) * top, bot)
         in
-        let message = Prover_message.Sigma_residue { f; q; domain= domain_K } in
         receive
-          ()
+          (Sigma_residue { f; q; domain= domain_K })
       in
-      return ()
+      return
+        [
+        ]
   end
 
   module Marlin_prover_message = struct
@@ -892,8 +893,6 @@ negligible amount (which is fine), and lets us reduce argument size by 9 group e
   let vanishing_polynomial d x =
     let open Arithmetic_expression in
     Arithmetic_computation.(circuit (Domain.vanishing d x) >>| constant)
-
-  (* Radically fair environment *)
 
   let query' HlistId.[h_3; g_3 ; row; col; value] beta_3 =
     let open AHP in
