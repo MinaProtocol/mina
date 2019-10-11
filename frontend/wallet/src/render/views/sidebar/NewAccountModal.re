@@ -26,7 +26,7 @@ let make = (~onClose) => {
     <div className=Modal.Styles.default>
       <Alert
         kind=`Info
-        message="You can change the name or delete the account later."
+        message="You can rename or delete your account at anytime."
       />
       <Spacer height=1. />
       <TextField
