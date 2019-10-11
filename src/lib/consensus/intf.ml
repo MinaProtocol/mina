@@ -398,6 +398,8 @@ module type S = sig
       val curr_slot : Value.t -> Slot.t
 
       val global_slot : Value.t -> int
+
+      val total_currency : Value.t -> Amount.t
     end
 
     module Proposal_data : sig

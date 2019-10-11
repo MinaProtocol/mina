@@ -32,7 +32,7 @@ let main () =
   let%bind () =
     Coda_worker_testnet.Payments.assert_retrievable_payments testnet payments
   in
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async ~summary:"Test batch payments" (Async.Command.Spec.return main)

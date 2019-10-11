@@ -160,7 +160,8 @@ struct
     let hash = Fn.compose State_hash.hash state_hash
 
     let name t =
-      Visualization.display_short_sexp (module State_hash) @@ state_hash t
+      Visualization.display_prefix_of_string @@ State_hash.to_base58_check
+      @@ state_hash t
 
     type display =
       { state_hash: string
@@ -173,7 +174,8 @@ struct
       let blockchain_state = Blockchain_state.display (blockchain_state t) in
       let consensus_state = consensus_state t in
       let parent =
-        Visualization.display_short_sexp (module State_hash) @@ parent_hash t
+        Visualization.display_prefix_of_string @@ State_hash.to_base58_check
+        @@ parent_hash t
       in
       { state_hash= name t
       ; blockchain_state
