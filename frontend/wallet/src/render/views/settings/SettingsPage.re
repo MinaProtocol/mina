@@ -34,7 +34,15 @@ module Styles = {
       ]),
     ]);
 
-  let walletItemContainer =
+  let emptyAccountSettings =
+    style([
+      display(`flex),
+      alignItems(`center),
+      justifyContent(`center),
+      padding(rem(1.)),
+    ]);
+
+  let accountSettings =
     style([
       display(`flex),
       flexDirection(`column),
@@ -44,7 +52,7 @@ module Styles = {
       width(`rem(28.)),
     ]);
 
-  let walletItem =
+  let accountItem =
     merge([
       Theme.Text.Body.regular,
       style([
@@ -61,12 +69,12 @@ module Styles = {
       ]),
     ]);
 
-  let walletName = style([width(`rem(12.5)), color(Theme.Colors.marine)]);
+  let accountName = style([width(`rem(12.5)), color(Theme.Colors.marine)]);
 
-  let walletKey =
+  let accountKey =
     merge([Theme.Text.Body.mono, style([color(Theme.Colors.midnightAlpha(0.7))])]);
 
-  let walletChevron =
+  let accountChevron =
     style([display(`inlineFlex), color(Theme.Colors.tealAlpha(0.5))]);
 };
 
@@ -117,14 +125,14 @@ module AccountSettingsItem = {
     let keyStr = PublicKey.toString(publicKey);
     let route = "/settings/" ++ Js.Global.encodeURIComponent(keyStr);
     <div
-      className=Styles.walletItem
+      className=Styles.accountItem
       onClick={_ => ReasonReact.Router.push(route)}>
-      <div className=Styles.walletName> <WalletName pubkey=publicKey /> </div>
-      <span className=Styles.walletKey>
+      <div className=Styles.accountName> <WalletName pubkey=publicKey /> </div>
+      <span className=Styles.accountKey>
         <Pill> {React.string(PublicKey.prettyPrint(publicKey))} </Pill>
       </span>
       <Spacer width=5.0 />
-      <span className=Styles.walletChevron>
+      <span className=Styles.accountChevron>
         <Icon kind=Icon.EmptyChevronRight />
       </span>
     </div>;
@@ -157,11 +165,11 @@ let make = () => {
     <Spacer height=1. />
     <div className=Styles.label> {React.string("Account Settings")} </div>
     <Spacer height=0.5 />
-    <div className=Styles.walletItemContainer>
+    <div className=Styles.accountSettings>
       <WalletsQuery>
         {({result}) =>
            switch (result) {
-           | Loading
+           | Loading => <div className=Styles.emptyAccountSettings> <Loader /> </div>
            | Error(_) => React.null
            | Data(data) =>
              data##ownedWallets
