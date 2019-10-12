@@ -201,7 +201,7 @@ module Key = struct
        as a workaround, we generate extra keys, remove duplicates, and take as many as needed
        Issue #1078 notes the problem with the generators
      *)
-    let num_to_gen = num_keys + (num_keys / 5) in
+    let num_to_gen = num_keys + (num_keys / 4) in
     let more_than_enough_keys =
       Quickcheck.random_value
         (Quickcheck.Generator.list_with_length num_to_gen gen)

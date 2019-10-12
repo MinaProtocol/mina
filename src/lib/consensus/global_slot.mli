@@ -1,4 +1,4 @@
-include Coda_numbers.Nat.S_unchecked
+include Coda_numbers.Nat.Intf.S_unchecked
 
 val ( + ) : t -> int -> t
 
@@ -13,7 +13,7 @@ val slot : t -> Slot.t
 val to_epoch_and_slot : t -> Epoch.t * Slot.t
 
 module Checked : sig
-  include Coda_numbers.Nat.S_checked with type unchecked := t
+  include Coda_numbers.Nat.Intf.S_checked with type unchecked := t
 
   open Snark_params.Tick
 
