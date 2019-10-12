@@ -104,14 +104,13 @@ let copy ~src ~dst =
 let project_directory = "CODA_PROJECT_DIR"
 
 let run_service coda ~conf_dir ~logger =
-  O1trace.trace_task "web pipe" (fun () -> function
+  O1trace.trace "web pipe" (fun () -> function
     | `None ->
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "Not running a web client pipe" ;
-        don't_wait_for
-          (Strict_pipe.Reader.iter_without_pushback
-             (Coda_lib.validated_transitions coda)
-             ~f:ignore)
+        Strict_pipe.Reader.iter_without_pushback
+          (Coda_lib.validated_transitions coda)
+          ~f:ignore
     | `Local path ->
         let open Keypair in
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -130,7 +129,6 @@ let run_service coda ~conf_dir ~logger =
                    (module Lite_base.Lite_chain)
                    (get_lite_chain coda [Public_key.compress keypair.public_key]))
         )
-        |> don't_wait_for
     | `S3 ->
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Running S3 web client pipe" ;
@@ -166,4 +164,4 @@ let run_service coda ~conf_dir ~logger =
             [ store_verification_keys ~send:send_file_to_s3 ~logger
             ; js_file_storage_work ]
         in
-        don't_wait_for work )
+        Deferred.ignore work )

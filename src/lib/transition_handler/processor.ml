@@ -221,7 +221,7 @@ module Make (Inputs : Inputs.S) :
                `Partially_valid_transition vt ) ]
          ~f:(fun msg ->
            let open Deferred.Let_syntax in
-           trace_recurring_task "transition_handler_processor" (fun () ->
+           trace_recurring "transition_handler_processor" (fun () ->
                match msg with
                | `Catchup_breadcrumbs
                    (breadcrumb_subtrees, subsequent_callback_action) -> (
