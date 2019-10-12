@@ -104,14 +104,13 @@ let copy ~src ~dst =
 let project_directory = "CODA_PROJECT_DIR"
 
 let run_service coda ~conf_dir ~logger =
-  O1trace.trace_task "web pipe" (fun () -> function
+  O1trace.trace "web pipe" (fun () -> function
     | `None ->
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "Not running a web client pipe" ;
-        don't_wait_for
-          (Strict_pipe.Reader.iter_without_pushback
-             (Coda_lib.validated_transitions coda)
-             ~f:ignore)
+        don't_wait_for (Strict_pipe.Reader.iter_without_pushback
+          (Coda_lib.validated_transitions coda)
+          ~f:ignore)
     | `Local path ->
         let open Keypair in
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__

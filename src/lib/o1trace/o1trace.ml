@@ -55,7 +55,7 @@ let trace_event (name : string) =
   Option.iter !current_wr ~f:(fun wr ->
       emit_event wr {(new_event Event) with name} )
 
-let trace_task (name : string) (f : unit -> 'a) =
+let trace (name : string) (f : unit -> 'a) =
   let new_ctx =
     Execution_context.with_tid
       Scheduler.(t () |> current_execution_context)
@@ -70,7 +70,14 @@ let trace_task (name : string) (f : unit -> 'a) =
   | Ok x ->
       x
 
-let trace_recurring_task (name : string) (f : unit -> 'a) =
+let trace_task (name : string) (f : unit -> unit Deferred.t) =
+  don't_wait_for (trace name f)
+
+let recurring_prefix x = "R&" ^ x
+
+let trace_recurring name f = trace (recurring_prefix name) f
+
+let trace_recurring_task (name : string) (f : unit -> unit Deferred.t) =
   trace_task ("R&" ^ name) (fun () ->
       trace_event "started another" ;
       f () )
