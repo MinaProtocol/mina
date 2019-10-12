@@ -109,7 +109,7 @@ let%test_module "Ledger catchup" =
     let%test "catchup to a peer" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
@@ -144,7 +144,7 @@ let%test_module "Ledger catchup" =
 
     let%test "peers can provide transitions with length between max_length to \
               2 * max_length" =
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
@@ -194,7 +194,7 @@ let%test_module "Ledger catchup" =
 
     let%test "catchup would be successful even if the parent transition is \
               already in the frontier" =
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
@@ -224,7 +224,7 @@ let%test_module "Ledger catchup" =
           res )
 
     let%test "catchup would fail if one of the parent transition fails" =
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       heartbeat_flag := true ;
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
@@ -305,7 +305,7 @@ let%test_module "Ledger catchup" =
 
     let%test_unit "catchup won't be blocked by transitions that are still \
                    under processing" =
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       heartbeat_flag := true ;
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))

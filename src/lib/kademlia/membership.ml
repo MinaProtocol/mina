@@ -207,27 +207,34 @@ module Haskell_process = struct
       let%bind coda_binary_absolute = Lazy.force get_coda_binary in
       let open Deferred.Let_syntax in
       match%map
-        keep_trying
-          (List.filter_map ~f:Fn.id
-             [ Some
-                 ( Unix.getenv "CODA_KADEMLIA_PATH"
-                 |> Option.value ~default:coda_kademlia )
-             ; ( match coda_binary_absolute with
-               | Ok path ->
-                   Some (Filename.dirname path ^/ "kademlia")
-               | Error _ ->
-                   None )
-             ; ( match get_project_root () with
-               | Some path ->
-                   Some (path ^/ kademlia_binary)
-               | None ->
-                   None ) ])
-          ~f:(fun prog -> Process.create ~prog ~args ())
-        |> Deferred.Or_error.map ~f:(fun process ->
-               { failure_response= ref `Die
-               ; process
-               ; lock_path
-               ; already_waited= false } )
+        let open Deferred.Or_error.Let_syntax in
+        let%bind process =
+          keep_trying
+            (List.filter_map ~f:Fn.id
+               [ Some
+                   ( Unix.getenv "CODA_KADEMLIA_PATH"
+                   |> Option.value ~default:coda_kademlia )
+               ; ( match coda_binary_absolute with
+                 | Ok path ->
+                     Some (Filename.dirname path ^/ "kademlia")
+                 | Error _ ->
+                     None )
+               ; ( match get_project_root () with
+                 | Some path ->
+                     Some (path ^/ kademlia_binary)
+                 | None ->
+                     None ) ])
+            ~f:(fun prog -> Process.create ~prog ~args ())
+        in
+        let%bind () =
+          Deferred.map ~f:Or_error.return
+          @@ write_lock_file lock_path (Process.pid process)
+        in
+        return
+          { failure_response= ref `Die
+          ; process
+          ; lock_path
+          ; already_waited= false }
       with
       | Ok p ->
           (* If the Kademlia process dies, kill the parent daemon process. Fix
@@ -280,11 +287,7 @@ module Haskell_process = struct
     with
     | `Yes ->
         let%bind t = run_kademlia () in
-        let {failure_response= _; process; lock_path; already_waited= _} = t in
-        let%map () =
-          write_lock_file lock_path (Process.pid process)
-          |> Deferred.map ~f:Or_error.return
-        in
+        let {process; _} = t in
         don't_wait_for
           (Pipe.iter_without_pushback
              (Reader.pipe (Process.stderr process))
@@ -292,7 +295,7 @@ module Haskell_process = struct
                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                  ~metadata:[("str", `String str)]
                  "Kademlia stderr output: $str" )) ;
-        t
+        return t
     | _ ->
         Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
