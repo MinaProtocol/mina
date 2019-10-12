@@ -1,0 +1,3 @@
+(executable
+  (name driver)
+  (libraries core_kernel ppxlib))
