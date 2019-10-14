@@ -256,6 +256,7 @@ module Make (Inputs : Inputs_intf) = struct
       ~network_transition_reader ~proposer_transition_reader
       ~most_recent_valid_block:( most_recent_valid_block_reader
                                , most_recent_valid_block_writer ) frontier =
+    let initialization_finish_signal = Ivar.create () in
     let clear_reader, clear_writer =
       Strict_pipe.create ~name:"clear" Synchronous
     in
@@ -274,12 +275,14 @@ module Make (Inputs : Inputs_intf) = struct
     in
     Initial_validator.run ~logger ~trust_system ~verifier
       ~transition_reader:network_transition_reader
-      ~valid_transition_writer:valid_protocol_state_transition_writer ;
+      ~valid_transition_writer:valid_protocol_state_transition_writer
+      ~initialization_finish_signal ;
     upon
       (initialize ~logger ~network ~verifier ~trust_system ~frontier
          ~time_controller ~ledger_db ~frontier_w ~proposer_transition_reader
          ~clear_reader ~verified_transition_writer ~transition_reader_ref
          ~transition_writer_ref ~most_recent_valid_block_writer) (fun () ->
+        Ivar.fill_if_empty initialization_finish_signal () ;
         let valid_protocol_state_transition_reader, valid_transition_reader =
           Strict_pipe.Reader.Fork.two valid_protocol_state_transition_reader
         in

@@ -27,7 +27,7 @@ let main n waiting_time () =
       ~duration:(Time.Span.of_ms (2 * epoch_duration |> Float.of_int))
   in
   let%bind () = after (Time.Span.of_sec (waiting_time |> Float.of_int)) in
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   let open Command.Let_syntax in

@@ -1227,7 +1227,8 @@ module T = struct
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
-         -> Transaction_snark_work.Checked.t option) =
+         -> Transaction_snark_work.Checked.t option)
+      ~(state_body_hash : State_body_hash.t) =
     O1trace.trace_event "curr_hash" ;
     let validating_ledger = Transaction_validator.create t.ledger in
     O1trace.trace_event "done mask" ;
@@ -1281,7 +1282,9 @@ module T = struct
       "Number of proofs ready for purchase: $proof_count"
       ~metadata:[("proof_count", `Int proof_count)] ;
     trace_event "prediffs done" ;
-    {Staged_ledger_diff.With_valid_signatures_and_proofs.diff; creator= self}
+    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
+    ; creator= self
+    ; state_body_hash }
 
   module For_tests = struct
     let materialized_snarked_ledger_hash = materialized_snarked_ledger_hash
@@ -1304,6 +1307,7 @@ let%test_module "test" =
       let diff =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
+          ~state_body_hash:State_body_hash.dummy
       in
       let diff' = Staged_ledger_diff.forget diff in
       let%bind verifier = Verifier.create ~logger ~pids in
@@ -1545,7 +1549,7 @@ let%test_module "test" =
      fun init_state cmds cmd_iters sl ?(expected_proof_count = None) test_mask
          provers stmt_to_work ->
       let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let%map total_ledger_proofs =
         iter_cmds_acc cmds cmd_iters 0
           (fun cmds_left count_opt cmds_this_iter proof_count ->
@@ -1723,7 +1727,8 @@ let%test_module "test" =
                   ; user_commands= List.take txns slots
                   ; coinbase= Zero }
                 , None )
-            ; creator= self_pk }
+            ; creator= self_pk
+            ; state_body_hash= State_body_hash.dummy }
         | Some (_, _) ->
             let txns_in_second_diff = List.drop txns slots in
             let diff : Staged_ledger_diff.Diff.t =
@@ -1737,7 +1742,7 @@ let%test_module "test" =
                   ; user_commands= txns_in_second_diff
                   ; coinbase= Zero } )
             in
-            {diff; creator= self_pk}
+            {diff; creator= self_pk; state_body_hash= State_body_hash.dummy}
       in
       let empty_diff : Staged_ledger_diff.t =
         { diff=
@@ -1745,7 +1750,8 @@ let%test_module "test" =
               ; user_commands= []
               ; coinbase= Staged_ledger_diff.At_most_two.Zero }
             , None )
-        ; creator= self_pk }
+        ; creator= self_pk
+        ; state_body_hash= State_body_hash.dummy }
       in
       Quickcheck.test (gen_below_capacity ())
         ~sexp_of:
@@ -1765,7 +1771,7 @@ let%test_module "test" =
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               let logger = Logger.null () in
-              let pids = Child_processes.Termination.create_pid_set () in
+              let pids = Child_processes.Termination.create_pid_table () in
               let%map checked =
                 iter_cmds_acc cmds iters true
                   (fun _cmds_left _count_opt cmds_this_iter checked ->
@@ -1815,7 +1821,7 @@ let%test_module "test" =
 
     let%test_unit "Snarked ledger" =
       let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       Quickcheck.test (gen_below_capacity ()) ~trials:20
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
@@ -1873,7 +1879,7 @@ let%test_module "test" =
         -> unit Deferred.t =
      fun init_state cmds cmd_iters proofs_available sl test_mask provers ->
       let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let%map proofs_available_left =
         iter_cmds_acc cmds cmd_iters proofs_available
           (fun cmds_left _count_opt cmds_this_iter proofs_available_left ->

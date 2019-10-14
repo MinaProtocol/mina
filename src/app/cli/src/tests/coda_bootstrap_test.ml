@@ -41,7 +41,7 @@ let main () =
   (* TODO: one of the previous_statuses should be `Bootstrap. The broadcast pip 
     coda.transition_frontier never gets set to None *)
   assert (Hash_set.mem previous_status `Synced) ;
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async ~summary:"Test that triggers bootstrap once"

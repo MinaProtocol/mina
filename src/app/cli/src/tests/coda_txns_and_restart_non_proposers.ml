@@ -47,7 +47,7 @@ let main () =
   in
   (* settle for a few more min *)
   let%bind () = after (Time.Span.of_min 1.) in
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async ~summary:"only restart non-proposers"

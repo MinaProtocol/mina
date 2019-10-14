@@ -199,7 +199,7 @@ module Types = struct
 
       let staged_ledger_hash = string_option_entry "Staged-ledger hash"
 
-      let state_hash = string_option_entry "Staged hash"
+      let state_hash = string_option_entry "Protocol state hash"
 
       let commit_id = string_entry "Git SHA-1"
 

@@ -7,6 +7,8 @@ open Signature_lib
 open Coda_transition
 
 module Make (Inputs : Transition_frontier.Inputs_intf) = struct
+  let max_blocklength_observed = ref 0
+
   type validation_error =
     [ `Invalid_time_received of [`Too_early | `Too_late of int64]
     | `Invalid_proof
@@ -143,52 +145,52 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
   end
 
   let run ~logger ~trust_system ~verifier ~transition_reader
-      ~valid_transition_writer =
+      ~valid_transition_writer ~initialization_finish_signal =
     let open Deferred.Let_syntax in
     let duplicate_checker = Duplicate_proposal_detector.create () in
     Reader.iter transition_reader ~f:(fun network_transition ->
-        let `Transition transition_env, `Time_received time_received =
-          network_transition
-        in
-        let transition_with_hash =
-          Envelope.Incoming.data transition_env
-          |> With_hash.of_data
-               ~hash_data:
-                 (Fn.compose Protocol_state.hash
-                    External_transition.protocol_state)
-        in
-        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:
-            [ ( "transition"
-              , State_hash.to_yojson @@ With_hash.hash transition_with_hash )
-            ]
-          "received $transition for initial validation" ;
-        Duplicate_proposal_detector.check duplicate_checker logger
-          transition_with_hash ;
-        let sender = Envelope.Incoming.sender transition_env in
-        match%bind
-          let open Deferred.Result.Monad_infix in
-          External_transition.(
-            Validation.wrap transition_with_hash
-            |> Fn.compose Deferred.return
-                 (validate_time_received ~time_received)
-            >>= validate_proof ~verifier
-            >>= Fn.compose Deferred.return validate_delta_transition_chain)
-        with
-        | Ok verified_transition ->
-            Envelope.Incoming.wrap ~data:verified_transition ~sender
-            |> Writer.write valid_transition_writer ;
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "transition"
-                  , State_hash.to_yojson
-                    @@ External_transition.Initial_validated.state_hash
-                         verified_transition ) ]
-              "$transition passed initial validator" ;
-            return ()
-        | Error error ->
-            handle_validation_error ~logger ~trust_system ~sender
-              ~state_hash:(With_hash.hash transition_with_hash)
-              error )
+        if Ivar.is_full initialization_finish_signal then (
+          let `Transition transition_env, `Time_received time_received =
+            network_transition
+          in
+          let transition_with_hash =
+            Envelope.Incoming.data transition_env
+            |> With_hash.of_data
+                 ~hash_data:
+                   (Fn.compose Protocol_state.hash
+                      External_transition.protocol_state)
+          in
+          Duplicate_proposal_detector.check duplicate_checker logger
+            transition_with_hash ;
+          let sender = Envelope.Incoming.sender transition_env in
+          match%bind
+            let open Deferred.Result.Monad_infix in
+            External_transition.(
+              Validation.wrap transition_with_hash
+              |> Fn.compose Deferred.return
+                   (validate_time_received ~time_received)
+              >>= validate_proof ~verifier
+              >>= Fn.compose Deferred.return validate_delta_transition_chain)
+          with
+          | Ok verified_transition ->
+              let blockchain_length =
+                External_transition.Initial_validated.consensus_state
+                  verified_transition
+                |> Consensus.Data.Consensus_state.blockchain_length
+                |> Coda_numbers.Length.to_int
+              in
+              if blockchain_length > !max_blocklength_observed then (
+                Coda_metrics.(
+                  Gauge.set Transition_frontier.max_blocklength_observed
+                  @@ Int.to_float blockchain_length) ;
+                max_blocklength_observed := blockchain_length ) ;
+              Writer.write valid_transition_writer
+              @@ Envelope.Incoming.wrap ~data:verified_transition ~sender ;
+              return ()
+          | Error error ->
+              handle_validation_error ~logger ~trust_system ~sender
+                ~state_hash:(With_hash.hash transition_with_hash)
+                error )
+        else Deferred.unit )
     |> don't_wait_for
 end

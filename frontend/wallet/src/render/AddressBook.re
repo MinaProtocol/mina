@@ -8,6 +8,18 @@ type t = StrDict.t(string);
 
 let empty = StrDict.empty;
 
+let default =
+  StrDict.fromList([
+    (
+      "tdNE67M9Snd4KF2Y3xgCQ8Res8LQxckx5xpraAAfa9uv1P6GUy8a6QkXbLnN8PknuKDknEerRCYGujScean4D88v5sJcTqiuqnr2666Csc8QhpUW6MeXq7MgEha7S6ttxB3bY9MMVrDNBB",
+      "Faucet",
+    ),
+    (
+      "tdNDk6tKpzhVXUqozR5y2r77pppsEak7icvdYNsv2dbKx6r69AGUUbQsfrHHquZipQCmMj4VRhVF3u4F5NDgdbuxxWANULyVjUYPbe85fv7bpjKRgSpGR3zo2566s5GNNKQyLRUm12wt5o",
+      "Echo Service",
+    ),
+  ]);
+
 let fromJsonString = jsonStr => {
   let json = Js.Json.parseExn(jsonStr);
   let jsDict = Json.Decode.(json |> dict(string));

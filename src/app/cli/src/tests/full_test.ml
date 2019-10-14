@@ -79,7 +79,7 @@ let print_heartbeat logger =
 
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
-  let pids = Child_processes.Termination.create_pid_set () in
+  let pids = Child_processes.Termination.create_pid_table () in
   setup_time_offsets () ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;

@@ -47,7 +47,7 @@ let%test_module "Bootstrap Controller" =
         Bootstrap_controller.For_tests.Transition_cache.create ()
       in
       let num_breadcrumbs = (Transition_frontier.max_length * 2) + 2 in
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let network =
         Network.create_stub ~logger
           ~ip_table:(Hashtbl.create (module Unix.Inet_addr))
@@ -158,7 +158,7 @@ let%test_module "Bootstrap Controller" =
 
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let num_breadcrumbs = 10 in
       let accounts = Genesis_ledger.accounts in
       heartbeat_flag := true ;
@@ -232,7 +232,7 @@ let%test_module "Bootstrap Controller" =
       Backtrace.elide := false ;
       heartbeat_flag := true ;
       Printexc.record_backtrace true ;
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
@@ -273,7 +273,7 @@ let%test_module "Bootstrap Controller" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       heartbeat_flag := true ;
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let small_peer_num_breadcrumbs = 6 in
       let large_peer_num_breadcrumbs = small_peer_num_breadcrumbs * 2 in
       let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
@@ -329,7 +329,7 @@ let%test_module "Bootstrap Controller" =
 
     let%test "`on_transition` should deny outdated transitions" =
       heartbeat_flag := true ;
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
