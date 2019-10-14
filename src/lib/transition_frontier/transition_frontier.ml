@@ -894,12 +894,13 @@ struct
                     Ledger.Maskable.register_mask db_casted
                       (Ledger.Mask.create ())
                   in
+                  let%bind () = Async.Scheduler.yield () in
                   let%bind () =
                     Non_empty_list.iter_deferred txns ~f:(fun txn ->
-                        let%map () = Async.Scheduler.yield () in
-                        ignore
-                          ( Ledger.apply_transaction db_mask txn
-                          |> Or_error.ok_exn ) )
+                        return
+                        @@ ignore
+                             ( Ledger.apply_transaction db_mask txn
+                             |> Or_error.ok_exn ) )
                   in
                   let%bind () = Async.Scheduler.yield () in
                   Ledger.commit db_mask ;
