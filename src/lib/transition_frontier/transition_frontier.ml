@@ -551,15 +551,12 @@ struct
     in
     let root_ledger = Staged_ledger.ledger root in
     let soon_to_be_root_ledger = Staged_ledger.ledger soon_to_be_root in
-    let%bind soon_to_be_root_merkle_root =
-      Deferred.create (fun ivar ->
-          Ivar.fill ivar @@ Ledger.merkle_root soon_to_be_root_ledger )
+    let soon_to_be_root_merkle_root =
+      Ledger.merkle_root soon_to_be_root_ledger
     in
-    let%map () =
-      Deferred.create (fun ivar ->
-          Ledger.commit soon_to_be_root_ledger ;
-          Ivar.fill ivar () )
-    in
+    let%bind () = Async.Scheduler.yield () in
+    Ledger.commit soon_to_be_root_ledger ;
+    let%map () = Async.Scheduler.yield () in
     let root_ledger_merkle_root_after_commit =
       Ledger.merkle_root root_ledger
     in
@@ -899,16 +896,14 @@ struct
                   in
                   let%bind () =
                     Non_empty_list.iter_deferred txns ~f:(fun txn ->
-                        Deferred.create (fun ivar ->
-                            ignore
-                              ( Ledger.apply_transaction db_mask txn
-                              |> Or_error.ok_exn ) ;
-                            Ivar.fill ivar () ) )
+                        let%map () = Async.Scheduler.yield () in
+                        ignore
+                          ( Ledger.apply_transaction db_mask txn
+                          |> Or_error.ok_exn ) )
                   in
-                  let%map () =
-                    Deferred.create (fun ivar ->
-                        Ledger.commit db_mask ; Ivar.fill ivar () )
-                  in
+                  let%bind () = Async.Scheduler.yield () in
+                  Ledger.commit db_mask ;
+                  let%map () = Async.Scheduler.yield () in
                   ignore
                   @@ Ledger.Maskable.unregister_mask_exn db_casted db_mask
               | _, false | None, _ ->
