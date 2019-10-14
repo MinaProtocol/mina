@@ -85,7 +85,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           let%map new_root =
             Pending_coinbase.Checked.add_coinbase root_after_delete
               ( Snark_transition.proposer transition
-              , Snark_transition.coinbase transition )
+              , Snark_transition.coinbase_amount transition
+              , Snark_transition.coinbase_state_body_hash transition )
           in
           (new_root, deleted_stack)
         in

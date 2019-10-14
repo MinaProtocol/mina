@@ -3,7 +3,7 @@
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
 !!! note
-    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.7-beta`.
+    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.9-beta`.
 
 ## Requirements
 
@@ -14,11 +14,18 @@ Note: Windows is not officially supported at this time. However, community membe
 **Hardware**: Sending and receiving coda does not require any special hardware, but participating as a node operator currently requires:
 
 - at least a 4-core processor
-- at least 8 GB of RAM
+- at least 16 GB of RAM
 
 GPUs aren't currently required, but may be required for node operators when the protoctol is upgraded.
 
 **Network**: At least 1 Mbps connection
+
+**VM Instances**:
+O(1) Labs has tested running nodes on several cloud providers, and recommends the following instances for basic node operator needs. Keep in mind that custom requirements as well as different cost constraints may require a different instance type.
+- AWS - [c5.2xlarge](https://www.ec2instances.info/?filter=c5.2xl&region=us-west-2&cost_duration=daily&selected=c5.2xlarge)
+- GCP - [c2-standard-4](https://cloud.google.com/compute/docs/machine-types)
+- Azure - [Standard_F8s_v2](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/sizes-compute#fsv2-series-1)
+- Digital Ocean - [c-8-16gib](https://cloud.digitalocean.com/droplets/new?size=c-8-16gib)
 
 ## Installation
 

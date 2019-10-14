@@ -32,7 +32,9 @@ module Protocol_state = struct
       module T = struct
         type t =
           { previous_state_hash: State_hash.Stable.V1.t
-          ; blockchain_state: Coda_state.Blockchain_state.Value.Stable.V1.t }
+          ; blockchain_state: Coda_state.Blockchain_state.Value.Stable.V1.t
+          ; consensus_state: Consensus.Data.Consensus_state.Value.Stable.V1.t
+          }
         [@@deriving bin_io, version {unnumbered}]
       end
 
@@ -44,7 +46,8 @@ module Protocol_state = struct
 
   type t = Stable.Latest.t =
     { previous_state_hash: State_hash.t
-    ; blockchain_state: Coda_state.Blockchain_state.Value.t }
+    ; blockchain_state: Coda_state.Blockchain_state.Value.t
+    ; consensus_state: Consensus.Data.Consensus_state.Value.t }
 end
 
 module Stable = struct
@@ -91,8 +94,9 @@ let of_transition tracked_participants external_transition =
   let protocol_state =
     { Protocol_state.previous_state_hash= parent_hash external_transition
     ; blockchain_state=
-        Coda_state.Protocol_state.blockchain_state
-        @@ protocol_state external_transition }
+        External_transition.Validated.blockchain_state external_transition
+    ; consensus_state=
+        External_transition.Validated.consensus_state external_transition }
   in
   let open Result.Let_syntax in
   let staged_ledger_diff = staged_ledger_diff external_transition in

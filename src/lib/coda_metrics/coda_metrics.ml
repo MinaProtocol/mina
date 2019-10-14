@@ -91,6 +91,8 @@ module TextFormat_0_0_4 = struct
 end
 
 module Runtime = struct
+  let subsystem = "Runtime"
+
   let start_time = Core.Time.now ()
 
   let current = ref (Gc.stat ())
@@ -98,6 +100,7 @@ module Runtime = struct
   let update () = current := Gc.stat ()
 
   let simple_metric ~metric_type ~help name fn =
+    let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
     let info =
       {MetricInfo.name= MetricName.v name; help; metric_type; label_names= []}
     in
@@ -356,6 +359,10 @@ end
 
 module Transition_frontier = struct
   let subsystem = "Transition_frontier"
+
+  let max_blocklength_observed : Gauge.t =
+    let help = "max blocklength observed by the system" in
+    Gauge.v "max_blocklength_observed" ~help ~namespace ~subsystem
 
   let slot_fill_rate : Gauge.t =
     let help = "number of blocks / total slots since genesis" in
