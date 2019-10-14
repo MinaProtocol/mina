@@ -94,7 +94,7 @@ let validate_rpc_type_decl inner3_modules type_decl =
 let validate_plain_type_decl inner3_modules type_decl =
   match inner3_modules with
   | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
-      (* NOTE: The pattern here with "T" can be removed when the versioning
+      (* NOTE: The pattern here with "T" can be removed when the registration
          functors are replaced with the versioned module ppx.
       *)
       validate_module_version module_version type_decl.ptype_loc
@@ -147,7 +147,7 @@ let validate_type_decl inner3_modules generation_kind type_decl =
 let module_name_from_plain_path inner3_modules =
   match inner3_modules with
   | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
-      (* NOTE: The pattern here with "T" can be removed when the versioning
+      (* NOTE: The pattern here with "T" can be removed when the registration
          functors are replaced with the versioned module ppx.
       *)
       module_version
