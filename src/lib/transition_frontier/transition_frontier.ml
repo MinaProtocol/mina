@@ -542,7 +542,7 @@ struct
    *  modifies the heir's staged-ledger and sets the heir as the new root.
    *  Modifications are in-place
   *)
-  let move_root t (soon_to_be_root_node : Node.t) : Node.t =
+  let move_root t (soon_to_be_root_node : Node.t) : Node.t Deferred.t =
     let root_node = Hashtbl.find_exn t.table t.root in
     let root_breadcrumb = root_node.breadcrumb in
     let root = root_breadcrumb |> Breadcrumb.staged_ledger in
@@ -551,10 +551,15 @@ struct
     in
     let root_ledger = Staged_ledger.ledger root in
     let soon_to_be_root_ledger = Staged_ledger.ledger soon_to_be_root in
-    let soon_to_be_root_merkle_root =
-      Ledger.merkle_root soon_to_be_root_ledger
+    let%bind soon_to_be_root_merkle_root =
+      Deferred.create (fun ivar ->
+          Ivar.fill ivar @@ Ledger.merkle_root soon_to_be_root_ledger )
     in
-    Ledger.commit soon_to_be_root_ledger ;
+    let%map () =
+      Deferred.create (fun ivar ->
+          Ledger.commit soon_to_be_root_ledger ;
+          Ivar.fill ivar () )
+    in
     let root_ledger_merkle_root_after_commit =
       Ledger.merkle_root root_ledger
     in
@@ -576,13 +581,16 @@ struct
     Hashtbl.remove t.table t.root ;
     Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
     t.root <- new_root_hash ;
+    (* TODO: these metrics are too expensive to compute in this way, but it should be ok for beta *)
+    (*
     let num_finalized_staged_txns =
       Breadcrumb.user_commands new_root |> List.length |> Float.of_int
     in
-    (* TODO: these metrics are too expensive to compute in this way, but it should be ok for beta *)
     let root_snarked_ledger_accounts =
       Ledger.Db.to_list t.root_snarked_ledger
     in
+    *)
+    (*
     Coda_metrics.(
       Gauge.set Transition_frontier.recently_finalized_staged_txns
         num_finalized_staged_txns) ;
@@ -598,6 +606,7 @@ struct
         @@ List.fold_left root_snarked_ledger_accounts ~init:0
              ~f:(fun sum account ->
                sum + Currency.Balance.to_int account.balance ) )) ;
+    *)
     Coda_metrics.(Counter.inc_one Transition_frontier.root_transitions) ;
     let consensus_state = Breadcrumb.consensus_state new_root in
     let blockchain_length =
@@ -745,7 +754,7 @@ struct
               ) ] ;
         (* 4 *)
         (* note: new_root_node is the same as root_node if the root didn't change *)
-        let garbage_breadcrumbs, new_root_node =
+        let%bind garbage_breadcrumbs, new_root_node =
           if distance_to_root > max_length then (
             Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
               "Moving the root of the transition frontier. The new node is \
@@ -809,7 +818,7 @@ struct
               Gauge.dec Transition_frontier.active_breadcrumbs
                 (Float.of_int @@ (1 + List.length garbage_hashes))) ;
             (* 4.IV *)
-            let new_root_node = move_root t heir_node in
+            let%bind new_root_node = move_root t heir_node in
             (* 4.V *)
             let new_root_staged_ledger =
               Breadcrumb.staged_ledger new_root_node.breadcrumb
@@ -857,43 +866,54 @@ struct
                 | None ->
                     () ) ;
             (* 4.VII *)
-            ( match
+            let%map () =
+              match
                 ( Staged_ledger.proof_txns new_root_staged_ledger
                 , heir_node.breadcrumb.just_emitted_a_proof )
               with
-            | Some txns, true ->
-                let proof_data =
-                  Staged_ledger.current_ledger_proof new_root_staged_ledger
-                  |> Option.value_exn
-                in
-                [%test_result: Frozen_ledger_hash.t]
-                  ~message:
-                    "Root snarked ledger hash should be the same as the \
-                     source hash in the proof that was just emitted"
-                  ~expect:(Ledger_proof.statement proof_data).source
-                  ( Ledger.Db.merkle_root t.root_snarked_ledger
-                  |> Frozen_ledger_hash.of_ledger_hash ) ;
-                (* Apply all the transactions associated with the new ledger
-                   proof to the database-backed SNARKed ledger. We create a
-                   mask and apply them to that, then commit it to the DB. This
-                   saves a lot of IO since committing is batched. Would be even
-                   faster if we implemented #2760. *)
-                let db_casted =
-                  Ledger.Any_ledger.cast
-                    (module Ledger.Db)
-                    t.root_snarked_ledger
-                in
-                let db_mask =
-                  Ledger.Maskable.register_mask db_casted
-                    (Ledger.Mask.create ())
-                in
-                Non_empty_list.iter txns ~f:(fun txn ->
-                    Ledger.apply_transaction db_mask txn
-                    |> Or_error.ok_exn |> ignore ) ;
-                Ledger.commit db_mask ;
-                ignore @@ Ledger.Maskable.unregister_mask_exn db_casted db_mask
-            | _, false | None, _ ->
-                () ) ;
+              | Some txns, true ->
+                  let proof_data =
+                    Staged_ledger.current_ledger_proof new_root_staged_ledger
+                    |> Option.value_exn
+                  in
+                  [%test_result: Frozen_ledger_hash.t]
+                    ~message:
+                      "Root snarked ledger hash should be the same as the \
+                       source hash in the proof that was just emitted"
+                    ~expect:(Ledger_proof.statement proof_data).source
+                    ( Ledger.Db.merkle_root t.root_snarked_ledger
+                    |> Frozen_ledger_hash.of_ledger_hash ) ;
+                  (* Apply all the transactions associated with the new ledger
+                     proof to the database-backed SNARKed ledger. We create a
+                     mask and apply them to that, then commit it to the DB. This
+                     saves a lot of IO since committing is batched. Would be even
+                     faster if we implemented #2760. *)
+                  let db_casted =
+                    Ledger.Any_ledger.cast
+                      (module Ledger.Db)
+                      t.root_snarked_ledger
+                  in
+                  let db_mask =
+                    Ledger.Maskable.register_mask db_casted
+                      (Ledger.Mask.create ())
+                  in
+                  let%bind () =
+                    Non_empty_list.iter_deferred txns ~f:(fun txn ->
+                        Deferred.create (fun ivar ->
+                            ignore
+                              ( Ledger.apply_transaction db_mask txn
+                              |> Or_error.ok_exn ) ;
+                            Ivar.fill ivar () ) )
+                  in
+                  let%map () =
+                    Deferred.create (fun ivar ->
+                        Ledger.commit db_mask ; Ivar.fill ivar () )
+                  in
+                  ignore
+                  @@ Ledger.Maskable.unregister_mask_exn db_casted db_mask
+              | _, false | None, _ ->
+                  return ()
+            in
             [%test_result: Frozen_ledger_hash.t]
               ~message:
                 "Root snarked ledger hash diverged from blockchain state \
@@ -909,7 +929,7 @@ struct
             Extensions.Root_history.enqueue t.extensions.root_history
               root_state_hash root_breadcrumb ;
             (garbage_breadcrumbs, new_root_node) )
-          else ([], root_node)
+          else return ([], root_node)
         in
         (* 5 *)
         Extensions.handle_diff t.extensions t.extension_writers
