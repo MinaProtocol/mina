@@ -261,7 +261,11 @@ let convert_module_stri last_version stri =
     |> int_of_string
   in
   Option.iter last_version ~f:(fun last_version ->
-      if version >= last_version then
+      if version = last_version then
+        (* Mimic wording of the equivalent OCaml error. *)
+        Location.raise_errorf ~loc
+          "Multiple definition of the module name V%i." version
+      else if version >= last_version then
         Location.raise_errorf ~loc
           "Versioned modules must be listed in decreasing order." ) ;
   let type_stri, str_rest =
