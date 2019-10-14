@@ -167,7 +167,6 @@ let version_type version stri =
                   (* sanity check *)
                   assert (Int.equal read_version version) ;
                   t]]]
-    ; [%stri let _ = bin_read_t]
     ; [%stri
         let __bin_read_t__ =
           [%e
@@ -181,7 +180,6 @@ let version_type version stri =
                   (* sanity check *)
                   assert (Int.equal read_version version) ;
                   t]]]
-    ; [%stri let _ = __bin_read_t__]
     ; [%stri
         let bin_size_t =
           [%e
@@ -190,7 +188,6 @@ let version_type version stri =
                 fun t ->
                   With_version.create t
                   |> [%e apply_args [%expr With_version.bin_size_t]]]]]
-    ; [%stri let _ = bin_size_t]
     ; [%stri
         let bin_write_t =
           [%e
@@ -199,9 +196,7 @@ let version_type version stri =
                 fun buf ~pos t ->
                   With_version.create t
                   |> [%e apply_args [%expr With_version.bin_write_t]] buf ~pos]]]
-    ; [%stri let _ = bin_write_t]
     ; [%stri let bin_shape_t = With_version.bin_shape_t]
-    ; [%stri let _ = bin_shape_t]
     ; [%stri
         let bin_reader_t =
           [%e
@@ -212,7 +207,6 @@ let version_type version stri =
                 ; vtag_read=
                     [%e apply_args ~f:(mk_field "read") [%expr __bin_read_t__]]
                 }]]]
-    ; [%stri let _ = bin_reader_t]
     ; [%stri
         let bin_writer_t =
           [%e
@@ -223,7 +217,6 @@ let version_type version stri =
                 ; write=
                     [%e apply_args ~f:(mk_field "write") [%expr bin_write_t]]
                 }]]]
-    ; [%stri let _ = bin_writer_t]
     ; [%stri
         let bin_t =
           [%e
@@ -236,7 +229,16 @@ let version_type version stri =
                 ; reader=
                     [%e apply_args ~f:(mk_field "reader") [%expr bin_reader_t]]
                 }]]]
-    ; [%stri let _ = bin_t] ]
+    ; [%stri
+        let _ =
+          ( bin_read_t
+          , __bin_read_t__
+          , bin_size_t
+          , bin_write_t
+          , bin_shape_t
+          , bin_reader_t
+          , bin_writer_t
+          , bin_t )] ]
   in
   (List.is_empty params, t :: with_version :: bin_io_shadows)
 
