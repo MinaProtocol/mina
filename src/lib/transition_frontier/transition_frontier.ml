@@ -594,6 +594,8 @@ struct
       Gauge.set Transition_frontier.recently_finalized_staged_txns
         num_finalized_staged_txns) ;
     Coda_metrics.(
+      Transition_frontier.TPS_10min.update num_finalized_staged_txns) ;
+    Coda_metrics.(
       Counter.inc Transition_frontier.finalized_staged_txns
         num_finalized_staged_txns) ;
     Coda_metrics.(
