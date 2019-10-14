@@ -127,20 +127,24 @@ module Haskell_process = struct
   type t =
     { failure_response: [`Die | `Ignore] ref
     ; process: Process.t
-    ; mutable already_waited: bool
+    ; terminated_ivar: unit Ivar.t
+          (** Filled once the process is terminated. *)
     ; lock_path: string }
 
-  let kill {failure_response; process; lock_path; already_waited} =
+  let kill {failure_response; process; terminated_ivar; _} =
     failure_response := `Ignore ;
-    if not already_waited then
-      let%bind _ =
-        Process.run_exn ~prog:"kill"
-          ~args:[Pid.to_string (Process.pid process)]
-          ()
-      in
-      let%bind _ = Process.wait process in
-      Sys.remove lock_path
-    else Deferred.unit
+    match Ivar.peek terminated_ivar with
+    | None ->
+        let%bind _ =
+          Process.run_exn ~prog:"kill"
+            ~args:[Pid.to_string (Process.pid process)]
+            ()
+        in
+        (* Wait for the process to terminate before returning. *)
+        Ivar.read terminated_ivar
+    | Some () ->
+        (* Process has already terminated so killing it is a no-op. *)
+        Deferred.unit
 
   let cli_format : Unix.Inet_addr.t -> int -> string =
    fun host discovery_port ->
@@ -234,24 +238,27 @@ module Haskell_process = struct
           { failure_response= ref `Die
           ; process
           ; lock_path
-          ; already_waited= false }
+          ; terminated_ivar= Ivar.create () }
       with
       | Ok p ->
           (* If the Kademlia process dies, kill the parent daemon process. Fix
          * for #550 *)
           Deferred.bind (Process.wait p.process) ~f:(fun code ->
-              p.already_waited <- true ;
-              match (!(p.failure_response), code) with
-              | `Ignore, _ | _, Ok () ->
-                  return ()
-              | `Die, (Error _ as e) ->
-                  Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                    "Kademlia process died: $exit_or_signal"
-                    ~metadata:
-                      [ ( "exit_or_signal"
-                        , `String (Unix.Exit_or_signal.to_string_hum e) ) ] ;
-                  let%map () = Sys.remove lock_path in
-                  raise Child_died )
+              let%bind () =
+                match (!(p.failure_response), code) with
+                | `Ignore, _ | _, Ok () ->
+                    return ()
+                | `Die, (Error _ as e) ->
+                    Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                      "Kademlia process died: $exit_or_signal"
+                      ~metadata:
+                        [ ( "exit_or_signal"
+                          , `String (Unix.Exit_or_signal.to_string_hum e) ) ] ;
+                    raise Child_died
+              in
+              let%bind () = Sys.remove lock_path in
+              Ivar.fill p.terminated_ivar () ;
+              Deferred.unit )
           |> don't_wait_for ;
           Ok p
       | Error e ->
