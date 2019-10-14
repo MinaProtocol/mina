@@ -555,7 +555,8 @@ struct
       Ledger.merkle_root soon_to_be_root_ledger
     in
     let%bind () = Async.Scheduler.yield () in
-    Ledger.commit soon_to_be_root_ledger ;
+    O1trace.measure "committing new root mask" (fun () ->
+        Ledger.commit soon_to_be_root_ledger ) ;
     let%map () = Async.Scheduler.yield () in
     let root_ledger_merkle_root_after_commit =
       Ledger.merkle_root root_ledger
@@ -821,14 +822,16 @@ struct
               Breadcrumb.staged_ledger new_root_node.breadcrumb
             in
             (* 4.VI *)
-            Consensus.Hooks.frontier_root_transition
-              (Breadcrumb.consensus_state root_node.breadcrumb)
-              (Breadcrumb.consensus_state new_root_node.breadcrumb)
-              ~local_state:t.consensus_local_state
-              ~snarked_ledger:
-                (Coda_base.Ledger.Any_ledger.cast
-                   (module Coda_base.Ledger.Db)
-                   t.root_snarked_ledger) ;
+            O1trace.measure "calling consensus hook frontier_root_transition"
+              (fun () ->
+                Consensus.Hooks.frontier_root_transition
+                  (Breadcrumb.consensus_state root_node.breadcrumb)
+                  (Breadcrumb.consensus_state new_root_node.breadcrumb)
+                  ~local_state:t.consensus_local_state
+                  ~snarked_ledger:
+                    (Coda_base.Ledger.Any_ledger.cast
+                       (module Coda_base.Ledger.Db)
+                       t.root_snarked_ledger) ) ;
             Debug_assert.debug_assert (fun () ->
                 (* After the lock transition, if the local_state was previously synced, it should continue to be synced *)
                 match
@@ -897,13 +900,15 @@ struct
                   let%bind () = Async.Scheduler.yield () in
                   let%bind () =
                     Non_empty_list.iter_deferred txns ~f:(fun txn ->
-                        return
-                        @@ ignore
-                             ( Ledger.apply_transaction db_mask txn
-                             |> Or_error.ok_exn ) )
+                        O1trace.measure "apply transaction to db mask"
+                          (fun () ->
+                            ignore
+                            @@ Or_error.ok_exn
+                                 (Ledger.apply_transaction db_mask txn) ) ;
+                        Deferred.unit )
                   in
-                  let%bind () = Async.Scheduler.yield () in
-                  Ledger.commit db_mask ;
+                  O1trace.measure "committing db mask" (fun () ->
+                      Ledger.commit db_mask ) ;
                   let%map () = Async.Scheduler.yield () in
                   ignore
                   @@ Ledger.Maskable.unregister_mask_exn db_casted db_mask
