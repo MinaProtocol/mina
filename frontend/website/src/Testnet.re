@@ -245,7 +245,6 @@ module Styles = {
         [
           gridTemplateColumns([`repeat((`num(2), `fr(1.0)))]),
           gridTemplateRows([`repeat((`num(2), `rem(6.0)))]),
-          gridRowGap(rem(1.5)),
           gridColumnGap(rem(1.5)),
         ],
       ),
@@ -254,8 +253,6 @@ module Styles = {
         [
           gridTemplateColumns([`repeat((`num(2), `fr(1.0)))]),
           gridTemplateRows([`repeat((`num(2), `rem(5.4)))]),
-          gridRowGap(rem(1.5)),
-          gridColumnGap(rem(1.5)),
         ],
       ),
       media(
@@ -263,7 +260,7 @@ module Styles = {
         [
           gridTemplateColumns([`repeat((`num(4), `fr(1.0)))]),
           gridTemplateRows([`repeat((`num(1), `rem(7.5)))]),
-          gridColumnGap(rem(1.75)),
+          gridColumnGap(rem(1.0)),
         ],
       ),
     ]);
@@ -285,8 +282,7 @@ module Styles = {
   let termynal =
     style([
       height(`rem(16.875)),
-      marginLeft(`rem(1.875)),
-      marginRight(`rem(1.875)),
+      margin2(~v=`zero, ~h=`rem(1.875)),
       fontSize(`rem(0.625)),
       media(
         Style.MediaQuery.notMobile,

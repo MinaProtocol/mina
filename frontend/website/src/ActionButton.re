@@ -41,14 +41,10 @@ module Styles = {
       Style.Typeface.ibmplexsans,
       fontStyle(`normal),
       fontWeight(`normal),
-      fontSize(`rem(0.82)),
+      fontSize(`rem(0.8125)),
       color(Style.Colors.teal),
       textAlign(`left),
-      marginTop(`rem(0.1)),
-      media(
-        "(min-width: 70rem) and (max-width: 83.9375rem)",
-        [fontSize(`px(13))],
-      ),
+      marginTop(`rem(0.0625)),
     ]);
   let ctaIcon =
     style([
