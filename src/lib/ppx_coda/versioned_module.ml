@@ -153,8 +153,6 @@ let version_type version stri =
       pexp_field e
         (Located.mk (Ldot (Ldot (Lident "Bin_prot", "Type_class"), fld))))
   in
-  let version_stmt = [%stri let version = [%e Ast_builder.eint version]] in
-  let no_unused_version = [%stri let _ = version] in
   let bin_io_shadows =
     [ [%stri
         let bin_read_t =
@@ -240,8 +238,7 @@ let version_type version stri =
                 }]]]
     ; [%stri let _ = bin_t] ]
   in
-  ( List.is_empty params
-  , version_stmt :: no_unused_version :: t :: with_version :: bin_io_shadows )
+  (List.is_empty params, t :: with_version :: bin_io_shadows)
 
 let convert_module_stri last_version stri =
   let module_pattern =
