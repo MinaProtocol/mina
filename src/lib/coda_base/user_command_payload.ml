@@ -53,7 +53,7 @@ module Common = struct
   end
 
   (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
+  type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
   let to_input ({fee; nonce; memo} : t) : _ Random_oracle.Input.t =
     { field_elements= [||]
@@ -220,7 +220,7 @@ module Stable = struct
 end
 
 (* bin_io omitted *)
-type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
+type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
 let create ~fee ~nonce ~memo ~body : t = {common= {fee; nonce; memo}; body}
 

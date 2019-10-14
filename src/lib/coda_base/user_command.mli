@@ -3,15 +3,21 @@ open Import
 module Payload = User_command_payload
 
 module Poly : sig
-  module Stable : sig
-    module V1 : sig
-      type ('payload, 'pk, 'signature) t =
-        {payload: 'payload; sender: 'pk; signature: 'signature}
-      [@@deriving bin_io, sexp, hash, yojson]
-    end
+  type ('payload, 'pk, 'signature) t =
+    {payload: 'payload; sender: 'pk; signature: 'signature}
+  [@@deriving sexp, hash, yojson, eq, compare]
 
-    module Latest = V1
-  end
+  module Stable :
+    sig
+      module V1 : sig
+        type ('payload, 'pk, 'signature) t =
+          {payload: 'payload; sender: 'pk; signature: 'signature}
+        [@@deriving bin_io, sexp, hash, yojson, eq, compare]
+      end
+
+      module Latest = V1
+    end
+    with type ('payload, 'pk, 'signature) V1.t = ('payload, 'pk, 'signature) t
 end
 
 module Stable : sig
