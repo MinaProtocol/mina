@@ -8,9 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -131,6 +129,10 @@ func badHelper(e error) error {
 	return wrapError(e, "initializing helper")
 }
 
+func badAddr(e error) error {
+	return wrapError(e, "initializing external addr")
+}
+
 func needsConfigure() error {
 	return badRPC(errors.New("helper not yet configured"))
 }
@@ -171,7 +173,11 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		maddrs[i] = res
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, multiaddr.NewMultiaddr(m.External), m.Statedir, privk, m.NetworkID)
+	externalMaddr, err := multiaddr.NewMultiaddr(m.External)
+	if err != nil {
+		return nil, badAddr(err)
+	}
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID)
 	if err != nil {
 		return nil, badHelper(err)
 	}

@@ -3,14 +3,6 @@ open Async
 open Signature_lib
 open Coda_base
 
-module Client = Graphql_client_lib.Make (struct
-  let address = "graphql"
-
-  let preprocess_variables_string = Fn.id
-
-  let headers = String.Map.empty
-end)
-
 let print_rpc_error error =
   eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
 
@@ -124,11 +116,11 @@ let get_balance_graphql =
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Get balance associated with a public key"
-    (Cli_lib.Background_daemon.rpc_init pk_flag ~f:(fun port public_key ->
+    (Cli_lib.Background_daemon.graphql_init pk_flag ~f:(fun port public_key ->
          let%map response =
-           Client.query
+           Graphql_client.query
              (Graphql_queries.Get_wallet.make
-                ~public_key:(Graphql_client_lib.Encoders.public_key public_key)
+                ~public_key:(Graphql_client.Encoders.public_key public_key)
                 ())
              port
          in
@@ -613,8 +605,8 @@ let send_payment_graphql =
           ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, amount)
           ->
          let%map response =
-           Graphql_client_lib.(
-             Client.query
+           Graphql_client.(
+             Graphql_client.query
                (Graphql_queries.Send_payment.make
                   ~receiver:(Encoders.public_key receiver)
                   ~sender:(Encoders.public_key sender)
@@ -636,11 +628,11 @@ let delegate_stake_graphql =
   in
   let args = Args.zip2 Cli_lib.Flag.user_command_common receiver_flag in
   Command.async ~summary:"Delegate your stake to another public key"
-    (Cli_lib.Background_daemon.rpc_init args
+    (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun rest_port ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver) ->
          let%map response =
-           Graphql_client_lib.(
-             Client.query
+           Graphql_client.(
+             Graphql_client.query
                (Graphql_queries.Send_delegation.make
                   ~receiver:(Encoders.public_key receiver)
                   ~sender:(Encoders.public_key sender)
@@ -748,7 +740,7 @@ let cancel_transaction_graphql =
     ~summary:
       "Cancel a transaction -- this submits a replacement transaction with a \
        fee larger than the cancelled transaction."
-    (Cli_lib.Background_daemon.rpc_init txn_id_flag
+    (Cli_lib.Background_daemon.graphql_init txn_id_flag
        ~f:(fun rest_port user_command ->
          let receiver =
            match
@@ -761,8 +753,8 @@ let cancel_transaction_graphql =
          in
          let open Deferred.Let_syntax in
          let%bind nonce_response =
-           let open Graphql_client_lib.Encoders in
-           Client.query
+           let open Graphql_client.Encoders in
+           Graphql_client.query
              (Graphql_queries.Get_inferred_nonce.make
                 ~public_key:(public_key (User_command.sender user_command))
                 ())
@@ -795,7 +787,7 @@ let cancel_transaction_graphql =
          printf "Fee to cancel transaction is %s coda.\n"
            (Currency.Fee.to_string cancel_fee) ;
          let cancel_query =
-           let open Graphql_client_lib.Encoders in
+           let open Graphql_client.Encoders in
            Graphql_queries.Send_payment.make
              ~sender:(public_key (User_command.sender user_command))
              ~receiver:(public_key receiver) ~fee:(fee cancel_fee)
@@ -806,7 +798,9 @@ let cancel_transaction_graphql =
                      (User_command.nonce user_command)))
              ()
          in
-         let%map cancel_response = Client.query cancel_query rest_port in
+         let%map cancel_response =
+           Graphql_client.query cancel_query rest_port
+         in
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
            ((cancel_response#sendPayment)#payment)#id ))
 
@@ -954,7 +948,7 @@ let snark_pool_list =
   Command.async ~summary:"List of snark works in the snark pool in JSON format"
     (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
          Deferred.map
-           (Client.query (Graphql_queries.Snark_pool.make ()) port)
+           (Graphql_client.query (Graphql_queries.Snark_pool.make ()) port)
            ~f:(fun response ->
              let lst =
                [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
@@ -1017,10 +1011,11 @@ let set_staking_graphql =
       (required public_key_compressed)
   in
   Command.async ~summary:"Start producing blocks"
-    (Cli_lib.Background_daemon.rpc_init pk_flag ~f:(fun rest_port public_key ->
+    (Cli_lib.Background_daemon.graphql_init pk_flag
+       ~f:(fun rest_port public_key ->
          let%map _ =
-           Graphql_client_lib.(
-             Client.query
+           Graphql_client.(
+             Graphql_client.query
                (Graphql_queries.Set_staking.make
                   ~public_key:(Encoders.public_key public_key)
                   ()))
@@ -1045,11 +1040,11 @@ let set_snark_worker =
          let graphql =
            Graphql_queries.Set_snark_worker.make
              ~wallet:
-               Graphql_client_lib.Encoders.(
+               Graphql_client.Encoders.(
                  optional optional_public_key ~f:public_key)
              ()
          in
-         Deferred.map (Client.query graphql port) ~f:(fun response ->
+         Deferred.map (Graphql_client.query graphql port) ~f:(fun response ->
              ( match optional_public_key with
              | Some public_key ->
                  printf
@@ -1069,12 +1064,10 @@ let set_snark_work_fee =
        ~f:(fun port fee ->
          let graphql =
            Graphql_queries.Set_snark_work_fee.make
-             ~fee:
-               ( Graphql_client_lib.Encoders.uint64
-               @@ Currency.Fee.to_uint64 fee )
+             ~fee:(Graphql_client.Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
              ()
          in
-         Deferred.map (Client.query graphql port) ~f:(fun response ->
+         Deferred.map (Graphql_client.query graphql port) ~f:(fun response ->
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
                (Currency.Fee.to_int fee)
@@ -1166,7 +1159,7 @@ let import_key =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
              let%map _response =
-               Client.query_or_error
+               Graphql_client.query_or_error
                  (Graphql_queries.Reload_wallets.make ())
                  port
              in
@@ -1180,7 +1173,7 @@ let list_accounts =
   Command.async ~summary:"List all owned accounts"
     (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
          let%map response =
-           Client.query (Graphql_queries.Get_wallets.make ()) port
+           Graphql_client.query (Graphql_queries.Get_wallets.make ()) port
          in
          match response#ownedWallets with
          | [||] ->
@@ -1207,7 +1200,7 @@ let create_account =
            Secrets.Keypair.prompt_password "Password for new account: "
          in
          let%map response =
-           Client.query
+           Graphql_client.query
              (Graphql_queries.Add_wallet.make
                 ~password:(Bytes.to_string password) ())
              port
@@ -1237,9 +1230,9 @@ let unlock_account =
          match%bind args with
          | Ok password_bytes ->
              let%map response =
-               Client.query
+               Graphql_client.query
                  (Graphql_queries.Unlock_wallet.make
-                    ~public_key:(Graphql_client_lib.Encoders.public_key pk_str)
+                    ~public_key:(Graphql_client.Encoders.public_key pk_str)
                     ~password:(Bytes.to_string password_bytes)
                     ())
                  port
@@ -1263,7 +1256,7 @@ let lock_account =
   Command.async ~summary:"Lock a tracked account"
     (Cli_lib.Background_daemon.graphql_init pk_flag ~f:(fun port pk ->
          let%map response =
-           Client.query
+           Graphql_client.query
              (Graphql_queries.Lock_wallet.make
                 ~public_key:(Graphql_client.Encoders.public_key pk)
                 ())
