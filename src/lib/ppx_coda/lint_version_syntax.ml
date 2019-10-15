@@ -92,7 +92,8 @@ let check_deriving_usage =
 
     method! module_expr expr ((in_functor, errors) as acc) =
       match expr.pmod_desc with
-      | Pmod_functor (_label, _mty, body) ->
+      (* don't match special case of functor with () argument *)
+      | Pmod_functor (_label, Some _mty, body) ->
           let _, errs = self#module_expr body (true, errors) in
           (in_functor, errs)
       | _ ->
