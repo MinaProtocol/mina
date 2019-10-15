@@ -18,6 +18,10 @@ positive-tests : unexpired.ml
 	@ echo -n "Unexpired, should succeed..."
 	@ dune build unexpired.cma ${REDIRECT}
 	@ echo "OK"
+# version syntax
+	@ echo -n "Version syntax, should succeed..."
+	@ dune build good_version_syntax.cma ${REDIRECT}
+	@ echo "OK"
 # versioning
 	@ echo -n "Versioned types, should succeed..."
 	@ dune build versioned_good.cma ${REDIRECT}
@@ -40,6 +44,22 @@ negative-tests :
 	@ echo "OK"
 	@ echo -n "Invalid format, should fail..."
 	@ ! dune build expiry_invalid_format.cma ${REDIRECT}
+	@ echo "OK"
+# version syntax 
+	@ echo -n "Missing deriving version, should fail..."
+	@ ! dune build bad_version_syntax_missing_version.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "bin_io in functor body, should fail..."
+	@ ! dune build bad_version_syntax_bin_io_in_functor.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "version in functor body, should fail..."
+	@ ! dune build bad_version_syntax_version_in_functor.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "bin_io in nested functor body, should fail..."
+	@ ! dune build bad_version_syntax_bin_io_in_nested_functor.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Multiple version syntax errors, use VERBOSE to see them all..."
+	@ ! dune build bad_version_syntax_multiple_errors.cma ${REDIRECT}
 	@ echo "OK"
 # versioning
 	@ echo -n "Versioned type in module with invalid name, should fail..."

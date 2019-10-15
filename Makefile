@@ -80,8 +80,8 @@ build_archive: git_hooks reformat-diff
 	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && dune build app/archive/archive.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build-syntax-linter:
-	cd src && dune build lib/lint_syntax/driver.exe
+build-version-syntax-linter:
+	cd src && dune build lib/ppx_coda/drivers/lint_version_syntax_driver.exe
 
 dev: codabuilder containerstart build
 

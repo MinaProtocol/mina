@@ -1,5 +1,3 @@
-open Core_kernel
-
 (* deriving version in functor body *)
 
 module Functor (X : sig end) = struct

@@ -10,6 +10,8 @@ struct
     module V1 = struct
       module T = struct
         type t = string [@@deriving bin_io]
+
+        let why = Y.y
       end
     end
   end

@@ -14,10 +14,24 @@ end
 
 let%test_module "bin_io only" =
   ( module struct
-    type t = string [@@deriving bin_io]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = string [@@deriving bin_io]
+        end
+      end
+    end
   end )
 
 let%test_module "version only" =
   ( module struct
-    type t = string [@@deriving version]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = string [@@deriving version]
+
+          let _ = version
+        end
+      end
+    end
   end )
