@@ -287,7 +287,7 @@ module T = struct
 
     let new_block =
       C.create_pipe ~f:new_block_impl ~name:"new_block"
-        ~bin_input:[%bin_type_class: Account.Stable.V1.key]
+        ~bin_input:[%bin_type_class: Account.Key.Stable.V1.t]
         ~bin_output:
           [%bin_type_class:
             ( Auxiliary_database.Filtered_external_transition.Stable.V1.t
