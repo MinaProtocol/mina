@@ -1,6 +1,14 @@
 open Core
 
-type t [@@deriving bin_io]
+module Stable : sig
+  module V1 : sig
+    type t [@@deriving bin_io, version]
+  end
+
+  module Latest = V1
+end
+
+type t = Stable.V1.t
 
 module Level : sig
   type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
@@ -25,7 +33,16 @@ module Source : sig
 end
 
 module Metadata : sig
-  type t = Yojson.Safe.json String.Map.t [@@deriving yojson, bin_io]
+  module Stable : sig
+    module V1 : sig
+      type t = Yojson.Safe.json String.Map.t
+      [@@deriving yojson, bin_io, version]
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.V1.t
 end
 
 module Message : sig
@@ -66,7 +83,7 @@ module Transport : sig
      *  size, the old log is deleted and a new log is
      *  started. *)
     val dumb_logrotate :
-      directory:string -> log_name:string -> max_size:int -> t
+      directory:string -> log_filename:string -> max_size:int -> t
   end
 end
 

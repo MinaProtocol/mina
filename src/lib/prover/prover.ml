@@ -35,7 +35,8 @@ module Worker_state = struct
     val verify : Protocol_state.Value.t -> Proof.t -> bool
   end
 
-  type init_arg = {conf_dir: string; logger: Logger.t} [@@deriving bin_io]
+  type init_arg = {conf_dir: string; logger: Logger.Stable.Latest.t}
+  [@@deriving bin_io]
 
   type t = (module S) Deferred.t
 
@@ -238,7 +239,7 @@ module Worker = struct
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-               ~log_name:"coda-prover.log" ~max_size) ;
+               ~log_filename:"coda-prover.log" ~max_size) ;
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Prover started" ;
         Worker_state.create {conf_dir; logger}
@@ -279,15 +280,17 @@ let create ~logger ~pids ~conf_dir =
        (Process.stdout process |> Reader.pipe)
        ~f:(fun stdout ->
          return
-         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-              stdout ) ;
+         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              "Prover stdout: $stdout"
+              ~metadata:[("stdout", `String stdout)] ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
-         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-              stderr ) ;
+         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              "Prover stderr: $stderr"
+              ~metadata:[("stderr", `String stderr)] ) ;
   {connection; process}
 
 let initialized {connection; _} =

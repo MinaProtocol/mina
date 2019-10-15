@@ -32,29 +32,45 @@ module Source = struct
 end
 
 module Metadata = struct
-  type t = Yojson.Safe.json String.Map.t
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Yojson.Safe.json String.Map.t [@@deriving version {asserted}]
+
+        let to_yojson t = `Assoc (String.Map.to_alist t)
+
+        let of_yojson = function
+          | `Assoc alist ->
+              Ok (String.Map.of_alist_exn alist)
+          | _ ->
+              Error "expected object"
+
+        include Binable.Of_binable
+                  (String)
+                  (struct
+                    type nonrec t = t
+
+                    let to_binable t = to_yojson t |> Yojson.Safe.to_string
+
+                    let of_binable (t : string) : t =
+                      Yojson.Safe.from_string t |> of_yojson |> Result.ok
+                      |> Option.value_exn
+                  end)
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
 
   let empty = String.Map.empty
 
-  let to_yojson t = `Assoc (String.Map.to_alist t)
+  let to_yojson = Stable.Latest.to_yojson
 
-  let of_yojson = function
-    | `Assoc alist ->
-        Ok (String.Map.of_alist_exn alist)
-    | _ ->
-        Error "expected object"
+  let of_yojson = Stable.Latest.of_yojson
 
-  include Binable.Of_binable
-            (String)
-            (struct
-              type nonrec t = t
-
-              let to_binable t = to_yojson t |> Yojson.Safe.to_string
-
-              let of_binable (t : string) : t =
-                Yojson.Safe.from_string t |> of_yojson |> Result.ok
-                |> Option.value_exn
-            end)
+  type t = Stable.Latest.t
 
   let mem = String.Map.mem
 
@@ -173,19 +189,19 @@ module Transport = struct
 
       type t =
         { directory: string
-        ; log_name: string
+        ; log_filename: string
         ; max_size: int
         ; mutable primary_log: File_descr.t
         ; mutable primary_log_size: int }
 
-      let create ~directory ~max_size ~log_name =
+      let create ~directory ~max_size ~log_filename =
         if not (Result.is_ok (access directory [`Exists])) then
           mkdir_p ~perm:0o755 directory ;
         if not (Result.is_ok (access directory [`Exists; `Read; `Write])) then
           failwithf
             "cannot create log files: read/write permissions required on %s"
             directory () ;
-        let primary_log_loc = Filename.concat directory log_name in
+        let primary_log_loc = Filename.concat directory log_filename in
         let primary_log_size, mode =
           if Result.is_ok (access primary_log_loc [`Exists; `Read; `Write])
           then
@@ -194,13 +210,13 @@ module Transport = struct
           else (0, [O_RDWR; O_CREAT])
         in
         let primary_log = openfile ~perm:log_perm ~mode primary_log_loc in
-        {directory; log_name; max_size; primary_log; primary_log_size}
+        {directory; log_filename; max_size; primary_log; primary_log_size}
 
       let rotate t =
-        let primary_log_loc = Filename.concat t.directory t.log_name in
-        let secondary_log_name = t.log_name ^ ".0" in
+        let primary_log_loc = Filename.concat t.directory t.log_filename in
+        let secondary_log_filename = t.log_filename ^ ".0" in
         let secondary_log_loc =
-          Filename.concat t.directory secondary_log_name
+          Filename.concat t.directory secondary_log_filename
         in
         close t.primary_log ;
         rename ~src:primary_log_loc ~dst:secondary_log_loc ;
@@ -217,10 +233,10 @@ module Transport = struct
         t.primary_log_size <- t.primary_log_size + len
     end
 
-    let dumb_logrotate ~directory ~log_name ~max_size =
+    let dumb_logrotate ~directory ~log_filename ~max_size =
       T
         ( (module Dumb_logrotate)
-        , Dumb_logrotate.create ~directory ~log_name ~max_size )
+        , Dumb_logrotate.create ~directory ~log_filename ~max_size )
   end
 end
 
@@ -237,7 +253,6 @@ module Consumer_registry = struct
     Consumer_tbl.add_multi t ~key:id ~data:{processor; transport}
 
   let broadcast_log_message ~id msg =
-    (* TODO: warn or fail if there's no registered consumer? Issue #3000 *)
     Hashtbl.find_and_call t id
       ~if_found:(fun consumers ->
         List.iter consumers
@@ -261,7 +276,20 @@ module Consumer_registry = struct
             () )
 end
 
-type t = {null: bool; metadata: Metadata.t; id: string} [@@deriving bin_io]
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t = {null: bool; metadata: Metadata.Stable.V1.t; id: string}
+      [@@deriving bin_io, version]
+    end
+
+    include T
+  end
+
+  module Latest = V1
+end
+
+type t = Stable.Latest.t = {null: bool; metadata: Metadata.t; id: string}
 
 let create ?(metadata = []) ?(id = "default") () =
   let pid = lazy (Unix.getpid () |> Pid.to_int) in

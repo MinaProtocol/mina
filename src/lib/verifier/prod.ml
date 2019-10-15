@@ -15,7 +15,7 @@ module Worker_state = struct
       Transaction_snark.t -> message:Sok_message.t -> bool
   end
 
-  type init_arg = {conf_dir: string option; logger: Logger.t}
+  type init_arg = {conf_dir: string option; logger: Logger.Stable.Latest.t}
   [@@deriving bin_io]
 
   type t = (module S) Deferred.t
@@ -127,7 +127,7 @@ module Worker = struct
             ~transport:
               (Logger.Transport.File_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
-                 ~log_name:"coda-verifier.log" ~max_size) ) ;
+                 ~log_filename:"coda-verifier.log" ~max_size) ) ;
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Verifier started" ;
         Worker_state.create {conf_dir; logger}
@@ -168,15 +168,17 @@ let create ~logger ~pids ~conf_dir =
        (Process.stdout process |> Reader.pipe)
        ~f:(fun stdout ->
          return
-         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-              stdout ) ;
+         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              "Verifier stdout: $stdout"
+              ~metadata:[("stdout", `String stdout)] ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
-         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-              stderr ) ;
+         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              "Verifier stderr: $stderr"
+              ~metadata:[("stdout", `String stderr)] ) ;
   connection
 
 let verify_blockchain_snark t chain =

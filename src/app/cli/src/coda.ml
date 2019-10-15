@@ -241,7 +241,7 @@ let daemon logger =
          ~processor:(Logger.Processor.raw ())
          ~transport:
            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-              ~log_name:"coda.log" ~max_size:logrotate_max_size) ;
+              ~log_filename:"coda.log" ~max_size:logrotate_max_size) ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Coda daemon is booting up; built with commit $commit on branch \
           $branch"
