@@ -87,58 +87,36 @@ let validate_version_if_bin_io =
 (* traverse AST, collect errors *)
 let check_deriving_usage =
   object (self)
-    (* int indicates how many functors we've entered *)
-    inherit [int * (Location.t * string) list] Ast_traverse.fold as super
+    (* bool indicates whether we're in a functor *)
+    inherit [bool * (Location.t * string) list] Ast_traverse.fold as super
 
-    method! structure_item str ((functor_depth, errors) as acc) =
-      let item_errors =
-        match str.pstr_desc with
-        | Pstr_module {pmb_expr; _} -> (
-          match pmb_expr.pmod_desc with
-          | Pmod_structure structure ->
-              let _, errs = self#structure structure acc in
-              errs
-          | Pmod_functor (_name, _mod_type_opt, mod_expr) ->
-              let rec functor_body_errors mod_exp =
-                match mod_exp.pmod_desc with
-                | Pmod_structure str ->
-                    let _, errs =
-                      self#structure str (functor_depth + 1, errors)
-                    in
-                    errs
-                | Pmod_functor (_, _, mod_expr') ->
-                    functor_body_errors mod_expr'
-                | Pmod_apply (mod_expr1, mod_expr2) ->
-                    functor_body_errors mod_expr1
-                    @ functor_body_errors mod_expr2
-                | Pmod_constraint (mod_expr', _) ->
-                    functor_body_errors mod_expr'
-                | Pmod_ident _ | Pmod_unpack _ | Pmod_extension _ ->
-                    []
-              in
-              errors @ functor_body_errors mod_expr
-          | _ ->
-              errors )
-        | Pstr_type (_rec_decl, type_decls) ->
-            (* for type declaration, check attributes *)
-            let f =
-              if functor_depth > 0 then validate_neither_bin_io_nor_version
-              else validate_version_if_bin_io
-            in
-            errors @ List.concat @@ List.map type_decls ~f
-        | Pstr_extension ((name, _payload), _attrs)
-          when String.equal name.txt "test_module" ->
-            (* don't check for errors in test code *)
-            errors
-        | _ ->
-            let _, errs = super#structure_item str acc in
-            errs
-      in
-      (functor_depth, item_errors)
+    method! module_expr expr ((in_functor, errors) as acc) =
+      match expr.pmod_desc with
+      | Pmod_functor (_label, _mty, body) ->
+          let _, errs = self#module_expr body (true, errors) in
+          (in_functor, errs)
+      | _ ->
+          super#module_expr expr acc
+
+    method! structure_item str ((in_functor, errors) as acc) =
+      match str.pstr_desc with
+      | Pstr_type (_rec_decl, type_decls) ->
+          (* for type declaration, check attributes *)
+          let f =
+            if in_functor then validate_neither_bin_io_nor_version
+            else validate_version_if_bin_io
+          in
+          (in_functor, errors @ List.concat @@ List.map type_decls ~f)
+      | Pstr_extension ((name, _payload), _attrs)
+        when String.equal name.txt "test_module" ->
+          (* don't check for errors in test code *)
+          acc
+      | _ ->
+          super#structure_item str acc
   end
 
 let enforce_deriving_usage str =
-  let _in_functor, errors = check_deriving_usage#structure str (0, []) in
+  let _in_functor, errors = check_deriving_usage#structure str (false, []) in
   if !errors_as_warnings_ref then (
     (* we can't print Lint_error.t's, so collect the same information
      in a way we can print, that is, a list of location, string pairs *)
