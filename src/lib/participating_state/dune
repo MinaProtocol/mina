@@ -1,4 +1,4 @@
 (library
   (name participating_state)
   (public_name participating_state)
-  (libraries core_kernel))
+  (libraries async_kernel core_kernel))
