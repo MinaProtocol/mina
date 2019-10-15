@@ -81,3 +81,8 @@ let min_elt ~compare (x, xs) =
 let max_elt ~compare (x, xs) =
   Option.value_map ~default:x (List.max_elt ~compare xs) ~f:(fun maximum ->
       if compare x maximum > 0 then x else maximum )
+
+let rec iter_deferred (x, xs) ~f =
+  let open Async_kernel in
+  let%bind () = f x in
+  match xs with [] -> return () | h :: t -> iter_deferred (h, t) ~f
