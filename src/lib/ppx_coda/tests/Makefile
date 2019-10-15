@@ -55,6 +55,9 @@ negative-tests :
 	@ echo -n "version in functor body, should fail..."
 	@ ! dune build bad_version_syntax_version_in_functor.cma ${REDIRECT}
 	@ echo "OK"
+	@ echo -n "versioned in functor body, should fail..."
+	@ ! dune build bad_version_syntax_versioned_in_functor.cma ${REDIRECT}
+	@ echo "OK"
 	@ echo -n "bin_io in nested functor body, should fail..."
 	@ ! dune build bad_version_syntax_bin_io_in_nested_functor.cma ${REDIRECT}
 	@ echo "OK"

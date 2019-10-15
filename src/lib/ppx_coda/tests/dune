@@ -76,6 +76,11 @@
   (modules bad_version_syntax_version_in_functor))
 
 (library
+  (name bad_version_syntax_versioned_in_functor)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (modules bad_version_syntax_versioned_in_functor))
+
+(library
   (name bad_version_syntax_bin_io_in_nested_functor)
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (libraries core_kernel)

@@ -84,6 +84,9 @@ let validate_version_if_bin_io =
     ~pred:(fun has_bin_io has_version -> has_bin_io && not has_version)
     "Must have deriving version if deriving bin_io"
 
+let versioned_in_functor_error loc =
+  (loc, "Cannot use versioned extension within a functor body")
+
 (* traverse AST, collect errors *)
 let check_deriving_usage =
   object (self)
@@ -108,6 +111,9 @@ let check_deriving_usage =
             else validate_version_if_bin_io
           in
           (in_functor, errors @ List.concat_map type_decls ~f)
+      | Pstr_extension ((name, _payload), _attrs)
+        when in_functor && String.equal name.txt "versioned" ->
+          (in_functor, errors @ [versioned_in_functor_error name.loc])
       | Pstr_extension ((name, _payload), _attrs)
         when String.equal name.txt "test_module" ->
           (* don't check for errors in test code *)
