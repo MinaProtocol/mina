@@ -52,7 +52,7 @@ module Make (Inputs : Inputs_intf) = struct
             total_currency + (Balance.to_int @@ Account.balance account) )
       in
       let uuid = format_uuid mask in
-      { hash= Visualization.display_short_sexp (module Hash) root_hash
+      { hash= Visualization.display_prefix_of_string @@ Hash.to_string root_hash
       ; num_accounts
       ; total_currency
       ; uuid }

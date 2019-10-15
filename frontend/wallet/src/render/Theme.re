@@ -60,6 +60,8 @@ module Colors = {
   let midnightAlpha = a => `rgba((31, 45, 61, a));
   let midnight = midnightAlpha(1.0);
 
+  let midnightBlue = `rgb((52, 75, 101));
+
   let jungle = `hex("2BAC46");
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
@@ -145,6 +147,7 @@ module Text = {
         fontWeight(`normal),
         fontSize(`rem(0.8125)),
         lineHeight(`rem(1.25)),
+        color(Colors.midnight),
       ]);
 
     let semiBold =
@@ -155,9 +158,35 @@ module Text = {
         lineHeight(`rem(1.5)),
         letterSpacing(`rem(-0.0125)),
       ]);
+
+    let smallCaps =
+      style([
+        Typeface.plex,
+        fontWeight(`semiBold),
+        fontSize(`rem(0.75)),
+        lineHeight(`rem(1.0)),
+        letterSpacing(`rem(0.0875)),
+        textTransform(`uppercase),
+      ]);
+    let error =
+      style([
+        Typeface.plex,
+        fontWeight(`semiBold),
+        fontSize(`rem(1.)),
+        letterSpacing(`rem(-0.0125)),
+        color(Colors.roseBud),
+      ]);
   };
 
   module Header = {
+    let h1 =
+      style([
+        Typeface.plex,
+        color(Colors.saville),
+        fontSize(`rem(2.79)),
+        fontWeight(`num(300)),
+        lineHeight(`rem(3.73)),
+      ]);
     let h3 =
       style([
         Typeface.plex,
@@ -210,3 +239,23 @@ let codaLogoCurrent =
     backgroundColor(`hex("516679")),
     margin(`em(0.5)),
   ]);
+
+module Onboarding = {
+  let main =
+    merge([
+      style([
+        position(`absolute),
+        top(`zero),
+        left(`zero),
+        background(white),
+        zIndex(100),
+        display(`flex),
+        flexDirection(`row),
+        paddingTop(Spacing.headerHeight),
+        paddingBottom(Spacing.footerHeight),
+        height(`vh(100.)),
+        width(`vw(100.)),
+      ]),
+      Window.Styles.bg,
+    ]);
+};
