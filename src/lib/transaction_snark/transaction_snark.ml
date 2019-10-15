@@ -267,12 +267,13 @@ module Verification_keys = struct
 
   let dummy : t =
     let groth16 =
-      Tick_backend.Verification_key.dummy
+      Tick_backend.Verification_key.get_dummy
         ~input_size:(Tick.Data_spec.size (tick_input ()))
     in
     { merge= groth16
     ; base= groth16
-    ; wrap= Tock_backend.Verification_key.dummy ~input_size:Wrap_input.size }
+    ; wrap= Tock_backend.Verification_key.get_dummy ~input_size:Wrap_input.size
+    }
 end
 
 module Keys0 = struct

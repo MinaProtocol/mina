@@ -1,6 +1,6 @@
 # GUI Wallet
 
-<img width="100%" src="https://cdn.codaprotocol.com/website/static/img/coda-wallet-cd4e13e99eab19b21dce06a3a9abe03f5e847ec0682e205d64b72fc89057ff51.png" alt="Screenshot of the Coda Wallet GUI." />
+<img width="100%" src="https://cdn.codaprotocol.com/website/static/img/coda-wallet-84ca8e1441ef0ff0a2cd22cebdf5aa84704c43d729b3c48732f76db2971ef20d<Paste>.png" alt="Screenshot of the Coda Wallet GUI." />
 
 The GUI Wallet is the easiest way to connect to the Coda network and run a node. You can use the wallet to send transactions, check your funds, stake coda, and create zk-SNARKs to compress transactions.
 

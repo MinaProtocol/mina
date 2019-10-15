@@ -48,7 +48,7 @@ let main () =
          ~f:(fun {With_hash.hash; _} -> hash))
   in
   assert (Hash_set.equal observed_hashset stored_state_hashes) ;
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async

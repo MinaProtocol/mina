@@ -25,7 +25,7 @@ let make = () => {
     {switch (url.path) {
      | ["settings"] => <SettingsPage />
      | ["settings", publicKey] =>
-       <WalletSettings publicKey={PublicKey.uriDecode(publicKey)} />
+       <AccountSettings publicKey={PublicKey.uriDecode(publicKey)} />
      | ["wallet", _pk, ..._] => <Transactions />
      | _ =>
        <WalletQuery>
