@@ -12,7 +12,7 @@ module Index = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = int [@@deriving bin_io, to_yojson, sexp, version]
+      type t = int [@@deriving to_yojson, sexp]
 
       let to_latest = Fn.id
     end
@@ -61,7 +61,7 @@ module Poly = struct
         ; receipt_chain_hash: 'receipt_chain_hash
         ; delegate: 'pk
         ; voting_for: 'state_hash }
-      [@@deriving sexp, bin_io, eq, compare, hash, yojson, version]
+      [@@deriving sexp, eq, compare, hash, yojson]
     end
   end]
 
@@ -86,7 +86,7 @@ module Key = struct
   module Stable = struct
     module V1 = struct
       type t = Public_key.Compressed.Stable.V1.t
-      [@@deriving sexp, bin_io, eq, hash, compare, yojson]
+      [@@deriving sexp, eq, hash, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -105,7 +105,7 @@ module Stable = struct
       , Receipt.Chain_hash.Stable.V1.t
       , State_hash.Stable.V1.t )
       Poly.Stable.V1.t
-    [@@deriving sexp, bin_io, eq, hash, compare, yojson, version]
+    [@@deriving sexp, eq, hash, compare, yojson]
 
     let to_latest = Fn.id
 
