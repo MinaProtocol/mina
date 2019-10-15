@@ -78,7 +78,7 @@ let recurring_prefix x = "R&" ^ x
 let trace_recurring name f = trace (recurring_prefix name) f
 
 let trace_recurring_task (name : string) (f : unit -> unit Deferred.t) =
-  trace_task ("R&" ^ name) (fun () ->
+  trace_task (recurring_prefix name) (fun () ->
       trace_event "started another" ;
       f () )
 
