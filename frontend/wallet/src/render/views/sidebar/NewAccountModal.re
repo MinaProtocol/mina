@@ -22,11 +22,11 @@ let make = (~onClose) => {
   let (_settings, updateAddressBook) =
     React.useContext(AddressBookProvider.context);
 
-  <Modal title="Add Wallet" onRequestClose=onClose>
+  <Modal title="New Account" onRequestClose=onClose>
     <div className=Modal.Styles.default>
       <Alert
         kind=`Info
-        message="You can change the name or delete the wallet later."
+        message="You can rename or delete your account at anytime."
       />
       <Spacer height=1. />
       <TextField

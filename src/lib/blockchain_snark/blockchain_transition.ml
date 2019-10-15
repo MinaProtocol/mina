@@ -70,10 +70,10 @@ module Keys = struct
 
     let dummy =
       { step=
-          Tick_backend.Verification_key.dummy
+          Tick_backend.Verification_key.get_dummy
             ~input_size:Coda_base.Transition_system.step_input_size
       ; wrap=
-          Tock_backend.Bowe_gabizon.Verification_key.dummy
+          Tock_backend.Bowe_gabizon.Verification_key.get_dummy
             ~input_size:Wrap_input.size }
 
     let load ({step; wrap} : Location.t) =

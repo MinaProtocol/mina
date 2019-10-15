@@ -221,7 +221,7 @@ let make = (~onClose) => {
                  (),
                )##variables;
              let performMutation =
-               Task.liftPromise(() => mutation(~variables, ()));
+               Task.liftPromise(() => mutation(~variables, ~refetchQueries=[|"transactions"|], ()));
              Task.perform(
                performMutation,
                ~f=
