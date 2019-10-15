@@ -581,20 +581,9 @@ struct
     t.root <- new_root_hash ;
     (* TODO: these metrics are too expensive to compute in this way, but it should be ok for beta *)
     (*
-    let num_finalized_staged_txns =
-      Breadcrumb.user_commands new_root |> List.length |> Float.of_int
-    in
     let root_snarked_ledger_accounts =
       Ledger.Db.to_list t.root_snarked_ledger
     in
-    *)
-    (*
-    Coda_metrics.(
-      Gauge.set Transition_frontier.recently_finalized_staged_txns
-        num_finalized_staged_txns) ;
-    Coda_metrics.(
-      Counter.inc Transition_frontier.finalized_staged_txns
-        num_finalized_staged_txns) ;
     Coda_metrics.(
       Gauge.set Transition_frontier.root_snarked_ledger_accounts
         (Float.of_int @@ List.length root_snarked_ledger_accounts)) ;
@@ -605,6 +594,15 @@ struct
              ~f:(fun sum account ->
                sum + Currency.Balance.to_int account.balance ) )) ;
     *)
+    let num_finalized_staged_txns =
+      Breadcrumb.user_commands new_root |> List.length |> Float.of_int
+    in
+    Coda_metrics.(
+      Gauge.set Transition_frontier.recently_finalized_staged_txns
+        num_finalized_staged_txns) ;
+    Coda_metrics.(
+      Counter.inc Transition_frontier.finalized_staged_txns
+        num_finalized_staged_txns) ;
     Coda_metrics.(Counter.inc_one Transition_frontier.root_transitions) ;
     let consensus_state = Breadcrumb.consensus_state new_root in
     let blockchain_length =
