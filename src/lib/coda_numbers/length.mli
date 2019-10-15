@@ -1,1 +1,1 @@
-include Nat.S
+include Nat.Intf.UInt32
