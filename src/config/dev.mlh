@@ -7,11 +7,11 @@
 [%%import "config/proof_level/check.mlh"]
 [%%import "config/txpool_size.mlh"]
 
-[%%define time_offsets true]
+[%%define time_offsets false]
 [%%define fake_hash false]
 
 [%%define genesis_ledger "test"]
-[%%define genesis_state_timestamp "1970-01-01T00:00:00Z"]
+[%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
 [%%define block_window_duration 2000]
 
 [%%define integration_tests true]
