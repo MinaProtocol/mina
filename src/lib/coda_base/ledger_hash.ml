@@ -62,6 +62,9 @@ let empty_hash =
   digest_fold (State.create ()) (Fold.string_triples "nothing up my sleeve")
   |> of_hash
 
+let%bench "Ledger_hash.merge ~height:1 empty_hash empty_hash" =
+  merge ~height:1 empty_hash empty_hash
+
 let of_digest = Fn.compose Fn.id of_hash
 
 type path = Pedersen.Digest.t list
