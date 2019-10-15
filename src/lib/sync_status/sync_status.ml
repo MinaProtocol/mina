@@ -46,7 +46,7 @@ module Stable = struct
     module T = struct
       type t =
         [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
-      [@@deriving bin_io, version, sexp, hash, compare, equal, enum]
+      [@@deriving bin_io, version, sexp, hash, compare, equal, enumerate]
 
       let to_yojson = to_yojson
     end
@@ -59,7 +59,7 @@ module Stable = struct
 end
 
 type t = [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
-[@@deriving sexp, hash, equal, enum]
+[@@deriving sexp, hash, equal, enumerate]
 
 include Hashable.Make (Stable.Latest.T)
 

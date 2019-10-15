@@ -138,8 +138,7 @@ module Types = struct
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
-        (List.init (Sync_status.max + 1) ~f:(fun i ->
-             let status = Option.value_exn (Sync_status.of_enum i) in
+        (List.map Sync_status.all ~f:(fun status ->
              enum_value
                (String.map ~f:Char.uppercase @@ Sync_status.to_string status)
                ~value:status ))
