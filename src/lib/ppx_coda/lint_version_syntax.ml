@@ -106,7 +106,7 @@ let check_deriving_usage =
             if in_functor then validate_neither_bin_io_nor_version
             else validate_version_if_bin_io
           in
-          (in_functor, errors @ List.concat @@ List.map type_decls ~f)
+          (in_functor, errors @ List.concat_map type_decls ~f)
       | Pstr_extension ((name, _payload), _attrs)
         when String.equal name.txt "test_module" ->
           (* don't check for errors in test code *)
