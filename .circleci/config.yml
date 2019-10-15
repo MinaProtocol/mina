@@ -109,7 +109,9 @@ jobs:
             - run:
                   name: Check CODEOWNERS file format
                   command: ./scripts/lint_codeowners.sh
-
+            - run:
+                  name: Require ppx_coda preprocessing for linting
+                  command: ./scripts/require-ppx-coda.py
     update-branch-protection:
         docker:
             - image: python:3
