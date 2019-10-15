@@ -110,20 +110,42 @@ let setup (type n) ?(logger = Logger.null ())
   in
   {fake_gossip_network; peer_networks}
 
-type peer_config = {initial_frontier_size: int} [@@deriving make]
+module Generator = struct
+  open Quickcheck
+  open Generator.Let_syntax
 
-let gen ~max_frontier_length configs =
-  let open Quickcheck.Generator.Let_syntax in
-  let consensus_local_state =
-    Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-  in
-  let%map frontiers =
-    Vect.Quickcheck_generator.map configs ~f:(fun config ->
-        Transition_frontier.For_tests.gen ~consensus_local_state
-          ~max_length:max_frontier_length ~size:config.initial_frontier_size ()
-    )
-  in
-  setup ~consensus_local_state frontiers
+  type peer_config =
+       max_frontier_length:int
+    -> consensus_local_state:Consensus.Data.Local_state.t
+    -> Transition_frontier.t Generator.t
+
+  let fresh_peer ~max_frontier_length ~consensus_local_state =
+    Transition_frontier.For_tests.gen ~consensus_local_state
+      ~max_length:max_frontier_length ~size:0 ()
+
+  let peer_with_branch ~frontier_branch_size ~max_frontier_length
+      ~consensus_local_state =
+    let%map frontier, branch =
+      Transition_frontier.For_tests.gen_with_branch
+        ~max_length:max_frontier_length ~frontier_size:0
+        ~branch_size:frontier_branch_size ~consensus_local_state ()
+    in
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Deferred.List.iter branch
+          ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
+    frontier
+
+  let gen ~max_frontier_length configs =
+    let open Quickcheck.Generator.Let_syntax in
+    let consensus_local_state =
+      Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
+    in
+    let%map frontiers =
+      Vect.Quickcheck_generator.map configs ~f:(fun config ->
+          config ~max_frontier_length ~consensus_local_state )
+    in
+    setup ~consensus_local_state frontiers
+end
 
 (*
 let send_transition ~logger ~transition_writer ~peer:{peer; frontier}

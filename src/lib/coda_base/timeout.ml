@@ -40,6 +40,12 @@ module Timeout_intf (Time : Time_intf) = struct
       -> Time.Controller.t
       -> 'a Deferred.t
       -> [`Ok of 'a | `Timeout] Deferred.t
+
+    val await_exn :
+         timeout_duration:Time.Span.t
+      -> Time.Controller.t
+      -> 'a Deferred.t
+      -> 'a Deferred.t
   end
 end
 
@@ -82,4 +88,11 @@ module Make (Time : Time_intf) : Timeout_intf(Time).S = struct
     Deferred.(
       choose
         [choice deferred (fun x -> `Ok x); choice timeout (Fn.const `Timeout)])
+
+  let await_exn ~timeout_duration time_controller deferred =
+    match%map await ~timeout_duration time_controller deferred with
+    | `Timeout ->
+        failwith "timeout"
+    | `Ok x ->
+        x
 end

@@ -14,3 +14,5 @@ val mem : t -> State_hash.t -> bool
 val most_recent : t -> Root_data.Limited.t option
 
 val oldest : t -> Root_data.Limited.t option
+
+val to_list : t -> Root_data.Limited.t list

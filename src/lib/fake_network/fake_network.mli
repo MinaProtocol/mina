@@ -19,9 +19,18 @@ val setup :
   -> (Transition_frontier.t, 'n) Vect.t
   -> 'n t
 
-type peer_config = {initial_frontier_size: int} [@@deriving make]
+module Generator : sig
+  open Quickcheck
 
-val gen :
-     max_frontier_length:int
-  -> (peer_config, 'n) Vect.t
-  -> 'n t Quickcheck.Generator.t
+  type peer_config =
+       max_frontier_length:int
+    -> consensus_local_state:Consensus.Data.Local_state.t
+    -> Transition_frontier.t Generator.t
+
+  val fresh_peer : peer_config
+
+  val peer_with_branch : frontier_branch_size:int -> peer_config
+
+  val gen :
+    max_frontier_length:int -> (peer_config, 'n) Vect.t -> 'n t Generator.t
+end

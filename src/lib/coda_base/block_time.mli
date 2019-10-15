@@ -139,4 +139,7 @@ module Timeout : sig
     -> Controller.t
     -> 'a Deferred.t
     -> [`Ok of 'a | `Timeout] Deferred.t
+
+  val await_exn :
+    timeout_duration:Span.t -> Controller.t -> 'a Deferred.t -> 'a Deferred.t
 end

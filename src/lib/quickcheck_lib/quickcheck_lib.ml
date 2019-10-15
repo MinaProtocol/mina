@@ -154,13 +154,13 @@ let gen_imperative_rose_tree ?(p = 0.75) (root_gen : 'a t)
           return (fun parent -> Rose_tree.T (parent, []))
       | n ->
           let%bind fork_count = geometric ~p 1 >>| Int.max n in
-          let%bind fork_sizes = gen_division (n - 1) fork_count in
+          let%bind fork_sizes = gen_division n fork_count in
           let positive_fork_sizes =
             List.filter fork_sizes ~f:(fun s -> s > 0)
           in
           let%map forks =
             map_gens positive_fork_sizes ~f:(fun s ->
-                tuple2 node_gen (with_size ~size:s self) )
+                tuple2 node_gen (with_size ~size:(s - 1) self) )
           in
           fun parent ->
             Rose_tree.T
