@@ -138,11 +138,10 @@ module Types = struct
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
-        [ enum_value "BOOTSTRAP" ~value:`Bootstrap
-        ; enum_value "SYNCED" ~value:`Synced
-        ; enum_value "OFFLINE" ~value:`Offline
-        ; enum_value "CONNECTING" ~value:`Connecting
-        ; enum_value "LISTENING" ~value:`Listening ]
+        (List.map Sync_status.all ~f:(fun status ->
+             enum_value
+               (String.map ~f:Char.uppercase @@ Sync_status.to_string status)
+               ~value:status ))
 
   let transaction_status : ('context, Transaction_status.State.t option) typ =
     enum "TransactionStatus" ~doc:"Status of a transaction"
@@ -1504,20 +1503,28 @@ module Queries = struct
   let pooled_user_commands =
     field "pooledUserCommands"
       ~doc:
-        "Retrieve all the user commands submitted by the current daemon that \
-         are pending inclusion"
+        "Retrieve all the scheduled user commands for a specified sender that \
+         the current daemon sees in their transaction pool. All scheduled \
+         commands are queried if no sender is specified"
       ~typ:(non_null @@ list @@ non_null Types.user_command)
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of sender of pooled user commands"
-              ~typ:(non_null Types.Input.public_key_arg) ]
-      ~resolve:(fun {ctx= coda; _} () pk ->
+              ~typ:Types.Input.public_key_arg ]
+      ~resolve:(fun {ctx= coda; _} () opt_pk ->
         let transaction_pool = Coda_lib.transaction_pool coda in
-        List.map
-          (Network_pool.Transaction_pool.Resource_pool.all_from_user
-             (Network_pool.Transaction_pool.resource_pool transaction_pool)
-             pk)
-          ~f:User_command.forget_check )
+        let resource_pool =
+          Network_pool.Transaction_pool.resource_pool transaction_pool
+        in
+        ( match opt_pk with
+        | None ->
+            Network_pool.Transaction_pool.Resource_pool.transactions
+              resource_pool
+            |> Sequence.to_list
+        | Some pk ->
+            Network_pool.Transaction_pool.Resource_pool.all_from_user
+              resource_pool pk )
+        |> List.map ~f:User_command.forget_check )
 
   let sync_state =
     result_field_no_inputs "syncStatus" ~doc:"Network sync status" ~args:[]
