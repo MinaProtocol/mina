@@ -943,40 +943,51 @@ let snark_job_list =
          | Error e ->
              print_rpc_error e ))
 
-let json_request ~summary ~graphql ~name input_flags =
-  Command.async ~summary
-    (Cli_lib.Background_daemon.graphql_init input_flags ~f:(fun port input ->
-         let graphql = graphql input () in
-         Deferred.bind (Graphql_client.query_raw_exn graphql port)
-           ~f:(fun response ->
-             match response |> Yojson.Basic.Util.member name with
-             | `Null ->
-                 eprintf "Failed to get field %s from json output:\n%s\n" name
-                   (Yojson.Basic.to_string response) ;
-                 exit 21
-             | valid_json ->
-                 Core.printf !"%s\n" @@ Yojson.Basic.to_string valid_json
-                 |> Deferred.return ) ))
-
 let snark_pool_list =
   let open Command.Param in
-  json_request ~summary:"List of snark works in the snark pool in JSON format"
-    ~graphql:(fun () -> Graphql_queries.Snark_pool.make)
-    ~name:"snarkPool" (return ())
+  Command.async ~summary:"List of snark works in the snark pool in JSON format"
+    (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
+         Deferred.map
+           (Graphql_client.query_exn (Graphql_queries.Snark_pool.make ()) port)
+           ~f:(fun response ->
+             let lst =
+               [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
+                 (Array.to_list
+                    (Array.map
+                       ~f:(fun w ->
+                         { Cli_lib.Graphql_types.Completed_works.Work.work_ids=
+                             Array.to_list w#work_ids
+                         ; fee= Currency.Fee.of_uint64 w#fee
+                         ; prover= w#prover } )
+                       response#snarkPool))
+             in
+             print_string (Yojson.Safe.to_string lst) ) ))
 
 let pooled_user_commands =
-  json_request ~name:"pooledUserCommands"
+  let public_key_flag =
+    Command.Param.(
+      anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed))
+  in
+  Command.async
     ~summary:
       "Retrieve all the user commands submitted by the current daemon that \
        are pending inclusion"
-    ~graphql:(fun maybe_public_key ->
-      let public_key =
-        Yojson.Safe.to_basic
-        @@ [%to_yojson: Public_key.Compressed.t option] maybe_public_key
-      in
-      Graphql_queries.Pooled_user_commands.make ~public_key )
-    Command.Param.(
-      anon @@ maybe @@ ("fee" %: Cli_lib.Arg_type.public_key_compressed))
+    (Cli_lib.Background_daemon.graphql_init public_key_flag
+       ~f:(fun port maybe_public_key ->
+         let public_key =
+           Yojson.Safe.to_basic
+           @@ [%to_yojson: Public_key.Compressed.t option] maybe_public_key
+         in
+         let graphql =
+           Graphql_queries.Pooled_user_commands.make ~public_key ()
+         in
+         let%map response = Graphql_client.query_exn graphql port in
+         let json_response : Yojson.Safe.json =
+           `List
+             ( List.map ~f:Graphql_client.User_command.to_yojson
+             @@ Array.to_list response#pooledUserCommands )
+         in
+         print_string (Yojson.Safe.to_string json_response) ))
 
 let start_tracing =
   let open Deferred.Let_syntax in

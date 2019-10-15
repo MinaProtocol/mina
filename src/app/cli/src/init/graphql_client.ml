@@ -1,6 +1,7 @@
 open Core
 open Async
 open Signature_lib
+open Coda_base
 
 module Client = Graphql_client_lib.Make (struct
   let address = "graphql"
@@ -42,6 +43,19 @@ let query_exn query_obj port = run_exn ~f:query query_obj port
 
 let query_raw_exn query_obj port = run_exn ~f:query_raw query_obj port
 
+module User_command = struct
+  type t =
+    { id: string
+    ; isDelegation: bool
+    ; nonce: int
+    ; from: Public_key.Compressed.t
+    ; to_: Public_key.Compressed.t
+    ; amount: Currency.Amount.t
+    ; fee: Currency.Fee.t
+    ; memo: User_command_memo.t }
+  [@@deriving yojson]
+end
+
 module Encoders = struct
   let optional = Option.value_map ~default:`Null
 
@@ -72,4 +86,12 @@ module Decoders = struct
 
   let balance json =
     Yojson.Basic.Util.to_string json |> Currency.Balance.of_string
+
+  let amount json =
+    Yojson.Basic.Util.to_string json |> Currency.Amount.of_string
+
+  let fee json = Yojson.Basic.Util.to_string json |> Currency.Fee.of_string
+
+  let nonce json =
+    Yojson.Basic.Util.to_string json |> Coda_base.Account.Nonce.of_string
 end
