@@ -6,6 +6,8 @@ open Async
 
 let init () = Parallel.init_master ()
 
+type ports = {communication_port: int; discovery_port: int; libp2p_port: int}
+
 let net_configs n =
   let ips =
     List.init n ~f:(fun i ->
@@ -13,14 +15,17 @@ let net_configs n =
   in
   let addrs_and_ports_list =
     List.mapi ips ~f:(fun i ip ->
-        let communication_port = 23000 + (i * 2) in
-        let discovery_port = 23000 + 1 + (i * 2) in
+        let base = 23000 + (i * 3) in
+        let communication_port = base in
+        let discovery_port = base + 1 in
+        let libp2p_port = base + 2 in
         let client_port = 20000 + i in
         Kademlia.Node_addrs_and_ports.
           { external_ip= ip
           ; bind_ip= ip
           ; discovery_port
           ; communication_port
+          ; libp2p_port
           ; client_port } )
   in
   let all_peers =
@@ -61,7 +66,7 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None)
   in
   configs
 
-let stabalize_and_start_or_timeout ?(timeout_ms = 2000.) nodes =
+let stabalize_and_start_or_timeout ?(timeout_ms = 10000.) nodes =
   let ready () =
     let check_ready node =
       let%map peers = Coda_process.peers_exn node in

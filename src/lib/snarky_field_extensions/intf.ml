@@ -39,7 +39,8 @@ module type Basic = sig
 
   val map2_ : 'a t_ -> 'b t_ -> f:('a -> 'b -> 'c) -> 'c t_
 
-  module Unchecked : Snarkette.Fields.Intf with type t = Base.Unchecked.t A.t
+  module Unchecked :
+    Snarkette.Fields.Sqrt_field_intf with type t = Base.Unchecked.t A.t
 
   type t = Base.t A.t
 
@@ -71,6 +72,8 @@ module type Basic = sig
   val square : [`Define | `Custom of t -> (t, _) Checked.t]
 
   val inv_exn : [`Define | `Custom of t -> (t, _) Checked.t]
+
+  val real_part : 'a t_ -> 'a
 end
 
 module type S = sig

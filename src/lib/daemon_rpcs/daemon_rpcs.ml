@@ -171,7 +171,7 @@ module Types = struct
 
       let option_entry ~(f : 'a -> string) (name : string)
           (field : 'a option FieldT.t) =
-        match FieldT.get field with None -> None | Some x -> Some (name, f x)
+        Option.map (FieldT.get field) ~f:(fun x -> (name, f x))
 
       let string_option_entry = option_entry ~f:Fn.id
 
@@ -199,7 +199,7 @@ module Types = struct
 
       let staged_ledger_hash = string_option_entry "Staged-ledger hash"
 
-      let state_hash = string_option_entry "Staged hash"
+      let state_hash = string_option_entry "Protocol state hash"
 
       let commit_id = string_entry "Git SHA-1"
 
@@ -223,6 +223,8 @@ module Types = struct
 
       let consensus_time_best_tip =
         string_option_entry "Best tip consensus time"
+
+      let next_proposal = string_option_entry "Next proposal"
 
       let consensus_time_now = string_entry "Consensus time now"
 
@@ -267,6 +269,7 @@ module Types = struct
       ; propose_pubkeys: string list
       ; histograms: Histograms.t option
       ; consensus_time_best_tip: string option
+      ; next_proposal: string option
       ; consensus_time_now: string
       ; consensus_mechanism: string
       ; consensus_configuration: Consensus.Configuration.t }
@@ -284,7 +287,7 @@ module Types = struct
         ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent
         ~snark_worker ~propose_pubkeys ~histograms ~consensus_time_best_tip
         ~consensus_time_now ~consensus_mechanism ~consensus_configuration
-        ~snark_work_fee
+        ~next_proposal ~snark_work_fee
       |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =

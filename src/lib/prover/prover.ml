@@ -52,11 +52,7 @@ module Worker_state = struct
              ( module struct
                open Snark_params
                open Keys
-               module Consensus_mechanism = Consensus
                module Transaction_snark = Transaction_snark
-               module Blockchain_state = Blockchain_snark_state
-               module State =
-                 Blockchain_snark_state.Make_update (Transaction_snark)
 
                let wrap hash proof =
                  let module Wrap = Keys.Wrap in
@@ -104,11 +100,7 @@ module Worker_state = struct
          | "check" ->
              ( module struct
                open Snark_params
-               module Consensus_mechanism = Consensus
                module Transaction_snark = Transaction_snark
-               module Blockchain_state = Blockchain_snark_state
-               module State =
-                 Blockchain_snark_state.Make_update (Transaction_snark)
 
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
@@ -233,13 +225,25 @@ end
 
 type t = {connection: Worker.Connection.t; process: Process.t}
 
-let create () =
+let create ~logger ~pids =
+  let on_failure err =
+    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      "Prover process failed with error $err"
+      ~metadata:[("err", `String (Error.to_string_hum err))] ;
+    Error.raise err
+  in
   let%map connection, process =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure:Error.raise ~shutdown_on:Disconnect
-      ~connection_state_init_arg:() ()
+      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:() ()
   in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "Daemon started process of kind $process_kind with pid $prover_pid"
+    ~metadata:
+      [ ("prover_pid", `Int (Process.pid process |> Pid.to_int))
+      ; ( "process_kind"
+        , `String Child_processes.Termination.(show_process_kind Prover) ) ] ;
+  Child_processes.Termination.(register_process pids process Prover) ;
   File_system.dup_stdout process ;
   File_system.dup_stderr process ;
   {connection; process}
@@ -274,7 +278,7 @@ let extend_blockchain {connection; _} chain next_state block prover_state
                 (Binable.to_string (module Extend_blockchain_input) input) )
           ; ("error", `String (Error.to_string_hum e)) ]
         "Prover failed: $error" ;
-      Error.raise e
+      Error e
 
 let prove t ~prev_state ~prev_state_proof ~next_state
     (transition : Internal_transition.t) pending_coinbase =
@@ -289,6 +293,6 @@ let prove t ~prev_state ~prev_state_proof ~next_state
       pending_coinbase
   in
   Coda_metrics.(
-    Gauge.set Proving_time.blockchain_proving_time_ms
+    Gauge.set Cryptography.blockchain_proving_time_ms
       (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
   proof

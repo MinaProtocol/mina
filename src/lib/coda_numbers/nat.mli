@@ -1,8 +1,4 @@
-module type S_unchecked = Intf.S_unchecked
-
-module type S_checked = Intf.S_checked
-
-module type S = Intf.S
+module Intf = Intf
 
 module Make : Intf.F
 

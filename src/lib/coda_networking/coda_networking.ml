@@ -5,23 +5,13 @@ open Coda_base
 open Coda_state
 open Pipe_lib
 open Network_peer
+open Coda_transition
 
 let refused_answer_query_string = "Refused to answer_query"
 
 type exn += No_initial_peers
 
-module type Base_inputs_intf = Coda_intf.Inputs_intf
-
-(* assumption: the Rpcs functor is applied only once in the codebase, so that
-   any versions appearing in Inputs represent unique types
-
-   with that assumption, it's legitimate for the choice of versions to be made
-   inside the Rpcs functor, rather than at the locus of application
-*)
-
-module Make_rpcs (Inputs : Base_inputs_intf) = struct
-  open Inputs
-
+module Rpcs = struct
   (* for versioning of the types here, see
 
      RFC 0012, and
@@ -385,8 +375,6 @@ module Make_rpcs (Inputs : Base_inputs_intf) = struct
 end
 
 module Make_message (Inputs : sig
-  include Base_inputs_intf
-
   module Snark_pool_diff : sig
     type t [@@deriving sexp]
 
@@ -462,8 +450,6 @@ struct
 end
 
 module type Inputs_intf = sig
-  include Base_inputs_intf
-
   module Snark_pool_diff : sig
     type t [@@deriving sexp, to_yojson]
 
@@ -505,7 +491,6 @@ end
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
   module Message = Make_message (Inputs)
-  module Rpcs = Make_rpcs (Inputs)
   module Gossip_net = Gossip_net.Make (Message)
   module Membership = Membership.Haskell
   module Peer = Peer
@@ -771,7 +756,8 @@ module Make (Inputs : Inputs_intf) = struct
           match Envelope.Incoming.data envelope with
           | New_state state ->
               Perf_histograms.add_span ~name:"external_transition_latency"
-                (Core.Time.abs_diff (Core.Time.now ())
+                (Core.Time.abs_diff
+                   Block_time.(now config.time_controller |> to_time)
                    ( External_transition.protocol_state state
                    |> Protocol_state.blockchain_state
                    |> Blockchain_state.timestamp |> Block_time.to_time )) ;

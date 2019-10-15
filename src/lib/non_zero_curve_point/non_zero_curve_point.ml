@@ -1,9 +1,18 @@
+[%%import
+"../../config.mlh"]
+
 open Core_kernel
 open Snark_params
 open Fold_lib
 open Module_version
 
 let parity y = Tick.Bigint.(test_bit (of_field y) 0)
+
+let gen_uncompressed =
+  Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
+      let open Option.Let_syntax in
+      let%map y = Tick.Inner_curve.find_y x in
+      (x, y) )
 
 module Compressed = struct
   open Tick
@@ -13,7 +22,7 @@ module Compressed = struct
       module V1 = struct
         module T = struct
           type ('field, 'boolean) t = {x: 'field; is_odd: 'boolean}
-          [@@deriving bin_io, sexp, compare, eq, hash, version]
+          [@@deriving bin_io, compare, eq, hash, version]
         end
 
         include T
@@ -24,14 +33,17 @@ module Compressed = struct
 
     type ('field, 'boolean) t = ('field, 'boolean) Stable.Latest.t =
       {x: 'field; is_odd: 'boolean}
-    [@@deriving sexp, compare, eq, hash]
+    [@@deriving compare, eq, hash]
   end
+
+  let compress (x, y) = {Poly.x; is_odd= parity y}
 
   module Stable = struct
     module V1 = struct
       module T = struct
+        (* we define sexp operations manually, don't derive them *)
         type t = (Field.t, bool) Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
+        [@@deriving bin_io, eq, compare, hash, version {asserted}]
       end
 
       include T
@@ -56,6 +68,16 @@ module Compressed = struct
 
         let version_byte = version_byte
       end)
+
+      (* sexp representation is a Base58Check string, like the yojson representation *)
+      let sexp_of_t t = to_base58_check t |> Sexp.of_string
+
+      let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
+
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%map uncompressed = gen_uncompressed in
+        compress uncompressed
     end
 
     module Latest = V1
@@ -68,25 +90,57 @@ module Compressed = struct
 
     module Registrar = Registration.Make (Module_decl)
     module Registered_V1 = Registrar.Register (V1)
+
+    (* see lib/module_version/README-version-asserted.md *)
+    module For_tests = struct
+      [%%if
+      curve_size = 298]
+
+      let%test "nonzero_curve_point_compressed v1" =
+        let point =
+          Quickcheck.random_value
+            ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
+        in
+        let known_good_hash =
+          "\x20\x1E\xC9\xEC\x67\x5E\x76\x79\x18\xBB\x28\x2C\x51\x5B\x36\x37\x5B\x5F\x39\x18\x21\x3A\x33\x4C\x69\x4B\x8C\xC6\x09\x24\xAD\xE7"
+        in
+        Serialization.check_serialization (module V1) point known_good_hash
+
+      [%%elif
+      curve_size = 753]
+
+      let%test "nonzero_curve_point_compressed v1" =
+        let point =
+          Quickcheck.random_value
+            ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
+        in
+        let known_good_hash =
+          "\x20\x1E\xC9\xEC\x67\x5E\x76\x79\x18\xBB\x28\x2C\x51\x5B\x36\x37\x5B\x5F\x39\x18\x21\x3A\x33\x4C\x69\x4B\x8C\xC6\x09\x24\xAD\xE7"
+        in
+        Serialization.check_serialization (module V1) point known_good_hash
+
+      [%%else]
+
+      let%test "nonzero_curve_point_compressed v1" =
+        failwith "Unknown curve size"
+
+      [%%endif]
+    end
   end
 
-  (* bin_io omitted *)
-  type t = (Field.t, bool) Poly.t [@@deriving sexp, compare, hash]
+  (* bin_io, sexp omitted *)
+  type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving compare, hash]
 
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
   include Codable.Make_base58_check (Stable.Latest)
 
-  let compress (x, y) : t = {x; is_odd= parity y}
+  [%%define_locally
+  Stable.Latest.(sexp_of_t, t_of_sexp, gen)]
 
   let to_string = to_base58_check
 
   let empty = Poly.{x= Field.zero; is_odd= false}
-
-  let gen =
-    let open Quickcheck.Generator.Let_syntax in
-    let%map x = Field.gen and is_odd = Bool.quickcheck_generator in
-    Poly.{x; is_odd}
 
   let bit_length_to_triple_length n = (n + 2) / 3
 
@@ -161,8 +215,10 @@ let decompress_exn t = Option.value_exn (decompress t)
 module Stable = struct
   module V1 = struct
     module T = struct
-      type t = Tick.Field.t * Tick.Field.t
-      [@@deriving sexp, eq, compare, hash, version {asserted}]
+      type t =
+        Tick.Field.t * Tick.Field.t
+        (* sexp operations written manually, don't derive them *)
+      [@@deriving eq, compare, hash, version {asserted}]
 
       include Binable.Of_binable
                 (Compressed.Stable.V1)
@@ -173,17 +229,12 @@ module Stable = struct
 
                   let to_binable = compress
                 end)
-
-      let to_yojson (x, y) =
-        Tick.Field.(`List [`String (to_string x); `String (to_string y)])
-
-      let description = "Non zero curve point"
-
-      let version_byte = Base58_check.Version_bytes.non_zero_curve_point
     end
 
     include T
     include Registration.Make_latest_version (T)
+
+    let gen : t Quickcheck.Generator.t = gen_uncompressed
 
     let of_bigstring bs =
       let open Or_error.Let_syntax in
@@ -197,7 +248,22 @@ module Stable = struct
       let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
       bs
 
-    include Codable.Make_base58_check (T)
+    (* We reuse the Base58check-based yojson (de)serialization from the
+       compressed representation. *)
+    let of_yojson json =
+      let open Result in
+      Compressed.of_yojson json
+      >>= fun compressed ->
+      Result.of_option ~error:"couldn't decompress, curve point invalid"
+        (decompress compressed)
+
+    let to_yojson t = Compressed.to_yojson @@ compress t
+
+    (* as for yojson, use the Base58check-based sexps from the compressed representation *)
+    let sexp_of_t t = Compressed.sexp_of_t @@ compress t
+
+    let t_of_sexp sexp =
+      Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
   end
 
   module Latest = V1
@@ -210,15 +276,53 @@ module Stable = struct
 
   module Registrar = Registration.Make (Module_decl)
   module Registered_V1 = Registrar.Register (V1)
+
+  (* see lib/module_version/README-version-asserted.md *)
+  module For_tests = struct
+    [%%if
+    curve_size = 298]
+
+    let%test "nonzero_curve_point v1" =
+      let point =
+        Quickcheck.random_value
+          ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
+      in
+      let known_good_hash =
+        "\x47\xCA\x5D\x76\x2C\xBF\xC0\xF1\x11\x9F\x56\x6A\x79\x03\x77\x4C\xC4\x2F\x6D\xB8\x3F\xC3\x0E\x03\x99\x71\x1B\xF3\x54\xDD\x84\xFA"
+      in
+      Serialization.check_serialization (module V1) point known_good_hash
+
+    [%%elif
+    curve_size = 753]
+
+    let%test "nonzero_curve_point v1" =
+      let point =
+        Quickcheck.random_value
+          ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
+      in
+      let known_good_hash =
+        "\x47\xCA\x5D\x76\x2C\xBF\xC0\xF1\x11\x9F\x56\x6A\x79\x03\x77\x4C\xC4\x2F\x6D\xB8\x3F\xC3\x0E\x03\x99\x71\x1B\xF3\x54\xDD\x84\xFA"
+      in
+      Serialization.check_serialization (module V1) point known_good_hash
+
+    [%%else]
+
+    let%test "nonzero_curve_point_v1" = failwith "Unknown curve size"
+
+    [%%endif]
+  end
 end
 
 (* bin_io omitted *)
-type t = Stable.Latest.t [@@deriving sexp, compare, hash]
+type t = Stable.Latest.t [@@deriving compare, hash, yojson]
 
 (* so we can make sets of public keys *)
 include Comparable.Make_binable (Stable.Latest)
 
 type var = Tick.Field.Var.t * Tick.Field.Var.t
+
+[%%define_locally
+Stable.Latest.(gen)]
 
 let assert_equal var1 var2 =
   let open Tick0.Checked.Let_syntax in
@@ -238,12 +342,6 @@ let ( = ) = equal
 let of_inner_curve_exn = Tick.Inner_curve.to_affine_exn
 
 let to_inner_curve = Tick.Inner_curve.of_affine
-
-let gen : t Quickcheck.Generator.t =
-  Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
-      let open Option.Let_syntax in
-      let%map y = Tick.Inner_curve.find_y x in
-      (x, y) )
 
 open Tick
 open Let_syntax
@@ -268,7 +366,7 @@ let%snarkydef compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   {Compressed.Poly.x; is_odd}
 
 [%%define_locally
-Stable.Latest.(of_bigstring, to_bigstring)]
+Stable.Latest.(of_bigstring, to_bigstring, sexp_of_t, t_of_sexp)]
 
 let%test_unit "point-compression: decompress . compress = id" =
   Quickcheck.test gen ~f:(fun pk ->

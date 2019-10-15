@@ -36,18 +36,22 @@ let group_sequence : 'a Sequence.t -> 'a t Sequence.t =
 let group_list : 'a list -> 'a t list =
  fun xs -> xs |> Sequence.of_list |> group_sequence |> Sequence.to_list
 
-let zip_exn : 'a t -> 'b t -> ('a * 'b) t =
+let zip : 'a t -> 'b t -> ('a * 'b) t Or_error.t =
  fun a b ->
   match (a, b) with
   | `One a1, `One b1 ->
-      `One (a1, b1)
+      Ok (`One (a1, b1))
   | `Two (a1, a2), `Two (b1, b2) ->
-      `Two ((a1, b1), (a2, b2))
+      Ok (`Two ((a1, b1), (a2, b2)))
   | _ ->
-      failwith "One_or_two.zip_exn mismatched"
+      Or_error.error_string "One_or_two.zip mismatched"
 
-module Monadic (M : Monad.S) : Intfs.Monadic with type 'a m := 'a M.t = struct
-  let sequence : 'a M.t t -> 'a t M.t = function
+let zip_exn : 'a t -> 'b t -> ('a * 'b) t =
+ fun a b -> Or_error.ok_exn @@ zip a b
+
+module Monadic2 (M : Monad.S2) :
+  Intfs.Monadic2 with type ('a, 'e) m := ('a, 'e) M.t = struct
+  let sequence : ('a, 'e) M.t t -> ('a t, 'e) M.t = function
     | `One def ->
         M.map def ~f:(fun x -> `One x)
     | `Two (def1, def2) ->
@@ -56,13 +60,24 @@ module Monadic (M : Monad.S) : Intfs.Monadic with type 'a m := 'a M.t = struct
         let%map b = def2 in
         `Two (a, b)
 
-  let map : 'a t -> f:('a -> 'b M.t) -> 'b t M.t =
+  let map : 'a t -> f:('a -> ('b, 'e) M.t) -> ('b t, 'e) M.t =
    fun t ~f ->
-    sequence
-    @@ match t with `One a -> `One (f a) | `Two (a, b) -> `Two (f a, f b)
+    (* We could use sequence here, but this approach saves us computation in the
+       Result and option monads when the first component of a `Two fails. *)
+    match t with
+    | `One a ->
+        M.map ~f:(fun x -> `One x) (f a)
+    | `Two (a, b) ->
+        let open M.Let_syntax in
+        let%bind a' = f a in
+        let%map b' = f b in
+        `Two (a', b')
 
   let fold :
-      'a t -> init:'accum -> f:('accum -> 'a -> 'accum M.t) -> 'accum M.t =
+         'a t
+      -> init:'accum
+      -> f:('accum -> 'a -> ('accum, 'e) M.t)
+      -> ('accum, 'e) M.t =
    fun t ~init ~f ->
     match t with
     | `One a ->
@@ -71,6 +86,10 @@ module Monadic (M : Monad.S) : Intfs.Monadic with type 'a m := 'a M.t = struct
         M.bind (f init a) ~f:(fun x -> f x b)
 end
 
+module Monadic (M : Monad.S) : Intfs.Monadic with type 'a m := 'a M.t =
+  Monadic2 (Base__.Monad_intf.S_to_S2 (M))
+
+module Deferred_result = Monadic2 (Deferred.Result)
 module Ident = Monadic (Monad.Ident)
 module Deferred = Monadic (Deferred)
 module Option = Monadic (Option)

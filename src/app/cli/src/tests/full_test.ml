@@ -37,6 +37,17 @@ let with_check = false
 [%%endif]
 
 [%%if
+curve_size = 753]
+
+let medium_curves = true
+
+[%%else]
+
+let medium_curves = false
+
+[%%endif]
+
+[%%if
 time_offsets = true]
 
 let setup_time_offsets () =
@@ -68,6 +79,7 @@ let print_heartbeat logger =
 
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
+  let pids = Child_processes.Termination.create_pid_table () in
   setup_time_offsets () ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
@@ -115,7 +127,7 @@ let run_test () : unit Deferred.t =
         Auxiliary_database.External_transition_database.create ~logger
           external_transition_database_dir
       in
-      let time_controller = Block_time.Controller.(create basic) in
+      let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let consensus_local_state =
         Consensus.Data.Local_state.create
           (Public_key.Compressed.Set.singleton
@@ -124,6 +136,7 @@ let run_test () : unit Deferred.t =
       let discovery_port = 8001 in
       let communication_port = 8000 in
       let client_port = 8123 in
+      let libp2p_port = 8002 in
       let net_config =
         Coda_networking.Config.
           { logger
@@ -142,8 +155,13 @@ let run_test () : unit Deferred.t =
                   ; bind_ip= Unix.Inet_addr.localhost
                   ; discovery_port
                   ; communication_port
+                  ; libp2p_port
                   ; client_port }
               ; trust_system
+              ; enable_libp2p= false
+              ; disable_haskell= false
+              ; libp2p_keypair= None
+              ; libp2p_peers= []
               ; max_concurrent_connections= Some 10
               ; log_gossip_heard=
                   { snark_pool_diff= false
@@ -161,7 +179,7 @@ let run_test () : unit Deferred.t =
       in
       let%bind coda =
         Coda_lib.create
-          (Coda_lib.Config.make ~logger ~trust_system ~net_config
+          (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~conf_dir:temp_conf_dir
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
@@ -399,11 +417,16 @@ let run_test () : unit Deferred.t =
                ( Genesis_ledger.keypair_of_account_record_exn (sk, account)
                , account ) )
       in
+      let timeout_mins =
+        if (with_snark || with_check) && medium_curves then 90.
+        else if with_snark then 15.
+        else 7.
+      in
       let%map () =
         if with_snark then
           let accounts = List.take other_accounts 2 in
           let%bind blockchain_length' =
-            test_multiple_payments accounts ~txn_count:2 120.
+            test_multiple_payments accounts ~txn_count:2 timeout_mins
           in
           (*wait for a block after the ledger_proof is emitted*)
           let%map () =
@@ -420,14 +443,14 @@ let run_test () : unit Deferred.t =
           let%map _ =
             test_multiple_payments other_accounts
               ~txn_count:(List.length other_accounts / 2)
-              7.
+              timeout_mins
           in
           ()
         else
           let%bind _ =
             test_multiple_payments other_accounts
               ~txn_count:(List.length other_accounts)
-              7.
+              timeout_mins
           in
           test_duplicate_payments sender_keypair receiver_keypair
       in

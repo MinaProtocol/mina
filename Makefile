@@ -10,6 +10,7 @@ DOCKERNAME = codabuilder-$(MYUID)
 
 # Unique signature of kademlia code tree
 KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
+LIBP2P_HELPER_SIG = $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
@@ -18,6 +19,7 @@ endif
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
+ WRAPAPP = docker exec --workdir /home/opam/app -t $(DOCKERNAME)
  WRAPSRC = docker exec --workdir /home/opam/app/src -t $(DOCKERNAME)
 else
  $(info INFO Not using Docker)
@@ -62,15 +64,27 @@ kademlia:
 	@# FIXME: Bash wrap here is awkward but required to get nix-env
 	bash -c "source ~/.profile && cd src/app/kademlia-haskell && nix-build release2.nix"
 
+libp2p_helper:
+	bash -c "source ~/.profile && cd src/app/libp2p_helper && nix-build default.nix"
+
 # Alias
-dht: kademlia
+dht: kademlia libp2p_helper
 
 build: git_hooks reformat-diff
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build app/logproc/logproc.exe app/cli/src/coda.exe  --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
+build_archive: git_hooks reformat-diff
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && dune build app/archive/archive.exe --profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
 dev: codabuilder containerstart build
+
+# update OPAM, pinned packages in Docker
+update-opam:
+	$(WRAPAPP) ./scripts/update-opam-in-docker.sh
 
 macos-portable:
 	@rm -rf _build/coda-daemon-macos/
@@ -148,17 +162,20 @@ docker-toolchain-rust:
 	fi
 
 # All in one step to build toolchain and binary for kademlia
+# TODO: Rename to docker-toolchain-discovery
 docker-toolchain-haskell:
 	@echo "Building codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG)" ;\
     docker build --file dockerfiles/Dockerfile-toolchain-haskell --tag codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) . ;\
     echo  'Extracting deb package' ;\
     mkdir -p src/_build ;\
-    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-kademlia.deb > src/_build/coda-kademlia.deb
-
-toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell
+    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-discovery.deb > src/_build/coda-discovery.deb
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
+	make render-circleci
+
+update-rust-deps:
+	./scripts/update-rust-toolchain-references.sh $(GITLONGHASH)
 	make render-circleci
 
 # Local 'codabuilder' docker image (based off docker-toolchain)

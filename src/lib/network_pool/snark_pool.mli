@@ -1,7 +1,6 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib
-open Signature_lib
 
 module type S = sig
   type ledger_proof
@@ -14,12 +13,15 @@ module type S = sig
 
   type transition_frontier
 
+  type transaction_snark_work_info
+
   module Resource_pool : sig
     include
       Intf.Snark_resource_pool_intf
       with type ledger_proof := ledger_proof
        and type work := transaction_snark_work_statement
        and type transition_frontier := transition_frontier
+       and type work_info := transaction_snark_work_info
 
     val remove_solved_work : t -> transaction_snark_work_statement -> unit
 
@@ -30,11 +32,19 @@ module type S = sig
        and type resource_pool := t
   end
 
+  module For_tests : sig
+    val get_rebroadcastable :
+         Resource_pool.t
+      -> is_expired:(Time.t -> [`Expired | `Ok])
+      -> Resource_pool.Diff.t list
+  end
+
   include
     Intf.Network_pool_base_intf
     with type resource_pool := Resource_pool.t
      and type resource_pool_diff := Resource_pool.Diff.t
      and type transition_frontier := transition_frontier
+     and type config := Resource_pool.Config.t
 
   val get_completed_work :
        t
@@ -42,8 +52,8 @@ module type S = sig
     -> transaction_snark_work_checked option
 
   val load :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
+       config:Resource_pool.Config.t
+    -> logger:Logger.t
     -> disk_location:string
     -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
                       Linear_pipe.Reader.t
@@ -85,44 +95,9 @@ module type Transition_frontier_intf = sig
     t -> (int * int Extensions.Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
 end
 
-module Make (Ledger_proof : sig
-  type t [@@deriving bin_io, sexp, yojson, version]
-end) (Transaction_snark_work : sig
-  type t =
-    { fee: Currency.Fee.t
-    ; proofs: Ledger_proof.t list
-    ; prover: Public_key.Compressed.t }
-
-  module Statement : sig
-    type t = Transaction_snark.Statement.t list [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, yojson, version]
-
-          include Hashable.S_binable with type t := t
-
-          val compact_json : t -> Yojson.Safe.json
-        end
-      end
-      with type V1.t = t
-
-    include Hashable.S with type t := t
-  end
-
-  module Checked :
-    sig
-      type unchecked
-
-      type t
-
-      val create_unsafe : unchecked -> t
-    end
-    with type unchecked := t
-end)
-(Transition_frontier : Transition_frontier_intf
-                       with type work := Transaction_snark_work.Statement.t) :
+module Make
+    (Transition_frontier : Transition_frontier_intf
+                           with type work := Transaction_snark_work.Statement.t) :
   S
   with type transaction_snark_statement := Transaction_snark.Statement.t
    and type transaction_snark_work_statement :=
@@ -130,6 +105,7 @@ end)
    and type transaction_snark_work_checked := Transaction_snark_work.Checked.t
    and type transition_frontier := Transition_frontier.t
    and type ledger_proof := Ledger_proof.t
+   and type transaction_snark_work_info := Transaction_snark_work.Info.t
 
 include
   S
@@ -139,3 +115,4 @@ include
    and type transaction_snark_work_checked := Transaction_snark_work.Checked.t
    and type transition_frontier := Transition_frontier.t
    and type ledger_proof := Ledger_proof.t
+   and type transaction_snark_work_info := Transaction_snark_work.Info.t

@@ -9,7 +9,7 @@ external createRetryLink: retryOptions => ReasonApolloTypes.apolloLink =
 let client = {
   let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
 
-  let uri = "http://localhost:49370/graphql";
+  let uri = "http://localhost:3085/graphql";
   let codaLink =
     ApolloLinks.createHttpLink(~uri, ~fetch=Bindings.Fetch.fetch, ());
 
@@ -17,11 +17,11 @@ let client = {
     {|
       {delay: {
         initial: 300,
-        max: 500,
+        max: 2000,
         jitter: false
       },
       attempts: {
-        max: 60,
+        max: 120,
       }}
     |}
   ];
@@ -63,7 +63,7 @@ module Decoders = {
     if (s == "string" && isFaker) {
       Js.Date.fromFloat(Js.Date.now());
     } else {
-      Js.Date.fromString(s);
+      Js.Date.fromFloat(float_of_string(s));
     };
 
   let optDate = Option.map(~f=date);

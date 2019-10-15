@@ -6,7 +6,7 @@ open Coda_transition
 open Coda_state
 open O1trace
 module Graphql_cohttp_async =
-  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Io)
+  Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
 
 let snark_job_list_json t =
@@ -306,7 +306,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                 , `String
                     (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" work.spec) )
               ] ;
-          List.iter work.metrics ~f:(fun (total, tag) ->
+          One_or_two.iter work.metrics ~f:(fun (total, tag) ->
               match tag with
               | `Merge ->
                   Perf_histograms.add_span ~name:"snark_worker_merge_time"
@@ -314,8 +314,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
               | `Transition ->
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
                     total ) ;
-          Network_pool.Snark_pool.add_completed_work (Coda_lib.snark_pool coda)
-            work ) ]
+          Coda_lib.add_work coda work ) ]
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       trace_task "REST server" (fun () ->
@@ -348,6 +347,11 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                 let lift x = `Response x in
                 match Uri.path uri with
                 | "/graphql" ->
+                    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                      "Received graphql request. Uri: $uri"
+                      ~metadata:
+                        [ ("uri", `String (Uri.to_string uri))
+                        ; ("context", `String "rest_server") ] ;
                     graphql_callback () req body
                 | "/status" ->
                     status `None >>| lift
@@ -465,7 +469,7 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
 You might be trying to connect to a different network version, or need to troubleshoot your configuration. See https://codaprotocol.com/docs/troubleshooting/ for details.
 
 %!|err}
-      | exn ->
+      | _ ->
           handle_crash exn ~conf_dir ~top_logger coda_ref ) ;
       Stdlib.exit 1 ) ;
   Async_unix.Signal.(
@@ -478,4 +482,5 @@ You might be trying to connect to a different network version, or need to troubl
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           !"Coda process was interrupted by $signal"
           ~metadata:[("signal", `String (to_string signal))] ;
-        Stdlib.exit 130 ))
+        (* causes async shutdown and at_exit handlers to run *)
+        Async.shutdown 130 ))

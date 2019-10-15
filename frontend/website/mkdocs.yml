@@ -6,7 +6,6 @@ repo_url: https://github.com/codaprotocol/coda/
 edit_uri: edit/develop/frontend/website/docs/
 nav:
   - Overview: index.md
-  - Coda Testnet: coda-testnet.md
   - Getting Started: getting-started.md
   - My First Transaction: my-first-transaction.md
   - Become a Node Operator: node-operator.md
@@ -23,6 +22,7 @@ nav:
     - Lifecycle of a Payment: architecture/lifecycle-payment.md
     - Consensus: architecture/consensus.md
     - Proof of Stake: architecture/proof-of-stake.md
+  - GUI Wallet: gui-wallet.md
   - CLI Reference: cli-reference.md
   - Troubleshooting: troubleshooting.md
   - FAQ: faq.md

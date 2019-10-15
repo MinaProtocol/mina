@@ -10,23 +10,17 @@ module Merkle_tree =
   Snarky.Merkle_tree.Checked
     (Tick)
     (struct
-      type value = Pedersen.Checked.Digest.t
+      type value = Field.t
 
-      type var = Pedersen.Checked.Digest.var
+      type var = Field.Var.t
 
-      let typ = Pedersen.Checked.Digest.typ
+      let typ = Field.typ
 
       let merge ~height h1 h2 =
-        let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =
-          Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
-            (bs :> Boolean.var list)
-        in
-        (* TODO: Think about if choose_preimage_var is ok *)
-        let%bind h1 = Pedersen.Checked.Digest.choose_preimage h1
-        and h2 = Pedersen.Checked.Digest.choose_preimage h2 in
-        Pedersen.Checked.digest_triples
-          ~init:Hash_prefix.merkle_tree.(height)
-          (to_triples h1 @ to_triples h2)
+        Tick.make_checked (fun () ->
+            Random_oracle.Checked.hash
+              ~init:Hash_prefix.Random_oracle.merkle_tree.(height)
+              [|h1; h2|] )
 
       let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 
@@ -57,11 +51,9 @@ let to_string t = Base58_check.String_ops.to_string t
 let of_string s = Base58_check.String_ops.of_string s
 
 let merge ~height (h1 : t) (h2 : t) =
-  let open Tick.Pedersen in
-  State.digest
-    (hash_fold
-       Hash_prefix.merkle_tree.(height)
-       Fold.(Digest.fold (h1 :> field) +> Digest.fold (h2 :> field)))
+  Random_oracle.hash
+    ~init:Hash_prefix.Random_oracle.merkle_tree.(height)
+    [|(h1 :> field); (h2 :> field)|]
   |> of_hash
 
 (* TODO: @ihm cryptography review *)

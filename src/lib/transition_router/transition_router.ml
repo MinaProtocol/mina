@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Coda_state
 open Pipe_lib
+open Coda_transition
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -14,39 +15,18 @@ module type Inputs_intf = sig
     val peers : t -> Network_peer.Peer.t list
   end
 
-  module Transition_frontier :
-    Coda_intf.Transition_frontier_intf
-    with type external_transition_validated := External_transition.Validated.t
-     and type mostly_validated_external_transition :=
-                ( [`Time_received] * unit Truth.true_t
-                , [`Proof] * unit Truth.true_t
-                , [`Delta_transition_chain]
-                  * Coda_base.State_hash.t Non_empty_list.t Truth.true_t
-                , [`Frontier_dependencies] * unit Truth.true_t
-                , [`Staged_ledger_diff] * unit Truth.false_t )
-                External_transition.Validation.with_transition
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type staged_ledger := Staged_ledger.t
-     and type verifier := Verifier.t
+  module Transition_frontier : Coda_intf.Transition_frontier_intf
 
   module Transition_frontier_controller :
     Coda_intf.Transition_frontier_controller_intf
-    with type external_transition_validated := External_transition.Validated.t
-     and type external_transition_with_initial_validation :=
-                External_transition.with_initial_validation
-     and type transition_frontier := Transition_frontier.t
+    with type transition_frontier := Transition_frontier.t
      and type breadcrumb := Transition_frontier.Breadcrumb.t
      and type network := Network.t
-     and type verifier := Verifier.t
 
   module Bootstrap_controller :
     Coda_intf.Bootstrap_controller_intf
     with type network := Network.t
-     and type verifier := Verifier.t
      and type transition_frontier := Transition_frontier.t
-     and type external_transition_with_initial_validation :=
-                External_transition.with_initial_validation
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -57,8 +37,9 @@ module Make (Inputs : Inputs_intf) = struct
     Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
   let is_transition_for_bootstrap ~logger root_state new_transition =
-    let open External_transition in
-    let new_state = protocol_state new_transition in
+    let new_state =
+      External_transition.Initial_validated.protocol_state new_transition
+    in
     Consensus.Hooks.should_bootstrap
       ~existing:(Protocol_state.consensus_state root_state)
       ~candidate:(Protocol_state.consensus_state new_state)
@@ -74,9 +55,11 @@ module Make (Inputs : Inputs_intf) = struct
   let start_transition_frontier_controller ~logger ~trust_system ~verifier
       ~network ~time_controller ~proposer_transition_reader
       ~verified_transition_writer ~clear_reader ~collected_transitions
-      ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
+      ~transition_reader_ref ~transition_writer_ref ~frontier_w
+      ~initialization_finish_signal frontier =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Starting Transition Frontier Controller phase" ;
+    Ivar.fill_if_empty initialization_finish_signal () ;
     let ( transition_frontier_controller_reader
         , transition_frontier_controller_writer ) =
       create_bufferred_pipe ~name:"transition frontier controller pipe" ()
@@ -99,7 +82,7 @@ module Make (Inputs : Inputs_intf) = struct
   let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
       ~time_controller ~proposer_transition_reader ~verified_transition_writer
       ~clear_reader ~transition_reader_ref ~transition_writer_ref ~ledger_db
-      ~frontier_w frontier =
+      ~frontier_w ~initialization_finish_signal frontier =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Starting Bootstrap Controller phase" ;
     let bootstrap_controller_reader, bootstrap_controller_writer =
@@ -129,6 +112,7 @@ module Make (Inputs : Inputs_intf) = struct
                      , `Float connectivity_time_uppperbound ) ]
                  ~location:__LOC__ ~module_:__MODULE__ ) ]
        in
+       Ivar.fill_if_empty initialization_finish_signal () ;
        Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
          ~ledger_db ~frontier ~transition_reader:!transition_reader_ref)
       (fun (new_frontier, collected_transitions) ->
@@ -137,13 +121,14 @@ module Make (Inputs : Inputs_intf) = struct
           ~network ~time_controller ~proposer_transition_reader
           ~verified_transition_writer ~clear_reader ~collected_transitions
           ~transition_reader_ref ~transition_writer_ref ~frontier_w
-          new_frontier )
+          ~initialization_finish_signal new_frontier )
 
   let run ~logger ~trust_system ~verifier ~network ~time_controller
       ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
       ~network_transition_reader ~proposer_transition_reader
       ~most_recent_valid_block:( most_recent_valid_block_reader
                                , most_recent_valid_block_writer ) frontier =
+    let initialization_finish_signal = Ivar.create () in
     let clear_reader, clear_writer =
       Strict_pipe.create ~name:"clear" Synchronous
     in
@@ -198,47 +183,49 @@ module Make (Inputs : Inputs_intf) = struct
       start_transition_frontier_controller ~logger ~trust_system ~verifier
         ~network ~time_controller ~proposer_transition_reader
         ~verified_transition_writer ~clear_reader ~collected_transitions:[]
-        ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier
+        ~transition_reader_ref ~transition_writer_ref ~frontier_w
+        ~initialization_finish_signal frontier
     else
       start_bootstrap_controller ~logger ~trust_system ~verifier ~network
         ~time_controller ~proposer_transition_reader
         ~verified_transition_writer ~clear_reader ~transition_reader_ref
-        ~transition_writer_ref ~ledger_db ~frontier_w frontier ;
+        ~transition_writer_ref ~ledger_db ~frontier_w
+        ~initialization_finish_signal frontier ;
     let ( valid_protocol_state_transition_reader
         , valid_protocol_state_transition_writer ) =
       create_bufferred_pipe ~name:"valid transitions" ()
     in
     Initial_validator.run ~logger ~trust_system ~verifier
       ~transition_reader:network_transition_reader
-      ~valid_transition_writer:valid_protocol_state_transition_writer ;
+      ~valid_transition_writer:valid_protocol_state_transition_writer
+      ~initialization_finish_signal ;
     let valid_protocol_state_transition_reader, valid_transition_reader =
       Strict_pipe.Reader.Fork.two valid_protocol_state_transition_reader
     in
     Strict_pipe.Reader.iter valid_transition_reader
       ~f:(fun transition_with_time ->
         let `Transition enveloped_transition, _ = transition_with_time in
-        let transition =
-          Envelope.Incoming.data enveloped_transition |> fst |> With_hash.data
-        in
+        let transition = Envelope.Incoming.data enveloped_transition in
         let current_consensus_state =
           External_transition.consensus_state
             (Broadcast_pipe.Reader.peek most_recent_valid_block_reader)
         in
         if
           Consensus.Hooks.select ~existing:current_consensus_state
-            ~candidate:External_transition.(consensus_state transition)
+            ~candidate:
+              External_transition.Initial_validated.(
+                consensus_state transition)
             ~logger
           = `Take
         then
-          Broadcast_pipe.Writer.write most_recent_valid_block_writer transition
+          Broadcast_pipe.Writer.write most_recent_valid_block_writer
+            (External_transition.Validation.forget_validation transition)
         else Deferred.unit )
     |> don't_wait_for ;
     Strict_pipe.Reader.iter_without_pushback
       valid_protocol_state_transition_reader ~f:(fun transition_with_time ->
         let `Transition enveloped_transition, _ = transition_with_time in
-        let transition =
-          Envelope.Incoming.data enveloped_transition |> fst |> With_hash.data
-        in
+        let transition = Envelope.Incoming.data enveloped_transition in
         ( match Broadcast_pipe.Reader.peek frontier_r with
         | Some frontier ->
             if
@@ -251,7 +238,7 @@ module Make (Inputs : Inputs_intf) = struct
                 ~network ~time_controller ~proposer_transition_reader
                 ~verified_transition_writer ~clear_reader
                 ~transition_reader_ref ~transition_writer_ref ~ledger_db
-                ~frontier_w frontier )
+                ~frontier_w ~initialization_finish_signal frontier )
         | None ->
             () ) ;
         Strict_pipe.Writer.write !transition_writer_ref transition_with_time )
