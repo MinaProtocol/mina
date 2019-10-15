@@ -1146,8 +1146,6 @@ let create ~logger ~conf_dir =
   | _ ->
       Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
-(*  Temporarily commenting out while we figure out how to build libp2p_helper on CI
-
 let%test_module "coda network tests" =
   ( module struct
     let () = Backtrace.elide := false
@@ -1179,10 +1177,12 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~me:kp_a ~maddrs ~network_id ~on_new_peer:Fn.ignore
+        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
+          ~network_id ~on_new_peer:Fn.ignore
         >>| Or_error.ok_exn
       and () =
-        configure b ~me:kp_b ~maddrs ~network_id ~on_new_peer:Fn.ignore
+        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
+          ~network_id ~on_new_peer:Fn.ignore
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a
@@ -1272,4 +1272,3 @@ let%test_module "coda network tests" =
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
   end )
-*)
