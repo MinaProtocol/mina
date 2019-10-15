@@ -100,31 +100,22 @@ end) =
 struct
   open Async
 
-  let data_set = ref []
+  let total = ref 0.
 
   let create () ~name ~subsystem ~namespace ~help =
     let gauge = Gauge.v name ~subsystem ~namespace ~help in
     let rec tick () =
       upon (after Spec.tick_interval) (fun () ->
-          let current_time = Core.Time.now () in
-          data_set :=
-            List.filter !data_set ~f:(fun (timestamp, _) ->
-                let open Core.Time in
-                sub current_time Spec.rolling_interval < timestamp ) ;
-          let total =
-            List.fold !data_set ~init:0. ~f:(fun accm (_, datum) ->
-                accm +. datum )
-          in
-          Gauge.set gauge (Spec.display total) ;
+          Gauge.set gauge (Spec.display !total) ;
           tick () )
     in
     tick ()
 
   let update datum =
-    let timestamp = Core.Time.now () in
-    data_set := (timestamp, datum) :: !data_set
+    total := !total +. datum ;
+    upon (after Spec.rolling_interval) (fun () -> total := !total -. datum)
 
-  let clear () = data_set := []
+  let clear () = total := 0.
 end
 
 module Runtime = struct
