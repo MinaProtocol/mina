@@ -2,7 +2,7 @@ let defaultName = "Primary Account";
 
 module AddWallet = [%graphql
   {|
-     mutation addWallet($password: String) {
+     mutation addWallet($password: String!) {
          addWallet(input: {password: $password}) {
            publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
          }
