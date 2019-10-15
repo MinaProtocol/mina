@@ -244,21 +244,18 @@ module Haskell_process = struct
           (* If the Kademlia process dies, kill the parent daemon process. Fix
          * for #550 *)
           Deferred.bind (Process.wait p.process) ~f:(fun code ->
-              let%bind () =
-                match (!(p.failure_response), code) with
-                | `Ignore, _ | _, Ok () ->
-                    return ()
-                | `Die, (Error _ as e) ->
-                    Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                      "Kademlia process died: $exit_or_signal"
-                      ~metadata:
-                        [ ( "exit_or_signal"
-                          , `String (Unix.Exit_or_signal.to_string_hum e) ) ] ;
-                    raise Child_died
-              in
               let%bind () = Sys.remove lock_path in
               Ivar.fill p.terminated_ivar () ;
-              Deferred.unit )
+              match (!(p.failure_response), code) with
+              | `Ignore, _ | _, Ok () ->
+                  return ()
+              | `Die, (Error _ as e) ->
+                  Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                    "Kademlia process died: $exit_or_signal"
+                    ~metadata:
+                      [ ( "exit_or_signal"
+                        , `String (Unix.Exit_or_signal.to_string_hum e) ) ] ;
+                  raise Child_died )
           |> don't_wait_for ;
           Ok p
       | Error e ->
@@ -270,20 +267,19 @@ module Haskell_process = struct
     in
     let kill_locked_process ~logger =
       match%bind Sys.file_exists lock_path with
-      | `Yes -> (
+      | `Yes ->
           let%bind p = Reader.file_contents lock_path in
-          match%bind Process.run ~prog:"kill" ~args:[p] () with
+          let%bind kill_res = Process.run ~prog:"kill" ~args:[p] () in
+          ( match kill_res with
           | Ok _ ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                 "Killing Kademlia process: $process"
-                ~metadata:[("process", `String p)] ;
-              let%map () = Sys.remove lock_path in
-              Ok ()
+                ~metadata:[("process", `String p)]
           | Error _ ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                 "Process $process does not exist, won't kill"
-                ~metadata:[("process", `String p)] ;
-              return @@ Ok () )
+                ~metadata:[("process", `String p)] ) ;
+          Deferred.map ~f:Or_error.return @@ Sys.remove lock_path
       | _ ->
           return @@ Ok ()
     in
