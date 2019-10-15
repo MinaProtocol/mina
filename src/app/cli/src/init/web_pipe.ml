@@ -108,9 +108,10 @@ let run_service coda ~conf_dir ~logger =
     | `None ->
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "Not running a web client pipe" ;
-        don't_wait_for (Strict_pipe.Reader.iter_without_pushback
-          (Coda_lib.validated_transitions coda)
-          ~f:ignore)
+        don't_wait_for
+          (Strict_pipe.Reader.iter_without_pushback
+             (Coda_lib.validated_transitions coda)
+             ~f:ignore)
     | `Local path ->
         let open Keypair in
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
