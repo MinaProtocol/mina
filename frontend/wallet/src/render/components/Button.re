@@ -34,6 +34,14 @@ module Styles = {
           backgroundColor(Theme.Colors.marineAlpha(1.)),
           color(white),
         ]),
+        focus([
+          backgroundColor(Theme.Colors.marineAlpha(1.)),
+          color(white),
+        ]),
+        active([
+          backgroundColor(Theme.Colors.marineAlpha(1.)),
+          color(white),
+        ]),
       ]),
     ]);
 
@@ -44,6 +52,8 @@ module Styles = {
         backgroundColor(Theme.Colors.serpentine),
         color(white),
         hover([backgroundColor(Theme.Colors.jungle)]),
+        focus([backgroundColor(Theme.Colors.jungle)]),
+        active([backgroundColor(Theme.Colors.jungle)]),
       ]),
     ]);
 
@@ -54,6 +64,8 @@ module Styles = {
         backgroundColor(Theme.Colors.roseBud),
         color(white),
         hover([backgroundColor(Theme.Colors.yeezy)]),
+        focus([backgroundColor(Theme.Colors.yeezy)]),
+        active([backgroundColor(Theme.Colors.yeezy)]),
       ]),
     ]);
 
@@ -64,6 +76,8 @@ module Styles = {
         backgroundColor(Theme.Colors.slateAlpha(0.05)),
         color(Theme.Colors.midnight),
         hover([backgroundColor(Theme.Colors.slateAlpha(0.2))]),
+        focus([backgroundColor(Theme.Colors.slateAlpha(0.2))]),
+        active([backgroundColor(Theme.Colors.slateAlpha(0.2))]),
       ]),
     ]);
 
