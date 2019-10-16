@@ -90,6 +90,34 @@ module TextFormat_0_0_4 = struct
           samples )
 end
 
+module Moving_average (Spec : sig
+  val tick_interval : Core.Time.Span.t
+
+  val rolling_interval : Core.Time.Span.t
+
+  val display : Float.t -> Float.t
+end) =
+struct
+  open Async
+
+  let total = ref 0.
+
+  let create () ~name ~subsystem ~namespace ~help =
+    let gauge = Gauge.v name ~subsystem ~namespace ~help in
+    let rec tick () =
+      upon (after Spec.tick_interval) (fun () ->
+          Gauge.set gauge (Spec.display !total) ;
+          tick () )
+    in
+    tick ()
+
+  let update datum =
+    total := !total +. datum ;
+    upon (after Spec.rolling_interval) (fun () -> total := !total -. datum)
+
+  let clear () = total := 0.
+end
+
 module Runtime = struct
   let subsystem = "Runtime"
 
@@ -409,6 +437,23 @@ module Transition_frontier = struct
   let finalized_staged_txns : Counter.t =
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
+
+  module TPS_10min = Moving_average (struct
+    let tick_interval = Core.Time.Span.of_min 1.
+
+    let rolling_interval = Core.Time.Span.of_min 10.
+
+    let display total_txns =
+      total_txns /. Core.Time.Span.to_sec rolling_interval
+  end)
+
+  let tps_10min =
+    let name = "tps_10min" in
+    let help =
+      "moving average for transaction per second, the rolling interval is set \
+       to 10 min"
+    in
+    TPS_10min.create ~name ~help ~namespace ~subsystem ()
 
   let recently_finalized_staged_txns : Gauge.t =
     let help =
