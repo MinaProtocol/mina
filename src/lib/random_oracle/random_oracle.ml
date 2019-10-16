@@ -202,10 +202,11 @@ module Checked = struct
     update params ~state:(f state) (f xs) |> Array.map ~f:to_cvar
 
   let hash ?init xs =
-    hash
-      ?init:(Option.map init ~f:(State.map ~f:constant))
-      params (Array.map xs ~f:of_cvar)
-    |> to_cvar
+    O1trace.measure "Random_oracle.hash" (fun () ->
+        hash
+          ?init:(Option.map init ~f:(State.map ~f:constant))
+          params (Array.map xs ~f:of_cvar)
+        |> to_cvar )
 
   let pack_input = pack_input ~project:Runners.Tick.Field.project
 
