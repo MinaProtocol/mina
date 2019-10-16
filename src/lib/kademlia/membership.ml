@@ -129,16 +129,27 @@ module Haskell_process = struct
     ; process: Process.t
     ; terminated_ivar: unit Ivar.t
           (** Filled once the process is terminated. *)
-    ; lock_path: string }
+    ; lock_path: string
+    ; logger: Logger.t }
 
-  let kill {failure_response; process; terminated_ivar; _} =
+  let kill {failure_response; process; terminated_ivar; logger; _} =
     failure_response := `Ignore ;
     match Ivar.peek terminated_ivar with
     | None ->
         let%bind _ =
-          Process.run_exn ~prog:"kill"
-            ~args:[Pid.to_string (Process.pid process)]
-            ()
+          match%map
+            Process.run ~prog:"kill"
+              ~args:[Pid.to_string (Process.pid process)]
+              ()
+          with
+          | Ok _ ->
+              ()
+          | Error err ->
+              (* There is a race where it dies in between the check and kill
+               starting. *)
+              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                "Killing kademlia helper failed: %s, hopefully it already died."
+                (Error.to_string_hum err)
         in
         (* Wait for the process to terminate before returning. *)
         Ivar.read terminated_ivar
@@ -238,7 +249,8 @@ module Haskell_process = struct
           { failure_response= ref `Die
           ; process
           ; lock_path
-          ; terminated_ivar= Ivar.create () }
+          ; terminated_ivar= Ivar.create ()
+          ; logger }
       with
       | Ok p ->
           (* If the Kademlia process dies, kill the parent daemon process. Fix
