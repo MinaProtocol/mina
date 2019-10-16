@@ -60,12 +60,17 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   in
   Option.is_some remainder
 
-let schedule_user_command t (txn : User_command.t) account_opt =
+let schedule_user_command t (txn : User_command.t) account_opt :
+    unit Or_error.t Deferred.t =
+  (* FIXME #3457: return a status from Transaction_pool.add and use it instead
+     of is_valid_user_command
+  *)
   if not (is_valid_user_command t txn account_opt) then
-    Or_error.error_string "Invalid user command: account balance is too low"
+    Deferred.return
+    @@ Or_error.error_string "Invalid user command: account balance is too low"
   else
     let txn_pool = Coda_lib.transaction_pool t in
-    don't_wait_for (Network_pool.Transaction_pool.add txn_pool txn) ;
+    let%map () = Network_pool.Transaction_pool.add txn_pool txn in
     let logger =
       Logger.extend
         (Coda_lib.top_level_logger t)
@@ -135,12 +140,10 @@ let get_nonce t (addr : Public_key.Compressed.t) =
   account.Account.Poly.nonce
 
 let send_user_command t (txn : User_command.t) =
-  Deferred.return
-  @@
   let public_key = Public_key.compress txn.sender in
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t public_key in
-  let open Or_error.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let%map () = schedule_user_command t txn account_opt in
   record_payment t txn (Option.value_exn account_opt)
 
@@ -213,12 +216,22 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
       verifying_txn
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
-let schedule_user_commands t txns =
-  List.map txns ~f:(fun (txn : User_command.t) ->
-      let public_key = Public_key.compress txn.sender in
-      let open Participating_state.Let_syntax in
-      let%map account_opt = get_account t public_key in
-      match schedule_user_command t txn account_opt with
+let schedule_user_commands t (txns : User_command.t list) :
+    unit Deferred.t Participating_state.t =
+  let open Participating_state.Let_syntax in
+  (* The ordering is important here. We need to create *one* deferred inside the
+     Participating_state monad, if we create multiple and sequence them
+     afterward the run order is undefined. *)
+  let%map account_txn_pairs =
+    List.map txns ~f:(fun txn ->
+        get_account t (Public_key.compress txn.sender) >>| fun acc -> (acc, txn)
+    )
+    |> Participating_state.sequence
+  in
+  Deferred.List.iter ~how:`Sequential account_txn_pairs
+    ~f:(fun (account_opt, txn) ->
+      let open Deferred.Let_syntax in
+      match%map schedule_user_command t txn account_opt with
       | Ok () ->
           ()
       | Error err ->
@@ -231,8 +244,6 @@ let schedule_user_commands t txns =
             ~metadata:[("error", `String (Error.to_string_hum err))]
             "Failure in schedule_user_commands: $error. This is not yet \
              reported to the client, see #1143" )
-  |> Participating_state.sequence
-  |> Participating_state.map ~f:ignore
 
 let prove_receipt t ~proving_receipt ~resulting_receipt :
     Payment_proof.t Deferred.Or_error.t =

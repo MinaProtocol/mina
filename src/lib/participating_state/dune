@@ -2,4 +2,4 @@
   (name participating_state)
   (public_name participating_state)
   (preprocess (pps ppx_coda))
-  (libraries core_kernel))
+  (libraries async_kernel core_kernel))
