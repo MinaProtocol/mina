@@ -357,7 +357,8 @@ let convert_modbody ~loc body =
               Array.find_map versions ~f:(fun (i, f) ->
                   if Int.equal i version then Some (f buf) else None )]
         in
-        convert :: versions :: rev_str
+        let convert_guard = [%stri let _ = deserialize_binary_opt] in
+        convert :: convert_guard :: versions :: rev_str
     | _ ->
         rev_str
   in
