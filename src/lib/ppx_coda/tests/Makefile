@@ -26,6 +26,10 @@ positive-tests : unexpired.ml
 	@ echo -n "Define locally, should succeed..."
 	@ dune build define_locally_good.cma ${REDIRECT}
 	@ echo "OK"
+# module versioning
+	@ echo -n "Module versioning, should succeed..."
+	@ dune exec ./versioned_module_good.exe ${REDIRECT}
+	@ echo "OK"
 
 negative-tests :
 # expiration
@@ -74,4 +78,20 @@ negative-tests :
 	@ echo "OK"
 	@ echo -n "Versioned types with GADT type with unversioned results, should fail..."
 	@ ! dune build versioned_bad_gadt_results.cma ${REDIRECT}
+	@ echo "OK"
+# module versioning
+	@ echo -n "Module versioning with wrong module name, should fail..."
+	@ ! dune build versioned_module_bad_stable_name.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Module versioning with wrong version name, should fail..."
+	@ ! dune build versioned_module_bad_version.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Module versioning with missing type, should fail..."
+	@ ! dune build versioned_module_bad_missing_type.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Module versioning with incorrect version order, should fail..."
+	@ ! dune build versioned_module_bad_version_order.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Module versioning with missing to_latest, should fail..."
+	@ ! dune build versioned_module_bad_missing_to_latest.cma ${REDIRECT}
 	@ echo "OK"

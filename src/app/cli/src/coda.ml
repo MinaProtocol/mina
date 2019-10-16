@@ -714,7 +714,7 @@ let daemon logger =
                (* check for other terminated children, without waiting *)
                terminated_child_loop ()
          in
-         Deferred.don't_wait_for @@ terminated_child_loop () ;
+         O1trace.trace_task "terminated child loop" terminated_child_loop ;
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
