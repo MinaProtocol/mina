@@ -90,8 +90,44 @@ module TextFormat_0_0_4 = struct
           samples )
 end
 
+module Moving_average (Spec : sig
+  val tick_interval : Core.Time.Span.t
+
+  val rolling_interval : Core.Time.Span.t
+
+  val display : Float.t -> Float.t
+end) =
+struct
+  open Async
+
+  let total = ref 0.
+
+  let create () ~name ~subsystem ~namespace ~help =
+    let gauge = Gauge.v name ~subsystem ~namespace ~help in
+    let rec tick () =
+      upon (after Spec.tick_interval) (fun () ->
+          Gauge.set gauge (Spec.display !total) ;
+          tick () )
+    in
+    tick ()
+
+  let update datum =
+    total := !total +. datum ;
+    upon (after Spec.rolling_interval) (fun () -> total := !total -. datum)
+
+  let clear () = total := 0.
+end
+
 module Runtime = struct
   let subsystem = "Runtime"
+
+  module Long_async_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 0.5 2. 7
+  end)
+
+  let long_async_cycle : Long_async_histogram.t =
+    let help = "A histogram for long async cycles" in
+    Long_async_histogram.v "long_async_cycle" ~help ~namespace ~subsystem
 
   let start_time = Core.Time.now ()
 
@@ -213,6 +249,20 @@ module Cryptography = struct
     let help = "# of pedersen hashes computed" in
     Counter.v "total_pedersen_hash_computed" ~help ~namespace ~subsystem
 
+  module Snark_work_histogram = Histogram (struct
+    let spec = Histogram_spec.of_linear 60. 30. 8
+  end)
+
+  let snark_work_merge_time_sec =
+    let help = "time elapsed while doing merge proof" in
+    Snark_work_histogram.v "snark_work_merge_time_sec" ~help ~namespace
+      ~subsystem
+
+  let snark_work_base_time_sec =
+    let help = "time elapsed while doing base proof" in
+    Snark_work_histogram.v "snark_work_base_time_sec" ~help ~namespace
+      ~subsystem
+
   (* TODO:
   let transaction_proving_time_ms =
     let help = "time elapsed while proving most recently generated transaction snark" in
@@ -307,6 +357,14 @@ module Snark_work = struct
        after every block"
     in
     Gauge.v "scan_state_snark_work" ~help ~namespace ~subsystem
+
+  module Snark_fee_histogram = Histogram (struct
+    let spec = Histogram_spec.of_linear 0. 1. 10
+  end)
+
+  let snark_fee =
+    let help = "A histogram for snark fees" in
+    Snark_fee_histogram.v "snark_fee" ~help ~namespace ~subsystem
 end
 
 module Trust_system = struct
@@ -387,6 +445,23 @@ module Transition_frontier = struct
   let finalized_staged_txns : Counter.t =
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
+
+  module TPS_10min = Moving_average (struct
+    let tick_interval = Core.Time.Span.of_min 1.
+
+    let rolling_interval = Core.Time.Span.of_min 10.
+
+    let display total_txns =
+      total_txns /. Core.Time.Span.to_sec rolling_interval
+  end)
+
+  let tps_10min =
+    let name = "tps_10min" in
+    let help =
+      "moving average for transaction per second, the rolling interval is set \
+       to 10 min"
+    in
+    TPS_10min.create ~name ~help ~namespace ~subsystem ()
 
   let recently_finalized_staged_txns : Gauge.t =
     let help =

@@ -26,7 +26,6 @@ module Worker_state = struct
        let module T = Transaction_snark.Verification.Make (struct
          let keys = tx_vk
        end) in
-       let module B = Blockchain_transition.Make (T) in
        let module M = struct
          let instance_hash =
            unstage (Blockchain_transition.instance_hash bc_vk.wrap)

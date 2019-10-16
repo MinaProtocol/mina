@@ -129,7 +129,7 @@ RUN cd /graphql_ppx && opam pin -y add .
 RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
       echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
       sudo apt-get update && \
-      sudo apt-get install --yes coda-kademlia
+      sudo apt-get install --yes coda-discovery
 
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
 # easier.
