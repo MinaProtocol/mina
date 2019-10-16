@@ -18,7 +18,7 @@ def dunes_ok (dune) :
   return (not (path_prefix2 == ['_build'] or path_prefix2 == ['external'] or
                path_prefix3 == ['lib', 'snarky'] or path_prefix3 == ['lib', 'ppx_coda']))
 
-dunes = list(filter(lambda s : len(s) > 0 and dunes_ok (s),dunes_raw))
+dune_paths = list(filter(lambda s : len(s) > 0 and dunes_ok (s),dunes_raw))
 
 library = sexpdata.loads ('library')
 preprocess = sexpdata.loads ('preprocess')
@@ -29,8 +29,13 @@ ppx_lint = sexpdata.loads ('ppx_coda')
 
 exit_code = 0
 
-def ppx_error (dune,ppx) :
-    print ("In dune file " + dune + ", the preprocessing clause does not contain " + (sexpdata.dumps (ppx)) + ", or is missing")
+def missing_ppx_error (dune,ppx) :
+    print ("In dune file " + dune + ", the preprocessing clause is missing; there should be one containing " + (sexpdata.dumps (ppx)))
+    global exit_code
+    exit_code = 1
+
+def no_ppx_error (dune,ppx) :
+    print ("In dune file " + dune + ", the preprocessing clause indicates no preprocessing, but it should include " + (sexpdata.dumps (ppx)))
     global exit_code
     exit_code = 1
 
@@ -38,26 +43,30 @@ def get_ppx_ndx (dune,ppxs,ppx) :
     try :
         ppxs.index (ppx)
     except :
-        ppx_error (dune,ppx)
+      print ("In dune file " + dune + ", the preprocessing clause does not contain " + (sexpdata.dumps (ppx)))
+      global exit_code
+      exit_code = 1
 
-for dune in dunes :
-    with open (dune) as fp :
+for dune in dune_paths :
+  with open (dune) as fp :
         # wrap in parens to get list of top-level clauses
         sexps = sexpdata.loads ('(' + fp.read () + ')')
         for sexp in sexps :
             if isinstance (sexp,list) and len (sexp) > 0 and sexpdata.car (sexp) == library :
                 clauses = sexpdata.cdr (sexp)
+                found_preprocess = False
                 for clause in clauses :
-                    if sexpdata.car (clause) == preprocess :
-                        subclause = sexpdata.car (sexpdata.cdr (clause))
-                        if subclause == no_preprocessing :
-                            # error if no preprocessing explicitly
-                            ppx_error (dune,ppx_lint)
-                        elif sexpdata.car (subclause) == pps :
-                            ppxs = sexpdata.cdr (subclause)
-                            lint_ppx_ndx = get_ppx_ndx (dune,ppxs,ppx_lint)
-                        else :
-                            # error if no preprocessing implicitly
-                            ppx_error (dune,ppx_lint)
+                  if sexpdata.car (clause) == preprocess :
+                    found_preprocess = True
+                    subclause = sexpdata.car (sexpdata.cdr (clause))
+                    if subclause == no_preprocessing :
+                      # error if no preprocessing explicitly
+                      no_ppx_error (dune,ppx_lint)
+                    elif sexpdata.car (subclause) == pps :
+                      ppxs = sexpdata.cdr (subclause)
+                      lint_ppx_ndx = get_ppx_ndx (dune,ppxs,ppx_lint)
+                if found_preprocess == False :
+                  # error if no preprocessing implicitly
+                  missing_ppx_error (dune,ppx_lint)
 
 exit (exit_code)
