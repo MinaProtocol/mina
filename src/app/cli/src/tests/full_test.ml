@@ -285,8 +285,9 @@ let run_test () : unit Deferred.t =
         in
         let%bind p1_res =
           Coda_commands.send_user_command coda (payment :> User_command.t)
+          |> Participating_state.to_deferred_or_error
         in
-        assert_ok (p1_res |> Participating_state.active_exn) ;
+        assert_ok (Or_error.join p1_res) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
@@ -294,8 +295,9 @@ let run_test () : unit Deferred.t =
         in
         let%bind p2_res =
           Coda_commands.send_user_command coda (payment' :> User_command.t)
+          |> Participating_state.to_deferred_or_error
         in
-        assert_ok (p2_res |> Participating_state.active_exn) ;
+        assert_ok @@ Or_error.join p2_res ;
         (* The payment fails, but the rpc command doesn't indicate that because that
            failure comes from the network. *)
         (* Let the system settle, mine some blocks *)
@@ -328,8 +330,9 @@ let run_test () : unit Deferred.t =
         in
         let%map p_res =
           Coda_commands.send_user_command coda (payment :> User_command.t)
+          |> Participating_state.to_deferred_or_error
         in
-        p_res |> Participating_state.active_exn |> assert_ok ;
+        p_res |> Or_error.join |> assert_ok ;
         new_balance_sheet'
       in
       let pks accounts =
