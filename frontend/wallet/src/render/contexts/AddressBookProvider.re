@@ -3,7 +3,7 @@ open Tc;
 module AddressBookContextType = {
   type t = (AddressBook.t, (AddressBook.t => AddressBook.t) => unit);
 
-  let initialContext = (AddressBook.empty, _ => ());
+  let initialContext = (AddressBook.default, _ => ());
 };
 
 type t = AddressBookContextType.t;
@@ -15,7 +15,7 @@ let createContext = () => {
       Bindings.LocalStorage.getItem(`AddressBook)
       |> Js.Nullable.toOption
       |> Option.map(~f=AddressBook.fromJsonString)
-      |> Option.withDefault(~default=AddressBook.empty)
+      |> Option.withDefault(~default=AddressBook.default)
     );
 
   (

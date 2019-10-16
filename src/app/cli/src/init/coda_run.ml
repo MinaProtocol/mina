@@ -6,7 +6,7 @@ open Coda_transition
 open Coda_state
 open O1trace
 module Graphql_cohttp_async =
-  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Io)
+  Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
 
 let snark_job_list_json t =
@@ -192,12 +192,13 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
   in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-          let%map result = Coda_commands.send_user_command coda tx in
-          result |> Participating_state.active_error |> Or_error.join )
+          Deferred.map
+            ( Coda_commands.send_user_command coda tx
+            |> Participating_state.to_deferred_or_error )
+            ~f:Or_error.join )
     ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-          return
-            ( Coda_commands.schedule_user_commands coda ts
-            |> Participating_state.active_error ) )
+          Coda_commands.schedule_user_commands coda ts
+          |> Participating_state.to_deferred_or_error )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
           return
             ( Coda_commands.get_balance coda pk
@@ -482,4 +483,5 @@ You might be trying to connect to a different network version, or need to troubl
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           !"Coda process was interrupted by $signal"
           ~metadata:[("signal", `String (to_string signal))] ;
-        Stdlib.exit 130 ))
+        (* causes async shutdown and at_exit handlers to run *)
+        Async.shutdown 130 ))

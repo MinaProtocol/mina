@@ -127,20 +127,24 @@ module Haskell_process = struct
   type t =
     { failure_response: [`Die | `Ignore] ref
     ; process: Process.t
-    ; mutable already_waited: bool
+    ; terminated_ivar: unit Ivar.t
+          (** Filled once the process is terminated. *)
     ; lock_path: string }
 
-  let kill {failure_response; process; lock_path; already_waited} =
+  let kill {failure_response; process; terminated_ivar; _} =
     failure_response := `Ignore ;
-    if not already_waited then
-      let%bind _ =
-        Process.run_exn ~prog:"kill"
-          ~args:[Pid.to_string (Process.pid process)]
-          ()
-      in
-      let%bind _ = Process.wait process in
-      Sys.remove lock_path
-    else Deferred.unit
+    match Ivar.peek terminated_ivar with
+    | None ->
+        let%bind _ =
+          Process.run_exn ~prog:"kill"
+            ~args:[Pid.to_string (Process.pid process)]
+            ()
+        in
+        (* Wait for the process to terminate before returning. *)
+        Ivar.read terminated_ivar
+    | Some () ->
+        (* Process has already terminated so killing it is a no-op. *)
+        Deferred.unit
 
   let cli_format : Unix.Inet_addr.t -> int -> string =
    fun host discovery_port ->
@@ -207,33 +211,41 @@ module Haskell_process = struct
       let%bind coda_binary_absolute = Lazy.force get_coda_binary in
       let open Deferred.Let_syntax in
       match%map
-        keep_trying
-          (List.filter_map ~f:Fn.id
-             [ Some
-                 ( Unix.getenv "CODA_KADEMLIA_PATH"
-                 |> Option.value ~default:coda_kademlia )
-             ; ( match coda_binary_absolute with
-               | Ok path ->
-                   Some (Filename.dirname path ^/ "kademlia")
-               | Error _ ->
-                   None )
-             ; ( match get_project_root () with
-               | Some path ->
-                   Some (path ^/ kademlia_binary)
-               | None ->
-                   None ) ])
-          ~f:(fun prog -> Process.create ~prog ~args ())
-        |> Deferred.Or_error.map ~f:(fun process ->
-               { failure_response= ref `Die
-               ; process
-               ; lock_path
-               ; already_waited= false } )
+        let open Deferred.Or_error.Let_syntax in
+        let%bind process =
+          keep_trying
+            (List.filter_map ~f:Fn.id
+               [ Some
+                   ( Unix.getenv "CODA_KADEMLIA_PATH"
+                   |> Option.value ~default:coda_kademlia )
+               ; ( match coda_binary_absolute with
+                 | Ok path ->
+                     Some (Filename.dirname path ^/ "kademlia")
+                 | Error _ ->
+                     None )
+               ; ( match get_project_root () with
+                 | Some path ->
+                     Some (path ^/ kademlia_binary)
+                 | None ->
+                     None ) ])
+            ~f:(fun prog -> Process.create ~prog ~args ())
+        in
+        let%bind () =
+          Deferred.map ~f:Or_error.return
+          @@ write_lock_file lock_path (Process.pid process)
+        in
+        return
+          { failure_response= ref `Die
+          ; process
+          ; lock_path
+          ; terminated_ivar= Ivar.create () }
       with
       | Ok p ->
           (* If the Kademlia process dies, kill the parent daemon process. Fix
          * for #550 *)
           Deferred.bind (Process.wait p.process) ~f:(fun code ->
-              p.already_waited <- true ;
+              let%bind () = Sys.remove lock_path in
+              Ivar.fill p.terminated_ivar () ;
               match (!(p.failure_response), code) with
               | `Ignore, _ | _, Ok () ->
                   return ()
@@ -243,7 +255,6 @@ module Haskell_process = struct
                     ~metadata:
                       [ ( "exit_or_signal"
                         , `String (Unix.Exit_or_signal.to_string_hum e) ) ] ;
-                  let%map () = Sys.remove lock_path in
                   raise Child_died )
           |> don't_wait_for ;
           Ok p
@@ -256,20 +267,19 @@ module Haskell_process = struct
     in
     let kill_locked_process ~logger =
       match%bind Sys.file_exists lock_path with
-      | `Yes -> (
+      | `Yes ->
           let%bind p = Reader.file_contents lock_path in
-          match%bind Process.run ~prog:"kill" ~args:[p] () with
+          let%bind kill_res = Process.run ~prog:"kill" ~args:[p] () in
+          ( match kill_res with
           | Ok _ ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                 "Killing Kademlia process: $process"
-                ~metadata:[("process", `String p)] ;
-              let%map () = Sys.remove lock_path in
-              Ok ()
+                ~metadata:[("process", `String p)]
           | Error _ ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                 "Process $process does not exist, won't kill"
-                ~metadata:[("process", `String p)] ;
-              return @@ Ok () )
+                ~metadata:[("process", `String p)] ) ;
+          Deferred.map ~f:Or_error.return @@ Sys.remove lock_path
       | _ ->
           return @@ Ok ()
     in
@@ -280,11 +290,7 @@ module Haskell_process = struct
     with
     | `Yes ->
         let%bind t = run_kademlia () in
-        let {failure_response= _; process; lock_path; already_waited= _} = t in
-        let%map () =
-          write_lock_file lock_path (Process.pid process)
-          |> Deferred.map ~f:Or_error.return
-        in
+        let {process; _} = t in
         don't_wait_for
           (Pipe.iter_without_pushback
              (Reader.pipe (Process.stderr process))
@@ -292,7 +298,7 @@ module Haskell_process = struct
                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                  ~metadata:[("str", `String str)]
                  "Kademlia stderr output: $str" )) ;
-        t
+        return t
     | _ ->
         Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 

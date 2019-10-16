@@ -117,7 +117,7 @@ module Styles = {
 };
 
 [@react.component]
-let make = () =>
+let make = (~hideText=false) =>
   <div className=Styles.container>
     <div className=Styles.bigSquare>
       <div className={Css.merge([Styles.square, Styles.first])} />
@@ -125,8 +125,12 @@ let make = () =>
       <div className={Css.merge([Styles.square, Styles.third])} />
       <div className={Css.merge([Styles.square, Styles.fourth])} />
     </div>
-    <Spacer height=0.25 />
-    <span className=Theme.Text.Body.semiBold>
-      {React.string("Loading...")}
-    </span>
+    {hideText
+       ? React.null
+       : <>
+           <Spacer height=0.25 />
+           <span className=Theme.Text.Body.semiBold>
+             {React.string("Loading...")}
+           </span>
+         </>}
   </div>;

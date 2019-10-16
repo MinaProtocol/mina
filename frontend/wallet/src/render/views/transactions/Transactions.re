@@ -202,7 +202,7 @@ let make = () => {
                  <div className=Styles.alertContainer>
                    <Alert
                      kind=`Info
-                     message="You don't have any coda in this wallet."
+                     message="You don't have any transactions related to this account."
                    />
                  </div>
                | (_, _) =>
@@ -232,7 +232,7 @@ let make = () => {
      | None =>
        <div className=Styles.alertContainer>
          <Alert
-           message="Select a wallet from the side bar to view related transactions."
+           message="Select an account from the side bar to view related transactions."
            kind=`Info
          />
        </div>

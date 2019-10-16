@@ -5,19 +5,7 @@ let length_in_triples = length_in_triples
 
 let salt (s : t) = Snark_params.Tick.Pedersen.(State.salt (s :> string))
 
-let protocol_state = salt protocol_state
-
-let protocol_state_body = salt protocol_state_body
-
 let account = salt account
-
-let proof_of_work = salt proof_of_work
-
-let merge_snark = salt merge_snark
-
-let base_snark = salt base_snark
-
-let transition_system_snark = salt transition_system_snark
 
 let receipt_chain = salt receipt_chain
 
@@ -25,12 +13,24 @@ let coinbase = salt coinbase
 
 let pending_coinbases = salt pending_coinbases
 
+let coinbase_stack_data = salt coinbase_stack_data
+
+let coinbase_stack_state_hash = salt coinbase_stack_state_hash
+
 let coinbase_stack = salt coinbase_stack
 
 let checkpoint_list = salt checkpoint_list
 
+let merge_snark = salt merge_snark
+
+let base_snark = salt base_snark
+
 module Random_oracle = struct
   let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
+
+  let protocol_state = salt protocol_state
+
+  let protocol_state_body = salt protocol_state_body
 
   let merkle_tree =
     Array.init Snark_params.ledger_depth ~f:(fun i -> salt (merkle_tree i))
@@ -46,4 +46,6 @@ module Random_oracle = struct
   let vrf_output = salt vrf_output
 
   let epoch_seed = salt epoch_seed
+
+  let transition_system_snark = salt transition_system_snark
 end

@@ -52,11 +52,7 @@ module Worker_state = struct
              ( module struct
                open Snark_params
                open Keys
-               module Consensus_mechanism = Consensus
                module Transaction_snark = Transaction_snark
-               module Blockchain_state = Blockchain_snark_state
-               module State =
-                 Blockchain_snark_state.Make_update (Transaction_snark)
 
                let wrap hash proof =
                  let module Wrap = Keys.Wrap in
@@ -104,11 +100,7 @@ module Worker_state = struct
          | "check" ->
              ( module struct
                open Snark_params
-               module Consensus_mechanism = Consensus
                module Transaction_snark = Transaction_snark
-               module Blockchain_state = Blockchain_snark_state
-               module State =
-                 Blockchain_snark_state.Make_update (Transaction_snark)
 
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
@@ -246,9 +238,12 @@ let create ~logger ~pids =
       ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:() ()
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Daemon started prover process with pid $prover_pid"
-    ~metadata:[("prover_pid", `Int (Process.pid process |> Pid.to_int))] ;
-  Child_processes.Termination.register_process pids process ;
+    "Daemon started process of kind $process_kind with pid $prover_pid"
+    ~metadata:
+      [ ("prover_pid", `Int (Process.pid process |> Pid.to_int))
+      ; ( "process_kind"
+        , `String Child_processes.Termination.(show_process_kind Prover) ) ] ;
+  Child_processes.Termination.(register_process pids process Prover) ;
   File_system.dup_stdout process ;
   File_system.dup_stderr process ;
   {connection; process}

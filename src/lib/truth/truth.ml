@@ -38,8 +38,8 @@ module Stable = struct
   module V1 = struct
     module T = struct
       type ('witness, _) t =
-        | True : 'witness -> ('witness, True.Stable.Latest.t) t
-        | False : ('witness, False.Stable.Latest.t) t
+        | True : 'witness -> ('witness, True.Stable.V1.t) t
+        | False : ('witness, False.Stable.V1.t) t
       [@@deriving version]
     end
 

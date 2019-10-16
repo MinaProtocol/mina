@@ -46,10 +46,12 @@ let fakerCommand = (~port) => {
   env: ChildProcess.Process.env,
 };
 
+[@bs.module "os"] external tmpdir : unit => string = "";
+
 module Process = {
   let start = (command: Command.t) => {
     let {Command.executable, args} = command;
-    let logfileName = "daemon.log";
+    let logfileName = tmpdir() ++ "/daemon.log";
     print_endline(
       {j|Starting $executable with $args. Logging to `$logfileName`|j},
     );
@@ -133,7 +135,7 @@ module CodaProcess = {
 
   let kill: t => unit = t => ChildProcess.Process.kill(t, "SIGINT");
 
-  let port = 0xc0da;
+  let port = 0xc0d;
 
   let start: list(string) => t =
     args => {

@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"path"
+	"strconv"
+
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log"
 	p2p "github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	host "github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	routing "github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -24,12 +28,8 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	tcp "github.com/libp2p/go-tcp-transport"
 	ws "github.com/libp2p/go-ws-transport"
-	"github.com/multiformats/go-multiaddr"
+	ma "github.com/multiformats/go-multiaddr"
 	"golang.org/x/crypto/blake2b"
-	"log"
-	"os"
-	"path"
-	"strconv"
 )
 
 // Helper contains all the daemon state
@@ -62,7 +62,7 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 // TODO: just put this into main.go?
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []multiaddr.Multiaddr, statedir string, pk crypto.PrivKey, networkID string) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string) (*Helper, error) {
 	logger := logging.Logger("codanet.Helper")
 	dso := dsb.DefaultOptions
 
@@ -109,6 +109,11 @@ func MakeHelper(ctx context.Context, listenOn []multiaddr.Multiaddr, statedir st
 		p2p.Peerstore(ps),
 		p2p.DisableRelay(),
 		p2p.ListenAddrs(listenOn...),
+		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
+			as = append(as, externalAddr)
+			return as
+		}),
+		p2p.NATPortMap(),
 		p2p.Routing(
 			p2pconfig.RoutingC(func(host host.Host) (routing.PeerRouting, error) {
 				kad, err := kad.New(ctx, host, kadopts.Datastore(dsDht), kadopts.Validator(rv))

@@ -129,6 +129,10 @@ func badHelper(e error) error {
 	return wrapError(e, "initializing helper")
 }
 
+func badAddr(e error) error {
+	return wrapError(e, "initializing external addr")
+}
+
 func needsConfigure() error {
 	return badRPC(errors.New("helper not yet configured"))
 }
@@ -142,6 +146,7 @@ type configureMsg struct {
 	Privk     string   `json:"privk"`
 	NetworkID string   `json:"network_id"`
 	ListenOn  []string `json:"ifaces"`
+	External  string   `json:"external_maddr"`
 }
 
 type discoveredPeerUpcall struct {
@@ -167,7 +172,12 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		}
 		maddrs[i] = res
 	}
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, m.Statedir, privk, m.NetworkID)
+
+	externalMaddr, err := multiaddr.NewMultiaddr(m.External)
+	if err != nil {
+		return nil, badAddr(err)
+	}
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID)
 	if err != nil {
 		return nil, badHelper(err)
 	}

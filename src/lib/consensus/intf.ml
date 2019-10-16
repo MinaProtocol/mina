@@ -2,8 +2,6 @@ open Core_kernel
 open Coda_numbers
 open Async
 open Currency
-open Fold_lib
-open Tuple_lib
 open Signature_lib
 open Coda_base
 
@@ -181,6 +179,7 @@ module type Snark_transition_intf = sig
          , 'consensus_transition
          , 'sok_digest
          , 'amount
+         , 'state_body_hash
          , 'public_key )
          t
     [@@deriving sexp]
@@ -195,11 +194,12 @@ module type Snark_transition_intf = sig
     , consensus_transition_var
     , Sok_message.Digest.Checked.t
     , Amount.var
+    , State_body_hash.var
     , Public_key.Compressed.var )
     Poly.t
 
   val consensus_transition :
-    (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
+    (_, 'consensus_transition, _, _, _, _) Poly.t -> 'consensus_transition
 end
 
 module type State_hooks_intf = sig
@@ -376,13 +376,12 @@ module type S = sig
 
       val length_in_triples : int
 
-      val var_to_triples :
-           var
-        -> ( Snark_params.Tick.Boolean.var Triple.t list
-           , _ )
-           Snark_params.Tick.Checked.t
+      open Snark_params.Tick
 
-      val fold : Value.t -> bool Triple.t Fold.t
+      val var_to_input :
+        var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+
+      val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
       val blockchain_length : Value.t -> Length.t
 
@@ -399,6 +398,8 @@ module type S = sig
       val curr_slot : Value.t -> Slot.t
 
       val global_slot : Value.t -> int
+
+      val total_currency : Value.t -> Amount.t
     end
 
     module Proposal_data : sig

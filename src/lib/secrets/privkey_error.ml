@@ -20,6 +20,6 @@ let to_string : t -> string = function
         !"Parent directory %s does not exist Hint: mkdir -p %s; chmod 700 %s\n"
         directory_name directory_name directory_name
 
-let raise t = raise (Privkey_exn t)
+let raise t = Error.raise (Error.of_string (to_string t))
 
 let corrupted_privkey error = Error (`Corrupted_privkey error)
