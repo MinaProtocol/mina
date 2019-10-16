@@ -20,41 +20,69 @@ module Ledger_inner = struct
   end
 
   module Hash = struct
-    (* TODO : version *)
-    module T = struct
-      type t = Ledger_hash.Stable.V1.t
-      [@@deriving bin_io, sexp, compare, hash, eq, yojson]
-    end
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Ledger_hash.Stable.V1.t
+        [@@deriving sexp, compare, hash, eq, yojson]
 
-    include T
-    include Hashable.Make_binable (T)
+        let to_latest = Fn.id
 
-    let to_string = Ledger_hash.to_string
+        module T = struct
+          (* nonrec and deriving don't work together *)
+          type typ = t [@@deriving bin_io, sexp, compare, hash]
 
-    let merge = Ledger_hash.merge
+          type t = typ [@@deriving bin_io, sexp, compare, hash]
+        end
 
-    let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+        include Hashable.Make_binable (T)
 
-    let empty_account = hash_account Account.empty
+        let to_string = Ledger_hash.to_string
+
+        let merge = Ledger_hash.merge
+
+        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+
+        let empty_account = hash_account Account.empty
+      end
+    end]
+
+    let _ = Stable.deserialize_binary_opt
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
   end
 
   module Account = struct
-    type t = Account.Stable.V1.t [@@deriving bin_io, eq, compare, sexp]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Account.Stable.V1.t [@@deriving eq, compare, sexp]
 
-    let empty = Account.empty
+        let to_latest = Fn.id
 
-    let public_key = Account.public_key
+        let empty = Account.empty
 
-    let balance Account.Poly.{balance; _} = balance
+        let public_key = Account.public_key
 
-    let initialize = Account.initialize
+        let balance Account.Poly.{balance; _} = balance
+
+        let initialize = Account.initialize
+      end
+    end]
+
+    type t = Stable.Latest.t [@@deriving compare, sexp]
+
+    let _ = Stable.deserialize_binary_opt
+
+    [%%define_locally
+    Stable.Latest.(empty, initialize)]
   end
 
   module Inputs = struct
     module Key = Public_key.Compressed
     module Balance = Currency.Balance
-    module Account = Account
-    module Hash = Hash
+    module Account = Account.Stable.V1
+    module Hash = Hash.Stable.V1
     module Depth = Depth
     module Kvdb = Kvdb
     module Location = Location_at_depth
