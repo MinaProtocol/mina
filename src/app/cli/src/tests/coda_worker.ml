@@ -406,7 +406,7 @@ module T = struct
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
-      O1trace.trace_task "worker_main" (fun () ->
+      O1trace.trace "worker_main" (fun () ->
           let%bind receipt_chain_dir_name =
             Unix.mkdtemp @@ conf_dir ^/ "receipt_chain"
           in

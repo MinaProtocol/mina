@@ -250,7 +250,7 @@ let run_test () : unit Deferred.t =
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
       let build_payment amount sender_sk receiver_pk fee =
-        trace_recurring_task "build_payment" (fun () ->
+        trace_recurring "build_payment" (fun () ->
             let nonce =
               Option.value_exn
                 ( Coda_commands.get_nonce coda (pk_of_sk sender_sk)
