@@ -46,6 +46,7 @@ let make = () => {
     ? <div className=Styles.main>
         <OnboardingHeader />
         {Array.of_list(onboardingSteps)[onboardingStep]}
+        <OnboardingFooter onboardingSteps onboardingStep />
       </div>
     : React.null;
 };

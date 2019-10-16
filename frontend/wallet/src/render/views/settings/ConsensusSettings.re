@@ -128,7 +128,7 @@ let make = () => {
       {React.string("Consensus Settings")}
     </h3>
     <Spacer height=0.5 />
-    <Well>
+    <Well disabled=true>
       <div className=Css.(style([display(`flex), alignItems(`flexEnd)]))>
         <div className=Css.(style([flexGrow(1.)]))>
           <div className=Styles.label> {React.string("Delegating to")} </div>

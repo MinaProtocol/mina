@@ -7,5 +7,6 @@
     core_kernel
     sponge_params
     curve_choice
+    o1trace
     snarky
     sponge ))
