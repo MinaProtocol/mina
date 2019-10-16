@@ -37,11 +37,7 @@ let run_exn ~f query_obj port =
 
 let query = Client.query
 
-let query_raw = Client.query_raw
-
 let query_exn query_obj port = run_exn ~f:query query_obj port
-
-let query_raw_exn query_obj port = run_exn ~f:query_raw query_obj port
 
 module User_command = struct
   type t =
