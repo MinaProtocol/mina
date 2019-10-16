@@ -121,6 +121,14 @@ end
 module Runtime = struct
   let subsystem = "Runtime"
 
+  module Long_async_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 0.5 2. 7
+  end)
+
+  let long_async_cycle : Long_async_histogram.t =
+    let help = "A histogram for long async cycles" in
+    Long_async_histogram.v "long_async_cycle" ~help ~namespace ~subsystem
+
   let start_time = Core.Time.now ()
 
   let current = ref (Gc.stat ())
@@ -349,6 +357,14 @@ module Snark_work = struct
        after every block"
     in
     Gauge.v "scan_state_snark_work" ~help ~namespace ~subsystem
+
+  module Snark_fee_histogram = Histogram (struct
+    let spec = Histogram_spec.of_linear 0. 1. 10
+  end)
+
+  let snark_fee =
+    let help = "A histogram for snark fees" in
+    Snark_fee_histogram.v "snark_fee" ~help ~namespace ~subsystem
 end
 
 module Trust_system = struct
