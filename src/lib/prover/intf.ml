@@ -25,7 +25,6 @@ module type S = sig
 
   val extend_blockchain :
        t
-    -> logger:Logger.t
     -> Blockchain.t
     -> Protocol_state.Value.t
     -> Snark_transition.value
@@ -35,7 +34,6 @@ module type S = sig
 
   val prove :
        t
-    -> logger:Logger.t
     -> prev_state:Protocol_state.Value.t
     -> prev_state_proof:Proof.t
     -> next_state:Protocol_state.Value.t

@@ -81,7 +81,7 @@ module Worker_state = struct
                      (Consensus.Data.Prover_state.handler state_for_handler
                         ~pending_coinbase)
                  in
-                 match
+                 let res =
                    Or_error.try_with (fun () ->
                        let prev_proof =
                          Tick.prove
@@ -91,14 +91,12 @@ module Worker_state = struct
                        in
                        { Blockchain.state= next_state
                        ; proof= wrap next_state_top_hash prev_proof } )
-                 with
-                 | Ok result ->
-                     Ok result
-                 | Error e ->
+                 in
+                 Or_error.iter_error res ~f:(fun e ->
                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                        ~metadata:[("error", `String (Error.to_string_hum e))]
-                       "Prover threw an error while extending block: $error" ;
-                     Error e
+                       "Prover threw an error while extending block: $error" ) ;
+                 res
 
                let verify state proof =
                  Tock.verify proof
@@ -131,7 +129,7 @@ module Worker_state = struct
                      (Consensus.Data.Prover_state.handler state_for_handler
                         ~pending_coinbase)
                  in
-                 match
+                 let res =
                    Or_error.map
                      (Tick.check
                         (main @@ Tick.Field.Var.constant next_state_top_hash)
@@ -139,14 +137,12 @@ module Worker_state = struct
                      ~f:(fun () ->
                        { Blockchain.state= next_state
                        ; proof= Precomputed_values.base_proof } )
-                 with
-                 | Ok result ->
-                     Ok result
-                 | Error e ->
+                 in
+                 Or_error.iter_error res ~f:(fun e ->
                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                        ~metadata:[("error", `String (Error.to_string_hum e))]
-                       "Prover threw an error while extending block: $error" ;
-                     Error e
+                       "Prover threw an error while extending block: $error" ) ;
+                 res
 
                let verify _state _proof = true
              end
@@ -252,7 +248,7 @@ module Worker = struct
   include Rpc_parallel.Make (T)
 end
 
-type t = {connection: Worker.Connection.t; process: Process.t}
+type t = {connection: Worker.Connection.t; process: Process.t; logger: Logger.t}
 
 let create ~logger ~pids ~conf_dir =
   let on_failure err =
@@ -291,12 +287,12 @@ let create ~logger ~pids ~conf_dir =
          @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__
               "Prover stderr: $stderr"
               ~metadata:[("stderr", `String stderr)] ) ;
-  {connection; process}
+  {connection; process; logger}
 
 let initialized {connection; _} =
   Worker.Connection.run connection ~f:Worker.functions.initialized ~arg:()
 
-let extend_blockchain {connection; _} ~logger chain next_state block
+let extend_blockchain {connection; logger; _} chain next_state block
     prover_state pending_coinbase =
   let input =
     { Extend_blockchain_input.chain
@@ -325,12 +321,12 @@ let extend_blockchain {connection; _} ~logger chain next_state block
         "Prover failed: $error" ;
       Error e
 
-let prove t ~logger ~prev_state ~prev_state_proof ~next_state
+let prove t ~prev_state ~prev_state_proof ~next_state
     (transition : Internal_transition.t) pending_coinbase =
   let open Deferred.Or_error.Let_syntax in
   let start_time = Core.Time.now () in
   let%map {Blockchain.proof; _} =
-    extend_blockchain t ~logger
+    extend_blockchain t
       (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
       next_state
       (Internal_transition.snark_transition transition)

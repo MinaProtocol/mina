@@ -319,8 +319,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   let t0 = Time.now time_controller in
                   match%bind
                     measure "proving state transition valid" (fun () ->
-                        Prover.prove prover ~logger
-                          ~prev_state:previous_protocol_state
+                        Prover.prove prover ~prev_state:previous_protocol_state
                           ~prev_state_proof:previous_protocol_state_proof
                           ~next_state:protocol_state internal_transition
                           pending_coinbase_witness )

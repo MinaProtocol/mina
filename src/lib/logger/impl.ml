@@ -43,7 +43,7 @@ module Metadata = struct
           | `Assoc alist ->
               Ok (String.Map.of_alist_exn alist)
           | _ ->
-              Error "expected object"
+              Error "Unexpected object"
 
         include Binable.Of_binable
                   (String)
