@@ -15,7 +15,7 @@ module type S = sig
   val to_bits : t -> bool list
 end
 
-module type Convertable_bits = sig
+module type Convertible_bits = sig
   include S
 
   val of_bits : bool list -> t

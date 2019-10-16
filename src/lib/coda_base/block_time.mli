@@ -26,7 +26,7 @@ module Time : sig
 
   val length_in_triples : int
 
-  module Bits : Bits_intf.Convertable_bits with type t := t
+  module Bits : Bits_intf.Convertible_bits with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 
