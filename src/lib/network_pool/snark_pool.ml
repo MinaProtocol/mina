@@ -258,6 +258,10 @@ struct
           Coda_metrics.(
             Gauge.set Snark_work.snark_pool_size
               (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ;
+          Coda_metrics.(
+            Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
+              ( fee.Coda_base.Fee_with_prover.fee |> Currency.Fee.to_int
+              |> Float.of_int )) ;
           `Added )
         else (
           if is_local then
