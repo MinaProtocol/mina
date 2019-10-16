@@ -1,0 +1,9 @@
+(library
+  (name votie_rpcs)
+  (public_name votie.rpcs)
+  (preprocess (pps ppx_jane ppx_coda ppx_deriving.eq ppx_deriving_yojson))
+  (inline_tests)
+  (libraries
+    async_kernel
+    votie_lib ))
+

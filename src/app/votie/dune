@@ -1,0 +1,29 @@
+(executable
+  (package votie)
+  (name votie)
+  (public_name votie)
+  (modes native)
+  (libraries votie_lib snarky universe sponge core async)
+  (preprocess (pps ppx_jane ppx_deriving.std))
+  (modules votie)
+)
+
+(executable
+  (package votie)
+  (name registrar)
+  (public_name registrar)
+  (modes native)
+  (libraries votie_lib votie_rpcs snarky universe sponge core async)
+  (preprocess (pps ppx_jane ppx_deriving.std))
+  (modules registrar)
+)
+
+(executable
+  (package votie)
+  (name registrar_client)
+  (public_name registrar_client)
+  (modes native)
+  (libraries votie_lib votie_rpcs snarky universe sponge core async)
+  (preprocess (pps ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (modules registrar_client)
+)
