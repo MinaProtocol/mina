@@ -19,6 +19,10 @@ module Styles = {
       borderRadius(`rem(0.25)),
       flexGrow(1.),
       hover([border(`px(1), `solid, Theme.Colors.hyperlink)]),
+      selector(
+        ":focus-within",
+        [border(`px(2), `solid, Theme.Colors.hyperlink)],
+      ),
       focus([border(`px(2), `solid, Theme.Colors.hyperlink)]),
     ]);
   let error =

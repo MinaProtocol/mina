@@ -86,23 +86,26 @@ module Make (Inputs : Inputs.S) = struct
         Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
             Block_time.Timeout.cancel time_controller timeout () ) ) ;
     let breadcrumb_builder_supervisor =
-      Capped_supervisor.create ~job_capacity:30
-        (fun (initial_hash, transition_branches) ->
-          match%map
-            Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~verifier
-              ~trust_system ~frontier ~initial_hash transition_branches
-          with
-          | Ok trees_of_breadcrumbs ->
-              Writer.write catchup_breadcrumbs_writer
-                (trees_of_breadcrumbs, `Catchup_scheduler)
-          | Error err ->
-              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                !"Error during buildup breadcrumbs inside catchup_scheduler: %s"
-                (Error.to_string_hum err) ;
-              List.iter transition_branches ~f:(fun subtree ->
-                  Rose_tree.iter subtree ~f:(fun cached_transition ->
-                      Cached.invalidate_with_failure cached_transition
-                      |> ignore ) ) )
+      O1trace.trace_recurring "breadcrumb builder" (fun () ->
+          Capped_supervisor.create ~job_capacity:30
+            (fun (initial_hash, transition_branches) ->
+              match%map
+                Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
+                  ~verifier ~trust_system ~frontier ~initial_hash
+                  transition_branches
+              with
+              | Ok trees_of_breadcrumbs ->
+                  Writer.write catchup_breadcrumbs_writer
+                    (trees_of_breadcrumbs, `Catchup_scheduler)
+              | Error err ->
+                  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                    !"Error during buildup breadcrumbs inside \
+                      catchup_scheduler: %s"
+                    (Error.to_string_hum err) ;
+                  List.iter transition_branches ~f:(fun subtree ->
+                      Rose_tree.iter subtree ~f:(fun cached_transition ->
+                          Cached.invalidate_with_failure cached_transition
+                          |> ignore ) ) ) )
     in
     { logger
     ; collected_transitions
