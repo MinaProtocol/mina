@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
+open O1trace
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -79,22 +80,25 @@ module Make (Inputs : Inputs_intf) :
         Transition_handler.Unprocessed_transition_cache.register_exn
           unprocessed_transition_cache t
         |> Strict_pipe.Writer.write primary_transition_writer ) ;
-    Transition_handler.Validator.run ~logger ~trust_system ~time_controller
-      ~frontier ~transition_reader:network_transition_reader
-      ~valid_transition_writer ~unprocessed_transition_cache ;
+    trace_recurring "validator" (fun () ->
+        Transition_handler.Validator.run ~logger ~trust_system ~time_controller
+          ~frontier ~transition_reader:network_transition_reader
+          ~valid_transition_writer ~unprocessed_transition_cache ) ;
     Strict_pipe.Reader.iter_without_pushback valid_transition_reader
       ~f:(Strict_pipe.Writer.write primary_transition_writer)
     |> don't_wait_for ;
     let clean_up_catchup_scheduler = Ivar.create () in
-    Transition_handler.Processor.run ~logger ~time_controller ~trust_system
-      ~verifier ~frontier ~primary_transition_reader
-      ~proposer_transition_reader:proposer_transition_reader_copy
-      ~clean_up_catchup_scheduler ~catchup_job_writer
-      ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-      ~processed_transition_writer ;
-    Catchup.run ~logger ~trust_system ~verifier ~network ~frontier
-      ~catchup_job_reader ~catchup_breadcrumbs_writer
-      ~unprocessed_transition_cache ;
+    trace_recurring "processor" (fun () ->
+        Transition_handler.Processor.run ~logger ~time_controller ~trust_system
+          ~verifier ~frontier ~primary_transition_reader
+          ~proposer_transition_reader:proposer_transition_reader_copy
+          ~clean_up_catchup_scheduler ~catchup_job_writer
+          ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
+          ~processed_transition_writer ) ;
+    trace_recurring "catchup" (fun () ->
+        Catchup.run ~logger ~trust_system ~verifier ~network ~frontier
+          ~catchup_job_reader ~catchup_breadcrumbs_writer
+          ~unprocessed_transition_cache ) ;
     Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
         let open Strict_pipe.Writer in
         kill valid_transition_writer ;
