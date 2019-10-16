@@ -1,3 +1,8 @@
+(rule
+ (targets assets.ml)
+ (deps (source_tree assets))
+ (action (run %{bin:ocaml-crunch} -m plain assets -o assets.ml)))
+
 (library
   (name init)
   (public_name init)
