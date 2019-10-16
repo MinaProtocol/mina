@@ -7,5 +7,5 @@
  (libraries core logger pipe_lib async async_extra file_system
    network_peer trust_system ctypes ctypes.foreign)
  (preprocess
-  (pps ppx_coda ppx_jane bisect_ppx -- -conditional))
+  (pps ppx_coda -lint-version-syntax-warnings ppx_jane bisect_ppx -- -conditional))
  (synopsis "Kademlia DHT -- only being used for its membership"))
