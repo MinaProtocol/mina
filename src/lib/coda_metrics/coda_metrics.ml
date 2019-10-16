@@ -241,6 +241,20 @@ module Cryptography = struct
     let help = "# of pedersen hashes computed" in
     Counter.v "total_pedersen_hash_computed" ~help ~namespace ~subsystem
 
+  module Snark_work_histogram = Histogram (struct
+    let spec = Histogram_spec.of_linear 60. 30. 8
+  end)
+
+  let snark_work_merge_time_sec =
+    let help = "time elapsed while doing merge proof" in
+    Snark_work_histogram.v "snark_work_merge_time_sec" ~help ~namespace
+      ~subsystem
+
+  let snark_work_base_time_sec =
+    let help = "time elapsed while doing base proof" in
+    Snark_work_histogram.v "snark_work_base_time_sec" ~help ~namespace
+      ~subsystem
+
   (* TODO:
   let transaction_proving_time_ms =
     let help = "time elapsed while proving most recently generated transaction snark" in

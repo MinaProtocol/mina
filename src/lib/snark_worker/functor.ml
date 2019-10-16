@@ -79,10 +79,16 @@ module Make (Inputs : Intf.Inputs_intf) :
     One_or_two.iter metrics ~f:(fun (total, tag) ->
         match tag with
         | `Merge ->
+            Coda_metrics.(
+              Cryptography.Snark_work_histogram.observe
+                Cryptography.snark_work_merge_time_sec (Time.Span.to_sec total)) ;
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               "Merge SNARK generated in $time"
               ~metadata:[("time", `String (Time.Span.to_string_hum total))]
         | `Transition ->
+            Coda_metrics.(
+              Cryptography.Snark_work_histogram.observe
+                Cryptography.snark_work_base_time_sec (Time.Span.to_sec total)) ;
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               "Base SNARK generated in $time"
               ~metadata:[("time", `String (Time.Span.to_string_hum total))] )

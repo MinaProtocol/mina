@@ -243,7 +243,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs
     ~consensus_local_state ~frontier_reader ~transition_writer
     ~set_next_proposal =
-  trace_task "block_producer" (fun () ->
+  trace "block_producer" (fun () ->
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Pausing block production while bootstrapping"
@@ -506,7 +506,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
       let proposal_supervisor = Singleton_supervisor.create ~task:propose in
       let scheduler = Singleton_scheduler.create time_controller in
       let rec check_for_proposal () =
-        trace_recurring_task "check for proposal" (fun () ->
+        trace_recurring "check for proposal" (fun () ->
             (* See if we want to change keypairs *)
             let keypairs =
               match Agent.get keypairs with

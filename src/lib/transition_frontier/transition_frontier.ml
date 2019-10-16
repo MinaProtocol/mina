@@ -41,7 +41,7 @@ struct
 
     let build ~logger ~verifier ~trust_system ~parent
         ~transition:transition_with_validation ~sender =
-      O1trace.measure "Breadcrumb.build" (fun () ->
+      O1trace.trace_recurring "Breadcrumb.build" (fun () ->
           let open Deferred.Let_syntax in
           match%bind
             Staged_ledger_validation.validate_staged_ledger_diff ~logger

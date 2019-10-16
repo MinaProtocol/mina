@@ -4,6 +4,7 @@ open Pipe_lib
 open Coda_base
 open Signature_lib
 open Auxiliary_database
+open O1trace
 
 type 'a reader_and_writer = 'a Pipe.Reader.t * 'a Pipe.Writer.t
 
@@ -30,63 +31,65 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
            let reader, writer = Pipe.create () in
            (wallet, (reader, writer)) )
   in
-  Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
-      let hash =
-        new_block |> Coda_transition.External_transition.Validated.state_hash
-      in
-      let filtered_external_transition_result =
-        if is_storing_all then
-          Filtered_external_transition.of_transition `All new_block
-        else
-          Filtered_external_transition.of_transition
-            (`Some
-              ( Public_key.Compressed.Set.of_list
-              @@ Hashtbl.keys subscribed_block_users ))
+  trace_task "subscriptions new block loop" (fun () ->
+      Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
+          let hash =
             new_block
-      in
-      match filtered_external_transition_result with
-      | Ok filtered_external_transition ->
-          let block_time = Block_time.now time_controller in
-          let filtered_external_transition_with_hash =
-            {With_hash.data= filtered_external_transition; hash}
+            |> Coda_transition.External_transition.Validated.state_hash
           in
-          let participants =
-            Filtered_external_transition.participants
-              filtered_external_transition
+          let filtered_external_transition_result =
+            if is_storing_all then
+              Filtered_external_transition.of_transition `All new_block
+            else
+              Filtered_external_transition.of_transition
+                (`Some
+                  ( Public_key.Compressed.Set.of_list
+                  @@ Hashtbl.keys subscribed_block_users ))
+                new_block
           in
-          Set.iter participants ~f:(fun participant ->
-              (* Send block to subscribed partipants *)
-              Hashtbl.find_and_call subscribed_block_users participant
-                ~if_found:(fun (_, writer) ->
-                  Pipe.write_without_pushback writer
-                    filtered_external_transition_with_hash )
-                ~if_not_found:ignore ;
-              (* Send payments to subscribed partipants *)
-              Hashtbl.find_and_call subscribed_payment_users participant
-                ~if_found:(fun (_, writer) ->
-                  let user_commands =
-                    User_command.filter_by_participant
-                      (Filtered_external_transition.user_commands
-                         filtered_external_transition)
-                      participant
-                  in
-                  List.iter user_commands ~f:(fun user_command ->
-                      Pipe.write_without_pushback writer user_command ) )
-                ~if_not_found:ignore ) ;
-          External_transition_database.add external_transition_database
-            filtered_external_transition_with_hash block_time ;
-          Deferred.unit
-      | Error e ->
-          Logger.error logger
-            "Staged ledger had error with transactions in block for state \
-             $state_hash: $error"
-            ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:
-              [ ( "error"
-                , `String (Staged_ledger.Pre_diff_info.Error.to_string e) )
-              ; ("state_hash", State_hash.to_yojson hash) ] ;
-          Deferred.unit )
-  |> don't_wait_for ;
+          match filtered_external_transition_result with
+          | Ok filtered_external_transition ->
+              let block_time = Block_time.now time_controller in
+              let filtered_external_transition_with_hash =
+                {With_hash.data= filtered_external_transition; hash}
+              in
+              let participants =
+                Filtered_external_transition.participants
+                  filtered_external_transition
+              in
+              Set.iter participants ~f:(fun participant ->
+                  (* Send block to subscribed partipants *)
+                  Hashtbl.find_and_call subscribed_block_users participant
+                    ~if_found:(fun (_, writer) ->
+                      Pipe.write_without_pushback writer
+                        filtered_external_transition_with_hash )
+                    ~if_not_found:ignore ;
+                  (* Send payments to subscribed partipants *)
+                  Hashtbl.find_and_call subscribed_payment_users participant
+                    ~if_found:(fun (_, writer) ->
+                      let user_commands =
+                        User_command.filter_by_participant
+                          (Filtered_external_transition.user_commands
+                             filtered_external_transition)
+                          participant
+                      in
+                      List.iter user_commands ~f:(fun user_command ->
+                          Pipe.write_without_pushback writer user_command ) )
+                    ~if_not_found:ignore ) ;
+              External_transition_database.add external_transition_database
+                filtered_external_transition_with_hash block_time ;
+              Deferred.unit
+          | Error e ->
+              Logger.error logger
+                "Staged ledger had error with transactions in block for state \
+                 $state_hash: $error"
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "error"
+                    , `String (Staged_ledger.Pre_diff_info.Error.to_string e)
+                    )
+                  ; ("state_hash", State_hash.to_yojson hash) ] ;
+              Deferred.unit ) ) ;
   let reorganization_subscription = [] in
   let reader, writer =
     Strict_pipe.create ~name:"Reorganization subscription"
