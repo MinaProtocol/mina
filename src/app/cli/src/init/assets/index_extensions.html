@@ -10,6 +10,7 @@ add "&raw" to the end of the URL within a browser.
 <!DOCTYPE html>
 <html>
 <head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <style>
     html, body {
       height: 100%;
@@ -21,12 +22,17 @@ add "&raw" to the end of the URL within a browser.
   <link href="//cdn.jsdelivr.net/npm/graphiql@0.12.0/graphiql.css" rel="stylesheet" />
   <script src="//cdn.jsdelivr.net/react/15.4.2/react.min.js"></script>
   <script src="//cdn.jsdelivr.net/react/15.4.2/react-dom.min.js"></script>
-  <script src="//unpkg.com/graphiql-with-extensions@0.14.1/graphiqlWithExtensions.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/codaprotocol/graphiql-with-extensions@8c90eed/graphiqlWithExtensions.min.js"></script>
   <script src="//unpkg.com/subscriptions-transport-ws@0.8.1/browser/client.js"></script>
   <script src="//unpkg.com/graphiql-subscriptions-fetcher@0.0.2/browser/client.js"></script>
 </head>
 <body>
   <script>
+    var defaultQuery = "query MyQuery { \nversion\n}";
+    var serverUrl = window.location.host + window.location.pathname;
+    var httpServerUrl = "http://" + serverUrl;
+    var wsServerUrl = "ws://" + serverUrl;
+
     // Collect the URL parameters
     var parameters = {};
     window.location.search.substr(1).split('&').forEach(function (entry) {
@@ -60,7 +66,7 @@ add "&raw" to the end of the URL within a browser.
     }
     // Defines a GraphQL fetcher using the fetch API.
     function graphQLFetcher(graphQLParams) {
-      return fetch(window.location, {
+      return fetch(httpServerUrl, {
         method: 'post',
         headers: {
           'Accept': 'application/json',
@@ -99,7 +105,7 @@ add "&raw" to the end of the URL within a browser.
       history.replaceState(null, null, locationQuery(parameters));
     }
 
-    var subscriptionsClient = new SubscriptionsTransportWs.SubscriptionClient('ws://' + window.location.host + window.location.pathname, { reconnect: true });
+    var subscriptionsClient = new SubscriptionsTransportWs.SubscriptionClient(wsServerUrl, { reconnect: true });
 
     var subscriptionsFetcher = GraphiQLSubscriptionsFetcher.graphQLFetcher(subscriptionsClient, graphQLFetcher);
 
@@ -110,10 +116,11 @@ add "&raw" to the end of the URL within a browser.
         onEditQuery: onEditQuery,
         onEditVariables: onEditVariables,
         onEditOperationName: onEditOperationName,
-        query: parameters.query,
+        query: parameters.query || defaultQuery,
         response: parameters.response,
         variables: parameters.variables,
         operationName: parameters.operationName,
+        serverUrl: httpServerUrl,
       }),
       document.body
     );
