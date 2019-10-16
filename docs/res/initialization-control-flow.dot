@@ -1,0 +1,10 @@
+digraph G {
+  rankdir=LR;
+
+  "daemon starts" -> "initialization";
+  "initialization" -> "start listening to gossip";
+  "start listening to gossip" -> "should bootstrap";
+  "should bootstrap" -> "Bootstrap controller" [label="Yes"];
+  "should bootstrap" -> "Transition frontier controller" [label="No"];
+  "Bootstrap controller" -> "Transition frontier controller" [label="bootstrap finishes"];
+}
