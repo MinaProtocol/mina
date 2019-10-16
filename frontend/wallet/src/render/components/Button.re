@@ -30,18 +30,9 @@ module Styles = {
       style([
         backgroundColor(Theme.Colors.marineAlpha(0.1)),
         color(Theme.Colors.marineAlpha(1.)),
-        hover([
-          backgroundColor(Theme.Colors.marineAlpha(1.)),
-          color(white),
-        ]),
-        focus([
-          backgroundColor(Theme.Colors.marineAlpha(1.)),
-          color(white),
-        ]),
-        active([
-          backgroundColor(Theme.Colors.marineAlpha(1.)),
-          color(white),
-        ]),
+        hover([backgroundColor(Theme.Colors.marine), color(white)]),
+        focus([backgroundColor(Theme.Colors.marine), color(white)]),
+        active([backgroundColor(Theme.Colors.marine), color(white)]),
       ]),
     ]);
 
