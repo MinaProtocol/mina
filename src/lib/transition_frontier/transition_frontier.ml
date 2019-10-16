@@ -610,6 +610,8 @@ struct
     Coda_metrics.(
       Counter.inc Transition_frontier.finalized_staged_txns
         num_finalized_staged_txns) ;
+    Coda_metrics.(
+      Transition_frontier.TPS_10min.update num_finalized_staged_txns) ;
     Coda_metrics.(Counter.inc_one Transition_frontier.root_transitions) ;
     let consensus_state = Breadcrumb.consensus_state new_root in
     let blockchain_length =
