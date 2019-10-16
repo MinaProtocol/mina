@@ -1,7 +1,18 @@
 open Receipt_chain_database_lib
 
-type t = (Receipt.Chain_hash.t, User_command.t) Payment_proof.t
-[@@deriving eq, sexp, bin_io, yojson]
+module Stable : sig
+  module V1 : sig
+    type t =
+      ( Receipt.Chain_hash.Stable.V1.t
+      , User_command.Stable.V1.t )
+      Payment_proof.Stable.V1.t
+    [@@deriving bin_io, eq, sexp, yojson, version]
+  end
+
+  module Latest = V1
+end
+
+type t = Stable.Latest.t [@@deriving eq, sexp, yojson]
 
 val initial_receipt : t -> Receipt.Chain_hash.t
 

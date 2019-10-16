@@ -1,14 +1,20 @@
 open Core_kernel
 open Receipt_chain_database_lib
 
-module T = struct
-  (* TODO : version *)
-  type t =
-    (Receipt.Chain_hash.Stable.V1.t, User_command.Stable.V1.t) Payment_proof.t
-  [@@deriving eq, sexp, bin_io, yojson]
-end
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t =
+      ( Receipt.Chain_hash.Stable.V1.t
+      , User_command.Stable.V1.t )
+      Payment_proof.Stable.V1.t
+    [@@deriving eq, sexp, yojson]
 
-include T
+    let to_latest = Fn.id
+  end
+end]
+
+type t = Stable.Latest.t [@@deriving eq, sexp, yojson]
 
 let initial_receipt = Payment_proof.initial_receipt
 
@@ -32,4 +38,5 @@ let gen_test =
 let%test_unit "json" =
   Quickcheck.test ~seed:(`Deterministic "seed") ~trials:20 gen_test
     ~sexp_of:sexp_of_t ~f:(fun t ->
-      assert (Codable.For_tests.check_encoding (module T) ~equal t) )
+      assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t)
+  )

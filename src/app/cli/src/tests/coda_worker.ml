@@ -283,7 +283,7 @@ module T = struct
         ~bin_input:
           [%bin_type_class:
             Receipt.Chain_hash.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t]
-        ~bin_output:Payment_proof.bin_t ()
+        ~bin_output:Payment_proof.Stable.V1.bin_t ()
 
     let new_block =
       C.create_pipe ~f:new_block_impl ~name:"new_block"

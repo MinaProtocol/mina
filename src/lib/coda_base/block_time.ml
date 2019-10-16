@@ -8,32 +8,17 @@ open Tick
 open Unsigned_extended
 open Snark_bits
 open Fold_lib
-open Module_version
 
 module Time = struct
   (* Milliseconds since epoch *)
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = UInt64.t
-        [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
-      end
+      type t = UInt64.t [@@deriving sexp, compare, eq, hash, yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "block_time"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   module Controller = struct
     [%%if
@@ -85,27 +70,14 @@ module Time = struct
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 
   module Span = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t = UInt64.t [@@deriving bin_io, sexp, compare, version]
-        end
+        type t = UInt64.t [@@deriving sexp, compare]
 
-        include T
-        include Registration.Make_latest_version (T)
+        let to_latest = Fn.id
       end
-
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "block_time_span"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
+    end]
 
     include Stable.Latest
     module Bits = B.UInt64
