@@ -357,6 +357,14 @@ module Snark_work = struct
        after every block"
     in
     Gauge.v "scan_state_snark_work" ~help ~namespace ~subsystem
+
+  module Snark_fee_histogram = Histogram (struct
+    let spec = Histogram_spec.of_linear 0. 1. 10
+  end)
+
+  let snark_fee =
+    let help = "A histogram for snark fees" in
+    Snark_fee_histogram.v "snark_fee" ~help ~namespace ~subsystem
 end
 
 module Trust_system = struct
