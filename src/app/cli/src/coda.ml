@@ -591,8 +591,8 @@ let daemon logger =
            ~f:(fun span ->
              let secs = Time_ns.Span.to_sec span in
              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-               ~metadata:[("time_elapsed", `Float secs)]
-               "Long async cycle, $time_elapsed seconds" ;
+               ~metadata:[("long_async_cycle", `Float secs)]
+               "Long async cycle, $long_async_cycle seconds" ;
              Coda_metrics.(
                Runtime.Long_async_histogram.observe Runtime.long_async_cycle
                  secs) ) ;
