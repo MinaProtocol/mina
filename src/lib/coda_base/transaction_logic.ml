@@ -688,19 +688,20 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     res
 
   let apply_transaction ledger (t : Transaction.t) =
-    let previous_hash = merkle_root ledger in
-    Or_error.map
-      ( match t with
-      | User_command txn ->
-          Or_error.map (apply_user_command ledger txn) ~f:(fun u ->
-              Undo.Varying.User_command u )
-      | Fee_transfer t ->
-          Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
-              Undo.Varying.Fee_transfer u )
-      | Coinbase t ->
-          Or_error.map (apply_coinbase ledger t) ~f:(fun u ->
-              Undo.Varying.Coinbase u ) )
-      ~f:(fun varying -> {Undo.previous_hash; varying})
+    O1trace.measure "apply_transaction" (fun () ->
+        let previous_hash = merkle_root ledger in
+        Or_error.map
+          ( match t with
+          | User_command txn ->
+              Or_error.map (apply_user_command ledger txn) ~f:(fun u ->
+                  Undo.Varying.User_command u )
+          | Fee_transfer t ->
+              Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
+                  Undo.Varying.Fee_transfer u )
+          | Coinbase t ->
+              Or_error.map (apply_coinbase ledger t) ~f:(fun u ->
+                  Undo.Varying.Coinbase u ) )
+          ~f:(fun varying -> {Undo.previous_hash; varying}) )
 
   let merkle_root_after_user_command_exn ledger payment =
     let undo = Or_error.ok_exn (apply_user_command ledger payment) in
