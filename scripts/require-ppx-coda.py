@@ -54,11 +54,8 @@ for dune in dunes :
                             # error if no preprocessing explicitly
                             ppx_error (dune,ppx_lint)
                         elif sexpdata.car (subclause) == pps :
-                            # if there is preprocessing, static checks before version registration before versioning, and all three must occur
                             ppxs = sexpdata.cdr (subclause)
                             lint_ppx_ndx = get_ppx_ndx (dune,ppxs,ppx_lint)
-                            if (lint_ppx_ndx == None) :
-                                continue
                         else :
                             # error if no preprocessing implicitly
                             ppx_error (dune,ppx_lint)
