@@ -8,17 +8,17 @@ import sexpdata
 
 dune_string = subprocess.check_output(['find','src','-name','dune'])
 
-dunes_raw = string.split (dune_string,'\n')
+dune_paths_raw = string.split (dune_string,'\n')
 
-# filter out dunes where we don't require linting
-def dunes_ok (dune) :
+# filter out dune paths where we don't require linting
+def dune_paths_ok (dune) :
   path = dune.split ('/')
   path_prefix2 = path[1:2]
   path_prefix3 = path[1:3]
   return (not (path_prefix2 == ['_build'] or path_prefix2 == ['external'] or
                path_prefix3 == ['lib', 'snarky'] or path_prefix3 == ['lib', 'ppx_coda']))
 
-dune_paths = list(filter(lambda s : len(s) > 0 and dunes_ok (s),dunes_raw))
+dune_paths = list(filter(lambda s : len(s) > 0 and dune_paths_ok (s),dune_paths_raw))
 
 library = sexpdata.loads ('library')
 preprocess = sexpdata.loads ('preprocess')
