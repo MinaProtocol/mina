@@ -90,17 +90,23 @@ module Make (Inputs : Inputs.S) :
                        over the transition frontier root"
                     , metadata ) )
             in
-            Cached.invalidate_with_failure
-              cached_initially_validated_transition
-            |> ignore ;
+            let (_
+                  : External_transition.Initial_validated.t Envelope.Incoming.t)
+                =
+              Cached.invalidate_with_failure
+                cached_initially_validated_transition
+            in
             Error ()
         | Error `Already_in_frontier ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
               "Refusing to process the transition with hash $state_hash \
                because is is already in the transition frontier" ;
-            Cached.invalidate_with_failure
-              cached_initially_validated_transition
-            |> ignore ;
+            let (_
+                  : External_transition.Initial_validated.t Envelope.Incoming.t)
+                =
+              Cached.invalidate_with_failure
+                cached_initially_validated_transition
+            in
             return (Error ())
         | Error `Parent_missing_from_frontier -> (
             let _, validation =
@@ -152,14 +158,20 @@ module Make (Inputs : Inputs.S) :
                     @ [("error", `String (Error.to_string_hum error))] )
                   "Error while building breadcrumb in the transition handler \
                    processor: $error" ;
-                Cached.invalidate_with_failure
-                  cached_initially_validated_transition
-                |> ignore ;
+                let (_
+                      : External_transition.Initial_validated.t
+                        Envelope.Incoming.t) =
+                  Cached.invalidate_with_failure
+                    cached_initially_validated_transition
+                in
                 Deferred.return (Error ())
             | Error (`Fatal_error exn) ->
-                Cached.invalidate_with_failure
-                  cached_initially_validated_transition
-                |> ignore ;
+                let (_
+                      : External_transition.Initial_validated.t
+                        Envelope.Incoming.t) =
+                  Cached.invalidate_with_failure
+                    cached_initially_validated_transition
+                in
                 raise exn
             | Ok breadcrumb ->
                 Deferred.return (Ok breadcrumb) )
@@ -252,8 +264,13 @@ module Make (Inputs : Inputs.S) :
                    | Error err ->
                        List.iter breadcrumb_subtrees ~f:(fun tree ->
                            Rose_tree.iter tree ~f:(fun cached_breadcrumb ->
-                               Cached.invalidate_with_failure cached_breadcrumb
-                               |> ignore ) ) ;
+                               let (_
+                                     : Inputs.Transition_frontier.Breadcrumb.t)
+                                   =
+                                 Cached.invalidate_with_failure
+                                   cached_breadcrumb
+                               in
+                               () ) ) ;
                        Logger.error logger ~module_:__MODULE__
                          ~location:__LOC__
                          "Error, failed to attach all catchup breadcrumbs to \
@@ -291,7 +308,10 @@ module Make (Inputs : Inputs.S) :
                              [("error", `String (Error.to_string_hum err))]
                            "Error, failed to attach proposed breadcrumb to \
                             transition frontier: $error" ;
-                         Cached.invalidate_with_failure breadcrumb |> ignore
+                         let (_ : Inputs.Transition_frontier.Breadcrumb.t) =
+                           Cached.invalidate_with_failure breadcrumb
+                         in
+                         ()
                    in
                    Coda_metrics.(
                      Gauge.dec_one
