@@ -138,11 +138,10 @@ module Types = struct
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
-        [ enum_value "BOOTSTRAP" ~value:`Bootstrap
-        ; enum_value "SYNCED" ~value:`Synced
-        ; enum_value "OFFLINE" ~value:`Offline
-        ; enum_value "CONNECTING" ~value:`Connecting
-        ; enum_value "LISTENING" ~value:`Listening ]
+        (List.map Sync_status.all ~f:(fun status ->
+             enum_value
+               (String.map ~f:Char.uppercase @@ Sync_status.to_string status)
+               ~value:status ))
 
   let transaction_status : ('context, Transaction_status.State.t option) typ =
     enum "TransactionStatus" ~doc:"Status of a transaction"
@@ -1334,13 +1333,16 @@ module Mutations = struct
       Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp
         payment_body
     in
-    match%map Coda_commands.send_user_command coda command with
-    | `Active (Ok _) ->
-        Ok command
-    | `Active (Error e) ->
-        Error ("Couldn't send user_command: " ^ Error.to_string_hum e)
+    match Coda_commands.send_user_command coda command with
+    | `Active f -> (
+        let open Deferred.Let_syntax in
+        match%map f with
+        | Ok _receipt ->
+            Ok command
+        | Error e ->
+            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
-        Error "Daemon is bootstrapping"
+        return @@ Error "Daemon is bootstrapping"
 
   let parse_user_command_input ~kind coda from to_ fee maybe_memo =
     let open Result.Let_syntax in

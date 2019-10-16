@@ -93,7 +93,10 @@ let validate_rpc_type_decl inner3_modules type_decl =
 
 let validate_plain_type_decl inner3_modules type_decl =
   match inner3_modules with
-  | ["T"; module_version; "Stable"] ->
+  | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
+      (* NOTE: The pattern here with "T" can be removed when the registration
+         functors are replaced with the versioned module ppx.
+      *)
       validate_module_version module_version type_decl.ptype_loc
   | _ ->
       Location.raise_errorf ~loc:type_decl.ptype_loc
@@ -143,7 +146,10 @@ let validate_type_decl inner3_modules generation_kind type_decl =
 
 let module_name_from_plain_path inner3_modules =
   match inner3_modules with
-  | ["T"; module_version; "Stable"] ->
+  | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
+      (* NOTE: The pattern here with "T" can be removed when the registration
+         functors are replaced with the versioned module ppx.
+      *)
       module_version
   | _ ->
       failwith "module_name_from_plain_path: unexpected module path"
@@ -182,7 +188,11 @@ let generate_version_number_decl inner3_modules loc generation_kind =
     String.sub module_name ~pos:1 ~len:(String.length module_name - 1)
     |> int_of_string
   in
-  [%stri let version = [%e eint version]]
+  [%str
+    let version = [%e eint version]
+
+    (* to prevent unused value warnings *)
+    let _ = version]
 
 let ocaml_builtin_types =
   ["bytes"; "int"; "int32"; "int64"; "float"; "char"; "string"; "bool"; "unit"]
@@ -467,18 +477,15 @@ let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
     generate_versioned_decls ~asserted generation_kind type_decl
   in
   let type_name = type_decl.ptype_name.txt in
-  let has_type_params = not (List.is_empty type_decl.ptype_params) in
   (* generate version number for Rpc response, but not for query, so we
      don't get an unused value
    *)
-  if
-    unnumbered || has_type_params
-    || (generation_kind = Rpc && String.equal type_name "query")
+  if unnumbered || (generation_kind = Rpc && String.equal type_name "query")
   then versioned_decls
   else
     generate_version_number_decl inner3_modules type_decl.ptype_loc
       generation_kind
-    :: versioned_decls
+    @ versioned_decls
 
 let generate_val_decls_for_type_decl type_decl ~numbered =
   match type_decl.ptype_kind with

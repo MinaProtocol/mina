@@ -9,7 +9,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('daemon' 'bot')
+VALID_SERVICES=('coda-daemon' 'bot')
 
 function usage() {
   if [ -n "$1" ]; then
@@ -45,7 +45,7 @@ bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
   DOCKER_CONTEXT="frontend/bot"
   ;;
-daemon)
+coda-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon"
   DOCKER_CONTEXT="."
   ;;
