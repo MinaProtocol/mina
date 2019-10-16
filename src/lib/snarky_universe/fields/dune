@@ -1,0 +1,8 @@
+(library
+  (name fields)
+  (public_name snarky_universe.fields)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    snarky
+    snarkette
+    core_kernel ))
