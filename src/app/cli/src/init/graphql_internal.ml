@@ -200,7 +200,7 @@ struct
     in
     match (req.meth, path_parts, accept_html) with
     | `GET, ["graphql"], true ->
-        static_file_response "index.html"
+        static_file_response "index_extensions.html"
     | `GET, ["graphql"], false ->
         if
           Cohttp.Header.get headers "Connection" = Some "Upgrade"

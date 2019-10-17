@@ -65,7 +65,7 @@ struct
   module Stable = struct
     module V5 = struct
       module T = struct
-        type t = M.t [@@deriving version]
+        type t = M.t
       end
 
       include T
