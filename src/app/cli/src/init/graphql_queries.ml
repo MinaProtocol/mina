@@ -147,3 +147,23 @@ query nonce($public_key: PublicKey) {
   }
 }
 |}]
+
+module Pooled_user_commands = struct
+  open Graphql_client.User_command
+
+  include [%graphql
+  {|
+query user_commands($public_key: PublicKey) {
+  pooledUserCommands(publicKey: $public_key) @bsRecord {
+    id
+    isDelegation
+    nonce
+    from @bsDecoder(fn: "Decoders.public_key")
+    to_: to @bsDecoder(fn: "Decoders.public_key")
+    amount @bsDecoder(fn: "Decoders.amount")
+    fee @bsDecoder(fn: "Decoders.fee")
+    memo @bsDecoder(fn: "Coda_base.User_command_memo.of_string")
+  }
+}
+|}]
+end
