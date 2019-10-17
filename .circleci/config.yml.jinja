@@ -61,7 +61,7 @@ jobs:
 
     build-archive:
         docker:
-            - image: codaprotocol/coda:toolchain-49b82f20eecac055b45df0626d50a2d098b950ad
+            - image: codaprotocol/coda:toolchain-FIXME
               environment: 
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -91,7 +91,7 @@ jobs:
                   command: ls && ./scripts/archive/make_hasura_configurations.sh     
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-49b82f20eecac055b45df0626d50a2d098b950ad
+            - image: codaprotocol/coda:toolchain-FIXME
         steps:
             - checkout
             - run:
@@ -109,7 +109,9 @@ jobs:
             - run:
                   name: Check CODEOWNERS file format
                   command: ./scripts/lint_codeowners.sh
-
+            - run:
+                  name: Require ppx_coda preprocessing for linting
+                  command: ./scripts/require-ppx-coda.py
     update-branch-protection:
         docker:
             - image: python:3
@@ -266,7 +268,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-49b82f20eecac055b45df0626d50a2d098b950ad
+            - image: codaprotocol/coda:toolchain-FIXME
         steps:
             - checkout
             - run:
@@ -324,7 +326,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-49b82f20eecac055b45df0626d50a2d098b950ad
+            - image: codaprotocol/coda:toolchain-FIXME
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -365,7 +367,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-49b82f20eecac055b45df0626d50a2d098b950ad
+            - image: codaprotocol/coda:toolchain-FIXME
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -384,7 +386,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-49b82f20eecac055b45df0626d50a2d098b950ad
+            - image: codaprotocol/coda:toolchain-FIXME
         steps:
             - checkout
             - run:
@@ -403,7 +405,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-49b82f20eecac055b45df0626d50a2d098b950ad
+            - image: codaprotocol/coda:toolchain-FIXME
         steps:
             - checkout
             - run:

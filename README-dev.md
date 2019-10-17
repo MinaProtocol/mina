@@ -57,7 +57,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-49b82f20eecac055b45df0626d50a2d098b950ad`
+`docker pull codaprotocol/coda:toolchain-FIXME`
 
 * Create local builder image
 
