@@ -6,4 +6,4 @@
     async core cohttp graphql-async graphql-cohttp
     ; libs
     auxiliary_database coda_base coda_commands coda_lib)
-  (preprocess (pps ppx_jane)))
+  (preprocess (pps ppx_coda ppx_jane)))
