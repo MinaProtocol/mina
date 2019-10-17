@@ -98,14 +98,6 @@ let validate:
       })
     };
 
-let modalButtons = onClose => {
-  <div className=Css.(style([display(`flex)]))>
-    <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
-    <Spacer width=1. />
-    <Button label="Send" style=Button.Green type_="submit" />
-  </div>;
-};
-
 module SendForm = {
   open ModalState.Unvalidated;
 
@@ -193,7 +185,11 @@ module SendForm = {
        }}
       <Spacer height=1.0 />
       //Disable Modal button if no active wallet
-      {modalButtons(onClose)}
+      <div className=Css.(style([display(`flex)]))>
+        <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
+        <Spacer width=1. />
+        <Button label="Send" style=Button.Green type_="submit" />
+      </div>
     </form>;
   };
 };
