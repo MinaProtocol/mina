@@ -511,14 +511,12 @@ struct
           { timeout: Time.Span.t
           ; target_peer_count: int
           ; initial_peers: Host_and_port.t list
-          ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+          ; addrs_and_ports: Node_addrs_and_ports.t
           ; conf_dir: string
           ; chain_id: string
           ; logger: Logger.t
           ; trust_system: Trust_system.t
           ; max_concurrent_connections: int option
-          ; enable_libp2p: bool
-          ; disable_haskell: bool
           ; libp2p_keypair: Coda_net2.Keypair.t option
           ; libp2p_peers: Coda_net2.Multiaddr.t list
           ; log_gossip_heard: log_gossip_heard }
@@ -556,7 +554,7 @@ struct
     let create_stub ~logger ~ip_table ~peers = {logger; ip_table; peers}
 
     let peers_by_ip _ ip =
-      [Network_peer.Peer.{host= ip; discovery_port= 0; communication_port= 0}]
+      [Network_peer.Peer.{host= ip; libp2p_port= 0; communication_port= 0}]
 
     let first_message _ = Ivar.create ()
 
@@ -692,7 +690,7 @@ struct
       let%map _, _, peers_with_frontiers =
         Deferred.List.fold
           ~init:(Constants.init_ip, Constants.init_discovery_port, []) configs
-          ~f:(fun (ip, discovery_port, acc_peers)
+          ~f:(fun (ip, libp2p_port, acc_peers)
              {num_breadcrumbs; accounts}
              ->
             let%bind frontier = create_root_frontier ~logger ~pids accounts in
@@ -706,11 +704,11 @@ struct
             let peer =
               Network_peer.Peer.create
                 (Unix.Inet_addr.inet4_addr_of_int32 ip)
-                ~discovery_port ~communication_port:(discovery_port + 1)
+                ~libp2p_port ~communication_port:(libp2p_port + 1)
             in
             let peer_with_frontier = {peer; frontier} in
             ( Int32.( + ) Int32.one ip
-            , discovery_port + 2
+            , libp2p_port + 2
             , peer_with_frontier :: acc_peers ) )
       in
       let network =

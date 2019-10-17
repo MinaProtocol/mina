@@ -6,7 +6,7 @@ open Async
 
 let init () = Parallel.init_master ()
 
-type ports = {communication_port: int; discovery_port: int; libp2p_port: int}
+type ports = {communication_port: int; libp2p_port: int}
 
 let net_configs n =
   let ips =
@@ -17,20 +17,18 @@ let net_configs n =
     List.mapi ips ~f:(fun i ip ->
         let base = 23000 + (i * 3) in
         let communication_port = base in
-        let discovery_port = base + 1 in
-        let libp2p_port = base + 2 in
+        let libp2p_port = base + 1 in
         let client_port = 20000 + i in
-        Kademlia.Node_addrs_and_ports.
+        Node_addrs_and_ports.
           { external_ip= ip
           ; bind_ip= ip
-          ; discovery_port
           ; communication_port
           ; libp2p_port
           ; client_port } )
   in
   let all_peers =
     List.map addrs_and_ports_list
-      ~f:Kademlia.Node_addrs_and_ports.to_discovery_host_and_port
+      ~f:Node_addrs_and_ports.to_libp2p_host_and_port
   in
   let peers =
     List.init n ~f:(fun i -> List.take all_peers i @ List.drop all_peers (i + 1)

@@ -50,7 +50,7 @@ let%test_module "Sync_handler" =
               let answer_writer = Sync_ledger.Mask.answer_writer sync_ledger in
               let peer =
                 Network_peer.Peer.create Unix.Inet_addr.localhost
-                  ~discovery_port:0 ~communication_port:1
+                  ~libp2p_port:0 ~communication_port:1
               in
               let network =
                 Network.create_stub ~logger

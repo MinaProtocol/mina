@@ -50,11 +50,6 @@ let daemon logger =
             provide both `propose-key` and `propose-public-key`. (default: \
             don't produce blocks)"
          (optional string)
-     and initial_peers_raw =
-       flag "peer"
-         ~doc:
-           "HOST:PORT TCP daemon communications (can be given multiple times)"
-         (listed peer)
      and run_snark_worker_flag =
        flag "run-snark-worker"
          ~doc:"PUBLICKEY Run the SNARK worker with this public key"
@@ -157,14 +152,6 @@ let daemon logger =
            "true|false Log transaction-pool diff received from peers \
             (default: false)"
          (optional bool)
-     and enable_libp2p =
-       flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
-     and libp2p_port =
-       flag "libp2p-port" (optional int)
-         ~doc:"PORT Port to use for libp2p (default: 28675)"
-     and disable_haskell =
-       flag "disable-old-discovery" no_arg
-         ~doc:"Disable the old discovery mechanism"
      and libp2p_keypair =
        flag "libp2p-keypair" (optional string)
          ~doc:
@@ -455,10 +442,6 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "rest-port"
              ~default:Port.default_rest rest_server_port
          in
-         let libp2p_port =
-           or_from_config YJ.Util.to_int_option "libp2p-port"
-             ~default:Port.default_libp2p libp2p_port
-         in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
@@ -503,55 +486,16 @@ let daemon logger =
            ; transaction_pool_diff= log_transaction_pool_diff
            ; new_state= log_received_blocks }
          in
-         let initial_peers_raw =
+         let libp2p_peers_raw =
            List.concat
-             [ initial_peers_raw
-             ; List.map ~f:Host_and_port.of_string
-               @@ or_from_config
+             [ libp2p_peers_raw
+             ; or_from_config
                     (Fn.compose Option.some
                        (YJ.Util.convert_each YJ.Util.to_string))
-                    "peers" None ~default:[] ]
+                    "libp2p_peers" None ~default:[] ]
          in
          let discovery_port = external_port + 1 in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-         let%bind initial_peers_cleaned_lists =
-           (* for each provided peer, lookup all its addresses *)
-           Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
-             initial_peers_raw ~f:(fun addr ->
-               let host = Host_and_port.host addr in
-               match%map
-                 Monitor.try_with_or_error (fun () ->
-                     Async.Unix.Host.getbyname_exn host )
-               with
-               | Ok unix_host ->
-                   (* assume addresses is nonempty *)
-                   let addresses = Array.to_list unix_host.addresses in
-                   let port = Host_and_port.port addr in
-                   Some
-                     (List.map addresses ~f:(fun inet_addr ->
-                          Host_and_port.create
-                            ~host:(Unix.Inet_addr.to_string inet_addr)
-                            ~port ))
-               | Error e ->
-                   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                     "Error on getbyname: $error"
-                     ~metadata:[("error", `String (Error.to_string_mach e))] ;
-                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                     "Failed to get addresses for host $host, skipping"
-                     ~metadata:[("host", `String host)] ;
-                   None )
-         in
-         (* flatten list of lists of host-and-ports *)
-         let initial_peers_cleaned = List.concat initial_peers_cleaned_lists in
-         let%bind () =
-           if
-             List.length initial_peers_raw <> 0
-             && List.length initial_peers_cleaned = 0
-           then (
-             eprintf "Error: failed to connect to any peers\n" ;
-             exit 10 )
-           else Deferred.unit
-         in
          let%bind external_ip =
            match external_ip_opt with
            | None ->
@@ -563,13 +507,12 @@ let daemon logger =
            Option.value bind_ip_opt ~default:"0.0.0.0"
            |> Unix.Inet_addr.of_string
          in
-         let addrs_and_ports : Kademlia.Node_addrs_and_ports.t =
+         let addrs_and_ports : Node_addrs_and_ports.t =
            { external_ip
            ; bind_ip
-           ; discovery_port
            ; communication_port= external_port
            ; client_port
-           ; libp2p_port }
+           ; libp2p_port= discovery_port }
          in
          let%bind propose_keypair =
            match propose_key with
@@ -629,12 +572,10 @@ let daemon logger =
                ; target_peer_count= 8
                ; conf_dir
                ; chain_id= Lazy.force chain_id
-               ; initial_peers= initial_peers_cleaned
+               ; initial_peers= []
                ; addrs_and_ports
                ; trust_system
                ; log_gossip_heard
-               ; enable_libp2p
-               ; disable_haskell
                ; libp2p_keypair
                ; libp2p_peers=
                    List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw

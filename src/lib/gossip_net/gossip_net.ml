@@ -5,9 +5,7 @@ open Core
 open Async
 open Pipe_lib
 open Network_peer
-open Kademlia
 open O1trace
-module Membership = Membership.Haskell
 
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
@@ -76,14 +74,12 @@ module type Config_intf = sig
     { timeout: Time.Span.t
     ; target_peer_count: int
     ; initial_peers: Host_and_port.t list
-    ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+    ; addrs_and_ports: Node_addrs_and_ports.t
     ; conf_dir: string
     ; chain_id: string
     ; logger: Logger.t
     ; trust_system: Trust_system.t
     ; max_concurrent_connections: int option
-    ; enable_libp2p: bool
-    ; disable_haskell: bool
     ; libp2p_keypair: Coda_net2.Keypair.t option
     ; libp2p_peers: Coda_net2.Multiaddr.t list
     ; log_gossip_heard: log_gossip_heard }
@@ -145,16 +141,12 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   module Peer_set = struct
     type t = {set: Peer.Hash_set.t; high_connectivity_signal: unit Ivar.t}
 
-    let is_empty {set; _} = Hash_set.is_empty set
-
     let add {set; high_connectivity_signal} value =
       Hash_set.add set value ;
       if Hash_set.length set >= 8 then
         Ivar.fill_if_empty high_connectivity_signal ()
 
     let remove {set; _} value = Hash_set.remove set value
-
-    let length {set; _} = Hash_set.length set
 
     let to_list {set; _} = Hash_set.to_list set
 
@@ -183,14 +175,12 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       { timeout: Time.Span.t
       ; target_peer_count: int
       ; initial_peers: Host_and_port.t list
-      ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+      ; addrs_and_ports: Node_addrs_and_ports.t
       ; conf_dir: string
       ; chain_id: string
       ; logger: Logger.t
       ; trust_system: Trust_system.t
       ; max_concurrent_connections: int option
-      ; enable_libp2p: bool
-      ; disable_haskell: bool
       ; libp2p_keypair: Coda_net2.Keypair.t option
       ; libp2p_peers: Coda_net2.Multiaddr.t list
       ; log_gossip_heard: log_gossip_heard }
@@ -203,10 +193,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     ; received_reader: Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; peers: Peer_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
-    ; disconnected_peers: Peer.Hash_set.t
     ; ban_notification_reader: ban_notification Linear_pipe.Reader.t
     ; ban_notification_writer: ban_notification Linear_pipe.Writer.t
-    ; mutable haskell_membership: Membership.t option
     ; peer_event_writer: Peer.Event.t Linear_pipe.Writer.t
     ; peer_event_reader: Peer.Event.t Linear_pipe.Reader.t
     ; mutable libp2p_membership: Coda_net2.net option
@@ -218,9 +206,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   (* OPTIMIZATION: use fast n choose k implementation - see python or old flow code *)
   let random_sublist xs n = List.take (List.permute xs) n
-
-  (* clear disconnect set if peer set is at least this large *)
-  let disconnect_clear_threshold = 3
 
   let to_where_to_connect (t : t) (peer : Peer.t) =
     Tcp.Where_to_connect.of_host_and_port
@@ -251,17 +236,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             (List.filter ip_peers ~f:(fun ip_peer ->
                  not (Peer.equal ip_peer peer) )) )
 
-  let mark_peer_disconnected t peer =
-    remove_peer t peer ;
-    Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("peer", Peer.to_yojson peer)]
-      !"Moving peer $peer to disconnected peer set" ;
-    Hash_set.add t.disconnected_peers peer
-
   let is_unix_errno errno unix_errno =
     Int.equal (Unix.Error.compare errno unix_errno) 0
 
-  let rec try_call_rpc :
+  let try_call_rpc :
             'r 'q.    t -> Peer.t -> ('r, 'q) dispatch -> 'r
             -> 'q Deferred.Or_error.t =
    fun t peer dispatch query ->
@@ -272,16 +250,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       >>= function
       | Ok (Ok result) ->
           (* call succeeded, result is valid *)
-          let%map () =
-            if Hash_set.mem t.disconnected_peers peer then (
-              (* optimistically, mark all disconnected peers as peers *)
-              Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:[("peer", Peer.to_yojson peer)]
-                !"On RPC call, reconnected to a disconnected peer: $peer" ;
-              unmark_all_disconnected_peers t )
-            else return ()
-          in
-          Ok result
+          return @@ Ok result
       | Ok (Error err) -> (
           (* call succeeded, result is an error *)
           Logger.error t.config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -343,7 +312,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                       ( Outgoing_connection_error
                       , Some ("Connection refused", []) ))
               in
-              mark_peer_disconnected t peer ;
               Or_error.of_exn exn
           | _ ->
               Logger.error t.config.logger ~module_:__MODULE__
@@ -367,105 +335,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                (Peer.to_string peer)
                (Option.value_exn t.config.max_concurrent_connections))
         else call ()
-
-  and record_peer_events t =
-    trace_task "peer events" (fun () ->
-        Option.map t.haskell_membership ~f:(fun membership ->
-            Linear_pipe.transfer_id
-              (Membership.changes membership)
-              t.peer_event_writer )
-        |> ignore )
-
-  and restart_kademlia t addl_peers =
-    Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-      "Restarting Kademlia" ;
-    match t.haskell_membership with
-    | Some membership -> (
-        let%bind () = Membership.stop membership in
-        let%map new_membership =
-          let initial_peers =
-            List.dedup_and_sort ~compare:Host_and_port.compare
-            @@ t.config.initial_peers @ addl_peers
-          in
-          Membership.connect ~node_addrs_and_ports:t.config.addrs_and_ports
-            ~initial_peers ~conf_dir:t.config.conf_dir ~logger:t.config.logger
-            ~trust_system:t.config.trust_system
-        in
-        match new_membership with
-        | Ok membership ->
-            t.haskell_membership <- Some membership ;
-            record_peer_events t
-        | Error _ ->
-            failwith "Could not restart Kademlia" )
-    | None ->
-        Deferred.unit
-
-  and unmark_all_disconnected_peers t =
-    Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Clearing disconnected peer set : %{sexp: Peer.t list}"
-      (Hash_set.to_list t.disconnected_peers) ;
-    let disconnected_peers =
-      List.map
-        (Hash_set.to_list t.disconnected_peers)
-        ~f:Peer.to_communications_host_and_port
-    in
-    Hash_set.clear t.disconnected_peers ;
-    restart_kademlia t disconnected_peers
-
-  and filter_peer t peer =
-    match%map try_call_rpc t peer Get_chain_id.dispatch_multi () with
-    | Ok their_chain_id ->
-        if String.equal their_chain_id t.config.chain_id then true
-        else (
-          Logger.warn t.config.logger
-            "Chain ID mismatch: refusing to connect to %s" ~location:__LOC__
-            ~module_:__MODULE__
-            ~metadata:
-              [ ("peer", Peer.to_yojson peer)
-              ; ("theirs", `String their_chain_id)
-              ; ("ours", `String t.config.chain_id) ]
-            (Peer.to_string peer) ;
-          false )
-    | Error e ->
-        Logger.warn t.config.logger
-          "Retrieving chain ID failed: refusing to connect to %s: $error"
-          ~location:__LOC__ ~module_:__MODULE__
-          ~metadata:
-            [ ("peer", Peer.to_yojson peer)
-            ; ("error", `String (Error.to_string_hum e)) ]
-          (Peer.to_string peer) ;
-        false
-
-  (* see if we can connect to a disconnected peer, every so often *)
-  let retry_disconnected_peer t =
-    let rec loop () =
-      let%bind () = Async.after (Time.Span.of_sec 30.0) in
-      let%bind () =
-        if
-          Peer_set.is_empty t.peers
-          && not (Hash_set.is_empty t.disconnected_peers)
-        then
-          let peer =
-            List.random_element_exn (Hash_set.to_list t.disconnected_peers)
-          in
-          Deferred.ignore
-            (Rpc.Connection.with_client (to_where_to_connect t peer)
-               (fun conn ->
-                 match%bind Versioned_rpc.Connection_with_menu.create conn with
-                 | Ok _conn' ->
-                     Logger.info t.config.logger ~module_:__MODULE__
-                       ~location:__LOC__
-                       !"Reconnected to a random disconnected peer: %{sexp: \
-                         Peer.t}"
-                       peer ;
-                     unmark_all_disconnected_peers t
-                 | Error _ ->
-                     return () ))
-        else return ()
-      in
-      loop ()
-    in
-    loop ()
 
   let broadcast_selected t peers msg =
     let send peer =
@@ -505,97 +374,31 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let t_for_restarting = Ivar.read t_hack in
     trace_task "gossip net" (fun () ->
         let fail m =
-          failwithf "Failed to connect to Kademlia process: %s" m ()
-        in
-        let restart_counter = ref 0 in
-        let rec handle_exn e =
-          incr restart_counter ;
-          if !restart_counter > 5 then
-            failwithf
-              "Already restarted Kademlia subprocess 5 times, dying with \
-               exception %s"
-              (Exn.to_string e) () ;
-          match Monitor.extract_exn e with
-          | Kademlia.Membership.Child_died ->
-              let t = Option.value_exn (Deferred.peek t_for_restarting) in
-              let peers =
-                List.map (Peer_set.to_list t.peers)
-                  ~f:Peer.to_communications_host_and_port
-              in
-              ( match%map
-                  Monitor.try_with ~extract_exn:true
-                    (fun () ->
-                      let%bind () = after Time.Span.second in
-                      restart_kademlia t peers )
-                    ~rest:(`Call handle_exn)
-                with
-              | Error Kademlia.Membership.Child_died ->
-                  handle_exn Kademlia.Membership.Child_died
-              | Ok () ->
-                  ()
-              | Error e ->
-                  failwithf "Unhandled Membership.connect exception: %s"
-                    (Exn.to_string e) () )
-              |> don't_wait_for
-          | _ ->
-              failwithf "Unhandled Membership.connect exception: %s"
-                (Exn.to_string e) ()
+          failwithf "Failed to create gossip net: %s" m ()
         in
         let peer_event_reader, peer_event_writer = Linear_pipe.create () in
         Linear_pipe.iter_unordered peer_event_reader ~max_concurrency:64
           ~f:(fun event ->
-            let%bind t = t_for_restarting in
+            let%map t = t_for_restarting in
             match event with
             | Peer.Event.Connect peers ->
-                let%map kept_peers =
-                  Deferred.List.filter peers ~f:(fun peer ->
-                      if%map filter_peer t peer then (
+                    List.iter peers ~f:(fun peer ->
                         Coda_metrics.(Gauge.inc_one Network.peers) ;
                         Peer_set.add t.peers peer ;
-                        Hashtbl.add_multi t.peers_by_ip ~key:peer.host
-                          ~data:peer ;
-                        if
-                          Int.equal (Peer_set.length t.peers)
-                            disconnect_clear_threshold
-                        then Hash_set.clear t.disconnected_peers
-                        else Hash_set.remove t.disconnected_peers peer ;
-                        true )
-                      else false )
-                in
+                        Hashtbl.add_multi t.peers_by_ip ~key:peer.host ~data:peer
+                        ) ;
                 Logger.info t.config.logger ~module_:__MODULE__
                   ~location:__LOC__
                   !"Connected to some peers [%s]"
-                  (Peer.pretty_list kept_peers) ;
+                  (Peer.pretty_list peers) ;
                 Ivar.fill_if_empty t.first_connect ()
             | Disconnect peers ->
                 Logger.info t.config.logger ~module_:__MODULE__
                   ~location:__LOC__ "Some peers disconnected: %s"
                   (Peer.pretty_list peers) ;
-                List.iter peers ~f:(mark_peer_disconnected t) ;
-                Deferred.unit )
+                List.iter peers ~f:(remove_peer t))
         |> don't_wait_for ;
-        let%bind haskell_membership =
-          if not config.disable_haskell then
-            match%map
-              Monitor.try_with
-                (fun () ->
-                  trace_task "membership" (fun () ->
-                      Membership.connect ~initial_peers:config.initial_peers
-                        ~node_addrs_and_ports:config.addrs_and_ports
-                        ~conf_dir:config.conf_dir ~logger:config.logger
-                        ~trust_system:config.trust_system ) )
-                ~rest:(`Call handle_exn)
-            with
-            | Ok (Ok membership) ->
-                Some membership
-            | Ok (Error e) ->
-                fail (Error.to_string_hum e)
-            | Error e ->
-                fail (Exn.to_string e)
-          else Deferred.return None
-        in
         let%bind libp2p_membership =
-          if config.enable_libp2p then
             match%bind
               Monitor.try_with (fun () ->
                   trace_task "coda_net2" (fun () ->
@@ -683,7 +486,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 fail (Error.to_string_hum e)
             | Error e ->
                 fail (Exn.to_string e)
-          else Deferred.return None
         in
         let first_connect = Ivar.create () in
         let broadcast_reader, broadcast_writer = Linear_pipe.create () in
@@ -700,10 +502,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; received_reader
           ; peers= Peer_set.create ()
           ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
-          ; disconnected_peers= Peer.Hash_set.create ()
           ; ban_notification_reader
           ; ban_notification_writer
-          ; haskell_membership
           ; libp2p_membership
           ; connections= Hashtbl.create (module Unix.Inet_addr)
           ; peer_event_writer
@@ -743,7 +543,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                        Connection_with_state.value_map conn_state
                          ~when_allowed:(fun _ -> Connection_with_state.Banned)
                          ~when_banned:Banned ) )) ;
-        don't_wait_for (retry_disconnected_peer t) ;
         trace_task "rebroadcasting messages" (fun () ->
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
@@ -789,7 +588,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           Rpc.Implementations.create_exn ~implementations
             ~on_unknown_rpc:(`Call handle_unknown_rpc)
         in
-        record_peer_events t ;
         let%map _ =
           Tcp.Server.create
             ~on_handler_error:
@@ -923,21 +721,12 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         if List.length !to_broadcast = 0 then `Done else `Continue )
 
   let random_peers t n =
-    (* choose disconnected peers if no other peers available *)
-    let peers =
-      if Peer_set.is_empty t.peers then t.disconnected_peers else t.peers.set
-    in
-    random_sublist (Hash_set.to_list peers) n
+    random_sublist (Peer_set.to_list t.peers) n
 
   let random_peers_except t n ~(except : Peer.Hash_set.t) =
     (* choose disconnected peers if no other peers available *)
-    let new_peers =
-      let open Hash_set in
-      let diff_peers = Hash_set.diff t.peers.set except in
-      if is_empty diff_peers then diff t.disconnected_peers except
-      else diff_peers
-    in
-    random_sublist (Hash_set.to_list new_peers) n
+    let new_peers = Hash_set.diff t.peers.set except
+    in random_sublist (Hash_set.to_list new_peers) n
 
   let query_peer t (peer : Peer.t) rpc query =
     Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__

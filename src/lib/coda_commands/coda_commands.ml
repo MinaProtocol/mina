@@ -264,7 +264,7 @@ let get_status ~flag t =
   let conf_dir = (Coda_lib.config t).conf_dir in
   let peers =
     List.map (Coda_lib.peers t) ~f:(fun peer ->
-        Network_peer.Peer.to_discovery_host_and_port peer
+        Network_peer.Peer.to_libp2p_host_and_port peer
         |> Host_and_port.to_string )
   in
   let user_commands_sent = !txn_count in

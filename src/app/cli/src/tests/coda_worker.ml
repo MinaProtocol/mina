@@ -8,7 +8,7 @@ open Init
 
 module Input = struct
   type t =
-    { addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+    { addrs_and_ports: Node_addrs_and_ports.t
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
     ; proposer: int option
@@ -476,8 +476,6 @@ module T = struct
                 ; addrs_and_ports
                 ; logger
                 ; trust_system
-                ; enable_libp2p= false
-                ; disable_haskell= false
                 ; libp2p_keypair= None
                 ; libp2p_peers= []
                 ; max_concurrent_connections

@@ -1,0 +1,9 @@
+(library
+ (name node_addrs_and_ports)
+ (public_name node_addrs_and_ports)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core network_peer)
+ (preprocess
+  (pps ppx_jane ppx_deriving.eq ppx_deriving.make bisect_ppx -- -conditional))
+ (synopsis "Type for collecting node network location information"))

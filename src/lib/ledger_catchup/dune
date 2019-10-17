@@ -15,6 +15,6 @@
     merkle_address 
     coda_base 
     coda_metrics
-    kademlia
+    node_addrs_and_ports
     transition_chain_verifier
     coda_networking))

@@ -133,10 +133,9 @@ let run_test () : unit Deferred.t =
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
-      let discovery_port = 8001 in
+      let libp2p_port = 8001 in
       let communication_port = 8000 in
       let client_port = 8123 in
-      let libp2p_port = 8002 in
       let net_config =
         Coda_networking.Config.
           { logger
@@ -153,13 +152,10 @@ let run_test () : unit Deferred.t =
               ; addrs_and_ports=
                   { external_ip= Unix.Inet_addr.localhost
                   ; bind_ip= Unix.Inet_addr.localhost
-                  ; discovery_port
                   ; communication_port
                   ; libp2p_port
                   ; client_port }
               ; trust_system
-              ; enable_libp2p= false
-              ; disable_haskell= false
               ; libp2p_keypair= None
               ; libp2p_peers= []
               ; max_concurrent_connections= Some 10

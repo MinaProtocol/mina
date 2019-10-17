@@ -37,7 +37,7 @@ let main () =
              S.equal
                (S.of_list
                   ( peers
-                  |> List.map ~f:Network_peer.Peer.to_discovery_host_and_port
+                  |> List.map ~f:Network_peer.Peer.to_libp2p_host_and_port
                   ))
                (S.of_list expected_peers) ) ))
   in

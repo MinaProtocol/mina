@@ -1,6 +1,5 @@
 open Core_kernel
 open Async
-open Kademlia
 open Coda_base
 open Coda_state
 open Pipe_lib
@@ -492,7 +491,6 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
   module Message = Make_message (Inputs)
   module Gossip_net = Gossip_net.Make (Message)
-  module Membership = Membership.Haskell
   module Peer = Peer
 
   type snark_pool_diff = Inputs.Snark_pool_diff.t
