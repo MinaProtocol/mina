@@ -37,7 +37,8 @@ let make = (~wallet, ~onClose, ~onSuccess) => {
             |> ignore;
           }}>
           {switch (result) {
-           | NotCalled => React.null
+           | NotCalled
+           | Loading => React.null
            | Data(_) =>
              onSuccess();
              React.null;
