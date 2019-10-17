@@ -606,6 +606,23 @@ let daemon logger =
              Coda_metrics.(
                Runtime.Long_async_histogram.observe Runtime.long_async_cycle
                  secs) ) ;
+         Stream.iter
+           Async_kernel.Async_kernel_scheduler.(long_jobs_with_context @@ t ())
+           ~f:(fun (context, span) ->
+             let secs = Time_ns.Span.to_sec span in
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:
+                 [ ("long_async_job", `Float secs)
+                 ; ( "backtrace"
+                   , `String
+                       (String.concat ~sep:"\n"
+                          (List.map ~f:Backtrace.to_string
+                             (Execution_context.backtrace_history context))) )
+                 ]
+               "Long async job, $long_async_cycle seconds" ;
+             Coda_metrics.(
+               Runtime.Long_job_histogram.observe Runtime.long_async_job secs)
+             ) ;
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
              ~location typ
