@@ -130,7 +130,7 @@ module SendForm = {
             validated,
             fun
             | Belt.Result.Error(e) => setError(e)
-            | Ok () => onClose(),
+            | Ok() => onClose(),
           )
         };
       }}>
