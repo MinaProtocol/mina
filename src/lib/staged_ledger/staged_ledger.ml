@@ -264,11 +264,11 @@ module T = struct
       Scan_state.staged_transactions scan_state |> Deferred.return
     in
     let%bind () =
-      List.fold_result
-        ~f:(fun _ tx ->
-          Ledger.apply_transaction snarked_ledger tx |> Or_error.ignore )
-        ~init:() txs
-      |> Deferred.return
+      Deferred.List.fold txs ~init:(Ok ()) ~f:(fun acc tx ->
+          Deferred.map (Async.Scheduler.yield ()) ~f:(fun () ->
+              Or_error.bind acc ~f:(fun () ->
+                  Ledger.apply_transaction snarked_ledger tx |> Or_error.ignore
+              ) ) )
     in
     let%bind () =
       let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
