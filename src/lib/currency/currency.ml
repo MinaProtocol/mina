@@ -247,8 +247,11 @@ end = struct
     end
   end]
 
-  (* type t = Stable.Latest.t  [@@deriving sexp, compare, hash] *)
-  include Stable.Latest
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
+
+  include Codable.Make_of_int (Stable.Latest.T)
+  include Hashable.Make (Stable.Latest.T)
+  include Comparable.Make (Stable.Latest.T)
 
   let to_uint64 = Unsigned.to_uint64
 
@@ -324,7 +327,7 @@ end = struct
   let var_of_t t =
     List.init M.length ~f:(fun i -> Boolean.var_of_value (Vector.get t i))
 
-  type magnitude = t [@@deriving sexp, bin_io, hash, compare, yojson]
+  type magnitude = t [@@deriving sexp, hash, compare, yojson]
 
   let fold_bits = fold
 
