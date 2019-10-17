@@ -13,6 +13,13 @@ module YJ = Yojson.Safe
 64]
 
 [%%if
+record_async_backtraces]
+
+let () = Async.Scheduler.set_record_backtraces true
+
+[%%endif]
+
+[%%if
 fake_hash]
 
 let maybe_sleep s = after (Time.Span.of_sec s)
@@ -237,11 +244,11 @@ let daemon logger =
          ~transport:(Logger.Transport.stdout ()) ;
        (* 512MB logrotate max size = 1GB max filesystem usage *)
        let logrotate_max_size = 1024 * 1024 * 512 in
-       Logger.Consumer_registry.register ~id:"raw_persistent"
+       Logger.Consumer_registry.register ~id:"default"
          ~processor:(Logger.Processor.raw ())
          ~transport:
            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-              ~max_size:logrotate_max_size) ;
+              ~log_filename:"coda.log" ~max_size:logrotate_max_size) ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Coda daemon is booting up; built with commit $commit on branch \
           $branch"
@@ -606,6 +613,23 @@ let daemon logger =
              Coda_metrics.(
                Runtime.Long_async_histogram.observe Runtime.long_async_cycle
                  secs) ) ;
+         Stream.iter
+           Async_kernel.Async_kernel_scheduler.(long_jobs_with_context @@ t ())
+           ~f:(fun (context, span) ->
+             let secs = Time_ns.Span.to_sec span in
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:
+                 [ ("long_async_job", `Float secs)
+                 ; ( "backtrace"
+                   , `String
+                       (String.concat ~sep:"␤"
+                          (List.map ~f:Backtrace.to_string
+                             (Execution_context.backtrace_history context))) )
+                 ]
+               "Long async job, $long_async_job seconds" ;
+             Coda_metrics.(
+               Runtime.Long_job_histogram.observe Runtime.long_async_job secs)
+             ) ;
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
              ~location typ
@@ -940,7 +964,7 @@ let print_version_info () =
 
 let () =
   Random.self_init () ;
-  let logger = Logger.create ~initialize_default_consumer:false () in
+  let logger = Logger.create () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
