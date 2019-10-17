@@ -1,4 +1,5 @@
-#!/usr/bin/python
+#! /usr/bin/env nix-shell
+#! nix-shell python2-env.nix --pure -i python2
 
 # In dune files, require preprocessing by ppx_coda, so that the version syntax linter is always run
 

@@ -1,4 +1,5 @@
-#!/usr/bin/python
+#! /usr/bin/env nix-shell
+#! nix-shell python2-env.nix --pure -i python2
 
 """Parse build logs and report on warn conditions"""
 

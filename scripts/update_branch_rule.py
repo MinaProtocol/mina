@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env nix-shell
+#! nix-shell python3-env.nix --pure -i python3
 
 from __future__ import print_function
 import os
