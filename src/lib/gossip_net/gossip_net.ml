@@ -377,10 +377,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         |> ignore )
 
   and restart_kademlia t addl_peers =
-    Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-      "Restarting Kademlia" ;
     match t.haskell_membership with
     | Some membership -> (
+        t.haskell_membership <- None ;
+        Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
+          "Restarting Kademlia" ;
         let%bind () = Membership.stop membership in
         let%map new_membership =
           let initial_peers =
@@ -398,6 +399,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         | Error _ ->
             failwith "Could not restart Kademlia" )
     | None ->
+        (* If we try to restart twice simultaneously, or we try to restart
+           before it's first launched we'll see this condition. *)
+        Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
+          "Can't restart kademlia, it's not running" ;
         Deferred.unit
 
   and unmark_all_disconnected_peers t =
