@@ -1,6 +1,7 @@
 (library
  (name debug_assert)
   (public_name debug_assert)
+  (preprocess (pps ppx_coda))
   (libraries async_kernel)
   (synopsis "Debug assertion library")
  )
