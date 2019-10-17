@@ -85,6 +85,7 @@ let make =
       ~width=10.5,
       ~height=3.,
       ~icon=?,
+      ~type_="button",
     ) =>
   <button
     disabled
@@ -98,7 +99,8 @@ let make =
       | Red => Styles.red
       | Gray => Styles.gray
       },
-    ])}>
+    ])}
+    type_>
     {switch (icon) {
      | Some(kind) => <Icon kind />
      | None => React.null
