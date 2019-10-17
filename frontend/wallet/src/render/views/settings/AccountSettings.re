@@ -24,7 +24,7 @@ module Styles = {
   let backHeaderText =
     merge([Theme.Text.Header.h3, style([color(Theme.Colors.midnight)])]);
 
-  let headerWalletName = style([fontSize(`rem(1.25))]);
+  let headerAccountName = style([fontSize(`rem(1.25))]);
 
   let label =
     merge([
@@ -50,7 +50,7 @@ module Styles = {
   let buttonWrapper = style([display(`flex)]);
 };
 
-module DeleteWallet = [%graphql
+module DeleteAccount = [%graphql
   {|
     mutation deleteWallet($key: PublicKey!) {
       deleteWallet(input: {publicKey: $key}) {
@@ -60,7 +60,7 @@ module DeleteWallet = [%graphql
   |}
 ];
 
-module DeleteWalletMutation = ReasonApollo.CreateMutation(DeleteWallet);
+module DeleteAccountMutation = ReasonApollo.CreateMutation(DeleteAccount);
 
 module DeleteButton = {
   type modalState = {
@@ -71,7 +71,7 @@ module DeleteButton = {
   let make = (~publicKey) => {
     let (modalState, updateModal) = React.useState(() => None);
     let (addressBook, _) = React.useContext(AddressBookProvider.context);
-    let walletName =
+    let accountName =
       switch (AddressBook.lookup(addressBook, publicKey)) {
       | Some(name) => name
       | None =>
@@ -79,22 +79,22 @@ module DeleteButton = {
       };
     let warningMessage =
       "Are you sure you want to delete "
-      ++ walletName
+      ++ accountName
       ++ "? \
-      This can't be undone, and you may lose the funds in this wallet.";
+      This can't be undone, and you may lose the funds in this account.";
     <>
       <Link
         kind=Link.Red
         onClick={_ =>
           updateModal(x => Option.or_(Some({text: "", error: None}), x))
         }>
-        {React.string("Delete wallet")}
+        {React.string("Delete account")}
       </Link>
       {switch (modalState) {
        | None => React.null
        | Some({text, error}) =>
          <Modal
-           title="Delete Wallet" onRequestClose={_ => updateModal(_ => None)}>
+           title="Delete Account" onRequestClose={_ => updateModal(_ => None)}>
            <div className=Styles.modalContainer>
              <div className=Styles.deleteAlert>
                <Alert kind=`Warning message=warningMessage />
@@ -104,7 +104,7 @@ module DeleteButton = {
               | None => React.null
               }}
              <div className=Styles.deleteModalLabel>
-               {React.string("Type wallet name to confirm:")}
+               {React.string("Type account name to confirm:")}
              </div>
              <TextField
                label="Name"
@@ -119,7 +119,7 @@ module DeleteButton = {
                  onClick={_ => updateModal(_ => None)}
                />
                <Spacer width=1. />
-               <DeleteWalletMutation>
+               <DeleteAccountMutation>
                  (
                    (mutation, _) =>
                      <Button
@@ -127,7 +127,7 @@ module DeleteButton = {
                        style=Button.Red
                        onClick={_ => {
                          let variables =
-                           DeleteWallet.make(
+                           DeleteAccount.make(
                              ~key=Apollo.Encoders.publicKey(publicKey),
                              (),
                            )##variables;
@@ -169,10 +169,10 @@ module DeleteButton = {
                                ),
                          );
                        }}
-                       disabled={text != walletName}
+                       disabled={text != accountName}
                      />
                  )
-               </DeleteWalletMutation>
+               </DeleteAccountMutation>
              </div>
            </div>
          </Modal>
@@ -214,12 +214,12 @@ let make = (~publicKey) => {
       </span>
       <Spacer width=0.5 />
       <span className=Styles.backHeaderText>
-        <WalletName pubkey=publicKey className=Styles.headerWalletName />
+        <AccountName pubkey=publicKey className=Styles.headerAccountName />
         {React.string(" settings")}
       </span>
     </div>
     <Spacer height=1. />
-    <div className=Styles.label> {React.string("Wallet name")} </div>
+    <div className=Styles.label> {React.string("Account name")} </div>
     <div className=Styles.textBox>
       <TextField
         label="Name"

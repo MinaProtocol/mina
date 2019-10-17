@@ -144,7 +144,7 @@ let extractTransactions: Js.t('a) => extractedResponse =
 
 [@react.component]
 let make = () => {
-  let activeWallet = Hooks.useActiveWallet();
+  let activeAccount = Hooks.useActiveAccount();
 
   let updateQuery: ReasonApolloQuery.updateQueryT = [%bs.raw
     {| function (prevResult, { fetchMoreResult }) {
@@ -176,7 +176,7 @@ let make = () => {
         {ReasonReact.string("Date / Amount")}
       </span>
     </div>
-    {switch (activeWallet) {
+    {switch (activeAccount) {
      | Some(pubkey) =>
        let transactionQuery =
          TransactionsQueryString.make(

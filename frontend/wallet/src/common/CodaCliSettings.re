@@ -8,7 +8,7 @@ module General = {
   type t = {testnet: Url.t};
 };
 
-module Wallets = {
+module Accounts = {
   type t = option(PublicKey.t);
 };
 
@@ -28,7 +28,7 @@ module Compression = {
 type t = {
   general: General.t,
   compression: Compression.t,
-  wallets: Wallets.t,
+  accounts: Accounts.t,
 };
 
 let default = (~testnet) => {
@@ -36,5 +36,5 @@ let default = (~testnet) => {
     General.testnet: testnet,
   },
   compression: None,
-  wallets: None,
+  accounts: None,
 };

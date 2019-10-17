@@ -16,7 +16,7 @@ module AddWalletMutation = ReasonApollo.CreateMutation(AddWallet);
 
 [@react.component]
 let make = (~onClose) => {
-  let (walletName, setName) = React.useState(() => defaultName);
+  let (accountName, setName) = React.useState(() => defaultName);
   let (password, setPassword) = React.useState(() => "");
 
   let (_settings, updateAddressBook) =
@@ -32,7 +32,7 @@ let make = (~onClose) => {
       <TextField
         label="Name"
         onChange={value => setName(_ => value)}
-        value=walletName
+        value=accountName
       />
       <Spacer height=0.5 />
       <TextField
@@ -65,10 +65,10 @@ let make = (~onClose) => {
                    ~f=
                      fun
                      | EmptyResponse => ()
-                     | Errors(_) => print_endline("Error adding wallet")
+                     | Errors(_) => print_endline("Error adding account")
                      | Data(data) => {
                          let key = data##addWallet##publicKey;
-                         updateAddressBook(AddressBook.set(~key, ~name=walletName));
+                         updateAddressBook(AddressBook.set(~key, ~name=accountName));
                          onClose();
                        },
                  );

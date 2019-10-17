@@ -16,19 +16,19 @@ module WalletQuery = ReasonApollo.CreateQuery(WalletLocked);
 [@react.component]
 let make = () => {
   let (modalOpen, setModalOpen) = React.useState(() => false);
-  let activeWallet = Hooks.useActiveWallet();
+  let activeAccount = Hooks.useActiveAccount();
   <>
     <Button
       label="Send"
       onClick={_ => setModalOpen(_ => true)}
-      disabled={!Option.isSome(activeWallet)}
+      disabled={!Option.isSome(activeAccount)}
     />
-    {switch (activeWallet) {
+    {switch (activeAccount) {
      | None => React.null
      | Some(pubkey) =>
-       let walletQuery =
+       let accountQuery =
          WalletLocked.make(~publicKey=Apollo.Encoders.publicKey(pubkey), ());
-       <WalletQuery variables=walletQuery##variables>
+       <WalletQuery variables=accountQuery##variables>
          (
            response =>
              switch (response.result) {
@@ -41,7 +41,7 @@ let make = () => {
                | (true, Some(wallet)) =>
                  wallet##locked
                    ? <UnlockModal
-                       wallet=pubkey
+                       account=pubkey
                        onClose={() => setModalOpen(_ => false)}
                        onSuccess={() => ()}
                      />

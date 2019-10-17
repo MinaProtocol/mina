@@ -1,6 +1,6 @@
 open Tc;
 
-module UnlockWallet = [%graphql
+module UnlockAccount = [%graphql
   {| mutation unlock($password: String, $publicKey: PublicKey) {
       unlockWallet(input: {password: $password, publicKey: $publicKey}) {
           publicKey
@@ -8,25 +8,25 @@ module UnlockWallet = [%graphql
   } |}
 ];
 
-module UnlockMutation = ReasonApollo.CreateMutation(UnlockWallet);
+module UnlockMutation = ReasonApollo.CreateMutation(UnlockAccount);
 
 type modalState = {error: option(string)};
 
 [@react.component]
-let make = (~wallet, ~onClose, ~onSuccess) => {
+let make = (~account, ~onClose, ~onSuccess) => {
   let (error, setError) = React.useState(() => None);
   let (password, setPassword) = React.useState(() => "");
   let variables =
-    UnlockWallet.make(
+    UnlockAccount.make(
       ~password,
-      ~publicKey=Apollo.Encoders.publicKey(wallet),
+      ~publicKey=Apollo.Encoders.publicKey(account),
       (),
     )##variables;
-  <Modal title="Unlock Wallet" onRequestClose=onClose>
+  <Modal title="Unlock Account" onRequestClose=onClose>
     <div className=Modal.Styles.default>
       <p className=Theme.Text.Body.regular>
         {React.string("Please enter password for ")}
-        <WalletName pubkey=wallet />
+        <AccountName pubkey=account />
         {React.string(".")}
       </p>
       <Spacer height=1. />
