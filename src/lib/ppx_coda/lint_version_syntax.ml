@@ -84,8 +84,18 @@ let validate_version_if_bin_io =
     ~pred:(fun has_bin_io has_version -> has_bin_io && not has_version)
     "Must have deriving version if deriving bin_io"
 
+let is_stable_latest_inc_decl inc_decl =
+  match inc_decl.pincl_mod.pmod_desc with
+  | Pmod_ident {txt= Ldot (Lident "Stable", "Latest"); _} ->
+      true
+  | _ ->
+      false
+
 let versioned_in_functor_error loc =
   (loc, "Cannot use versioned extension within a functor body")
+
+let include_stable_latest_error loc =
+  (loc, "Cannot use \"include Stable.Latest\"")
 
 (* traverse AST, collect errors *)
 let check_deriving_usage =
@@ -118,6 +128,8 @@ let check_deriving_usage =
         when String.equal name.txt "test_module" ->
           (* don't check for errors in test code *)
           acc
+      | Pstr_include inc_decl when is_stable_latest_inc_decl inc_decl ->
+          (in_functor, errors @ [include_stable_latest_error str.pstr_loc])
       | _ ->
           super#structure_item str acc
   end

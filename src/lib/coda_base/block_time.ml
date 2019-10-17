@@ -107,7 +107,8 @@ module Time = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    include Stable.Latest
+    type t = Stable.Latest.t [@@deriving sexp, compare]
+
     module Bits = B.UInt64
     include B.Snarkable.UInt64 (Tick)
 
