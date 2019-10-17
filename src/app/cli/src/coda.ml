@@ -619,7 +619,7 @@ let daemon logger =
                           (List.map ~f:Backtrace.to_string
                              (Execution_context.backtrace_history context))) )
                  ]
-               "Long async job, $long_async_cycle seconds" ;
+               "Long async job, $long_async_job seconds" ;
              Coda_metrics.(
                Runtime.Long_job_histogram.observe Runtime.long_async_job secs)
              ) ;
