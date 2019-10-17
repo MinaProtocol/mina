@@ -11,11 +11,11 @@ open Coda_transition
     [Catchup_scheduler]. With that state_hash, it will ask its peers for
     a merkle path/list from their oldest transition to the state_hash it is
     asking for. Upon receiving the merkle path/list, it will do the following:
-    
+
     1. verify the merkle path/list is correct by calling
     [Transition_chain_verifier.verify]. This function would returns a list
     of state hashes if the verification is successful.
-    
+
     2. using the list of state hashes to poke a transition frontier
     in order to find the hashes of missing transitions. If none of the hashes
     are found, then it means some more transitions are missing.

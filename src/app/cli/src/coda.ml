@@ -386,7 +386,17 @@ let daemon logger =
                 ; ("heap_chunks", `Int stat.heap_chunks)
                 ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
                 ; ("live_size", `Int (stat.live_words * bytes_per_word))
-                ; ("live_blocks", `Int stat.live_blocks) ]
+                ; ("live_blocks", `Int stat.live_blocks) ] ;
+            let {Jemalloc.active; resident; allocated; mapped} =
+              Jemalloc.get_memory_stats ()
+            in
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              "Jemalloc memory statistics (in bytes)"
+              ~metadata:
+                [ ("active", `Int (active * 1024))
+                ; ("resident", `Int (resident * 1024))
+                ; ("allocated", `Int (allocated * 1024))
+                ; ("mapped", `Int (mapped * 1024)) ]
           in
           let rec loop () =
             log_stats "before major gc" ;
@@ -589,8 +599,13 @@ let daemon logger =
            (Async.Scheduler.long_cycles
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
+             let secs = Time_ns.Span.to_sec span in
              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-               "Long async cycle, %0.01f seconds" (Time_ns.Span.to_sec span) ) ;
+               ~metadata:[("long_async_cycle", `Float secs)]
+               "Long async cycle, $long_async_cycle seconds" ;
+             Coda_metrics.(
+               Runtime.Long_async_histogram.observe Runtime.long_async_cycle
+                 secs) ) ;
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
              ~location typ
@@ -714,7 +729,7 @@ let daemon logger =
                (* check for other terminated children, without waiting *)
                terminated_child_loop ()
          in
-         Deferred.don't_wait_for @@ terminated_child_loop () ;
+         O1trace.trace_task "terminated child loop" terminated_child_loop ;
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir

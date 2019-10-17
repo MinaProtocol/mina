@@ -30,7 +30,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
             |> Array.of_list )
           ()
       in
-      let%map obj = Client.query_or_error graphql port in
+      let%map obj = Client.query graphql port in
       let list =
         Array.map obj#user_commands ~f:(fun obj -> (obj#hash, obj#first_seen))
         |> Array.to_list
@@ -54,7 +54,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         ~user_commands:(Array.of_list user_commands)
         ()
     in
-    let%map _result = Client.query_or_error graphql port in
+    let%map _result = Client.query graphql port in
     ()
 
   let create port = {port}
@@ -92,9 +92,7 @@ let%test_module "Processor" =
            Monitor.try_with_or_error ~name:"Write Processor" f
          in
          let%map clear_action =
-           Processor.Client.query_or_error
-             (Graphql_query.Clear_data.make ())
-             t.port
+           Processor.Client.query (Graphql_query.Clear_data.make ()) t.port
          in
          Or_error.all_unit
            [ result
@@ -174,7 +172,7 @@ let%test_module "Processor" =
               Strict_pipe.Writer.close writer ;
               let%bind () = processing_deferred_job in
               let%bind public_keys =
-                Processor.Client.query
+                Processor.Client.query_exn
                   (Graphql_query.Public_key.Query.make ())
                   t.port
               in
@@ -197,7 +195,7 @@ let%test_module "Processor" =
                 ~expect:accessed_accounts queried_public_keys ;
               let query_user_command user_command =
                 let%map query_result =
-                  Processor.Client.query
+                  Processor.Client.query_exn
                     (Graphql_query.User_commands.Query.make
                        ~hash:
                          Transaction_hash.(

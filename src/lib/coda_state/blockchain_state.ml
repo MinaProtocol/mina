@@ -3,21 +3,16 @@ open Coda_base
 open Snark_params.Tick
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
-          { staged_ledger_hash: 'staged_ledger_hash
-          ; snarked_ledger_hash: 'snarked_ledger_hash
-          ; timestamp: 'time }
-        [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson, version]
-      end
-
-      include T
+      type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
+        { staged_ledger_hash: 'staged_ledger_hash
+        ; snarked_ledger_hash: 'snarked_ledger_hash
+        ; timestamp: 'time }
+      [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson, version]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
         ('staged_ledger_hash, 'snarked_ledger_hash, 'time) Stable.Latest.t =
@@ -31,34 +26,20 @@ let staged_ledger_hash, snarked_ledger_hash, timestamp =
   Poly.(staged_ledger_hash, snarked_ledger_hash, timestamp)
 
 module Value = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          ( Staged_ledger_hash.Stable.V1.t
-          , Frozen_ledger_hash.Stable.V1.t
-          , Block_time.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-      end
+      type t =
+        ( Staged_ledger_hash.Stable.V1.t
+        , Frozen_ledger_hash.Stable.V1.t
+        , Block_time.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, eq, compare, hash, yojson]
 
-      include T
-      include Module_version.Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "coda_base_blockchain_state"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Module_version.Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 end
 
