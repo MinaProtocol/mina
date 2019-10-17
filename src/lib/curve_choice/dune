@@ -3,4 +3,4 @@
  (public_name curve_choice)
  (libraries snarkette snarky)
  (preprocess
-  (pps ppx_jane)))
+  (pps ppx_coda ppx_jane)))
