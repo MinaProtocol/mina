@@ -2,32 +2,27 @@ open Core_kernel
 open Coda_base
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ( 'blockchain_state
-             , 'consensus_transition
-             , 'sok_digest
-             , 'amount
-             , 'state_body_hash
-             , 'proposer_pk )
-             t =
-          { blockchain_state: 'blockchain_state
-          ; consensus_transition: 'consensus_transition
-          ; sok_digest: 'sok_digest
-          ; supply_increase: 'amount
-          ; ledger_proof: Proof.Stable.V1.t option
-          ; proposer: 'proposer_pk
-          ; coinbase_amount: 'amount
-          ; coinbase_state_body_hash: 'state_body_hash }
-        [@@deriving bin_io, to_yojson, sexp, fields, version]
-      end
-
-      include T
+      type ( 'blockchain_state
+           , 'consensus_transition
+           , 'sok_digest
+           , 'amount
+           , 'state_body_hash
+           , 'proposer_pk )
+           t =
+        { blockchain_state: 'blockchain_state
+        ; consensus_transition: 'consensus_transition
+        ; sok_digest: 'sok_digest
+        ; supply_increase: 'amount
+        ; ledger_proof: Proof.Stable.V1.t option
+        ; proposer: 'proposer_pk
+        ; coinbase_amount: 'amount
+        ; coinbase_state_body_hash: 'state_body_hash }
+      [@@deriving bin_io, to_yojson, sexp, fields, version]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ( 'blockchain_state
        , 'consensus_transition
@@ -55,25 +50,22 @@ module Poly = struct
 end
 
 module Value = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          ( Blockchain_state.Value.Stable.V1.t
-          , Consensus.Data.Consensus_transition.Value.Stable.V1.t
-          , Sok_message.Digest.Stable.V1.t
-          , Currency.Amount.Stable.V1.t
-          , State_body_hash.Stable.V1.t
-          , Signature_lib.Public_key.Compressed.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
-      end
+      type t =
+        ( Blockchain_state.Value.Stable.V1.t
+        , Consensus.Data.Consensus_transition.Value.Stable.V1.t
+        , Sok_message.Digest.Stable.V1.t
+        , Currency.Amount.Stable.V1.t
+        , State_body_hash.Stable.V1.t
+        , Signature_lib.Public_key.Compressed.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, to_yojson]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 end

@@ -15,7 +15,11 @@ RUN yarn build-without-copy
 
 ENV CODA_GRAPHQL_HOST=localhost
 ENV CODA_GRAPHQL_PORT=8304
-ADD wait-for-it.sh wait-for-it.sh
+
+ENV DOCKERIZE_VERSION v0.6.1
+RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
 
 ENTRYPOINT ["bash", "-c"]
-CMD ["./wait-for-it.sh --host=$CODA_GRAPHQL_HOST --port=$CODA_GRAPHQL_PORT --timeout=90 --strict -- yarn start" ]
+CMD ["dockerize -wait tcp://$CODA_GRAPHQL_HOST:$CODA_GRAPHQL_PORT -timeout 90s && yarn start" ]

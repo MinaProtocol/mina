@@ -3,23 +3,17 @@
 
 open Core_kernel
 open Coda_base
-open Module_version
 open Snark_params.Tick
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('state_hash, 'body) t =
-          {previous_state_hash: 'state_hash; body: 'body}
-        [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
-      end
-
-      include T
+      type ('state_hash, 'body) t =
+        {previous_state_hash: 'state_hash; body: 'body}
+      [@@deriving eq, ord, hash, sexp, to_yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t
   [@@deriving sexp]
@@ -34,20 +28,15 @@ let hash_abstract ~hash_body
 
 module Body = struct
   module Poly = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type ('blockchain_state, 'consensus_state) t =
-            { blockchain_state: 'blockchain_state
-            ; consensus_state: 'consensus_state }
-          [@@deriving bin_io, sexp, eq, compare, to_yojson, hash, version]
-        end
-
-        include T
+        type ('blockchain_state, 'consensus_state) t =
+          { blockchain_state: 'blockchain_state
+          ; consensus_state: 'consensus_state }
+        [@@deriving bin_io, sexp, eq, compare, to_yojson, hash, version]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type ('blockchain_state, 'consensus_state) t =
           ('blockchain_state, 'consensus_state) Stable.Latest.t =
@@ -56,31 +45,18 @@ module Body = struct
   end
 
   module Value = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t =
-            ( Blockchain_state.Value.Stable.V1.t
-            , Consensus.Data.Consensus_state.Value.Stable.V1.t )
-            Poly.Stable.V1.t
-          [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
-        end
+        type t =
+          ( Blockchain_state.Value.Stable.V1.t
+          , Consensus.Data.Consensus_state.Value.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
 
-        include T
-        include Registration.Make_latest_version (T)
+        let to_latest = Fn.id
       end
-
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "protocol_state_body"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
+    end]
 
     type t = Stable.Latest.t [@@deriving sexp, to_yojson]
   end
@@ -133,31 +109,17 @@ module Body = struct
 end
 
 module Value = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, hash, compare, eq, to_yojson, version]
-      end
+      type t =
+        (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
+      [@@deriving sexp, hash, compare, eq, to_yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "protocol_state_value"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, to_yojson]
 
   include Hashable.Make (Stable.Latest)

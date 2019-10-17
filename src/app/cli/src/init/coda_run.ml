@@ -182,7 +182,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
   (* Setup RPC server for client interactions *)
   let implement rpc f =
     Rpc.Rpc.implement rpc (fun () input ->
-        trace_recurring_task (Rpc.Rpc.name rpc) (fun () -> f () input) )
+        trace_recurring (Rpc.Rpc.name rpc) (fun () -> f () input) )
   in
   let implement_notrace = Rpc.Rpc.implement in
   let logger =
@@ -192,12 +192,13 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
   in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-          let%map result = Coda_commands.send_user_command coda tx in
-          result |> Participating_state.active_error |> Or_error.join )
+          Deferred.map
+            ( Coda_commands.send_user_command coda tx
+            |> Participating_state.to_deferred_or_error )
+            ~f:Or_error.join )
     ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-          return
-            ( Coda_commands.schedule_user_commands coda ts
-            |> Participating_state.active_error ) )
+          Coda_commands.schedule_user_commands coda ts
+          |> Participating_state.to_deferred_or_error )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
           return
             ( Coda_commands.get_balance coda pk
@@ -364,51 +365,54 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                  Logger.info logger
                    !"Created GraphQL server and status endpoints at port : %i"
                    rest_server_port ~module_:__MODULE__ ~location:__LOC__ ) )
-      |> ignore ) ;
+  ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Coda_lib.client_port coda))
   in
-  trace_task "client RPC handling" (fun () ->
-      Tcp.Server.create
-        ~on_handler_error:
-          (`Call
-            (fun _net exn ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                "Exception while handling TCP server request: $error"
-                ~metadata:
-                  [ ("error", `String (Exn.to_string_mach exn))
-                  ; ("context", `String "rpc_tcp_server") ] ))
-        where_to_listen
-        (fun address reader writer ->
-          let address = Socket.Address.Inet.addr address in
-          if not (Set.mem client_whitelist address) then (
-            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              !"Rejecting client connection from $address, it is not present \
-                in the whitelist."
-              ~metadata:
-                [("$address", `String (Unix.Inet_addr.to_string address))] ;
-            Deferred.unit )
-          else
-            Rpc.Connection.server_with_close reader writer
-              ~implementations:
-                (Rpc.Implementations.create_exn
-                   ~implementations:(client_impls @ snark_worker_impls)
-                   ~on_unknown_rpc:`Raise)
-              ~connection_state:(fun _ -> ())
-              ~on_handshake_error:
+  don't_wait_for
+    (Deferred.ignore
+       (trace "client RPC handling" (fun () ->
+            Tcp.Server.create
+              ~on_handler_error:
                 (`Call
-                  (fun exn ->
+                  (fun _net exn ->
                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                      "Exception while handling RPC server request from \
-                       $address: $error"
+                      "Exception while handling TCP server request: $error"
                       ~metadata:
                         [ ("error", `String (Exn.to_string_mach exn))
-                        ; ("context", `String "rpc_server")
-                        ; ( "address"
-                          , `String (Unix.Inet_addr.to_string address) ) ] ;
-                    Deferred.unit )) ) )
-  |> ignore
+                        ; ("context", `String "rpc_tcp_server") ] ))
+              where_to_listen
+              (fun address reader writer ->
+                let address = Socket.Address.Inet.addr address in
+                if not (Set.mem client_whitelist address) then (
+                  Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                    !"Rejecting client connection from $address, it is not \
+                      present in the whitelist."
+                    ~metadata:
+                      [("$address", `String (Unix.Inet_addr.to_string address))] ;
+                  Deferred.unit )
+                else
+                  Rpc.Connection.server_with_close reader writer
+                    ~implementations:
+                      (Rpc.Implementations.create_exn
+                         ~implementations:(client_impls @ snark_worker_impls)
+                         ~on_unknown_rpc:`Raise)
+                    ~connection_state:(fun _ -> ())
+                    ~on_handshake_error:
+                      (`Call
+                        (fun exn ->
+                          Logger.error logger ~module_:__MODULE__
+                            ~location:__LOC__
+                            "Exception while handling RPC server request from \
+                             $address: $error"
+                            ~metadata:
+                              [ ("error", `String (Exn.to_string_mach exn))
+                              ; ("context", `String "rpc_server")
+                              ; ( "address"
+                                , `String (Unix.Inet_addr.to_string address) )
+                              ] ;
+                          Deferred.unit )) ) )))
 
 let handle_crash e ~conf_dir ~top_logger coda_ref =
   let exn_str = Exn.to_string e in

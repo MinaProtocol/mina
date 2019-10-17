@@ -4,5 +4,5 @@
  (library_flags -linkall)
  (libraries core async)
  (preprocess
-  (pps ppx_jane))
+  (pps ppx_coda ppx_jane))
  (synopsis "Library for html"))
