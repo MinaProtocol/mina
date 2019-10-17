@@ -1,4 +1,5 @@
 (library
  (name snarky_log)
  (public_name snarky_log)
+ (preprocess (pps ppx_coda))
  (libraries yojson snarky webkit_trace_event))
