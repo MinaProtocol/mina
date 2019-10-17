@@ -24,7 +24,7 @@ let codaCommand = (~port, ~extraArgs) => {
           "-rest-port",
           Js.Int.toString(port),
           "-config-directory",
-          ProjectRoot.resource ^/ codaPath ^/ "config",
+          ProjectRoot.userData ^/ "coda" ^/ "config",
         |],
       ),
     env: ChildProcess.Process.env,
@@ -46,7 +46,7 @@ let fakerCommand = (~port) => {
   env: ChildProcess.Process.env,
 };
 
-[@bs.module "os"] external tmpdir : unit => string = "";
+[@bs.module "os"] external tmpdir: unit => string = "";
 
 module Process = {
   let start = (command: Command.t) => {
