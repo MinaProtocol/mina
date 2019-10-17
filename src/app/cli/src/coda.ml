@@ -612,7 +612,7 @@ let daemon logger =
              let secs = Time_ns.Span.to_sec span in
              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                ~metadata:
-                 [ ("long_async_cycle", `Float secs)
+                 [ ("long_async_job", `Float secs)
                  ; ( "backtrace"
                    , `String
                        (String.concat ~sep:"\n"
