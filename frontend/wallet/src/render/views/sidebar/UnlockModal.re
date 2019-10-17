@@ -52,7 +52,6 @@ let make = (~wallet, ~onClose, ~onSuccess) => {
                |> Option.withDefault(~default="Server error");
              setError(_ => Some(message));
              React.null;
-           | Loading => React.null
            }}
           <p className=Theme.Text.Body.regular>
             {React.string("Please enter password for ")}
