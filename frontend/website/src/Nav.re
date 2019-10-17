@@ -334,10 +334,11 @@ module SimpleButton = {
   open Style;
 
   [@react.component]
-  let make = (~name, ~activePage=false, ~link) => {
+  let make = (~name, ~activePage=false, ~link, ~target="_self") => {
     <A
       name={"nav-" ++ name}
       href=link
+      target
       className=Css.(
         merge([
           Body.basic,
@@ -365,16 +366,16 @@ let make = (~page) => {
   <NavWrapper keepAnnouncementBar=true>
     [|
       <SimpleButton name="Blog" link="/blog" activePage={page == `Blog} />,
-      <SimpleButton name="Docs" link="/docs/" activePage={page == `Docs} />,
+      <SimpleButton name="Docs" link="/docs" activePage={page == `Docs} />,
       <SimpleButton name="Careers" link="/jobs" activePage={page == `Jobs} />,
       <SimpleButton
         name="GitHub"
         link="https://github.com/CodaProtocol/coda"
-        activePage=false
+        target="_blank"
       />,
       <SimpleButton
         name="Testnet"
-        link="/testnet.html"
+        link="/testnet"
         activePage={page == `Testnet}
       />,
     |]
