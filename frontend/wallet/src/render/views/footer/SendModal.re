@@ -99,32 +99,6 @@ let validate:
       })
     };
 
-let modalButtons = (unvalidated, setModalState, onSubmit, onClose) => {
-  let setError = e =>
-    setModalState(s => {...s, ModalState.Unvalidated.errorOpt: Some(e)});
-
-  <div className=Css.(style([display(`flex)]))>
-    <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
-    <Spacer width=1. />
-    <Button
-      label="Send"
-      style=Button.Green
-      onClick={_ =>
-        switch (validate(unvalidated)) {
-        | Error(e) => setError(e)
-        | Ok(validated) =>
-          onSubmit(
-            validated,
-            fun
-            | Belt.Result.Error(e) => setError(e)
-            | Ok () => onClose(),
-          )
-        }
-      }
-    />
-  </div>;
-};
-
 module SendForm = {
   open ModalState.Unvalidated;
 
@@ -136,7 +110,23 @@ module SendForm = {
       React.useState(_ => emptyModal(activeAccount));
     let {fromStr, toStr, amountStr, feeStr, memoOpt, errorOpt} = sendState;
     let spacer = <Spacer height=0.5 />;
-    <div className=Styles.contentContainer>
+    let setError = e =>
+      setModalState(s => {...s, ModalState.Unvalidated.errorOpt: Some(e)});
+    <form
+      className=Styles.contentContainer
+      onSubmit={event => {
+        ReactEvent.Form.preventDefault(event);
+        switch (validate(sendState)) {
+        | Error(e) => setError(e)
+        | Ok(validated) =>
+          onSubmit(
+            validated,
+            fun
+            | Belt.Result.Error(e) => setError(e)
+            | Ok() => onClose(),
+          )
+        };
+      }}>
       {switch (errorOpt) {
        | None => React.null
        | Some(err) => <Alert kind=`Danger message=err />
@@ -195,9 +185,13 @@ module SendForm = {
          />
        }}
       <Spacer height=1.0 />
-      //Disable Modal button if no active account
-      {modalButtons(sendState, setModalState, onSubmit, onClose)}
-    </div>;
+      //Disable Modal button if no active wallet
+      <div className=Css.(style([display(`flex)]))>
+        <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
+        <Spacer width=1. />
+        <Button label="Send" style=Button.Green type_="submit" />
+      </div>
+    </form>;
   };
 };
 
