@@ -8,13 +8,28 @@ open Blockchain_snark
 module type S = Intf.S
 
 module Extend_blockchain_input = struct
-  type t =
-    { chain: Blockchain.t
-    ; next_state: Protocol_state.Value.Stable.Latest.t
-    ; block: Snark_transition.Value.Stable.Latest.t
-    ; prover_state: Consensus.Data.Prover_state.Stable.Latest.t
-    ; pending_coinbase: Pending_coinbase_witness.Stable.Latest.t }
-  [@@deriving bin_io, sexp]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { chain: Blockchain.Stable.V1.t
+        ; next_state: Protocol_state.Value.Stable.V1.t
+        ; block: Snark_transition.Value.Stable.V1.t
+        ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
+        ; pending_coinbase: Pending_coinbase_witness.Stable.V1.t }
+      [@@deriving sexp]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
+    { chain: Blockchain.Stable.V1.t
+    ; next_state: Protocol_state.Value.Stable.V1.t
+    ; block: Snark_transition.Value.Stable.V1.t
+    ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
+    ; pending_coinbase: Pending_coinbase_witness.Stable.V1.t }
+  [@@deriving sexp]
 end
 
 module Consensus_mechanism = Consensus
@@ -25,12 +40,12 @@ module Worker_state = struct
     module Transaction_snark : Transaction_snark.Verification.S
 
     val extend_blockchain :
-         Blockchain.t
+         Blockchain.Stable.Latest.t
       -> Protocol_state.Value.t
       -> Snark_transition.value
       -> Consensus.Data.Prover_state.t
       -> Pending_coinbase_witness.t
-      -> Blockchain.t Or_error.t
+      -> Blockchain.Stable.Latest.t Or_error.t
 
     val verify : Protocol_state.Value.t -> Proof.t -> bool
   end
@@ -61,7 +76,7 @@ module Worker_state = struct
                    Wrap.input {Wrap.Prover_state.proof} Wrap.main
                    (Wrap_input.of_tick_field hash)
 
-               let extend_blockchain (chain : Blockchain.t)
+               let extend_blockchain (chain : Blockchain.Stable.Latest.t)
                    (next_state : Protocol_state.Value.t)
                    (block : Snark_transition.value) state_for_handler
                    pending_coinbase =
@@ -87,7 +102,7 @@ module Worker_state = struct
                          (Keys.Step.input ()) prover_state main
                          next_state_top_hash
                      in
-                     { Blockchain.state= next_state
+                     { Blockchain.Stable.Latest.state= next_state
                      ; proof= wrap next_state_top_hash prev_proof } )
 
                let verify state proof =
@@ -102,7 +117,7 @@ module Worker_state = struct
                open Snark_params
                module Transaction_snark = Transaction_snark
 
-               let extend_blockchain (chain : Blockchain.t)
+               let extend_blockchain (chain : Blockchain.Stable.Latest.t)
                    (next_state : Protocol_state.Value.t)
                    (block : Snark_transition.value) state_for_handler
                    pending_coinbase =
@@ -126,7 +141,7 @@ module Worker_state = struct
                       (main @@ Tick.Field.Var.constant next_state_top_hash)
                       prover_state)
                    ~f:(fun () ->
-                     { Blockchain.state= next_state
+                     { Blockchain.Stable.Latest.state= next_state
                      ; proof= Precomputed_values.base_proof } )
 
                let verify _state _proof = true
@@ -139,7 +154,8 @@ module Worker_state = struct
                let extend_blockchain _chain next_state _block
                    _state_for_handler _pending_coinbase =
                  Ok
-                   { Blockchain.proof= Precomputed_values.base_proof
+                   { Blockchain.Stable.Latest.proof=
+                       Precomputed_values.base_proof
                    ; state= next_state }
 
                let verify _ _ = true
@@ -167,15 +183,16 @@ module Functions = struct
         `Initialized )
 
   let extend_blockchain =
-    create Extend_blockchain_input.bin_t
-      [%bin_type_class: Blockchain.t Or_error.t]
+    create Extend_blockchain_input.Stable.Latest.bin_t
+      [%bin_type_class: Blockchain.Stable.Latest.t Or_error.t]
       (fun w {chain; next_state; block; prover_state; pending_coinbase} ->
         let%map (module W) = Worker_state.get w in
         W.extend_blockchain chain next_state block prover_state
           pending_coinbase )
 
   let verify_blockchain =
-    create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
+    create Blockchain.Stable.Latest.bin_t bin_bool
+      (fun w {Blockchain.Stable.Latest.state; proof} ->
         let%map (module W) = Worker_state.get w in
         W.verify state proof )
 end
@@ -187,8 +204,11 @@ module Worker = struct
     type 'w functions =
       { initialized: ('w, unit, [`Initialized]) F.t
       ; extend_blockchain:
-          ('w, Extend_blockchain_input.t, Blockchain.t Or_error.t) F.t
-      ; verify_blockchain: ('w, Blockchain.t, bool) F.t }
+          ( 'w
+          , Extend_blockchain_input.t
+          , Blockchain.Stable.Latest.t Or_error.t )
+          F.t
+      ; verify_blockchain: ('w, Blockchain.Stable.Latest.t, bool) F.t }
 
     module Worker_state = Worker_state
 
@@ -275,7 +295,9 @@ let extend_blockchain {connection; _} chain next_state block prover_state
                 (Sexp.to_string (Extend_blockchain_input.sexp_of_t input)) )
           ; ( "input-bin-io"
             , `String
-                (Binable.to_string (module Extend_blockchain_input) input) )
+                (Binable.to_string
+                   (module Extend_blockchain_input.Stable.Latest)
+                   input) )
           ; ("error", `String (Error.to_string_hum e)) ]
         "Prover failed: $error" ;
       Error e
@@ -284,7 +306,7 @@ let prove t ~prev_state ~prev_state_proof ~next_state
     (transition : Internal_transition.t) pending_coinbase =
   let open Deferred.Or_error.Let_syntax in
   let start_time = Core.Time.now () in
-  let%map {Blockchain.proof; _} =
+  let%map {Blockchain.Stable.Latest.proof; _} =
     extend_blockchain t
       (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
       next_state

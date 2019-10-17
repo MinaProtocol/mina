@@ -47,7 +47,7 @@ module Worker = struct
     module F = Rpc_parallel.Function
 
     type 'w functions =
-      { verify_blockchain: ('w, Blockchain.t, bool) F.t
+      { verify_blockchain: ('w, Blockchain.Stable.Latest.t, bool) F.t
       ; verify_transaction_snark:
           ('w, Transaction_snark.t * Sok_message.t, bool) F.t }
 
@@ -64,7 +64,8 @@ module Worker = struct
              with type worker_state := Worker_state.t
               and type connection_state := Connection_state.t) =
     struct
-      let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
+      let verify_blockchain (w : Worker_state.t)
+          (chain : Blockchain.Stable.Latest.t) =
         match Coda_compile_config.proof_level with
         | "full" ->
             let%map (module M) = Worker_state.get w in
@@ -90,7 +91,8 @@ module Worker = struct
             ~f:(fun ~worker_state ~conn_state:_ i -> f worker_state i)
             ~bin_input:i ~bin_output:o ()
         in
-        { verify_blockchain= f (Blockchain.bin_t, Bool.bin_t, verify_blockchain)
+        { verify_blockchain=
+            f (Blockchain.Stable.Latest.bin_t, Bool.bin_t, verify_blockchain)
         ; verify_transaction_snark=
             f
               ( [%bin_type_class:
