@@ -39,7 +39,7 @@ let%test_module "Ledger catchup" =
     let trust_system = Trust_system.null ()
 
     let run_ledger_catchup ~logger ~pids =
-      let%map verifier = Verifier.create ~logger ~pids in
+      let%map verifier = Verifier.create ~logger ~pids ~conf_dir:None in
       Ledger_catchup.run ~verifier
 
     let assert_catchup_jobs_are_flushed transition_frontier =
