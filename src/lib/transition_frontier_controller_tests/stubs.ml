@@ -690,9 +690,7 @@ struct
       let%map _, _, peers_with_frontiers =
         Deferred.List.fold
           ~init:(Constants.init_ip, Constants.init_discovery_port, []) configs
-          ~f:(fun (ip, libp2p_port, acc_peers)
-             {num_breadcrumbs; accounts}
-             ->
+          ~f:(fun (ip, libp2p_port, acc_peers) {num_breadcrumbs; accounts} ->
             let%bind frontier = create_root_frontier ~logger ~pids accounts in
             let%map () =
               build_frontier_randomly frontier

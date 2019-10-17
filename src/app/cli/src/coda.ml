@@ -490,9 +490,9 @@ let daemon logger =
            List.concat
              [ libp2p_peers_raw
              ; or_from_config
-                    (Fn.compose Option.some
-                       (YJ.Util.convert_each YJ.Util.to_string))
-                    "libp2p_peers" None ~default:[] ]
+                 (Fn.compose Option.some
+                    (YJ.Util.convert_each YJ.Util.to_string))
+                 "libp2p_peers" None ~default:[] ]
          in
          let discovery_port = external_port + 1 in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
