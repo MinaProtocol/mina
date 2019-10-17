@@ -4,20 +4,18 @@ open Pipe_lib.Strict_pipe
 open Coda_base
 open Coda_state
 open Cache_lib
+open Coda_transition
 
 module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   Coda_intf.Transition_handler_validator_intf
-  with type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
-   and type unprocessed_transition_cache :=
+  with type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
-   and type transition_frontier := Inputs.Transition_frontier.t
-   and type staged_ledger := Inputs.Staged_ledger.t = struct
+   and type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
   let validate_transition ~logger ~frontier ~unprocessed_transition_cache
       (enveloped_transition :
-        External_transition.with_initial_validation Envelope.Incoming.t) =
+        External_transition.Initial_validated.t Envelope.Incoming.t) =
     let open Protocol_state in
     let open Result.Let_syntax in
     let {With_hash.hash= transition_hash; data= transition}, _ =
@@ -54,9 +52,9 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     Unprocessed_transition_cache.register_exn unprocessed_transition_cache
       enveloped_transition
 
-  let run ~logger ~trust_system ~frontier ~transition_reader
+  let run ~logger ~trust_system ~time_controller ~frontier ~transition_reader
       ~(valid_transition_writer :
-         ( ( External_transition.with_initial_validation Envelope.Incoming.t
+         ( ( External_transition.Initial_validated.t Envelope.Incoming.t
            , State_hash.t )
            Cached.t
          , crash buffered
@@ -89,15 +87,10 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                  |> Protocol_state.blockchain_state
                  |> Blockchain_state.timestamp |> Block_time.to_time
                in
-               let hist_name =
-                 match sender with
-                 | Envelope.Sender.Local ->
-                     "accepted_transition_local_latency"
-                 | Envelope.Sender.Remote _ ->
-                     "accepted_transition_remote_latency"
-               in
-               Perf_histograms.add_span ~name:hist_name
-                 (Core_kernel.Time.diff (Core_kernel.Time.now ())
+               Perf_histograms.add_span
+                 ~name:"accepted_transition_remote_latency"
+                 (Core_kernel.Time.diff
+                    Block_time.(now time_controller |> to_time)
                     transition_time) ;
                Writer.write valid_transition_writer cached_transition
            | Error (`In_frontier _) | Error (`In_process _) ->

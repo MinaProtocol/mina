@@ -32,7 +32,8 @@ module Child_process = {
   };
   type option;
 
-  [@bs.obj] external option: (~env: env=?, unit) => option = "";
+  [@bs.obj]
+  external option: (~env: env=?, ~encoding: string=?, unit) => option = "";
 
   [@bs.module "child_process"]
   external execSync: (string, option) => string = "execSync";
@@ -47,6 +48,7 @@ let load = path => {
           "CODA_CDN_URL": Links.Cdn.prefix(),
           "PATH": Js_dict.unsafeGet(Node.Process.process##env, "PATH"),
         },
+        ~encoding="utf-8",
         (),
       ),
     );

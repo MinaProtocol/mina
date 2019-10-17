@@ -60,12 +60,17 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   in
   Option.is_some remainder
 
-let schedule_user_command t (txn : User_command.t) account_opt =
+let schedule_user_command t (txn : User_command.t) account_opt :
+    unit Or_error.t Deferred.t =
+  (* FIXME #3457: return a status from Transaction_pool.add and use it instead
+     of is_valid_user_command
+  *)
   if not (is_valid_user_command t txn account_opt) then
-    Or_error.error_string "Invalid user command: account balance is too low"
+    Deferred.return
+    @@ Or_error.error_string "Invalid user command: account balance is too low"
   else
     let txn_pool = Coda_lib.transaction_pool t in
-    don't_wait_for (Network_pool.Transaction_pool.add txn_pool txn) ;
+    let%map () = Network_pool.Transaction_pool.add txn_pool txn in
     let logger =
       Logger.extend
         (Coda_lib.top_level_logger t)
@@ -135,12 +140,10 @@ let get_nonce t (addr : Public_key.Compressed.t) =
   account.Account.Poly.nonce
 
 let send_user_command t (txn : User_command.t) =
-  Deferred.return
-  @@
   let public_key = Public_key.compress txn.sender in
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t public_key in
-  let open Or_error.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let%map () = schedule_user_command t txn account_opt in
   record_payment t txn (Option.value_exn account_opt)
 
@@ -169,7 +172,7 @@ let replace_proposers keys pks =
     List.filter_map pks ~f:(fun pk ->
         let open Option.Let_syntax in
         let%map kps =
-          Coda_lib.wallets keys |> Secrets.Wallets.find ~needle:pk
+          Coda_lib.wallets keys |> Secrets.Wallets.find_unlocked ~needle:pk
         in
         (kps, pk) )
   in
@@ -213,12 +216,22 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
       verifying_txn
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
-let schedule_user_commands t txns =
-  List.map txns ~f:(fun (txn : User_command.t) ->
-      let public_key = Public_key.compress txn.sender in
-      let open Participating_state.Let_syntax in
-      let%map account_opt = get_account t public_key in
-      match schedule_user_command t txn account_opt with
+let schedule_user_commands t (txns : User_command.t list) :
+    unit Deferred.t Participating_state.t =
+  let open Participating_state.Let_syntax in
+  (* The ordering is important here. We need to create *one* deferred inside the
+     Participating_state monad, if we create multiple and sequence them
+     afterward the run order is undefined. *)
+  let%map account_txn_pairs =
+    List.map txns ~f:(fun txn ->
+        get_account t (Public_key.compress txn.sender) >>| fun acc -> (acc, txn)
+    )
+    |> Participating_state.sequence
+  in
+  Deferred.List.iter ~how:`Sequential account_txn_pairs
+    ~f:(fun (account_opt, txn) ->
+      let open Deferred.Let_syntax in
+      match%map schedule_user_command t txn account_opt with
       | Ok () ->
           ()
       | Error err ->
@@ -231,8 +244,6 @@ let schedule_user_commands t txns =
             ~metadata:[("error", `String (Error.to_string_hum err))]
             "Failure in schedule_user_commands: $error. This is not yet \
              reported to the client, see #1143" )
-  |> Participating_state.sequence
-  |> Participating_state.map ~f:ignore
 
 let prove_receipt t ~proving_receipt ~resulting_receipt :
     Payment_proof.t Deferred.Or_error.t =
@@ -382,6 +393,22 @@ let get_status ~flag t =
           ; state_hash= None
           ; consensus_time_best_tip= None } )
   in
+  let next_proposal =
+    let str time =
+      let open Time in
+      let time = Int64.to_float time |> Span.of_ms |> of_span_since_epoch in
+      let diff = diff time (now ()) in
+      if Span.(zero < diff) then sprintf "in %s" (Time.Span.to_string_hum diff)
+      else "Computing next proposal state..."
+    in
+    Option.map (Coda_lib.next_proposal t) ~f:(function
+      | `Propose_now _ ->
+          "Now"
+      | `Propose (time, _, _) ->
+          str time
+      | `Check_again time ->
+          sprintf "None this epoch… checking at %s" (str time) )
+  in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; blockchain_length
@@ -400,6 +427,7 @@ let get_status ~flag t =
       Public_key.Compressed.Set.to_list propose_pubkeys
       |> List.map ~f:Public_key.Compressed.to_base58_check
   ; histograms
+  ; next_proposal
   ; consensus_time_now
   ; consensus_mechanism
   ; consensus_configuration }

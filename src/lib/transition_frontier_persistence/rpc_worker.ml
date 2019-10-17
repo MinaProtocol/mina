@@ -89,12 +89,22 @@ module Make (Inputs : Intf.Worker_inputs) = struct
 
   type t = {connection: Rpc_worker.Connection.t; process: Process.t}
 
-  let create ~directory_name =
+  let create ~directory_name ~logger =
+    let on_failure err =
+      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        "Transition frontier persistence process failed with error $err"
+        ~metadata:[("err", `String (Error.to_string_hum err))] ;
+      Error.raise err
+    in
     let%map connection, process =
       Rpc_worker.spawn_in_foreground_exn
-        ~connection_timeout:(Time.Span.of_min 1.) ~on_failure:Error.raise
+        ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
         ~shutdown_on:Disconnect ~connection_state_init_arg:() directory_name
     in
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Daemon started transition frontier persistence process with pid \
+       $persistence_pid"
+      ~metadata:[("persistence_pid", `Int (Process.pid process |> Pid.to_int))] ;
     File_system.dup_stdout process ;
     File_system.dup_stderr process ;
     {connection; process}

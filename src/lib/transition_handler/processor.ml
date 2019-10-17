@@ -13,29 +13,17 @@ open Coda_base
 open Coda_state
 open Cache_lib
 open O1trace
+open Coda_transition
 
 module Make (Inputs : Inputs.S) :
   Coda_intf.Transition_handler_processor_intf
-  with type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t
-   and type transition_frontier := Inputs.Transition_frontier.t
+  with type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
-              Inputs.Transition_frontier.Breadcrumb.t
-   and type verifier := Inputs.Verifier.t = struct
+              Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
   module Catchup_scheduler = Catchup_scheduler.Make (Inputs)
   module Transition_frontier_validation =
     External_transition.Transition_frontier_validation (Transition_frontier)
-
-  type external_transition_with_initial_validation =
-    ( [`Time_received] * unit Truth.true_t
-    , [`Proof] * unit Truth.true_t
-    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
-    , [`Frontier_dependencies] * unit Truth.false_t
-    , [`Staged_ledger_diff] * unit Truth.false_t )
-    External_transition.Validation.with_transition
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
   let catchup_timeout_duration =
@@ -173,7 +161,7 @@ module Make (Inputs : Inputs.S) :
 
   let run ~logger ~verifier ~trust_system ~time_controller ~frontier
       ~(primary_transition_reader :
-         ( external_transition_with_initial_validation Envelope.Incoming.t
+         ( External_transition.Initial_validated.t Envelope.Incoming.t
          , State_hash.t )
          Cached.t
          Reader.t)
@@ -181,7 +169,7 @@ module Make (Inputs : Inputs.S) :
       ~(clean_up_catchup_scheduler : unit Ivar.t)
       ~(catchup_job_writer :
          ( State_hash.t
-           * ( external_transition_with_initial_validation Envelope.Incoming.t
+           * ( External_transition.Initial_validated.t Envelope.Incoming.t
              , State_hash.t )
              Cached.t
              Rose_tree.t
@@ -233,7 +221,7 @@ module Make (Inputs : Inputs.S) :
                `Partially_valid_transition vt ) ]
          ~f:(fun msg ->
            let open Deferred.Let_syntax in
-           trace_recurring_task "transition_handler_processor" (fun () ->
+           trace_recurring "transition_handler_processor" (fun () ->
                match msg with
                | `Catchup_breadcrumbs
                    (breadcrumb_subtrees, subsequent_callback_action) -> (
@@ -262,6 +250,18 @@ module Make (Inputs : Inputs.S) :
                    | `Catchup_scheduler ->
                        () )
                | `Proposed_breadcrumb breadcrumb ->
+                   let transition_time =
+                     Transition_frontier.Breadcrumb.validated_transition
+                       (Cached.peek breadcrumb)
+                     |> External_transition.Validated.protocol_state
+                     |> Protocol_state.blockchain_state
+                     |> Blockchain_state.timestamp |> Block_time.to_time
+                   in
+                   Perf_histograms.add_span
+                     ~name:"accepted_transition_local_latency"
+                     (Core_kernel.Time.diff
+                        Block_time.(now time_controller |> to_time)
+                        transition_time) ;
                    let%map () =
                      match%map
                        add_and_finalize ~only_if_present:false breadcrumb

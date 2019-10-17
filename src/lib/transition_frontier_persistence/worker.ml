@@ -2,6 +2,7 @@ open Core
 open Coda_base
 open Coda_state
 open Async
+open Coda_transition
 
 module Make (Inputs : Intf.Worker_inputs) :
   Intf.Worker

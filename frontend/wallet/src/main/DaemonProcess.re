@@ -14,7 +14,8 @@ let (^/) = Filename.concat;
 let codaPath = "_build/coda-daemon-macos";
 let codaCommand = (~port, ~extraArgs) => {
   {
-    Command.executable: ProjectRoot.resource ^/ codaPath ^/ "coda.exe",
+    // Assume coda is installed globally
+    Command.executable: "coda",
     args:
       Js.Array.concat(
         extraArgs,
@@ -26,18 +27,7 @@ let codaCommand = (~port, ~extraArgs) => {
           ProjectRoot.resource ^/ codaPath ^/ "config",
         |],
       ),
-    env:
-      Js.Dict.fromArray(
-        Js.Array.concat(
-          [|
-            (
-              "CODA_KADEMLIA_PATH",
-              ProjectRoot.resource ^/ codaPath ^/ "kademlia",
-            ),
-          |],
-          Js.Dict.entries(ChildProcess.Process.env),
-        ),
-      ),
+    env: ChildProcess.Process.env,
   };
 };
 
@@ -56,10 +46,12 @@ let fakerCommand = (~port) => {
   env: ChildProcess.Process.env,
 };
 
+[@bs.module "os"] external tmpdir : unit => string = "";
+
 module Process = {
   let start = (command: Command.t) => {
     let {Command.executable, args} = command;
-    let logfileName = "daemon.log";
+    let logfileName = tmpdir() ++ "/daemon.log";
     print_endline(
       {j|Starting $executable with $args. Logging to `$logfileName`|j},
     );
@@ -143,7 +135,7 @@ module CodaProcess = {
 
   let kill: t => unit = t => ChildProcess.Process.kill(t, "SIGINT");
 
-  let port = 0xc0da;
+  let port = 0xc0d;
 
   let start: list(string) => t =
     args => {

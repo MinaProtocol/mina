@@ -23,7 +23,7 @@ let main n enable_payments () =
         ~keypairs ~n:3
     else after (Time.Span.of_min 3.)
   in
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   let open Command.Let_syntax in

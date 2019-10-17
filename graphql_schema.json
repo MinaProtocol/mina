@@ -561,16 +561,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "UInt32",
-          "description": "String or Integer representation of a uint32 number. If the input is String, the String must represent a the number in base 10",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "INPUT_OBJECT",
           "name": "SendPaymentInput",
           "description": null,
@@ -774,6 +764,33 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "ReloadWalletsPayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "success",
+              "description": "True when the reload was successful",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "INPUT_OBJECT",
           "name": "DeleteWalletInput",
           "description": null,
@@ -843,6 +860,216 @@
           "possibleTypes": null
         },
         {
+          "kind": "INPUT_OBJECT",
+          "name": "LockInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "publicKey",
+              "description": "Public key specifying which account to lock",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "publicKey",
+              "description": "Public key specifying which account to lock",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "LockPayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "publicKey",
+              "description": "Public key of the unlocked account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "UnlockInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "publicKey",
+              "description": "Public key specifying which account to unlock",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "password",
+              "description": "Password for the account to be unlocked",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "publicKey",
+              "description": "Public key specifying which account to unlock",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "password",
+              "description": "Password for the account to be unlocked",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "UnlockPayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "publicKey",
+              "description": "Public key of the unlocked account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "AddWalletInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "password",
+              "description": "Password used to encrypt the new account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "password",
+              "description": "Password used to encrypt the new account",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "AddWalletPayload",
           "description": null,
@@ -877,13 +1104,90 @@
             {
               "name": "addWallet",
               "description": "Add a wallet - this will create a new keypair and store it in the daemon",
-              "args": [],
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "AddWalletInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "AddWalletPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "unlockWallet",
+              "description": "Allow transactions to be sent from the unlocked account",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "UnlockInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "UnlockPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lockWallet",
+              "description": "Lock an unlocked account to prevent transaction being sent from it",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "LockInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "LockPayload",
                   "ofType": null
                 }
               },
@@ -915,6 +1219,22 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "DeleteWalletPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "reloadWallets",
+              "description": "Reload wallet information from disk",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ReloadWalletsPayload",
                   "ofType": null
                 }
               },
@@ -1012,7 +1332,7 @@
             },
             {
               "name": "setStaking",
-              "description": "Set keys you wish to stake with - silently fails if you pass keys not tracked in ownedWallets",
+              "description": "Set keys you wish to stake with - silently fails if you pass keys not unlocked and tracked in ownedWallets",
               "args": [
                 {
                   "name": "input",
@@ -1099,6 +1419,71 @@
                   "name": "SetSnarkWorkFeePayload",
                   "ofType": null
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Float",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "TrustStatusPayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "ip_addr",
+              "description": "IP address",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "trust",
+              "description": "Trust score",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "banned_status",
+              "description": "Banned status",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -1249,8 +1634,8 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnarkJobs",
-          "description": "Snark works purchased",
+          "name": "CompletedWork",
+          "description": "Completed snark works",
           "fields": [
             {
               "name": "prover",
@@ -1582,6 +1967,91 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "UInt32",
+          "description": "String representing a uint32 number in base 10",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "ConsensusState",
+          "description": null,
+          "fields": [
+            {
+              "name": "blockchainLength",
+              "description": "Length of the blockchain at this block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "slot",
+              "description": "Slot in which this block was created",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "epoch",
+              "description": "Epoch in which this block was created",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "totalCurrency",
+              "description": "Total currency in circulation at this block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "BlockchainState",
           "description": null,
@@ -1663,7 +2133,7 @@
             },
             {
               "name": "blockchainState",
-              "description": "State related to the succinct blockchain",
+              "description": "State which is agnostic of a particular consensus algorithm",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1671,6 +2141,22 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "BlockchainState",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "consensusState",
+              "description": "State specific to the Codaboros Proof of Stake consensus algorithm",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ConsensusState",
                   "ofType": null
                 }
               },
@@ -1767,7 +2253,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "SnarkJobs",
+                      "name": "CompletedWork",
                       "ofType": null
                     }
                   }
@@ -2082,6 +2568,18 @@
               "deprecationReason": null
             },
             {
+              "name": "inferredNonce",
+              "description": "Like the `nonce` field, except it includes the scheduled transactions (transactions not yet included in a block) (stringified uint32)",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "receiptChainHash",
               "description": "Top hash of the receipt chain merkle-list",
               "args": [],
@@ -2119,7 +2617,7 @@
             },
             {
               "name": "stakingActive",
-              "description": "True if you are actively staking with this account - this may not yet have been updated if the staking key was changed recently",
+              "description": "True if you are actively staking with this account on the current daemon - this may not yet have been updated if the staking key was changed recently",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -2145,6 +2643,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "locked",
+              "description": "True if locked, false if unlocked, null if the account isn't tracked by the queried daemon",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -2911,6 +3421,18 @@
               "deprecationReason": null
             },
             {
+              "name": "nextProposal",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "consensusTimeNow",
               "description": null,
               "args": [],
@@ -3210,19 +3732,15 @@
             },
             {
               "name": "pooledUserCommands",
-              "description": "Retrieve all the user commands sent by a public key",
+              "description": "Retrieve all the user commands submitted by the current daemon that are pending inclusion",
               "args": [
                 {
                   "name": "publicKey",
                   "description": "Public key of sender of pooled user commands",
                   "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
+                    "kind": "SCALAR",
+                    "name": "PublicKey",
+                    "ofType": null
                   },
                   "defaultValue": null
                 }
@@ -3273,6 +3791,81 @@
                   "kind": "ENUM",
                   "name": "TransactionStatus",
                   "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "trustStatus",
+              "description": "Trust status for an IPv4 or IPv6 address",
+              "args": [
+                {
+                  "name": "ipAddress",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "OBJECT",
+                "name": "TrustStatusPayload",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "trustStatusAll",
+              "description": "IP address and trust status for all peers",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "TrustStatusPayload",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snarkPool",
+              "description": "List of completed snark works that have the lowest fee so far",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "CompletedWork",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,

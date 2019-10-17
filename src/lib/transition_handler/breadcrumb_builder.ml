@@ -2,15 +2,13 @@ open Coda_base
 open Core
 open Async
 open Cache_lib
+open Coda_transition
 
 module Make (Inputs : Inputs.S) :
   Coda_intf.Breadcrumb_builder_intf
-  with type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
-   and type transition_frontier := Inputs.Transition_frontier.t
+  with type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
-              Inputs.Transition_frontier.Breadcrumb.t
-   and type verifier := Inputs.Verifier.t = struct
+              Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
 
   let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
@@ -36,7 +34,9 @@ module Make (Inputs : Inputs.S) :
                          Rose_tree.to_yojson
                            (fun enveloped_transitions ->
                              Cached.peek enveloped_transitions
-                             |> Envelope.Incoming.data |> fst |> With_hash.hash
+                             |> Envelope.Incoming.data
+                             |> External_transition.Initial_validated
+                                .state_hash
                              |> fun hash ->
                              `String
                                (Coda_base.State_hash.to_base58_check hash) )
@@ -98,10 +98,11 @@ module Make (Inputs : Inputs.S) :
                   in
                   let open Deferred.Let_syntax in
                   match%bind
-                    Transition_frontier.Breadcrumb.build ~logger ~verifier
-                      ~trust_system ~parent
-                      ~transition:mostly_validated_transition
-                      ~sender:(Some sender)
+                    O1trace.trace_recurring "Breadcrumb.build" (fun () ->
+                        Transition_frontier.Breadcrumb.build ~logger ~verifier
+                          ~trust_system ~parent
+                          ~transition:mostly_validated_transition
+                          ~sender:(Some sender) )
                   with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in

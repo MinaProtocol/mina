@@ -1,7 +1,12 @@
 module Styles = {
   open Css;
-
   let container =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      width(`percent(100.)),
+    ]);
+  let labelContainer =
     style([
       display(`flex),
       alignItems(`center),
@@ -13,8 +18,30 @@ module Styles = {
       border(`px(1), `solid, Theme.Colors.marineAlpha(0.3)),
       borderRadius(`rem(0.25)),
       flexGrow(1.),
+      hover([border(`px(1), `solid, Theme.Colors.hyperlink)]),
+      selector(
+        ":focus-within",
+        [border(`px(2), `solid, Theme.Colors.hyperlink)],
+      ),
+      focus([border(`px(2), `solid, Theme.Colors.hyperlink)]),
     ]);
-
+  let error =
+    style([
+      display(`flex),
+      alignItems(`center),
+      justifyContent(`flexStart),
+      height(`rem(2.5)),
+      width(`percent(100.)),
+      padding2(~v=`zero, ~h=`rem(0.75)),
+      background(white),
+      border(`px(2), `solid, Theme.Colors.roseBud),
+      borderRadius(`rem(0.25)),
+      flexGrow(1.),
+      selector(
+        ":focus-within",
+        [border(`px(2), `solid, Theme.Colors.hyperlink)],
+      ),
+    ]);
   let label =
     merge([
       Theme.Text.Header.h6,
@@ -23,6 +50,11 @@ module Styles = {
         color(Theme.Colors.slateAlpha(0.7)),
         minWidth(`rem(2.5)),
       ]),
+    ]);
+  let errorText =
+    merge([
+      Theme.Text.Body.error,
+      style([textAlign(`right), paddingTop(`px(6))]),
     ]);
 
   let placeholderColor = Theme.Colors.slateAlpha(0.5);
@@ -133,7 +165,7 @@ module Button = {
 module Currency = {
   [@react.component]
   let make = (~onChange, ~value, ~label, ~placeholder=?) =>
-    <label className=Styles.container>
+    <label className=Styles.labelContainer>
       <span className=Styles.label> {React.string(label ++ ":")} </span>
       <Spacer width=0.5 />
       <span className={Styles.square(value != "")}>
@@ -161,20 +193,35 @@ let make =
       ~value,
       ~label,
       ~mono=false,
+      ~type_="text",
       ~button=React.null,
       ~placeholder=?,
       ~disabled=false,
+      ~error=?,
     ) =>
-  <label className=Styles.container>
-    <span className=Styles.label> {React.string(label ++ ":")} </span>
-    <Spacer width=0.5 />
-    <input
-      className={mono ? Styles.inputMono : Styles.input}
-      type_="text"
-      onChange={e => onChange(ReactEvent.Form.target(e)##value)}
-      value
-      ?placeholder
-      disabled
-    />
-    button
-  </label>;
+  <div className=Styles.container>
+    <label
+      className={
+        switch (error) {
+        | Some(_) => Styles.error
+        | None => Styles.labelContainer
+        }
+      }>
+      <span className=Styles.label> {React.string(label ++ ":")} </span>
+      <Spacer width=0.5 />
+      <input
+        className={mono ? Styles.inputMono : Styles.input}
+        type_
+        onChange={e => onChange(ReactEvent.Form.target(e)##value)}
+        value
+        ?placeholder
+        disabled
+      />
+      button
+    </label>
+    {switch (error) {
+     | Some(error) =>
+       <div className=Styles.errorText> {React.string(error)} </div>
+     | None => React.null
+     }}
+  </div>;

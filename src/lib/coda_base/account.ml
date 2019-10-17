@@ -7,20 +7,16 @@ open Let_syntax
 open Currency
 open Snark_bits
 open Fold_lib
-open Module_version
 
 module Index = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = int [@@deriving bin_io, to_yojson, sexp, version]
-      end
+      type t = int [@@deriving to_yojson, sexp]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
@@ -42,7 +38,8 @@ module Index = struct
     let set v i b = if b then v lor (one lsl i) else v land lnot (one lsl i)
   end
 
-  include (Bits.Vector.Make (Vector) : Bits_intf.S with type t := t)
+  include (
+    Bits.Vector.Make (Vector) : Bits_intf.Convertable_bits with type t := t)
 
   let fold_bits = fold
 
@@ -54,24 +51,19 @@ end
 module Nonce = Account_nonce
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'state_hash) t =
-          { public_key: 'pk
-          ; balance: 'amount
-          ; nonce: 'nonce
-          ; receipt_chain_hash: 'receipt_chain_hash
-          ; delegate: 'pk
-          ; voting_for: 'state_hash }
-        [@@deriving sexp, bin_io, eq, compare, hash, yojson, version]
-      end
-
-      include T
+      type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'state_hash) t =
+        { public_key: 'pk
+        ; balance: 'amount
+        ; nonce: 'nonce
+        ; receipt_chain_hash: 'receipt_chain_hash
+        ; delegate: 'pk
+        ; voting_for: 'state_hash }
+      [@@deriving sexp, eq, compare, hash, yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'state_hash) t =
         ( 'pk
@@ -89,49 +81,43 @@ module Poly = struct
   [@@deriving sexp, eq, compare, hash, yojson]
 end
 
+module Key = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Public_key.Compressed.Stable.V1.t
+      [@@deriving sexp, eq, hash, compare, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
+type key = Key.Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
+
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type key = Public_key.Compressed.Stable.V1.t
-      [@@deriving sexp, bin_io, eq, hash, compare, yojson]
+    type t =
+      ( Public_key.Compressed.Stable.V1.t
+      , Balance.Stable.V1.t
+      , Nonce.Stable.V1.t
+      , Receipt.Chain_hash.Stable.V1.t
+      , State_hash.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving sexp, eq, hash, compare, yojson]
 
-      type t =
-        ( Public_key.Compressed.Stable.V1.t
-        , Balance.Stable.V1.t
-        , Nonce.Stable.V1.t
-        , Receipt.Chain_hash.Stable.V1.t
-        , State_hash.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, bin_io, eq, hash, compare, yojson, version]
-    end
-
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
 
     let public_key (t : t) : key = t.public_key
   end
-
-  (* module version registration *)
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "coda_base_account"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 (* bin_io, version omitted *)
 type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare]
 
 [%%define_locally
 Stable.Latest.(public_key)]
-
-type key = Stable.Latest.key [@@deriving sexp, eq, hash, compare, yojson]
 
 type var =
   ( Public_key.Compressed.var
@@ -158,7 +144,7 @@ let initialize public_key : t =
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate= public_key
-  ; voting_for= State_hash.of_hash Outside_pedersen_image.t }
+  ; voting_for= State_hash.dummy }
 
 let typ : (var, value) Typ.t =
   let spec =
@@ -230,7 +216,7 @@ let empty =
     ; nonce= Nonce.zero
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; delegate= Public_key.Compressed.empty
-    ; voting_for= State_hash.of_hash Outside_pedersen_image.t }
+    ; voting_for= State_hash.dummy }
 
 let digest t = Pedersen.State.digest (crypto_hash t)
 
@@ -241,7 +227,7 @@ let create public_key balance =
     ; nonce= Nonce.zero
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; delegate= public_key
-    ; voting_for= State_hash.of_hash Outside_pedersen_image.t }
+    ; voting_for= State_hash.dummy }
 
 let gen =
   let open Quickcheck.Let_syntax in

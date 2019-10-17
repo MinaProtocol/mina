@@ -7,7 +7,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Build trace-tool
                   command: cd src/app/trace-tool && cargo build --frozen
@@ -17,7 +19,9 @@ jobs:
             xcode: "10.2.0"
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run: cd frontend/wallet && yarn
             - run:
                   name: Lint wallet
@@ -55,14 +59,44 @@ jobs:
                   name: Build bot
                   command: cd frontend/bot && yarn run build-ci
 
-    lint:
+    build-archive:
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
+              environment: 
+                CODA_DOCKER: true
+                HASURA_PORT: 8080
+            - image: postgres:12
+              environment: 
+                POSTGRES_PASSWORD: codarules
+                POSTGRES_USER: admin
+                POSTGRES_DB: archiver
+            - image: hasura/graphql-engine:v1.0.0-beta.6
+              environment: 
+                HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
+                HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+                HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
         steps:
             - checkout
             - run:
-                  name: Update submodules
+                  name: Update Submodules
                   command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Build Archive Process
+                  command:  bash -c 'eval `opam config env` && make build_archive'
+            - run: 
+                  name: Configure Hasura
+                  command: ls && ./scripts/archive/make_hasura_configurations.sh     
+    lint:
+        docker:
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
+        steps:
+            - checkout
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
@@ -75,7 +109,9 @@ jobs:
             - run:
                   name: Check CODEOWNERS file format
                   command: ./scripts/lint_codeowners.sh
-
+            - run:
+                  name: Require ppx_coda preprocessing for linting
+                  command: ./scripts/require-ppx-coda.py
     update-branch-protection:
         docker:
             - image: python:3
@@ -101,6 +137,11 @@ jobs:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
             OPAMYES: 1
         steps:
+            - run:
+                name: Delete xcode simulators (Free 10GB - unused)
+                command: |
+                    sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
+                    df -h
             # Attach workspace from prior linux build
             - attach_workspace:
                 at: /tmp/workspace
@@ -109,43 +150,52 @@ jobs:
                 command: |
                     sudo mkdir -p /var/lib/coda
                     sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
+                    sudo rm /tmp/workspace/coda*.bz2
             - checkout
             - run:
-                name: Update git submodules
-                command: git submodule sync && git submodule update --init --recursive
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
-                    - homebrew-v5-{{ checksum "scripts/macos-setup.sh" }}
+                    - homebrew-v6-{{ checksum "scripts/macos-setup-brew.sh" }}
                     - homebrew-v5-
             - run:
-                name: Install macos dependancies - homebrew - make macos-setup-download
-                command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
+                name: Install macos dependencies - homebrew - make macos-setup-download
+                command: |
+                    ./scripts/skip_if_only_frontend.sh make macos-setup-download
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v5-{{ checksum "scripts/macos-setup.sh" }}
+                key: homebrew-v6-{{ checksum "scripts/macos-setup-brew.sh" }}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
 
+            - run:
+                name: Create opam cache signature file
+                command: |
+                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat src/opam.export >> opam_ci_cache.sig
             - restore_cache:
                 name: Restore cache - opam
                 keys:
+                    - opam-v6-{{ checksum "opam_ci_cache.sig" }}
                     - opam-v5-{{ checksum "src/opam.export" }}
                     - opam-v4-{{ checksum "src/opam.export" }}
                     - opam-v3-{{ checksum "src/opam.export" }}
             - run:
-                name: Ensure opam permisssions
+                name: Ensure/Fix opam permisssions
                 command: |
                     set +e
-                    sudo chown -R distiller /Users/distiller/.opam
-                    sudo chmod -R u+w /Users/distiller/.opam
+                    sudo mkdir -p /Users/distiller/.opam
+                    sudo chown -R distiller /Users/distiller/.opam | true
+                    sudo chmod -R u+w /Users/distiller/.opam | true
             - run:
-                name: Install macos dependancies - opam -- make macos-setup-compile
+                name: Install macos dependencies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
                 name: Save cache - opam
-                key: opam-v5-{{ checksum "src/opam.export" }}
+                key: opam-v6-{{ checksum "opam_ci_cache.sig" }}
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
@@ -163,10 +213,18 @@ jobs:
                     cd src/app/kademlia-haskell
                     nix-build release2.nix
             - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
+            - run:
                 name: Build ocaml
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-                command: bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                command: |
+                    bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h
             - run:
                 name: Collect PV Keys
@@ -174,11 +232,13 @@ jobs:
                     mkdir -p package/keys
                     cp /var/lib/coda/* package/keys/.
             - run:
-                name: Collect and rewrite kademlia
+                name: Collect and rewrite aux binaries (kademlia + logproc)
                 command: |
                     cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
                     chmod +w package/kademlia
                     ./scripts/librewrite-macos.sh package/kademlia
+                    cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
+                    chmod +wx package/coda-logproc
             - run:
                 name: Collect coda binary
                 command: |
@@ -202,9 +262,7 @@ jobs:
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
-        environment:
-            DUNE_PROFILE: testnet_postake_medium_curves
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
@@ -213,18 +271,27 @@ jobs:
                       mkdir -p /tmp/artifacts
                       touch /tmp/artifacts/coda_pvkeys_dummy
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
             - run:
                   name: Download candidate stable PV keys
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
                   no_output_timeout: 20m
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
                   no_output_timeout: 20m
             - run:
                   name: Store genesis public/private keypairs
@@ -232,47 +299,7 @@ jobs:
             - run:
                   name: Upload deb to repo
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - run:
-                  name: Copy artifacts to cloud
-                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
-            - persist_to_workspace:
-                root: /tmp/artifacts
-                paths: coda_pvkeys*
-            - store_artifacts:
-                  path: /tmp/artifacts
-    build-artifacts--testnet_postake_many_proposers_medium_curves:
-        resource_class: xlarge
-        docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
-        environment:
-            DUNE_PROFILE: testnet_postake_many_proposers_medium_curves
-        steps:
-            - checkout
-            - run:
-                  name: Artifacts
-                  command: |
-                      mkdir -p /tmp/artifacts
-                      touch /tmp/artifacts/coda_pvkeys_dummy
-            - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Download candidate stable PV keys
-                  command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
-            - run:
-                  name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   no_output_timeout: 20m
-            - run:
-                  name: Build deb package with PV keys and PV key tar
-                  command: ./scripts/skip_if_only_frontend.sh make deb
-                  no_output_timeout: 20m
-            - run:
-                  name: Store genesis public/private keypairs
-                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
-            - run:
-                  name: Upload deb to repo
-                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
@@ -282,78 +309,106 @@ jobs:
             - store_artifacts:
                   path: /tmp/artifacts
     test-unit--test_postake_snarkless_unittest:
-        resource_class: large
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+          # Uncomment if you want to try debugging why this install breaks
+          # some unit tests:
+          # 1. The command_line_tests
+          # 2. Kademlia tests
+          #
+             #I'm sorry for the mess, but somehow this actually works
+             #Derived from: https://github.com/NixOS/nix/issues/971
+            #- run:
+                #name: Install nix and cachix
+                #command: |
+                     #Make a nix user
+                    #sudo addgroup --system nixbld && sudo adduser --home /home/nix --disabled-password --gecos "" --shell /bin/bash nix && sudo adduser nix nixbld && sudo mkdir -m 0755 /nix && sudo chown nix /nix && sudo mkdir -p /etc/nix && sudo bash -c 'echo "sandbox = false" > /etc/nix/nix.conf'
+                     #Install nix and cachix with that user
+                    #sudo -H -u nix bash -c 'cd /home/nix && touch ~/.bash_profile && (curl https://nixos.org/nix/install | sh) && cd /home/nix && . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install'
+
+            #- run:
+                #name: Build libp2p_helper using cachix
+                #command: |
+                     #Make sure our nix user can write to libp2p_helper dir
+                    #chmod -R 777 src/app/libp2p_helper
+                     #Do the build
+                    #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest src/lib --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
     test-unit--dev:
-        resource_class: large
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+          # Uncomment if you want to try debugging why this install breaks
+          # some unit tests:
+          # 1. The command_line_tests
+          # 2. Kademlia tests
+          #
+             #I'm sorry for the mess, but somehow this actually works
+             #Derived from: https://github.com/NixOS/nix/issues/971
+            #- run:
+                #name: Install nix and cachix
+                #command: |
+                     #Make a nix user
+                    #sudo addgroup --system nixbld && sudo adduser --home /home/nix --disabled-password --gecos "" --shell /bin/bash nix && sudo adduser nix nixbld && sudo mkdir -m 0755 /nix && sudo chown nix /nix && sudo mkdir -p /etc/nix && sudo bash -c 'echo "sandbox = false" > /etc/nix/nix.conf'
+                     #Install nix and cachix with that user
+                    #sudo -H -u nix bash -c 'cd /home/nix && touch ~/.bash_profile && (curl https://nixos.org/nix/install | sh) && cd /home/nix && . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install'
+
+            #- run:
+                #name: Build libp2p_helper using cachix
+                #command: |
+                     #Make sure our nix user can write to libp2p_helper dir
+                    #chmod -R 777 src/app/libp2p_helper
+                     #Do the build
+                    #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
-    test-unit--test_postake_snarkless_medium_curves_unit_test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
-        steps:
-            - checkout
-            - run: ulimit -c unlimited
-            - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_medium_curves_unit_test -j8 && (dune runtest --profile=test_postake_snarkless_medium_curves_unit_test -j8 || (./scripts/link-coredumps.sh && false))'
-                  no_output_timeout: 1h
-            - store_artifacts:
-                path: core_dumps
     test-unit--dev_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev_medium_curves -j8 && (dune runtest --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev_medium_curves -j8 && (dune runtest src/lib --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 1h
             - store_artifacts:
                 path: core_dumps
     test--fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- fake_hash:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test"'
@@ -362,12 +417,12 @@ jobs:
     test--test_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:full-test"'
@@ -379,12 +434,12 @@ jobs:
     test--test_postake_bootstrap:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-bootstrap-test"'
@@ -396,12 +451,12 @@ jobs:
     test--test_postake_catchup:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
@@ -410,12 +465,12 @@ jobs:
     test--test_postake_delegation:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_delegation:coda-delegation-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation:coda-delegation-test"'
@@ -424,12 +479,12 @@ jobs:
     test--test_postake_five_even_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5"'
@@ -438,12 +493,12 @@ jobs:
     test--test_postake_five_even_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments"'
@@ -452,12 +507,12 @@ jobs:
     test--test_postake_holy_grail:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5"'
@@ -469,12 +524,12 @@ jobs:
     test--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_snarkless:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:full-test"'
@@ -486,12 +541,12 @@ jobs:
     test--test_postake_split:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2"'
@@ -500,12 +555,12 @@ jobs:
     test--test_postake_split_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-peers-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-peers-test"'
@@ -532,15 +587,29 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-archive-node-test"'
             - store_artifacts:
                   path: test_logs
-    test--test_postake_txns:
+    test--test_postake_three_proposers:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Running test -- test_postake_three_proposers:coda-txns-and-restart-non-proposers
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_three_proposers:coda-txns-and-restart-non-proposers"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_txns:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
+        steps:
+            - checkout
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_txns:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-shared-state-test"'
@@ -549,29 +618,15 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-batch-payment-test"'
             - store_artifacts:
                   path: test_logs
-    test--test_postake_delegation_medium_curves:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
-        steps:
-            - checkout
-            - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test -- test_postake_delegation_medium_curves:coda-delegation-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation_medium_curves:coda-delegation-test"'
-            - store_artifacts:
-                  path: test_logs
     test--test_postake_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_medium_curves:full-test"'
@@ -583,14 +638,14 @@ jobs:
             - store_artifacts:
                   path: test_logs
     test--test_postake_snarkless_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:full-test"'
@@ -600,69 +655,17 @@ jobs:
             - store_artifacts:
                   path: test_logs
     test--test_postake_split_medium_curves:
-        resource_class: large
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
+            - image: codaprotocol/coda:toolchain-0b4ea6c4f8e5ba17bf5965dca7c74759442bff17
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2"'
-            - store_artifacts:
-                  path: test_logs
-    test--test_postake_split_snarkless_medium_curves:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
-        steps:
-            - checkout
-            - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-peers-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-peers-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-transitive-peers-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-transitive-peers-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-block-production-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-block-production-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 0
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 0"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 1
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 1"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-restart-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-restart-node-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-change-snark-worker-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-change-snark-worker-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-archive-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-archive-node-test"'
-            - store_artifacts:
-                  path: test_logs
-    test--test_postake_txns_medium_curves:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-75383cce8a7fc7713c6e56993a8b0f6159b86578
-        steps:
-            - checkout
-            - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test -- test_postake_txns_medium_curves:coda-shared-state-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns_medium_curves:coda-shared-state-test"'
-            - run:
-                  name: Running test -- test_postake_txns_medium_curves:coda-batch-payment-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns_medium_curves:coda-batch-payment-test"'
             - store_artifacts:
                   path: test_logs
 
@@ -677,12 +680,12 @@ workflows:
                     only: develop
             - tracetool
             - build-wallet
+            - build-archive
             - build-macos:
                 # only run AFTER linux build
                 requires:
                     - build-artifacts--testnet_postake_medium_curves
             - build-artifacts--testnet_postake_medium_curves
-            - build-artifacts--testnet_postake_many_proposers_medium_curves
             - test-unit--test_postake_snarkless_unittest
             - test-unit--dev
             - test--fake_hash
@@ -696,7 +699,9 @@ workflows:
             - test--test_postake_snarkless
             - test--test_postake_split
             - test--test_postake_split_snarkless
+            - test--test_postake_three_proposers
             - test--test_postake_txns
+
     daily:
         triggers:
           - schedule:
@@ -707,11 +712,7 @@ workflows:
                     - develop
                     - /release\/.*/
         jobs:
-          - test-unit--test_postake_snarkless_medium_curves_unit_test
           - test-unit--dev_medium_curves
-          - test--test_postake_delegation_medium_curves
           - test--test_postake_medium_curves
           - test--test_postake_snarkless_medium_curves
           - test--test_postake_split_medium_curves
-          - test--test_postake_split_snarkless_medium_curves
-          - test--test_postake_txns_medium_curves

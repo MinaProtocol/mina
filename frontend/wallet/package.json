@@ -8,7 +8,7 @@
     "@glennsl/bs-json": "^3.0.0",
     "apollo-link-retry": "^2.2.13",
     "bs-css": "^8.0.2",
-    "bs-electron": "github:Schmavery/bs-electron#ae44a7a509cbed92c032be2302a4e9cf12c11797",
+    "bs-electron": "github:Schmavery/bs-electron#0cf39124417bc3157b7a675154f591bf6e4b79ba",
     "bs-platform": "5.0.3",
     "graphql_ppx": "^0.2.8",
     "node-fetch": "^2.5.0",
@@ -27,9 +27,8 @@
   },
   "scripts": {
     "fake": "graphql-faker --port 8080 -- schema.graphql",
-    "real": "./_build/coda-daemon-macos/coda.exe daemon -config-dir $(mktemp -d -t coda_config) -rest-port 8080 &> /dev/tty",
+    "real": "./_build/coda-daemon-macos/coda.exe daemon -rest-port 8080 &> /dev/tty",
     "fake-inspector": "graphql-faker --open -- schema.graphql",
-    "pull-macos-binary": "curl https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip > coda-daemon-macos.zip && rm -rf _build/coda-daemon-macos/ && unzip coda-daemon-macos.zip",
     "build": "yarn copy-schema && bsb -make-world",
     "build-ci": "yarn run query-fake && yarn run build",
     "clean": "bsb -clean-world",
@@ -41,16 +40,19 @@
     "test": "yarn run build && jest lib/js/",
     "dist": "yarn run build && yarn run pack && build",
     "dev-real": "yarn run copy-schema && concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'",
-    "dev": "GRAPHQL_BACKEND=faker yarn dev-real",
+    "dev": "yarn gen-sdl && GRAPHQL_BACKEND=faker yarn dev-real",
     "copy-schema": "cp ../../graphql_schema.json graphql_schema.json",
     "gen-sdl": "node generate-schema.js ../../graphql_schema.json > schema.graphql",
     "regen-sdl": "node generate-schema.js http://localhost:8080/graphql > schema.graphql"
   },
   "build": {
-    "appId": "FOO.org.codaprotocol.prowallet",
+    "appId": "org.codaprotocol.wallet",
     "asarUnpack": [
       "lib"
     ],
+    "directories": {
+      "buildResources": "public/build"
+    },
     "files": [
       "lib/**/*",
       "!node_modules/electron",
@@ -67,16 +69,17 @@
       "bundle/**/*",
       "public/**/*"
     ],
+    "productName": "Coda Wallet",
     "compression": "store",
     "dmg": {
       "contents": [
         {
-          "x": 110,
-          "y": 150
+          "x": 160,
+          "y": 220
         },
         {
-          "x": 240,
-          "y": 150,
+          "x": 370,
+          "y": 220,
           "type": "link",
           "path": "/Applications"
         }

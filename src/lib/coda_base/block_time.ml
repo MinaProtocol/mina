@@ -43,10 +43,19 @@ module Time = struct
 
     let create offset = offset
 
-    let basic =
+    let basic ~logger =
       lazy
-        ( Core_kernel.Time.Span.of_int_sec @@ Int.of_string
-        @@ Unix.getenv "CODA_TIME_OFFSET" )
+        (let offset =
+           match Core.Sys.getenv "CODA_TIME_OFFSET" with
+           | Some tm ->
+               Int.of_string tm
+           | None ->
+               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                 "Environment variable CODA_TIME_OFFSET not found, using \
+                  default of 0" ;
+               0
+         in
+         Core_kernel.Time.Span.of_int_sec offset)
 
     [%%else]
 
@@ -54,13 +63,13 @@ module Time = struct
 
     let create () = ()
 
-    let basic = ()
+    let basic ~logger:_ = ()
 
     [%%endif]
   end
 
   (* DO NOT add bin_io the deriving list *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   type t0 = t
 
@@ -130,15 +139,7 @@ module Time = struct
     let min = UInt64.min
   end
 
-  let ( < ) = UInt64.( < )
-
-  let ( > ) = UInt64.( > )
-
-  let ( = ) = UInt64.( = )
-
-  let ( <= ) = UInt64.( <= )
-
-  let ( >= ) = UInt64.( >= )
+  include Comparable.Make (Stable.Latest)
 
   let of_time t =
     UInt64.of_int64
@@ -184,11 +185,28 @@ module Time = struct
     let bits = Span.Unpacked.var_to_bits var in
     Number.of_bits (bits :> Boolean.var list)
 
-  let to_string time =
-    to_span_since_epoch time |> Span.to_ms |> Int64.to_string
+  let to_int64 = Fn.compose Span.to_ms to_span_since_epoch
+
+  let of_int64 = Fn.compose of_span_since_epoch Span.of_ms
+
+  let to_string = Fn.compose Int64.to_string to_int64
 
   let of_string_exn string =
     Int64.of_string string |> Span.of_ms |> of_span_since_epoch
+
+  let gen_incl time_beginning time_end =
+    let open Quickcheck.Let_syntax in
+    let time_beginning_int64 = to_int64 time_beginning in
+    let time_end_int64 = to_int64 time_end in
+    let%map int64_time_span =
+      Int64.(gen_incl time_beginning_int64 time_end_int64)
+    in
+    of_span_since_epoch @@ Span.of_ms int64_time_span
+
+  let gen =
+    let open Quickcheck.Let_syntax in
+    let%map int64_time_span = Int64.(gen_incl zero max_value) in
+    of_span_since_epoch @@ Span.of_ms int64_time_span
 end
 
 include Time

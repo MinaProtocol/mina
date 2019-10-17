@@ -14,9 +14,9 @@ let proof : t = '\x70'
 
 let signature : t = '\x9A'
 
-let non_zero_curve_point : t = '\xCD'
+let non_zero_curve_point : t = '\xCE'
 
-let non_zero_curve_point_compressed : t = '\xCA'
+let non_zero_curve_point_compressed : t = '\xCB'
 
 let random_oracle_base : t = '\x03'
 
@@ -31,6 +31,8 @@ let user_command_memo : t = '\xA2'
 let lite_precomputed : t = '\xBC'
 
 let receipt_chain_hash : t = '\x9D'
+
+let transaction_hash : t = '\x9E'
 
 let secret_box_byteswr : t = '\x02'
 

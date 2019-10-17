@@ -18,10 +18,10 @@ let%test_module "Root_history and Transition_frontier" =
 
     let create_root_frontier = create_root_frontier accounts_with_secret_keys
 
-    let create_breadcrumbs ~logger ~trust_system ~size root =
+    let create_breadcrumbs ~logger ~pids ~trust_system ~size root =
       Deferred.all
       @@ Quickcheck.random_value
-           (gen_linear_breadcrumbs ~logger ~trust_system ~size
+           (gen_linear_breadcrumbs ~logger ~pids ~trust_system ~size
               ~accounts_with_secret_keys root)
 
     let breadcrumb_trail_equals =
@@ -29,14 +29,21 @@ let%test_module "Root_history and Transition_frontier" =
 
     let logger = Logger.null ()
 
+    let hb_logger = Logger.create ()
+
+    let pids = Child_processes.Termination.create_pid_table ()
+
     let trust_system = Trust_system.null ()
 
     let common_ancestor_test ancestor_length branch1_length branch2_length =
+      heartbeat_flag := true ;
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          print_heartbeat hb_logger |> don't_wait_for ;
+          let%bind frontier = create_root_frontier ~logger ~pids in
           let root = Transition_frontier.root frontier in
           let%bind ancestors =
-            create_breadcrumbs ~logger ~trust_system ~size:ancestor_length root
+            create_breadcrumbs ~logger ~pids ~trust_system
+              ~size:ancestor_length root
           in
           let youngest_ancestor = List.last_exn ancestors in
           let%bind () =
@@ -44,11 +51,11 @@ let%test_module "Root_history and Transition_frontier" =
                 Transition_frontier.add_breadcrumb_exn frontier ancestor )
           in
           let%bind branch1 =
-            create_breadcrumbs ~logger ~trust_system ~size:branch1_length
+            create_breadcrumbs ~logger ~pids ~trust_system ~size:branch1_length
               youngest_ancestor
           in
           let%bind branch2 =
-            create_breadcrumbs ~logger ~trust_system ~size:branch2_length
+            create_breadcrumbs ~logger ~pids ~trust_system ~size:branch2_length
               youngest_ancestor
           in
           let bc1, bc2 = (List.last_exn branch1, List.last_exn branch2) in
@@ -57,6 +64,7 @@ let%test_module "Root_history and Transition_frontier" =
               ~f:(fun breadcrumb ->
                 Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
           in
+          heartbeat_flag := false ;
           State_hash.equal
             (Transition_frontier.common_ancestor frontier bc1 bc2)
             (Transition_frontier.Breadcrumb.state_hash youngest_ancestor) )
@@ -77,11 +85,14 @@ let%test_module "Root_history and Transition_frontier" =
 
     let%test "If a transition does not exists in the transition_frontier or \
               in the root_history, then we should not get an answer" =
+      heartbeat_flag := true ;
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          print_heartbeat hb_logger |> don't_wait_for ;
+          let%bind frontier = create_root_frontier ~logger ~pids in
           let root = Transition_frontier.root frontier in
           let%bind breadcrumbs =
-            create_breadcrumbs ~logger ~trust_system ~size:max_length root
+            create_breadcrumbs ~logger ~pids ~trust_system ~size:max_length
+              root
           in
           let last_breadcrumb, breadcrumbs_to_add =
             let rev_breadcrumbs = List.rev breadcrumbs in
@@ -92,17 +103,24 @@ let%test_module "Root_history and Transition_frontier" =
             Deferred.List.iter breadcrumbs_to_add ~f:(fun breadcrumb ->
                 Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
           in
-          Option.is_none
-            ( breadcrumbs_path frontier
-            @@ Transition_frontier.Breadcrumb.state_hash last_breadcrumb ) )
+          let res =
+            Option.is_none
+              ( breadcrumbs_path frontier
+              @@ Transition_frontier.Breadcrumb.state_hash last_breadcrumb )
+          in
+          heartbeat_flag := false ;
+          res )
 
     let%test "Query transition only from transition_frontier if the \
               root_history is empty" =
+      heartbeat_flag := true ;
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          print_heartbeat hb_logger |> don't_wait_for ;
+          let%bind frontier = create_root_frontier ~logger ~pids in
           let root = Transition_frontier.root frontier in
           let%bind breadcrumbs =
-            create_breadcrumbs ~logger ~trust_system ~size:max_length root
+            create_breadcrumbs ~logger ~pids ~trust_system ~size:max_length
+              root
           in
           let%map () =
             Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
@@ -122,16 +140,19 @@ let%test_module "Root_history and Transition_frontier" =
             Transition_frontier.root frontier
             :: List.take breadcrumbs (random_index + 1)
           in
+          heartbeat_flag := false ;
           breadcrumb_trail_equals expected_breadcrumbs queried_breadcrumbs )
 
     let%test "Query transitions only from root_history" =
+      heartbeat_flag := true ;
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          print_heartbeat hb_logger |> don't_wait_for ;
+          let%bind frontier = create_root_frontier ~logger ~pids in
           let root = Transition_frontier.root frontier in
           let query_index = 1 in
           let size = max_length + query_index + 2 in
           let%bind breadcrumbs =
-            create_breadcrumbs ~logger ~trust_system ~size root
+            create_breadcrumbs ~logger ~pids ~trust_system ~size root
           in
           let%map () =
             Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
@@ -147,16 +168,19 @@ let%test_module "Root_history and Transition_frontier" =
           assert (
             Transition_frontier.For_tests.root_history_mem frontier query_hash
           ) ;
+          heartbeat_flag := false ;
           List.equal Transition_frontier.Breadcrumb.equal expected_breadcrumbs
             ( breadcrumbs_path frontier query_hash
             |> Option.value_exn |> Non_empty_list.to_list ) )
 
     let%test "moving the root removes the old root's non-heir children as \
               garbage" =
+      heartbeat_flag := true ;
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          print_heartbeat hb_logger |> don't_wait_for ;
+          let%bind frontier = create_root_frontier ~logger ~pids in
           let%bind () =
-            add_linear_breadcrumbs ~logger ~trust_system ~size:max_length
+            add_linear_breadcrumbs ~logger ~pids ~trust_system ~size:max_length
               ~accounts_with_secret_keys ~frontier
               ~parent:(Transition_frontier.root frontier)
           in
@@ -165,48 +189,60 @@ let%test_module "Root_history and Transition_frontier" =
             add_child ~logger ~trust_system ~accounts_with_secret_keys
               ~frontier
           in
-          let%bind soon_garbage = add_child ~parent:root in
+          let%bind soon_garbage = add_child ~parent:root ~pids in
           let%map _ =
-            add_child ~parent:(Transition_frontier.best_tip frontier)
+            add_child ~parent:(Transition_frontier.best_tip frontier) ~pids
           in
-          Transition_frontier.(
-            find frontier @@ Breadcrumb.state_hash soon_garbage)
-          |> Option.is_none )
+          let res =
+            Transition_frontier.(
+              find frontier @@ Breadcrumb.state_hash soon_garbage)
+            |> Option.is_none
+          in
+          heartbeat_flag := false ;
+          res )
 
     let%test "Transitions get popped off from root history" =
+      heartbeat_flag := true ;
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          print_heartbeat hb_logger |> don't_wait_for ;
+          let%bind frontier = create_root_frontier ~logger ~pids in
           let root = Transition_frontier.root frontier in
           let root_hash = Transition_frontier.Breadcrumb.state_hash root in
           let size = (3 * max_length) + 1 in
           let%map () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~trust_system ~size
+                (gen_linear_breadcrumbs ~logger ~pids ~trust_system ~size
                    ~accounts_with_secret_keys)
           in
           assert (
             not
             @@ Transition_frontier.For_tests.root_history_mem frontier
                  root_hash ) ;
-          Transition_frontier.find frontier root_hash |> Option.is_empty )
+          let res =
+            Transition_frontier.find frontier root_hash |> Option.is_empty
+          in
+          heartbeat_flag := false ;
+          res )
 
     let%test "Get transitions from both transition frontier and root history" =
+      heartbeat_flag := true ;
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          print_heartbeat hb_logger |> don't_wait_for ;
+          let%bind frontier = create_root_frontier ~logger ~pids in
           let root = Transition_frontier.root frontier in
           let num_root_history_breadcrumbs =
             Quickcheck.random_value (Int.gen_incl 1 (2 * max_length))
           in
           let%bind root_history_breadcrumbs =
-            create_breadcrumbs ~logger ~trust_system
+            create_breadcrumbs ~logger ~pids ~trust_system
               ~size:num_root_history_breadcrumbs root
           in
           let most_recent_breadcrumb_in_root_history_breadcrumb =
             List.last_exn root_history_breadcrumbs
           in
           let%bind transition_frontier_breadcrumbs =
-            create_breadcrumbs ~logger ~trust_system ~size:max_length
+            create_breadcrumbs ~logger ~pids ~trust_system ~size:max_length
               most_recent_breadcrumb_in_root_history_breadcrumb
           in
           let random_breadcrumb_index =
@@ -232,6 +268,7 @@ let%test_module "Root_history and Transition_frontier" =
             breadcrumbs_path frontier random_breadcrumb_hash
             |> Option.value_exn |> Non_empty_list.to_list
           in
+          heartbeat_flag := false ;
           List.equal Transition_frontier.Breadcrumb.equal
             expected_breadcrumb_trail result )
   end )

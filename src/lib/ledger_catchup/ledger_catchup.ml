@@ -3,6 +3,7 @@ open Async
 open Cache_lib
 open Pipe_lib
 open Coda_base
+open Coda_transition
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
@@ -10,11 +11,11 @@ open Coda_base
     [Catchup_scheduler]. With that state_hash, it will ask its peers for
     a merkle path/list from their oldest transition to the state_hash it is
     asking for. Upon receiving the merkle path/list, it will do the following:
-    
+
     1. verify the merkle path/list is correct by calling
     [Transition_chain_verifier.verify]. This function would returns a list
     of state hashes if the verification is successful.
-    
+
     2. using the list of state hashes to poke a transition frontier
     in order to find the hashes of missing transitions. If none of the hashes
     are found, then it means some more transitions are missing.
@@ -44,15 +45,12 @@ open Coda_base
 
 module Make (Inputs : Inputs.S) :
   Coda_intf.Catchup_intf
-  with type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
-   and type unprocessed_transition_cache :=
+  with type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
-   and type network := Inputs.Network.t
-   and type verifier := Inputs.Verifier.t = struct
+   and type network := Inputs.Network.t = struct
   open Inputs
 
   let verify_transition ~logger ~trust_system ~verifier ~frontier
@@ -213,6 +211,11 @@ module Make (Inputs : Inputs.S) :
             let%bind transitions =
               Network.get_transition_chain network peer hashes
             in
+            Coda_metrics.(
+              Gauge.set
+                Transition_frontier_controller
+                .transitions_downloaded_from_catchup
+                (Float.of_int (List.length transitions))) ;
             if not @@ verify_against_hashes transitions hashes then (
               let error_msg =
                 sprintf
@@ -308,7 +311,8 @@ module Make (Inputs : Inputs.S) :
     let maximum_download_size = 100 in
     Strict_pipe.Reader.iter_without_pushback catchup_job_reader
       ~f:(fun (target_hash, subtrees) ->
-        (let%bind () = Transition_frontier.incr_num_catchup_jobs frontier in
+        (let start_time = Core.Time.now () in
+         let%bind () = Transition_frontier.incr_num_catchup_jobs frontier in
          match%bind
            let open Deferred.Or_error.Let_syntax in
            let%bind preferred_peer, hashes_of_missing_transitions =
@@ -356,12 +360,18 @@ module Make (Inputs : Inputs.S) :
                  "catchup breadcrumbs pipe was closed; attempt to write to \
                   closed pipe" ;
                garbage_collect_subtrees ~logger ~subtrees:trees_of_breadcrumbs ;
+               Coda_metrics.(
+                 Gauge.set Transition_frontier_controller.catchup_time_ms
+                   Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                Transition_frontier.decr_num_catchup_jobs frontier )
              else
                let ivar = Ivar.create () in
                Strict_pipe.Writer.write catchup_breadcrumbs_writer
                  (trees_of_breadcrumbs, `Ledger_catchup ivar) ;
                let%bind () = Ivar.read ivar in
+               Coda_metrics.(
+                 Gauge.set Transition_frontier_controller.catchup_time_ms
+                   Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                Transition_frontier.decr_num_catchup_jobs frontier
          | Error e ->
              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
@@ -370,6 +380,9 @@ module Make (Inputs : Inputs.S) :
                 peers or transition frontier progressed faster than catchup \
                 data received. See error for details: $error" ;
              garbage_collect_subtrees ~logger ~subtrees ;
+             Coda_metrics.(
+               Gauge.set Transition_frontier_controller.catchup_time_ms
+                 Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
              Transition_frontier.decr_num_catchup_jobs frontier)
         |> don't_wait_for )
     |> don't_wait_for

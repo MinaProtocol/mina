@@ -131,7 +131,7 @@ module Pairing_info = struct
   let final_exponent_last_chunk_w1 = N.of_string "1"
 end
 
-module Pairing = Pairing.Make (N) (Fq) (Fq3) (Fq6) (G1) (G2) (Pairing_info)
+module Pairing = Pairing.Make (Fq) (Fq3) (Fq6) (G1) (G2) (Pairing_info)
 
 module Groth_maller = Groth_maller.Make (struct
   module N = N
@@ -145,7 +145,7 @@ end)
 
 module Make_bowe_gabizon (M : sig
   val hash :
-       ?message:bool array
+       ?message:Fq.t array
     -> a:G1.t
     -> b:G2.t
     -> c:G1.t

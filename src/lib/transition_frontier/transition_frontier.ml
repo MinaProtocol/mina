@@ -8,24 +8,8 @@ open Pipe_lib
 
 module type Inputs_intf = Inputs.Inputs_intf
 
-module Make (Inputs : Inputs_intf) :
-  Coda_intf.Transition_frontier_intf
-  with type mostly_validated_external_transition :=
-              ( [`Time_received] * unit Truth.true_t
-              , [`Proof] * unit Truth.true_t
-              , [`Delta_transition_chain]
-                * State_hash.t Non_empty_list.t Truth.true_t
-              , [`Frontier_dependencies] * unit Truth.true_t
-              , [`Staged_ledger_diff] * unit Truth.false_t )
-              Inputs.External_transition.Validation.with_transition
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t
-   and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
-   and type staged_ledger := Inputs.Staged_ledger.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type verifier := Inputs.Verifier.t = struct
-  open Inputs
-
+module Make (Inputs : Inputs_intf) : Coda_intf.Transition_frontier_intf =
+struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
@@ -35,7 +19,7 @@ module Make (Inputs : Inputs_intf) :
   module Breadcrumb = struct
     type t =
       { validated_transition: External_transition.Validated.t
-      ; mutable staged_ledger: Staged_ledger.t sexp_opaque
+      ; staged_ledger: Staged_ledger.t sexp_opaque
       ; just_emitted_a_proof: bool }
     [@@deriving sexp, fields]
 
@@ -53,15 +37,18 @@ module Make (Inputs : Inputs_intf) :
     let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
     module Staged_ledger_validation =
-      External_transition.Staged_ledger_validation (Staged_ledger)
+      External_transition.Staged_ledger_validation
 
     let build ~logger ~verifier ~trust_system ~parent
         ~transition:transition_with_validation ~sender =
-      O1trace.measure "Breadcrumb.build" (fun () ->
+      O1trace.trace_recurring "Breadcrumb.build" (fun () ->
           let open Deferred.Let_syntax in
           match%bind
             Staged_ledger_validation.validate_staged_ledger_diff ~logger
               ~verifier ~parent_staged_ledger:parent.staged_ledger
+              ~parent_protocol_state:
+                (External_transition.Validated.protocol_state
+                   parent.validated_transition)
               transition_with_validation
           with
           | Ok
@@ -81,7 +68,9 @@ module Make (Inputs : Inputs_intf) :
                     | `Incorrect_target_staged_ledger_hash ->
                         "staged ledger hash"
                     | `Incorrect_target_snarked_ledger_hash ->
-                        "snarked ledger hash" ))
+                        "snarked ledger hash"
+                    | `Incorrect_staged_ledger_diff_state_body_hash ->
+                        "state body hash" ))
               in
               let message =
                 "invalid staged ledger diff: incorrect " ^ reasons
@@ -171,7 +160,8 @@ module Make (Inputs : Inputs_intf) :
     let hash = Fn.compose State_hash.hash state_hash
 
     let name t =
-      Visualization.display_short_sexp (module State_hash) @@ state_hash t
+      Visualization.display_prefix_of_string @@ State_hash.to_base58_check
+      @@ state_hash t
 
     type display =
       { state_hash: string
@@ -184,7 +174,8 @@ module Make (Inputs : Inputs_intf) :
       let blockchain_state = Blockchain_state.display (blockchain_state t) in
       let consensus_state = consensus_state t in
       let parent =
-        Visualization.display_short_sexp (module State_hash) @@ parent_hash t
+        Visualization.display_prefix_of_string @@ State_hash.to_base58_check
+        @@ parent_hash t
       in
       { state_hash= name t
       ; blockchain_state
@@ -198,7 +189,7 @@ module Make (Inputs : Inputs_intf) :
           Set.union acc_set (User_command.Set.of_list user_commands) )
   end
 
-  let max_length = max_length
+  let max_length = Inputs.max_length
 
   module Diff = Diff.Make (struct
     include Inputs
@@ -558,7 +549,7 @@ module Make (Inputs : Inputs_intf) :
    *  modifies the heir's staged-ledger and sets the heir as the new root.
    *  Modifications are in-place
   *)
-  let move_root t (soon_to_be_root_node : Node.t) : Node.t =
+  let move_root t (soon_to_be_root_node : Node.t) : Node.t Deferred.t =
     let root_node = Hashtbl.find_exn t.table t.root in
     let root_breadcrumb = root_node.breadcrumb in
     let root = root_breadcrumb |> Breadcrumb.staged_ledger in
@@ -570,7 +561,10 @@ module Make (Inputs : Inputs_intf) :
     let soon_to_be_root_merkle_root =
       Ledger.merkle_root soon_to_be_root_ledger
     in
-    Ledger.commit soon_to_be_root_ledger ;
+    let%bind () = Async.Scheduler.yield () in
+    O1trace.measure "committing new root mask" (fun () ->
+        Ledger.commit soon_to_be_root_ledger ) ;
+    let%map () = Async.Scheduler.yield () in
     let root_ledger_merkle_root_after_commit =
       Ledger.merkle_root root_ledger
     in
@@ -592,19 +586,11 @@ module Make (Inputs : Inputs_intf) :
     Hashtbl.remove t.table t.root ;
     Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
     t.root <- new_root_hash ;
-    let num_finalized_staged_txns =
-      Breadcrumb.user_commands new_root |> List.length |> Float.of_int
-    in
     (* TODO: these metrics are too expensive to compute in this way, but it should be ok for beta *)
+    (*
     let root_snarked_ledger_accounts =
       Ledger.Db.to_list t.root_snarked_ledger
     in
-    Coda_metrics.(
-      Gauge.set Transition_frontier.recently_finalized_staged_txns
-        num_finalized_staged_txns) ;
-    Coda_metrics.(
-      Counter.inc Transition_frontier.finalized_staged_txns
-        num_finalized_staged_txns) ;
     Coda_metrics.(
       Gauge.set Transition_frontier.root_snarked_ledger_accounts
         (Float.of_int @@ List.length root_snarked_ledger_accounts)) ;
@@ -614,7 +600,31 @@ module Make (Inputs : Inputs_intf) :
         @@ List.fold_left root_snarked_ledger_accounts ~init:0
              ~f:(fun sum account ->
                sum + Currency.Balance.to_int account.balance ) )) ;
+    *)
+    let num_finalized_staged_txns =
+      Breadcrumb.user_commands new_root |> List.length |> Float.of_int
+    in
+    Coda_metrics.(
+      Gauge.set Transition_frontier.recently_finalized_staged_txns
+        num_finalized_staged_txns) ;
+    Coda_metrics.(
+      Counter.inc Transition_frontier.finalized_staged_txns
+        num_finalized_staged_txns) ;
+    Coda_metrics.(
+      Transition_frontier.TPS_10min.update num_finalized_staged_txns) ;
     Coda_metrics.(Counter.inc_one Transition_frontier.root_transitions) ;
+    let consensus_state = Breadcrumb.consensus_state new_root in
+    let blockchain_length =
+      consensus_state |> Consensus.Data.Consensus_state.blockchain_length
+      |> Coda_numbers.Length.to_int |> Float.of_int
+    in
+    let global_slot =
+      consensus_state |> Consensus.Data.Consensus_state.global_slot
+      |> Float.of_int
+    in
+    Coda_metrics.(
+      Gauge.set Transition_frontier.slot_fill_rate
+        (blockchain_length /. global_slot)) ;
     new_root_node
 
   let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
@@ -749,7 +759,7 @@ module Make (Inputs : Inputs_intf) :
               ) ] ;
         (* 4 *)
         (* note: new_root_node is the same as root_node if the root didn't change *)
-        let garbage_breadcrumbs, new_root_node =
+        let%bind garbage_breadcrumbs, new_root_node =
           if distance_to_root > max_length then (
             Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
               "Moving the root of the transition frontier. The new node is \
@@ -813,20 +823,22 @@ module Make (Inputs : Inputs_intf) :
               Gauge.dec Transition_frontier.active_breadcrumbs
                 (Float.of_int @@ (1 + List.length garbage_hashes))) ;
             (* 4.IV *)
-            let new_root_node = move_root t heir_node in
+            let%bind new_root_node = move_root t heir_node in
             (* 4.V *)
             let new_root_staged_ledger =
               Breadcrumb.staged_ledger new_root_node.breadcrumb
             in
             (* 4.VI *)
-            Consensus.Hooks.frontier_root_transition
-              (Breadcrumb.consensus_state root_node.breadcrumb)
-              (Breadcrumb.consensus_state new_root_node.breadcrumb)
-              ~local_state:t.consensus_local_state
-              ~snarked_ledger:
-                (Coda_base.Ledger.Any_ledger.cast
-                   (module Coda_base.Ledger.Db)
-                   t.root_snarked_ledger) ;
+            O1trace.measure "calling consensus hook frontier_root_transition"
+              (fun () ->
+                Consensus.Hooks.frontier_root_transition
+                  (Breadcrumb.consensus_state root_node.breadcrumb)
+                  (Breadcrumb.consensus_state new_root_node.breadcrumb)
+                  ~local_state:t.consensus_local_state
+                  ~snarked_ledger:
+                    (Coda_base.Ledger.Any_ledger.cast
+                       (module Coda_base.Ledger.Db)
+                       t.root_snarked_ledger) ) ;
             Debug_assert.debug_assert (fun () ->
                 (* After the lock transition, if the local_state was previously synced, it should continue to be synced *)
                 match
@@ -861,43 +873,55 @@ module Make (Inputs : Inputs_intf) :
                 | None ->
                     () ) ;
             (* 4.VII *)
-            ( match
+            let%map () =
+              match
                 ( Staged_ledger.proof_txns new_root_staged_ledger
                 , heir_node.breadcrumb.just_emitted_a_proof )
               with
-            | Some txns, true ->
-                let proof_data =
-                  Staged_ledger.current_ledger_proof new_root_staged_ledger
-                  |> Option.value_exn
-                in
-                [%test_result: Frozen_ledger_hash.t]
-                  ~message:
-                    "Root snarked ledger hash should be the same as the \
-                     source hash in the proof that was just emitted"
-                  ~expect:(Ledger_proof.statement proof_data).source
-                  ( Ledger.Db.merkle_root t.root_snarked_ledger
-                  |> Frozen_ledger_hash.of_ledger_hash ) ;
-                (* Apply all the transactions associated with the new ledger
-                   proof to the database-backed SNARKed ledger. We create a
-                   mask and apply them to that, then commit it to the DB. This
-                   saves a lot of IO since committing is batched. Would be even
-                   faster if we implemented #2760. *)
-                let db_casted =
-                  Ledger.Any_ledger.cast
-                    (module Ledger.Db)
-                    t.root_snarked_ledger
-                in
-                let db_mask =
-                  Ledger.Maskable.register_mask db_casted
-                    (Ledger.Mask.create ())
-                in
-                Non_empty_list.iter txns ~f:(fun txn ->
-                    Ledger.apply_transaction db_mask txn
-                    |> Or_error.ok_exn |> ignore ) ;
-                Ledger.commit db_mask ;
-                ignore @@ Ledger.Maskable.unregister_mask_exn db_casted db_mask
-            | _, false | None, _ ->
-                () ) ;
+              | Some txns, true ->
+                  let proof_data =
+                    Staged_ledger.current_ledger_proof new_root_staged_ledger
+                    |> Option.value_exn
+                  in
+                  [%test_result: Frozen_ledger_hash.t]
+                    ~message:
+                      "Root snarked ledger hash should be the same as the \
+                       source hash in the proof that was just emitted"
+                    ~expect:(Ledger_proof.statement proof_data).source
+                    ( Ledger.Db.merkle_root t.root_snarked_ledger
+                    |> Frozen_ledger_hash.of_ledger_hash ) ;
+                  (* Apply all the transactions associated with the new ledger
+                     proof to the database-backed SNARKed ledger. We create a
+                     mask and apply them to that, then commit it to the DB. This
+                     saves a lot of IO since committing is batched. Would be even
+                     faster if we implemented #2760. *)
+                  let db_casted =
+                    Ledger.Any_ledger.cast
+                      (module Ledger.Db)
+                      t.root_snarked_ledger
+                  in
+                  let db_mask =
+                    Ledger.Maskable.register_mask db_casted
+                      (Ledger.Mask.create ())
+                  in
+                  let%bind () = Async.Scheduler.yield () in
+                  let%bind () =
+                    Non_empty_list.iter_deferred txns ~f:(fun txn ->
+                        O1trace.measure "apply transaction to db mask"
+                          (fun () ->
+                            ignore
+                            @@ Or_error.ok_exn
+                                 (Ledger.apply_transaction db_mask txn) ) ;
+                        Deferred.unit )
+                  in
+                  O1trace.measure "committing db mask" (fun () ->
+                      Ledger.commit db_mask ) ;
+                  let%map () = Async.Scheduler.yield () in
+                  ignore
+                  @@ Ledger.Maskable.unregister_mask_exn db_casted db_mask
+              | _, false | None, _ ->
+                  return ()
+            in
             [%test_result: Frozen_ledger_hash.t]
               ~message:
                 "Root snarked ledger hash diverged from blockchain state \
@@ -913,7 +937,7 @@ module Make (Inputs : Inputs_intf) :
             Extensions.Root_history.enqueue t.extensions.root_history
               root_state_hash root_breadcrumb ;
             (garbage_breadcrumbs, new_root_node) )
-          else ([], root_node)
+          else return ([], root_node)
         in
         (* 5 *)
         Extensions.handle_diff t.extensions t.extension_writers

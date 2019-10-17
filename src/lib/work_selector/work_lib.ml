@@ -4,12 +4,6 @@ open Currency
 module Make (Inputs : Intf.Inputs_intf) = struct
   module Work_spec = Snark_work_lib.Work.Single.Spec
 
-  let statement_pair = function
-    | j, None ->
-        (Work_spec.statement j, None)
-    | j1, Some j2 ->
-        (Work_spec.statement j1, Some (Work_spec.statement j2))
-
   module Job_status = struct
     type t = Assigned of Time.t
 
@@ -22,8 +16,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   module State = struct
     module Seen_key = struct
       module T = struct
-        type t =
-          Transaction_snark.Statement.t * Transaction_snark.Statement.t option
+        type t = Transaction_snark.Statement.t One_or_two.t
         [@@deriving compare, sexp, to_yojson]
       end
 
@@ -38,61 +31,57 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
     let remove_old_assignments {jobs_seen; reassignment_wait} ~logger =
       let now = Time.now () in
-      Map.filteri jobs_seen ~f:(fun ~key:work ~data:status ->
-          if Job_status.is_old status ~now ~reassignment_wait then (
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:[("work", Seen_key.to_yojson work)]
-              "Waited too long to get work for $work. Ready to be reassigned" ;
-            Coda_metrics.(Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
-            false )
-          else true )
+      let jobs_seen =
+        Map.filteri jobs_seen ~f:(fun ~key:work ~data:status ->
+            if Job_status.is_old status ~now ~reassignment_wait then (
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("work", Seen_key.to_yojson work)]
+                "Waited too long to get work for $work. Ready to be reassigned" ;
+              Coda_metrics.(
+                Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
+              false )
+            else true )
+      in
+      {jobs_seen; reassignment_wait}
+
+    let remove t x =
+      { t with
+        jobs_seen=
+          Map.remove t.jobs_seen (One_or_two.map ~f:Work_spec.statement x) }
 
     let set t x =
       { t with
         jobs_seen=
-          Map.set t.jobs_seen ~key:(statement_pair x)
+          Map.set t.jobs_seen
+            ~key:(One_or_two.map ~f:Work_spec.statement x)
             ~data:(Job_status.Assigned (Time.now ())) }
   end
 
-  let pair_to_list = function j, Some j' -> [j; j'] | j, None -> [j]
-
-  let does_not_have_better_fee ~snark_pool ~fee (statement1, maybe_statement_2)
-      =
-    let statements = pair_to_list (statement1, maybe_statement_2) in
+  let does_not_have_better_fee ~snark_pool ~fee
+      (statements : ('a, 'b, 'c) Work_spec.t One_or_two.t) : bool =
     Option.value_map ~default:true
-      (Inputs.Snark_pool.get_completed_work snark_pool statements)
+      (Inputs.Snark_pool.get_completed_work snark_pool
+         (One_or_two.map ~f:Work_spec.statement statements))
       ~f:(fun priced_proof ->
         let competing_fee = Inputs.Transaction_snark_work.fee priced_proof in
         Fee.compare fee competing_fee < 0 )
 
   module For_tests = struct
-    let to_pair = function
-      | [x] ->
-          (x, None)
-      | [x1; x2] ->
-          (x1, Some x2)
-      | _ ->
-          failwith "Should contain one or two elements"
-
-    type statement = Transaction_snark.Statement.t
-
-    let does_not_have_better_fee ~snark_pool ~fee works =
-      does_not_have_better_fee ~snark_pool ~fee
-        (statement_pair (to_pair works))
+    let does_not_have_better_fee = does_not_have_better_fee
   end
 
-  let get_expensive_work ~snark_pool ~fee jobs =
-    List.filter jobs
-      ~f:
-        (Fn.compose (does_not_have_better_fee ~snark_pool ~fee) statement_pair)
+  let get_expensive_work ~snark_pool ~fee
+      (jobs : ('a, 'b, 'c) Work_spec.t One_or_two.t list) :
+      ('a, 'b, 'c) Work_spec.t One_or_two.t list =
+    List.filter jobs ~f:(does_not_have_better_fee ~snark_pool ~fee)
 
-  let all_works ~logger (staged_ledger : Inputs.Staged_ledger.t)
-      (state : State.t) =
-    let state = State.remove_old_assignments state ~logger in
+  let all_works (staged_ledger : Inputs.Staged_ledger.t) (state : State.t) =
     let all_jobs = Inputs.Staged_ledger.all_work_pairs_exn staged_ledger in
     let unseen_jobs =
       List.filter all_jobs ~f:(fun js ->
-          not @@ Map.mem state (statement_pair js) )
+          not
+          @@ Map.mem state.jobs_seen (One_or_two.map ~f:Work_spec.statement js)
+      )
     in
     unseen_jobs
 end
