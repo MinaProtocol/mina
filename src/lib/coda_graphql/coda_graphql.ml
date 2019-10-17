@@ -129,6 +129,19 @@ module Types = struct
     scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
       ~coerce:(fun key -> `String (Public_key.Compressed.to_base58_check key))
 
+  let to_signed_fee_exn sign magnitude =
+    let sgn =
+      match sign with
+      | "+" ->
+          Sgn.Pos
+      | "-" ->
+          Neg
+      | _ ->
+          failwith (sprintf "Invalid sign in signed fee: %s" sign)
+    in
+    let magnitude = Currency.Fee.of_uint64 magnitude in
+    Currency.Fee.Signed.create ~sgn ~magnitude
+
   let uint32 =
     unsigned_scalar_scalar ~to_string:Unsigned.UInt32.to_string "UInt32"
 
@@ -357,6 +370,60 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {Transaction_snark_work.Info.work_ids; _} ->
               One_or_two.to_list work_ids ) ] )
+
+  let signed_fee =
+    obj "SignedFee" ~doc:"Signed fee" ~fields:(fun _ ->
+        [ field "sign" ~typ:(non_null string) ~doc:"+/-"
+            ~args:Arg.[]
+            ~resolve:(fun _ fee ->
+              if Sgn.equal (Currency.Fee.Signed.sgn fee) Sgn.Pos then "+"
+              else "-" )
+        ; field "fee" ~typ:(non_null uint64) ~doc:"Fee"
+            ~args:Arg.[]
+            ~resolve:(fun _ fee ->
+              Currency.Fee.(to_uint64 (Signed.magnitude fee)) ) ] )
+
+  let work_statement =
+    obj "WorkDescription"
+      ~doc:
+        "Transition from a source ledger to a target ledger with some fee \
+         excess and increase in supply " ~fields:(fun _ ->
+        [ field "sourceLedgerHash" ~typ:(non_null string)
+            ~doc:"Base58Check-encoded hash of the source ledger"
+            ~args:Arg.[]
+            ~resolve:(fun _ {Transaction_snark.Statement.source; _} ->
+              Stringable.Frozen_ledger_hash.to_base58_check source )
+        ; field "targetLedgerHash" ~typ:(non_null string)
+            ~doc:"Base58Check-encoded hash of the target ledger"
+            ~args:Arg.[]
+            ~resolve:(fun _ {Transaction_snark.Statement.target; _} ->
+              Stringable.Frozen_ledger_hash.to_base58_check target )
+        ; field "feeExcess" ~typ:(non_null signed_fee)
+            ~doc:
+              "Total transaction fee that is not accounted for in the \
+               transition from source ledger to target ledger"
+            ~args:Arg.[]
+            ~resolve:(fun _ {Transaction_snark.Statement.fee_excess; _} ->
+              fee_excess )
+        ; field "supplyIncrease" ~typ:(non_null uint64)
+            ~doc:"Increase in total coinbase reward "
+            ~args:Arg.[]
+            ~resolve:(fun _ {Transaction_snark.Statement.supply_increase; _} ->
+              Currency.Amount.to_uint64 supply_increase )
+        ; field "workId" ~doc:"Unique identifier for a snark work"
+            ~typ:(non_null int)
+            ~args:Arg.[]
+            ~resolve:(fun _ w -> Transaction_snark.Statement.hash w) ] )
+
+  let pending_work =
+    obj "PendingSnarkWork"
+      ~doc:"Snark work bundles that are not available in the pool yet"
+      ~fields:(fun _ ->
+        [ field "workBundle"
+            ~args:Arg.[]
+            ~doc:"Work bundle with one or two snark work"
+            ~typ:(non_null @@ list @@ non_null work_statement)
+            ~resolve:(fun _ w -> One_or_two.to_list w) ] )
 
   let blockchain_state =
     obj "BlockchainState" ~fields:(fun _ ->
@@ -1646,6 +1713,22 @@ module Queries = struct
         Coda_lib.snark_pool coda |> Network_pool.Snark_pool.resource_pool
         |> Network_pool.Snark_pool.Resource_pool.all_completed_work )
 
+  let pending_snark_work =
+    field "pendingSnarkWork" ~doc:"List of snark works that are yet to be done"
+      ~args:Arg.[]
+      ~typ:(non_null @@ list @@ non_null Types.pending_work)
+      ~resolve:(fun {ctx= coda; _} () ->
+        match
+          Coda_lib.best_staged_ledger coda |> Participating_state.active
+        with
+        | Some staged_ledger ->
+            let snark_pool = Coda_lib.snark_pool coda in
+            let fee = Coda_lib.snark_work_fee coda in
+            let (module S) = Coda_lib.work_selection_method coda in
+            S.pending_work_statements ~snark_pool ~fee ~staged_ledger
+        | None ->
+            [] )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -1659,7 +1742,8 @@ module Queries = struct
     ; transaction_status
     ; trust_status
     ; trust_status_all
-    ; snark_pool ]
+    ; snark_pool
+    ; pending_snark_work ]
 end
 
 let schema =

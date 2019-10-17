@@ -107,12 +107,12 @@ module Job_view = struct
   [@@deriving sexp]
 
   let to_yojson ({value; position} : t) : Yojson.Safe.json =
-    let hash_string h = Sexp.to_string (Frozen_ledger_hash.sexp_of_t h) in
+    let hash_yojson h = Frozen_ledger_hash.to_yojson h in
     let statement_to_yojson (s : Transaction_snark.Statement.t) =
       `Assoc
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
-        ; ("Source", `String (hash_string s.source))
-        ; ("Target", `String (hash_string s.target))
+        ; ("Source", hash_yojson s.source)
+        ; ("Target", hash_yojson s.target)
         ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
         ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase) ]
     in

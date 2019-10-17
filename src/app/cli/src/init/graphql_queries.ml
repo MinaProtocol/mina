@@ -73,6 +73,25 @@ query snarkPool {
 }
 |}]
 
+module Pending_snark_work =
+[%graphql
+{|
+query pendingSnarkWork {
+  pendingSnarkWork {
+    workBundle {
+      source_ledger_hash: sourceLedgerHash
+      target_ledger_hash: targetLedgerHash
+      fee_excess: feeExcess {
+        sign
+        fee @bsDecoder(fn: "Decoders.uint64")
+      }
+      supply_increase: supplyIncrease @bsDecoder(fn: "Decoders.uint64")
+      work_id: workId
+      }
+    }
+    }
+|}]
+
 module Set_staking =
 [%graphql
 {|

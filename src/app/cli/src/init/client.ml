@@ -933,7 +933,10 @@ let constraint_system_digests =
 let snark_job_list =
   let open Deferred.Let_syntax in
   let open Command.Param in
-  Command.async ~summary:"List of snark jobs in the scan state in JSON format"
+  Command.async
+    ~summary:
+      "List of snark jobs in JSON format that are yet to be included in the \
+       blocks"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          match%map
            dispatch_join_errors Daemon_rpcs.Snark_job_list.rpc () port
@@ -988,6 +991,46 @@ let pooled_user_commands =
              @@ Array.to_list response#pooledUserCommands )
          in
          print_string (Yojson.Safe.to_string json_response) ))
+
+let pending_snark_work =
+  let open Command.Param in
+  Command.async
+    ~summary:
+      "List of snark works in JSON format that are not available in the pool \
+       yet"
+    (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
+         Deferred.map
+           (Graphql_client.query_exn
+              (Graphql_queries.Pending_snark_work.make ())
+              port)
+           ~f:(fun response ->
+             let lst =
+               [%to_yojson: Cli_lib.Graphql_types.Pending_snark_work.t]
+                 (Array.to_list
+                    (Array.map
+                       ~f:(fun bundle ->
+                         Array.to_list
+                           (Array.map bundle#workBundle ~f:(fun w ->
+                                let f = w#fee_excess in
+                                let hash_of_string =
+                                  Coda_graphql.Types.Stringable
+                                  .Frozen_ledger_hash
+                                  .of_base58_check_exn
+                                in
+                                { Cli_lib.Graphql_types.Pending_snark_work.Work
+                                  .work_id= w#work_id
+                                ; fee_excess=
+                                    Coda_graphql.Types.to_signed_fee_exn f#sign
+                                      f#fee
+                                ; supply_increase=
+                                    Currency.Amount.of_uint64 w#supply_increase
+                                ; source_ledger_hash=
+                                    hash_of_string w#source_ledger_hash
+                                ; target_ledger_hash=
+                                    hash_of_string w#target_ledger_hash } )) )
+                       response#pendingSnarkWork))
+             in
+             print_string (Yojson.Safe.to_string lst) ) ))
 
 let start_tracing =
   let open Deferred.Let_syntax in
@@ -1418,6 +1461,7 @@ let advanced =
     ; ("snark-job-list", snark_job_list)
     ; ("pooled-user-commands", pooled_user_commands)
     ; ("snark-pool-list", snark_pool_list)
+    ; ("pending-snark-work", pending_snark_work)
     ; ("unsafe-import", unsafe_import)
     ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
