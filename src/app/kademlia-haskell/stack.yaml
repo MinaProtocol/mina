@@ -1,5 +1,5 @@
 resolver: lts-13.7
-compiler: ghc-8.6.4
+compiler: ghc-8.6.5
 packages:
 - '.'
 # uncomment this, fix the path, and comment out the extra-dep below to do local
