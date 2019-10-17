@@ -131,10 +131,12 @@ let make = () => {
     | ["settings", ..._] => true
     | _ => false
     };
+  let (showToast, setToast) = React.useContext(ToastProvider.context);
   <header className=Styles.header>
     <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
       <img src="CodaLogo.svg" alt="Coda logo" />
     </div>
+    showToast ? <Toast style=Toast.Blue /> : React.null
     <div className=Styles.rightButtons>
       <SyncStatusQuery fetchPolicy="no-cache" partialRefetch=true>
         {response =>

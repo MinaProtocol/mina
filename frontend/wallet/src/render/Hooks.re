@@ -1,9 +1,14 @@
 let useActiveWallet = () => {
   let url = ReasonReact.Router.useUrl();
   switch (url.path) {
-  | ["wallet", walletKey] => Some(PublicKey.uriDecode(walletKey))
+  | ["account", accountKey] => Some(PublicKey.uriDecode(accountKey))
   | _ => None
   };
+};
+
+let useToast = toastText => {
+  let (_, setToast) = React.useContext(ToastProvider.context);
+  () => setToast(toastText);
 };
 
 // Vanilla React.useReducer aren't supposed to have any effects themselves.
