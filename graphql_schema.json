@@ -3495,6 +3495,24 @@
           "interfaces": null,
           "enumValues": [
             {
+              "name": "CONNECTING",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "LISTENING",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "OFFLINE",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "BOOTSTRAP",
               "description": null,
               "isDeprecated": false,
@@ -3507,19 +3525,7 @@
               "deprecationReason": null
             },
             {
-              "name": "OFFLINE",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "CONNECTING",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "LISTENING",
+              "name": "CATCHUP",
               "description": null,
               "isDeprecated": false,
               "deprecationReason": null
@@ -3732,7 +3738,7 @@
             },
             {
               "name": "pooledUserCommands",
-              "description": "Retrieve all the user commands submitted by the current daemon that are pending inclusion",
+              "description": "Retrieve all the scheduled user commands for a specified sender that the current daemon sees in their transaction pool. All scheduled commands are queried if no sender is specified",
               "args": [
                 {
                   "name": "publicKey",
