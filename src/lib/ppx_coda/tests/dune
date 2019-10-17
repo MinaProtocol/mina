@@ -1,6 +1,8 @@
 ;;; each library below has an identical preprocess clause, because of this
 ;;; dune bug: https://github.com/ocaml/dune/issues/1946
 
+
+
 ;;; should succeed
 
 ;; expiration
@@ -8,6 +10,13 @@
   (name unexpired)
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules unexpired))
+
+;; version syntax
+(library
+  (name good_version_syntax)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
+  (modules good_version_syntax))
 
 ;; versioning
 (library
@@ -20,7 +29,7 @@
 
 (library
   (name define_locally_good)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules define_locally_good))
 
 ;; module versioning
@@ -53,7 +62,45 @@
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules expiry_invalid_format))
 
+;; version syntax
+
+(library
+  (name bad_version_syntax_missing_version)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
+  (modules bad_version_syntax_missing_version))
+
+(library
+  (name bad_version_syntax_bin_io_in_functor)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
+  (modules bad_version_syntax_bin_io_in_functor))
+
+(library
+  (name bad_version_syntax_version_in_functor)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
+  (modules bad_version_syntax_version_in_functor))
+
+(library
+  (name bad_version_syntax_versioned_in_functor)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (modules bad_version_syntax_versioned_in_functor))
+
+(library
+  (name bad_version_syntax_bin_io_in_nested_functor)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
+  (modules bad_version_syntax_bin_io_in_nested_functor))
+
+(library
+  (name bad_version_syntax_multiple_errors)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
+  (modules bad_version_syntax_multiple_errors))
+
 ;; versioning
+
 (library
  (name versioned_bad_module_structure)
  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
