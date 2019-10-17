@@ -41,7 +41,7 @@ struct
 
     let build ~logger ~verifier ~trust_system ~parent
         ~transition:transition_with_validation ~sender =
-      O1trace.measure "Breadcrumb.build" (fun () ->
+      O1trace.trace_recurring "Breadcrumb.build" (fun () ->
           let open Deferred.Let_syntax in
           match%bind
             Staged_ledger_validation.validate_staged_ledger_diff ~logger
@@ -610,6 +610,8 @@ struct
     Coda_metrics.(
       Counter.inc Transition_frontier.finalized_staged_txns
         num_finalized_staged_txns) ;
+    Coda_metrics.(
+      Transition_frontier.TPS_10min.update num_finalized_staged_txns) ;
     Coda_metrics.(Counter.inc_one Transition_frontier.root_transitions) ;
     let consensus_state = Breadcrumb.consensus_state new_root in
     let blockchain_length =

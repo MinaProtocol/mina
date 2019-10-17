@@ -561,16 +561,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "UInt32",
-          "description": "String or Integer representation of a uint32 number. If the input is String, the String must represent a the number in base 10",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "INPUT_OBJECT",
           "name": "SendPaymentInput",
           "description": null,
@@ -1977,6 +1967,91 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "UInt32",
+          "description": "String representing a uint32 number in base 10",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "ConsensusState",
+          "description": null,
+          "fields": [
+            {
+              "name": "blockchainLength",
+              "description": "Length of the blockchain at this block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "slot",
+              "description": "Slot in which this block was created",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "epoch",
+              "description": "Epoch in which this block was created",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "totalCurrency",
+              "description": "Total currency in circulation at this block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "BlockchainState",
           "description": null,
@@ -2058,7 +2133,7 @@
             },
             {
               "name": "blockchainState",
-              "description": "State related to the succinct blockchain",
+              "description": "State which is agnostic of a particular consensus algorithm",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -2066,6 +2141,22 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "BlockchainState",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "consensusState",
+              "description": "State specific to the Codaboros Proof of Stake consensus algorithm",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ConsensusState",
                   "ofType": null
                 }
               },
@@ -3330,6 +3421,18 @@
               "deprecationReason": null
             },
             {
+              "name": "nextProposal",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "consensusTimeNow",
               "description": null,
               "args": [],
@@ -3635,13 +3738,9 @@
                   "name": "publicKey",
                   "description": "Public key of sender of pooled user commands",
                   "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
+                    "kind": "SCALAR",
+                    "name": "PublicKey",
+                    "ofType": null
                   },
                   "defaultValue": null
                 }

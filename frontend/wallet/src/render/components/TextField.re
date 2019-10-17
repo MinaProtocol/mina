@@ -37,6 +37,10 @@ module Styles = {
       border(`px(2), `solid, Theme.Colors.roseBud),
       borderRadius(`rem(0.25)),
       flexGrow(1.),
+      selector(
+        ":focus-within",
+        [border(`px(2), `solid, Theme.Colors.hyperlink)],
+      ),
     ]);
   let label =
     merge([
