@@ -1,19 +1,12 @@
 open Core_kernel
 
 (* A non-empty list is a tuple of the head and the rest (as a list) *)
+[%%versioned
 module Stable = struct
-  (* underlying type has a parameter, so don't register versions *)
   module V1 = struct
-    module T = struct
-      type 'a t = 'a * 'a list
-      [@@deriving sexp, compare, eq, hash, bin_io, version]
-    end
-
-    include T
+    type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash]
   end
-
-  module Latest = V1
-end
+end]
 
 (* bin_io omitted intentionally *)
 type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, eq, hash]
