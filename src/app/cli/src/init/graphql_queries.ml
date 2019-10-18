@@ -77,7 +77,7 @@ module Set_staking =
 [%graphql
 {|
 mutation ($public_key: PublicKey) {
-  setStaking(input : {wallets: [$public_key]}) {
+  setStaking(input : {accounts: [$public_key]}) {
     lastStaking
     }
   }
