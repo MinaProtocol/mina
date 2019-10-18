@@ -237,9 +237,9 @@ jobs:
                     cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
                     chmod +w package/kademlia
                     ./scripts/librewrite-macos.sh package/kademlia
-                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/libp2p_helper
-                    chmod +w package/libp2p_helper
-                    ./scripts/librewrite-macos.sh package/libp2p_helper
+                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
+                    chmod +w package/coda-libp2p_helper
+                    ./scripts/librewrite-macos.sh package/coda-libp2p_helper
                     cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
             - run:
