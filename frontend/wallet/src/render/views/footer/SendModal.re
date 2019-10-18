@@ -82,7 +82,7 @@ let validate:
   state =>
     switch (state, validatePubkey(state.toStr)) {
     | ({fromStr: None}, _) =>
-      Error("Please specify a account to send from.")
+      Error("Please specify an account to send from.")
     | ({toStr: ""}, _) => Error("Please specify a destination address.")
     | (_, None) => Error("Destination is invalid public key.")
     | ({amountStr}, _) when !validateInt64(amountStr) =>
