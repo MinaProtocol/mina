@@ -6,9 +6,13 @@ let useActiveWallet = () => {
   };
 };
 
-let useToast = toastText => {
+let useToast = () => {
   let (_, setToast) = React.useContext(ToastProvider.context);
-  () => setToast(toastText);
+  (toastText, toastType) => {
+    setToast(_ => Some({text: toastText, style: toastType}));
+    let _id = Js.Global.setTimeout(() => setToast(_ => None), 2000);
+    ();
+  };
 };
 
 // Vanilla React.useReducer aren't supposed to have any effects themselves.

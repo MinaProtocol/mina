@@ -1,15 +1,24 @@
-module ToastContextType = {
-  type t = (bool, unit => unit);
+type mode =
+  | Default
+  | Warning
+  | Success
+  | Error;
 
-  let initialContext = (false, () => ());
+type toast = {
+  text: string,
+  style: mode,
+};
+
+module ToastContextType = {
+  type t = (option(toast), (option(toast) => option(toast)) => unit);
+
+  let initialContext = (None, _ => ());
 };
 
 type t = ToastContextType.t;
 include ContextProvider.Make(ToastContextType);
 
 let createContext = () => {
-  let (showToast, setToast) = React.useState(() => false);
-  toastText => {
-    setToast(toastText);
-  };
+  let (showToast, setToast) = React.useState(() => None);
+  (showToast, setToast);
 };

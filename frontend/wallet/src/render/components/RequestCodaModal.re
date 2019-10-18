@@ -25,9 +25,12 @@ let make = (~wallets, ~setModalState) => {
   let activePublicKey = Hooks.useActiveWallet();
   let (selectedWallet, setSelectedWallet) =
     React.useState(() => activePublicKey);
-  let handleClipboard = (~wallet, _) =>
+  let toast = Hooks.useToast();
+  let handleClipboard = (~wallet, _) => {
     Bindings.Navigator.Clipboard.writeTextTask(PublicKey.toString(wallet))
     |> Task.perform(~f=() => setModalState(_ => false));
+    toast("Copied public key to clipboard", ToastProvider.Success);
+  };
   <Modal title="Request Coda" onRequestClose={() => setModalState(_ => false)}>
     <div className=Modal.Styles.default>
       <div className=Styles.bodyMargin>
