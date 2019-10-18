@@ -69,7 +69,7 @@
       "bundle/**/*",
       "public/**/*"
     ],
-    "productName": "Coda Wallet",
+    "productName": "CodaWallet",
     "compression": "store",
     "dmg": {
       "contents": [
@@ -86,9 +86,9 @@
       ]
     },
     "linux": {
+      "executableName": "coda-wallet",
       "target": [
-        "AppImage",
-        "deb"
+        "AppImage"
       ]
     },
     "win": {
