@@ -13,6 +13,13 @@ module YJ = Yojson.Safe
 64]
 
 [%%if
+record_async_backtraces]
+
+let () = Async.Scheduler.set_record_backtraces true
+
+[%%endif]
+
+[%%if
 fake_hash]
 
 let maybe_sleep s = after (Time.Span.of_sec s)
@@ -615,7 +622,7 @@ let daemon logger =
                  [ ("long_async_job", `Float secs)
                  ; ( "backtrace"
                    , `String
-                       (String.concat ~sep:"\n"
+                       (String.concat ~sep:"␤"
                           (List.map ~f:Backtrace.to_string
                              (Execution_context.backtrace_history context))) )
                  ]
