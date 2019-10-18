@@ -21,7 +21,7 @@ let make = (~account, ~onClose, ~onSuccess) => {
       ~publicKey=Apollo.Encoders.publicKey(account),
       (),
     )##variables;
-  <Modal title="Unlock Wallet" onRequestClose=onClose>
+  <Modal title="Unlock Account" onRequestClose=onClose>
     <UnlockMutation>
       ...{(mutation, {result}) =>
         <form
@@ -54,7 +54,7 @@ let make = (~account, ~onClose, ~onSuccess) => {
            }}
           <p className=Theme.Text.Body.regular>
             {React.string("Please enter password for ")}
-            <WalletName pubkey=wallet />
+            <AccountName pubkey=account />
             {React.string(".")}
           </p>
           <Spacer height=1. />

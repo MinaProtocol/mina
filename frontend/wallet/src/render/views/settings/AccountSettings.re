@@ -227,7 +227,7 @@ let make = (~publicKey) => {
           ~default="",
           AddressBook.lookup(addressBook, publicKey),
         )}
-        placeholder="My Coda Wallet"
+        placeholder="My Coda Account"
         onChange={value =>
           updateAddressBook(ab =>
             AddressBook.set(ab, ~key=publicKey, ~name=value)

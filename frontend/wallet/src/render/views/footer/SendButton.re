@@ -1,7 +1,7 @@
 open Tc;
 
 // Only use the getExn on ownedWallets
-module WalletLocked = [%graphql
+module AccountLocked = [%graphql
   {|
     query walletLocked ($publicKey: PublicKey!) @bsRecord {
       wallet(publicKey: $publicKey) {
@@ -11,7 +11,7 @@ module WalletLocked = [%graphql
   |}
 ];
 
-module WalletQuery = ReasonApollo.CreateQuery(WalletLocked);
+module AccountQuery = ReasonApollo.CreateQuery(AccountLocked);
 
 [@react.component]
 let make = () => {
@@ -27,8 +27,11 @@ let make = () => {
      | None => React.null
      | Some(pubkey) =>
        let accountQuery =
-         WalletLocked.make(~publicKey=Apollo.Encoders.publicKey(pubkey), ());
-       <WalletQuery variables=accountQuery##variables>
+         AccountLocked.make(
+           ~publicKey=Apollo.Encoders.publicKey(pubkey),
+           (),
+         );
+       <AccountQuery variables=accountQuery##variables>
          (
            response =>
              switch (response.result) {
@@ -38,8 +41,8 @@ let make = () => {
                switch (modalOpen, data##wallet) {
                | (false, _)
                | (true, None) => React.null
-               | (true, Some(wallet)) =>
-                 wallet##locked
+               | (true, Some(account)) =>
+                 account##locked
                    ? <UnlockModal
                        account=pubkey
                        onClose={() => setModalOpen(_ => false)}
@@ -49,7 +52,7 @@ let make = () => {
                }
              }
          )
-       </WalletQuery>;
+       </AccountQuery>;
      }}
   </>;
 };

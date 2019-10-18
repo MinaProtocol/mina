@@ -58,7 +58,7 @@ module Styles = {
 
 module LockAccount = [%graphql
   {|
-  mutation lockAccount($publicKey: PublicKey!) {
+  mutation lockWallet($publicKey: PublicKey!) {
     lockWallet(input: { publicKey: $publicKey }) { publicKey }
   } |}
 ];
