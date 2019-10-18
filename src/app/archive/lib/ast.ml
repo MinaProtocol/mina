@@ -5,6 +5,9 @@ module Rel_insert_input = struct
   type nonrec ('data, 'on_conflict) array = ('data array, 'on_conflict) t
 end
 
+(* Hack: void is an inhabited type. It is used to make empty lists *)
+type void
+
 module On_conflict = struct
   type ('constraint_, 'update_columns) t =
     < constraint_: 'constraint_ ; update_columns: 'update_columns array >
@@ -28,22 +31,18 @@ module On_conflict = struct
 
   type blocks_user_commands =
     ( [`blocks_user_commands_block_id_user_command_id_receipt_chain_has]
-    , [`block_id | `user_command_id | `receipt_chain_hash_id] )
+    , void )
     t
 
   type blocks_fee_transfers =
-    ( [`blocks_fee_transfers_block_id_fee_transfer_id_key]
-    , [`block_id | `fee_transfer_id] )
-    t
+    ([`blocks_fee_transfers_block_id_fee_transfer_id_key], void) t
 
   type block_snark_jobs =
-    ( [`blocks_snark_jobs_block_id_snark_job_id_key]
-    , [`block_id | `snark_job_id] )
-    t
+    ([`blocks_snark_jobs_block_id_snark_job_id_key], void) t
 
   type state_hashes = ([`state_hashes_value_key], [`value]) t
 
-  type blocks = ([`blocks_state_hash_key], [`state_hash]) t
+  type blocks = ([`blocks_state_hash_key], [`block_length]) t
 
   let public_keys : public_keys = create `public_keys_value_key [`value]
 
@@ -61,16 +60,13 @@ module On_conflict = struct
     create `receipt_chain_hashes_hash_key [`hash]
 
   let blocks_user_commands : blocks_user_commands =
-    create `blocks_user_commands_block_id_user_command_id_receipt_chain_has
-      [`block_id; `user_command_id; `receipt_chain_hash_id]
+    create `blocks_user_commands_block_id_user_command_id_receipt_chain_has []
 
   let blocks_fee_transfers : blocks_fee_transfers =
-    create `blocks_fee_transfers_block_id_fee_transfer_id_key
-      [`block_id; `fee_transfer_id]
+    create `blocks_fee_transfers_block_id_fee_transfer_id_key []
 
   let blocks_snark_jobs : block_snark_jobs =
-    create `blocks_snark_jobs_block_id_snark_job_id_key
-      [`block_id; `snark_job_id]
+    create `blocks_snark_jobs_block_id_snark_job_id_key []
 end
 
 type bit = Yojson.Basic.json
@@ -104,19 +100,19 @@ and fee_transfers_arr_rel_insert_input =
   , On_conflict.fee_transfers )
   Rel_insert_input.array
 
-and receipt_chain_hashesh_insert_input =
+and receipt_chain_hashes_insert_input =
   < blocks_user_commands: blocks_user_commands_arr_rel_insert_input option
   ; hash: string option
   ; receipt_chain_hash: receipt_chain_hashes_obj_rel_insert_input option
   ; receipt_chain_hashes: receipt_chain_hashes_arr_rel_insert_input option >
 
 and receipt_chain_hashes_obj_rel_insert_input =
-  ( receipt_chain_hashesh_insert_input
+  ( receipt_chain_hashes_insert_input
   , On_conflict.receipt_chain_hash )
   Rel_insert_input.t
 
 and receipt_chain_hashes_arr_rel_insert_input =
-  ( receipt_chain_hashesh_insert_input
+  ( receipt_chain_hashes_insert_input
   , On_conflict.receipt_chain_hash )
   Rel_insert_input.array
 

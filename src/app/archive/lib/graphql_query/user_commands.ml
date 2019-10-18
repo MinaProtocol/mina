@@ -12,6 +12,23 @@ module Query_first_seen =
     }
   |}]
 
+module Query_participants =
+[%graphql
+{|
+    query query ($hashes: [String!]!) {
+        user_commands(where: {hash: {_in: $hashes}} ) {
+          publicKeyByReceiver {
+            id
+            value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
+          }
+          public_key {
+            id
+            value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
+          }
+        }
+    }
+  |}]
+
 (* TODO: replace this with pagination *)
 module Query =
 [%graphql

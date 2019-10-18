@@ -10,7 +10,7 @@ curl -d'{"type":"replace_metadata", "args":'$(cat scripts/archive/metadata.json)
 
 mkdir -p output/
 # Generates the graphql query types for OCaml
-python3 scripts/introspection_query.py --port $HASURA_PORT --uri /v1/graphql \
+python3 scripts/introspection_query.py --port $HASURA_PORT --uri /v1/graphql --headers X-Hasura-Role:user \
     | _build/default/scripts/archive/ocaml/stitch_introspection.exe \
     > scripts/archive/output/graphql_schema.json
 
