@@ -1,7 +1,7 @@
 version: '3.3'
 services:
   configuration:
-    image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+    image: python:3.7-stretch
     environment:
       HASURA_PORT: 9000
     network_mode: host
@@ -9,6 +9,7 @@ services:
     depends_on:
     - "hasura"
     volumes:
-      - .:/home/opam/opam-repository/scripts/archive
-      - ../introspection_query.py:/home/opam/opam-repository/scripts/introspection_query.py
-      - ../../src/app/archive/archive_graphql_schema.json:/home/opam/opam-repository/src/app/archive/archive_graphql_schema.json
+      - .:/scripts/archive
+      - ../introspection_query.py:/scripts/introspection_query.py
+      - ../../src/app/archive/archive_graphql_schema.json:/src/app/archive/archive_graphql_schema.json
+    

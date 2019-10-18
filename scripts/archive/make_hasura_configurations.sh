@@ -1,8 +1,6 @@
 # Makes a database queryable through graphql
 set -e
 
-opam config exec -- dune build scripts/archive/ocaml/stitch_introspection.exe
-
 sleep 5
 
 curl -d'{"type":"replace_metadata", "args":'$(cat scripts/archive/metadata.json)'}' \
@@ -10,8 +8,7 @@ curl -d'{"type":"replace_metadata", "args":'$(cat scripts/archive/metadata.json)
 
 mkdir -p output/
 # Generates the graphql query types for OCaml
-python3 scripts/introspection_query.py --port $HASURA_PORT --uri /v1/graphql --headers X-Hasura-Role:user \
-    | _build/default/scripts/archive/ocaml/stitch_introspection.exe \
-    > scripts/archive/output/graphql_schema.json
+python3 /scripts/introspection_query.py --port $HASURA_PORT --uri /v1/graphql --headers X-Hasura-Role:user \
+    | python3 /scripts/archive/change_constraint.py > /scripts/archive/output/graphql_schema.json
 
 echo "Finished getting introspection data"
