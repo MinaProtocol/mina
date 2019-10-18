@@ -72,7 +72,10 @@ module Styles = {
   let accountName = style([width(`rem(12.5)), color(Theme.Colors.marine)]);
 
   let accountKey =
-    merge([Theme.Text.Body.mono, style([color(Theme.Colors.midnightAlpha(0.7))])]);
+    merge([
+      Theme.Text.Body.mono,
+      style([color(Theme.Colors.midnightAlpha(0.7))]),
+    ]);
 
   let accountChevron =
     style([display(`inlineFlex), color(Theme.Colors.tealAlpha(0.5))]);
@@ -127,7 +130,9 @@ module AccountSettingsItem = {
     <div
       className=Styles.accountItem
       onClick={_ => ReasonReact.Router.push(route)}>
-      <div className=Styles.accountName> <WalletName pubkey=publicKey /> </div>
+      <div className=Styles.accountName>
+        <AccountName pubkey=publicKey />
+      </div>
       <span className=Styles.accountKey>
         <Pill> {React.string(PublicKey.prettyPrint(publicKey))} </Pill>
       </span>
@@ -139,7 +144,7 @@ module AccountSettingsItem = {
   };
 };
 
-module WalletsQueryString = [%graphql
+module AccountsQueryString = [%graphql
   {|
     query getWallets {
       ownedWallets {
@@ -149,7 +154,7 @@ module WalletsQueryString = [%graphql
   |}
 ];
 
-module WalletsQuery = ReasonApollo.CreateQuery(WalletsQueryString);
+module AccountsQuery = ReasonApollo.CreateQuery(AccountsQueryString);
 
 [@react.component]
 let make = () => {
@@ -166,10 +171,11 @@ let make = () => {
     <div className=Styles.label> {React.string("Account Settings")} </div>
     <Spacer height=0.5 />
     <div className=Styles.accountSettings>
-      <WalletsQuery>
+      <AccountsQuery>
         {({result}) =>
            switch (result) {
-           | Loading => <div className=Styles.emptyAccountSettings> <Loader /> </div>
+           | Loading =>
+             <div className=Styles.emptyAccountSettings> <Loader /> </div>
            | Error(_) => React.null
            | Data(data) =>
              data##ownedWallets
@@ -181,7 +187,7 @@ let make = () => {
                 )
              |> React.array
            }}
-      </WalletsQuery>
+      </AccountsQuery>
     </div>
   </div>;
 };

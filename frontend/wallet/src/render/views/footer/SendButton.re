@@ -1,7 +1,7 @@
 open Tc;
 
 // Only use the getExn on ownedWallets
-module WalletLocked = [%graphql
+module AccountLocked = [%graphql
   {|
     query walletLocked ($publicKey: PublicKey!) @bsRecord {
       wallet(publicKey: $publicKey) {
@@ -11,24 +11,27 @@ module WalletLocked = [%graphql
   |}
 ];
 
-module WalletQuery = ReasonApollo.CreateQuery(WalletLocked);
+module AccountQuery = ReasonApollo.CreateQuery(AccountLocked);
 
 [@react.component]
 let make = () => {
   let (modalOpen, setModalOpen) = React.useState(() => false);
-  let activeWallet = Hooks.useActiveWallet();
+  let activeAccount = Hooks.useActiveAccount();
   <>
     <Button
       label="Send"
       onClick={_ => setModalOpen(_ => true)}
-      disabled={!Option.isSome(activeWallet)}
+      disabled={!Option.isSome(activeAccount)}
     />
-    {switch (activeWallet) {
+    {switch (activeAccount) {
      | None => React.null
      | Some(pubkey) =>
-       let walletQuery =
-         WalletLocked.make(~publicKey=Apollo.Encoders.publicKey(pubkey), ());
-       <WalletQuery variables=walletQuery##variables>
+       let accountQuery =
+         AccountLocked.make(
+           ~publicKey=Apollo.Encoders.publicKey(pubkey),
+           (),
+         );
+       <AccountQuery variables=accountQuery##variables>
          (
            response =>
              switch (response.result) {
@@ -38,10 +41,10 @@ let make = () => {
                switch (modalOpen, data##wallet) {
                | (false, _)
                | (true, None) => React.null
-               | (true, Some(wallet)) =>
-                 wallet##locked
+               | (true, Some(account)) =>
+                 account##locked
                    ? <UnlockModal
-                       wallet=pubkey
+                       account=pubkey
                        onClose={() => setModalOpen(_ => false)}
                        onSuccess={() => ()}
                      />
@@ -49,7 +52,7 @@ let make = () => {
                }
              }
          )
-       </WalletQuery>;
+       </AccountQuery>;
      }}
   </>;
 };
