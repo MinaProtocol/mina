@@ -21,13 +21,13 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~wallets, ~setModalState) => {
-  let activePublicKey = Hooks.useActiveWallet();
-  let (selectedWallet, setSelectedWallet) =
+let make = (~accounts, ~setModalState) => {
+  let activePublicKey = Hooks.useActiveAccount();
+  let (selectedAccount, setSelectedAccount) =
     React.useState(() => activePublicKey);
   let toast = Hooks.useToast();
-  let handleClipboard = (~wallet, _) => {
-    Bindings.Navigator.Clipboard.writeTextTask(PublicKey.toString(wallet))
+  let handleClipboard = (~account, _) =>
+    Bindings.Navigator.Clipboard.writeTextTask(PublicKey.toString(account))
     |> Task.perform(~f=() => setModalState(_ => false));
     toast("Copied public key to clipboard", ToastProvider.Default);
   };
@@ -36,27 +36,27 @@ let make = (~wallets, ~setModalState) => {
       <div className=Styles.bodyMargin>
         <Dropdown
           label="To"
-          value={Option.map(~f=PublicKey.toString, selectedWallet)}
+          value={Option.map(~f=PublicKey.toString, selectedAccount)}
           onChange={value =>
-            setSelectedWallet(_ => Some(PublicKey.ofStringExn(value)))
+            setSelectedAccount(_ => Some(PublicKey.ofStringExn(value)))
           }
           options={
-            wallets
-            |> Array.map(~f=wallet =>
+            accounts
+            |> Array.map(~f=account =>
                  (
-                   PublicKey.toString(wallet.Wallet.publicKey),
-                   <WalletDropdownItem wallet />,
+                   PublicKey.toString(account.Account.publicKey),
+                   <AccountDropdownItem account />,
                  )
                )
             |> Array.toList
           }
         />
         <Spacer height=1. />
-        {switch (selectedWallet) {
+        {switch (selectedAccount) {
          | None => React.null
-         | Some(selectedWallet) =>
+         | Some(selectedAccount) =>
            <div className=Styles.publicKey>
-             {React.string(PublicKey.toString(selectedWallet))}
+             {React.string(PublicKey.toString(selectedAccount))}
            </div>
          }}
       </div>
@@ -67,14 +67,14 @@ let make = (~wallets, ~setModalState) => {
           onClick={_ => setModalState(_ => false)}
         />
         <Spacer width=1. />
-        {switch (selectedWallet) {
+        {switch (selectedAccount) {
          | None =>
            <Button label="Copy public key" style=Button.Blue disabled=true />
-         | Some(selectedWallet) =>
+         | Some(selectedAccount) =>
            <Button
              label="Copy public key"
              style=Button.Blue
-             onClick={handleClipboard(~wallet=selectedWallet)}
+             onClick={handleClipboard(~account=selectedAccount)}
            />
          }}
       </div>

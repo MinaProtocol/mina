@@ -1,4 +1,4 @@
-let useActiveWallet = () => {
+let useActiveAccount = () => {
   let url = ReasonReact.Router.useUrl();
   switch (url.path) {
   | ["account", accountKey] => Some(PublicKey.uriDecode(accountKey))
