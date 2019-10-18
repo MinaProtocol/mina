@@ -30,6 +30,10 @@ positive-tests : unexpired.ml
 	@ echo -n "Define locally, should succeed..."
 	@ dune build define_locally_good.cma ${REDIRECT}
 	@ echo "OK"
+# define existing
+	@ echo -n "Define existing, should succeed..."
+	@ dune build define_existing_good.cma ${REDIRECT}
+	@ echo "OK"
 # module versioning
 	@ echo -n "Module versioning, should succeed..."
 	@ dune exec ./versioned_module_good.exe ${REDIRECT}
