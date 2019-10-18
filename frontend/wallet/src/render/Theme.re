@@ -20,7 +20,8 @@ module Colors = {
 
   let bgColor = white;
 
-  let bgColorElectronWindow = "#00E9E9E9";
+  // Linux doesn't support transparency
+  let bgColorElectronWindow = "#FFE9E9E9";
 
   let savilleAlpha = a => `rgba((61, 88, 120, a));
   let saville = savilleAlpha(1.);
