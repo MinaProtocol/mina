@@ -60,14 +60,14 @@ module StakingSwitch = {
   };
 };
 
-type ownedWallets =
-  Wallet.t = {
+type ownedAccounts =
+  Account.t = {
     locked: option(bool),
     publicKey: PublicKey.t,
     balance: {. "total": int64},
   };
 
-module Wallets = [%graphql
+module Accounts = [%graphql
   {| query getWallets { ownedWallets @bsRecord {
       publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
       locked
@@ -77,7 +77,7 @@ module Wallets = [%graphql
     }} |}
 ];
 
-module WalletQuery = ReasonApollo.CreateQuery(Wallets);
+module AccountQuery = ReasonApollo.CreateQuery(Accounts);
 
 [@react.component]
 let make = () => {
@@ -85,7 +85,7 @@ let make = () => {
   <div className=Styles.footer>
     <StakingSwitch />
     <div className=Styles.footerButtons>
-      <WalletQuery partialRefetch=true>
+      <AccountQuery partialRefetch=true>
         {response =>
            switch (response.result) {
            | Loading
@@ -100,13 +100,13 @@ let make = () => {
                {switch (modalState) {
                 | false => React.null
                 | true =>
-                  <RequestCodaModal wallets=data##ownedWallets setModalState />
+                  <RequestCodaModal accounts=data##ownedWallets setModalState />
                 }}
                <Spacer width=1. />
                <SendButton />
              </>
            }}
-      </WalletQuery>
+      </AccountQuery>
     </div>
   </div>;
 };
