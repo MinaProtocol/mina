@@ -26,7 +26,7 @@ let make = (~accounts, ~setModalState) => {
   let (selectedAccount, setSelectedAccount) =
     React.useState(() => activePublicKey);
   let toast = Hooks.useToast();
-  let handleClipboard = (~account, _) =>
+  let handleClipboard = (~account, _) => {
     Bindings.Navigator.Clipboard.writeTextTask(PublicKey.toString(account))
     |> Task.perform(~f=() => setModalState(_ => false));
     toast("Copied public key to clipboard", ToastProvider.Default);
