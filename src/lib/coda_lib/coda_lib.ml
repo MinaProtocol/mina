@@ -101,10 +101,11 @@ module Snark_worker = struct
     in
     don't_wait_for
       ( match%bind
-          Monitor.try_with (fun () -> Process.wait snark_worker_process)
+          Monitor.try_with (fun () ->
+              Process.collect_output_and_wait snark_worker_process )
         with
-      | Ok signal_or_error -> (
-        match signal_or_error with
+      | Ok {exit_status; _} -> (
+        match exit_status with
         | Ok () ->
             Logger.info logger "Snark worker process died" ~module_:__MODULE__
               ~location:__LOC__ ;

@@ -908,7 +908,7 @@ let shutdown (net : net) =
       ~args:[Pid.to_string (Process.pid net.subprocess)]
       ()
   in
-  let%bind _ = Process.wait net.subprocess in
+  let%bind _ = Process.collect_output_and_wait net.subprocess in
   Sys.remove net.lock_path
 
 module Stream = struct
@@ -1087,9 +1087,13 @@ let create ~logger ~conf_dir =
     | Ok p ->
         (* If the libp2p_helper process dies, kill the parent daemon process. Fix
        * for #550 *)
-        Deferred.upon (Process.wait p.subprocess) (fun code ->
+        Deferred.upon (Process.collect_output_and_wait p.subprocess)
+          (fun {exit_status; stdout= _; stderr= _} ->
+            (* We use collect_output_and_wait even though we don't care about
+               output that is now stale because it closes the stdout and stderr
+               pipes. *)
             p.finished <- true ;
-            match (p.failure_response, code) with
+            match (p.failure_response, exit_status) with
             | `Ignore, _ | _, Ok () ->
                 Hashtbl.iter p.outstanding_requests ~f:(fun iv ->
                     Ivar.fill iv

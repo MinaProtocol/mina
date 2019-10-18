@@ -255,10 +255,14 @@ module Haskell_process = struct
       | Ok p ->
           (* If the Kademlia process dies, kill the parent daemon process. Fix
          * for #550 *)
-          Deferred.bind (Process.wait p.process) ~f:(fun code ->
+          Deferred.bind (Process.collect_output_and_wait p.process)
+            ~f:(fun {exit_status; stdout= _; stderr= _} ->
+              (* We use collect_output_and_wait even though we don't care about
+                 output that is now stale because it closes the stdout and
+                 stderr pipes. *)
               let%bind () = Sys.remove lock_path in
               Ivar.fill p.terminated_ivar () ;
-              match (!(p.failure_response), code) with
+              match (!(p.failure_response), exit_status) with
               | `Ignore, _ | _, Ok () ->
                   return ()
               | `Die, (Error _ as e) ->
