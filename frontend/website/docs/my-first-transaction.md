@@ -76,7 +76,7 @@ While you're waiting take a look at your daemon logs for new blocks being genera
 
 ## Make a payment
 
-Finally we get to the good stuff, sending our first transaction! For testing purposes, there's already an [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service) set up that will immediately refund your payment minus the transaction fees.
+Finally we get to the good stuff, sending our first transaction! For testing purposes, there's already an [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo) set up that will immediately refund your payment minus the transaction fees.
 
 !!! warning
     Currently, there is a known issue with the echo service that prevents it from properly echoing back your payment! Don't worry, we'll still give you Testnet Points[\*](#disclaimer) for completing the challenge.
