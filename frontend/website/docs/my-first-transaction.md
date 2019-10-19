@@ -92,7 +92,7 @@ Let's send some of our newly received coda to this service to see what a payment
 If you're wondering what we passed in to the commands above:
 
 - For `amount`, we're sending a test value of `20` coda
-- The `receiver` is the public key of the [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service)
+- The `receiver` is the public key of the [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo)
 - For `fee`, let's use the current market rate of `5` coda
 - The `privkey-path` is the private key file path of the private key we generated the `keys` folder
 
