@@ -970,7 +970,7 @@ module Types = struct
     let set_staking =
       obj "SetStakingInput" ~coerce:Fn.id
         ~fields:
-          [ arg "accounts"
+          [ arg "publicKeys"
               ~typ:(non_null (list (non_null public_key_arg)))
               ~doc:
                 "Public keys of accounts you wish to stake - these must be \
@@ -984,7 +984,7 @@ module Types = struct
     let set_snark_worker =
       obj "SetSnarkWorkerInput" ~coerce:Fn.id
         ~fields:
-          [ arg "wallet" ~typ:public_key_arg
+          [ arg "publicKey" ~typ:public_key_arg
               ~doc:
                 "Public key you wish to start snark-working on; null to stop \
                  doing any snark work" ]
