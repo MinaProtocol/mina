@@ -2,7 +2,7 @@
 
 Coda is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
 
-The Coda Wallet desktop app allows you to manage your wallets, send and receive transactions, and stake your Coda for coinbase rewards.
+The Coda Wallet desktop app allows you to manage your accounts, send and receive transactions, and stake your Coda for coinbase rewards.
 
 We have a [Discord server](https://bit.ly/CodaDiscord)! Please come by if you
 need help or have questions. You might also be interested in the [OCaml

@@ -3,4 +3,4 @@
   (public_name quickcheck_lib)
   (libraries core_kernel currency rose_tree)
   (inline_tests)
-  (preprocess (pps ppx_jane)))
+  (preprocess (pps ppx_coda ppx_jane)))

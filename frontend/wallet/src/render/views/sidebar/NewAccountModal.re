@@ -1,8 +1,8 @@
 open Tc;
 
-let defaultName = "My Wallet";
+let defaultName = "My Account";
 
-module AddWallet = [%graphql
+module AddAccount = [%graphql
   {|
      mutation addWallet($password: String) {
          addWallet(input: {password: $password}) {
@@ -12,11 +12,11 @@ module AddWallet = [%graphql
    |}
 ];
 
-module AddWalletMutation = ReasonApollo.CreateMutation(AddWallet);
+module AddAccountMutation = ReasonApollo.CreateMutation(AddAccount);
 
 [@react.component]
 let make = (~onClose) => {
-  let (walletName, setName) = React.useState(() => defaultName);
+  let (accountName, setName) = React.useState(() => defaultName);
   let (password, setPassword) = React.useState(() => "");
 
   let (_settings, updateAddressBook) =
@@ -32,7 +32,7 @@ let make = (~onClose) => {
       <TextField
         label="Name"
         onChange={value => setName(_ => value)}
-        value=walletName
+        value=accountName
       />
       <Spacer height=0.5 />
       <TextField
@@ -45,13 +45,13 @@ let make = (~onClose) => {
       <div className=Css.(style([display(`flex)]))>
         <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
         <Spacer width=1. />
-        <AddWalletMutation>
+        <AddAccountMutation>
           {(mutation, _) =>
              <Button
                label="Create"
                style=Button.Green
                onClick={_ => {
-                 let variables = AddWallet.make(~password, ())##variables;
+                 let variables = AddAccount.make(~password, ())##variables;
                  let performMutation =
                    Task.liftPromise(() =>
                      mutation(
@@ -65,16 +65,18 @@ let make = (~onClose) => {
                    ~f=
                      fun
                      | EmptyResponse => ()
-                     | Errors(_) => print_endline("Error adding wallet")
+                     | Errors(_) => print_endline("Error adding account")
                      | Data(data) => {
                          let key = data##addWallet##publicKey;
-                         updateAddressBook(AddressBook.set(~key, ~name=walletName));
+                         updateAddressBook(
+                           AddressBook.set(~key, ~name=accountName),
+                         );
                          onClose();
                        },
                  );
                }}
              />}
-        </AddWalletMutation>
+        </AddAccountMutation>
       </div>
     </div>
   </Modal>;
