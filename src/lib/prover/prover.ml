@@ -40,12 +40,12 @@ module Worker_state = struct
     module Transaction_snark : Transaction_snark.Verification.S
 
     val extend_blockchain :
-         Blockchain.Stable.Latest.t
+         Blockchain.t
       -> Protocol_state.Value.t
       -> Snark_transition.value
       -> Consensus.Data.Prover_state.t
       -> Pending_coinbase_witness.t
-      -> Blockchain.Stable.Latest.t Or_error.t
+      -> Blockchain.t Or_error.t
 
     val verify : Protocol_state.Value.t -> Proof.t -> bool
   end
@@ -102,7 +102,7 @@ module Worker_state = struct
                          (Keys.Step.input ()) prover_state main
                          next_state_top_hash
                      in
-                     { Blockchain.Stable.Latest.state= next_state
+                     { Blockchain.state= next_state
                      ; proof= wrap next_state_top_hash prev_proof } )
 
                let verify state proof =
@@ -117,7 +117,7 @@ module Worker_state = struct
                open Snark_params
                module Transaction_snark = Transaction_snark
 
-               let extend_blockchain (chain : Blockchain.Stable.Latest.t)
+               let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
                    (block : Snark_transition.value) state_for_handler
                    pending_coinbase =
@@ -141,7 +141,7 @@ module Worker_state = struct
                       (main @@ Tick.Field.Var.constant next_state_top_hash)
                       prover_state)
                    ~f:(fun () ->
-                     { Blockchain.Stable.Latest.state= next_state
+                     { Blockchain.state= next_state
                      ; proof= Precomputed_values.base_proof } )
 
                let verify _state _proof = true
@@ -154,8 +154,7 @@ module Worker_state = struct
                let extend_blockchain _chain next_state _block
                    _state_for_handler _pending_coinbase =
                  Ok
-                   { Blockchain.Stable.Latest.proof=
-                       Precomputed_values.base_proof
+                   { Blockchain.proof= Precomputed_values.base_proof
                    ; state= next_state }
 
                let verify _ _ = true
@@ -192,7 +191,7 @@ module Functions = struct
 
   let verify_blockchain =
     create Blockchain.Stable.Latest.bin_t bin_bool
-      (fun w {Blockchain.Stable.Latest.state; proof} ->
+      (fun w {Blockchain.state; proof} ->
         let%map (module W) = Worker_state.get w in
         W.verify state proof )
 end
@@ -306,7 +305,7 @@ let prove t ~prev_state ~prev_state_proof ~next_state
     (transition : Internal_transition.t) pending_coinbase =
   let open Deferred.Or_error.Let_syntax in
   let start_time = Core.Time.now () in
-  let%map {Blockchain.Stable.Latest.proof; _} =
+  let%map {Blockchain.proof; _} =
     extend_blockchain t
       (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
       next_state
