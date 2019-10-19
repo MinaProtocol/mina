@@ -144,7 +144,7 @@
           "description": null,
           "fields": [
             {
-              "name": "wallet",
+              "name": "publicKey",
               "description": "Public key you wish to start snark-working on; null to stop doing any snark work",
               "args": [],
               "type": {
@@ -158,7 +158,7 @@
           ],
           "inputFields": [
             {
-              "name": "wallet",
+              "name": "publicKey",
               "description": "Public key you wish to start snark-working on; null to stop doing any snark work",
               "type": {
                 "kind": "SCALAR",
@@ -201,7 +201,7 @@
           "description": null,
           "fields": [
             {
-              "name": "accounts",
+              "name": "publicKeys",
               "description": "Public keys of accounts you wish to stake - these must be accounts that are in trackedAccounts",
               "args": [],
               "type": {
@@ -227,7 +227,7 @@
           ],
           "inputFields": [
             {
-              "name": "accounts",
+              "name": "publicKeys",
               "description": "Public keys of accounts you wish to stake - these must be accounts that are in trackedAccounts",
               "type": {
                 "kind": "NON_NULL",
