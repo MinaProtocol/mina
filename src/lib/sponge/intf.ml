@@ -36,7 +36,17 @@ module Inputs = struct
   module type Rescue = sig
     include Common
 
+    val rounds : int
+
     val alphath_root : Field.t -> Field.t
+  end
+
+  module type Poseidon = sig
+    include Common
+
+    val rounds_full : int
+
+    val rounds_partial : int
   end
 end
 
