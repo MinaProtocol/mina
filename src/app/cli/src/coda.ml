@@ -58,7 +58,7 @@ let daemon logger =
             don't produce blocks)"
          (optional string)
      and initial_peers_raw =
-       flag "peer"
+       flag "kademlia-peer"
          ~doc:
            "HOST:PORT TCP daemon communications (can be given multiple times)"
          (listed peer)
@@ -179,7 +179,7 @@ let daemon logger =
             generate-libp2p-keypair`) to use with libp2p (default: generate \
             new keypair)"
      and libp2p_peers_raw =
-       flag "libp2p-peer"
+       flag "peer"
          ~doc:
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             libp2p discovery"
