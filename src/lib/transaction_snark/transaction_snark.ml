@@ -180,11 +180,24 @@ module Stable = struct
         ; fee_excess: Amount.Signed.Stable.V1.t
         ; sok_digest: Sok_message.Digest.Stable.V1.t
         ; proof: Proof.Stable.V1.t }
-      [@@deriving bin_io, compare, fields, sexp, version, yojson]
+      [@@deriving bin_io, compare, fields, sexp, version]
     end
 
     include T
     include Registration.Make_latest_version (T)
+
+    let to_yojson t =
+      `Assoc
+        [ ("source", Frozen_ledger_hash.to_yojson t.source)
+        ; ("target", Frozen_ledger_hash.to_yojson t.target)
+        ; ("proof_type", Proof_type.to_yojson t.proof_type)
+        ; ("supply_increase", Amount.to_yojson t.supply_increase)
+        ; ( "pending_coinbase_stack_state"
+          , Pending_coinbase_stack_state.to_yojson
+              t.pending_coinbase_stack_state )
+        ; ("fee_excess", Amount.Signed.to_yojson t.fee_excess)
+        ; ("sok_digest", `String "<opaque>")
+        ; ("proof", Proof.to_yojson t.proof) ]
   end
 
   module Latest = V1
@@ -209,7 +222,9 @@ type t = Stable.Latest.t =
   ; fee_excess: Amount.Signed.Stable.V1.t
   ; sok_digest: Sok_message.Digest.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
-[@@deriving fields, sexp, yojson]
+[@@deriving fields, sexp]
+
+let to_yojson = Stable.Latest.to_yojson
 
 let statement
     ({ source
