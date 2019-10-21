@@ -41,22 +41,26 @@ let of_string string =
 
 let to_yojson status = `String (to_string status)
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
-      [@@deriving bin_io, version, sexp, hash, compare, equal, enumerate]
+    type t =
+      [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
+    [@@deriving sexp, hash, compare, equal, enumerate]
 
-      let to_yojson = to_yojson
+    let to_latest = Fn.id
+
+    let to_yojson = to_yojson
+
+    module T = struct
+      type typ = t [@@deriving sexp, hash, compare, equal, enumerate]
+
+      type t = typ [@@deriving sexp, hash, compare, equal, enumerate]
     end
 
-    include T
     include Hashable.Make (T)
   end
-
-  module Latest = V1
-end
+end]
 
 type t = [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
 [@@deriving sexp, hash, equal, enumerate]

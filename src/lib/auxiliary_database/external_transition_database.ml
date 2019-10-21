@@ -4,17 +4,15 @@ module Time = Block_time
 
 module Database = struct
   module Value = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t =
-            Filtered_external_transition.Stable.V1.t * Block_time.Stable.V1.t
-          [@@deriving bin_io, version {unnumbered}]
-        end
+        type t =
+          Filtered_external_transition.Stable.V1.t * Block_time.Stable.V1.t
 
-        include T
+        let to_latest = Fn.id
       end
-    end
+    end]
   end
 
   include Rocksdb.Serializable.Make (State_hash.Stable.V1) (Value.Stable.V1)

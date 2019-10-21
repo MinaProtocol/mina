@@ -121,11 +121,23 @@ end
 module Runtime = struct
   let subsystem = "Runtime"
 
+  module Long_async_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 0.5 2. 7
+  end)
+
+  let long_async_cycle : Long_async_histogram.t =
+    let help = "A histogram for long async cycles" in
+    Long_async_histogram.v "long_async_cycle" ~help ~namespace ~subsystem
+
   let start_time = Core.Time.now ()
 
-  let current = ref (Gc.stat ())
+  let current_gc = ref (Gc.stat ())
 
-  let update () = current := Gc.stat ()
+  let current_jemalloc = ref (Jemalloc.get_memory_stats ())
+
+  let update () =
+    current_gc := Gc.stat () ;
+    current_jemalloc := Jemalloc.get_memory_stats ()
 
   let simple_metric ~metric_type ~help name fn =
     let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
@@ -142,59 +154,81 @@ module Runtime = struct
 
   let ocaml_gc_major_words =
     simple_metric ~metric_type:Counter "ocaml_gc_major_words"
-      (fun () -> !current.Gc.Stat.major_words)
+      (fun () -> !current_gc.Gc.Stat.major_words)
       ~help:
         "Number of words allocated in the major heap since the program was \
          started."
 
   let ocaml_gc_minor_collections =
     simple_metric ~metric_type:Counter "ocaml_gc_minor_collections"
-      (fun () -> float_of_int !current.Gc.Stat.minor_collections)
+      (fun () -> float_of_int !current_gc.Gc.Stat.minor_collections)
       ~help:
         "Number of minor collection cycles completed since the program was \
          started."
 
   let ocaml_gc_major_collections =
     simple_metric ~metric_type:Counter "ocaml_gc_major_collections"
-      (fun () -> float_of_int !current.Gc.Stat.major_collections)
+      (fun () -> float_of_int !current_gc.Gc.Stat.major_collections)
       ~help:
         "Number of major collection cycles completed since the program was \
          started."
 
   let ocaml_gc_heap_words =
     simple_metric ~metric_type:Gauge "ocaml_gc_heap_words"
-      (fun () -> float_of_int !current.Gc.Stat.heap_words)
+      (fun () -> float_of_int !current_gc.Gc.Stat.heap_words)
       ~help:"Total size of the major heap, in words."
 
   let ocaml_gc_compactions =
     simple_metric ~metric_type:Counter "ocaml_gc_compactions"
-      (fun () -> float_of_int !current.Gc.Stat.compactions)
+      (fun () -> float_of_int !current_gc.Gc.Stat.compactions)
       ~help:"Number of heap compactions since the program was started."
 
   let ocaml_gc_top_heap_words =
     simple_metric ~metric_type:Counter "ocaml_gc_top_heap_words"
-      (fun () -> float_of_int !current.Gc.Stat.top_heap_words)
+      (fun () -> float_of_int !current_gc.Gc.Stat.top_heap_words)
       ~help:"Maximum size reached by the major heap, in words."
 
   let ocaml_gc_live_words =
     simple_metric ~metric_type:Counter "ocaml_gc_live_words"
-      (fun () -> float_of_int !current.Gc.Stat.live_words)
+      (fun () -> float_of_int !current_gc.Gc.Stat.live_words)
       ~help:"Live words allocated by the GC."
 
   let ocaml_gc_free_words =
     simple_metric ~metric_type:Counter "ocaml_gc_free_words"
-      (fun () -> float_of_int !current.Gc.Stat.free_words)
+      (fun () -> float_of_int !current_gc.Gc.Stat.free_words)
       ~help:"Words freed by the GC."
 
   let ocaml_gc_largest_free =
     simple_metric ~metric_type:Counter "ocaml_gc_largest_free"
-      (fun () -> float_of_int !current.Gc.Stat.largest_free)
+      (fun () -> float_of_int !current_gc.Gc.Stat.largest_free)
       ~help:"Size of the largest block freed by the GC."
 
   let ocaml_gc_stack_size =
     simple_metric ~metric_type:Counter "ocaml_gc_stack_size"
-      (fun () -> float_of_int !current.Gc.Stat.stack_size)
+      (fun () -> float_of_int !current_gc.Gc.Stat.stack_size)
       ~help:"Current stack size."
+
+  let jemalloc_active_bytes =
+    simple_metric ~metric_type:Gauge "jemalloc_active_bytes"
+      (fun () -> float_of_int @@ (1024 * !current_jemalloc.active))
+      ~help:"active memory in bytes"
+
+  let jemalloc_resident_bytes =
+    simple_metric ~metric_type:Gauge "jemalloc_resident_bytes"
+      (fun () -> float_of_int @@ (1024 * !current_jemalloc.resident))
+      ~help:
+        "resident memory in bytes (may be zero depending on jemalloc compile \
+         options)"
+
+  let jemalloc_allocated_bytes =
+    simple_metric ~metric_type:Gauge "jemalloc_allocated_bytes"
+      (fun () -> float_of_int @@ (1024 * !current_jemalloc.allocated))
+      ~help:"memory allocated to heap objects in bytes"
+
+  let jemalloc_mapped_bytes =
+    simple_metric ~metric_type:Gauge "jemalloc_mapped_bytes"
+      (fun () -> float_of_int @@ (1024 * !current_jemalloc.mapped))
+      ~help:"memory mapped into process address space in bytes"
 
   let process_cpu_seconds_total =
     simple_metric ~metric_type:Counter "process_cpu_seconds_total" Sys.time
@@ -218,6 +252,10 @@ module Runtime = struct
     ; ocaml_gc_free_words
     ; ocaml_gc_largest_free
     ; ocaml_gc_stack_size
+    ; jemalloc_active_bytes
+    ; jemalloc_resident_bytes
+    ; jemalloc_allocated_bytes
+    ; jemalloc_mapped_bytes
     ; process_cpu_seconds_total
     ; process_uptime_ms_total ]
 
@@ -349,6 +387,14 @@ module Snark_work = struct
        after every block"
     in
     Gauge.v "scan_state_snark_work" ~help ~namespace ~subsystem
+
+  module Snark_fee_histogram = Histogram (struct
+    let spec = Histogram_spec.of_linear 0. 1. 10
+  end)
+
+  let snark_fee =
+    let help = "A histogram for snark fees" in
+    Snark_fee_histogram.v "snark_fee" ~help ~namespace ~subsystem
 end
 
 module Trust_system = struct
