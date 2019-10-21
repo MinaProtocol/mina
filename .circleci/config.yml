@@ -112,10 +112,13 @@ jobs:
             - run:
                   name: Require ppx_coda preprocessing for linting
                   command: ./scripts/require-ppx-coda.py
+    lint-opt:
+        docker:
+            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+        steps:
             - run:
                   name: Compare versioned types in PR
                   command: ./scripts/compare_pr_diff_types.sh
-
     update-branch-protection:
         docker:
             - image: python:3
