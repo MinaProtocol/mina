@@ -116,7 +116,7 @@ struct
         else "Decreasing"
       in
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:([("peer_ip", Peer_id.to_yojson peer)] @ action_metadata)
+        ~metadata:([("peer_id", Peer_id.to_yojson peer)] @ action_metadata)
         "%s trust for peer $peer due to action %s. New trust is %f." verb
         action_fmt simple_new.trust
     in
@@ -126,7 +126,7 @@ struct
           Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
             ~location:__LOC__
             ~metadata:
-              ( [ ("peer_ip", Peer_id.to_yojson peer)
+              ( [ ("peer_id", Peer_id.to_yojson peer)
                 ; ( "expiration"
                   , `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
                   ) ]
