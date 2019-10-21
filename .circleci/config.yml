@@ -112,6 +112,10 @@ jobs:
             - run:
                   name: Require ppx_coda preprocessing for linting
                   command: ./scripts/require-ppx-coda.py
+            - run:
+                  name: Compare versioned types in PR
+                  command: source ~/.profile && (cd src ; dune build --profile=print_versioned_types lib/ppx_coda/run_ppx_coda.exe) && ./scripts/compare_pr_diff_types.py ${CIRCLE_PULL_REQUEST}'
+
     update-branch-protection:
         docker:
             - image: python:3

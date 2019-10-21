@@ -255,7 +255,7 @@ let convert_module_stri last_version stri =
           "Expected a statement of the form `module Vn = struct ... end`." )
       (fun name str -> (name, str))
   in
-  Versioned.validate_module_version name.txt name.loc ;
+  Versioned_type.validate_module_version name.txt name.loc ;
   let version =
     String.sub name.txt ~pos:1 ~len:(String.length name.txt - 1)
     |> int_of_string

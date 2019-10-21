@@ -27,4 +27,6 @@
 
 [%%define mock_frontend_data false]
 
+[%%define print_versioned_types false]
+
 [%%define daemon_expiry "2019-10-22 14:00:00-07:00"]
