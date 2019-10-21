@@ -117,7 +117,7 @@ struct
       in
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:([("peer_id", Peer_id.to_yojson peer)] @ action_metadata)
-        "%s trust for peer $peer due to action %s. New trust is %f." verb
+        "%s trust for peer $peer_id due to %s. New trust is %f." verb
         action_fmt simple_new.trust
     in
     let%map () =
@@ -131,7 +131,7 @@ struct
                   , `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
                   ) ]
               @ action_metadata )
-            "Banning peer $peer until $expiration because it %s" action_fmt ;
+            "Banning peer $peer_id until $expiration due to %s" action_fmt ;
           if Option.is_some db then (
             Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
             Strict_pipe.Writer.write bans_writer (peer, expiration) )
