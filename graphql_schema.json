@@ -1182,7 +1182,7 @@
             },
             {
               "name": "createAccount",
-              "description": "Add a wallet - this will create a new keypair and store it in the daemon",
+              "description": "Create a new account - this will create a new keypair and store it in the daemon",
               "args": [
                 {
                   "name": "input",

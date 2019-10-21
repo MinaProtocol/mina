@@ -1335,6 +1335,13 @@ end
 module Mutations = struct
   open Schema
 
+  let create_account_resolver {ctx= t; _} () password =
+    let password = lazy (return (Bytes.of_string password)) in
+    let%map pk =
+      Coda_lib.wallets t |> Secrets.Wallets.generate_new ~password
+    in
+    Result.return pk
+
   let add_wallet =
     io_field "addWallet"
       ~doc:
@@ -1343,26 +1350,28 @@ module Mutations = struct
       ~deprecated:(Deprecated (Some "use createAccount instead"))
       ~typ:(non_null Types.Payload.create_account)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_account)]
-      ~resolve:(fun {ctx= t; _} () password ->
-        let password = lazy (return (Bytes.of_string password)) in
-        let%map pk =
-          Coda_lib.wallets t |> Secrets.Wallets.generate_new ~password
-        in
-        Result.return pk )
+      ~resolve:create_account_resolver
 
   let create_account =
     io_field "createAccount"
       ~doc:
-        "Add a wallet - this will create a new keypair and store it in the \
-         daemon"
+        "Create a new account - this will create a new keypair and store it \
+         in the daemon"
       ~typ:(non_null Types.Payload.create_account)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_account)]
-      ~resolve:(fun {ctx= t; _} () password ->
-        let password = lazy (return (Bytes.of_string password)) in
-        let%map pk =
-          Coda_lib.wallets t |> Secrets.Wallets.generate_new ~password
-        in
-        Result.return pk )
+      ~resolve:create_account_resolver
+
+  let unlock_account_resolver {ctx= t; _} () (password, pk) =
+    let password = lazy (return (Bytes.of_string password)) in
+    match%map
+      Coda_lib.wallets t |> Secrets.Wallets.unlock ~needle:pk ~password
+    with
+    | Error `Not_found ->
+        Error "Could not find owned account associated with provided key"
+    | Error `Bad_password ->
+        Error "Wrong password provided"
+    | Ok () ->
+        Ok pk
 
   let unlock_wallet =
     io_field "unlockWallet"
@@ -1370,34 +1379,18 @@ module Mutations = struct
       ~deprecated:(Deprecated (Some "use unlockAccount instead"))
       ~typ:(non_null Types.Payload.unlock_account)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.unlock_account)]
-      ~resolve:(fun {ctx= t; _} () (password, pk) ->
-        let password = lazy (return (Bytes.of_string password)) in
-        match%map
-          Coda_lib.wallets t |> Secrets.Wallets.unlock ~needle:pk ~password
-        with
-        | Error `Not_found ->
-            Error "Could not find owned account associated with provided key"
-        | Error `Bad_password ->
-            Error "Wrong password provided"
-        | Ok () ->
-            Ok pk )
+      ~resolve:unlock_account_resolver
 
   let unlock_account =
     io_field "unlockAccount"
       ~doc:"Allow transactions to be sent from the unlocked account"
       ~typ:(non_null Types.Payload.unlock_account)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.unlock_account)]
-      ~resolve:(fun {ctx= t; _} () (password, pk) ->
-        let password = lazy (return (Bytes.of_string password)) in
-        match%map
-          Coda_lib.wallets t |> Secrets.Wallets.unlock ~needle:pk ~password
-        with
-        | Error `Not_found ->
-            Error "Could not find owned account associated with provided key"
-        | Error `Bad_password ->
-            Error "Wrong password provided"
-        | Ok () ->
-            Ok pk )
+      ~resolve:unlock_account_resolver
+
+  let lock_account_resolver {ctx= t; _} () pk =
+    Coda_lib.wallets t |> Secrets.Wallets.lock ~needle:pk ;
+    pk
 
   let lock_wallet =
     field "lockWallet"
@@ -1405,18 +1398,25 @@ module Mutations = struct
       ~deprecated:(Deprecated (Some "use lockAccount instead"))
       ~typ:(non_null Types.Payload.lock_account)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.lock_account)]
-      ~resolve:(fun {ctx= t; _} () pk ->
-        Coda_lib.wallets t |> Secrets.Wallets.lock ~needle:pk ;
-        pk )
+      ~resolve:lock_account_resolver
 
   let lock_account =
     field "lockAccount"
       ~doc:"Lock an unlocked account to prevent transaction being sent from it"
       ~typ:(non_null Types.Payload.lock_account)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.lock_account)]
-      ~resolve:(fun {ctx= t; _} () pk ->
-        Coda_lib.wallets t |> Secrets.Wallets.lock ~needle:pk ;
-        pk )
+      ~resolve:lock_account_resolver
+
+  let delete_account_resolver {ctx= coda; _} () public_key =
+    let open Deferred.Result.Let_syntax in
+    let wallets = Coda_lib.wallets coda in
+    let%map () =
+      Deferred.Result.map_error
+        ~f:(fun `Not_found ->
+          "Could not find account with specified public key" )
+        (Secrets.Wallets.delete wallets public_key)
+    in
+    public_key
 
   let delete_wallet =
     io_field "deleteWallet"
@@ -1424,32 +1424,20 @@ module Mutations = struct
       ~deprecated:(Deprecated (Some "use deleteAccount instead"))
       ~typ:(non_null Types.Payload.delete_account)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.delete_account)]
-      ~resolve:(fun {ctx= coda; _} () public_key ->
-        let open Deferred.Result.Let_syntax in
-        let wallets = Coda_lib.wallets coda in
-        let%map () =
-          Deferred.Result.map_error
-            ~f:(fun `Not_found ->
-              "Could not find wallet with specified public key" )
-            (Secrets.Wallets.delete wallets public_key)
-        in
-        public_key )
+      ~resolve:delete_account_resolver
 
   let delete_account =
     io_field "deleteAccount"
       ~doc:"Delete the private key for an account that you track"
       ~typ:(non_null Types.Payload.delete_account)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.delete_account)]
-      ~resolve:(fun {ctx= coda; _} () public_key ->
-        let open Deferred.Result.Let_syntax in
-        let wallets = Coda_lib.wallets coda in
-        let%map () =
-          Deferred.Result.map_error
-            ~f:(fun `Not_found ->
-              "Could not find wallet with specified public key" )
-            (Secrets.Wallets.delete wallets public_key)
-        in
-        public_key )
+      ~resolve:delete_account_resolver
+
+  let reload_account_resolver {ctx= coda; _} () =
+    let%map _ =
+      Secrets.Wallets.reload ~logger:(Logger.create ()) (Coda_lib.wallets coda)
+    in
+    Ok true
 
   let reload_wallets =
     io_field "reloadWallets"
@@ -1457,24 +1445,14 @@ module Mutations = struct
       ~deprecated:(Deprecated (Some "use reloadAccounts instead"))
       ~typ:(non_null Types.Payload.reload_accounts)
       ~args:Arg.[]
-      ~resolve:(fun {ctx= coda; _} () ->
-        let%map _ =
-          Secrets.Wallets.reload ~logger:(Logger.create ())
-            (Coda_lib.wallets coda)
-        in
-        Ok true )
+      ~resolve:reload_account_resolver
 
   let reload_accounts =
     io_field "reloadAccounts"
       ~doc:"Reload tracked account information from disk"
       ~typ:(non_null Types.Payload.reload_accounts)
       ~args:Arg.[]
-      ~resolve:(fun {ctx= coda; _} () ->
-        let%map _ =
-          Secrets.Wallets.reload ~logger:(Logger.create ())
-            (Coda_lib.wallets coda)
-        in
-        Ok true )
+      ~resolve:reload_account_resolver
 
   let reset_trust_status =
     io_field "resetTrustStatus"
@@ -1732,40 +1710,42 @@ module Queries = struct
       ~doc:"The version of the node (git commit hash)"
       ~resolve:(fun _ _ -> Some Coda_version.commit_id)
 
+  let tracked_accounts_resolver {ctx= coda; _} () =
+    let wallets = Coda_lib.wallets coda in
+    let propose_public_keys = Coda_lib.propose_public_keys coda in
+    wallets |> Secrets.Wallets.pks
+    |> List.map ~f:(fun pk ->
+           { Types.AccountObj.account=
+               Types.AccountObj.Partial_account.of_pk coda pk
+           ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
+           ; is_actively_staking=
+               Public_key.Compressed.Set.mem propose_public_keys pk
+           ; path= Secrets.Wallets.get_path wallets pk } )
+
   let owned_wallets =
     field "ownedWallets"
       ~doc:"Wallets for which the daemon knows the private key"
       ~typ:(non_null (list (non_null Types.AccountObj.account)))
       ~deprecated:(Deprecated (Some "use trackedAccounts instead"))
       ~args:Arg.[]
-      ~resolve:(fun {ctx= coda; _} () ->
-        let wallets = Coda_lib.wallets coda in
-        let propose_public_keys = Coda_lib.propose_public_keys coda in
-        wallets |> Secrets.Wallets.pks
-        |> List.map ~f:(fun pk ->
-               { Types.AccountObj.account=
-                   Types.AccountObj.Partial_account.of_pk coda pk
-               ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
-               ; is_actively_staking=
-                   Public_key.Compressed.Set.mem propose_public_keys pk
-               ; path= Secrets.Wallets.get_path wallets pk } ) )
+      ~resolve:tracked_accounts_resolver
 
   let tracked_accounts =
     field "trackedAccounts"
       ~doc:"Accounts for which the daemon tracks the private key"
       ~typ:(non_null (list (non_null Types.AccountObj.account)))
       ~args:Arg.[]
-      ~resolve:(fun {ctx= coda; _} () ->
-        let wallets = Coda_lib.wallets coda in
-        let propose_public_keys = Coda_lib.propose_public_keys coda in
-        wallets |> Secrets.Wallets.pks
-        |> List.map ~f:(fun pk ->
-               { Types.AccountObj.account=
-                   Types.AccountObj.Partial_account.of_pk coda pk
-               ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
-               ; is_actively_staking=
-                   Public_key.Compressed.Set.mem propose_public_keys pk
-               ; path= Secrets.Wallets.get_path wallets pk } ) )
+      ~resolve:tracked_accounts_resolver
+
+  let account_resolver {ctx= coda; _} () pk =
+    let propose_public_keys = Coda_lib.propose_public_keys coda in
+    let wallets = Coda_lib.wallets coda in
+    Some
+      { Types.AccountObj.account= Types.AccountObj.Partial_account.of_pk coda pk
+      ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
+      ; is_actively_staking=
+          Public_key.Compressed.Set.mem propose_public_keys pk
+      ; path= Secrets.Wallets.get_path wallets pk }
 
   let wallet =
     field "wallet" ~doc:"Find any wallet via a public key"
@@ -1774,16 +1754,7 @@ module Queries = struct
         Arg.
           [ arg "publicKey" ~doc:"Public key of account being retrieved"
               ~typ:(non_null Types.Input.public_key_arg) ]
-      ~resolve:(fun {ctx= coda; _} () pk ->
-        let propose_public_keys = Coda_lib.propose_public_keys coda in
-        let wallets = Coda_lib.wallets coda in
-        Some
-          { Types.AccountObj.account=
-              Types.AccountObj.Partial_account.of_pk coda pk
-          ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
-          ; is_actively_staking=
-              Public_key.Compressed.Set.mem propose_public_keys pk
-          ; path= Secrets.Wallets.get_path wallets pk } )
+      ~resolve:account_resolver
 
   let account =
     field "account" ~doc:"Find any account via a public key"
@@ -1792,16 +1763,7 @@ module Queries = struct
         Arg.
           [ arg "publicKey" ~doc:"Public key of account being retrieved"
               ~typ:(non_null Types.Input.public_key_arg) ]
-      ~resolve:(fun {ctx= coda; _} () pk ->
-        let propose_public_keys = Coda_lib.propose_public_keys coda in
-        let wallets = Coda_lib.wallets coda in
-        Some
-          { Types.AccountObj.account=
-              Types.AccountObj.Partial_account.of_pk coda pk
-          ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
-          ; is_actively_staking=
-              Public_key.Compressed.Set.mem propose_public_keys pk
-          ; path= Secrets.Wallets.get_path wallets pk } )
+      ~resolve:account_resolver
 
   let transaction_status =
     result_field "transactionStatus" ~doc:"Get the status of a transaction"
