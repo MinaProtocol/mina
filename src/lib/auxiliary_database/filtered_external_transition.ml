@@ -4,21 +4,17 @@ open Coda_transition
 open Signature_lib
 
 module Transactions = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { user_commands: User_command.Stable.V1.t list
-          ; fee_transfers: Fee_transfer.Single.Stable.V1.t list
-          ; coinbase: Currency.Amount.Stable.V1.t }
-        [@@deriving bin_io, version {unnumbered}]
-      end
+      type t =
+        { user_commands: User_command.Stable.V1.t list
+        ; fee_transfers: Fee_transfer.Single.Stable.V1.t list
+        ; coinbase: Currency.Amount.Stable.V1.t }
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t =
     { user_commands: User_command.t list
@@ -27,22 +23,17 @@ module Transactions = struct
 end
 
 module Protocol_state = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { previous_state_hash: State_hash.Stable.V1.t
-          ; blockchain_state: Coda_state.Blockchain_state.Value.Stable.V1.t
-          ; consensus_state: Consensus.Data.Consensus_state.Value.Stable.V1.t
-          }
-        [@@deriving bin_io, version {unnumbered}]
-      end
+      type t =
+        { previous_state_hash: State_hash.Stable.V1.t
+        ; blockchain_state: Coda_state.Blockchain_state.Value.Stable.V1.t
+        ; consensus_state: Consensus.Data.Consensus_state.Value.Stable.V1.t }
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t =
     { previous_state_hash: State_hash.t
@@ -50,22 +41,18 @@ module Protocol_state = struct
     ; consensus_state: Consensus.Data.Consensus_state.Value.t }
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        { creator: Public_key.Compressed.Stable.V1.t
-        ; protocol_state: Protocol_state.Stable.V1.t
-        ; transactions: Transactions.Stable.V1.t
-        ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list }
-      [@@deriving bin_io, version {unnumbered}]
-    end
+    type t =
+      { creator: Public_key.Compressed.Stable.V1.t
+      ; protocol_state: Protocol_state.Stable.V1.t
+      ; transactions: Transactions.Stable.V1.t
+      ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list }
 
-    include T
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t =
   { creator: Public_key.Compressed.t
