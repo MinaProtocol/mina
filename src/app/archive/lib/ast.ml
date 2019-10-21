@@ -5,7 +5,6 @@ module Rel_insert_input = struct
   type nonrec ('data, 'on_conflict) array = ('data array, 'on_conflict) t
 end
 
-(* Hack: void is an inhabited type. It is used to make empty lists *)
 type void
 
 module On_conflict = struct
