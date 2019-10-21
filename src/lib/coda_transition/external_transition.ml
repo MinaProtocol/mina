@@ -4,52 +4,61 @@ open Coda_base
 open Coda_state
 open Module_version
 
+[%%versioned
 module Stable = struct
   module V1 = struct
+    type t =
+      { protocol_state: Protocol_state.Value.Stable.V1.t
+      ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+      ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
+      ; delta_transition_chain_proof:
+          State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list }
+    [@@deriving sexp, fields]
+
+    let to_latest = Fn.id
+
+    let to_yojson
+        { protocol_state
+        ; protocol_state_proof= _
+        ; staged_ledger_diff= _
+        ; delta_transition_chain_proof= _ } =
+      `Assoc
+        [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
+        ; ("protocol_state_proof", `String "<opaque>")
+        ; ("staged_ledger_diff", `String "<opaque>")
+        ; ("delta_transition_chain_proof", `String "<opaque>") ]
+
+    let delta_transition_chain_proof {delta_transition_chain_proof; _} =
+      delta_transition_chain_proof
+
+    let consensus_state {protocol_state; _} =
+      Protocol_state.consensus_state protocol_state
+
+    let blockchain_state {protocol_state; _} =
+      Protocol_state.blockchain_state protocol_state
+
+    let state_hash {protocol_state; _} = Protocol_state.hash protocol_state
+
+    let parent_hash {protocol_state; _} =
+      Protocol_state.previous_state_hash protocol_state
+
+    let proposer {staged_ledger_diff; _} =
+      Staged_ledger_diff.creator staged_ledger_diff
+
+    let user_commands {staged_ledger_diff; _} =
+      Staged_ledger_diff.user_commands staged_ledger_diff
+
+    let payments external_transition =
+      List.filter
+        (user_commands external_transition)
+        ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
+
     module T = struct
-      type t =
-        { protocol_state: Protocol_state.Value.Stable.V1.t
-        ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-        ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
-        ; delta_transition_chain_proof:
-            State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list }
-      [@@deriving sexp, fields, bin_io, version]
+      type nonrec t = t
 
-      let to_yojson
-          { protocol_state
-          ; protocol_state_proof= _
-          ; staged_ledger_diff= _
-          ; delta_transition_chain_proof= _ } =
-        `Assoc
-          [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
-          ; ("protocol_state_proof", `String "<opaque>")
-          ; ("staged_ledger_diff", `String "<opaque>")
-          ; ("delta_transition_chain_proof", `String "<opaque>") ]
+      let t_of_sexp = t_of_sexp
 
-      let delta_transition_chain_proof {delta_transition_chain_proof; _} =
-        delta_transition_chain_proof
-
-      let consensus_state {protocol_state; _} =
-        Protocol_state.consensus_state protocol_state
-
-      let blockchain_state {protocol_state; _} =
-        Protocol_state.blockchain_state protocol_state
-
-      let state_hash {protocol_state; _} = Protocol_state.hash protocol_state
-
-      let parent_hash {protocol_state; _} =
-        Protocol_state.previous_state_hash protocol_state
-
-      let proposer {staged_ledger_diff; _} =
-        Staged_ledger_diff.creator staged_ledger_diff
-
-      let user_commands {staged_ledger_diff; _} =
-        Staged_ledger_diff.user_commands staged_ledger_diff
-
-      let payments external_transition =
-        List.filter
-          (user_commands external_transition)
-          ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
+      let sexp_of_t = sexp_of_t
 
       let compare =
         Comparable.lift
@@ -66,22 +75,9 @@ module Stable = struct
           ~f:consensus_state
     end
 
-    include T
     include Comparable.Make (T)
-    include Registration.Make_latest_version (T)
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "external_transition"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 (* bin_io omitted *)
 type t = Stable.Latest.t =
@@ -135,18 +131,22 @@ module Validation = struct
           * 'delta_transition_chain
           * 'frontier_dependencies
           * 'staged_ledger_diff
-          constraint 'time_received = [`Time_received] * (unit, _) Truth.t
-          constraint 'proof = [`Proof] * (unit, _) Truth.t
+          constraint
+            'time_received =
+            [`Time_received] * (unit, _) Truth.Stable.V1.t
+          constraint 'proof = [`Proof] * (unit, _) Truth.Stable.V1.t
           constraint
             'delta_transition_chain =
             [`Delta_transition_chain]
-            * (State_hash.t Non_empty_list.t, _) Truth.t
+            * ( State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
+              , _ )
+              Truth.Stable.V1.t
           constraint
             'frontier_dependencies =
-            [`Frontier_dependencies] * (unit, _) Truth.t
+            [`Frontier_dependencies] * (unit, _) Truth.Stable.V1.t
           constraint
             'staged_ledger_diff =
-            [`Staged_ledger_diff] * (unit, _) Truth.t
+            [`Staged_ledger_diff] * (unit, _) Truth.Stable.V1.t
         [@@deriving version]
       end
 
@@ -542,12 +542,24 @@ module Validated = struct
             Validation.Stable.V1.t
         [@@deriving version]
 
-        type erased =
-          ( Stable.Latest.t
-          , State_hash.Stable.Latest.t )
-          With_hash.Stable.Latest.t
-          * State_hash.Stable.Latest.t Non_empty_list.Stable.Latest.t
-        [@@deriving sexp, bin_io]
+        module Erased = struct
+          (* if this type receives a new version, that changes the serialization of
+             the type `t', so that type must also get a new version
+          *)
+          [%%versioned
+          module Stable = struct
+            module V1 = struct
+              type t =
+                (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
+                * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
+              [@@deriving sexp]
+
+              let to_latest = Fn.id
+            end
+          end]
+        end
+
+        type erased = Erased.Stable.Latest.t [@@deriving sexp]
 
         let erase (transition_with_hash, validation) =
           ( transition_with_hash
@@ -574,7 +586,7 @@ module Validated = struct
                   end)
 
         include Binable.Of_binable (struct
-                    type t = erased [@@deriving bin_io]
+                    type t = Erased.Stable.Latest.t [@@deriving bin_io]
                   end)
                   (struct
                     type nonrec t = t
