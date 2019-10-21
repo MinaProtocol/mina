@@ -101,7 +101,7 @@ module Stable = struct
     type t =
       ( Public_key.Compressed.Stable.V1.t
       , Balance.Stable.V1.t
-      , string (* dummy for CI testing *)
+      , Nonce.Stable.V1.t
       , Receipt.Chain_hash.Stable.V1.t
       , State_hash.Stable.V1.t )
       Poly.Stable.V1.t
