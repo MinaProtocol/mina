@@ -10,20 +10,45 @@
 
 (executable
   (package votie)
-  (name registrar)
-  (public_name registrar)
+  (name voter)
+  (public_name voter)
   (modes native)
-  (libraries votie_lib votie_rpcs snarky universe sponge core async)
-  (preprocess (pps ppx_jane ppx_deriving.std))
-  (modules registrar)
-)
+  (libraries
+    textutils.ascii_table
+    votie_lib
+    voter_lib
+    commander
+    votie_rpcs
+    snarky
+    universe
+    core async)
+  (preprocess (pps ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (modules voter) )
 
 (executable
   (package votie)
-  (name registrar_client)
-  (public_name registrar_client)
+  (name voter_daemon)
+  (public_name voter_daemon)
   (modes native)
-  (libraries votie_lib votie_rpcs snarky universe sponge core async)
+  (libraries votie_lib voter_lib votie_rpcs snarky universe sponge core async async.persistent_connection)
   (preprocess (pps ppx_jane ppx_deriving.std ppx_deriving_yojson))
-  (modules registrar_client)
-)
+  (modules voter_daemon) )
+
+(executable
+  (package votie)
+  (name registrar_daemon)
+  (public_name registrar_daemon)
+  (modes native)
+  (libraries votie_lib registrar_lib votie_rpcs snarky universe sponge core async)
+  (preprocess (pps ppx_jane ppx_deriving.std))
+  (modules registrar_daemon))
+
+(executable
+  (package votie)
+  (name registrar)
+  (public_name registrar)
+  (modes native)
+  (libraries votie_lib registrar_lib votie_rpcs snarky universe sponge core async)
+  (preprocess (pps ppx_jane ppx_deriving.std))
+  (modules registrar))
+

@@ -1,4 +1,5 @@
 (library
+  (flags -w -2)
   (name votie_rpcs)
   (public_name votie.rpcs)
   (preprocess (pps ppx_jane ppx_coda ppx_deriving.eq ppx_deriving_yojson))

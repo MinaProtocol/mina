@@ -50,14 +50,14 @@ module Hash = struct
     end
 
     val typ : (Checked.t, t) Typ.t
-  end  = struct
+  end = struct
     type t = Field.t [@@deriving bin_io, eq, compare, sexp]
 
     let to_yojson x = `String (Field.to_string x)
 
-      open Run
-    module Checked = struct
+    open Run
 
+    module Checked = struct
       type t = Field.t
 
       let if_ = Field.if_
@@ -68,9 +68,9 @@ module Hash = struct
     let typ = Field.typ
   end
 
-
   module Rounds = struct
     let rounds_full = 8
+
     let rounds_partial = 83
   end
 
@@ -83,13 +83,10 @@ module Hash = struct
     let to_the_alpha x =
       let open Field in
       let res = x + zero in
-      res *= res ;
-      (* x^2 *)
-      res *= res ;
-      (* x^4 *)
-      res *= x ;
-      (* x^5 *)
-      res
+      res *= res ; (* x^2 *)
+                   res *= res ; (* x^4 *)
+                                res *= x ; (* x^5 *)
+                                           res
 
     module Operations = struct
       let apply_matrix rows v =
@@ -109,7 +106,7 @@ module Hash = struct
     end
   end
 
-  include Sponge.Make(Sponge.Poseidon(Inputs))
+  include Sponge.Make (Sponge.Poseidon (Inputs))
 
   let update ~state = update ~state params
 
@@ -118,6 +115,7 @@ module Hash = struct
   module Checked = struct
     module Inputs = struct
       include Rounds
+
       module Field = struct
         (* The linear combinations involved in computing Poseidon do not involve very many
     variables, but if they are represented as arithmetic expressions (that is, "Cvars"
@@ -184,7 +182,8 @@ module Hash = struct
 
       module Operations = Sponge.Make_operations (Field)
     end
-    include Sponge.Make(Sponge.Poseidon(Inputs))
+
+    include Sponge.Make (Sponge.Poseidon (Inputs))
 
     type t = Field.Var.t
 
@@ -209,21 +208,22 @@ module Hash = struct
     let digest xs = xs.(0)
   end
 
-let pack_input = pack_input ~project:Field.project
+  let pack_input = pack_input ~project:Field.project
 end
 
 module Merkle_tree (Elt : sig
-    type t [@@deriving bin_io, eq, sexp, to_yojson, compare]
+  type t [@@deriving bin_io, eq, sexp, to_yojson, compare]
 
-    val hash : t -> Hash.Digest.t
+  val hash : t -> Hash.Digest.t
 
-    module Checked : sig
-      type t
-      val hash : t -> Hash.Digest.Checked.t
-    end
-end) = struct
+  module Checked : sig
+    type t
+
+    val hash : t -> Hash.Digest.Checked.t
+  end
+end) =
+struct
   module Root = Hash
-
   open Run
 
   module Index = struct
@@ -231,8 +231,7 @@ end) = struct
 
     let to_bits ~depth n =
       let test_bit n i = (n lsl i) land 1 = 1 in
-      List.init depth
-        ~f:(fun i -> test_bit n (depth - 1 - i ) )
+      List.init depth ~f:(fun i -> test_bit n (depth - 1 - i))
 
     module Checked = struct
       (* MSB first *)
@@ -240,17 +239,14 @@ end) = struct
     end
 
     let typ ~depth =
-      Typ.transport
-        (Typ.list ~length:depth Boolean.typ)
-        ~there:(to_bits ~depth)
-        ~back:(fun bits ->
-            List.fold_left bits ~init:0 ~f:(fun acc b ->
-              (acc lsl 1) lor (if b then 1 else 0) ) )
+      Typ.transport (Typ.list ~length:depth Boolean.typ)
+        ~there:(to_bits ~depth) ~back:(fun bits ->
+          List.fold_left bits ~init:0 ~f:(fun acc b ->
+              (acc lsl 1) lor if b then 1 else 0 ) )
   end
 
   module Checked = struct
-    let merge ~height:_ l r =
-      Hash.Checked.(hash [| l; r |])
+    let merge ~height:_ l r = Hash.Checked.(hash [|l; r|])
 
     let implied_root entry_hash addr0 path0 =
       let rec go height acc addr path =
@@ -274,24 +270,30 @@ end) = struct
         root
   end
 
-      let merge ~height:_ l r =
-        Hash.hash [| l; r |]
-  include Sparse_ledger_lib.Sparse_ledger.Make(struct
-      include Hash.Digest
-      let __versioned__ = ()
+  let merge ~height:_ l r = Hash.hash [|l; r|]
 
-    (* TODO: Prefix with height *)
-      let merge = merge
-    end)(struct
-      include Unit
-      let to_yojson () = `String "()"
-      let __versioned__ = ()
-    end)
-      (struct
-        include Elt
-        let data_hash = hash
-        let __versioned__ = ()
-      end)
+  include Sparse_ledger_lib.Sparse_ledger.Make (struct
+              include Hash.Digest
+
+              let __versioned__ = ()
+
+              (* TODO: Prefix with height *)
+              let merge = merge
+            end)
+            (struct
+              include Unit
+
+              let to_yojson () = `String "()"
+
+              let __versioned__ = ()
+            end)
+            (struct
+              include Elt
+
+              let data_hash = hash
+
+              let __versioned__ = ()
+            end)
 
   open Sparse_ledger_lib.Sparse_ledger
 
@@ -301,8 +303,7 @@ end) = struct
       | [], [] ->
           acc
       | b :: bs, h :: hs ->
-          let l = if b then h else acc
-          and r = if b then acc else h in
+          let l = if b then h else acc and r = if b then acc else h in
           let acc' = merge ~height l r in
           go (height + 1) acc' bs hs
       | _, _ ->
@@ -311,7 +312,8 @@ end) = struct
     in
     go 0 entry_hash (Index.to_bits ~depth:(List.length path0) addr0) path0
 
-  let hash_tree : (Hash.Digest.t, Elt.t) Poly.Tree.t -> Hash.Digest.t = function
+  let hash_tree : (Hash.Digest.t, Elt.t) Poly.Tree.t -> Hash.Digest.t =
+    function
     | Account a ->
         Elt.hash a
     | Hash h ->
@@ -320,33 +322,35 @@ end) = struct
         h
 
   let of_list ~default leaves0 =
-    let leaves = 
+    let leaves =
       let n = List.length leaves0 in
       let padding = (1 lsl Int.ceil_pow2 n) - n in
       leaves0 @ List.init padding ~f:(fun _ -> default)
     in
     let rec pair_up acc = function
-      | [] -> List.rev acc
-      | x :: y :: xs -> pair_up ((x, y) :: acc) xs
-      | _ -> assert false
+      | [] ->
+          List.rev acc
+      | x :: y :: xs ->
+          pair_up ((x, y) :: acc) xs
+      | _ ->
+          assert false
     in
     let rec go height (trees : _ Poly.Tree.t list) =
       match trees with
-      | [ r ] -> (r, height)
+      | [r] ->
+          (r, height)
       | _ :: _ ->
-        let merged =
-          List.map (pair_up [] trees) ~f:(fun (l, r) ->
-              Poly.Tree.Node (
-                merge ~height (hash_tree l) (hash_tree r)
-                            , l, r) )
-        in
-        go (height + 1) merged
-      | [] -> assert false
+          let merged =
+            List.map (pair_up [] trees) ~f:(fun (l, r) ->
+                Poly.Tree.Node (merge ~height (hash_tree l) (hash_tree r), l, r)
+            )
+          in
+          go (height + 1) merged
+      | [] ->
+          assert false
     in
-    let tree, height = 
+    let tree, height =
       go 0 (List.map leaves ~f:(fun l -> Poly.Tree.Account l))
     in
-    { Poly.indexes = []
-    ; depth = height
-    ; tree }
+    {Poly.indexes= []; depth= height; tree}
 end
