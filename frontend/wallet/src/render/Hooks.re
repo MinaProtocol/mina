@@ -6,6 +6,7 @@ let useActiveAccount = () => {
   };
 };
 
+// TODO: If two toasts are triggered in close proximity, the second will be cancelled by the setTimeout() called by the first useToast().
 let useToast = () => {
   let (_, setToast) = React.useContext(ToastProvider.context);
   (toastText, toastType) => {
