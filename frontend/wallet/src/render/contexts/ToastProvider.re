@@ -7,6 +7,7 @@ type mode =
 type toast = {
   text: string,
   style: mode,
+  timeoutId: Js.Global.timeoutId,
 };
 
 module ToastContextType = {

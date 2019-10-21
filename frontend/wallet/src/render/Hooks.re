@@ -10,9 +10,15 @@ let useActiveAccount = () => {
 let useToast = () => {
   let (_, setToast) = React.useContext(ToastProvider.context);
   (toastText, toastType) => {
-    setToast(_ => Some({text: toastText, style: toastType}));
-    let _id = Js.Global.setTimeout(() => setToast(_ => None), 2000);
-    ();
+    let id = Js.Global.setTimeout(() => setToast(_ => None), 2000);
+
+    setToast(currentToast => {
+      switch (currentToast) {
+      | Some(currentToast) => Js.Global.clearTimeout(currentToast.timeoutId)
+      | None => ()
+      };
+      Some({text: toastText, style: toastType, timeoutId: id});
+    });
   };
 };
 
