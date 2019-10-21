@@ -2,4 +2,4 @@
  (name cache_dir)
  (public_name cache_dir)
  (libraries core async)
- (preprocess no_preprocessing))
+ (preprocess (pps ppx_coda)))
