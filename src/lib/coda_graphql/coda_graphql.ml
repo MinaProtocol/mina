@@ -1018,33 +1018,31 @@ module Types = struct
                     let%map decoded = Cursor.deserialize data in
                     Some decoded
               in
+              let value_filter_specification =
+                Option.value_map public_key ~default:`All ~f:(fun public_key ->
+                    `User_only public_key )
+              in
               let%map ( (queried_nodes, has_earlier_page, has_later_page)
                       , total_counts ) =
                 Deferred.return
                 @@
-                match (first, after, last, before, public_key) with
-                | _, _, _, _, None ->
-                    (* TODO: Return an actual pagination with a limited range of elements rather than returning all the elemens in the database *)
-                    let values = Pagination_database.get_all_values database in
-                    Result.return
-                      ( (values, `Has_earlier_page false, `Has_later_page false)
-                      , Some (List.length values) )
-                | Some _n_queries_before, _, Some _n_queries_after, _, _ ->
+                match (first, after, last, before) with
+                | Some _n_queries_before, _, Some _n_queries_after, _ ->
                     Error
                       "Illegal query: first and last must not be non-null \
                        value at the same time"
-                | num_to_query, cursor, None, _, Some public_key ->
+                | num_pages, cursor, None, _ ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
-                    ( Pagination_database.get_earlier_values database
-                        public_key cursor num_to_query
+                    ( Pagination_database.query database ~navigation:`Earlier
+                        ~value_filter_specification ~cursor ~num_pages
                     , Pagination_database.get_total_values database public_key
                     )
-                | None, _, num_to_query, cursor, Some public_key ->
+                | None, _, num_pages, cursor ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
-                    ( Pagination_database.get_later_values database public_key
-                        cursor num_to_query
+                    ( Pagination_database.query database ~navigation:`Later
+                        ~value_filter_specification ~cursor ~num_pages
                     , Pagination_database.get_total_values database public_key
                     )
               in

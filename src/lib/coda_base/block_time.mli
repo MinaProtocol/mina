@@ -21,6 +21,8 @@ module Time : sig
     module V1 : sig
       type nonrec t = t
       [@@deriving sexp, bin_io, compare, eq, hash, yojson, version]
+
+      include Hashable.S with type t := t
     end
   end
 
@@ -78,6 +80,8 @@ module Time : sig
   end
 
   include Comparable.S with type t := t
+
+  include Hashable.S with type t := t
 
   val field_var_to_unpacked :
     Tick.Field.Var.t -> (Unpacked.var, _) Tick.Checked.t
