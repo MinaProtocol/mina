@@ -19,6 +19,8 @@ module Make_operations (Field : Intf.Field) = struct
   let copy = Array.copy
 end
 
+let _rounds_for_alpha_equal_11 = 11
+
 let m = 3
 
 module Rescue (Inputs : Intf.Inputs.Rescue) = struct
@@ -46,8 +48,6 @@ NB: As you can see from the analysis this is really specialized to alpha = 11 an
 should be higher for smaller alpha.
 *)
 
-  let rounds = 11
-
   open Inputs
   include Operations
   module Field = Field
@@ -64,14 +64,14 @@ should be higher for smaller alpha.
         state )
 end
 
-module Poseidon (Inputs : Intf.Inputs.Common) = struct
+let _rounds_full_for_alpha_equal_11 = 8
+
+let _rounds_partial_for_alpha_equal_11 = 33
+
+module Poseidon (Inputs : Intf.Inputs.Poseidon) = struct
   open Inputs
   include Operations
   module Field = Field
-
-  let rounds_full = 8
-
-  let rounds_partial = 33
 
   let half_rounds_full = rounds_full / 2
 

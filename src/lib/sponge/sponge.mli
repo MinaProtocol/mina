@@ -9,7 +9,7 @@ end
 module Rescue (Inputs : Intf.Inputs.Rescue) :
   Intf.Permutation with module Field = Inputs.Field
 
-module Poseidon (Inputs : Intf.Inputs.Common) :
+module Poseidon (Inputs : Intf.Inputs.Poseidon) :
   Intf.Permutation with module Field = Inputs.Field
 
 module Make_operations (Field : Intf.Field) :
