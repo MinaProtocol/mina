@@ -250,6 +250,8 @@ module Types = struct
           |> digest_entries ~title:""
         in
         map_entry "Consensus configuration" ~f:render
+
+      let libp2p_peer_id = string_entry "Libp2p PeerID"
     end
 
     type t =
@@ -272,7 +274,8 @@ module Types = struct
       ; next_proposal: string option
       ; consensus_time_now: string
       ; consensus_mechanism: string
-      ; consensus_configuration: Consensus.Configuration.t }
+      ; consensus_configuration: Consensus.Configuration.t
+      ; libp2p_peer_id: string }
     [@@deriving to_yojson, bin_io, fields]
 
     let entries (s : t) =
@@ -287,7 +290,7 @@ module Types = struct
         ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent
         ~snark_worker ~propose_pubkeys ~histograms ~consensus_time_best_tip
         ~consensus_time_now ~consensus_mechanism ~consensus_configuration
-        ~next_proposal ~snark_work_fee
+        ~next_proposal ~snark_work_fee ~libp2p_peer_id
       |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =

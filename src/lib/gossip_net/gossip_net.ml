@@ -134,6 +134,8 @@ module type S = sig
   val high_connectivity_signal : t -> unit Ivar.t
 
   val peers_by_ip : t -> Unix.Inet_addr.t -> Peer.t list
+
+  val net2 : t -> Coda_net2.net option
 end
 
 module Make (Message : Message_intf) : S with type msg := Message.msg = struct
@@ -503,6 +505,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let send_ban_notification t banned_peer banned_until =
     Linear_pipe.write_without_pushback t.ban_notification_writer
       {banned_peer; banned_until}
+
+  let net2 t = t.libp2p_membership
 
   let create (config : Config.t)
       (implementation_list : Host_and_port.t Rpc.Implementation.t list) =
