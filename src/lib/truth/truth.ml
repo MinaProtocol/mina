@@ -1,31 +1,27 @@
+include Core_kernel
+
 module True = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = unit [@@deriving version {unnumbered}]
-      end
+      type t = unit
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t
 end
 
 module False = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = unit [@@deriving version {unnumbered}]
-      end
+      type t = unit
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t
 end
@@ -34,6 +30,11 @@ type true_ = True.t
 
 type false_ = False.t
 
+(* can't use %%versioned here because the generated 'deriving bin_io' doesn't work with GADTs;
+   but we don't need the bin_io here; this type is only versioned because it's
+   used in External_transition.Validated, which has a versioned type 't', but that type
+   uses Binable.Of_binable to rely on another type's serialization
+ *)
 module Stable = struct
   module V1 = struct
     module T = struct

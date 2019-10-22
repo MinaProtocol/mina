@@ -4,7 +4,6 @@ open Coda_base
 open Snark_params
 open Currency
 open Fold_lib
-open Module_version
 
 let state_hash_size_in_triples = Tick.Field.size_in_triples
 
@@ -17,30 +16,15 @@ let wrap_input = Tock.Data_spec.[Wrap_input.typ]
 let exists' typ ~f = Tick.(exists typ ~compute:As_prover.(map get_state ~f))
 
 module Proof_type = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = [`Base | `Merge]
-        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
-      end
+      type t = [`Base | `Merge] [@@deriving compare, equal, hash, sexp, yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_snark_proof_type"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 
   let is_base = function `Base -> true | `Merge -> false
@@ -48,30 +32,17 @@ end
 
 module Pending_coinbase_stack_state = struct
   (* State of the coinbase stack for the current transaction snark *)
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { source: Pending_coinbase.Stack.Stable.V1.t
-          ; target: Pending_coinbase.Stack.Stable.V1.t }
-        [@@deriving sexp, bin_io, hash, compare, eq, fields, yojson, version]
-      end
+      type t =
+        { source: Pending_coinbase.Stack.Stable.V1.t
+        ; target: Pending_coinbase.Stack.Stable.V1.t }
+      [@@deriving sexp, hash, compare, eq, fields, yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_snark_pending_coinbase_stack_state"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t =
     { source: Pending_coinbase.Stack.Stable.V1.t
@@ -83,37 +54,23 @@ module Pending_coinbase_stack_state = struct
 end
 
 module Statement = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { source: Frozen_ledger_hash.Stable.V1.t
-          ; target: Frozen_ledger_hash.Stable.V1.t
-          ; supply_increase: Currency.Amount.Stable.V1.t
-          ; pending_coinbase_stack_state:
-              Pending_coinbase_stack_state.Stable.V1.t
-          ; fee_excess: Currency.Fee.Signed.Stable.V1.t
-          ; proof_type: Proof_type.Stable.V1.t }
-        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
-      end
+      type t =
+        { source: Frozen_ledger_hash.Stable.V1.t
+        ; target: Frozen_ledger_hash.Stable.V1.t
+        ; supply_increase: Currency.Amount.Stable.V1.t
+        ; pending_coinbase_stack_state:
+            Pending_coinbase_stack_state.Stable.V1.t
+        ; fee_excess: Currency.Fee.Signed.Stable.V1.t
+        ; proof_type: Proof_type.Stable.V1.t }
+      [@@deriving compare, equal, hash, sexp, yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_snark_statement"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t =
     { source: Frozen_ledger_hash.Stable.V1.t
     ; target: Frozen_ledger_hash.Stable.V1.t
@@ -167,39 +124,24 @@ module Statement = struct
         {source= pending_coinbase_before; target= pending_coinbase_after} }
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        { source: Frozen_ledger_hash.Stable.V1.t
-        ; target: Frozen_ledger_hash.Stable.V1.t
-        ; proof_type: Proof_type.Stable.V1.t
-        ; supply_increase: Amount.Stable.V1.t
-        ; pending_coinbase_stack_state:
-            Pending_coinbase_stack_state.Stable.V1.t
-        ; fee_excess: Amount.Signed.Stable.V1.t
-        ; sok_digest: Sok_message.Digest.Stable.V1.t
-        ; proof: Proof.Stable.V1.t }
-      [@@deriving bin_io, compare, fields, sexp, version, yojson]
-    end
+    type t =
+      { source: Frozen_ledger_hash.Stable.V1.t
+      ; target: Frozen_ledger_hash.Stable.V1.t
+      ; proof_type: Proof_type.Stable.V1.t
+      ; supply_increase: Amount.Stable.V1.t
+      ; pending_coinbase_stack_state: Pending_coinbase_stack_state.Stable.V1.t
+      ; fee_excess: Amount.Signed.Stable.V1.t
+      ; sok_digest: Sok_message.Digest.Stable.V1.t
+      ; proof: Proof.Stable.V1.t }
+    [@@deriving compare, fields, sexp, yojson]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
   end
+end]
 
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "transaction_snark"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
-
-(* bin_io omitted *)
 type t = Stable.Latest.t =
   { source: Frozen_ledger_hash.Stable.V1.t
   ; target: Frozen_ledger_hash.Stable.V1.t
