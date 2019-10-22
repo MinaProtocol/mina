@@ -14,7 +14,7 @@ module Make (Inputs : Inputs_intf) :
   with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
-  module Merkle_list = Merkle_list_prover.Make (struct
+  module Merkle_list = Merkle_list_prover.Make_ident (struct
     type value = External_transition.Validated.t
 
     type context = Transition_frontier.t

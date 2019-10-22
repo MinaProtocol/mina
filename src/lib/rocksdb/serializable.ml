@@ -1,7 +1,7 @@
 open Core_kernel
 
 module type S = sig
-  include Key_value_database.S
+  include Key_value_database.Intf.Ident
 
   module T : sig
     type nonrec t = t
@@ -21,8 +21,9 @@ module type S = sig
 end
 
 module Make (Key : Binable.S) (Value : Binable.S) :
-  Key_value_database.S with type key := Key.t and type value := Value.t =
-struct
+  Key_value_database.Intf.Ident
+  with type key := Key.t
+   and type value := Value.t = struct
   type t = Database.t
 
   let create ~directory = Database.create ~directory

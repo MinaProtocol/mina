@@ -25,7 +25,7 @@ module Make0 (Peer_id : sig
 end) (Now : sig
   val now : unit -> Time.t
 end)
-(Db : Key_value_database.S
+(Db : Key_value_database.Intf.Ident
       with type key := Peer_id.t
        and type value := Record.t)
 (Action : Action_intf) =
