@@ -705,6 +705,7 @@ let daemon logger =
              external_transition_database_dir
          in
          (* log terminated child processes *)
+         (* FIXME adapt to new system, move into child_processes lib *)
          let pids = Child_processes.Termination.create_pid_table () in
          let rec terminated_child_loop () =
            match
