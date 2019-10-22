@@ -658,8 +658,7 @@ let daemon logger =
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
          let receipt_chain_database =
-           Coda_base.Receipt_chain_database.create
-             ~directory:receipt_chain_dir_name
+           Receipt_chain_database.create ~directory:receipt_chain_dir_name
          in
          trace_database_initialization "receipt_chain_database" __LOC__
            receipt_chain_dir_name ;
