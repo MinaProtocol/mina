@@ -167,7 +167,7 @@ let daemon logger =
      and disable_libp2p =
        flag "disable-libp2p-discovery" no_arg ~doc:"Disable libp2p discovery"
      and discovery_port =
-       flag "discoery-port" (optional int)
+       flag "discovery-port" (optional int)
          ~doc:"PORT Port to use for peer-to-peer discovery (default: 28675)"
      and enable_old_discovery =
        flag "enable-old-discovery" no_arg
