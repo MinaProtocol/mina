@@ -46,7 +46,7 @@ Depending on your router, you may see one of the following errors:
 - `No IGD UPnP Device found on the network!`
 - `connect: Connection refused`
 
-If so, find your router model and search for `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Coda node. You'll need to open the TCP port 8302, and the UDP port 8303 by default.
+If so, find your router model and search for `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Coda node. You'll need to open the TCP port 8303 by default.
 
 ### Issues determining IP address
 
