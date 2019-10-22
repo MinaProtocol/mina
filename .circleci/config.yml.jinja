@@ -116,6 +116,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
         steps:
+            - checkout
             - run:
                   name: Compare versioned types in PR
                   command: ./scripts/compare_pr_diff_types.sh
