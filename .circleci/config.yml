@@ -681,6 +681,7 @@ workflows:
     coda_parallel:
         jobs:
             - lint
+            - lint-opt
             - update-branch-protection:
                 filters:
                   branches:
