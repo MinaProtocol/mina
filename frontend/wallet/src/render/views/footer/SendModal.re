@@ -56,8 +56,8 @@ module ModalState = {
 };
 
 let emptyModal: option(PublicKey.t) => ModalState.Unvalidated.t =
-  activeWallet => {
-    fromStr: Option.map(~f=PublicKey.toString, activeWallet),
+  activeAccount => {
+    fromStr: Option.map(~f=PublicKey.toString, activeAccount),
     toStr: "",
     amountStr: "",
     feeStr: "",
@@ -81,7 +81,8 @@ let validate:
   ModalState.Unvalidated.t => Belt.Result.t(ModalState.Validated.t, string) =
   state =>
     switch (state, validatePubkey(state.toStr)) {
-    | ({fromStr: None}, _) => Error("Please specify a wallet to send from.")
+    | ({fromStr: None}, _) =>
+      Error("Please specify an account to send from.")
     | ({toStr: ""}, _) => Error("Please specify a destination address.")
     | (_, None) => Error("Destination is invalid public key.")
     | ({amountStr}, _) when !validateInt64(amountStr) =>
@@ -103,10 +104,10 @@ module SendForm = {
 
   [@react.component]
   let make = (~onSubmit, ~onClose) => {
-    let activeWallet = Hooks.useActiveWallet();
+    let activeAccount = Hooks.useActiveAccount();
     let (addressBook, _) = React.useContext(AddressBookProvider.context);
     let (sendState, setModalState) =
-      React.useState(_ => emptyModal(activeWallet));
+      React.useState(_ => emptyModal(activeAccount));
     let {fromStr, toStr, amountStr, feeStr, memoOpt, errorOpt} = sendState;
     let spacer = <Spacer height=0.5 />;
     let setError = e =>
@@ -131,10 +132,10 @@ module SendForm = {
        | Some(err) => <Alert kind=`Danger message=err />
        }}
       spacer
-      // Disable dropdown, only show active Wallet
+      // Disable dropdown, only show active Account
       <TextField
         label="From"
-        value={WalletName.getName(
+        value={AccountName.getName(
           Option.getExn(fromStr) |> PublicKey.ofStringExn,
           addressBook,
         )}

@@ -4,7 +4,7 @@ module Styles = {
   open Css;
   open Theme;
 
-  let walletItem =
+  let accountItem =
     style([
       position(`relative),
       flexShrink(0),
@@ -20,12 +20,12 @@ module Styles = {
       borderTop(`px(1), `solid, white),
     ]);
 
-  let inactiveWalletItem =
-    merge([walletItem, style([hover([color(Colors.saville)])]), notText]);
+  let inactiveAccountItem =
+    merge([accountItem, style([hover([color(Colors.saville)])]), notText]);
 
-  let activeWalletItem =
+  let activeAccountItem =
     merge([
-      walletItem,
+      accountItem,
       style([
         color(Colors.marine),
         backgroundColor(Colors.hyperlinkAlpha(0.15)),
@@ -56,48 +56,50 @@ module Styles = {
     style([position(`absolute), top(`px(4)), right(`px(4))]);
 };
 
-module LockWallet = [%graphql
+module LockAccount = [%graphql
   {|
   mutation lockWallet($publicKey: PublicKey!) {
     lockWallet(input: { publicKey: $publicKey }) { publicKey }
   } |}
 ];
 
-module LockWalletMutation = ReasonApollo.CreateMutation(LockWallet);
+module LockAccountMutation = ReasonApollo.CreateMutation(LockAccount);
 
 [@react.component]
-let make = (~wallet: Wallet.t) => {
+let make = (~account: Account.t) => {
   let isActive =
-    Option.map(Hooks.useActiveWallet(), ~f=activeWallet =>
-      PublicKey.equal(activeWallet, wallet.publicKey)
+    Option.map(Hooks.useActiveAccount(), ~f=activeAccount =>
+      PublicKey.equal(activeAccount, account.publicKey)
     )
     |> Option.withDefault(~default=false);
 
-  let isLocked = Option.withDefault(~default=true, wallet.locked);
+  let isLocked = Option.withDefault(~default=true, account.locked);
   let (showModal, setModalOpen) = React.useState(() => false);
   <div
-    className={isActive ? Styles.activeWalletItem : Styles.inactiveWalletItem}
+    className={
+      isActive ? Styles.activeAccountItem : Styles.inactiveAccountItem
+    }
     onClick={_ =>
       ReasonReact.Router.push(
-        "/wallet/" ++ PublicKey.uriEncode(wallet.publicKey),
+        "/account/" ++ PublicKey.uriEncode(account.publicKey),
       )
     }>
     {isActive ? <div className=Styles.activeIndicator /> : React.null}
-    <WalletName
-      pubkey={wallet.publicKey}
+    <AccountName
+      pubkey={account.publicKey}
       className=Theme.Text.Body.smallCaps
     />
     <div className=Styles.balance>
       <span className=Css.(style([paddingBottom(px(2))]))>
         {React.string({js|■ |js})}
       </span>
-      {ReasonReact.string(Int64.to_string(wallet.balance##total))}
+      {ReasonReact.string(Int64.to_string(account.balance##total))}
     </div>
-    <LockWalletMutation>
-      {(lockWallet, _) => {
+    <LockAccountMutation>
+      {(lockAccount, _) => {
          let variables =
-           LockWallet.make(
-             ~publicKey=Apollo.Encoders.publicKey(wallet.publicKey),
+           LockAccount.make(
+             ~publicKey=Apollo.Encoders.publicKey(account.publicKey),
              (),
            )##variables;
          <div
@@ -105,9 +107,9 @@ let make = (~wallet: Wallet.t) => {
              ReactEvent.Synthetic.stopPropagation(evt);
              isLocked
                ? setModalOpen(_ => true)
-               : lockWallet(
+               : lockAccount(
                    ~variables,
-                   ~refetchQueries=[|"getWallets", "walletLocked"|],
+                   ~refetchQueries=[|"getWallets", "accountLocked"|],
                    (),
                  )
                  |> ignore;
@@ -116,10 +118,10 @@ let make = (~wallet: Wallet.t) => {
            <Icon kind={isLocked ? Icon.Locked : Icon.Unlocked} />
          </div>;
        }}
-    </LockWalletMutation>
+    </LockAccountMutation>
     {showModal
        ? <UnlockModal
-           wallet={wallet.publicKey}
+           account={account.publicKey}
            onClose={() => setModalOpen(_ => false)}
            onSuccess={() => setModalOpen(_ => false)}
          />
