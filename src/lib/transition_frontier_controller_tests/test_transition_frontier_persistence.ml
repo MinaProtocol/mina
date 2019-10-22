@@ -125,7 +125,7 @@ let%test_module "Transition Frontier Persistence" =
         with_persistence ~logger ~pids ~directory_name ~f:(fun (frontier, t) ->
             let create_breadcrumb =
               gen_breadcrumb ~logger ~pids ~trust_system
-                ~accounts_with_secret_keys:Genesis_ledger.accounts
+                Genesis_ledger.accounts
               |> Quickcheck.random_value
             in
             let root = Transition_frontier.root frontier in

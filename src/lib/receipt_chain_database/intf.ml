@@ -23,9 +23,11 @@ open Coda_base
 module type S = sig
   type t
 
+  type config
+
   module M : Key_value_database.Monad.S
 
-  val create : directory:string -> t
+  val create : config -> t
 
   (** [prove t ~proving_receipt ~resulting_receipt] will provide a proof of a
       `proving_receipt` hash up to an underlying `resulting_receipt` hash. The

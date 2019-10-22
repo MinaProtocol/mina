@@ -127,7 +127,8 @@ end
 
 module Intf = Merkle_ledger.Intf
 
-module In_memory_kvdb : Intf.Key_value_database = struct
+module In_memory_kvdb : Intf.Key_value_database with type config := string =
+struct
   module Bigstring_frozen = struct
     module T = struct
       include Bigstring.Stable.V1
@@ -157,7 +158,7 @@ module In_memory_kvdb : Intf.Key_value_database = struct
 
   let get_uuid t = t.uuid
 
-  let create ~directory:_ =
+  let create _ =
     {uuid= Uuid_unix.create (); table= Bigstring_frozen.Table.create ()}
 
   let close _ = ()

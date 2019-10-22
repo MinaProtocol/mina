@@ -65,11 +65,14 @@ end
 module type Key_value_database = sig
   type t [@@deriving sexp]
 
+  type config
+
   include
     Key_value_database.Intf.Ident
     with type t := t
      and type key := Bigstring.t
      and type value := Bigstring.t
+     and type config := config
 
   val get_uuid : t -> Uuid.t
 
