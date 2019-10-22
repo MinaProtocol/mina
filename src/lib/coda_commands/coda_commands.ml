@@ -409,6 +409,16 @@ let get_status ~flag t =
       | `Check_again time ->
           sprintf "None this epoch… checking at %s" (str time) )
   in
+  let libp2p_peer_id =
+    Option.value ~default:"<not connected to libp2p>"
+      Option.(
+        Coda_lib.net t |> Coda_networking.net2 >>= Coda_net2.me
+        >>| Coda_net2.Keypair.to_peerid >>| Coda_net2.PeerID.to_string)
+  in
+  let addrs_and_ports =
+    Kademlia.Node_addrs_and_ports.to_display
+      (Coda_lib.config t).net_config.gossip_net_params.addrs_and_ports
+  in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; blockchain_length
@@ -430,7 +440,9 @@ let get_status ~flag t =
   ; next_proposal
   ; consensus_time_now
   ; consensus_mechanism
-  ; consensus_configuration }
+  ; consensus_configuration
+  ; libp2p_peer_id
+  ; addrs_and_ports }
 
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 

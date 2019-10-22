@@ -164,20 +164,20 @@ let daemon logger =
            "true|false Log transaction-pool diff received from peers \
             (default: false)"
          (optional bool)
-     and enable_libp2p =
-       flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
-     and libp2p_port =
-       flag "libp2p-port" (optional int)
-         ~doc:"PORT Port to use for libp2p (default: 28675)"
-     and disable_haskell =
-       flag "disable-old-discovery" no_arg
-         ~doc:"Disable the old discovery mechanism"
+     and disable_libp2p =
+       flag "disable-libp2p-discovery" no_arg ~doc:"Disable libp2p discovery"
+     and discovery_port =
+       flag "discovery-port" (optional int)
+         ~doc:"PORT Port to use for peer-to-peer discovery (default: 28675)"
+     and enable_old_discovery =
+       flag "enable-old-discovery" no_arg
+         ~doc:"Enable the old Haskell Kademlia discovery"
      and libp2p_keypair =
-       flag "libp2p-keypair" (optional string)
+       flag "discovery-keypair" (optional string)
          ~doc:
-           "KEYPAIR Keypair (generated from `coda advanced \
-            generate-libp2p-keypair`) to use with libp2p (default: generate \
-            new keypair)"
+           "PUBKEY,PRIVKEY,PEERID Keypair (generated from `coda advanced \
+            generate-libp2p-keypair`) to use with libp2p discovery (default: \
+            generate new temporary keypair)"
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
@@ -472,9 +472,9 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "rest-port"
              ~default:Port.default_rest rest_server_port
          in
-         let libp2p_port =
-           or_from_config YJ.Util.to_int_option "libp2p-port"
-             ~default:Port.default_libp2p libp2p_port
+         let discovery_port =
+           or_from_config YJ.Util.to_int_option "discovery-port"
+             ~default:Port.default_discovery discovery_port
          in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
@@ -529,7 +529,7 @@ let daemon logger =
                        (YJ.Util.convert_each YJ.Util.to_string))
                     "peers" None ~default:[] ]
          in
-         let discovery_port = external_port + 1 in
+         let old_discovery_port = external_port + 1 in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
          let%bind initial_peers_cleaned_lists =
            (* for each provided peer, lookup all its addresses *)
@@ -583,10 +583,10 @@ let daemon logger =
          let addrs_and_ports : Kademlia.Node_addrs_and_ports.t =
            { external_ip
            ; bind_ip
-           ; discovery_port
+           ; discovery_port= old_discovery_port
            ; communication_port= external_port
            ; client_port
-           ; libp2p_port }
+           ; libp2p_port= discovery_port }
          in
          let%bind propose_keypair =
            match propose_key with
@@ -672,8 +672,8 @@ let daemon logger =
                ; addrs_and_ports
                ; trust_system
                ; log_gossip_heard
-               ; enable_libp2p
-               ; disable_haskell
+               ; enable_libp2p= not disable_libp2p
+               ; disable_haskell= not enable_old_discovery
                ; libp2p_keypair
                ; libp2p_peers=
                    List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
