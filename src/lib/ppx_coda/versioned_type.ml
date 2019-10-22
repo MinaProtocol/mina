@@ -144,7 +144,11 @@ let type_decls_to_stri type_decls =
 let formatter =
   let std_formatter = Format.std_formatter in
   let funs = Format.pp_get_formatter_out_functions std_formatter () in
-  let funs' = {funs with out_newline= (fun () -> funs.out_spaces 1)} in
+  let funs' =
+    { funs with
+      out_newline= (fun () -> funs.out_spaces 1)
+    ; out_indent= (fun _ -> ()) }
+  in
   Format.pp_set_formatter_out_functions std_formatter funs' ;
   std_formatter
 
