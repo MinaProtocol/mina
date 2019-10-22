@@ -39,7 +39,7 @@ for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do
     if [ $CURRENT_COMMIT != $DOCKER_COMMIT ] ; then
         repin $pkg
     else
-	uptodate $pkg
+      uptodate $pkg
     fi
 done
 
@@ -50,6 +50,6 @@ for pkg in ocaml-sodium coda_base58 ; do
     if [ $CURRENT_COMMIT != $DOCKER_COMMIT ] ; then
         repin $pkg
     else
-	uptodate $pkg
+      uptodate $pkg
     fi
 done

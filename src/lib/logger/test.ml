@@ -3,8 +3,9 @@ module Logger = Impl
 
 let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
   let max_size = 1024 * 2 (* 2KB *) in
-  let logger = Logger.create ~initialize_default_consumer:false () in
+  let logger = Logger.create () ~id:"test" in
   let directory = Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
+  let log_filename = "coda.log" in
   let exists name =
     Result.is_ok (Unix.access (Filename.concat directory name) [`Exists])
   in
@@ -30,7 +31,8 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
     Logger.Consumer_registry.register ~id:"test"
       ~processor:(Logger.Processor.raw ())
       ~transport:
-        (Logger.Transport.File_system.dumb_logrotate ~directory ~max_size) ;
+        (Logger.Transport.File_system.dumb_logrotate ~directory ~log_filename
+           ~max_size) ;
     run_test ~last_size:0 ~rotations:0 ~rotation_expected:false
   with exn ->
     ignore (Unix.system ("rm -rf " ^ directory)) ;

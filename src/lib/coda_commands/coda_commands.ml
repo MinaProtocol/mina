@@ -195,20 +195,19 @@ module Receipt_chain_hash = struct
   Receipt.Chain_hash.(cons, empty)]
 end
 
-module Payment_verifier =
-  Receipt_chain_database_lib.Verifier.Make (User_command) (Receipt_chain_hash)
-
 let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
-    (verifying_txn : User_command.t) proof =
+    (verifying_txn : User_command.t) (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
   let resulting_receipt = account.Account.Poly.receipt_chain_hash in
   let open Or_error.Let_syntax in
-  let%bind () = Payment_verifier.verify ~resulting_receipt proof in
-  if
-    List.exists (Payment_proof.payments proof) ~f:(fun txn ->
-        User_command.equal verifying_txn txn )
+  let%bind (_ : Receipt.Chain_hash.t Non_empty_list.t) =
+    Result.of_option
+      (Receipt_chain_database.verify ~init:init_receipt proof resulting_receipt)
+      ~error:(Error.createf "Merkle list proof of payment is invalid")
+  in
+  if List.exists proof ~f:(fun txn -> User_command.equal verifying_txn txn)
   then Ok ()
   else
     Or_error.errorf
@@ -245,8 +244,7 @@ let schedule_user_commands t (txns : User_command.t list) :
             "Failure in schedule_user_commands: $error. This is not yet \
              reported to the client, see #1143" )
 
-let prove_receipt t ~proving_receipt ~resulting_receipt :
-    Payment_proof.t Deferred.Or_error.t =
+let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in
   (* TODO: since we are making so many reads to `receipt_chain_database`,
      reads should be async to not get IO-blocked. See #1125 *)
@@ -409,6 +407,16 @@ let get_status ~flag t =
       | `Check_again time ->
           sprintf "None this epoch… checking at %s" (str time) )
   in
+  let libp2p_peer_id =
+    Option.value ~default:"<not connected to libp2p>"
+      Option.(
+        Coda_lib.net t |> Coda_networking.net2 >>= Coda_net2.me
+        >>| Coda_net2.Keypair.to_peerid >>| Coda_net2.PeerID.to_string)
+  in
+  let addrs_and_ports =
+    Kademlia.Node_addrs_and_ports.to_display
+      (Coda_lib.config t).net_config.gossip_net_params.addrs_and_ports
+  in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; blockchain_length
@@ -430,7 +438,9 @@ let get_status ~flag t =
   ; next_proposal
   ; consensus_time_now
   ; consensus_mechanism
-  ; consensus_configuration }
+  ; consensus_configuration
+  ; libp2p_peer_id
+  ; addrs_and_ports }
 
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
