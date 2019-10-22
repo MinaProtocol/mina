@@ -2,6 +2,7 @@
 
    - "deriving bin_io" and "deriving version" never appear in types defined inside functor bodies
    - otherwise, "bin_io" may appear in a "deriving" attribute only if "version" also appears in that extension
+   - the construct "include Stable.Latest" is prohibited
 
 *)
 
