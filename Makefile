@@ -73,7 +73,7 @@ dht: kademlia libp2p_helper
 build: git_hooks reformat-diff
 	$(info opam hack)
 	opam pin remove async_kernel
-	unset DUNE_PROFILE; opam pin add src/external/async_kernel
+	DUNE_HACK=$(DUNE_PROFILE); unset DUNE_PROFILE; opam pin add src/external/async_kernel; DUNE_PROFILE=$(DUNE_HACK)
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build app/logproc/logproc.exe app/cli/src/coda.exe  --profile=$(DUNE_PROFILE)
 	$(info Build complete)
