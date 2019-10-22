@@ -5,6 +5,12 @@ module Styles = {
     style([display(`flex), flexDirection(`row)]);
   };
 
+  let fadeIn =
+    keyframes([
+      (0, [opacity(0.), top(`px(50))]),
+      (100, [opacity(1.), top(`px(0))]),
+    ]);
+
   let heroLeft = {
     style([
       display(`flex),
@@ -16,10 +22,24 @@ module Styles = {
     ]);
   };
 
+  let header = {
+    merge([
+      Theme.Text.Header.h1,
+      style([animation(fadeIn, ~duration=1000, ~iterationCount=`count(1))]),
+    ]);
+  };
+
   let heroBody = {
     merge([
-      Theme.Text.Body.regular,
-      style([maxWidth(`rem(21.5)), color(Theme.Colors.midnightBlue)]),
+      Theme.Text.Body.regularLight,
+      style([
+        opacity(0.),
+        maxWidth(`rem(21.5)),
+        color(Theme.Colors.midnightBlue),
+        animation(fadeIn, ~duration=1050, ~iterationCount=`count(1)),
+        animationDelay(250),
+        animationFillMode(`forwards),
+      ]),
     ]);
   };
   let buttonRow = {
@@ -34,9 +54,7 @@ let make = (~closeOnboarding, ~prevStep) => {
   <div className=Theme.Onboarding.main>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
-        <h1 className=Theme.Text.Header.h1>
-          {React.string("Setup Complete!")}
-        </h1>
+        <h1 className=Styles.header> {React.string("Setup Complete!")} </h1>
         <Spacer height=1. />
         <p className=Styles.heroBody>
           {React.string(
