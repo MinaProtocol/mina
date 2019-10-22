@@ -151,7 +151,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
     let add {set; high_connectivity_signal} value =
       Hash_set.add set value ;
-      if Hash_set.length set >= 8 then
+      if Hash_set.length set >= 4 then
         Ivar.fill_if_empty high_connectivity_signal ()
 
     let remove {set; _} value = Hash_set.remove set value
