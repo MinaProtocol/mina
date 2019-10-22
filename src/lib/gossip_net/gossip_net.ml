@@ -134,6 +134,8 @@ module type S = sig
   val high_connectivity_signal : t -> unit Ivar.t
 
   val peers_by_ip : t -> Unix.Inet_addr.t -> Peer.t list
+
+  val net2 : t -> Coda_net2.net option
 end
 
 module Make (Message : Message_intf) : S with type msg := Message.msg = struct
@@ -149,7 +151,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
     let add {set; high_connectivity_signal} value =
       Hash_set.add set value ;
-      if Hash_set.length set >= 8 then
+      if Hash_set.length set >= 4 then
         Ivar.fill_if_empty high_connectivity_signal ()
 
     let remove {set; _} value = Hash_set.remove set value
@@ -377,10 +379,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         |> ignore )
 
   and restart_kademlia t addl_peers =
-    Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-      "Restarting Kademlia" ;
     match t.haskell_membership with
     | Some membership -> (
+        t.haskell_membership <- None ;
+        Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
+          "Restarting Kademlia" ;
         let%bind () = Membership.stop membership in
         let%map new_membership =
           let initial_peers =
@@ -398,6 +401,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         | Error _ ->
             failwith "Could not restart Kademlia" )
     | None ->
+        (* If we try to restart twice simultaneously, or we try to restart
+           before it's first launched we'll see this condition. *)
+        Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
+          "Can't restart kademlia, it's not running" ;
         Deferred.unit
 
   and unmark_all_disconnected_peers t =
@@ -498,6 +505,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let send_ban_notification t banned_peer banned_until =
     Linear_pipe.write_without_pushback t.ban_notification_writer
       {banned_peer; banned_until}
+
+  let net2 t = t.libp2p_membership
 
   let create (config : Config.t)
       (implementation_list : Host_and_port.t Rpc.Implementation.t list) =
