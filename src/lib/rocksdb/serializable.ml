@@ -1,6 +1,11 @@
 open Core_kernel
 
-module Make (Key : Binable.S) (Value : Binable.S) = struct
+module Make (Key : Binable.S) (Value : Binable.S) : 
+  Key_value_database.Intf.S 
+    with module M := Key_value_database.Monad.Ident 
+    and type key := Key.t
+    and type value := Value.t
+    and type config := string = struct
   type t = Database.t
 
   let create directory = Database.create directory

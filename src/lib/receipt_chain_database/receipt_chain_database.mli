@@ -11,7 +11,7 @@ module Make
                      and type key := Receipt.Chain_hash.t
                      and type value := Tree_node.t
                      and type config := Config.t) :
-  Intf.S with module M := Monad and type input := Config.t
+  Intf.S with module M := Monad and type config := Config.t
 
 (* A Rocksdb version of the receipt_chain_database *)
 module Rocksdb :
@@ -23,4 +23,4 @@ module Rocksdb :
 include
   Intf.S
   with module M := Key_value_database.Monad.Ident
-   and type input := string
+   and type config := string
