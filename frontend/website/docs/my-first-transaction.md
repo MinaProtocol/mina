@@ -76,7 +76,7 @@ While you're waiting take a look at your daemon logs for new blocks being genera
 
 ## Make a payment
 
-Finally we get to the good stuff, sending our first transaction! For testing purposes, there's already an [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service) set up that will immediately refund your payment minus the transaction fees.
+Finally we get to the good stuff, sending our first transaction! For testing purposes, there's already an [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo) set up that will immediately refund your payment minus the transaction fees.
 
 !!! warning
     Currently, there is a known issue with the echo service that prevents it from properly echoing back your payment! Don't worry, we'll still give you Testnet Points[\*](#disclaimer) for completing the challenge.
@@ -92,7 +92,7 @@ Let's send some of our newly received coda to this service to see what a payment
 If you're wondering what we passed in to the commands above:
 
 - For `amount`, we're sending a test value of `20` coda
-- The `receiver` is the public key of the [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service)
+- The `receiver` is the public key of the [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo)
 - For `fee`, let's use the current market rate of `5` coda
 - The `privkey-path` is the private key file path of the private key we generated the `keys` folder
 

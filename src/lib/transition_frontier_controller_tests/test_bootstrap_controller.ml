@@ -38,7 +38,7 @@ let%test_module "Bootstrap Controller" =
     let trust_system = Trust_system.null ()
 
     let f_with_verifier ~f ~logger ~pids ~trust_system =
-      let%map verifier = Verifier.create ~logger ~pids in
+      let%map verifier = Verifier.create ~logger ~pids ~conf_dir:None in
       f ~logger ~trust_system ~verifier
 
     let%test "`bootstrap_controller` caches all transitions it is passed \
@@ -190,7 +190,9 @@ let%test_module "Bootstrap Controller" =
               let pending_coinbases =
                 Staged_ledger.pending_coinbase_collection staged_ledger
               in
-              let%bind verifier = Verifier.create ~logger ~pids in
+              let%bind verifier =
+                Verifier.create ~logger ~pids ~conf_dir:None
+              in
               let%map actual_staged_ledger =
                 Staged_ledger
                 .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state

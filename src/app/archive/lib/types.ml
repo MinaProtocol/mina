@@ -1,6 +1,8 @@
 open Core
 open Coda_base
-open Signature_lib
+open Coda_state
+open Coda_transition
+open Graphql_query.Base_types
 
 (** Library used to encode and decode types to a graphql format.
 
@@ -18,135 +20,43 @@ open Signature_lib
 
     **)
 
-module type Numeric_intf = sig
-  type t
+let encode_as_obj_rel_insert_input data
+    (on_conflict : ('constraint_, 'update_columns) Ast.On_conflict.t) =
+  object
+    method data = data
 
-  val num_bits : int
+    method on_conflict = Some on_conflict
+  end
 
-  val zero : t
+let encode_as_arr_rel_insert_input data
+    (on_conflict : ('constraint_, 'update_columns) Ast.On_conflict.t) =
+  object
+    method data = Array.of_list data
 
-  val one : t
+    method on_conflict = Some on_conflict
+  end
 
-  val ( lsl ) : t -> int -> t
+module Public_key = struct
+  let encode public_key =
+    object
+      method blocks = None
 
-  val ( lsr ) : t -> int -> t
+      method fee_transfers = None
 
-  val ( land ) : t -> t -> t
+      method snark_jobs = None
 
-  val ( lor ) : t -> t -> t
+      method userCommandsByReceiver = None
 
-  val ( = ) : t -> t -> bool
-end
+      method user_commands = None
 
-module type Binary_intf = sig
-  type t
+      method value =
+        Option.some
+        @@ Signature_lib.Public_key.Compressed.to_base58_check public_key
+    end
 
-  val to_bits : t -> bool list
-
-  val of_bits : bool list -> t
-end
-
-module Bitstring : sig
-  type t = private string
-
-  val of_numeric : (module Numeric_intf with type t = 'a) -> 'a -> t
-
-  val to_numeric : (module Numeric_intf with type t = 'a) -> t -> 'a
-
-  val to_bitstring : (module Binary_intf with type t = 'a) -> 'a -> t
-
-  val of_bitstring : (module Binary_intf with type t = 'a) -> t -> 'a
-
-  val to_yojson : t -> Yojson.Basic.json
-
-  val of_yojson : Yojson.Basic.json -> t
-end = struct
-  type t = string
-
-  let to_string =
-    Fn.compose String.of_char_list
-      (List.map ~f:(fun bit -> if bit then '1' else '0'))
-
-  let of_string_exn : t -> bool list =
-    Fn.compose
-      (List.map ~f:(function
-        | '1' ->
-            true
-        | '0' ->
-            false
-        | bad_char ->
-            failwithf !"Unexpected char: %c" bad_char () ))
-      String.to_list
-
-  let to_bitstring (type t) (module Binary : Binary_intf with type t = t)
-      (value : t) =
-    to_string @@ Binary.to_bits value
-
-  let of_bitstring (type t) (module Binary : Binary_intf with type t = t) bits
-      =
-    Binary.of_bits @@ of_string_exn bits
-
-  let of_numeric (type t) (module Numeric : Numeric_intf with type t = t)
-      (value : t) =
-    let open Numeric in
-    to_string @@ List.init num_bits ~f:(fun i -> (value lsr i) land one = one)
-
-  let to_numeric (type num) (module Numeric : Numeric_intf with type t = num)
-      (bitstring : t) =
-    let open Numeric in
-    of_string_exn bitstring
-    |> List.fold_right ~init:Numeric.zero ~f:(fun bool acc_num ->
-           (acc_num lsl 1) lor if bool then one else zero )
-
-  let to_yojson t = `String t
-
-  let of_yojson = function
-    | `String value ->
-        value
-    | _ ->
-        failwith "Expected Yojson string"
-end
-
-module User_command_type = struct
-  type t = [`Payment | `Delegation]
-
-  let encode = function
-    | `Payment ->
-        `String "payment"
-    | `Delegation ->
-        `String "delegation"
-
-  let decode = function
-    | `String "payment" ->
-        `Payment
-    | `String "delegation" ->
-        `Delegation
-    | _ ->
-        raise (Invalid_argument "Unexpected input to decode user command type")
-end
-
-module Make_Bitstring_converters (Bit : Binary_intf) = struct
-  open Bitstring
-
-  let serialize amount = to_yojson @@ to_bitstring (module Bit) amount
-
-  let deserialize yojson = of_bitstring (module Bit) @@ of_yojson yojson
-end
-
-module Fee = Make_Bitstring_converters (Currency.Fee)
-module Amount = Make_Bitstring_converters (Currency.Amount)
-module Nonce = Make_Bitstring_converters (Account.Nonce)
-
-module Block_time = struct
-  let serialize value =
-    Bitstring.to_yojson
-    @@ Bitstring.of_numeric (module Int64)
-    @@ Block_time.to_int64 value
-
-  let deserialize value =
-    Block_time.of_int64
-    @@ Bitstring.to_numeric (module Int64)
-    @@ Bitstring.of_yojson value
+  let encode_as_obj_rel_insert_input public_key =
+    encode_as_obj_rel_insert_input (encode public_key)
+      Ast.On_conflict.public_keys
 end
 
 module User_command = struct
@@ -157,39 +67,9 @@ module User_command = struct
     | Stake_delegation (Set_delegate delegation) ->
         delegation.new_delegate
 
-  let create_public_key_obj public_key =
-    object
-      method data =
-        object
-          method blocks = None
-
-          method fee_transfers = None
-
-          method userCommandsByReceiver = None
-
-          method user_commands = None
-
-          method value = Some public_key
-        end
-
-      method on_conflict =
-        Option.some
-        @@ object
-             method constraint_ = `public_keys_value_key
-
-             method update_columns = Array.of_list [`value]
-           end
-    end
-
   let encode {With_hash.data= user_command; hash} first_seen =
     let payload = User_command.payload user_command in
     let body = payload.body in
-    let sender =
-      Public_key.Compressed.to_base58_check @@ User_command.sender user_command
-    in
-    let receiver =
-      Public_key.Compressed.to_base58_check @@ receiver user_command
-    in
     let open Option in
     object
       method hash = some @@ Transaction_hash.to_base58_check hash
@@ -216,13 +96,13 @@ module User_command = struct
       method nonce =
         some @@ Nonce.serialize @@ User_command_payload.nonce payload
 
-      method public_key = some @@ create_public_key_obj sender
+      method public_key =
+        some @@ Public_key.encode_as_obj_rel_insert_input
+        @@ User_command.sender user_command
 
-      method publicKeyByReceiver = some @@ create_public_key_obj receiver
-
-      method sender = None
-
-      method receiver = None
+      method publicKeyByReceiver =
+        some @@ Public_key.encode_as_obj_rel_insert_input
+        @@ receiver user_command
 
       method typ =
         some
@@ -233,6 +113,11 @@ module User_command = struct
              | Stake_delegation _ ->
                  `Delegation )
     end
+
+  let encode_as_obj_rel_insert_input user_command_with_hash first_seen =
+    encode_as_obj_rel_insert_input
+      (encode user_command_with_hash first_seen)
+      Ast.On_conflict.user_commands
 
   let decode obj =
     let receiver = (obj#publicKeyByReceiver)#value in
@@ -251,4 +136,250 @@ module User_command = struct
     in
     ( Coda_base.{User_command.Poly.Stable.V1.payload; sender; signature= ()}
     , obj#first_seen )
+end
+
+module Fee_transfer = struct
+  let encode {With_hash.data: Fee_transfer.Single.t = (receiver, fee); hash}
+      first_seen =
+    let open Option in
+    object
+      method hash = some @@ Transaction_hash.to_base58_check hash
+
+      method fee = some @@ Fee.serialize fee
+
+      method first_seen = Option.map first_seen ~f:Block_time.serialize
+
+      method public_key =
+        some @@ Public_key.encode_as_obj_rel_insert_input receiver
+
+      method receiver = None
+
+      method blocks_fee_transfers = None
+    end
+
+  let encode_as_obj_rel_insert_input fee_transfer_with_hash first_seen =
+    encode_as_obj_rel_insert_input
+      (encode fee_transfer_with_hash first_seen)
+      Ast.On_conflict.fee_transfers
+end
+
+module Snark_job = struct
+  let encode ({fee; prover; work_ids; _} : Transaction_snark_work.Info.t) =
+    let open Option in
+    let job1, job2 =
+      match work_ids with
+      | `One job1 ->
+          (Some job1, None)
+      | `Two (job1, job2) ->
+          (Some job1, Some job2)
+    in
+    object
+      method blocks_snark_jobs = None
+
+      method fee = some @@ Fee.serialize fee
+
+      method job1 = job1
+
+      method job2 = job2
+
+      method prover = None
+
+      method public_key =
+        some @@ Public_key.encode_as_obj_rel_insert_input prover
+    end
+
+  let encode_as_obj_rel_insert_input transaction_snark_work =
+    encode_as_obj_rel_insert_input
+      (encode transaction_snark_work)
+      Ast.On_conflict.snark_jobs
+end
+
+module Receipt_chain_hash = struct
+  type t = {value: Receipt.Chain_hash.t; parent: Receipt.Chain_hash.t}
+
+  let to_obj value parent =
+    object
+      method blocks_user_commands = None
+
+      method hash = value
+
+      method receipt_chain_hash = None
+
+      method receipt_chain_hashes = parent
+    end
+
+  let encode t =
+    let open Option in
+    let parent =
+      to_obj (some @@ Receipt.Chain_hash.to_string @@ t.parent) None
+    in
+    let value = some @@ Receipt.Chain_hash.to_string @@ t.value in
+    let encoded_receipt_chain =
+      to_obj value
+        ( some
+        @@ encode_as_arr_rel_insert_input [parent]
+             Ast.On_conflict.receipt_chain_hash )
+    in
+    encode_as_obj_rel_insert_input encoded_receipt_chain
+      Ast.On_conflict.receipt_chain_hash
+end
+
+module Blocks_user_commands = struct
+  let encode user_command_with_hash first_seen receipt_chain_opt =
+    object
+      method block = None
+
+      method receipt_chain_hash =
+        Option.map receipt_chain_opt ~f:Receipt_chain_hash.encode
+
+      method user_command =
+        Some
+          (User_command.encode_as_obj_rel_insert_input user_command_with_hash
+             first_seen)
+    end
+
+  let encode_as_arr_rel_insert_input user_commands =
+    encode_as_arr_rel_insert_input
+      (List.map user_commands
+         ~f:(fun (user_command_with_hash, first_seen, receipt_chain) ->
+           encode user_command_with_hash first_seen receipt_chain ))
+      Ast.On_conflict.blocks_user_commands
+end
+
+module Blocks_fee_transfers = struct
+  let encode fee_transfer first_seen =
+    object
+      method block = None
+
+      method block_id = None
+
+      method fee_transfer =
+        Some
+          (Fee_transfer.encode_as_obj_rel_insert_input fee_transfer first_seen)
+
+      method fee_transfer_id = None
+    end
+
+  let encode_as_arr_rel_insert_input fee_transfers =
+    encode_as_arr_rel_insert_input
+      (List.map fee_transfers ~f:(fun (fee_transfers_with_hash, first_seen) ->
+           encode fee_transfers_with_hash first_seen ))
+      Ast.On_conflict.blocks_fee_transfers
+end
+
+module Blocks_snark_job = struct
+  let encode snark_job =
+    let obj =
+      object
+        method block = None
+
+        method block_id = None
+
+        method snark_job =
+          Option.some @@ Snark_job.encode_as_obj_rel_insert_input snark_job
+
+        method snark_job_id = None
+      end
+    in
+    obj
+
+  let encode_as_arr_rel_insert_input snark_jobs =
+    encode_as_arr_rel_insert_input
+      (List.map snark_jobs ~f:encode)
+      Ast.On_conflict.blocks_snark_jobs
+end
+
+module State_hashes = struct
+  let encode state_hash =
+    object
+      method block = None
+
+      method blocks = None
+
+      method value = Some (State_hash.to_base58_check state_hash)
+    end
+
+  let encode_as_obj_rel_insert_input state_hash =
+    encode_as_obj_rel_insert_input (encode state_hash)
+      Ast.On_conflict.state_hashes
+end
+
+module Blocks = struct
+  let serialize
+      (With_hash.{hash; data= external_transition} :
+        (External_transition.t, State_hash.t) With_hash.t)
+      (user_commands :
+        ( (Coda_base.User_command.t, Transaction_hash.t) With_hash.t
+        * Coda_base.Block_time.t option
+        * Receipt_chain_hash.t option )
+        list)
+      (fee_transfers :
+        ( (Coda_base.Fee_transfer.Single.t, Transaction_hash.t) With_hash.t
+        * Coda_base.Block_time.t option )
+        list) =
+    let blockchain_state =
+      External_transition.blockchain_state external_transition
+    in
+    let consensus_state =
+      External_transition.consensus_state external_transition
+    in
+    let global_slot =
+      Consensus.Data.Consensus_state.global_slot consensus_state
+    in
+    let staged_ledger_diff =
+      External_transition.staged_ledger_diff external_transition
+    in
+    let snark_jobs =
+      List.map
+        (Staged_ledger_diff.completed_works staged_ledger_diff)
+        ~f:Transaction_snark_work.info
+    in
+    let open Option in
+    object
+      method stateHashByStateHash =
+        some @@ State_hashes.encode_as_obj_rel_insert_input hash
+
+      method public_key =
+        some @@ Public_key.encode_as_obj_rel_insert_input
+        @@ External_transition.proposer external_transition
+
+      method stateHashByParentHash =
+        some @@ State_hashes.encode_as_obj_rel_insert_input
+        @@ External_transition.parent_hash external_transition
+
+      method snarked_ledger_hash =
+        some @@ Ledger_hash.to_string @@ Frozen_ledger_hash.to_ledger_hash
+        @@ Blockchain_state.snarked_ledger_hash blockchain_state
+
+      method ledger_hash =
+        some @@ Ledger_hash.to_string @@ Staged_ledger_hash.ledger_hash
+        @@ Blockchain_state.staged_ledger_hash blockchain_state
+
+      method global_slot = some global_slot
+
+      (* TODO: Need to implement *)
+      method ledger_proof_nonce = some 0
+
+      (* TODO: Need to implement *)
+      method status = some 0
+
+      method block_length =
+        some @@ Length.serialize
+        @@ Consensus.Data.Consensus_state.blockchain_length consensus_state
+
+      method block_time =
+        some @@ Block_time.serialize
+        @@ External_transition.timestamp external_transition
+
+      method blocks_fee_transfers =
+        some
+        @@ Blocks_fee_transfers.encode_as_arr_rel_insert_input fee_transfers
+
+      method blocks_snark_jobs =
+        some @@ Blocks_snark_job.encode_as_arr_rel_insert_input snark_jobs
+
+      method blocks_user_commands =
+        some
+        @@ Blocks_user_commands.encode_as_arr_rel_insert_input user_commands
+    end
 end

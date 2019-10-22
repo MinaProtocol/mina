@@ -1,4 +1,5 @@
 open Core_kernel
+open Coda_base
 
 module type Printable_intf = sig
   type t [@@deriving to_yojson]
@@ -30,7 +31,7 @@ module String_list_formatter = struct
 end
 
 module Prove_receipt = struct
-  type t = Coda_base.Payment_proof.t [@@deriving yojson]
+  type t = Receipt.Chain_hash.t * User_command.t list [@@deriving yojson]
 
   let to_text proof =
     sprintf

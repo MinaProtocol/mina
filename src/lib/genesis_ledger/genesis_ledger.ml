@@ -59,6 +59,11 @@ genesis_ledger = "seared_kobe"]
 
 include Seared_kobe_ledger
 
+[%%elif
+genesis_ledger = "van_helsing"]
+
+include Van_helsing_ledger
+
 [%%else]
 
 [%%error

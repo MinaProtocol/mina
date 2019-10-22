@@ -146,7 +146,7 @@ module Haskell_process = struct
               ()
           | Error err ->
               (* There is a race where it dies in between the check and kill
-               starting. *)
+                 starting. *)
               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                 "Killing kademlia helper failed: %s, hopefully it already died."
                 (Error.to_string_hum err)
