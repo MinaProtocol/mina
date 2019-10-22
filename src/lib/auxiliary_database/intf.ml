@@ -35,7 +35,7 @@ module type Pagination = sig
       if [value_filter_specification]=[`User_only A]
 
       The number of values that the pagination request contains is based on the
-      value of [num_pages]. If [num_pages] is None, then it will return all
+      value of [num_items]. If [num_items] is None, then it will return all
       values that occurred after the cursor offset if [navigation]=`Later is
       specified, otherwise it will return all values that occurred before the
       cursor offset if [navigation]=`Earlier *)
@@ -44,7 +44,7 @@ module type Pagination = sig
     -> navigation:[`Earlier | `Later]
     -> cursor:cursor option
     -> value_filter_specification:[`All | `User_only of Public_key.Compressed.t]
-    -> num_pages:int option
+    -> num_items:int option
     -> value list * [`Has_earlier_page of bool] * [`Has_later_page of bool]
 end
 

@@ -1031,18 +1031,18 @@ module Types = struct
                     Error
                       "Illegal query: first and last must not be non-null \
                        value at the same time"
-                | num_pages, cursor, None, _ ->
+                | num_items, cursor, None, _ ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
                     ( Pagination_database.query database ~navigation:`Earlier
-                        ~value_filter_specification ~cursor ~num_pages
+                        ~value_filter_specification ~cursor ~num_items
                     , Pagination_database.get_total_values database public_key
                     )
-                | None, _, num_pages, cursor ->
+                | None, _, num_items, cursor ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
                     ( Pagination_database.query database ~navigation:`Later
-                        ~value_filter_specification ~cursor ~num_pages
+                        ~value_filter_specification ~cursor ~num_items
                     , Pagination_database.get_total_values database public_key
                     )
               in

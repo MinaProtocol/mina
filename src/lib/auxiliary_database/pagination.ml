@@ -174,7 +174,7 @@ struct
     (List.map cursor_with_dates ~f:fst, has_previous, has_next)
 
   let query t ~navigation ~cursor:cursor_opt ~value_filter_specification
-      ~num_pages:num_pages_opt =
+      ~num_items:num_items_opt =
     let open Option.Let_syntax in
     let query_opt =
       let%map left, right =
@@ -186,9 +186,9 @@ struct
       in
       match navigation with
       | `Earlier ->
-          get_earlier_values left right num_pages_opt
+          get_earlier_values left right num_items_opt
       | `Later ->
-          get_later_values left right num_pages_opt
+          get_later_values left right num_items_opt
     in
     let cursors, has_earlier, has_later =
       Option.value query_opt
@@ -206,7 +206,7 @@ struct
         ~value_filter_specification:
           (Option.value_map public_key_opt ~default:`All ~f:(fun public_key ->
                `User_only public_key ))
-        ~num_pages:None
+        ~num_items:None
     in
     result
 end
@@ -364,7 +364,7 @@ let%test_module "Pagination" =
               , `Has_earlier_page has_earlier
               , `Has_later_page has_later ) =
             query_next_page t ~cursor:(Some query_transaction)
-              ~num_pages:(Some (List.length next_page_transactions_with_dates))
+              ~num_items:(Some (List.length next_page_transactions_with_dates))
           in
           assert_same_set expected_next_page_transactions
             next_page_transactions ;
@@ -393,7 +393,7 @@ let%test_module "Pagination" =
               , `Has_earlier_page has_earlier
               , `Has_later_page has_later ) =
             query_next_page t ~cursor:(Some query_transaction)
-              ~value_filter_specification:(`User_only pk1) ~num_pages:None
+              ~value_filter_specification:(`User_only pk1) ~num_items:None
           in
           assert_same_set expected_next_page_transactions
             next_page_transactions ;
@@ -402,8 +402,8 @@ let%test_module "Pagination" =
     let test_cursor_input_omitted ~trials gen ~query_next_page ~check_pages
         ~compare =
       Quickcheck.test gen ~trials
-        ~f:(fun (num_pages, transactions_with_dates) ->
-          Option.iter num_pages ~f:(fun amount_to_query ->
+        ~f:(fun (num_items, transactions_with_dates) ->
+          Option.iter num_items ~f:(fun amount_to_query ->
               assert (List.length transactions_with_dates >= amount_to_query)
           ) ;
           let t = Pagination.create () in
@@ -415,14 +415,14 @@ let%test_module "Pagination" =
             let sorted_transactions =
               extract_transactions sorted_transaction_with_dates
             in
-            Option.value_map num_pages ~default:sorted_transactions
+            Option.value_map num_items ~default:sorted_transactions
               ~f:(List.take sorted_transactions)
           in
           let ( next_page_transactions
               , `Has_earlier_page has_earlier
               , `Has_later_page has_later ) =
             query_next_page t ~cursor:None
-              ~value_filter_specification:(`User_only pk1) ~num_pages
+              ~value_filter_specification:(`User_only pk1) ~num_items
           in
           assert_same_set expected_next_page_transactions
             next_page_transactions ;
@@ -452,7 +452,7 @@ let%test_module "Pagination" =
               , `Has_later_page has_later ) =
             query_next_page t ~cursor:(Some querying_transaction)
               ~value_filter_specification:(`User_only pk1)
-              ~num_pages:(Some amount_to_query)
+              ~num_items:(Some amount_to_query)
           in
           assert_same_set expected_next_page_transactions
             next_page_transactions ;
