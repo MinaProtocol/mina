@@ -1,6 +1,6 @@
 let defaultName = "Primary Account";
 
-module AddWallet = [%graphql
+module AddAccount = [%graphql
   {|
      mutation addWallet($password: String!) {
          addWallet(input: {password: $password}) {
@@ -10,7 +10,7 @@ module AddWallet = [%graphql
    |}
 ];
 
-module AddWalletMutation = ReasonApollo.CreateMutation(AddWallet);
+module AddAccountMutation = ReasonApollo.CreateMutation(AddAccount);
 
 module Styles = {
   open Css;
@@ -43,13 +43,13 @@ module Styles = {
 
 [@react.component]
 let make = (~nextStep, ~prevStep) => {
-  let (walletName, setName) = React.useState(() => defaultName);
+  let (accountName, setName) = React.useState(() => defaultName);
   let (password, setPassword) = React.useState(() => "");
 
   let (_settings, updateAddressBook) =
     React.useContext(AddressBookProvider.context);
 
-  let mutationVariables = AddWallet.make(~password, ())##variables;
+  let mutationVariables = AddAccount.make(~password, ())##variables;
 
   <div className=Theme.Onboarding.main>
     <div className=Styles.hero>
@@ -68,7 +68,7 @@ let make = (~nextStep, ~prevStep) => {
           <TextField
             label="Name"
             onChange={value => setName(_ => value)}
-            value=walletName
+            value=accountName
           />
           <Spacer height=0.5 />
           <TextField
@@ -86,7 +86,7 @@ let make = (~nextStep, ~prevStep) => {
             onClick={_ => prevStep()}
           />
           <Spacer width=0.5 />
-          <AddWalletMutation>
+          <AddAccountMutation>
             {(mutation, {result}) =>
                <>
                  <Button
@@ -110,17 +110,17 @@ let make = (~nextStep, ~prevStep) => {
                   | Data(data) =>
                     let key = data##addWallet##publicKey;
                     updateAddressBook(
-                      AddressBook.set(~key, ~name=walletName),
+                      AddressBook.set(~key, ~name=accountName),
                     );
                     ReasonReact.Router.push(
-                      "/wallet/" ++ PublicKey.uriEncode(key),
+                      "/account/" ++ PublicKey.uriEncode(key),
                     );
                     nextStep();
                     React.null;
                   | _ => React.null
                   }}
                </>}
-          </AddWalletMutation>
+          </AddAccountMutation>
         </div>
       </div>
       <div

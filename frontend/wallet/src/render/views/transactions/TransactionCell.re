@@ -87,7 +87,7 @@ module ViewModel = {
   };
 
   let ofTransaction =
-      (transaction: Transaction.t, ~myWallets: list(PublicKey.t), ~pending) => {
+      (transaction: Transaction.t, ~myAccounts: list(PublicKey.t), ~pending) => {
     switch (transaction) {
     | UserCommand(userCmd) => {
         sender: Actor.Key(userCmd.from),
@@ -95,7 +95,7 @@ module ViewModel = {
         action: pending ? Action.Pending : Action.Transfer,
         info: Info.Memo(userCmd.memo, userCmd.date),
         amountDelta:
-          Caml.List.exists(PublicKey.equal(userCmd.from), myWallets)
+          Caml.List.exists(PublicKey.equal(userCmd.from), myAccounts)
             ? Int64.(neg(one)) *^ userCmd.amount -^ userCmd.fee
             : userCmd.amount,
       }
@@ -242,7 +242,7 @@ module InfoSection = {
 
   [@react.component]
   let make = (~viewModel: ViewModel.t) => {
-    let activeWallet = Hooks.useActiveWallet();
+    let activeAccount = Hooks.useActiveAccount();
     let (expanded, setExpanded) = React.useState(() => false);
     <div
       onClick={_e =>
@@ -286,7 +286,7 @@ module InfoSection = {
                            value={
                              Option.map(
                                ~f=PublicKey.equal(pubkey),
-                               activeWallet,
+                               activeAccount,
                              )
                              |> Option.withDefault(~default=false)
                                ? amount : Int64.neg(amount)
@@ -370,11 +370,11 @@ module TopLevelStyles = {
 // use a consistent grid layout to keep everything lined up.
 [@react.component]
 let make = (~transaction: Transaction.t, ~pending=false) => {
-  let activeWallet = Hooks.useActiveWallet();
-  let myWallets =
-    Option.map(~f=wallet => [wallet], activeWallet)
+  let activeAccount = Hooks.useActiveAccount();
+  let myAccounts =
+    Option.map(~f=account => [account], activeAccount)
     |> Option.withDefault(~default=[]);
-  let viewModel = ViewModel.ofTransaction(transaction, ~myWallets, ~pending);
+  let viewModel = ViewModel.ofTransaction(transaction, ~myAccounts, ~pending);
 
   <>
     <span className=TopLevelStyles.Actors.wrapper>

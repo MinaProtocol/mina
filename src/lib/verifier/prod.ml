@@ -90,7 +90,8 @@ module Worker = struct
             ~f:(fun ~worker_state ~conn_state:_ i -> f worker_state i)
             ~bin_input:i ~bin_output:o ()
         in
-        { verify_blockchain= f (Blockchain.bin_t, Bool.bin_t, verify_blockchain)
+        { verify_blockchain=
+            f (Blockchain.Stable.Latest.bin_t, Bool.bin_t, verify_blockchain)
         ; verify_transaction_snark=
             f
               ( [%bin_type_class:

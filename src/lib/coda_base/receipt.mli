@@ -1,9 +1,12 @@
 open Snark_params.Tick
+open Core
 
 module Chain_hash : sig
   include Data_hash.Full_size
 
   include Codable.S with type t := t
+
+  val gen : t Quickcheck.Generator.t
 
   val to_string : t -> string
 
