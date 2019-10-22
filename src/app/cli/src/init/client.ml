@@ -353,7 +353,8 @@ let verify_receipt =
                     (sprintf "Payment file %s has invalid json format"
                        payment_path)
            and proof =
-             Payment_proof.of_yojson proof_json
+             [%of_yojson: Receipt.Chain_hash.t * User_command.t list]
+               proof_json
              |> to_deferred_or_error
                   ~error:
                     (sprintf "Proof file %s has invalid json format" proof_path)
