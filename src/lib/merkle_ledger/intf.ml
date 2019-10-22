@@ -66,7 +66,7 @@ module type Key_value_database = sig
   type t [@@deriving sexp]
 
   include
-    Key_value_database.S
+    Key_value_database.Intf.Ident
     with type t := t
      and type key := Bigstring.t
      and type value := Bigstring.t
