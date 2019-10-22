@@ -34,7 +34,6 @@
     debug_assert
     merkle_mask
     trust_system
-    receipt_chain_database_lib
     storage
     yojson
     codable

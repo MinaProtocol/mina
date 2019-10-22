@@ -401,7 +401,7 @@ module Verify_proof = struct
   type query =
     Public_key.Compressed.Stable.Latest.t
     * User_command.Stable.V1.t
-    * Payment_proof.t
+    * (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list)
   [@@deriving bin_io]
 
   type response = unit Or_error.t [@@deriving bin_io]
@@ -417,7 +417,9 @@ module Prove_receipt = struct
     Receipt.Chain_hash.Stable.Latest.t * Public_key.Compressed.Stable.Latest.t
   [@@deriving bin_io]
 
-  type response = Payment_proof.t Or_error.t [@@deriving bin_io]
+  type response =
+    (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list) Or_error.t
+  [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 

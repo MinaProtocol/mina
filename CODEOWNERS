@@ -83,7 +83,7 @@
 /src/lib/prover/ @nholland94 @bkase @imeckler @mrmr1993
 /src/lib/quickcheck_lib/ @nholland94 @ghost-not-in-the-shell @enolan
 /src/lib/random_oracle/ @cmr @imeckler @mrmr1993
-/src/lib/receipt_chain_database_lib/ @wu-s-john @bkase
+/src/lib/receipt_chain_database/ @wu-s-john @bkase
 /src/lib/rocksdb/ @psteckler @nholland94 @wu-s-john
 /src/lib/transition_chain_prover/ @ghost-not-in-the-shell @nholland94
 /src/lib/transition_chain_verifier/ @ghost-not-in-the-shell @nholland94
