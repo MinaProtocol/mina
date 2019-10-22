@@ -35,8 +35,6 @@ module Make () = struct
 
       include T
       include Binable.Of_stringable (T1)
-      include Hashable.Make (T1)
-      include Comparable.Make (T1)
     end
 
     module Latest = V1
