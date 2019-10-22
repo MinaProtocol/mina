@@ -11,6 +11,15 @@ let rec to_list : type n. ('a, n) t -> 'a list = function
 let rec map : type n. f:('a -> 'b) -> ('a, n) t -> ('b, n) t =
  fun ~f ls -> match ls with [] -> [] | h :: t -> f h :: map ~f t
 
+let rec map2 : type n.
+    f:('a -> 'b -> 'c) -> ('a, n) t -> ('b, n) t -> ('c, n) t =
+ fun ~f ls_a ls_b ->
+  match (ls_a, ls_b) with
+  | [], [] ->
+      []
+  | h_a :: t_a, h_b :: t_b ->
+      f h_a h_b :: map2 ~f t_a t_b
+
 let rec fold : type n. init:'b -> f:('b -> 'a -> 'b) -> ('a, n) t -> 'b =
  fun ~init ~f ls ->
   match ls with [] -> init | h :: t -> fold ~init:(f init h) ~f t

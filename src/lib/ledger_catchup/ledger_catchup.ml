@@ -468,7 +468,7 @@ let%test_module "Ledger_catchup tests" =
       let target_breadcrumb = List.last_exn target_best_tip_path in
       let%bind `Test {breadcrumbs_reader; _}, _ =
         run_catchup_with_target ~network:my_net.network
-          ~frontier:my_net.frontier ~target_breadcrumb
+          ~frontier:my_net.state.frontier ~target_breadcrumb
       in
       (* TODO: expose Strict_pipe.read *)
       let%map cached_catchup_breadcrumbs =
@@ -521,7 +521,8 @@ let%test_module "Ledger_catchup tests" =
           (* TODO: I don't think I'm testing this right... *)
           let target_best_tip_path =
             Transition_frontier.(
-              path_map ~f:Fn.id peer_net.frontier (best_tip peer_net.frontier))
+              path_map ~f:Fn.id peer_net.state.frontier
+                (best_tip peer_net.state.frontier))
           in
           Thread_safe.block_on_async_exn (fun () ->
               test_successful_catchup ~my_net ~target_best_tip_path ) )
@@ -536,7 +537,7 @@ let%test_module "Ledger_catchup tests" =
           let open Fake_network in
           let [my_net; peer_net] = network.peer_networks in
           let target_best_tip_path =
-            [Transition_frontier.best_tip peer_net.frontier]
+            [Transition_frontier.best_tip peer_net.state.frontier]
           in
           Thread_safe.block_on_async_exn (fun () ->
               test_successful_catchup ~my_net ~target_best_tip_path ) )
@@ -552,13 +553,13 @@ let%test_module "Ledger_catchup tests" =
           let open Fake_network in
           let [my_net; peer_net] = network.peer_networks in
           let target_breadcrumb =
-            Transition_frontier.best_tip peer_net.frontier
+            Transition_frontier.best_tip peer_net.state.frontier
           in
           let failing_transition =
             let open Transition_frontier.Extensions in
             let history =
               get_extension
-                (Transition_frontier.extensions peer_net.frontier)
+                (Transition_frontier.extensions peer_net.state.frontier)
                 Root_history
             in
             let failing_root_data =
@@ -569,7 +570,7 @@ let%test_module "Ledger_catchup tests" =
           Thread_safe.block_on_async_exn (fun () ->
               let%bind `Test {cache; _}, `Cached_transition cached_transition =
                 run_catchup_with_target ~network:my_net.network
-                  ~frontier:my_net.frontier ~target_breadcrumb
+                  ~frontier:my_net.state.frontier ~target_breadcrumb
               in
               let cached_failing_transition =
                 Transition_handler.Unprocessed_transition_cache.register_exn
@@ -599,19 +600,19 @@ let%test_module "Ledger_catchup tests" =
         ~f:(fun network ->
           let open Fake_network in
           let [my_net; peer_net] = network.peer_networks in
-          Core.Printf.printf "$my_net.frontier.root = %s\n"
-            (State_hash.to_base58_check @@ Transition_frontier.(Breadcrumb.state_hash @@ root my_net.frontier));
-          Core.Printf.printf "$peer_net.frontier.root = %s\n"
-            (State_hash.to_base58_check @@ Transition_frontier.(Breadcrumb.state_hash @@ root my_net.frontier));
+          Core.Printf.printf "$my_net.state.frontier.root = %s\n"
+            (State_hash.to_base58_check @@ Transition_frontier.(Breadcrumb.state_hash @@ root my_net.state.frontier));
+          Core.Printf.printf "$peer_net.state.frontier.root = %s\n"
+            (State_hash.to_base58_check @@ Transition_frontier.(Breadcrumb.state_hash @@ root my_net.state.frontier));
           let missing_breadcrumbs =
-            let best_tip_path = Transition_frontier.best_tip_path peer_net.frontier in
+            let best_tip_path = Transition_frontier.best_tip_path peer_net.state.frontier in
             Core.Printf.printf "$best_tip_path=\n  %s\n"
               (String.concat ~sep:"\n  " @@ List.map ~f:(Fn.compose State_hash.to_base58_check Transition_frontier.Breadcrumb.state_hash) best_tip_path);
             (* List.take best_tip_path (List.length best_tip_path - 1) *)
             best_tip_path
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
-            let%bind {cache; job_writer; breadcrumbs_reader} = run_catchup ~network:my_net.network ~frontier:my_net.frontier in
+            let%bind {cache; job_writer; breadcrumbs_reader} = run_catchup ~network:my_net.network ~frontier:my_net.state.frontier in
             let jobs =
               List.map (List.rev missing_breadcrumbs) ~f:(fun breadcrumb ->
                 let parent_hash = Transition_frontier.Breadcrumb.parent_hash breadcrumb in

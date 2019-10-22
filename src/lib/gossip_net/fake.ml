@@ -26,14 +26,22 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
   module Network = struct
     type rpc_hook = {hook: 'q 'r. ('q, 'r) rpc -> 'q -> 'r Deferred.Or_error.t}
 
-    type node = {peer: Peer.t; mutable rpc_hook: rpc_hook option}
+    type network_interface =
+      { broadcast_message_writer:
+          ( Message.t Envelope.Incoming.t
+          , Strict_pipe.crash Strict_pipe.buffered
+          , unit )
+          Strict_pipe.Writer.t
+      ; rpc_hook: rpc_hook }
+
+    type node = {peer: Peer.t; mutable interface: network_interface option}
 
     type t = {nodes: (Unix.Inet_addr.t, node list) Hashtbl.t}
 
     let create peers =
       let nodes = Hashtbl.create (module Unix.Inet_addr) in
       List.iter peers ~f:(fun peer ->
-          Hashtbl.add_multi nodes ~key:peer.host ~data:{peer; rpc_hook= None}
+          Hashtbl.add_multi nodes ~key:peer.host ~data:{peer; interface= None}
       ) ;
       {nodes}
 
@@ -43,28 +51,37 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
              if Unix.Inet_addr.equal node.peer.host local_ip then None
              else Some node.peer )
 
-    let lookup_peer t peer =
+    let lookup_node t peer =
       let error = Error.of_string "peer does not exist" in
-      let peers = Hashtbl.find t.nodes peer.host |> Option.value_exn ~error in
-      List.find peers ~f:(fun node -> Peer.equal peer node.peer)
+      let nodes = Hashtbl.find t.nodes peer.host |> Option.value_exn ~error in
+      List.find nodes ~f:(fun node -> Peer.equal peer node.peer)
       |> Option.value_exn ~error
 
-    let register_rpc_hook t peer hook =
-      let peer = lookup_peer t peer in
-      peer.rpc_hook <- Some hook
+    let attach_interface t peer interface =
+      let node = lookup_node t peer in
+      node.interface <- Some interface
+
+    let get_interface peer =
+      Option.value_exn peer.interface
+        ~error:
+          (Error.of_string "cannot call rpc on peer which was never registered")
+
+    let broadcast t ~sender msg =
+      Hashtbl.iter t.nodes ~f:(fun nodes ->
+          List.iter nodes ~f:(fun node ->
+              if not (Peer.equal node.peer sender) then
+                let intf = get_interface node in
+                let msg =
+                  Envelope.(
+                    Incoming.wrap ~data:msg ~sender:(Sender.Remote sender.host))
+                in
+                Strict_pipe.Writer.write intf.broadcast_message_writer msg ) )
 
     let call_rpc : type q r.
         t -> Peer.t -> (q, r) rpc -> q -> r Deferred.Or_error.t =
      fun t peer rpc query ->
-      let peer = lookup_peer t peer in
-      let {hook} =
-        match peer.rpc_hook with
-        | None ->
-            failwith "cannot call rpc on peer which was never registered"
-        | Some f ->
-            f
-      in
-      hook rpc query
+      let intf = get_interface (lookup_node t peer) in
+      intf.rpc_hook.hook rpc query
   end
 
   module Instance = struct
@@ -120,7 +137,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let ban_notification_reader, ban_notification_writer =
         Linear_pipe.create ()
       in
-      Network.register_rpc_hook network me (rpc_hook me rpc_handlers) ;
+      Network.(
+        attach_interface network me
+          { broadcast_message_writer= received_message_writer
+          ; rpc_hook= rpc_hook me rpc_handlers }) ;
       { network
       ; me
       ; rpc_handlers
@@ -160,7 +180,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let query_random_peers _ = failwith "TODO stub"
 
-    let broadcast _ = failwith "TODO stub"
+    let broadcast t msg = Network.broadcast t.network ~sender:t.me msg
 
     let broadcast_all _ = failwith "TODO stub"
   end
