@@ -150,6 +150,8 @@ module Stable = struct
         ; ("fee_excess", Amount.Signed.to_yojson t.fee_excess)
         ; ("sok_digest", `String "<opaque>")
         ; ("proof", Proof.to_yojson t.proof) ]
+
+    let to_latest = Fn.id
   end
 end]
 
