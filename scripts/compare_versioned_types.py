@@ -48,7 +48,6 @@ def compare_types (fn,original,modified) :
             print ('  Now: ' + mod)
             global exit_code
             exit_code = 1
-    sys.exit (exit_code)
 
 def create_types_file (ocaml,tag) :
     out_fn = os.path.basename (ocaml) + '-' + tag
@@ -62,6 +61,7 @@ def main (original,modified) :
     orig_types = create_types_file (original,'original')
     mod_types = create_types_file (modified,'modified')
     compare_types (modified,orig_types,mod_types)
+    sys.exit (exit_code)
 
 if __name__ == "__main__":
     if len(sys.argv) != 3 or sys.argv[1] == sys.argv[2] :
