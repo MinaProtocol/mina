@@ -76,7 +76,7 @@ module Worker_state = struct
                    Wrap.input {Wrap.Prover_state.proof} Wrap.main
                    (Wrap_input.of_tick_field hash)
 
-               let extend_blockchain (chain : Blockchain.Stable.Latest.t)
+               let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
                    (block : Snark_transition.value) state_for_handler
                    pending_coinbase =
@@ -203,11 +203,8 @@ module Worker = struct
     type 'w functions =
       { initialized: ('w, unit, [`Initialized]) F.t
       ; extend_blockchain:
-          ( 'w
-          , Extend_blockchain_input.t
-          , Blockchain.Stable.Latest.t Or_error.t )
-          F.t
-      ; verify_blockchain: ('w, Blockchain.Stable.Latest.t, bool) F.t }
+          ('w, Extend_blockchain_input.t, Blockchain.t Or_error.t) F.t
+      ; verify_blockchain: ('w, Blockchain.t, bool) F.t }
 
     module Worker_state = Worker_state
 
