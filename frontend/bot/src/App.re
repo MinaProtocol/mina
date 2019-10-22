@@ -16,7 +16,6 @@ let handleMessageHelper = msg =>
   switch (Array.to_list(Js.String.split(" ", Message.content(msg)))) {
   | ["$tiny"] => Message.reply(msg, Messages.greeting)
   | ["$help"] => Message.reply(msg, Messages.help)
-  | ["$status"] => Status.handleMessage(msg)
   | ["$request", pk] => Faucet.handleMessage(msg, pk)
   | ["$request", ..._] => Message.reply(msg, Messages.requestError)
   | _ => ()
