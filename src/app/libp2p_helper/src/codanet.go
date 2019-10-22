@@ -5,9 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"path"
-	"strconv"
 
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log"
@@ -66,16 +64,13 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	logger := logging.Logger("codanet.Helper")
 	dso := dsb.DefaultOptions
 
-	bp := path.Join(statedir, strconv.Itoa(os.Getpid()))
-	os.MkdirAll(bp, 0700)
-
-	ds, err := dsb.NewDatastore(path.Join(statedir, strconv.Itoa(os.Getpid()), "libp2p-peerstore-v0"), &dso)
+	ds, err := dsb.NewDatastore(path.Join(statedir, "libp2p-peerstore-v0"), &dso)
 	if err != nil {
 		return nil, err
 	}
 
 	dsoDht := dsb.DefaultOptions
-	dsDht, err := dsb.NewDatastore(path.Join(statedir, strconv.Itoa(os.Getpid()), "libp2p-dht-v0"), &dsoDht)
+	dsDht, err := dsb.NewDatastore(path.Join(statedir, "libp2p-dht-v0"), &dsoDht)
 	if err != nil {
 		return nil, err
 	}
