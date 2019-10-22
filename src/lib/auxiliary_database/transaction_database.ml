@@ -28,7 +28,7 @@ struct
       transaction transaction date
 
   let create ~logger directory =
-    let database = Database.create ~directory in
+    let database = Database.create directory in
     let pagination = Pagination.create () in
     List.iter (Database.to_alist database) ~f:(add_user_transaction pagination) ;
     {database; pagination; logger}

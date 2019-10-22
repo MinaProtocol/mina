@@ -10,7 +10,7 @@ end
 
 include T
 
-let create ~directory =
+let create directory =
   let opts = Rocks.Options.create () in
   Rocks.Options.set_create_if_missing opts true ;
   {uuid= Uuid_unix.create (); db= Rocks.open_db ~opts directory}
@@ -86,7 +86,7 @@ let%test_unit "to_alist (of_alist l) = l" =
             List.sort kvs ~compare:[%compare: string * string]
             |> List.map ~f:(fun (k, v) -> (s k, s v))
           in
-          let db = create ~directory in
+          let db = create directory in
           List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
           let alist =
             List.sort (to_alist db)

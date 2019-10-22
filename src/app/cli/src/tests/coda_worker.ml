@@ -424,11 +424,11 @@ module T = struct
               ~location typ
           in
           let receipt_chain_database =
-            Receipt_chain_database.create ~directory:receipt_chain_dir_name
+            Receipt_chain_database.create receipt_chain_dir_name
           in
           trace_database_initialization "receipt_chain_database" __LOC__
             receipt_chain_dir_name ;
-          let trust_system = Trust_system.create ~db_dir:trust_dir in
+          let trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let transaction_database =
             Auxiliary_database.Transaction_database.create ~logger
