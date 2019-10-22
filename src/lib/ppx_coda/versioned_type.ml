@@ -137,8 +137,8 @@ let filter_type_decls_attrs type_decl =
 
 (* convert type_decls to structure item so we can print it *)
 let type_decls_to_stri type_decls =
-  (* alas, type derivers aren't passed the rec flag, use a default *)
-  {pstr_desc= Pstr_type (Ast.Nonrecursive, type_decls); pstr_loc= Location.none}
+  (* type derivers only work with recursive types *)
+  {pstr_desc= Pstr_type (Ast.Recursive, type_decls); pstr_loc= Location.none}
 
 (* replace newlines in standard formmatter with a space, so type is all on one line *)
 let formatter =
