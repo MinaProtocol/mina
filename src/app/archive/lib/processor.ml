@@ -1,6 +1,8 @@
 open Core
 open Async
 open Pipe_lib
+open Coda_transition
+open Coda_state
 open Coda_base
 open Signature_lib
 
@@ -57,10 +59,162 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
     let%map _result = Client.query graphql port in
     ()
 
+  let compute_with_receipt_chains
+      (user_commands :
+        ((User_command.t, Transaction_hash.t) With_hash.t * Block_time.t option)
+        list)
+      (sender_receipt_chains_from_parent_ledger :
+        Receipt.Chain_hash.t Public_key.Compressed.Map.t) :
+      ( (User_command.t, Transaction_hash.t) With_hash.t
+      * Block_time.t option
+      * Types.Receipt_chain_hash.t option )
+      list =
+    (* The user commands should be sorted by nonces *)
+    let sorted_user_commands =
+      List.sort user_commands
+        ~compare:
+          (Comparable.lift Account.Nonce.compare
+             ~f:(fun ({With_hash.data= user_command; _}, _) ->
+               User_command.nonce user_command ))
+    in
+    List.folding_map sorted_user_commands
+      ~init:sender_receipt_chains_from_parent_ledger
+      ~f:(fun acc_sender_receipt_chains
+         ( ({With_hash.data= user_command; _} as user_command_with_hash)
+         , block_time )
+         ->
+        let user_command_payload = User_command.payload user_command in
+        let sender = User_command.sender user_command in
+        let udpated_sender_receipt_chain, new_receipt_chain =
+          Option.value_map ~default:(acc_sender_receipt_chains, None)
+            (Map.find acc_sender_receipt_chains sender)
+            ~f:(fun previous_receipt_chain ->
+              let new_receipt_chain =
+                Receipt.Chain_hash.cons user_command_payload
+                  previous_receipt_chain
+              in
+              let updated_receipt_chain_hash =
+                Map.set acc_sender_receipt_chains ~key:sender
+                  ~data:new_receipt_chain
+              in
+              let receipt_chain_input =
+                Types.
+                  { Receipt_chain_hash.value= new_receipt_chain
+                  ; parent= previous_receipt_chain }
+              in
+              (updated_receipt_chain_hash, Some receipt_chain_input) )
+        in
+        ( udpated_sender_receipt_chain
+        , (user_command_with_hash, block_time, new_receipt_chain) ) )
+
+  type 'a graphql_result =
+    < parse: Yojson.Basic.json -> 'a
+    ; query: string
+    ; variables: Yojson.Basic.json >
+
+  let tag_with_first_seen
+      ~(get_first_seen : string array -> 'output graphql_result)
+      ~(get_obj :
+            'output
+         -> < hash: Transaction_hash.t ; first_seen: Block_time.t option ; .. >
+            array) transactions_with_hash default_block_time port =
+    let open Deferred.Result.Let_syntax in
+    let hashes =
+      List.map transactions_with_hash
+        ~f:(Fn.compose Transaction_hash.to_base58_check With_hash.hash)
+    in
+    let graphql = get_first_seen (Array.of_list hashes) in
+    let%map first_query_response =
+      let%map result = Client.query graphql port in
+      Array.to_list (get_obj result)
+      |> List.map ~f:(fun obj -> (obj#hash, obj#first_seen))
+    in
+    let map = Transaction_hash.Map.of_alist_exn first_query_response in
+    List.map transactions_with_hash
+      ~f:(fun ({With_hash.hash; _} as user_command_with_hash) ->
+        let first_seen_in_db = Option.join @@ Map.find map hash in
+        ( user_command_with_hash
+        , Option.value_map first_seen_in_db ~default:(Some default_block_time)
+            ~f:Option.some ) )
+
+  let added_transition {port}
+      ({With_hash.data= block; _} as block_with_hash :
+        (External_transition.t, State_hash.t) With_hash.t)
+      (sender_receipt_chains_from_parent_ledger :
+        Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
+    let open Deferred.Result.Let_syntax in
+    let transactions =
+      List.bind (External_transition.transactions block) ~f:(function
+        | User_command checked_user_command ->
+            [`User_command (User_command.forget_check checked_user_command)]
+        | Fee_transfer fee_transfer -> (
+          match fee_transfer with
+          | One fee_transfer ->
+              [`Fee_transfer fee_transfer]
+          | Two (fee_transfer1, fee_transfer2) ->
+              [`Fee_transfer fee_transfer1; `Fee_transfer fee_transfer2] )
+        | Coinbase _ ->
+            [] )
+    in
+    let user_commands, fee_transfers =
+      List.fold transactions ~init:([], [])
+        ~f:(fun (acc_user_commands, acc_fee_transfers) -> function
+        | `User_command user_command ->
+            ( With_hash.of_data user_command
+                ~hash_data:Transaction_hash.hash_user_command
+              :: acc_user_commands
+            , acc_fee_transfers )
+        | `Fee_transfer fee_transfer ->
+            ( acc_user_commands
+            , With_hash.of_data fee_transfer
+                ~hash_data:Transaction_hash.hash_fee_transfer
+              :: acc_fee_transfers ) )
+    in
+    let block_time =
+      Blockchain_state.timestamp @@ External_transition.blockchain_state block
+    in
+    let%bind user_commands_with_time =
+      tag_with_first_seen
+        ~get_first_seen:(fun hashes ->
+          Graphql_query.User_commands.Query_first_seen.make ~hashes () )
+        ~get_obj:(fun result -> result#user_commands)
+        user_commands block_time port
+    in
+    let%bind fee_transfers_with_time =
+      tag_with_first_seen
+        ~get_first_seen:(fun hashes ->
+          Graphql_query.Fee_transfers.Query_first_seen.make ~hashes () )
+        ~get_obj:(fun result -> result#fee_transfers)
+        fee_transfers block_time port
+    in
+    let encoded_block =
+      Types.Blocks.serialize block_with_hash
+        (compute_with_receipt_chains user_commands_with_time
+           sender_receipt_chains_from_parent_ledger)
+        fee_transfers_with_time
+    in
+    let graphql =
+      Graphql_query.Blocks.Insert.make
+        ~blocks:(Array.of_list [encoded_block])
+        ()
+    in
+    let%bind _ = Client.query graphql port in
+    Deferred.Result.return ()
+
   let create port = {port}
 
   let run t reader =
     Strict_pipe.Reader.iter reader ~f:(function
+      | Diff.Transition_frontier
+          (Breadcrumb_added {block; sender_receipt_chains_from_parent_ledger})
+        -> (
+          match%bind
+            added_transition t block sender_receipt_chains_from_parent_ledger
+          with
+          | Error e ->
+              Graphql_client_lib.Connection_error.ok_exn e
+          | Ok () ->
+              Deferred.return () )
       | Diff.Transition_frontier _ ->
           (* TODO: Implement *)
           Deferred.return ()
@@ -71,151 +225,3 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
           | Error e ->
               Graphql_client_lib.Connection_error.ok_exn e ) )
 end
-
-let%test_module "Processor" =
-  ( module struct
-    module Processor = Make (struct
-      let address = "v1/graphql"
-
-      let headers = String.Map.of_alist_exn [("X-Hasura-Role", "user")]
-
-      let preprocess_variables_string =
-        String.substr_replace_all ~pattern:{|"constraint_"|}
-          ~with_:{|"constraint"|}
-    end)
-
-    let t = {Processor.port= 9000}
-
-    let try_with ~f =
-      Deferred.Or_error.ok_exn
-      @@ let%bind result =
-           Monitor.try_with_or_error ~name:"Write Processor" f
-         in
-         let%map clear_action =
-           Processor.Client.query (Graphql_query.Clear_data.make ()) t.port
-         in
-         Or_error.all_unit
-           [ result
-           ; Result.map_error clear_action ~f:(fun error ->
-                 Error.createf
-                   !"Issue clearing data in database: %{sexp:Error.t}"
-                 @@ Graphql_client_lib.Connection_error.to_error error )
-             |> Result.ignore ]
-
-    let assert_user_command
-        ((user_command, block_time) :
-          (User_command_payload.t, Public_key.t, _) User_command.Poly.t
-          * Block_time.t option)
-        ((decoded_user_command, decoded_block_time) :
-          ( User_command_payload.t
-          , Public_key.Compressed.t
-          , _ )
-          User_command.Poly.t
-          * Block_time.t option) =
-      [%test_result: User_command_payload.t] ~equal:User_command_payload.equal
-        ~expect:user_command.payload decoded_user_command.payload ;
-      [%test_result: Public_key.Compressed.t]
-        ~equal:Public_key.Compressed.equal
-        ~expect:(Public_key.compress user_command.sender)
-        decoded_user_command.sender ;
-      [%test_result: Block_time.t option]
-        ~equal:[%equal: Block_time.t Option.t] ~expect:block_time
-        decoded_block_time
-
-    let%test_unit "Process multiple user commands from Transaction_pool diff \
-                   (including a duplicate)" =
-      Backtrace.elide := false ;
-      let n_keys = 2 in
-      let keys = Array.init n_keys ~f:(fun _ -> Keypair.create ()) in
-      let user_command_gen =
-        User_command.Gen.payment_with_random_participants ~keys
-          ~max_amount:10000 ~max_fee:1000 ()
-      in
-      let gen_user_command_with_time =
-        Quickcheck.Generator.both user_command_gen Block_time.gen
-      in
-      Thread_safe.block_on_async_exn
-      @@ fun () ->
-      try_with ~f:(fun () ->
-          Async.Quickcheck.async_test
-            ~sexp_of:
-              [%sexp_of:
-                Block_time.t
-                * (User_command.t * Block_time.t)
-                * (User_command.t * Block_time.t)]
-            (Quickcheck.Generator.tuple3 Block_time.gen
-               gen_user_command_with_time gen_user_command_with_time) ~trials:1
-            ~f:(fun ( block_time0
-                    , (user_command1, block_time1)
-                    , (user_command2, block_time2) )
-               ->
-              let reader, writer =
-                Strict_pipe.create ~name:"archive"
-                  (Buffered (`Capacity 10, `Overflow Crash))
-              in
-              let min_block_time = Block_time.min block_time0 block_time1 in
-              let max_block_time = Block_time.max block_time0 block_time1 in
-              let processing_deferred_job = Processor.run t reader in
-              Strict_pipe.Writer.write writer
-                (Transaction_pool
-                   { Diff.Transaction_pool.added=
-                       User_command.Map.of_alist_exn
-                         [ (user_command1, min_block_time)
-                         ; (user_command2, block_time2) ]
-                   ; removed= User_command.Set.empty }) ;
-              Strict_pipe.Writer.write writer
-                (Transaction_pool
-                   { Diff.Transaction_pool.added=
-                       User_command.Map.of_alist_exn
-                         [(user_command1, max_block_time)]
-                   ; removed= User_command.Set.empty }) ;
-              Strict_pipe.Writer.close writer ;
-              let%bind () = processing_deferred_job in
-              let%bind public_keys =
-                Processor.Client.query_exn
-                  (Graphql_query.Public_key.Query.make ())
-                  t.port
-              in
-              let queried_public_keys =
-                Array.map public_keys#public_keys ~f:(fun obj -> obj#value)
-              in
-              [%test_result: Int.t] ~equal:Int.equal ~expect:n_keys
-                (Array.length queried_public_keys) ;
-              let queried_public_keys =
-                Public_key.Compressed.Set.of_array queried_public_keys
-              in
-              let accessed_accounts =
-                Public_key.Compressed.Set.of_list
-                @@ List.concat
-                     [ User_command.accounts_accessed user_command1
-                     ; User_command.accounts_accessed user_command2 ]
-              in
-              [%test_result: Public_key.Compressed.Set.t]
-                ~equal:Public_key.Compressed.Set.equal
-                ~expect:accessed_accounts queried_public_keys ;
-              let query_user_command user_command =
-                let%map query_result =
-                  Processor.Client.query_exn
-                    (Graphql_query.User_commands.Query.make
-                       ~hash:
-                         Transaction_hash.(
-                           to_base58_check @@ hash_user_command user_command)
-                       ())
-                    t.port
-                in
-                let queried_user_command = query_result#user_commands.(0) in
-                Types.User_command.decode queried_user_command
-              in
-              let%bind decoded_user_command1 =
-                query_user_command user_command1
-              in
-              assert_user_command
-                (user_command1, Some min_block_time)
-                decoded_user_command1 ;
-              let%map decoded_user_command2 =
-                query_user_command user_command2
-              in
-              assert_user_command
-                (user_command2, Some block_time2)
-                decoded_user_command2 ) )
-  end )

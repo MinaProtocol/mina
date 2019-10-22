@@ -505,7 +505,7 @@ let make = () => {
           Northern Arizona University."
       />
       <Member
-        name={js|Emre Tekişalp|js}
+        name={js|Emre Tekisalp|js}
         title="Head of Business Development"
         description="Emre's career has focused on bringing new economic \
         opportunities to societies using the power of technology. Before O(1) \
