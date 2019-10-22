@@ -666,6 +666,8 @@ struct
     let transaction_pool_diffs _ = failwith "stub"
 
     let snark_pool_diffs _ = failwith "stub"
+
+    let net2 _ = None
   end
 
   module Network_builder = struct
