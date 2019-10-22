@@ -31,9 +31,7 @@ let%test_module "Processor" =
            Monitor.try_with_or_error ~name:"Write Processor" f
          in
          let%map clear_action =
-           Processor.Client.query_or_error
-             (Graphql_query.Clear_data.T.make ())
-             t.port
+           Processor.Client.query (Graphql_query.Clear_data.make ()) t.port
          in
          Or_error.all_unit
            [ result
@@ -81,7 +79,7 @@ let%test_module "Processor" =
 
     let query_participants (t : Processor.t) hashes =
       let%map response =
-        Processor.Client.query
+        Processor.Client.query_exn
           (Graphql_query.User_commands.Query_participants.make
              ~hashes:(Array.of_list hashes) ())
           t.port
@@ -158,7 +156,7 @@ let%test_module "Processor" =
                      [(user_command1, max_block_time)])
               in
               let%bind public_keys =
-                Processor.Client.query
+                Processor.Client.query_exn
                   (Graphql_query.Public_keys.Query.make ())
                   t.port
               in
@@ -181,7 +179,7 @@ let%test_module "Processor" =
                 ~expect:accessed_accounts queried_public_keys ;
               let query_user_command hash =
                 let%map query_result =
-                  Processor.Client.query
+                  Processor.Client.query_exn
                     (Graphql_query.User_commands.Query.make ~hash ())
                     t.port
                 in

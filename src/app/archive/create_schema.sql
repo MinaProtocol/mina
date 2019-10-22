@@ -25,6 +25,7 @@ CREATE TABLE blocks (
   state_hash int NOT NULL,
   parent_hash int NOT NULL,
   creator int NOT NULL,
+  snarked_ledger_hash text NOT NULL,
   ledger_hash text NOT NULL,
   global_slot int NOT NULL,
   ledger_proof_nonce int NOT NULL,

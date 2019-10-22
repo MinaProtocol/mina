@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries core ppxlib)
  (preprocess
-  (pps bisect_ppx ppx_jane ppxlib.metaquot ppxlib.runner -- -conditional))
+  (pps ppx_coda bisect_ppx ppx_jane ppxlib.metaquot ppxlib.runner -- -conditional))
  (synopsis "PPX utilities"))

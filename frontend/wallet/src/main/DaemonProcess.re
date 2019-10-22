@@ -24,7 +24,7 @@ let codaCommand = (~port, ~extraArgs) => {
           "-rest-port",
           Js.Int.toString(port),
           "-config-directory",
-          ProjectRoot.resource ^/ codaPath ^/ "config",
+          ProjectRoot.userData ^/ "coda" ^/ "config",
         |],
       ),
     env: ChildProcess.Process.env,
@@ -46,10 +46,12 @@ let fakerCommand = (~port) => {
   env: ChildProcess.Process.env,
 };
 
+[@bs.module "os"] external tmpdir: unit => string = "";
+
 module Process = {
   let start = (command: Command.t) => {
     let {Command.executable, args} = command;
-    let logfileName = "daemon.log";
+    let logfileName = tmpdir() ++ "/daemon.log";
     print_endline(
       {j|Starting $executable with $args. Logging to `$logfileName`|j},
     );
@@ -140,17 +142,7 @@ module CodaProcess = {
       switch (Js.Dict.get(ChildProcess.Process.env, "GRAPHQL_BACKEND")) {
       | Some("faker") => Process.start(fakerCommand(~port))
       | _ =>
-        /* Workaround for https://github.com/CodaProtocol/coda/issues/2667
-           Remove the config deletion when it is resolved.  */
-        let transitionFrontierPath =
-          ProjectRoot.resource ^/ codaPath ^/ "config/transition_frontier";
-
-        Printf.fprintf(stderr, "Deleting %s\n%!", transitionFrontierPath);
-        Bindings.ChildProcess.execSync(
-          "rm",
-          [|"-rf", transitionFrontierPath|],
-        );
-        Process.start(codaCommand(~port, ~extraArgs=args |> Array.fromList));
+        Process.start(codaCommand(~port, ~extraArgs=args |> Array.fromList))
       };
     };
 };

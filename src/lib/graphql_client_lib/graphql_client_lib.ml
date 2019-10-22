@@ -1,6 +1,5 @@
 open Core
 open Async
-open Signature_lib
 
 module type Config_intf = sig
   val address : string
@@ -72,7 +71,7 @@ end
 module Make (Config : Config_intf) = struct
   let local_uri port = make_local_uri port Config.address
 
-  let query_or_error query_obj port =
+  let query query_obj port =
     let variables_string =
       Config.preprocess_variables_string
       @@ Yojson.Basic.to_string query_obj#variables
@@ -84,10 +83,12 @@ module Make (Config : Config_intf) = struct
     let open Deferred.Result.Let_syntax in
     let headers =
       List.fold ~init:(Cohttp.Header.init ())
-        (("Accept", "application/json") :: Map.to_alist Config.headers)
-        ~f:(fun header (key, value) -> Cohttp.Header.add header key value)
+        ( ("Accept", "application/json")
+        :: ("Content-Type", "application/json")
+        :: Map.to_alist Config.headers ) ~f:(fun header (key, value) ->
+          Cohttp.Header.add header key value )
     in
-    let%bind _, body =
+    let%bind response, body =
       Deferred.Or_error.try_with ~extract_exn:true (fun () ->
           Cohttp_async.Client.post ~headers
             ~body:(Cohttp_async.Body.of_string body_string)
@@ -98,15 +99,26 @@ module Make (Config : Config_intf) = struct
     let%bind body_str =
       Cohttp_async.Body.to_string body |> Deferred.map ~f:Result.return
     in
-    let body_json = Yojson.Basic.from_string body_str in
+    let%bind body_json =
+      match
+        Cohttp.Code.code_of_status (Cohttp_async.Response.status response)
+      with
+      | 200 ->
+          Deferred.return (Ok (Yojson.Basic.from_string body_str))
+      | code ->
+          Deferred.return
+            (Error
+               (`Failed_request
+                 (Printf.sprintf "Status code %d -- %s" code body_str)))
+    in
     let open Yojson.Basic.Util in
     ( match (member "errors" body_json, member "data" body_json) with
     | `Null, `Null ->
         Error (`Graphql_error "Empty response from graphql query")
     | error, `Null ->
         Error (`Graphql_error (graphql_error_to_string error))
-    | _, data ->
-        Result.try_with (fun () -> query_obj#parse data)
+    | _, raw_json ->
+        Result.try_with (fun () -> query_obj#parse raw_json)
         |> Result.map_error ~f:(fun e ->
                `Graphql_error
                  (Printf.sprintf
@@ -114,40 +126,11 @@ module Make (Config : Config_intf) = struct
                     (Exn.to_string e)) ) )
     |> Deferred.return
 
-  let query query_obj port =
+  let query_exn query_obj port =
     let open Deferred.Let_syntax in
-    match%bind query_or_error query_obj port with
+    match%bind query query_obj port with
     | Ok r ->
         Deferred.return r
     | Error error ->
         Connection_error.ok_exn error
-end
-
-module Encoders = struct
-  let optional = Option.value_map ~default:`Null
-
-  let uint64 value = `String (Unsigned.UInt64.to_string value)
-
-  let amount value = `String (Currency.Amount.to_string value)
-
-  let fee value = `String (Currency.Fee.to_string value)
-
-  let nonce value = `String (Coda_base.Account.Nonce.to_string value)
-
-  let uint32 value = `String (Unsigned.UInt32.to_string value)
-
-  let public_key value = `String (Public_key.Compressed.to_base58_check value)
-end
-
-module Decoders = struct
-  let optional ~f = function `Null -> None | json -> Some (f json)
-
-  let public_key json =
-    Yojson.Basic.Util.to_string json
-    |> Public_key.Compressed.of_base58_check_exn
-
-  let optional_public_key = Option.map ~f:public_key
-
-  let uint64 json =
-    Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
 end

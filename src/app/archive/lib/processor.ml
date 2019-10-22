@@ -32,7 +32,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
             |> Array.of_list )
           ()
       in
-      let%map obj = Client.query_or_error graphql port in
+      let%map obj = Client.query graphql port in
       let list =
         Array.map obj#user_commands ~f:(fun obj -> (obj#hash, obj#first_seen))
         |> Array.to_list
@@ -56,7 +56,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         ~user_commands:(Array.of_list user_commands)
         ()
     in
-    let%map _result = Client.query_or_error graphql port in
+    let%map _result = Client.query graphql port in
     ()
 
   let compute_with_receipt_chains
@@ -125,7 +125,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
     in
     let graphql = get_first_seen (Array.of_list hashes) in
     let%map first_query_response =
-      let%map result = Client.query_or_error graphql port in
+      let%map result = Client.query graphql port in
       Array.to_list (get_obj result)
       |> List.map ~f:(fun obj -> (obj#hash, obj#first_seen))
     in
@@ -198,7 +198,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         ~blocks:(Array.of_list [encoded_block])
         ()
     in
-    let%bind _ = Client.query_or_error graphql port in
+    let%bind _ = Client.query graphql port in
     Deferred.Result.return ()
 
   let create port = {port}

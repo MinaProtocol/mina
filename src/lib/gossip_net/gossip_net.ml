@@ -369,7 +369,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         else call ()
 
   and record_peer_events t =
-    trace_task "peer events" (fun () ->
+    trace_recurring "peer events" (fun () ->
         Option.map t.haskell_membership ~f:(fun membership ->
             Linear_pipe.transfer_id
               (Membership.changes membership)
@@ -503,7 +503,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       (implementation_list : Host_and_port.t Rpc.Implementation.t list) =
     let t_hack = Ivar.create () in
     let t_for_restarting = Ivar.read t_hack in
-    trace_task "gossip net" (fun () ->
+    trace "gossip net" (fun () ->
         let fail m =
           failwithf "Failed to connect to Kademlia process: %s" m ()
         in
@@ -579,7 +579,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             match%map
               Monitor.try_with
                 (fun () ->
-                  trace_task "membership" (fun () ->
+                  trace "membership" (fun () ->
                       Membership.connect ~initial_peers:config.initial_peers
                         ~node_addrs_and_ports:config.addrs_and_ports
                         ~conf_dir:config.conf_dir ~logger:config.logger
@@ -598,7 +598,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           if config.enable_libp2p then
             match%bind
               Monitor.try_with (fun () ->
-                  trace_task "coda_net2" (fun () ->
+                  trace "coda_net2" (fun () ->
                       Coda_net2.create ~logger:config.logger
                         ~conf_dir:(config.conf_dir ^/ "coda_net2") ) )
             with
@@ -641,6 +641,12 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   let open Deferred.Or_error.Let_syntax in
                   let%bind () =
                     configure net2 ~me ~maddrs:[]
+                      ~external_maddr:
+                        (Multiaddr.of_string
+                           (sprintf "/ip4/%s/tcp/%d"
+                              (Unix.Inet_addr.to_string
+                                 config.addrs_and_ports.external_ip)
+                              config.addrs_and_ports.libp2p_port))
                       ~network_id:"libp2p phase2 test network" ~on_new_peer
                   in
                   let%bind _disc_handler =
@@ -745,14 +751,13 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                          ~when_banned:Banned ) )) ;
         don't_wait_for (retry_disconnected_peer t) ;
         trace_task "rebroadcasting messages" (fun () ->
-            don't_wait_for
-              (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
-                 ~f:(fun m ->
-                   Logger.trace t.config.logger ~module_:__MODULE__
-                     ~location:__LOC__
-                     ~metadata:[("message", `String (Message.summary m))]
-                     "broadcasting message: $message" ;
-                   broadcast_random t t.config.target_peer_count m )) ) ;
+            Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
+              ~f:(fun m ->
+                Logger.trace t.config.logger ~module_:__MODULE__
+                  ~location:__LOC__
+                  ~metadata:[("message", `String (Message.summary m))]
+                  "broadcasting message: $message" ;
+                broadcast_random t t.config.target_peer_count m ) ) ;
         let implementations =
           let implementations =
             Versioned_rpc.Menu.add

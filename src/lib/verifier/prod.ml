@@ -26,7 +26,6 @@ module Worker_state = struct
        let module T = Transaction_snark.Verification.Make (struct
          let keys = tx_vk
        end) in
-       let module B = Blockchain_transition.Make (T) in
        let module M = struct
          let instance_hash =
            unstage (Blockchain_transition.instance_hash bc_vk.wrap)
@@ -91,7 +90,8 @@ module Worker = struct
             ~f:(fun ~worker_state ~conn_state:_ i -> f worker_state i)
             ~bin_input:i ~bin_output:o ()
         in
-        { verify_blockchain= f (Blockchain.bin_t, Bool.bin_t, verify_blockchain)
+        { verify_blockchain=
+            f (Blockchain.Stable.Latest.bin_t, Bool.bin_t, verify_blockchain)
         ; verify_transaction_snark=
             f
               ( [%bin_type_class:

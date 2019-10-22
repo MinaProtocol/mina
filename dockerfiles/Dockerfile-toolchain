@@ -17,6 +17,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libffi-dev \
     libgmp-dev \
     libgmp3-dev \
+    libjemalloc-dev \
     libprocps-dev \
     libsodium-dev \
     libssl-dev \
@@ -28,9 +29,12 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     perl \
     pkg-config \
     python-jinja2 \
+    python-pip \
     rubygems \
     zlib1g-dev \
     libbz2-dev
+
+RUN sudo pip install sexpdata
 
 RUN sudo gem install deb-s3
 
@@ -49,7 +53,7 @@ RUN cd /rocksdb && sudo make static_lib PORTABLE=1 -j$(nproc) && sudo cp librock
 RUN sudo git clone https://github.com/CodaProtocol/coda /coda
 
 # submodules
-RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib ppx_optcomp rpc_parallel ; do \
+RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do \
       # remove leading "-" indicating uninitialized
       cd /coda && sudo bash -c "git submodule status src/external/$pkg | awk '{print \$1}' | sed s/-// > ~opam/opam-repository/$pkg.commit" ; \
     done
@@ -95,7 +99,7 @@ ADD /src/external/async_kernel /async_kernel
 ADD /src/external/graphql_ppx /graphql_ppx
 
 # Remove .git files for submodules
-RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib ppx_optcomp rpc_parallel ; do \
+RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do \
       sudo rm -f /$pkg/.git ; \
     done
 
@@ -129,7 +133,7 @@ RUN cd /graphql_ppx && opam pin -y add .
 RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
       echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
       sudo apt-get update && \
-      sudo apt-get install --yes coda-kademlia
+      sudo apt-get install --yes coda-discovery
 
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
 # easier.

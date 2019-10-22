@@ -1,6 +1,5 @@
 open Core_kernel
 open Coda_state
-open Module_version
 
 module type S = sig
   type t [@@deriving sexp, to_yojson]
@@ -28,31 +27,18 @@ module type S = sig
   val staged_ledger_diff : t -> Staged_ledger_diff.t
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        { snark_transition: Snark_transition.Value.Stable.V1.t
-        ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
-        ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
-      [@@deriving sexp, to_yojson, fields, bin_io, version]
-    end
+    type t =
+      { snark_transition: Snark_transition.Value.Stable.V1.t
+      ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
+      ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
+    [@@deriving sexp, to_yojson, fields]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "internal_transition"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 (* bin_io, version omitted *)
 type t = Stable.Latest.t =

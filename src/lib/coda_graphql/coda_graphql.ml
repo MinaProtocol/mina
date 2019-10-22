@@ -117,22 +117,31 @@ module Types = struct
     end)
   end
 
+  let unsigned_scalar_scalar ~to_string typ_name =
+    scalar typ_name
+      ~doc:
+        (Core.sprintf
+           !"String representing a %s number in base 10"
+           (String.lowercase typ_name))
+      ~coerce:(fun num -> `String (to_string num))
+
   let public_key =
     scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
       ~coerce:(fun key -> `String (Public_key.Compressed.to_base58_check key))
 
+  let uint32 =
+    unsigned_scalar_scalar ~to_string:Unsigned.UInt32.to_string "UInt32"
+
   let uint64 =
-    scalar "UInt64" ~doc:"String representing a uint64 number in base 10"
-      ~coerce:(fun num -> `String (Unsigned.UInt64.to_string num))
+    unsigned_scalar_scalar ~to_string:Unsigned.UInt64.to_string "UInt64"
 
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
-        [ enum_value "BOOTSTRAP" ~value:`Bootstrap
-        ; enum_value "SYNCED" ~value:`Synced
-        ; enum_value "OFFLINE" ~value:`Offline
-        ; enum_value "CONNECTING" ~value:`Connecting
-        ; enum_value "LISTENING" ~value:`Listening ]
+        (List.map Sync_status.all ~f:(fun status ->
+             enum_value
+               (String.map ~f:Char.uppercase @@ Sync_status.to_string status)
+               ~value:status ))
 
   let transaction_status : ('context, Transaction_status.State.t option) typ =
     enum "TransactionStatus" ~doc:"Status of a transaction"
@@ -370,6 +379,28 @@ module Types = struct
               Stringable.Ledger_hash.to_base58_check
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
 
+  let consensus_state =
+    let open Consensus.Data.Consensus_state in
+    obj "ConsensusState" ~fields:(fun _ ->
+        [ field "blockchainLength" ~typ:(non_null uint32)
+            ~doc:"Length of the blockchain at this block"
+            ~args:Arg.[]
+            ~resolve:(fun _ (t : Value.t) ->
+              Coda_numbers.Length.to_uint32 @@ blockchain_length t )
+        ; field "slot" ~doc:"Slot in which this block was created"
+            ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ t -> curr_slot t)
+        ; field "epoch" ~doc:"Epoch in which this block was created"
+            ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ t -> curr_epoch t)
+        ; field "totalCurrency"
+            ~doc:"Total currency in circulation at this block"
+            ~typ:(non_null uint64)
+            ~args:Arg.[]
+            ~resolve:(fun _ t -> Amount.to_uint64 @@ total_currency t) ] )
+
   let protocol_state =
     let open Filtered_external_transition.Protocol_state in
     obj "ProtocolState" ~fields:(fun _ ->
@@ -379,10 +410,17 @@ module Types = struct
             ~resolve:(fun _ t ->
               Stringable.State_hash.to_base58_check t.previous_state_hash )
         ; field "blockchainState"
-            ~doc:"State related to the succinct blockchain"
+            ~doc:"State which is agnostic of a particular consensus algorithm"
             ~typ:(non_null blockchain_state)
             ~args:Arg.[]
-            ~resolve:(fun _ t -> t.blockchain_state) ] )
+            ~resolve:(fun _ t -> t.blockchain_state)
+        ; field "consensusState"
+            ~doc:
+              "State specific to the Codaboros Proof of Stake consensus \
+               algorithm"
+            ~typ:(non_null consensus_state)
+            ~args:Arg.[]
+            ~resolve:(fun _ t -> t.consensus_state) ] )
 
   let block :
       ( Coda_lib.t
@@ -1295,13 +1333,16 @@ module Mutations = struct
       Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp
         payment_body
     in
-    match%map Coda_commands.send_user_command coda command with
-    | `Active (Ok _) ->
-        Ok command
-    | `Active (Error e) ->
-        Error ("Couldn't send user_command: " ^ Error.to_string_hum e)
+    match Coda_commands.send_user_command coda command with
+    | `Active f -> (
+        let open Deferred.Let_syntax in
+        match%map f with
+        | Ok _receipt ->
+            Ok command
+        | Error e ->
+            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
-        Error "Daemon is bootstrapping"
+        return @@ Error "Daemon is bootstrapping"
 
   let parse_user_command_input ~kind coda from to_ fee maybe_memo =
     let open Result.Let_syntax in
@@ -1465,20 +1506,28 @@ module Queries = struct
   let pooled_user_commands =
     field "pooledUserCommands"
       ~doc:
-        "Retrieve all the user commands submitted by the current daemon that \
-         are pending inclusion"
+        "Retrieve all the scheduled user commands for a specified sender that \
+         the current daemon sees in their transaction pool. All scheduled \
+         commands are queried if no sender is specified"
       ~typ:(non_null @@ list @@ non_null Types.user_command)
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of sender of pooled user commands"
-              ~typ:(non_null Types.Input.public_key_arg) ]
-      ~resolve:(fun {ctx= coda; _} () pk ->
+              ~typ:Types.Input.public_key_arg ]
+      ~resolve:(fun {ctx= coda; _} () opt_pk ->
         let transaction_pool = Coda_lib.transaction_pool coda in
-        List.map
-          (Network_pool.Transaction_pool.Resource_pool.all_from_user
-             (Network_pool.Transaction_pool.resource_pool transaction_pool)
-             pk)
-          ~f:User_command.forget_check )
+        let resource_pool =
+          Network_pool.Transaction_pool.resource_pool transaction_pool
+        in
+        ( match opt_pk with
+        | None ->
+            Network_pool.Transaction_pool.Resource_pool.transactions
+              resource_pool
+            |> Sequence.to_list
+        | Some pk ->
+            Network_pool.Transaction_pool.Resource_pool.all_from_user
+              resource_pool pk )
+        |> List.map ~f:User_command.forget_check )
 
   let sync_state =
     result_field_no_inputs "syncStatus" ~doc:"Network sync status" ~args:[]

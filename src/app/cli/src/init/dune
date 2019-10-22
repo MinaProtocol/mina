@@ -1,3 +1,8 @@
+(rule
+ (targets assets.ml)
+ (deps (source_tree assets))
+ (action (run %{bin:ocaml-crunch} -m plain assets -o assets.ml)))
+
 (library
   (name init)
   (public_name init)
@@ -5,6 +10,7 @@
     ; opam deps
     async cohttp core
     ; libs
+    snarky_log
     coda_base coda_graphql coda_lib coda_state
     coda_transition coda_version lite_compat lite_lib
     o1trace transition_frontier web_client_pipe web_request 

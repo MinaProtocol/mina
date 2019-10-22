@@ -97,7 +97,7 @@ query IntrospectionQuery {
 
 def print_schema(port, uri, extra_headers):
     conn = http.client.HTTPConnection("localhost", port)
-    headers = {"Content-type": "application/json; charset=uft",
+    headers = {"Content-type": "application/json",
                "Accept": "text/plain"}
     headers.update(extra_headers)
 
@@ -111,7 +111,7 @@ def print_schema(port, uri, extra_headers):
     response = conn.getresponse()
     data = response.read()
     conn.close()
-
+    
     parsed = json.loads(data.decode('utf-8'))
     print(json.dumps(parsed, indent=2))
 

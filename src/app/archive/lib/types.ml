@@ -347,6 +347,10 @@ module Blocks = struct
         some @@ State_hashes.encode_as_obj_rel_insert_input
         @@ External_transition.parent_hash external_transition
 
+      method snarked_ledger_hash =
+        some @@ Ledger_hash.to_string @@ Frozen_ledger_hash.to_ledger_hash
+        @@ Blockchain_state.snarked_ledger_hash blockchain_state
+
       method ledger_hash =
         some @@ Ledger_hash.to_string @@ Staged_ledger_hash.ledger_hash
         @@ Blockchain_state.staged_ledger_hash blockchain_state
