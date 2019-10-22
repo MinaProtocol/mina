@@ -1542,23 +1542,43 @@ module Data = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
-          type t =
-            ( Length.Stable.V1.t
-            , Vrf.Output.Truncated.Stable.V1.t
-            , Amount.Stable.V1.t
-            , Global_slot.Stable.V1.t
-            , Epoch_data.Staking.Value.Stable.V1.t
-            , Epoch_data.Next.Value.Stable.V1.t
-            , bool
-            , Checkpoints.Stable.V1.t )
-            Poly.Stable.V1.t
-          [@@deriving sexp, eq, compare, hash, to_yojson]
+            type t =
+              ( Length.Stable.V1.t
+              , Vrf.Output.Truncated.Stable.V1.t
+              , Amount.Stable.V1.t
+              , Global_slot.Stable.V1.t
+              , Epoch_data.Staking.Value.Stable.V1.t
+              , Epoch_data.Next.Value.Stable.V1.t
+              , bool
+              , Checkpoints.Stable.V1.t )
+              Poly.Stable.V1.t
+            [@@deriving sexp, bin_io, eq, compare, hash, version]
 
-          let to_latest = Fn.id
+            let to_yojson t =
+              `Assoc
+                [ ( "blockchain_length"
+                  , Length.to_yojson t.Poly.blockchain_length )
+                ; ("epoch_count", Length.to_yojson t.epoch_count)
+                ; ("min_epoch_length", Length.to_yojson t.min_epoch_length)
+                ; ("last_vrf_output", `String "<opaque>")
+                ; ("total_currency", Amount.to_yojson t.total_currency)
+                ; ("curr_global_slot", Global_slot.to_yojson t.curr_global_slot)
+                ; ( "staking_epoch_data"
+                  , Epoch_data.Staking.Value.to_yojson t.staking_epoch_data )
+                ; ( "next_epoch_data"
+                  , Epoch_data.Next.Value.to_yojson t.next_epoch_data )
+                ; ( "has_ancestor_in_same_checkpoint_window"
+                  , `Bool t.has_ancestor_in_same_checkpoint_window )
+                ; ("checkpoints", Checkpoints.to_yojson t.checkpoints) ]
+          end
         end
       end]
 
-      type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, to_yojson]
+      type t = Stable.Latest.t
+      [@@deriving sexp, eq, compare, hash]
+
+      let to_yojson = Stable.Latest.to_yojson
+
     end
 
     open Snark_params.Tick

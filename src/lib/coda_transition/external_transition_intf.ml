@@ -23,6 +23,8 @@ module type External_transition_common_intf = sig
 
   val proposer : t -> Public_key.Compressed.t
 
+  val transactions : t -> Transaction.t list
+
   val user_commands : t -> User_command.t list
 
   val payments : t -> User_command.t list
