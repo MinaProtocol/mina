@@ -8,13 +8,28 @@ open Blockchain_snark
 module type S = Intf.S
 
 module Extend_blockchain_input = struct
-  type t =
-    { chain: Blockchain.t
-    ; next_state: Protocol_state.Value.Stable.Latest.t
-    ; block: Snark_transition.Value.Stable.Latest.t
-    ; prover_state: Consensus.Data.Prover_state.Stable.Latest.t
-    ; pending_coinbase: Pending_coinbase_witness.Stable.Latest.t }
-  [@@deriving bin_io, sexp]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { chain: Blockchain.Stable.V1.t
+        ; next_state: Protocol_state.Value.Stable.V1.t
+        ; block: Snark_transition.Value.Stable.V1.t
+        ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
+        ; pending_coinbase: Pending_coinbase_witness.Stable.V1.t }
+      [@@deriving sexp]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
+    { chain: Blockchain.Stable.V1.t
+    ; next_state: Protocol_state.Value.Stable.V1.t
+    ; block: Snark_transition.Value.Stable.V1.t
+    ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
+    ; pending_coinbase: Pending_coinbase_witness.Stable.V1.t }
+  [@@deriving sexp]
 end
 
 module Consensus_mechanism = Consensus
@@ -167,15 +182,16 @@ module Functions = struct
         `Initialized )
 
   let extend_blockchain =
-    create Extend_blockchain_input.bin_t
-      [%bin_type_class: Blockchain.t Or_error.t]
+    create Extend_blockchain_input.Stable.Latest.bin_t
+      [%bin_type_class: Blockchain.Stable.Latest.t Or_error.t]
       (fun w {chain; next_state; block; prover_state; pending_coinbase} ->
         let%map (module W) = Worker_state.get w in
         W.extend_blockchain chain next_state block prover_state
           pending_coinbase )
 
   let verify_blockchain =
-    create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
+    create Blockchain.Stable.Latest.bin_t bin_bool
+      (fun w {Blockchain.state; proof} ->
         let%map (module W) = Worker_state.get w in
         W.verify state proof )
 end
@@ -275,7 +291,9 @@ let extend_blockchain {connection; _} chain next_state block prover_state
                 (Sexp.to_string (Extend_blockchain_input.sexp_of_t input)) )
           ; ( "input-bin-io"
             , `String
-                (Binable.to_string (module Extend_blockchain_input) input) )
+                (Binable.to_string
+                   (module Extend_blockchain_input.Stable.Latest)
+                   input) )
           ; ("error", `String (Error.to_string_hum e)) ]
         "Prover failed: $error" ;
       Error e
