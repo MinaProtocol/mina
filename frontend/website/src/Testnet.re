@@ -477,7 +477,7 @@ let make = () => {
       <div className=Styles.dashboardHeader>
         <h1 className=Style.H1.hero> {React.string("Network Dashboard")} </h1>
         <a
-          href="https://o1testnet.grafana.net/d/mO5fAWHWk/testnet-stats?orgId=1"
+          href="https://o1testnet.grafana.net/d/Rgo87HhWz/block-producer-dashboard?orgId=1"
           target="_blank"
           className=Styles.headerLink>
           {React.string({j|View Full Dashboard\u00A0→|j})}

@@ -58,6 +58,8 @@ module Time : sig
 
     val to_time_ns_span : t -> Core.Time_ns.Span.t
 
+    val to_string_hum : t -> string
+
     val to_ms : t -> Int64.t
 
     val of_ms : Int64.t -> t
@@ -79,6 +81,8 @@ module Time : sig
     val ( >= ) : t -> t -> bool
 
     val min : t -> t -> t
+
+    val zero : t
   end
 
   val field_var_to_unpacked :
