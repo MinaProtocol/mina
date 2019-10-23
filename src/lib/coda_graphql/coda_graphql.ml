@@ -221,6 +221,16 @@ module Types = struct
                ~slot_duration:nn_int ~epoch_duration:nn_int
                ~acceptable_network_delay:nn_int )
 
+    let addrs_and_ports :
+        (_, Kademlia.Node_addrs_and_ports.Display.Stable.V1.t option) typ =
+      obj "AddrsAndPorts" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Kademlia.Node_addrs_and_ports.Display.Stable.V1.Fields.fold
+               ~init:[] ~external_ip:nn_string ~bind_ip:nn_string
+               ~discovery_port:nn_int ~client_port:nn_int ~libp2p_port:nn_int
+               ~communication_port:nn_int )
+
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
@@ -237,6 +247,8 @@ module Types = struct
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms) ~consensus_time_best_tip:string
                ~consensus_time_now:nn_string ~consensus_mechanism:nn_string
+               ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
+               ~libp2p_peer_id:nn_string
                ~consensus_configuration:
                  (id ~typ:(non_null consensus_configuration))
                ~highest_block_length_received:nn_int )

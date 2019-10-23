@@ -15,11 +15,12 @@ module Worker_state = struct
       Transaction_snark.t -> message:Sok_message.t -> bool
   end
 
-  type init_arg = unit [@@deriving bin_io]
+  type init_arg = {conf_dir: string option; logger: Logger.Stable.Latest.t}
+  [@@deriving bin_io]
 
   type t = (module S) Deferred.t
 
-  let create () : t Deferred.t =
+  let create {logger; _} : t Deferred.t =
     Deferred.return
       (let%map bc_vk = Snark_keys.blockchain_verification ()
        and tx_vk = Snark_keys.transaction_verification () in
@@ -31,11 +32,31 @@ module Worker_state = struct
            unstage (Blockchain_transition.instance_hash bc_vk.wrap)
 
          let verify_wrap state proof =
-           Tock.verify proof bc_vk.wrap
-             Tock.Data_spec.[Wrap_input.typ]
-             (Wrap_input.of_tick_field (instance_hash state))
+           match
+             Or_error.try_with (fun () ->
+                 Tock.verify proof bc_vk.wrap
+                   Tock.Data_spec.[Wrap_input.typ]
+                   (Wrap_input.of_tick_field (instance_hash state)) )
+           with
+           | Ok result ->
+               result
+           | Error e ->
+               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                 ~metadata:[("error", `String (Error.to_string_hum e))]
+                 "Verifier threw an exception while verifying blockchain snark" ;
+               failwith "Verifier crashed"
 
-         let verify_transaction_snark = T.verify
+         let verify_transaction_snark ledger_proof ~message =
+           match
+             Or_error.try_with (fun () -> T.verify ledger_proof ~message)
+           with
+           | Ok result ->
+               result
+           | Error e ->
+               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                 ~metadata:[("error", `String (Error.to_string_hum e))]
+                 "Verifier threw an exception while verifying transaction snark" ;
+               failwith "Verifier crashed"
        end in
        (module M : S))
 
@@ -99,9 +120,21 @@ module Worker = struct
               , Bool.bin_t
               , verify_transaction_snark ) }
 
-      let init_worker_state () = Worker_state.create ()
+      let init_worker_state Worker_state.{conf_dir; logger} =
+        ( if Option.is_some conf_dir then
+          let max_size = 256 * 1024 * 512 in
+          Logger.Consumer_registry.register ~id:"default"
+            ~processor:(Logger.Processor.raw ())
+            ~transport:
+              (Logger.Transport.File_system.dumb_logrotate
+                 ~directory:(Option.value_exn conf_dir)
+                 ~log_filename:"coda-verifier.log" ~max_size) ) ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Verifier started" ;
+        Worker_state.create {conf_dir; logger}
 
-      let init_connection_state ~connection:_ ~worker_state:_ = return
+      let init_connection_state ~connection:_ ~worker_state:_ () =
+        Deferred.unit
     end
   end
 
@@ -111,7 +144,7 @@ end
 type t = Worker.Connection.t
 
 (* TODO: investigate why conf_dir wasn't being used *)
-let create ~logger ~pids =
+let create ~logger ~pids ~conf_dir =
   let on_failure err =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Verifier process failed with error $err"
@@ -120,7 +153,8 @@ let create ~logger ~pids =
   in
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:() ()
+      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
+      {conf_dir; logger}
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Daemon started process of kind $process_kind with pid $verifier_pid"
@@ -128,9 +162,24 @@ let create ~logger ~pids =
       [ ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
       ; ( "process_kind"
         , `String Child_processes.Termination.(show_process_kind Verifier) ) ] ;
-  Child_processes.Termination.(register_process pids process Verifier) ;
-  File_system.dup_stdout process ;
-  File_system.dup_stderr process ;
+  Child_processes.Termination.register_process pids process
+    Child_processes.Termination.Verifier ;
+  don't_wait_for
+  @@ Pipe.iter
+       (Process.stdout process |> Reader.pipe)
+       ~f:(fun stdout ->
+         return
+         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              "Verifier stdout: $stdout"
+              ~metadata:[("stdout", `String stdout)] ) ;
+  don't_wait_for
+  @@ Pipe.iter
+       (Process.stderr process |> Reader.pipe)
+       ~f:(fun stderr ->
+         return
+         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              "Verifier stderr: $stderr"
+              ~metadata:[("stdout", `String stderr)] ) ;
   connection
 
 let verify_blockchain_snark t chain =

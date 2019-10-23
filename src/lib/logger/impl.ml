@@ -32,17 +32,45 @@ module Source = struct
 end
 
 module Metadata = struct
-  type t = Yojson.Safe.json String.Map.t
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Yojson.Safe.json String.Map.t [@@deriving version {asserted}]
+
+        let to_yojson t = `Assoc (String.Map.to_alist t)
+
+        let of_yojson = function
+          | `Assoc alist ->
+              Ok (String.Map.of_alist_exn alist)
+          | _ ->
+              Error "Unexpected object"
+
+        include Binable.Of_binable
+                  (String)
+                  (struct
+                    type nonrec t = t
+
+                    let to_binable t = to_yojson t |> Yojson.Safe.to_string
+
+                    let of_binable (t : string) : t =
+                      Yojson.Safe.from_string t |> of_yojson |> Result.ok
+                      |> Option.value_exn
+                  end)
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
 
   let empty = String.Map.empty
 
-  let to_yojson t = `Assoc (String.Map.to_alist t)
+  let to_yojson = Stable.Latest.to_yojson
 
-  let of_yojson = function
-    | `Assoc alist ->
-        Ok (String.Map.of_alist_exn alist)
-    | _ ->
-        Error "expected object"
+  let of_yojson = Stable.Latest.of_yojson
+
+  type t = Stable.Latest.t
 
   let mem = String.Map.mem
 
@@ -159,24 +187,21 @@ module Transport = struct
 
       let log_perm = 0o644
 
-      let primary_log_name = "coda.log"
-
-      let secondary_log_name = "coda.log.0"
-
       type t =
         { directory: string
+        ; log_filename: string
         ; max_size: int
         ; mutable primary_log: File_descr.t
         ; mutable primary_log_size: int }
 
-      let create ~directory ~max_size =
+      let create ~directory ~max_size ~log_filename =
         if not (Result.is_ok (access directory [`Exists])) then
           mkdir_p ~perm:0o755 directory ;
         if not (Result.is_ok (access directory [`Exists; `Read; `Write])) then
           failwithf
             "cannot create log files: read/write permissions required on %s"
             directory () ;
-        let primary_log_loc = Filename.concat directory primary_log_name in
+        let primary_log_loc = Filename.concat directory log_filename in
         let primary_log_size, mode =
           if Result.is_ok (access primary_log_loc [`Exists; `Read; `Write])
           then
@@ -185,12 +210,13 @@ module Transport = struct
           else (0, [O_RDWR; O_CREAT])
         in
         let primary_log = openfile ~perm:log_perm ~mode primary_log_loc in
-        {directory; max_size; primary_log; primary_log_size}
+        {directory; log_filename; max_size; primary_log; primary_log_size}
 
       let rotate t =
-        let primary_log_loc = Filename.concat t.directory primary_log_name in
+        let primary_log_loc = Filename.concat t.directory t.log_filename in
+        let secondary_log_filename = t.log_filename ^ ".0" in
         let secondary_log_loc =
-          Filename.concat t.directory secondary_log_name
+          Filename.concat t.directory secondary_log_filename
         in
         close t.primary_log ;
         rename ~src:primary_log_loc ~dst:secondary_log_loc ;
@@ -207,57 +233,74 @@ module Transport = struct
         t.primary_log_size <- t.primary_log_size + len
     end
 
-    let dumb_logrotate ~directory ~max_size =
-      T ((module Dumb_logrotate), Dumb_logrotate.create ~directory ~max_size)
+    let dumb_logrotate ~directory ~log_filename ~max_size =
+      T
+        ( (module Dumb_logrotate)
+        , Dumb_logrotate.create ~directory ~log_filename ~max_size )
   end
 end
 
 module Consumer_registry = struct
-  type id = string
-
   type consumer = {processor: Processor.t; transport: Transport.t}
 
-  type nonrec t = (id, consumer) List.Assoc.t ref
+  module Consumer_tbl = Hashtbl.Make (String)
 
-  let t : t = ref []
+  type t = consumer list Consumer_tbl.t
 
-  let is_registered id = Option.is_some (List.Assoc.find !t id ~equal:( = ))
+  let t : t = Consumer_tbl.create ()
 
   let register ~id ~processor ~transport =
-    if is_registered id then
-      failwith "cannot register logger consumer with the same id twice"
-    else t := List.Assoc.add !t id {processor; transport} ~equal:( = )
+    Consumer_tbl.add_multi t ~key:id ~data:{processor; transport}
 
-  let broadcast_log_message msg =
-    (* TODO: warn or fail if there's no registered consumer? Issue #3000 *)
-    List.iter !t ~f:(fun (_id, consumer) ->
-        let (Processor.T ((module Processor_mod), processor)) =
-          consumer.processor
+  let broadcast_log_message ~id msg =
+    Hashtbl.find_and_call t id
+      ~if_found:(fun consumers ->
+        List.iter consumers
+          ~f:(fun { processor= Processor.T ((module Processor), processor)
+                  ; transport= Transport.T ((module Transport), transport) }
+             ->
+            match Processor.process processor msg with
+            | Some str ->
+                Transport.transport transport str
+            | None ->
+                () ) )
+      ~if_not_found:(fun _ ->
+        let (Processor.T ((module Processor), processor)) = Processor.raw () in
+        let (Transport.T ((module Transport), transport)) =
+          Transport.stdout ()
         in
-        let (Transport.T ((module Transport_mod), transport)) =
-          consumer.transport
-        in
-        match Processor_mod.process processor msg with
+        match Processor.process processor msg with
         | Some str ->
-            Transport_mod.transport transport str
+            Transport.transport transport str
         | None ->
             () )
 end
 
-type t = {null: bool; metadata: Metadata.t}
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t = {null: bool; metadata: Metadata.Stable.V1.t; id: string}
+      [@@deriving bin_io, version]
+    end
 
-let create ?(metadata = []) ?(initialize_default_consumer = true) () =
-  if initialize_default_consumer then
-    if not (Consumer_registry.is_registered "default") then
-      Consumer_registry.register ~id:"default" ~processor:(Processor.raw ())
-        ~transport:(Transport.stdout ()) ;
+    include T
+  end
+
+  module Latest = V1
+end
+
+type t = Stable.Latest.t = {null: bool; metadata: Metadata.t; id: string}
+
+let create ?(metadata = []) ?(id = "default") () =
   let pid = lazy (Unix.getpid () |> Pid.to_int) in
   let metadata' = ("pid", `Int (Lazy.force pid)) :: metadata in
-  {null= false; metadata= Metadata.extend Metadata.empty metadata'}
+  {null= false; metadata= Metadata.extend Metadata.empty metadata'; id}
 
-let null () = {null= true; metadata= Metadata.empty}
+let null () = {null= true; metadata= Metadata.empty; id= "default"}
 
 let extend t metadata = {t with metadata= Metadata.extend t.metadata metadata}
+
+let change_id {null; metadata; id= _} ~id = {null; metadata; id}
 
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   { Message.timestamp= Time.now ()
@@ -266,7 +309,7 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   ; message
   ; metadata= Metadata.extend t.metadata metadata }
 
-let log t ~level ~module_ ~location ?(metadata = []) fmt =
+let log ({id; _} as t) ~level ~module_ ~location ?(metadata = []) fmt =
   let f message =
     if t.null then ()
     else
@@ -274,7 +317,7 @@ let log t ~level ~module_ ~location ?(metadata = []) fmt =
         make_message t ~level ~module_ ~location ~metadata ~message
       in
       if Message.check_invariants message then
-        Consumer_registry.broadcast_log_message message
+        Consumer_registry.broadcast_log_message ~id message
       else failwith "invalid log call"
   in
   ksprintf f fmt

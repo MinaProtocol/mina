@@ -109,6 +109,8 @@ module type Network_intf = sig
 
   val banned_until : ban_notification -> Time.t
 
+  val net2 : t -> Coda_net2.net option
+
   module Gossip_net : sig
     module Config : Gossip_net.Config_intf
   end
