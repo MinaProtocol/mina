@@ -20,6 +20,7 @@ module Time = struct
       end
 
       include T
+      include Hashable.Make (T)
       include Registration.Make_latest_version (T)
     end
 
@@ -70,8 +71,6 @@ module Time = struct
 
   (* DO NOT add bin_io the deriving list *)
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
-  type t0 = t
 
   module B = Bits
 
@@ -140,6 +139,7 @@ module Time = struct
   end
 
   include Comparable.Make (Stable.Latest)
+  include Hashable.Make (Stable.Latest)
 
   let of_time t =
     UInt64.of_int64

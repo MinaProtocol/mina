@@ -5,9 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"path"
-	"strconv"
 
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log"

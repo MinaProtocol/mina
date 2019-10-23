@@ -10,16 +10,13 @@ open Fold_lib
 open Module_version
 
 module type Basic = sig
-  type t = private Pedersen.Digest.t
-  [@@deriving sexp, eq, compare, hash, yojson]
+  type t = private Pedersen.Digest.t [@@deriving sexp, compare, hash, yojson]
 
   val gen : t Quickcheck.Generator.t
 
   val to_bytes : t -> string
 
   val length_in_triples : int
-
-  val ( = ) : t -> t -> bool
 
   module Stable : sig
     module V1 : sig
@@ -55,6 +52,8 @@ module type Basic = sig
   include Bits_intf.S with type t := t
 
   include Hashable with type t := t
+
+  include Comparable.S with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 end
@@ -109,8 +108,9 @@ struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
+  include Comparable.Make (Stable.Latest)
   include Hashable.Make (Stable.Latest)
 
   let to_bytes t =
@@ -118,13 +118,13 @@ struct
 
   let length_in_bits = M.length_in_bits
 
-  let () = assert (length_in_bits <= Field.size_in_bits)
+  let () = assert (Int.(length_in_bits <= Field.size_in_bits))
 
   let length_in_triples = bit_length_to_triple_length length_in_bits
 
   let gen : t Quickcheck.Generator.t =
     let m =
-      if length_in_bits = Field.size_in_bits then
+      if Int.(length_in_bits = Field.size_in_bits) then
         Bignum_bigint.(Field.size - one)
       else Bignum_bigint.(pow (of_int 2) (of_int length_in_bits) - one)
     in
@@ -188,10 +188,10 @@ struct
       let open Typ.Store.Let_syntax in
       let n = Bigint.of_field t in
       let rec go i acc =
-        if i < 0 then return (Bitstring.Lsb_first.of_list acc)
+        if Int.(i < 0) then return (Bitstring.Lsb_first.of_list acc)
         else
           let%bind b = Boolean.typ.store (Bigint.test_bit n i) in
-          go (i - 1) (b :: acc)
+          go Int.(i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
       {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
@@ -200,10 +200,10 @@ struct
     let alloc =
       let open Typ.Alloc.Let_syntax in
       let rec go i acc =
-        if i < 0 then return (Bitstring.Lsb_first.of_list acc)
+        if Int.(i < 0) then return (Bitstring.Lsb_first.of_list acc)
         else
           let%bind b = Boolean.typ.alloc in
-          go (i - 1) (b :: acc)
+          go Int.(i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
       {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
@@ -244,14 +244,14 @@ struct
     let%map bits = unpack digest in
     {digest; bits= Some (Bitstring.Lsb_first.of_list bits)}
 
-  let max = Bignum_bigint.(two_to_the length_in_bits - one)
+  let max_size = Bignum_bigint.(two_to_the length_in_bits - one)
 
   let of_hash x =
-    if Bignum_bigint.( <= ) Bigint.(to_bignum_bigint (of_field x)) max then
-      Ok x
+    if Bignum_bigint.( <= ) Bigint.(to_bignum_bigint (of_field x)) max_size
+    then Ok x
     else
       Or_error.errorf
         !"Data_hash.of_hash: %{sexp:Pedersen.Digest.t} > \
           %{sexp:Bignum_bigint.t}"
-        x max
+        x max_size
 end

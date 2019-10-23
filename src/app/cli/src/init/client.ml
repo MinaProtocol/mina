@@ -3,6 +3,14 @@ open Async
 open Signature_lib
 open Coda_base
 
+module Client = Graphql_client_lib.Make (struct
+  let address = "graphql"
+
+  let preprocess_variables_string = Fn.id
+
+  let headers = String.Map.empty
+end)
+
 let print_rpc_error error =
   eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
 
