@@ -116,7 +116,6 @@ jobs:
         docker:
             - image: python:3
         steps:
-            - checkout
             - run:
                 name: Install dependencies
                 command: pip install --user requests jinja2
@@ -129,6 +128,7 @@ jobs:
         docker:
             - image: nixos/nix
         steps:
+            - checkout
             - run:
                 name: Install cachix
                 command: nix-env -iA cachix -f https://cachix.org/api/v1/install
