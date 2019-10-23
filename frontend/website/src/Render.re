@@ -208,6 +208,13 @@ Router.(
               <Wrapped> <Testnet /> </Wrapped>
             </Page>,
         ),
+        File(
+          "sfbw",
+          name =>
+            <Page page=`Sfbw name extraHeaders={Testnet.extraHeaders()}>
+              <Wrapped> <Sfbw /> </Wrapped>
+            </Page>,
+        ),
         RawFile(
           "privacy",
           <Page page=`Privacy name="privacy">
