@@ -1340,7 +1340,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Int",
+                  "name": "bit",
                   "ofType": null
                 }
               },
@@ -1655,23 +1655,7 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "epoch",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "description": null
-            },
-            {
-              "args": [],
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "id",
+              "name": "global_slot",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1719,6 +1703,22 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "parent_hash",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "public_key",
               "type": {
                 "kind": "NON_NULL",
@@ -1735,23 +1735,7 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "slot",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "description": null
-            },
-            {
-              "args": [],
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "staged_ledger_hash",
+              "name": "snarked_ledger_hash",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1767,11 +1751,47 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "stateHashByParentHash",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "state_hashes",
+                  "ofType": null
+                }
+              },
+              "description": "An object relationship"
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "stateHashByStateHash",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "state_hashes",
+                  "ofType": null
+                }
+              },
+              "description": "An object relationship"
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "state_hash",
               "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
               },
               "description": null
             },
@@ -1881,7 +1901,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "Int_comparison_exp",
+                "name": "bit_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -1937,17 +1957,7 @@
               "description": null
             },
             {
-              "name": "epoch",
-              "defaultValue": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "Int_comparison_exp",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "id",
+              "name": "global_slot",
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
@@ -1977,6 +1987,16 @@
               "description": null
             },
             {
+              "name": "parent_hash",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "Int_comparison_exp",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "public_key",
               "defaultValue": null,
               "type": {
@@ -1987,21 +2007,31 @@
               "description": null
             },
             {
-              "name": "slot",
+              "name": "snarked_ledger_hash",
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "Int_comparison_exp",
+                "name": "String_comparison_exp",
                 "ofType": null
               },
               "description": null
             },
             {
-              "name": "staged_ledger_hash",
+              "name": "stateHashByParentHash",
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "String_comparison_exp",
+                "name": "state_hashes_bool_exp",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "stateHashByStateHash",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "state_hashes_bool_exp",
                 "ofType": null
               },
               "description": null
@@ -2011,7 +2041,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "String_comparison_exp",
+                "name": "Int_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -2042,12 +2072,6 @@
           "interfaces": null,
           "name": "blocks_constraint",
           "enumValues": [
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "blocks_pkey",
-              "description": "unique or primary key constraint"
-            },
             {
               "isDeprecated": false,
               "deprecationReason": null,
@@ -2285,37 +2309,6 @@
         {
           "inputFields": [
             {
-              "name": "block_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "fee_transfer_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            }
-          ],
-          "kind": "INPUT_OBJECT",
-          "possibleTypes": null,
-          "interfaces": null,
-          "name": "blocks_fee_transfers_inc_input",
-          "enumValues": null,
-          "description": "input type for incrementing integer columne in table \"blocks_fee_transfers\"",
-          "fields": null
-        },
-        {
-          "inputFields": [
-            {
               "name": "block",
               "defaultValue": null,
               "type": {
@@ -2326,31 +2319,11 @@
               "description": null
             },
             {
-              "name": "block_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
               "name": "fee_transfer",
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "fee_transfers_obj_rel_insert_input",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "fee_transfer_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
                 "ofType": null
               },
               "description": null
@@ -2572,28 +2545,7 @@
           "fields": null
         },
         {
-          "inputFields": [
-            {
-              "name": "block_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "fee_transfer_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            }
-          ],
+          "inputFields": [],
           "kind": "INPUT_OBJECT",
           "possibleTypes": null,
           "interfaces": null,
@@ -2608,47 +2560,14 @@
           "possibleTypes": null,
           "interfaces": null,
           "name": "blocks_fee_transfers_update_column",
-          "enumValues": [
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "block_id",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "fee_transfer_id",
-              "description": "column name"
-            }
-          ],
+          "enumValues": [],
           "description": "update columns of table \"blocks_fee_transfers\"",
           "fields": null
         },
         {
           "inputFields": [
             {
-              "name": "block_length",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "creator",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "epoch",
+              "name": "global_slot",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -2659,16 +2578,6 @@
             },
             {
               "name": "ledger_proof_nonce",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "slot",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -2703,7 +2612,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "bit",
                 "ofType": null
               },
               "description": null
@@ -2749,17 +2658,7 @@
               "description": null
             },
             {
-              "name": "creator",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "epoch",
+              "name": "global_slot",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -2799,17 +2698,7 @@
               "description": null
             },
             {
-              "name": "slot",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "staged_ledger_hash",
+              "name": "snarked_ledger_hash",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -2819,11 +2708,21 @@
               "description": null
             },
             {
-              "name": "state_hash",
+              "name": "stateHashByParentHash",
               "defaultValue": null,
               "type": {
-                "kind": "SCALAR",
-                "name": "String",
+                "kind": "INPUT_OBJECT",
+                "name": "state_hashes_obj_rel_insert_input",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "stateHashByStateHash",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "state_hashes_obj_rel_insert_input",
                 "ofType": null
               },
               "description": null
@@ -3013,17 +2912,7 @@
               "description": null
             },
             {
-              "name": "epoch",
-              "defaultValue": null,
-              "type": {
-                "kind": "ENUM",
-                "name": "order_by",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "id",
+              "name": "global_slot",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -3053,6 +2942,16 @@
               "description": null
             },
             {
+              "name": "parent_hash",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "public_key",
               "defaultValue": null,
               "type": {
@@ -3063,7 +2962,7 @@
               "description": null
             },
             {
-              "name": "slot",
+              "name": "snarked_ledger_hash",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -3073,11 +2972,21 @@
               "description": null
             },
             {
-              "name": "staged_ledger_hash",
+              "name": "stateHashByParentHash",
               "defaultValue": null,
               "type": {
-                "kind": "ENUM",
-                "name": "order_by",
+                "kind": "INPUT_OBJECT",
+                "name": "state_hashes_order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "stateHashByStateHash",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "state_hashes_order_by",
                 "ofType": null
               },
               "description": null
@@ -3139,13 +3048,7 @@
             {
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "epoch",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "id",
+              "name": "global_slot",
               "description": "column name"
             },
             {
@@ -3163,13 +3066,13 @@
             {
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "slot",
+              "name": "parent_hash",
               "description": "column name"
             },
             {
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "staged_ledger_hash",
+              "name": "snarked_ledger_hash",
               "description": "column name"
             },
             {
@@ -3195,7 +3098,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "bit",
                 "ofType": null
               },
               "description": null
@@ -3211,17 +3114,7 @@
               "description": null
             },
             {
-              "name": "creator",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "epoch",
+              "name": "global_slot",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -3251,27 +3144,7 @@
               "description": null
             },
             {
-              "name": "slot",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "staged_ledger_hash",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "state_hash",
+              "name": "snarked_ledger_hash",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -3526,37 +3399,6 @@
         {
           "inputFields": [
             {
-              "name": "block_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "snark_job_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            }
-          ],
-          "kind": "INPUT_OBJECT",
-          "possibleTypes": null,
-          "interfaces": null,
-          "name": "blocks_snark_jobs_inc_input",
-          "enumValues": null,
-          "description": "input type for incrementing integer columne in table \"blocks_snark_jobs\"",
-          "fields": null
-        },
-        {
-          "inputFields": [
-            {
               "name": "block",
               "defaultValue": null,
               "type": {
@@ -3567,31 +3409,11 @@
               "description": null
             },
             {
-              "name": "block_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
               "name": "snark_job",
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "snark_jobs_obj_rel_insert_input",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "snark_job_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
                 "ofType": null
               },
               "description": null
@@ -3813,28 +3635,7 @@
           "fields": null
         },
         {
-          "inputFields": [
-            {
-              "name": "block_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "snark_job_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            }
-          ],
+          "inputFields": [],
           "kind": "INPUT_OBJECT",
           "possibleTypes": null,
           "interfaces": null,
@@ -3849,20 +3650,7 @@
           "possibleTypes": null,
           "interfaces": null,
           "name": "blocks_snark_jobs_update_column",
-          "enumValues": [
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "block_id",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "snark_job_id",
-              "description": "column name"
-            }
-          ],
+          "enumValues": [],
           "description": "update columns of table \"blocks_snark_jobs\"",
           "fields": null
         },
@@ -3888,13 +3676,7 @@
             {
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "creator",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "epoch",
+              "name": "global_slot",
               "description": "column name"
             },
             {
@@ -3912,19 +3694,7 @@
             {
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "slot",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "staged_ledger_hash",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "state_hash",
+              "name": "snarked_ledger_hash",
               "description": "column name"
             },
             {
@@ -4208,62 +3978,11 @@
         {
           "inputFields": [
             {
-              "name": "block_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "receipt_chain_hash_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "user_command_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            }
-          ],
-          "kind": "INPUT_OBJECT",
-          "possibleTypes": null,
-          "interfaces": null,
-          "name": "blocks_user_commands_inc_input",
-          "enumValues": null,
-          "description": "input type for incrementing integer columne in table \"blocks_user_commands\"",
-          "fields": null
-        },
-        {
-          "inputFields": [
-            {
               "name": "block",
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "blocks_obj_rel_insert_input",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "block_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
                 "ofType": null
               },
               "description": null
@@ -4279,31 +3998,11 @@
               "description": null
             },
             {
-              "name": "receipt_chain_hash_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
               "name": "user_command",
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "user_commands_obj_rel_insert_input",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "user_command_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
                 "ofType": null
               },
               "description": null
@@ -4551,38 +4250,7 @@
           "fields": null
         },
         {
-          "inputFields": [
-            {
-              "name": "block_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "receipt_chain_hash_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "user_command_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            }
-          ],
+          "inputFields": [],
           "kind": "INPUT_OBJECT",
           "possibleTypes": null,
           "interfaces": null,
@@ -4597,26 +4265,7 @@
           "possibleTypes": null,
           "interfaces": null,
           "name": "blocks_user_commands_update_column",
-          "enumValues": [
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "block_id",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "receipt_chain_hash_id",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "user_command_id",
-              "description": "column name"
-            }
-          ],
+          "enumValues": [],
           "description": "update columns of table \"blocks_user_commands\"",
           "fields": null
         },
@@ -4777,9 +4426,13 @@
               "deprecationReason": null,
               "name": "hash",
               "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
               },
               "description": null
             },
@@ -5676,6 +5329,33 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
+                      "name": "state_hashes_bool_exp",
+                      "ofType": null
+                    }
+                  },
+                  "description": "filter the rows which have to be deleted"
+                }
+              ],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "delete_state_hashes",
+              "type": {
+                "kind": "OBJECT",
+                "name": "state_hashes_mutation_response",
+                "ofType": null
+              },
+              "description": "delete data from the table: \"state_hashes\""
+            },
+            {
+              "args": [
+                {
+                  "name": "where",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
                       "name": "user_commands_bool_exp",
                       "ofType": null
                     }
@@ -6069,6 +5749,51 @@
                         "name": null,
                         "ofType": {
                           "kind": "INPUT_OBJECT",
+                          "name": "state_hashes_insert_input",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  },
+                  "description": "the rows to be inserted"
+                },
+                {
+                  "name": "on_conflict",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "state_hashes_on_conflict",
+                    "ofType": null
+                  },
+                  "description": "on conflict condition"
+                }
+              ],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "insert_state_hashes",
+              "type": {
+                "kind": "OBJECT",
+                "name": "state_hashes_mutation_response",
+                "ofType": null
+              },
+              "description": "insert data into the table: \"state_hashes\""
+            },
+            {
+              "args": [
+                {
+                  "name": "objects",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "INPUT_OBJECT",
                           "name": "user_commands_insert_input",
                           "ofType": null
                         }
@@ -6148,16 +5873,6 @@
             {
               "args": [
                 {
-                  "name": "_inc",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "blocks_fee_transfers_inc_input",
-                    "ofType": null
-                  },
-                  "description": "increments the integer columns with given value of the filtered values"
-                },
-                {
                   "name": "_set",
                   "defaultValue": null,
                   "type": {
@@ -6195,16 +5910,6 @@
             {
               "args": [
                 {
-                  "name": "_inc",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "blocks_snark_jobs_inc_input",
-                    "ofType": null
-                  },
-                  "description": "increments the integer columns with given value of the filtered values"
-                },
-                {
                   "name": "_set",
                   "defaultValue": null,
                   "type": {
@@ -6241,16 +5946,6 @@
             },
             {
               "args": [
-                {
-                  "name": "_inc",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "blocks_user_commands_inc_input",
-                    "ofType": null
-                  },
-                  "description": "increments the integer columns with given value of the filtered values"
-                },
                 {
                   "name": "_set",
                   "defaultValue": null,
@@ -6373,16 +6068,6 @@
             {
               "args": [
                 {
-                  "name": "_inc",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "receipt_chain_hashes_inc_input",
-                    "ofType": null
-                  },
-                  "description": "increments the integer columns with given value of the filtered values"
-                },
-                {
                   "name": "_set",
                   "defaultValue": null,
                   "type": {
@@ -6467,15 +6152,42 @@
             {
               "args": [
                 {
-                  "name": "_inc",
+                  "name": "_set",
                   "defaultValue": null,
                   "type": {
                     "kind": "INPUT_OBJECT",
-                    "name": "user_commands_inc_input",
+                    "name": "state_hashes_set_input",
                     "ofType": null
                   },
-                  "description": "increments the integer columns with given value of the filtered values"
+                  "description": "sets the columns of the filtered rows to the given values"
                 },
+                {
+                  "name": "where",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "state_hashes_bool_exp",
+                      "ofType": null
+                    }
+                  },
+                  "description": "filter the rows which have to be updated"
+                }
+              ],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "update_state_hashes",
+              "type": {
+                "kind": "OBJECT",
+                "name": "state_hashes_mutation_response",
+                "ofType": null
+              },
+              "description": "update data of the table: \"state_hashes\""
+            },
+            {
+              "args": [
                 {
                   "name": "_set",
                   "defaultValue": null,
@@ -6766,6 +6478,97 @@
                 }
               },
               "description": null
+            },
+            {
+              "args": [
+                {
+                  "name": "distinct_on",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "ENUM",
+                        "name": "snark_jobs_select_column",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "distinct select on columns"
+                },
+                {
+                  "name": "limit",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "limit the nuber of rows returned"
+                },
+                {
+                  "name": "offset",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "skip the first n rows. Use only with order_by"
+                },
+                {
+                  "name": "order_by",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "INPUT_OBJECT",
+                        "name": "snark_jobs_order_by",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "sort the rows by one or more columns"
+                },
+                {
+                  "name": "where",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "snark_jobs_bool_exp",
+                    "ofType": null
+                  },
+                  "description": "filter the rows returned"
+                }
+              ],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "snark_jobs",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "snark_jobs",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": "An array relationship"
             },
             {
               "args": [
@@ -7081,6 +6884,16 @@
               "description": null
             },
             {
+              "name": "snark_jobs",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "snark_jobs_bool_exp",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "userCommandsByReceiver",
               "defaultValue": null,
               "type": {
@@ -7160,6 +6973,16 @@
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "fee_transfers_arr_rel_insert_input",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "snark_jobs",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "snark_jobs_arr_rel_insert_input",
                 "ofType": null
               },
               "description": null
@@ -7531,33 +7354,6 @@
             {
               "args": [
                 {
-                  "name": "id",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "description": null
-                }
-              ],
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "blocks_by_pk",
-              "type": {
-                "kind": "OBJECT",
-                "name": "blocks",
-                "ofType": null
-              },
-              "description": "fetch data from the table: \"blocks\" using primary key columns"
-            },
-            {
-              "args": [
-                {
                   "name": "distinct_on",
                   "defaultValue": null,
                   "type": {
@@ -8313,6 +8109,124 @@
                       "name": null,
                       "ofType": {
                         "kind": "ENUM",
+                        "name": "state_hashes_select_column",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "distinct select on columns"
+                },
+                {
+                  "name": "limit",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "limit the nuber of rows returned"
+                },
+                {
+                  "name": "offset",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "skip the first n rows. Use only with order_by"
+                },
+                {
+                  "name": "order_by",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "INPUT_OBJECT",
+                        "name": "state_hashes_order_by",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "sort the rows by one or more columns"
+                },
+                {
+                  "name": "where",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "state_hashes_bool_exp",
+                    "ofType": null
+                  },
+                  "description": "filter the rows returned"
+                }
+              ],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "state_hashes",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "state_hashes",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": "fetch data from the table: \"state_hashes\""
+            },
+            {
+              "args": [
+                {
+                  "name": "id",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  },
+                  "description": null
+                }
+              ],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "state_hashes_by_pk",
+              "type": {
+                "kind": "OBJECT",
+                "name": "state_hashes",
+                "ofType": null
+              },
+              "description": "fetch data from the table: \"state_hashes\" using primary key columns"
+            },
+            {
+              "args": [
+                {
+                  "name": "distinct_on",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "ENUM",
                         "name": "user_commands_select_column",
                         "ofType": null
                       }
@@ -8430,95 +8344,16 @@
           "description": "columns and relationships of \"receipt_chain_hashes\"",
           "fields": [
             {
-              "args": [
-                {
-                  "name": "distinct_on",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "LIST",
-                    "name": null,
-                    "ofType": {
-                      "kind": "NON_NULL",
-                      "name": null,
-                      "ofType": {
-                        "kind": "ENUM",
-                        "name": "blocks_user_commands_select_column",
-                        "ofType": null
-                      }
-                    }
-                  },
-                  "description": "distinct select on columns"
-                },
-                {
-                  "name": "limit",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "Int",
-                    "ofType": null
-                  },
-                  "description": "limit the nuber of rows returned"
-                },
-                {
-                  "name": "offset",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "Int",
-                    "ofType": null
-                  },
-                  "description": "skip the first n rows. Use only with order_by"
-                },
-                {
-                  "name": "order_by",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "LIST",
-                    "name": null,
-                    "ofType": {
-                      "kind": "NON_NULL",
-                      "name": null,
-                      "ofType": {
-                        "kind": "INPUT_OBJECT",
-                        "name": "blocks_user_commands_order_by",
-                        "ofType": null
-                      }
-                    }
-                  },
-                  "description": "sort the rows by one or more columns"
-                },
-                {
-                  "name": "where",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "blocks_user_commands_bool_exp",
-                    "ofType": null
-                  },
-                  "description": "filter the rows returned"
-                }
-              ],
+              "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
               "name": "blocks_user_commands",
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "blocks_user_commands",
-                      "ofType": null
-                    }
-                  }
-                }
+                "kind": "OBJECT",
+                "name": "blocks_user_commands",
+                "ofType": null
               },
-              "description": "An array relationship"
+              "description": "An object relationship"
             },
             {
               "args": [],
@@ -8575,97 +8410,6 @@
                 "ofType": null
               },
               "description": "An object relationship"
-            },
-            {
-              "args": [
-                {
-                  "name": "distinct_on",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "LIST",
-                    "name": null,
-                    "ofType": {
-                      "kind": "NON_NULL",
-                      "name": null,
-                      "ofType": {
-                        "kind": "ENUM",
-                        "name": "receipt_chain_hashes_select_column",
-                        "ofType": null
-                      }
-                    }
-                  },
-                  "description": "distinct select on columns"
-                },
-                {
-                  "name": "limit",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "Int",
-                    "ofType": null
-                  },
-                  "description": "limit the nuber of rows returned"
-                },
-                {
-                  "name": "offset",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "Int",
-                    "ofType": null
-                  },
-                  "description": "skip the first n rows. Use only with order_by"
-                },
-                {
-                  "name": "order_by",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "LIST",
-                    "name": null,
-                    "ofType": {
-                      "kind": "NON_NULL",
-                      "name": null,
-                      "ofType": {
-                        "kind": "INPUT_OBJECT",
-                        "name": "receipt_chain_hashes_order_by",
-                        "ofType": null
-                      }
-                    }
-                  },
-                  "description": "sort the rows by one or more columns"
-                },
-                {
-                  "name": "where",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "receipt_chain_hashes_bool_exp",
-                    "ofType": null
-                  },
-                  "description": "filter the rows returned"
-                }
-              ],
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "receipt_chain_hashes",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "receipt_chain_hashes",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "description": "An array relationship"
             }
           ]
         },
@@ -8801,16 +8545,6 @@
                 "ofType": null
               },
               "description": null
-            },
-            {
-              "name": "receipt_chain_hashes",
-              "defaultValue": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "receipt_chain_hashes_bool_exp",
-                "ofType": null
-              },
-              "description": null
             }
           ],
           "kind": "INPUT_OBJECT",
@@ -8847,32 +8581,11 @@
         {
           "inputFields": [
             {
-              "name": "parent_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            }
-          ],
-          "kind": "INPUT_OBJECT",
-          "possibleTypes": null,
-          "interfaces": null,
-          "name": "receipt_chain_hashes_inc_input",
-          "enumValues": null,
-          "description": "input type for incrementing integer columne in table \"receipt_chain_hashes\"",
-          "fields": null
-        },
-        {
-          "inputFields": [
-            {
               "name": "blocks_user_commands",
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "blocks_user_commands_arr_rel_insert_input",
+                "name": "blocks_user_commands_obj_rel_insert_input",
                 "ofType": null
               },
               "description": null
@@ -8888,31 +8601,11 @@
               "description": null
             },
             {
-              "name": "parent_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
               "name": "receipt_chain_hash",
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "receipt_chain_hashes_obj_rel_insert_input",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "receipt_chain_hashes",
-              "defaultValue": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "receipt_chain_hashes_arr_rel_insert_input",
                 "ofType": null
               },
               "description": null
@@ -9062,6 +8755,16 @@
         {
           "inputFields": [
             {
+              "name": "blocks_user_commands",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_user_commands_order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "hash",
               "defaultValue": null,
               "type": {
@@ -9150,16 +8853,6 @@
                 "ofType": null
               },
               "description": null
-            },
-            {
-              "name": "parent_id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
             }
           ],
           "kind": "INPUT_OBJECT",
@@ -9181,12 +8874,6 @@
               "isDeprecated": false,
               "deprecationReason": null,
               "name": "hash",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "parent_id",
               "description": "column name"
             }
           ],
@@ -9303,7 +8990,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Int",
+                  "name": "bit",
                   "ofType": null
                 }
               },
@@ -9364,6 +9051,22 @@
                 }
               },
               "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "public_key",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "public_keys",
+                  "ofType": null
+                }
+              },
+              "description": "An object relationship"
             }
           ]
         },
@@ -9465,7 +9168,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "Int_comparison_exp",
+                "name": "bit_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -9509,6 +9212,16 @@
                 "ofType": null
               },
               "description": null
+            },
+            {
+              "name": "public_key",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "public_keys_bool_exp",
+                "ofType": null
+              },
+              "description": null
             }
           ],
           "kind": "INPUT_OBJECT",
@@ -9545,7 +9258,7 @@
         {
           "inputFields": [
             {
-              "name": "fee",
+              "name": "id",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -9610,7 +9323,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "bit",
                 "ofType": null
               },
               "description": null
@@ -9641,6 +9354,16 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "Int",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "public_key",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "public_keys_obj_rel_insert_input",
                 "ofType": null
               },
               "description": null
@@ -9838,6 +9561,16 @@
                 "ofType": null
               },
               "description": null
+            },
+            {
+              "name": "public_key",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "public_keys_order_by",
+                "ofType": null
+              },
+              "description": null
             }
           ],
           "kind": "INPUT_OBJECT",
@@ -9892,7 +9625,7 @@
         {
           "inputFields": [
             {
-              "name": "fee",
+              "name": "id",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -9950,7 +9683,7 @@
             {
               "isDeprecated": false,
               "deprecationReason": null,
-              "name": "fee",
+              "name": "id",
               "description": "column name"
             },
             {
@@ -9973,6 +9706,583 @@
             }
           ],
           "description": "update columns of table \"snark_jobs\"",
+          "fields": null
+        },
+        {
+          "inputFields": null,
+          "kind": "OBJECT",
+          "possibleTypes": null,
+          "interfaces": [],
+          "name": "state_hashes",
+          "enumValues": null,
+          "description": "columns and relationships of \"state_hashes\"",
+          "fields": [
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block",
+              "type": {
+                "kind": "OBJECT",
+                "name": "blocks",
+                "ofType": null
+              },
+              "description": "An object relationship"
+            },
+            {
+              "args": [
+                {
+                  "name": "distinct_on",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "ENUM",
+                        "name": "blocks_select_column",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "distinct select on columns"
+                },
+                {
+                  "name": "limit",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "limit the nuber of rows returned"
+                },
+                {
+                  "name": "offset",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "skip the first n rows. Use only with order_by"
+                },
+                {
+                  "name": "order_by",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "INPUT_OBJECT",
+                        "name": "blocks_order_by",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "sort the rows by one or more columns"
+                },
+                {
+                  "name": "where",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "blocks_bool_exp",
+                    "ofType": null
+                  },
+                  "description": "filter the rows returned"
+                }
+              ],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "blocks",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "blocks",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": "An array relationship"
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "id",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "value",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "description": null
+            }
+          ]
+        },
+        {
+          "inputFields": [
+            {
+              "name": "data",
+              "defaultValue": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "state_hashes_insert_input",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": null
+            },
+            {
+              "name": "on_conflict",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "state_hashes_on_conflict",
+                "ofType": null
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "state_hashes_arr_rel_insert_input",
+          "enumValues": null,
+          "description": "input type for inserting array relation for remote table \"state_hashes\"",
+          "fields": null
+        },
+        {
+          "inputFields": [
+            {
+              "name": "_and",
+              "defaultValue": null,
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "state_hashes_bool_exp",
+                  "ofType": null
+                }
+              },
+              "description": null
+            },
+            {
+              "name": "_not",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "state_hashes_bool_exp",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_or",
+              "defaultValue": null,
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "state_hashes_bool_exp",
+                  "ofType": null
+                }
+              },
+              "description": null
+            },
+            {
+              "name": "block",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_bool_exp",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "blocks",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_bool_exp",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "id",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "Int_comparison_exp",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "value",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "String_comparison_exp",
+                "ofType": null
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "state_hashes_bool_exp",
+          "enumValues": null,
+          "description": "Boolean expression to filter rows from the table \"state_hashes\". All fields are combined with a logical 'AND'.",
+          "fields": null
+        },
+        {
+          "inputFields": null,
+          "kind": "ENUM",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "state_hashes_constraint",
+          "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "state_hashes_pkey",
+              "description": "unique or primary key constraint"
+            },
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "state_hashes_value_key",
+              "description": "unique or primary key constraint"
+            }
+          ],
+          "description": "unique or primary key constraints on table \"state_hashes\"",
+          "fields": null
+        },
+        {
+          "inputFields": [
+            {
+              "name": "block",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_obj_rel_insert_input",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "blocks",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_arr_rel_insert_input",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "value",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "state_hashes_insert_input",
+          "enumValues": null,
+          "description": "input type for inserting data into table \"state_hashes\"",
+          "fields": null
+        },
+        {
+          "inputFields": null,
+          "kind": "OBJECT",
+          "possibleTypes": null,
+          "interfaces": [],
+          "name": "state_hashes_mutation_response",
+          "enumValues": null,
+          "description": "response of any mutation on the table \"state_hashes\"",
+          "fields": [
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "affected_rows",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "description": "number of affected rows by the mutation"
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "returning",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "state_hashes",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": "data of the affected rows by the mutation"
+            }
+          ]
+        },
+        {
+          "inputFields": [
+            {
+              "name": "data",
+              "defaultValue": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "state_hashes_insert_input",
+                  "ofType": null
+                }
+              },
+              "description": null
+            },
+            {
+              "name": "on_conflict",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "state_hashes_on_conflict",
+                "ofType": null
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "state_hashes_obj_rel_insert_input",
+          "enumValues": null,
+          "description": "input type for inserting object relation for remote table \"state_hashes\"",
+          "fields": null
+        },
+        {
+          "inputFields": [
+            {
+              "name": "constraint_",
+              "defaultValue": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "state_hashes_constraint",
+                  "ofType": null
+                }
+              },
+              "description": null
+            },
+            {
+              "name": "update_columns",
+              "defaultValue": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "state_hashes_update_column",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "state_hashes_on_conflict",
+          "enumValues": null,
+          "description": "on conflict condition type for table \"state_hashes\"",
+          "fields": null
+        },
+        {
+          "inputFields": [
+            {
+              "name": "block",
+              "defaultValue": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "blocks_order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "id",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "value",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "state_hashes_order_by",
+          "enumValues": null,
+          "description": "ordering options when selecting data from \"state_hashes\"",
+          "fields": null
+        },
+        {
+          "inputFields": null,
+          "kind": "ENUM",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "state_hashes_select_column",
+          "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "id",
+              "description": "column name"
+            },
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "value",
+              "description": "column name"
+            }
+          ],
+          "description": "select columns of table \"state_hashes\"",
+          "fields": null
+        },
+        {
+          "inputFields": [
+            {
+              "name": "value",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "state_hashes_set_input",
+          "enumValues": null,
+          "description": "input type for updating data in table \"state_hashes\"",
+          "fields": null
+        },
+        {
+          "inputFields": null,
+          "kind": "ENUM",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "state_hashes_update_column",
+          "enumValues": [
+            {
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "value",
+              "description": "column name"
+            }
+          ],
+          "description": "update columns of table \"state_hashes\"",
           "fields": null
         },
         {
@@ -10074,33 +10384,6 @@
                 }
               },
               "description": "fetch data from the table: \"blocks\""
-            },
-            {
-              "args": [
-                {
-                  "name": "id",
-                  "defaultValue": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "description": null
-                }
-              ],
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "blocks_by_pk",
-              "type": {
-                "kind": "OBJECT",
-                "name": "blocks",
-                "ofType": null
-              },
-              "description": "fetch data from the table: \"blocks\" using primary key columns"
             },
             {
               "args": [
@@ -10846,6 +11129,124 @@
                 "ofType": null
               },
               "description": "fetch data from the table: \"snark_jobs\" using primary key columns"
+            },
+            {
+              "args": [
+                {
+                  "name": "distinct_on",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "ENUM",
+                        "name": "state_hashes_select_column",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "distinct select on columns"
+                },
+                {
+                  "name": "limit",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "limit the nuber of rows returned"
+                },
+                {
+                  "name": "offset",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "skip the first n rows. Use only with order_by"
+                },
+                {
+                  "name": "order_by",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "INPUT_OBJECT",
+                        "name": "state_hashes_order_by",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "sort the rows by one or more columns"
+                },
+                {
+                  "name": "where",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "state_hashes_bool_exp",
+                    "ofType": null
+                  },
+                  "description": "filter the rows returned"
+                }
+              ],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "state_hashes",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "state_hashes",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": "fetch data from the table: \"state_hashes\""
+            },
+            {
+              "args": [
+                {
+                  "name": "id",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  },
+                  "description": null
+                }
+              ],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "state_hashes_by_pk",
+              "type": {
+                "kind": "OBJECT",
+                "name": "state_hashes",
+                "ofType": null
+              },
+              "description": "fetch data from the table: \"state_hashes\" using primary key columns"
             },
             {
               "args": [
@@ -11632,37 +12033,6 @@
         {
           "inputFields": [
             {
-              "name": "receiver",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "sender",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            }
-          ],
-          "kind": "INPUT_OBJECT",
-          "possibleTypes": null,
-          "interfaces": null,
-          "name": "user_commands_inc_input",
-          "enumValues": null,
-          "description": "input type for incrementing integer columne in table \"user_commands\"",
-          "fields": null
-        },
-        {
-          "inputFields": [
-            {
               "name": "amount",
               "defaultValue": null,
               "type": {
@@ -12169,26 +12539,6 @@
               "description": null
             },
             {
-              "name": "receiver",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "sender",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
               "name": "typ",
               "defaultValue": null,
               "type": {
@@ -12248,18 +12598,6 @@
               "isDeprecated": false,
               "deprecationReason": null,
               "name": "nonce",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "receiver",
-              "description": "column name"
-            },
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "sender",
               "description": "column name"
             },
             {

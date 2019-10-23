@@ -250,6 +250,23 @@ module Types = struct
           |> digest_entries ~title:""
         in
         map_entry "Consensus configuration" ~f:render
+
+      let addrs_and_ports =
+        let render conf =
+          let fmt_field name op field = (name, op (Field.get field conf)) in
+          Kademlia.Node_addrs_and_ports.Display.Stable.V1.Fields.to_list
+            ~external_ip:(fmt_field "External IP" Fn.id)
+            ~bind_ip:(fmt_field "Bind IP" Fn.id)
+            ~discovery_port:(fmt_field "Haskell Kademlia port" string_of_int)
+            ~client_port:(fmt_field "Client port" string_of_int)
+            ~libp2p_port:(fmt_field "Discovery (libp2p) port" string_of_int)
+            ~communication_port:(fmt_field "External port" string_of_int)
+          |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
+          |> digest_entries ~title:""
+        in
+        map_entry "Addresses and ports" ~f:render
+
+      let libp2p_peer_id = string_entry "Libp2p PeerID"
     end
 
     type t =
@@ -272,7 +289,9 @@ module Types = struct
       ; next_proposal: string option
       ; consensus_time_now: string
       ; consensus_mechanism: string
-      ; consensus_configuration: Consensus.Configuration.t }
+      ; consensus_configuration: Consensus.Configuration.t
+      ; addrs_and_ports: Kademlia.Node_addrs_and_ports.Display.Stable.V1.t
+      ; libp2p_peer_id: string }
     [@@deriving to_yojson, bin_io, fields]
 
     let entries (s : t) =
@@ -287,7 +306,7 @@ module Types = struct
         ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent
         ~snark_worker ~propose_pubkeys ~histograms ~consensus_time_best_tip
         ~consensus_time_now ~consensus_mechanism ~consensus_configuration
-        ~next_proposal ~snark_work_fee
+        ~next_proposal ~snark_work_fee ~addrs_and_ports ~libp2p_peer_id
       |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =

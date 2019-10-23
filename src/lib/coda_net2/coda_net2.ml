@@ -719,17 +719,30 @@ module Keypair = struct
   let secret_key_base58 {secret; _} = to_b58_data secret
 
   let to_string {secret; public; peer_id} =
-    String.concat ~sep:";" [to_b58_data secret; to_b58_data public; peer_id]
+    String.concat ~sep:"," [to_b58_data secret; to_b58_data public; peer_id]
 
   let of_string s =
-    match String.split s ~on:';' with
-    | [secret_b58; public_b58; peer_id] ->
-        let open Or_error.Let_syntax in
-        let%map secret = of_b58_data (`String secret_b58)
-        and public = of_b58_data (`String public_b58) in
-        {secret; public; peer_id}
-    | _ ->
-        Or_error.errorf "%s is not a valid Keypair.to_string output" s
+    let with_semicolon =
+      match String.split s ~on:';' with
+      | [secret_b58; public_b58; peer_id] ->
+          let open Or_error.Let_syntax in
+          let%map secret = of_b58_data (`String secret_b58)
+          and public = of_b58_data (`String public_b58) in
+          {secret; public; peer_id}
+      | _ ->
+          Or_error.errorf "%s is not a valid Keypair.to_string output" s
+    in
+    let with_comma =
+      match String.split s ~on:',' with
+      | [secret_b58; public_b58; peer_id] ->
+          let open Or_error.Let_syntax in
+          let%map secret = of_b58_data (`String secret_b58)
+          and public = of_b58_data (`String public_b58) in
+          {secret; public; peer_id}
+      | _ ->
+          Or_error.errorf "%s is not a valid Keypair.to_string output" s
+    in
+    if Or_error.is_error with_semicolon then with_comma else with_semicolon
 
   let to_peerid {peer_id; _} = peer_id
 end

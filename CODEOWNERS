@@ -15,6 +15,7 @@
 
 /src/external/ @cmr @bkase @psteckler @imeckler
 
+/src/app/archive @wu-s-john @bkase @schmavery
 /src/app/cli/src/tests @cmr @bkase @wu-s-john @ghost-not-in-the-shell @deepthiskumar
 /src/app/cli/src/coda.ml @nholland94 @bkase @cmr @imeckler
 /src/app/cli/src/init @nholland94 @bkase @cmr @imeckler
