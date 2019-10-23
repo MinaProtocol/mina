@@ -122,7 +122,7 @@ let jobOpenings = [|
   ),
   (
     "fullstack-engineer",
-    "Senior Product Engineer (Full-stack) (San Francisco).",
+    "Senior Product Engineer (Full-stack) (San Francisco)",
   ),
   (
     "marketing-and-communications-manager",
