@@ -24,11 +24,11 @@ module Make (Inputs : Inputs_intf) :
     Root_history.lookup root_history state_hash
 
   let get_breadcrumb_ledgers frontier =
-    List.map
-      (Transition_frontier.all_breadcrumbs frontier)
-      ~f:
-        (Fn.compose Staged_ledger.ledger
-           Transition_frontier.Breadcrumb.staged_ledger)
+    List.map (Transition_frontier.all_breadcrumbs frontier)
+      ~f:(fun breadcrumb ->
+        Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+        |> Staged_ledger.ledger
+        |> Ledger.Any_ledger.cast (module Ledger) )
 
   let get_ledger_by_hash ~frontier ledger_hash =
     let ledger_breadcrumbs =
@@ -40,12 +40,11 @@ module Make (Inputs : Inputs_intf) :
         (module Ledger.Db)
         (Transition_frontier.root_snarked_ledger frontier)
     in
-    let mask =
-      Ledger.Maskable.register_mask root_ledger (Ledger.Mask.create ())
-    in
-    Sequence.append (Sequence.singleton mask) ledger_breadcrumbs
+    Sequence.append (Sequence.singleton root_ledger) ledger_breadcrumbs
     |> Sequence.find ~f:(fun ledger ->
-           Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash )
+           Ledger_hash.equal
+             (Ledger.Any_ledger.M.merkle_root ledger)
+             ledger_hash )
 
   let answer_query :
          frontier:Inputs.Transition_frontier.t
@@ -60,9 +59,10 @@ module Make (Inputs : Inputs_intf) :
         return None
     | Some ledger ->
         let responder =
-          Sync_ledger.Mask.Responder.create ledger ignore ~logger ~trust_system
+          Sync_ledger.Any_ledger.Responder.create ledger ignore ~logger
+            ~trust_system
         in
-        Sync_ledger.Mask.Responder.answer_query responder query
+        Sync_ledger.Any_ledger.Responder.answer_query responder query
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier state_hash
       =
