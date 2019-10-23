@@ -9,6 +9,8 @@ module Time : sig
 
   include Comparable.S with type t := t
 
+  include Hashable.S with type t := t
+
   module Controller : sig
     type t
 
@@ -21,6 +23,8 @@ module Time : sig
     module V1 : sig
       type nonrec t = t
       [@@deriving sexp, bin_io, compare, eq, hash, yojson, version]
+
+      include Hashable.S with type t := t
     end
   end
 
