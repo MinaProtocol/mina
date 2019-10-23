@@ -380,13 +380,14 @@ let generate_contained_type_version_decls type_decl =
   in
   let main_type_version_decls =
     match type_decl.ptype_kind with
-    | Ptype_abstract ->
-        if Option.is_none type_decl.ptype_manifest then
+    | Ptype_abstract -> (
+      match type_decl.ptype_manifest with
+      | Some manifest ->
+          generate_core_type_version_decls type_name manifest
+      | None ->
           Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
             "Versioned type, not a label or variant, must have manifest \
-             (right-hand side)" ;
-        let manifest = Option.value_exn type_decl.ptype_manifest in
-        generate_core_type_version_decls type_name manifest
+             (right-hand side)" )
     | Ptype_variant ctor_decls ->
         List.fold ctor_decls ~init:[] ~f:(fun accum ctor_decl ->
             generate_constructor_decl_decls type_name ctor_decl @ accum )
