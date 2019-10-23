@@ -5,6 +5,8 @@ open Pipe_lib
 
 type t
 
+exception Child_died
+
 (** A pipe of the standard out of the process, grouped by line. *)
 val stdout_lines : t -> string Strict_pipe.Reader.t
 
@@ -35,7 +37,8 @@ val start_custom :
   -> stderr:output_handling (** What to do with process standard error *)
   -> termination:[ `Always_raise
                  | `Raise_on_failure
-                 | `Handler of Unix.Exit_or_signal.t -> unit Deferred.t
+                 | `Handler of
+                   killed:bool -> Unix.Exit_or_signal.t -> unit Deferred.t
                  | `Ignore ]
      (** What to do when the process exits. Not that an exception will never be
          raised and the handler will not be called if you kill the process with

@@ -17,7 +17,7 @@ type t =
   ; mutable termination_response:
       [ `Always_raise
       | `Raise_on_failure
-      | `Handler of Unix.Exit_or_signal.t -> unit Deferred.t
+      | `Handler of killed:bool -> Unix.Exit_or_signal.t -> unit Deferred.t
       | `Ignore ] }
 
 let stdout_lines : t -> string Strict_pipe.Reader.t = fun t -> t.stdout_pipe
@@ -222,7 +222,8 @@ let start_custom :
     -> stderr:output_handling
     -> termination:[ `Always_raise
                    | `Raise_on_failure
-                   | `Handler of Unix.Exit_or_signal.t -> unit Deferred.t
+                   | `Handler of
+                     killed:bool -> Unix.Exit_or_signal.t -> unit Deferred.t
                    | `Ignore ]
     -> t Deferred.Or_error.t =
  fun ~logger ~name ~checkout_relative_path ~conf_dir ~args ~stdout ~stderr
@@ -286,7 +287,7 @@ let start_custom :
   don't_wait_for
     (let open Deferred.Let_syntax in
     let%bind termination_status = Process.wait process in
-    (* TODO stdin *)
+    let%bind () = Writer.close @@ Process.stdin process in
     let%bind () = Reader.close @@ Process.stdout process in
     let%bind () = Reader.close @@ Process.stderr process in
     let%bind () = Sys.remove lock_path in
@@ -310,7 +311,7 @@ let start_custom :
     | `Raise_on_failure, Ok () ->
         Deferred.unit
     | `Handler f, _ ->
-        f termination_status) ;
+        f ~killed:t.killing termination_status) ;
   Deferred.Or_error.return t
 
 let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
