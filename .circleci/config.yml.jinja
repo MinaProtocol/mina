@@ -116,6 +116,7 @@ jobs:
         docker:
             - image: python:3
         steps:
+            - checkout
             - run:
                 name: Install dependencies
                 command: pip install --user requests jinja2
