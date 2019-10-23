@@ -16,13 +16,19 @@ val stderr_lines : t -> string Strict_pipe.Reader.t
 (** Writer to process's stdin *)
 val stdin : t -> Writer.t
 
+(** [None] if the process is still running, [Some] when it's exited *)
 val termination_status : t -> Unix.Exit_or_signal.t option
 
+(** What to do with one of standard out or standard error. If the first
+    component is [`Log] and the process outputs valid messages in our JSON
+    format they will be passed through unmodified regardless of the level.
+    Otherwise they'll be wrapped and logged at the specified level.
+*)
 type output_handling =
   [`Log of Logger.Level.t | `Don't_log] * [`Pipe | `No_pipe]
 
-(** Start a process, logging its stdout and stderr at the trace level, and
-    handling a lock file. *)
+(** Start a process, handling a lock file, termination, optional logging, and
+    the standard in, out and error fds. *)
 val start_custom :
      logger:Logger.t
   -> name:string
@@ -40,15 +46,14 @@ val start_custom :
                  | `Handler of
                    killed:bool -> Unix.Exit_or_signal.t -> unit Deferred.t
                  | `Ignore ]
-     (** What to do when the process exits. Not that an exception will never be
-         raised and the handler will not be called if you kill the process with
-         [kill] *)
+     (** What to do when the process exits. Not that an exception will not be
+         raised after you run [kill] on it, regardless of this value. *)
   -> t Deferred.Or_error.t
 
 val kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t
 
-(* TODO *)
-(* modify the rpc parallel worker logging code Jiawei wrote to work with this *)
-(* val start_rpc_worker *)
+(* TODO: Launch RPC parallel workers with this stuff, modify the rpc parallel
+   worker logging code Jiawei wrote to work this way. *)
+(* val start_rpc_worker : ... *)
 
 module Termination : module type of Termination
