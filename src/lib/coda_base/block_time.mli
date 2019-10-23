@@ -9,6 +9,8 @@ module Time : sig
 
   include Comparable.S with type t := t
 
+  include Hashable.S with type t := t
+
   module Controller : sig
     type t
 
@@ -21,12 +23,14 @@ module Time : sig
     module V1 : sig
       type nonrec t = t
       [@@deriving sexp, bin_io, compare, eq, hash, yojson, version]
+
+      include Hashable.S with type t := t
     end
   end
 
   val length_in_triples : int
 
-  module Bits : Bits_intf.Convertable_bits with type t := t
+  module Bits : Bits_intf.Convertible_bits with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 
