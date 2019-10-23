@@ -124,6 +124,20 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
+    build-auxiliary:
+        docker:
+            - image: nixos/nix
+        steps:
+            - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
+
     build-macos:
       # only run when there's a 'release' tag
       # filters:
@@ -677,6 +691,7 @@ workflows:
     coda_parallel:
         jobs:
             - lint
+            - build-auxiliary
             - update-branch-protection:
                 filters:
                   branches:
