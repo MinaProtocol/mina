@@ -285,8 +285,9 @@ let get_status ~flag t =
   let snark_work_fee = Currency.Fee.to_int @@ Coda_lib.snark_work_fee t in
   let propose_pubkeys = Coda_lib.propose_public_keys t in
   let consensus_mechanism = Consensus.name in
+  let time_controller = (Coda_lib.config t).time_controller in
   let consensus_time_now =
-    Consensus.time_hum (Block_time.now (Coda_lib.config t).time_controller)
+    Consensus.time_hum (Block_time.now time_controller)
   in
   let consensus_configuration = Consensus.Configuration.t in
   let r = Perf_histograms.report in
@@ -393,10 +394,10 @@ let get_status ~flag t =
   in
   let next_proposal =
     let str time =
-      let open Time in
-      let time = Int64.to_float time |> Span.of_ms |> of_span_since_epoch in
-      let diff = diff time (now ()) in
-      if Span.(zero < diff) then sprintf "in %s" (Time.Span.to_string_hum diff)
+      let open Block_time in
+      let since_epoch_time = time |> Span.of_ms |> of_span_since_epoch in
+      let diff = diff since_epoch_time (now time_controller) in
+      if Span.(zero < diff) then sprintf "in %s" (Span.to_string_hum diff)
       else "Computing next proposal state..."
     in
     Option.map (Coda_lib.next_proposal t) ~f:(function
@@ -465,8 +466,8 @@ module For_tests = struct
           (Fn.compose
              Auxiliary_database.Filtered_external_transition.user_commands
              With_hash.data)
-      @@ Auxiliary_database.External_transition_database.get_values
-           external_transition_database public_key
+      @@ Auxiliary_database.External_transition_database.get_all_values
+           external_transition_database (Some public_key)
     in
     let participants_user_commands =
       User_command.filter_by_participant user_commands public_key
