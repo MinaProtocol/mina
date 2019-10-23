@@ -11,9 +11,8 @@ module Stable : sig
   module Latest = V1
 end
 
-type t = Stable.V1.t =
-  { public_key: Public_key.Stable.V1.t
-  ; private_key: Private_key.Stable.V1.t sexp_opaque }
+type t = Stable.Latest.t =
+  {public_key: Public_key.t; private_key: Private_key.t sexp_opaque}
 [@@deriving sexp, compare]
 
 include Comparable.S with type t := t
