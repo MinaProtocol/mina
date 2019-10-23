@@ -92,10 +92,11 @@ let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
                 in
                 let open Deferred.Let_syntax in
                 match%bind
-                  Transition_frontier.Breadcrumb.build ~logger ~verifier
-                    ~trust_system ~parent
-                    ~transition:mostly_validated_transition
-                    ~sender:(Some sender)
+                  O1trace.trace_recurring "Breadcrumb.build" (fun () ->
+                      Transition_frontier.Breadcrumb.build ~logger ~verifier
+                        ~trust_system ~parent
+                        ~transition:mostly_validated_transition
+                        ~sender:(Some sender) )
                 with
                 | Ok new_breadcrumb ->
                     let open Result.Let_syntax in

@@ -56,8 +56,8 @@ module ModalState = {
 };
 
 let emptyModal: option(PublicKey.t) => ModalState.Unvalidated.t =
-  activeWallet => {
-    fromStr: Option.map(~f=PublicKey.toString, activeWallet),
+  activeAccount => {
+    fromStr: Option.map(~f=PublicKey.toString, activeAccount),
     toStr: "",
     amountStr: "",
     feeStr: "",
@@ -81,7 +81,8 @@ let validate:
   ModalState.Unvalidated.t => Belt.Result.t(ModalState.Validated.t, string) =
   state =>
     switch (state, validatePubkey(state.toStr)) {
-    | ({fromStr: None}, _) => Error("Please specify a wallet to send from.")
+    | ({fromStr: None}, _) =>
+      Error("Please specify an account to send from.")
     | ({toStr: ""}, _) => Error("Please specify a destination address.")
     | (_, None) => Error("Destination is invalid public key.")
     | ({amountStr}, _) when !validateInt64(amountStr) =>
@@ -98,53 +99,43 @@ let validate:
       })
     };
 
-let modalButtons = (unvalidated, setModalState, onSubmit, onClose) => {
-  let setError = e =>
-    setModalState(s => {...s, ModalState.Unvalidated.errorOpt: Some(e)});
+module SendForm = {
+  open ModalState.Unvalidated;
 
-  <div className=Css.(style([display(`flex)]))>
-    <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
-    <Spacer width=1. />
-    <Button
-      label="Send"
-      style=Button.Green
-      onClick={_ =>
-        switch (validate(unvalidated)) {
+  [@react.component]
+  let make = (~onSubmit, ~onClose) => {
+    let activeAccount = Hooks.useActiveAccount();
+    let (addressBook, _) = React.useContext(AddressBookProvider.context);
+    let (sendState, setModalState) =
+      React.useState(_ => emptyModal(activeAccount));
+    let {fromStr, toStr, amountStr, feeStr, memoOpt, errorOpt} = sendState;
+    let spacer = <Spacer height=0.5 />;
+    let setError = e =>
+      setModalState(s => {...s, ModalState.Unvalidated.errorOpt: Some(e)});
+    <form
+      className=Styles.contentContainer
+      onSubmit={event => {
+        ReactEvent.Form.preventDefault(event);
+        switch (validate(sendState)) {
         | Error(e) => setError(e)
         | Ok(validated) =>
           onSubmit(
             validated,
             fun
             | Belt.Result.Error(e) => setError(e)
-            | Ok () => onClose(),
+            | Ok() => onClose(),
           )
-        }
-      }
-    />
-  </div>;
-};
-
-module SendForm = {
-  open ModalState.Unvalidated;
-
-  [@react.component]
-  let make = (~onSubmit, ~onClose) => {
-    let activeWallet = Hooks.useActiveWallet();
-    let (addressBook, _) = React.useContext(AddressBookProvider.context);
-    let (sendState, setModalState) =
-      React.useState(_ => emptyModal(activeWallet));
-    let {fromStr, toStr, amountStr, feeStr, memoOpt, errorOpt} = sendState;
-    let spacer = <Spacer height=0.5 />;
-    <div className=Styles.contentContainer>
+        };
+      }}>
       {switch (errorOpt) {
        | None => React.null
        | Some(err) => <Alert kind=`Danger message=err />
        }}
       spacer
-      // Disable dropdown, only show active Wallet
+      // Disable dropdown, only show active Account
       <TextField
         label="From"
-        value={WalletName.getName(
+        value={AccountName.getName(
           Option.getExn(fromStr) |> PublicKey.ofStringExn,
           addressBook,
         )}
@@ -195,8 +186,12 @@ module SendForm = {
        }}
       <Spacer height=1.0 />
       //Disable Modal button if no active wallet
-      {modalButtons(sendState, setModalState, onSubmit, onClose)}
-    </div>;
+      <div className=Css.(style([display(`flex)]))>
+        <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
+        <Spacer width=1. />
+        <Button label="Send" style=Button.Green type_="submit" />
+      </div>
+    </form>;
   };
 };
 
@@ -221,7 +216,9 @@ let make = (~onClose) => {
                  (),
                )##variables;
              let performMutation =
-               Task.liftPromise(() => mutation(~variables, ()));
+               Task.liftPromise(() =>
+                 mutation(~variables, ~refetchQueries=[|"transactions"|], ())
+               );
              Task.perform(
                performMutation,
                ~f=

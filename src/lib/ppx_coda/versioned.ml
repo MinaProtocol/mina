@@ -93,7 +93,10 @@ let validate_rpc_type_decl inner3_modules type_decl =
 
 let validate_plain_type_decl inner3_modules type_decl =
   match inner3_modules with
-  | ["T"; module_version; "Stable"] ->
+  | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
+      (* NOTE: The pattern here with "T" can be removed when the registration
+         functors are replaced with the versioned module ppx.
+      *)
       validate_module_version module_version type_decl.ptype_loc
   | _ ->
       Location.raise_errorf ~loc:type_decl.ptype_loc
@@ -143,7 +146,10 @@ let validate_type_decl inner3_modules generation_kind type_decl =
 
 let module_name_from_plain_path inner3_modules =
   match inner3_modules with
-  | ["T"; module_version; "Stable"] ->
+  | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
+      (* NOTE: The pattern here with "T" can be removed when the registration
+         functors are replaced with the versioned module ppx.
+      *)
       module_version
   | _ ->
       failwith "module_name_from_plain_path: unexpected module path"
@@ -182,7 +188,11 @@ let generate_version_number_decl inner3_modules loc generation_kind =
     String.sub module_name ~pos:1 ~len:(String.length module_name - 1)
     |> int_of_string
   in
-  [%stri let version = [%e eint version]]
+  [%str
+    let version = [%e eint version]
+
+    (* to prevent unused value warnings *)
+    let _ = version]
 
 let ocaml_builtin_types =
   ["bytes"; "int"; "int32"; "int64"; "float"; "char"; "string"; "bool"; "unit"]
@@ -310,6 +320,9 @@ let rec generate_core_type_version_decls type_name core_type =
   | Ptyp_var _ ->
       (* type variable *)
       []
+  | Ptyp_any ->
+      (* underscore *)
+      []
   | _ ->
       Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
         "Can't determine versioning for contained type"
@@ -353,24 +366,38 @@ let generate_constructor_decl_decls type_name ctor_decl =
       in
       arg_lets @ result_lets
 
-let generate_contained_type_decls type_decl =
+let generate_constraint_type_decls type_name cstrs =
+  let gen_for_constraint (ty1, ty2, _loc) =
+    List.concat_map [ty1; ty2] ~f:(generate_core_type_version_decls type_name)
+  in
+  List.concat_map cstrs ~f:gen_for_constraint
+
+let generate_contained_type_version_decls type_decl =
   let type_name = type_decl.ptype_name.txt in
-  match type_decl.ptype_kind with
-  | Ptype_abstract ->
-      if Option.is_none type_decl.ptype_manifest then
+  let constraint_type_version_decls =
+    generate_constraint_type_decls type_decl.ptype_name.txt
+      type_decl.ptype_cstrs
+  in
+  let main_type_version_decls =
+    match type_decl.ptype_kind with
+    | Ptype_abstract -> (
+      match type_decl.ptype_manifest with
+      | Some manifest ->
+          generate_core_type_version_decls type_name manifest
+      | None ->
+          Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+            "Versioned type, not a label or variant, must have manifest \
+             (right-hand side)" )
+    | Ptype_variant ctor_decls ->
+        List.fold ctor_decls ~init:[] ~f:(fun accum ctor_decl ->
+            generate_constructor_decl_decls type_name ctor_decl @ accum )
+    | Ptype_record label_decls ->
+        generate_version_lets_for_label_decls type_name label_decls
+    | Ptype_open ->
         Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
-          "Versioned type, not a label or variant, must have manifest \
-           (right-hand side)" ;
-      let manifest = Option.value_exn type_decl.ptype_manifest in
-      generate_core_type_version_decls type_name manifest
-  | Ptype_variant ctor_decls ->
-      List.fold ctor_decls ~init:[] ~f:(fun accum ctor_decl ->
-          generate_constructor_decl_decls type_name ctor_decl @ accum )
-  | Ptype_record label_decls ->
-      generate_version_lets_for_label_decls type_name label_decls
-  | Ptype_open ->
-      Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
-        "Versioned type may not be open"
+          "Versioned type may not be open"
+  in
+  constraint_type_version_decls @ main_type_version_decls
 
 let generate_versioned_decls ~asserted generation_kind type_decl =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -387,10 +414,10 @@ let generate_versioned_decls ~asserted generation_kind type_decl =
     | Rpc ->
         (* check whether contained types are versioned,
         but don't assert versioned-ness of this type *)
-        generate_contained_type_decls type_decl
+        generate_contained_type_version_decls type_decl
     | Plain ->
         (* check contained types, assert this type is versioned *)
-        versioned_current :: generate_contained_type_decls type_decl
+        versioned_current :: generate_contained_type_version_decls type_decl
 
 let get_type_decl_representative type_decls =
   let type_decl1 = List.hd_exn type_decls in
@@ -467,18 +494,15 @@ let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
     generate_versioned_decls ~asserted generation_kind type_decl
   in
   let type_name = type_decl.ptype_name.txt in
-  let has_type_params = not (List.is_empty type_decl.ptype_params) in
   (* generate version number for Rpc response, but not for query, so we
      don't get an unused value
    *)
-  if
-    unnumbered || has_type_params
-    || (generation_kind = Rpc && String.equal type_name "query")
+  if unnumbered || (generation_kind = Rpc && String.equal type_name "query")
   then versioned_decls
   else
     generate_version_number_decl inner3_modules type_decl.ptype_loc
       generation_kind
-    :: versioned_decls
+    @ versioned_decls
 
 let generate_val_decls_for_type_decl type_decl ~numbered =
   match type_decl.ptype_kind with

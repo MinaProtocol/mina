@@ -516,6 +516,8 @@ let wrap_rpc_data_in_envelope conn data =
   let sender = Envelope.Sender.Remote inet_addr in
   Envelope.Incoming.wrap ~data ~sender
 
+let net2 t = Gossip_net.net2 t.gossip_net
+
 let create (config : Config.t)
     ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
           State_hash.t Envelope.Incoming.t

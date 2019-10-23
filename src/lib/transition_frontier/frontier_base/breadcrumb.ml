@@ -22,7 +22,7 @@ let create validated_transition staged_ledger =
 
 let build ~logger ~verifier ~trust_system ~parent
     ~transition:transition_with_validation ~sender =
-  O1trace.measure "Breadcrumb.build" (fun () ->
+  O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
         External_transition.Staged_ledger_validation

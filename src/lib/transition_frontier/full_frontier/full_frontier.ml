@@ -317,7 +317,7 @@ let move_root t ~new_root_hash ~garbage =
     (* STEP 2 *)
     (* go ahead and remove the old root from the frontier *)
     Hashtbl.remove t.table t.root ;
-    Ledger.commit m1 ;
+    O1trace.measure "committing new root mask" (fun () -> Ledger.commit m1) ;
     [%test_result: Ledger_hash.t]
       ~message:
         "Merkle root of new root's staged ledger mask is the same after \
@@ -368,10 +368,11 @@ let move_root t ~new_root_hash ~garbage =
   (* rewrite the root pointer to the new root hash *)
   t.root <- new_root_hash ;
   (* notify consensus that the root transitioned *)
-  Consensus.Hooks.frontier_root_transition
-    (Breadcrumb.consensus_state old_root_node.breadcrumb)
-    (Breadcrumb.consensus_state new_root_node.breadcrumb)
-    ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger
+  O1trace.measure "calling consensus hook frontier_root_transition" (fun () ->
+      Consensus.Hooks.frontier_root_transition
+        (Breadcrumb.consensus_state old_root_node.breadcrumb)
+        (Breadcrumb.consensus_state new_root_node.breadcrumb)
+        ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger )
 
 (* calculates the diffs which need to be applied in order to add a breadcrumb to the frontier *)
 let calculate_diffs t breadcrumb =
@@ -468,7 +469,18 @@ let update_metrics_with_diff (type mutant) t
           Int.to_float
             (List.length (Breadcrumb.user_commands new_root_breadcrumb))
         in
-        (* TODO: this metric collection is super inefficient right now *)
+        Gauge.dec Transition_frontier.active_breadcrumbs
+          num_breadcrumbs_removed ;
+        Gauge.set Transition_frontier.recently_finalized_staged_txns
+          num_finalized_staged_txns ;
+        Counter.inc Transition_frontier.finalized_staged_txns
+          num_finalized_staged_txns ;
+        Counter.inc_one Transition_frontier.root_transitions ;
+        Gauge.set Transition_frontier.slot_fill_rate
+          (blockchain_length /. global_slot) ;
+        Transition_frontier.TPS_10min.update num_finalized_staged_txns)
+      (* TODO: optimize and add these metrics back in (#2850) *)
+      (*
         let root_snarked_ledger_accounts =
           Ledger.Any_ledger.M.to_list t.root_ledger
         in
@@ -481,19 +493,11 @@ let update_metrics_with_diff (type mutant) t
                ~f:(fun sum account ->
                  sum + Currency.Balance.to_int account.balance ))
         in
-        Gauge.dec Transition_frontier.active_breadcrumbs
-          num_breadcrumbs_removed ;
-        Gauge.set Transition_frontier.recently_finalized_staged_txns
-          num_finalized_staged_txns ;
-        Counter.inc Transition_frontier.finalized_staged_txns
-          num_finalized_staged_txns ;
         Gauge.set Transition_frontier.root_snarked_ledger_accounts
           num_root_snarked_ledger_accounts ;
         Gauge.set Transition_frontier.root_snarked_ledger_total_currency
           root_snarked_ledger_total_currency ;
-        Counter.inc_one Transition_frontier.root_transitions ;
-        Gauge.set Transition_frontier.slot_fill_rate
-          (blockchain_length /. global_slot))
+        *)
   | _ ->
       ()
 

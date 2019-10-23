@@ -138,11 +138,10 @@ module Types = struct
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
-        [ enum_value "BOOTSTRAP" ~value:`Bootstrap
-        ; enum_value "SYNCED" ~value:`Synced
-        ; enum_value "OFFLINE" ~value:`Offline
-        ; enum_value "CONNECTING" ~value:`Connecting
-        ; enum_value "LISTENING" ~value:`Listening ]
+        (List.map Sync_status.all ~f:(fun status ->
+             enum_value
+               (String.map ~f:Char.uppercase @@ Sync_status.to_string status)
+               ~value:status ))
 
   let transaction_status : ('context, Transaction_status.State.t option) typ =
     enum "TransactionStatus" ~doc:"Status of a transaction"
@@ -222,6 +221,16 @@ module Types = struct
                ~slot_duration:nn_int ~epoch_duration:nn_int
                ~acceptable_network_delay:nn_int )
 
+    let addrs_and_ports :
+        (_, Kademlia.Node_addrs_and_ports.Display.Stable.V1.t option) typ =
+      obj "AddrsAndPorts" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Kademlia.Node_addrs_and_ports.Display.Stable.V1.Fields.fold
+               ~init:[] ~external_ip:nn_string ~bind_ip:nn_string
+               ~discovery_port:nn_int ~client_port:nn_int ~libp2p_port:nn_int
+               ~communication_port:nn_int )
+
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
@@ -238,6 +247,8 @@ module Types = struct
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms) ~consensus_time_best_tip:string
                ~consensus_time_now:nn_string ~consensus_mechanism:nn_string
+               ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
+               ~libp2p_peer_id:nn_string
                ~consensus_configuration:
                  (id ~typ:(non_null consensus_configuration))
                ~highest_block_length_received:nn_int )
@@ -1019,33 +1030,31 @@ module Types = struct
                     let%map decoded = Cursor.deserialize data in
                     Some decoded
               in
+              let value_filter_specification =
+                Option.value_map public_key ~default:`All ~f:(fun public_key ->
+                    `User_only public_key )
+              in
               let%map ( (queried_nodes, has_earlier_page, has_later_page)
                       , total_counts ) =
                 Deferred.return
                 @@
-                match (first, after, last, before, public_key) with
-                | _, _, _, _, None ->
-                    (* TODO: Return an actual pagination with a limited range of elements rather than returning all the elemens in the database *)
-                    let values = Pagination_database.get_all_values database in
-                    Result.return
-                      ( (values, `Has_earlier_page false, `Has_later_page false)
-                      , Some (List.length values) )
-                | Some _n_queries_before, _, Some _n_queries_after, _, _ ->
+                match (first, after, last, before) with
+                | Some _n_queries_before, _, Some _n_queries_after, _ ->
                     Error
                       "Illegal query: first and last must not be non-null \
                        value at the same time"
-                | num_to_query, cursor, None, _, Some public_key ->
+                | num_items, cursor, None, _ ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
-                    ( Pagination_database.get_earlier_values database
-                        public_key cursor num_to_query
+                    ( Pagination_database.query database ~navigation:`Earlier
+                        ~value_filter_specification ~cursor ~num_items
                     , Pagination_database.get_total_values database public_key
                     )
-                | None, _, num_to_query, cursor, Some public_key ->
+                | None, _, num_items, cursor ->
                     let open Result.Let_syntax in
                     let%map cursor = resolve_cursor cursor in
-                    ( Pagination_database.get_later_values database public_key
-                        cursor num_to_query
+                    ( Pagination_database.query database ~navigation:`Later
+                        ~value_filter_specification ~cursor ~num_items
                     , Pagination_database.get_total_values database public_key
                     )
               in
@@ -1334,13 +1343,16 @@ module Mutations = struct
       Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp
         payment_body
     in
-    match%map Coda_commands.send_user_command coda command with
-    | `Active (Ok _) ->
-        Ok command
-    | `Active (Error e) ->
-        Error ("Couldn't send user_command: " ^ Error.to_string_hum e)
+    match Coda_commands.send_user_command coda command with
+    | `Active f -> (
+        let open Deferred.Let_syntax in
+        match%map f with
+        | Ok _receipt ->
+            Ok command
+        | Error e ->
+            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
-        Error "Daemon is bootstrapping"
+        return @@ Error "Daemon is bootstrapping"
 
   let parse_user_command_input ~kind coda from to_ fee maybe_memo =
     let open Result.Let_syntax in
@@ -1504,20 +1516,28 @@ module Queries = struct
   let pooled_user_commands =
     field "pooledUserCommands"
       ~doc:
-        "Retrieve all the user commands submitted by the current daemon that \
-         are pending inclusion"
+        "Retrieve all the scheduled user commands for a specified sender that \
+         the current daemon sees in their transaction pool. All scheduled \
+         commands are queried if no sender is specified"
       ~typ:(non_null @@ list @@ non_null Types.user_command)
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of sender of pooled user commands"
-              ~typ:(non_null Types.Input.public_key_arg) ]
-      ~resolve:(fun {ctx= coda; _} () pk ->
+              ~typ:Types.Input.public_key_arg ]
+      ~resolve:(fun {ctx= coda; _} () opt_pk ->
         let transaction_pool = Coda_lib.transaction_pool coda in
-        List.map
-          (Network_pool.Transaction_pool.Resource_pool.all_from_user
-             (Network_pool.Transaction_pool.resource_pool transaction_pool)
-             pk)
-          ~f:User_command.forget_check )
+        let resource_pool =
+          Network_pool.Transaction_pool.resource_pool transaction_pool
+        in
+        ( match opt_pk with
+        | None ->
+            Network_pool.Transaction_pool.Resource_pool.transactions
+              resource_pool
+            |> Sequence.to_list
+        | Some pk ->
+            Network_pool.Transaction_pool.Resource_pool.all_from_user
+              resource_pool pk )
+        |> List.map ~f:User_command.forget_check )
 
   let sync_state =
     result_field_no_inputs "syncStatus" ~doc:"Network sync status" ~args:[]

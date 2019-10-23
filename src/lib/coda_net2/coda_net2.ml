@@ -719,17 +719,30 @@ module Keypair = struct
   let secret_key_base58 {secret; _} = to_b58_data secret
 
   let to_string {secret; public; peer_id} =
-    String.concat ~sep:";" [to_b58_data secret; to_b58_data public; peer_id]
+    String.concat ~sep:"," [to_b58_data secret; to_b58_data public; peer_id]
 
   let of_string s =
-    match String.split s ~on:';' with
-    | [secret_b58; public_b58; peer_id] ->
-        let open Or_error.Let_syntax in
-        let%map secret = of_b58_data (`String secret_b58)
-        and public = of_b58_data (`String public_b58) in
-        {secret; public; peer_id}
-    | _ ->
-        Or_error.errorf "%s is not a valid Keypair.to_string output" s
+    let with_semicolon =
+      match String.split s ~on:';' with
+      | [secret_b58; public_b58; peer_id] ->
+          let open Or_error.Let_syntax in
+          let%map secret = of_b58_data (`String secret_b58)
+          and public = of_b58_data (`String public_b58) in
+          {secret; public; peer_id}
+      | _ ->
+          Or_error.errorf "%s is not a valid Keypair.to_string output" s
+    in
+    let with_comma =
+      match String.split s ~on:',' with
+      | [secret_b58; public_b58; peer_id] ->
+          let open Or_error.Let_syntax in
+          let%map secret = of_b58_data (`String secret_b58)
+          and public = of_b58_data (`String public_b58) in
+          {secret; public; peer_id}
+      | _ ->
+          Or_error.errorf "%s is not a valid Keypair.to_string output" s
+    in
+    if Or_error.is_error with_semicolon then with_comma else with_semicolon
 
   let to_peerid {peer_id; _} = peer_id
 end
@@ -1146,8 +1159,6 @@ let create ~logger ~conf_dir =
   | _ ->
       Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
-(*  Temporarily commenting out while we figure out how to build libp2p_helper on CI
-
 let%test_module "coda network tests" =
   ( module struct
     let () = Backtrace.elide := false
@@ -1179,10 +1190,12 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~me:kp_a ~maddrs ~network_id ~on_new_peer:Fn.ignore
+        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
+          ~network_id ~on_new_peer:Fn.ignore
         >>| Or_error.ok_exn
       and () =
-        configure b ~me:kp_b ~maddrs ~network_id ~on_new_peer:Fn.ignore
+        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
+          ~network_id ~on_new_peer:Fn.ignore
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a
@@ -1272,4 +1285,3 @@ let%test_module "coda network tests" =
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
   end )
-*)

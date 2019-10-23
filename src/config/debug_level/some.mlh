@@ -2,3 +2,4 @@
 [%%define call_logger false]
 [%%define tracing true]
 [%%define cache_exceptions true]
+[%%define record_async_backtraces false]

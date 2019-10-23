@@ -15,7 +15,7 @@ module Make (N : sig
 
   val random : unit -> t
 end)
-(Bits : Bits_intf.Convertable_bits with type t := N.t) =
+(Bits : Bits_intf.Convertible_bits with type t := N.t) =
 struct
   module Stable = struct
     module V1 = struct

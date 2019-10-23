@@ -67,7 +67,7 @@ module Peer_set = struct
 
   let add {set; high_connectivity_signal} value =
     Hash_set.add set value ;
-    if Hash_set.length set >= 8 then
+    if Hash_set.length set >= 4 then
       Ivar.fill_if_empty high_connectivity_signal ()
 
   let remove {set; _} value = Hash_set.remove set value
@@ -295,7 +295,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           else call ()
 
     and record_peer_events t =
-      trace_task "peer events" (fun () ->
+      trace_recurring "peer events" (fun () ->
           Option.map t.haskell_membership ~f:(fun membership ->
               Linear_pipe.transfer_id
                 (Membership.changes membership)
@@ -303,10 +303,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           |> ignore )
 
     and restart_kademlia t addl_peers =
-      Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-        "Restarting Kademlia" ;
       match t.haskell_membership with
       | Some membership -> (
+          t.haskell_membership <- None ;
+          Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
+            "Restarting Kademlia" ;
           let%bind () = Membership.stop membership in
           let%map new_membership =
             let initial_peers =
@@ -324,6 +325,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           | Error _ ->
               failwith "Could not restart Kademlia" )
       | None ->
+          (* If we try to restart twice simultaneously, or we try to restart
+             before it's first launched we'll see this condition. *)
+          Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
+            "Can't restart kademlia, it's not running" ;
           Deferred.unit
 
     and unmark_all_disconnected_peers t =
@@ -436,6 +441,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       Linear_pipe.write_without_pushback t.ban_notification_writer
         {banned_peer; banned_until}
 
+    let net2 t = t.libp2p_membership
+
     let create_rpc_implementations (Rpc_handler (rpc, handler)) =
       let (module Impl) = implementation_of_rpc rpc in
       Impl.implement_multi handler
@@ -447,7 +454,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       in
       let t_hack = Ivar.create () in
       let t_for_restarting = Ivar.read t_hack in
-      trace_task "gossip net" (fun () ->
+      trace "gossip net" (fun () ->
           let fail m =
             failwithf "Failed to connect to Kademlia process: %s" m ()
           in
@@ -523,7 +530,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
               match%map
                 Monitor.try_with
                   (fun () ->
-                    trace_task "membership" (fun () ->
+                    trace "membership" (fun () ->
                         Membership.connect ~initial_peers:config.initial_peers
                           ~node_addrs_and_ports:config.addrs_and_ports
                           ~conf_dir:config.conf_dir ~logger:config.logger
@@ -542,7 +549,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             if config.enable_libp2p then
               match%bind
                 Monitor.try_with (fun () ->
-                    trace_task "coda_net2" (fun () ->
+                    trace "coda_net2" (fun () ->
                         Coda_net2.create ~logger:config.logger
                           ~conf_dir:(config.conf_dir ^/ "coda_net2") ) )
               with
@@ -696,14 +703,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                            ~when_banned:Banned ) )) ;
           don't_wait_for (retry_disconnected_peer t) ;
           trace_task "rebroadcasting messages" (fun () ->
-              don't_wait_for
-                (Linear_pipe.iter_unordered ~max_concurrency:64
-                   broadcast_reader ~f:(fun m ->
-                     Logger.trace t.config.logger ~module_:__MODULE__
-                       ~location:__LOC__
-                       ~metadata:[("message", `String (Message.summary m))]
-                       "broadcasting message: $message" ;
-                     broadcast_random t t.config.target_peer_count m )) ) ;
+              Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
+                ~f:(fun m ->
+                  Logger.trace t.config.logger ~module_:__MODULE__
+                    ~location:__LOC__
+                    ~metadata:[("message", `String (Message.summary m))]
+                    "broadcasting message: $message" ;
+                  broadcast_random t t.config.target_peer_count m ) ) ;
           let implementations =
             let implementations =
               Versioned_rpc.Menu.add

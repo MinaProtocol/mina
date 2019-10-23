@@ -3,7 +3,7 @@ set -eu
 
 export HOMEBREW_NO_AUTO_UPDATE=1
 
-NEEDED_PACKAGES="gpatch opam cmake gmp pkg-config openssl libffi libsodium boost zlib libomp bash"
+NEEDED_PACKAGES="bash boost cmake gmp gpatch jemalloc libffi libomp libsodium opam openssl pkg-config zlib"
 echo "Needed:  ${NEEDED_PACKAGES}"
 
 CURRENT_PACKAGES=$(brew list | xargs)

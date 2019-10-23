@@ -18,7 +18,7 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
     module V1 = struct
       module T = struct
         type t = Transaction_snark.Stable.V1.t
-        [@@deriving bin_io, compare, sexp, version, yojson]
+        [@@deriving bin_io, compare, sexp, version, to_yojson]
       end
 
       include T
@@ -37,7 +37,7 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   let statement (t : t) = Transaction_snark.statement t
 

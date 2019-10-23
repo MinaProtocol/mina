@@ -93,7 +93,7 @@ module T = struct
     ; prove_receipt:
         ( 'worker
         , Receipt.Chain_hash.t * Receipt.Chain_hash.t
-        , Payment_proof.t )
+        , Receipt.Chain_hash.t * User_command.t list )
         Rpc_parallel.Function.t
     ; new_block:
         ( 'worker
@@ -150,7 +150,7 @@ module T = struct
     ; coda_root_diff: unit -> Coda_lib.root_diff Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
-        -> Payment_proof.t Deferred.t
+        -> (Receipt.Chain_hash.t * User_command.t list) Deferred.t
     ; coda_get_all_transitions:
            Public_key.Compressed.t
         -> ( Auxiliary_database.Filtered_external_transition.t
@@ -281,11 +281,13 @@ module T = struct
         ~bin_input:
           [%bin_type_class:
             Receipt.Chain_hash.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t]
-        ~bin_output:Payment_proof.bin_t ()
+        ~bin_output:
+          [%bin_type_class:
+            Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list] ()
 
     let new_block =
       C.create_pipe ~f:new_block_impl ~name:"new_block"
-        ~bin_input:[%bin_type_class: Account.Stable.V1.key]
+        ~bin_input:[%bin_type_class: Account.Key.Stable.V1.t]
         ~bin_output:
           [%bin_type_class:
             ( Auxiliary_database.Filtered_external_transition.Stable.V1.t
@@ -403,7 +405,7 @@ module T = struct
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
-      O1trace.trace_task "worker_main" (fun () ->
+      O1trace.trace "worker_main" (fun () ->
           let%bind receipt_chain_dir_name =
             Unix.mkdtemp @@ conf_dir ^/ "receipt_chain"
           in
@@ -419,8 +421,7 @@ module T = struct
               ~location typ
           in
           let receipt_chain_database =
-            Coda_base.Receipt_chain_database.create
-              ~directory:receipt_chain_dir_name
+            Receipt_chain_database.create ~directory:receipt_chain_dir_name
           in
           trace_database_initialization "receipt_chain_database" __LOC__
             receipt_chain_dir_name ;
@@ -536,8 +537,8 @@ module T = struct
             let external_transition_database =
               Coda_lib.external_transition_database coda
             in
-            Auxiliary_database.External_transition_database.get_values
-              external_transition_database pk
+            Auxiliary_database.External_transition_database.get_all_values
+              external_transition_database (Some pk)
             |> Deferred.return
           in
           let coda_get_balance pk =
@@ -570,16 +571,14 @@ module T = struct
               User_command.sign (Keypair.of_private_key_exn sender_sk) payload
             in
             let payment = build_txn amount sk pk fee in
-            let%map receipt =
-              Coda_commands.send_user_command coda (payment :> User_command.t)
-            in
-            receipt |> Participating_state.active_exn
+            Coda_commands.send_user_command coda (payment :> User_command.t)
+            |> Participating_state.to_deferred_or_error
+            |> Deferred.map ~f:Or_error.join
           in
           let coda_process_user_command cmd =
-            let%map receipt =
-              Coda_commands.send_user_command coda (cmd :> User_command.t)
-            in
-            receipt |> Participating_state.active_exn
+            Coda_commands.send_user_command coda (cmd :> User_command.t)
+            |> Participating_state.to_deferred_or_error
+            |> Deferred.map ~f:Or_error.join
           in
           let coda_prove_receipt (proving_receipt, resulting_receipt) =
             match%map

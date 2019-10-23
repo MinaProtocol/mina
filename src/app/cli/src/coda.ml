@@ -13,6 +13,13 @@ module YJ = Yojson.Safe
 64]
 
 [%%if
+record_async_backtraces]
+
+let () = Async.Scheduler.set_record_backtraces true
+
+[%%endif]
+
+[%%if
 fake_hash]
 
 let maybe_sleep s = after (Time.Span.of_sec s)
@@ -51,7 +58,7 @@ let daemon logger =
             don't produce blocks)"
          (optional string)
      and initial_peers_raw =
-       flag "peer"
+       flag "kademlia-peer"
          ~doc:
            "HOST:PORT TCP daemon communications (can be given multiple times)"
          (listed peer)
@@ -157,22 +164,22 @@ let daemon logger =
            "true|false Log transaction-pool diff received from peers \
             (default: false)"
          (optional bool)
-     and enable_libp2p =
-       flag "libp2p-discovery" no_arg ~doc:"Use libp2p for peer discovery"
-     and libp2p_port =
-       flag "libp2p-port" (optional int)
-         ~doc:"PORT Port to use for libp2p (default: 28675)"
-     and disable_haskell =
-       flag "disable-old-discovery" no_arg
-         ~doc:"Disable the old discovery mechanism"
+     and disable_libp2p =
+       flag "disable-libp2p-discovery" no_arg ~doc:"Disable libp2p discovery"
+     and discovery_port =
+       flag "discovery-port" (optional int)
+         ~doc:"PORT Port to use for peer-to-peer discovery (default: 28675)"
+     and enable_old_discovery =
+       flag "enable-old-discovery" no_arg
+         ~doc:"Enable the old Haskell Kademlia discovery"
      and libp2p_keypair =
-       flag "libp2p-keypair" (optional string)
+       flag "discovery-keypair" (optional string)
          ~doc:
-           "KEYPAIR Keypair (generated from `coda advanced \
-            generate-libp2p-keypair`) to use with libp2p (default: generate \
-            new keypair)"
+           "PUBKEY,PRIVKEY,PEERID Keypair (generated from `coda advanced \
+            generate-libp2p-keypair`) to use with libp2p discovery (default: \
+            generate new temporary keypair)"
      and libp2p_peers_raw =
-       flag "libp2p-peer"
+       flag "peer"
          ~doc:
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             libp2p discovery"
@@ -237,11 +244,11 @@ let daemon logger =
          ~transport:(Logger.Transport.stdout ()) ;
        (* 512MB logrotate max size = 1GB max filesystem usage *)
        let logrotate_max_size = 1024 * 1024 * 512 in
-       Logger.Consumer_registry.register ~id:"raw_persistent"
+       Logger.Consumer_registry.register ~id:"default"
          ~processor:(Logger.Processor.raw ())
          ~transport:
            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-              ~max_size:logrotate_max_size) ;
+              ~log_filename:"coda.log" ~max_size:logrotate_max_size) ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Coda daemon is booting up; built with commit $commit on branch \
           $branch"
@@ -386,7 +393,17 @@ let daemon logger =
                 ; ("heap_chunks", `Int stat.heap_chunks)
                 ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
                 ; ("live_size", `Int (stat.live_words * bytes_per_word))
-                ; ("live_blocks", `Int stat.live_blocks) ]
+                ; ("live_blocks", `Int stat.live_blocks) ] ;
+            let {Jemalloc.active; resident; allocated; mapped} =
+              Jemalloc.get_memory_stats ()
+            in
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              "Jemalloc memory statistics (in bytes)"
+              ~metadata:
+                [ ("active", `Int (active * 1024))
+                ; ("resident", `Int (resident * 1024))
+                ; ("allocated", `Int (allocated * 1024))
+                ; ("mapped", `Int (mapped * 1024)) ]
           in
           let rec loop () =
             log_stats "before major gc" ;
@@ -455,9 +472,9 @@ let daemon logger =
            or_from_config YJ.Util.to_int_option "rest-port"
              ~default:Port.default_rest rest_server_port
          in
-         let libp2p_port =
-           or_from_config YJ.Util.to_int_option "libp2p-port"
-             ~default:Port.default_libp2p libp2p_port
+         let discovery_port =
+           or_from_config YJ.Util.to_int_option "discovery-port"
+             ~default:Port.default_discovery discovery_port
          in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
@@ -512,7 +529,7 @@ let daemon logger =
                        (YJ.Util.convert_each YJ.Util.to_string))
                     "peers" None ~default:[] ]
          in
-         let discovery_port = external_port + 1 in
+         let old_discovery_port = external_port + 1 in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
          let%bind initial_peers_cleaned_lists =
            (* for each provided peer, lookup all its addresses *)
@@ -566,10 +583,10 @@ let daemon logger =
          let addrs_and_ports : Kademlia.Node_addrs_and_ports.t =
            { external_ip
            ; bind_ip
-           ; discovery_port
+           ; discovery_port= old_discovery_port
            ; communication_port= external_port
            ; client_port
-           ; libp2p_port }
+           ; libp2p_port= discovery_port }
          in
          let%bind propose_keypair =
            match propose_key with
@@ -589,8 +606,30 @@ let daemon logger =
            (Async.Scheduler.long_cycles
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
+             let secs = Time_ns.Span.to_sec span in
              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-               "Long async cycle, %0.01f seconds" (Time_ns.Span.to_sec span) ) ;
+               ~metadata:[("long_async_cycle", `Float secs)]
+               "Long async cycle, $long_async_cycle seconds" ;
+             Coda_metrics.(
+               Runtime.Long_async_histogram.observe Runtime.long_async_cycle
+                 secs) ) ;
+         Stream.iter
+           Async_kernel.Async_kernel_scheduler.(long_jobs_with_context @@ t ())
+           ~f:(fun (context, span) ->
+             let secs = Time_ns.Span.to_sec span in
+             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               ~metadata:
+                 [ ("long_async_job", `Float secs)
+                 ; ( "backtrace"
+                   , `String
+                       (String.concat ~sep:"␤"
+                          (List.map ~f:Backtrace.to_string
+                             (Execution_context.backtrace_history context))) )
+                 ]
+               "Long async job, $long_async_job seconds" ;
+             Coda_metrics.(
+               Runtime.Long_job_histogram.observe Runtime.long_async_job secs)
+             ) ;
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
              ~location typ
@@ -625,8 +664,8 @@ let daemon logger =
              ; initial_peers= initial_peers_cleaned
              ; addrs_and_ports
              ; trust_system
-             ; enable_libp2p
-             ; disable_haskell
+             ; enable_libp2p= not disable_libp2p
+             ; disable_haskell= not enable_old_discovery
              ; libp2p_keypair
              ; libp2p_peers=
                  List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
@@ -646,8 +685,7 @@ let daemon logger =
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
          let receipt_chain_database =
-           Coda_base.Receipt_chain_database.create
-             ~directory:receipt_chain_dir_name
+           Receipt_chain_database.create ~directory:receipt_chain_dir_name
          in
          trace_database_initialization "receipt_chain_database" __LOC__
            receipt_chain_dir_name ;
@@ -717,7 +755,7 @@ let daemon logger =
                (* check for other terminated children, without waiting *)
                terminated_child_loop ()
          in
-         Deferred.don't_wait_for @@ terminated_child_loop () ;
+         O1trace.trace_task "terminated child loop" terminated_child_loop ;
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
@@ -929,7 +967,7 @@ let print_version_info () =
 
 let () =
   Random.self_init () ;
-  let logger = Logger.create ~initialize_default_consumer:false () in
+  let logger = Logger.create () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;

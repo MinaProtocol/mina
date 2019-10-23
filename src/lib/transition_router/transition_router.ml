@@ -3,6 +3,7 @@ open Async_kernel
 open Coda_state
 open Pipe_lib
 open Coda_transition
+open O1trace
 
 let create_bufferred_pipe ?name () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
@@ -39,10 +40,11 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
   transition_writer_ref := transition_frontier_controller_writer ;
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   let new_verified_transition_reader =
-    Transition_frontier_controller.run ~logger ~trust_system ~verifier ~network
-      ~time_controller ~collected_transitions ~frontier
-      ~network_transition_reader:!transition_reader_ref
-      ~proposer_transition_reader ~clear_reader
+    trace_recurring "transition frontier controller" (fun () ->
+        Transition_frontier_controller.run ~logger ~trust_system ~verifier
+          ~network ~time_controller ~collected_transitions ~frontier
+          ~network_transition_reader:!transition_reader_ref
+          ~proposer_transition_reader ~clear_reader )
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -63,38 +65,39 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   transition_reader_ref := bootstrap_controller_reader ;
   transition_writer_ref := bootstrap_controller_writer ;
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
-  upon
-    (let%bind () =
-       let connectivity_time_uppperbound = 15.0 in
-       let high_connectivity_deferred =
-         Coda_networking.on_first_high_connectivity network ~f:Fn.id
-       in
-       Deferred.any
-         [ high_connectivity_deferred
-         ; ( after (Time_ns.Span.of_sec connectivity_time_uppperbound)
-           >>| fun () ->
-           if not @@ Deferred.is_determined high_connectivity_deferred then
-             Logger.info logger
-               !"Will start bootstrapping without connecting with too many \
-                 peers"
-               ~metadata:
-                 [ ( "num peers"
-                   , `Int (List.length @@ Coda_networking.peers network) )
-                 ; ( "Max seconds to wait for high connectivity"
-                   , `Float connectivity_time_uppperbound ) ]
-               ~location:__LOC__ ~module_:__MODULE__ ) ]
-     in
-     Ivar.fill_if_empty initialization_finish_signal () ;
-     Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
-       ~consensus_local_state ~transition_reader:!transition_reader_ref
-       ~persistent_frontier ~persistent_root ~initial_root_transition)
-    (fun (new_frontier, collected_transitions) ->
-      Strict_pipe.Writer.kill !transition_writer_ref ;
-      start_transition_frontier_controller ~logger ~trust_system ~verifier
-        ~network ~time_controller ~proposer_transition_reader
-        ~verified_transition_writer ~clear_reader ~collected_transitions
-        ~transition_reader_ref ~transition_writer_ref ~frontier_w
-        ~initialization_finish_signal new_frontier )
+  trace_recurring "bootstrap controller" (fun () ->
+      upon
+        (let%bind () =
+           let connectivity_time_uppperbound = 15.0 in
+           let high_connectivity_deferred =
+             Coda_networking.on_first_high_connectivity network ~f:Fn.id
+           in
+           Deferred.any
+             [ high_connectivity_deferred
+             ; ( after (Time_ns.Span.of_sec connectivity_time_uppperbound)
+               >>| fun () ->
+               if not @@ Deferred.is_determined high_connectivity_deferred then
+                 Logger.info logger
+                   !"Will start bootstrapping without connecting with too \
+                     many peers"
+                   ~metadata:
+                     [ ( "num peers"
+                       , `Int (List.length @@ Coda_networking.peers network) )
+                     ; ( "Max seconds to wait for high connectivity"
+                       , `Float connectivity_time_uppperbound ) ]
+                   ~location:__LOC__ ~module_:__MODULE__ ) ]
+         in
+         Ivar.fill_if_empty initialization_finish_signal () ;
+         Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
+           ~consensus_local_state ~transition_reader:!transition_reader_ref
+           ~persistent_frontier ~persistent_root ~initial_root_transition)
+        (fun (new_frontier, collected_transitions) ->
+          Strict_pipe.Writer.kill !transition_writer_ref ;
+          start_transition_frontier_controller ~logger ~trust_system ~verifier
+            ~network ~time_controller ~proposer_transition_reader
+            ~verified_transition_writer ~clear_reader ~collected_transitions
+            ~transition_reader_ref ~transition_writer_ref ~frontier_w
+            ~initialization_finish_signal new_frontier ) )
 
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~consensus_local_state ~persistent_root ~persistent_frontier

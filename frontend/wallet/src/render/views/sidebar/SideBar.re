@@ -13,7 +13,7 @@ module Styles = {
 
   let footer = style([padding2(~v=`rem(0.5), ~h=`rem(0.75))]);
 
-  let addWalletLink =
+  let addAccountLink =
     merge([
       Theme.Text.Body.regular,
       style([
@@ -36,15 +36,16 @@ let make = () => {
   let (modalOpen, setModalOpen) = React.useState(() => false);
 
   <div className=Styles.sidebar>
-    <WalletList />
+    <AccountList />
     <div className=Styles.footer>
-      <a className=Styles.addWalletLink onClick={_ => setModalOpen(_ => true)}>
-        {React.string("+ Add wallet")}
+      <a
+        className=Styles.addAccountLink onClick={_ => setModalOpen(_ => true)}>
+        {React.string("+ New Account")}
       </a>
     </div>
     {switch (modalOpen) {
      | false => React.null
-     | true => <AddWalletModal onClose={() => setModalOpen(_ => false)} />
+     | true => <NewAccountModal onClose={() => setModalOpen(_ => false)} />
      }}
   </div>;
 };

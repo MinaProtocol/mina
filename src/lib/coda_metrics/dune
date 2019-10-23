@@ -1,5 +1,5 @@
 (library
   (name coda_metrics)
   (public_name coda_metrics)
-  (libraries async prometheus cohttp cohttp-async logger)
-  (preprocess (pps ppx_jane)))
+  (libraries async cohttp cohttp-async logger jemalloc prometheus)
+  (preprocess (pps ppx_coda ppx_jane)))
