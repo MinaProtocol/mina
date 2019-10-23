@@ -1057,7 +1057,9 @@ let begin_advertising net =
   | Error e ->
       Error e
 
-let create ~logger ~conf_dir = Helper.create logger conf_dir
+let create ~logger ~conf_dir =
+  let conf_dir' = conf_dir ^/ "libp2p_helper" in
+  Unix.mkdir ~p:() conf_dir' >>= fun () -> Helper.create logger conf_dir'
 
 let%test_module "coda network tests" =
   ( module struct
