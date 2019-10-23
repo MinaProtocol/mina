@@ -322,7 +322,11 @@ let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
         Deferred.map (Ivar.read t.terminated_ivar) ~f:Or_error.return
       else (
         t.killing <- true ;
-        t.termination_response <- `Ignore ;
+        ( match t.termination_response with
+        | `Handler _ ->
+            ()
+        | _ ->
+            t.termination_response <- `Ignore ) ;
         match Signal.send Signal.term (`Pid (Process.pid t.process)) with
         | `Ok ->
             Deferred.map (Ivar.read t.terminated_ivar) ~f:Or_error.return
