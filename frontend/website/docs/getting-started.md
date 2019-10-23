@@ -3,7 +3,7 @@
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
 !!! note
-    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.9-beta`.
+    This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.10-beta`.
 
 ## Requirements
 
@@ -22,6 +22,7 @@ GPUs aren't currently required, but may be required for node operators when the 
 
 **VM Instances**:
 O(1) Labs has tested running nodes on several cloud providers, and recommends the following instances for basic node operator needs. Keep in mind that custom requirements as well as different cost constraints may require a different instance type.
+
 - AWS - [c5.2xlarge](https://www.ec2instances.info/?filter=c5.2xl&region=us-west-2&cost_duration=daily&selected=c5.2xlarge)
 - GCP - [c2-standard-4](https://cloud.google.com/compute/docs/machine-types)
 - Azure - [Standard_F8s_v2](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/sizes-compute#fsv2-series-1)
@@ -56,6 +57,7 @@ Add the Coda Debian repo and install:
 
 ```
 sudo apt-get remove coda-testnet-postake-medium-curves
+sudo apt-get remove coda-kademlia
 echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
 sudo apt-get install -t release coda-testnet-postake-medium-curves
@@ -75,12 +77,11 @@ If you're running another Linux distro or a different version of macOS, you can 
 
 ## Set up port forwarding and any firewalls
 
-If you are running a firewall, you should allow traffic on TCP port 8302 and UDP port 8303. Additionally, unless the `-external-ip YOUR_IP` flag is provided, the daemon will use HTTPS (443) and HTTP (80) to try and determine its own IP address.
+If you are running a firewall, you should allow traffic on TCP port 8303. Additionally, unless the `-external-ip YOUR_IP` flag is provided, the daemon will use HTTPS (443) and HTTP (80) to try and determine its own IP address.
 
 You may need to configure your router's port forwarding to allow inbound traffic to the following ports through your **external** IP address.
 
-- `TCP` port `8302`
-- `UDP` port `8303`
+- `TCP` port `8303`
 
 For walk-through instructions see [this guide](/docs/troubleshooting/#port-forwarding).
 ## Next
