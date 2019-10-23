@@ -417,10 +417,6 @@ let%test_module _ =
           assert (Option.is_some @@ termination_status process) ;
           Deferred.unit )
 
-    let () =
-      Async.Scheduler.set_record_backtraces true ;
-      Core.Backtrace.elide := false
-
     let%test_unit "if you spawn two processes it kills the earlier one" =
       async_with_temp_dir (fun conf_dir ->
           let open Deferred.Let_syntax in
