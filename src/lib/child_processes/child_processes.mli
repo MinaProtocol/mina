@@ -46,7 +46,7 @@ val start_custom :
                  | `Handler of
                    killed:bool -> Unix.Exit_or_signal.t -> unit Deferred.t
                  | `Ignore ]
-     (** What to do when the process exits. Not that an exception will not be
+     (** What to do when the process exits. Note that an exception will not be
          raised after you run [kill] on it, regardless of this value. *)
   -> t Deferred.Or_error.t
 
