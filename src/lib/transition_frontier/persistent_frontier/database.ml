@@ -4,6 +4,9 @@ open Coda_base
 open Coda_transition
 open Frontier_base
 
+(* TODO: bundle together with other writes by sharing batch requests between
+ * function calls in this module (#3738) *)
+
 let rec deferred_list_result_iter ls ~f =
   let open Deferred.Result.Let_syntax in
   match ls with
@@ -18,8 +21,7 @@ open Result.Let_syntax
 
 (* TODO: implement versions with module versioning. For
  * now, this is just stubbed so we can add db migrations
- * later.
- *)
+ * later. (#3736) *)
 let version = 1
 
 module Schema = struct
@@ -226,7 +228,7 @@ let check t =
         get t.db ~key:(Transition best_tip)
           ~error:(`Corrupt (`Not_found `Best_tip_transition))
       in
-      (* [new] TODO: crawl from root and validate tree structure is not malformed *)
+      (* TODO: crawl from root and validate tree structure is not malformed (#3737) *)
       ()
   | _ ->
       Error `Invalid_version
@@ -315,7 +317,6 @@ let set_best_tip t hash =
 let get_frontier_hash t =
   get t.db ~key:Frontier_hash ~error:(`Not_found `Frontier_hash)
 
-(* TODO: bundle together with other writes using batch? *)
 let set_frontier_hash t hash = set t.db ~key:Frontier_hash ~data:hash
 
 let rec crawl_successors t hash ~init ~f =

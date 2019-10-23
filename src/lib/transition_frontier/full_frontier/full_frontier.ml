@@ -257,6 +257,122 @@ let calculate_root_transition_diff t heir =
   Diff.Full.E.E
     (Root_transitioned {new_root= new_root_data; garbage= Full garbage_nodes})
 
+let move_root t ~new_root_hash ~garbage =
+  (* The transition frontier at this point in time has the following mask topology:
+   *
+   *   (`s` represents a snarked ledger, `m` represents a mask)
+   * 
+   *     garbage
+   *     [m...]
+   *       ^
+   *       |          successors
+   *       m0 -> m1 -> [m...]
+   *       ^
+   *       |
+   *       s
+   *
+   * In this diagram, the old root's mask (`m0`) is parented off of the root snarked
+   * ledger database, and the new root's mask (`m1`) is parented off of the `m0`.
+   * There is also some garbage parented off of `m0`, and some successors that will
+   * be kept in the tree after transition which are parented off of `m1`.
+   *
+   * In order to move the root, we must form a mask `m1'` with the same merkle root
+   * as `m1`, except that it is parented directly off of the root snarked ledger
+   * instead of `m0`. Furthermore, the root snarked ledger `s` may update to another
+   * merkle root as `s'` if there is a proof emitted in the transition between `m0`
+   * and `m1`.
+   *
+   * To form a mask `m1'` and update the snarked ledger from `s` to `s'` (which is a
+   * noop in the case of no ledger proof emitted between `m0` and `m1`), we must perform
+   * the following operations on masks in order:
+   *
+   *     1) unattach and destroy all the garbage (to avoid unecessary trickling of
+   *        invalidations from `m0` during the next step)
+   *     2) commit `m1` into `m0`, making `m0` into `m1'` (same merkle root as `m1`), and
+   *        making `m1` into an identity mask (an empty mask on top of `m1'`).
+   *     3) safely remove `m1` and reparent all the successors of `m1` onto `m1'`
+   *     4) create a new temporary mask `mt` with `s` as it's parent
+   *     5) apply any transactions to `mt` that appear in the transition between `s` and `s'`
+   *     6) commit `mt` into `s`, turning `s` into `s'`
+   *     7) unattach and destroy `mt`
+   *)
+  let old_root_node = Hashtbl.find_exn t.table t.root in
+  let new_root_node = Hashtbl.find_exn t.table new_root_hash in
+  let new_staged_ledger =
+    let m0 = Breadcrumb.mask old_root_node.breadcrumb in
+    let m1 = Breadcrumb.mask new_root_node.breadcrumb in
+    let m1_hash_pre_commit = Ledger.merkle_root m1 in
+    (* STEP 1 *)
+    List.iter garbage ~f:(fun node ->
+        let open Diff.Node_list in
+        let hash = External_transition.Validated.state_hash node.transition in
+        let breadcrumb = find_exn t hash in
+        let mask = Breadcrumb.mask breadcrumb in
+        (* this should get garbage collected and should not require additional destruction *)
+        ignore
+          (Ledger.Maskable.unregister_mask_exn
+             (Ledger.Mask.Attached.get_parent mask)
+             mask) ;
+        Hashtbl.remove t.table hash ) ;
+    (* STEP 2 *)
+    (* go ahead and remove the old root from the frontier *)
+    Hashtbl.remove t.table t.root ;
+    Ledger.commit m1 ;
+    [%test_result: Ledger_hash.t]
+      ~message:
+        "Merkle root of new root's staged ledger mask is the same after \
+         committing"
+      ~expect:m1_hash_pre_commit (Ledger.merkle_root m1) ;
+    [%test_result: Ledger_hash.t]
+      ~message:
+        "Merkle root of old root's staged ledger mask is the same as the new \
+         root's staged ledger mask after committing"
+      ~expect:m1_hash_pre_commit (Ledger.merkle_root m0) ;
+    (* STEP 3 *)
+    (* the staged ledger's mask needs replaced before m1 is made invalid *)
+    let new_staged_ledger =
+      Staged_ledger.replace_ledger_exn
+        (Breadcrumb.staged_ledger new_root_node.breadcrumb)
+        m0
+    in
+    Ledger.remove_and_reparent_exn m1 m1 ;
+    (* STEPS 4-7 *)
+    (* we need to perform steps 4-7 iff there was a proof emitted in the scan
+     * state we are transitioning to *)
+    if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
+      let s = t.root_ledger in
+      (* STEP 4 *)
+      let mt = Ledger.Maskable.register_mask s (Ledger.Mask.create ()) in
+      (* STEP 5 *)
+      Non_empty_list.iter
+        (Option.value_exn
+           (Staged_ledger.proof_txns
+              (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
+        ~f:(fun txn ->
+          ignore (Or_error.ok_exn (Ledger.apply_transaction mt txn)) ) ;
+      (* STEP 6 *)
+      Ledger.commit mt ;
+      (* STEP 7 *)
+      ignore (Ledger.Maskable.unregister_mask_exn s mt) ) ;
+    new_staged_ledger
+  in
+  (* rewrite the new root breadcrumb to contain the new root mask *)
+  let new_root_breadcrumb =
+    Breadcrumb.create
+      (Breadcrumb.validated_transition new_root_node.breadcrumb)
+      new_staged_ledger
+  in
+  let new_root_node = {new_root_node with breadcrumb= new_root_breadcrumb} in
+  (* update the new root breadcrumb in the frontier *)
+  Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
+  (* rewrite the root pointer to the new root hash *)
+  t.root <- new_root_hash ;
+  (* notify consensus that the root transitioned *)
+  Consensus.Hooks.frontier_root_transition
+    (Breadcrumb.consensus_state old_root_node.breadcrumb)
+    (Breadcrumb.consensus_state new_root_node.breadcrumb)
+    ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger
+
 (* calculates the diffs which need to be applied in order to add a breadcrumb to the frontier *)
 let calculate_diffs t breadcrumb =
   let open Diff in
@@ -315,114 +431,10 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
   | Root_transitioned
-      {new_root= {hash= new_root_hash; _}; garbage= Full garbage_breadcrumbs}
-    ->
-      (* The transition frontier at this point in time has the following mask topology:
-       *
-       *   (`s` represents a snarked ledger, `m` represents a mask)
-       * 
-       *     garbage
-       *     [m...]
-       *       ^
-       *       |          successors
-       *       m0 -> m1 -> [m...]
-       *       ^
-       *       |
-       *       s
-       *
-       * In this diagram, the old root's mask (`m0`) is parented off of the root snarked
-       * ledger database, and the new root's mask (`m1`) is parented off of the `m0`.
-       * There is also some garbage parented off of `m0`, and some successors that will
-       * be kept in the tree after transition which are parented off of `m1`.
-       *
-       * In order to move the root, we must form a mask `m1'` with the same merkle root
-       * as `m1`, except that it is parented directly off of the root snarked ledger
-       * instead of `m0`. Furthermore, the root snarked ledger `s` may update to another
-       * merkle root as `s'` if there is a proof emitted in the transition between `m0`
-       * and `m1`.
-       *
-       * To form a mask `m1'` and update the snarked ledger from `s` to `s'` (which is a
-       * noop in the case of no ledger proof emitted between `m0` and `m1`), we must perform
-       * the following operations on masks in order:
-       *
-       *     1) unattach and destroy all the garbage (to avoid unecessary trickling of
-       *        invalidations from `m0` during the next step)
-       *     2) commit `m1` into `m0`, making `m0` into `m1'` (same merkle root as `m1`), and
-       *        making `m1` into an identity mask (an empty mask on top of `m1'`).
-       *     3) safely reparent all the successors of `m1` onto `m1'`
-       *     4) unattach and destroy `m1`
-       *     5) create a new temporary mask `mt` with `s` as it's parent
-       *     6) apply any transactions to `mt` that appear in the transition between `s` and `s'`
-       *     7) commit `mt` into `s`, turning `s` into `s'`
-       *     8) unattach and destroy `mt`
-       *)
-      let old_root_node = Hashtbl.find_exn t.table t.root in
-      let new_root_node = Hashtbl.find_exn t.table new_root_hash in
-      let new_staged_ledger =
-        let m0 = Breadcrumb.mask old_root_node.breadcrumb in
-        let m1 = Breadcrumb.mask new_root_node.breadcrumb in
-        let m1_hash_pre_commit = Ledger.merkle_root m1 in
-        List.iter garbage_breadcrumbs ~f:(fun node ->
-            let open Diff.Node_list in
-            let hash =
-              External_transition.Validated.state_hash node.transition
-            in
-            let breadcrumb = find_exn t hash in
-            let mask = Breadcrumb.mask breadcrumb in
-            (* this should get garbage collected and should not require additional destruction *)
-            ignore
-              (Ledger.Maskable.unregister_mask_exn
-                 (Ledger.Mask.Attached.get_parent mask)
-                 mask) ;
-            Hashtbl.remove t.table hash ) ;
-        Hashtbl.remove t.table t.root ;
-        Ledger.commit m1 ;
-        [%test_result: Ledger_hash.t]
-          ~message:
-            "Merkle root of new root's staged ledger mask is the same after \
-             committing"
-          ~expect:m1_hash_pre_commit (Ledger.merkle_root m1) ;
-        [%test_result: Ledger_hash.t]
-          ~message:
-            "Merkle root of old root's staged ledger mask is the same as the \
-             new root's staged ledger mask after committing"
-          ~expect:m1_hash_pre_commit (Ledger.merkle_root m0) ;
-        (* reparent all the successors of m1 onto m0 *)
-        (* the staged ledger's mask needs replaced before m1 is made invalid *)
-        let new_staged_ledger =
-          Staged_ledger.replace_ledger_exn
-            (Breadcrumb.staged_ledger new_root_node.breadcrumb)
-            m0
-        in
-        Ledger.remove_and_reparent_exn m1 m1 ;
-        if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
-          let s = t.root_ledger in
-          let mt = Ledger.Maskable.register_mask s (Ledger.Mask.create ()) in
-          Non_empty_list.iter
-            (Option.value_exn
-               (Staged_ledger.proof_txns
-                  (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
-            ~f:(fun txn ->
-              ignore (Or_error.ok_exn (Ledger.apply_transaction mt txn)) ) ;
-          Ledger.commit mt ;
-          ignore (Ledger.Maskable.unregister_mask_exn s mt) ) ;
-        new_staged_ledger
-      in
-      let new_root_breadcrumb =
-        Breadcrumb.create
-          (Breadcrumb.validated_transition new_root_node.breadcrumb)
-          new_staged_ledger
-      in
-      let new_root_node =
-        {new_root_node with breadcrumb= new_root_breadcrumb}
-      in
-      Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
-      t.root <- new_root_hash ;
-      Consensus.Hooks.frontier_root_transition
-        (Breadcrumb.consensus_state old_root_node.breadcrumb)
-        (Breadcrumb.consensus_state new_root_node.breadcrumb)
-        ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger ;
-      (Breadcrumb.state_hash old_root_node.breadcrumb, Some new_root_hash)
+      {new_root= {hash= new_root_hash; _}; garbage= Full garbage} ->
+      let old_root_hash = t.root in
+      move_root t ~new_root_hash ~garbage ;
+      (old_root_hash, Some new_root_hash)
   (* These are invalid inhabitants for the type signature of this function,
    * but the OCaml compiler isn't smart enough to realize this. *)
   | Root_transitioned {garbage= Lite _; _} ->
@@ -536,7 +548,8 @@ let apply_diffs t diffs =
                   , Consensus.Data.Local_state.to_yojson
                       t.consensus_local_state )
                 ; ("tf_viz", `String (visualize_to_string t)) ] ;
-            assert false )
+            failwith
+              "local state desynced after applying diffs to full frontier" )
       | None ->
           () ) ;
   `New_root new_root

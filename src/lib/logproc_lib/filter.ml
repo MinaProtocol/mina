@@ -69,7 +69,48 @@ module Parser = struct
 
   let is_numeric = function '0' .. '9' -> true | _ -> false
 
-  let is_text = function '!' | '#' .. '~' -> true | _ -> false
+  let is_text = function
+    | ' '
+    | '\t'
+    | '\n'
+    | '\r'
+    | '!'
+    | '#'
+    | '$'
+    | '%'
+    | '&'
+    | '\''
+    | '('
+    | ')'
+    | '*'
+    | '+'
+    | ','
+    | '-'
+    | '.'
+    | '/'
+    | ':'
+    | ';'
+    | '<'
+    | '='
+    | '>'
+    | '?'
+    | '@'
+    | '['
+    | '\\'
+    | ']'
+    | '^'
+    | '_'
+    | '`'
+    | '{'
+    | '|'
+    | '}'
+    | '~'
+    | '0' .. '9'
+    | 'A' .. 'Z'
+    | 'a' .. 'z' ->
+        true
+    | _ ->
+        false
 
   let parens = (char '(', char ')')
 

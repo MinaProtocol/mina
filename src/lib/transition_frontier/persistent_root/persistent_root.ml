@@ -113,14 +113,6 @@ module Instance = struct
       |> Option.value ~default:(Lazy.force genesis_root_identifier)
     in
     set_root_identifier t {root_identifier with state_hash}
-
-  (*
-  let at_genesis t =
-    let%map state_hash = load_state_hash t in
-    let snarked_ledger_hash = Ledger.Db.merkle_root t.snarked_ledger in
-    State_hash.equal state_hash (With_hash.hash Genesis_protocol_state.t)
-    && Ledger_hash.equal snarked_ledger_hash (Ledger.merkle_root Genesis_ledger.t)
-  *)
 end
 
 type t = Factory_type.t

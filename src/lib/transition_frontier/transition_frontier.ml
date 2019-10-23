@@ -28,12 +28,12 @@ type t =
   ; extensions: Extensions.t }
 
 let genesis_root_data =
-  lazy
-    (let open Root_data.Limited.Stable.Latest in
-    let transition = Lazy.force External_transition.genesis in
-    let scan_state = Staged_ledger.Scan_state.empty () in
-    let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
-    {transition; scan_state; pending_coinbase})
+  let open Root_data.Limited.Stable.Latest in
+  let open Lazy.Let_syntax in
+  let%map transition = External_transition.genesis in
+  let scan_state = Staged_ledger.Scan_state.empty () in
+  let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
+  {transition; scan_state; pending_coinbase}
 
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
@@ -47,7 +47,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
         root_identifier
     | None ->
         failwith
-          "not persistent root identifier found (should have been written \
+          "no persistent root identifier found (should have been written \
            already)"
   in
   let%bind () =

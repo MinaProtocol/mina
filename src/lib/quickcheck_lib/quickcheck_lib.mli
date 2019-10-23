@@ -1,16 +1,6 @@
 open Core_kernel
 open Quickcheck
 
-module Gen_tuple : sig
-  val pair : 'a Generator.t -> 'b Generator.t -> ('a * 'b) Generator.t
-
-  val triple :
-       'a Generator.t
-    -> 'b Generator.t
-    -> 'c Generator.t
-    -> ('a * 'b * 'c) Generator.t
-end
-
 (** [of_array array] selects a random element from [array] to select an element *)
 val of_array : 'a array -> 'a Generator.t
 

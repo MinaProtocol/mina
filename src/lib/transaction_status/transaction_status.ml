@@ -77,7 +77,6 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
 let%test_module "transaction_status" =
   ( module struct
     open Async
-    open Quickcheck_lib
 
     let max_length = 10
 
@@ -147,7 +146,8 @@ let%test_module "transaction_status" =
     let%test_unit "A pending transaction is either in the transition frontier \
                    or transaction pool, but not in the best path of the \
                    transition frontier" =
-      Quickcheck.test ~trials:1 (Gen_tuple.pair gen_frontier gen_user_command)
+      Quickcheck.test ~trials:1
+        (Quickcheck.Generator.tuple2 gen_frontier gen_user_command)
         ~f:(fun (frontier, user_command) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let frontier_broadcast_pipe, _ =
@@ -178,7 +178,7 @@ let%test_module "transaction_status" =
         Non_empty_list.init head_user_command tail_user_commands
       in
       Quickcheck.test ~trials:1
-        (Gen_tuple.pair gen_frontier user_commands_generator)
+        (Quickcheck.Generator.tuple2 gen_frontier user_commands_generator)
         ~f:(fun (frontier, user_commands) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let frontier_broadcast_pipe, _ =

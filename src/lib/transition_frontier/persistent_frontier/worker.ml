@@ -5,7 +5,7 @@ open Frontier_base
 
 module Worker = struct
   (* when this is transitioned to an RPC worker, the db argument
-   * should just be a directory, but while this is still in process,candidate.curr_epoch_data.length
+   * should just be a directory, but while this is still in process,
    * the full instance is needed to share with other threads
    *)
   type t = {db: Database.t; logger: Logger.t}

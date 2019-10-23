@@ -60,7 +60,7 @@ module Make (Inputs : Inputs_intf) :
     let kvdb = Kvdb.create ~directory in
     {uuid; kvdb}
 
-  let close {kvdb; _} = Kvdb.close kvdb
+  let close {kvdb; uuid= _} = Kvdb.close kvdb
 
   let with_ledger ~f =
     let t = create () in

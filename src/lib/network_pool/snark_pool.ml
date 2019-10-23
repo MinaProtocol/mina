@@ -380,6 +380,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
          ~sender:Envelope.Sender.Local)
 end
 
+(* TODO: defunctor or remove monkey patching (#3731) *)
 include Make (struct
   include Transition_frontier
 

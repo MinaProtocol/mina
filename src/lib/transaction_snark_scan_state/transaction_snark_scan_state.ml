@@ -507,7 +507,7 @@ let next_on_new_tree = Parallel_scan.next_on_new_tree
 
 let base_jobs_on_latest_tree = Parallel_scan.base_jobs_on_latest_tree
 
-(* TODO: make this operation O(1) -- gets used in Sync_handler RPC, which is performance sensitive *)
+(* TODO: make this operation O(1) -- gets used in Sync_handler RPC, which is performance sensitive (#3733) *)
 let target_merkle_root t =
   let open Transaction_with_witness in
   let open Option.Let_syntax in

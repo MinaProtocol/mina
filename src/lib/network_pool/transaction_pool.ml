@@ -733,6 +733,7 @@ end)
     (Staged_ledger)
     (Transition_frontier)
 
+(* TODO: defunctor or remove monkey patching (#3731) *)
 include Make
           (Staged_ledger)
           (struct

@@ -2,19 +2,6 @@ open Core_kernel
 open Quickcheck.Generator
 open Quickcheck.Let_syntax
 
-module Gen_tuple = struct
-  let pair a b =
-    let%bind a' = a in
-    let%map b' = b in
-    (a', b')
-
-  let triple a b c =
-    let%bind a' = a in
-    let%bind b' = b in
-    let%map c' = c in
-    (a', b', c')
-end
-
 let of_array array = Quickcheck.Generator.of_list @@ Array.to_list array
 
 let rec map_gens ls ~f =
