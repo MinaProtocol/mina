@@ -20,6 +20,7 @@ module Time = struct
       end
 
       include T
+      include Hashable.Make (T)
       include Registration.Make_latest_version (T)
     end
 
@@ -138,6 +139,7 @@ module Time = struct
   end
 
   include Comparable.Make (Stable.Latest)
+  include Hashable.Make (Stable.Latest)
 
   let of_time t =
     UInt64.of_int64
