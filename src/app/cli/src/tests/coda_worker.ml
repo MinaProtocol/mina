@@ -531,8 +531,8 @@ module T = struct
             let external_transition_database =
               Coda_lib.external_transition_database coda
             in
-            Auxiliary_database.External_transition_database.get_values
-              external_transition_database pk
+            Auxiliary_database.External_transition_database.get_all_values
+              external_transition_database (Some pk)
             |> Deferred.return
           in
           let coda_get_balance pk =

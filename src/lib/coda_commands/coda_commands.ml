@@ -467,8 +467,8 @@ module For_tests = struct
           (Fn.compose
              Auxiliary_database.Filtered_external_transition.user_commands
              With_hash.data)
-      @@ Auxiliary_database.External_transition_database.get_values
-           external_transition_database public_key
+      @@ Auxiliary_database.External_transition_database.get_all_values
+           external_transition_database (Some public_key)
     in
     let participants_user_commands =
       User_command.filter_by_participant user_commands public_key
