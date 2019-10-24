@@ -202,7 +202,7 @@
           "fields": [
             {
               "name": "publicKeys",
-              "description": "Public keys of accounts you wish to stake - these must be accounts that are in trackedAccounts",
+              "description": "Public keys of accounts you wish to stake with - these must be accounts that are in trackedAccounts",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -228,7 +228,7 @@
           "inputFields": [
             {
               "name": "publicKeys",
-              "description": "Public keys of accounts you wish to stake - these must be accounts that are in trackedAccounts",
+              "description": "Public keys of accounts you wish to stake with - these must be accounts that are in trackedAccounts",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -260,7 +260,7 @@
           "fields": [
             {
               "name": "lastStaking",
-              "description": "Returns the last public keys that were staking before or empty if there were none",
+              "description": "Returns the public keys that were staking funds previously",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1520,7 +1520,7 @@
             },
             {
               "name": "setStaking",
-              "description": "Set keys you wish to stake with - silently fails if you pass keys not unlocked and tracked in trackedAccounts",
+              "description": "Set keys you wish to stake with - silently fails if you pass keys corresponding to accounts that are either locked or in trackedAccounts",
               "args": [
                 {
                   "name": "input",
@@ -2043,7 +2043,7 @@
             },
             {
               "name": "toAccount",
-              "description": "Public key of the receiver",
+              "description": "Account of the receiver",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
