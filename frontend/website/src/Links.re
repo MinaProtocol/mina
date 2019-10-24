@@ -150,6 +150,13 @@ module ThirdParty = {
     ),
     link: "https://hackernoon.com/a-blockchain-the-size-of-a-few-tweets-9db820eb6b29",
   };
+  let globalCoinResearch = {
+    name: (
+      "Global Coin Research: Interview with Coda",
+      "global-coin-research",
+    ),
+    link: "https://globalcoinresearch.com/2019/10/23/cofounder-of-coda-protocol-evan-shapiro-on-coda-the-current-pos-landscape-and-osaka-devcon-takeways/",
+  };
 };
 
 module Talks = {
@@ -262,6 +269,7 @@ module Lists = {
     [
       render_post(name, title),
       Static.whitepaper(),
+      ThirdParty.globalCoinResearch,
       ThirdParty.coindeskStartupBlockchain,
       ThirdParty.codaMediumPost,
       ThirdParty.tokenDailyQA,
