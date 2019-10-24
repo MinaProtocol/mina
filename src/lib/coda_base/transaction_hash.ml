@@ -14,3 +14,6 @@ end)
 Base58_check.(of_base58_check, of_base58_check_exn, to_base58_check)]
 
 let hash_user_command = Fn.compose digest_string User_command.to_base58_check
+
+let hash_fee_transfer =
+  Fn.compose digest_string Fee_transfer.Single.to_base58_check
