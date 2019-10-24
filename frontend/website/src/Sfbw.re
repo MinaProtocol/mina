@@ -21,5 +21,5 @@ module Styles = {
 let make = () =>
   <div className=Styles.wrapper>
     <h1 className=Styles.header> {React.string("Stay in touch")} </h1>
-    <NewsletterWidget />
+    <NewsletterWidget center=true />
   </div>;
