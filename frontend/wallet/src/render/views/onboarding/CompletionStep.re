@@ -25,7 +25,6 @@ module Styles = {
   let header = {
     merge([
       Theme.Text.Header.h1,
-      //style([animation(fadeIn, ~duration=1000, ~iterationCount=`count(1))]),
     ]);
   };
 
@@ -33,12 +32,8 @@ module Styles = {
     merge([
       Theme.Text.Body.regularLight,
       style([
-        opacity(0.),
         maxWidth(`rem(21.5)),
-        color(Theme.Colors.midnightBlue),
-        animation(fadeIn, ~duration=500, ~iterationCount=`count(1)),
-        animationDelay(250),
-        animationFillMode(`forwards),
+        color(Theme.Colors.midnightBlue),     
       ]),
     ]);
   };
@@ -55,18 +50,22 @@ let make = (~closeOnboarding, ~prevStep) => {
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
         <h1 className=Styles.header> {React.string("Setup Complete!")} </h1>
-        <Spacer height=1. />
-        <p className=Styles.heroBody>
-          {React.string(
-             "You've successfully set up Coda Wallet. Head over to the Faucet to request funds to start sending transactions on the Coda network.",
-           )}
-        </p>
+        <Spacer height=0.25 />
+        <FadeIn duration=500 delay=150>
+          <p className=Styles.heroBody>
+            {React.string(
+              "You've successfully set up Coda Wallet. Head over to the Faucet to request funds to start sending transactions on the Coda network.",
+            )}
+          </p>
+        </FadeIn>
         <Spacer height=0.5 />
+        <FadeIn duration=500 delay=250>
         <Link
           kind=Link.Blue
           onClick={_ => openExternal("https://discord.gg/JN75xk")}>
           {React.string("Open Discord")}
         </Link>
+        </FadeIn> 
         <Spacer height=2. />
         <div className=Styles.buttonRow>
           <Button

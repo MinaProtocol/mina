@@ -35,7 +35,7 @@ module Styles = {
     merge([
       Theme.Text.Body.regularLight,
       style([
-        marginTop(`rem(2.)),
+        marginTop(`rem(1.)),
         marginBottom(`rem(2.)),
         maxWidth(`rem(24.)),
         color(Theme.Colors.midnightBlue),
@@ -82,13 +82,15 @@ let make = (~nextStep, ~prevStep) => {
            )}
           </FadeIn> 
         </p>
-        <Link
-          kind=Link.Blue
-          onClick={_ =>
-            openExternal("https://codaprotocol.com/docs/getting-started/")
-          }>
-          {React.string("Getting started")}
-        </Link>
+        <FadeIn duration=500 delay=250>
+          <Link
+            kind=Link.Blue
+            onClick={_ =>
+              openExternal("https://codaprotocol.com/docs/getting-started/")
+            }>
+            {React.string("Getting started")}
+          </Link>
+        </FadeIn> 
         <Spacer height=2.0 />
         <div className=Styles.buttonRow>
           <Button

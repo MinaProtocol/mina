@@ -38,7 +38,7 @@ module Styles = {
     merge([
       Theme.Text.Body.regularLight,
       style([
-        marginTop(`rem(2.)),
+        marginTop(`rem(1.)),
         marginBottom(`rem(3.)),
         maxWidth(`rem(28.)),
         color(Theme.Colors.midnightBlue),
@@ -143,11 +143,13 @@ let make = (~nextStep) => {
     </div>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
+      <FadeIn duration=500 delay=0>
         <h1 className=Styles.header>
-          <FadeIn duration=500 delay=0>
+
             {React.string("Welcome to Coda Wallet!")}
-          </FadeIn>
+        
         </h1>
+          </FadeIn>
         <p className=Styles.heroBody>
           <FadeIn duration=500 delay=150>
             {React.string(

@@ -85,17 +85,17 @@ let make = (~nextStep, ~prevStep) => {
           {React.string("Create Your Account")}
         </FadeIn> 
         </h1>
-        <Spacer height=1. />
+        <Spacer height=0.5 />
         <p className=Styles.heroBody>
-        <FadeIn duration=500>
+        <FadeIn duration=500 delay=150>
           {React.string(
              "Create your first account to complete setting up Coda Wallet. Please be sure to choose a secure password.",
            )}
         </FadeIn>
         </p>
         <div className=Styles.textFields>
-        <FadeIn duration=500>
-          <Spacer height=1. />
+        <FadeIn duration=500 delay=200>
+          <Spacer height=0.5 />
           <TextField
             label="Name"
             onChange={value => setName(_ => value)}
