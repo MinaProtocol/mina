@@ -62,16 +62,16 @@ jobs:
     build-archive:
         docker:
             - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
-              environment: 
+              environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
             - image: postgres:12
-              environment: 
+              environment:
                 POSTGRES_PASSWORD: codarules
                 POSTGRES_USER: admin
                 POSTGRES_DB: archiver
             - image: hasura/graphql-engine:v1.0.0-beta.6
-              environment: 
+              environment:
                 HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
                 HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
                 HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
@@ -86,9 +86,9 @@ jobs:
             - run:
                   name: Build Archive Process
                   command:  bash -c 'eval `opam config env` && make build_archive'
-            - run: 
+            - run:
                   name: Configure Hasura
-                  command: ls && ./scripts/archive/make_hasura_configurations.sh     
+                  command: ls && ./scripts/archive/make_hasura_configurations.sh
     lint:
         docker:
             - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
@@ -131,6 +131,21 @@ jobs:
             - run:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
+
+    build-auxiliary:
+        docker:
+            - image: nixos/nix
+        steps:
+            - checkout
+            - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
 
     build-macos:
       # only run when there's a 'release' tag
@@ -686,6 +701,7 @@ workflows:
         jobs:
             - lint
             - lint-opt
+            - build-auxiliary
             - update-branch-protection:
                 filters:
                   branches:
