@@ -594,7 +594,7 @@ module Types = struct
                   new_delegate )
         ; field "toAccount"
             ~typ:(non_null AccountObj.account)
-            ~doc:"Public key of the receiver"
+            ~doc:"Account of the receiver"
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} payment ->
               let pk =
@@ -801,9 +801,7 @@ module Types = struct
     let set_staking =
       obj "SetStakingPayload" ~fields:(fun _ ->
           [ field "lastStaking"
-              ~doc:
-                "Returns the last public keys that were staking before or \
-                 empty if there were none"
+              ~doc:"Returns the public keys that were staking funds previously"
               ~typ:(non_null (list (non_null public_key)))
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
@@ -973,8 +971,8 @@ module Types = struct
           [ arg "publicKeys"
               ~typ:(non_null (list (non_null public_key_arg)))
               ~doc:
-                "Public keys of accounts you wish to stake - these must be \
-                 accounts that are in trackedAccounts" ]
+                "Public keys of accounts you wish to stake with - these must \
+                 be accounts that are in trackedAccounts" ]
 
     let set_snark_work_fee =
       obj "SetSnarkWorkFee"
@@ -1579,7 +1577,8 @@ module Mutations = struct
     field "setStaking"
       ~doc:
         "Set keys you wish to stake with - silently fails if you pass keys \
-         not unlocked and tracked in trackedAccounts"
+         corresponding to accounts that are either locked or in \
+         trackedAccounts"
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_staking)]
       ~typ:(non_null Types.Payload.set_staking)
       ~resolve:(fun {ctx= coda; _} () pks ->
