@@ -11,7 +11,11 @@ module Single : sig
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson, hash]
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
+
+  include Comparable.S with type t := t
+
+  include Codable.Base58_check_intf with type t := t
 end
 
 module Stable : sig
@@ -28,7 +32,9 @@ end
 type t = Stable.Latest.t =
   | One of Single.Stable.V1.t
   | Two of Single.Stable.V1.t * Single.Stable.V1.t
-[@@deriving sexp, compare, eq, yojson, hash]
+[@@deriving sexp, compare, yojson, hash]
+
+include Comparable.S with type t := t
 
 val to_list : t -> Single.t list
 

@@ -12,26 +12,36 @@ alter table public_keys add constraint public_keys_value_key unique (value);
 
 CREATE INDEX public_keys_value_index ON public_keys (value);
 
-CREATE TABLE blocks (
+CREATE TABLE state_hashes (
   id serial PRIMARY KEY,
-  state_hash text,
+  value text NOT NULL
+);
+
+CREATE INDEX state_hashes_value_index ON state_hashes (value);
+
+alter table state_hashes add constraint state_hashes_value_key unique (value);
+
+CREATE TABLE blocks (
+  state_hash int NOT NULL,
+  parent_hash int NOT NULL,
   creator int NOT NULL,
-  staged_ledger_hash text NOT NULL,
+  snarked_ledger_hash text NOT NULL,
   ledger_hash text NOT NULL,
-  epoch int NOT NULL,
-  slot int NOT NULL,
+  global_slot int NOT NULL,
   ledger_proof_nonce int NOT NULL,
   status int NOT NULL,
-  block_length int NOT NULL,
+  block_length bit(32) NOT NULL,
   block_time bit(64) NOT NULL,
-  FOREIGN KEY (creator) REFERENCES public_keys (id)
+  FOREIGN KEY (creator) REFERENCES public_keys (id),
+  FOREIGN KEY (state_hash) REFERENCES state_hashes (id),
+  FOREIGN KEY (parent_hash) REFERENCES state_hashes (id)
 );
 
 alter table blocks add constraint blocks_state_hash_key unique (state_hash);
 
 CREATE INDEX blocks_state_hash_index ON blocks (state_hash);
 
-CREATE INDEX block_compare ON blocks (block_length, epoch, slot);
+CREATE INDEX block_compare ON blocks (block_length, global_slot);
 
 CREATE INDEX block_time ON blocks (block_time);
 
@@ -71,7 +81,7 @@ CREATE INDEX fast_user_command_receiver_pagination ON user_commands (receiver, f
 
 CREATE TABLE fee_transfers (
   id serial PRIMARY KEY,
-  hash text,
+  hash text NOT NULL,
   fee bit(64) NOT NULL,
   receiver int NOT NULL,
   first_seen bit(64),
@@ -88,7 +98,7 @@ CREATE TABLE blocks_user_commands (
   block_id int NOT NULL,
   user_command_id int NOT NULL,
   receipt_chain_hash_id int,
-  FOREIGN KEY (block_id) REFERENCES blocks (id),
+  FOREIGN KEY (block_id) REFERENCES blocks (state_hash),
   FOREIGN KEY (user_command_id) REFERENCES user_commands (id),
   FOREIGN KEY (receipt_chain_hash_id) REFERENCES receipt_chain_hashes(id)
 );
@@ -102,7 +112,7 @@ CREATE INDEX blocks_user_command__user_command_id ON blocks_user_commands (user_
 CREATE TABLE blocks_fee_transfers (
   block_id int NOT NULL,
   fee_transfer_id int NOT NULL,
-  FOREIGN KEY (block_id) REFERENCES blocks (id),
+  FOREIGN KEY (block_id) REFERENCES blocks (state_hash),
   FOREIGN KEY (fee_transfer_id) REFERENCES fee_transfers (id)
 );
 
@@ -115,9 +125,10 @@ CREATE INDEX blocks_fee_transfers__fee_transfer_id ON blocks_fee_transfers (fee_
 CREATE TABLE snark_jobs (
   id serial PRIMARY KEY,
   prover int NOT NULL,
-  fee int NOT NULL,
+  fee bit(64) NOT NULL,
   job1 int,
-  job2 int
+  job2 int,
+  FOREIGN KEY (prover) REFERENCES public_keys (id)
 );
 
 CREATE INDEX snark_job_index ON snark_jobs (job1, job2);
@@ -127,7 +138,7 @@ alter table snark_jobs add constraint snark_jobs_job1_job2_key unique (job1, job
 CREATE TABLE blocks_snark_jobs (
   block_id int NOT NULL,
   snark_job_id int NOT NULL,
-  FOREIGN KEY (block_id) REFERENCES blocks (id),
+  FOREIGN KEY (block_id) REFERENCES blocks (state_hash),
   FOREIGN KEY (snark_job_id) REFERENCES snark_jobs (id)
 );
 

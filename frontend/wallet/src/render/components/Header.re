@@ -136,6 +136,7 @@ let make = () => {
     <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
       <img src="CodaLogo.svg" alt="Coda logo" />
     </div>
+    <Toast />
     <div className=Styles.rightButtons>
       <SyncStatusQuery fetchPolicy="no-cache" partialRefetch=true>
         {response =>

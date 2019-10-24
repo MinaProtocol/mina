@@ -97,7 +97,7 @@ module Make (Inputs : Inputs_intf) = struct
     trace_recurring "bootstrap controller" (fun () ->
         upon
           (let%bind () =
-             let connectivity_time_uppperbound = 15.0 in
+             let connectivity_time_uppperbound = 60.0 in
              let high_connectivity_deferred =
                Ivar.read (Network.high_connectivity network)
              in
@@ -109,7 +109,7 @@ module Make (Inputs : Inputs_intf) = struct
                  then
                    Logger.info logger
                      !"Will start bootstrapping without connecting with too \
-                       many peers"
+                       many peers ($num_peers connected)"
                      ~metadata:
                        [ ( "num peers"
                          , `Int (List.length @@ Network.peers network) )
