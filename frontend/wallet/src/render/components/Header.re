@@ -117,6 +117,7 @@ module SyncStatus = {
       | `SYNCED => <Alert kind=`Success message="Synced" />
       | `BOOTSTRAP => <Alert kind=`Warning message="Syncing" />
       | `CONNECTING => <Alert kind=`Warning message="Connecting" />
+      | `CATCHUP => <Alert kind=`Warning message="Catching up" />
       | `LISTENING => <Alert kind=`Warning message="Listening" />
       }
     };
