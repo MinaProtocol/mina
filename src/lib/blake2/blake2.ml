@@ -31,22 +31,23 @@ module Make () = struct
       module T = struct
         type t = T1.t
         [@@deriving version {asserted; unnumbered}, hash, sexp, compare]
-
-        [%%define_locally
-        T1.(to_raw_string, digest_string, to_hex)]
-
-        include Binable.Of_stringable (T1)
-        include Hashable.Make (T1)
-        include Comparable.Make (T1)
       end
 
       include T
+      include Binable.Of_stringable (T1)
     end
 
     module Latest = V1
   end
 
-  include Stable.Latest
+  type t = T1.t [@@deriving hash, sexp, compare]
+
+  [%%define_locally
+  T1.(to_raw_string, digest_string, to_hex)]
+
+  (* do not use Binable.Of_stringable *)
+  include Hashable.Make (T1)
+  include Comparable.Make (T1)
 
   (* Little endian *)
   let bits_to_string bits =
