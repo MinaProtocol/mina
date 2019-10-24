@@ -27,18 +27,27 @@ open Module_version
  *)
 
 module Coinbase_data = struct
-  type t =
-    Public_key.Compressed.Stable.V1.t
-    * Amount.Stable.V1.t
-    * State_body_hash.Stable.V1.t
-  [@@deriving bin_io, sexp]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        Public_key.Compressed.Stable.V1.t
+        * Amount.Stable.V1.t
+        * State_body_hash.Stable.V1.t
+      [@@deriving sexp]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t
 
   let of_coinbase (cb : Coinbase.t) : t =
     (cb.proposer, cb.amount, cb.state_body_hash)
 
   type var = Public_key.Compressed.var * Amount.var * State_body_hash.var
 
-  type value = t [@@deriving bin_io, sexp]
+  type value = Stable.Latest.t [@@deriving sexp]
 
   let length_in_triples =
     Public_key.Compressed.length_in_triples + Amount.length_in_triples

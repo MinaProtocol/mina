@@ -25,13 +25,10 @@ module Rpcs = struct
       let name = "get_staged_ledger_aux_and_pending_coinbases_at_hash"
 
       module T = struct
-        (* "master" types, do not change *)
-        type query = State_hash.Stable.V1.t
+        type query = State_hash.t
 
         type response =
-          ( Staged_ledger.Scan_state.Stable.V1.t
-          * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.Stable.V1.t )
+          (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
           option
       end
 
@@ -78,11 +75,9 @@ module Rpcs = struct
       let name = "answer_sync_ledger_query"
 
       module T = struct
-        (* "master" types, do not change *)
-        type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
+        type query = Ledger_hash.t * Sync_ledger.Query.t
 
-        type response =
-          Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
+        type response = Sync_ledger.Answer.t Core.Or_error.t
       end
 
       module Caller = T
@@ -126,9 +121,9 @@ module Rpcs = struct
       let name = "get_transition_chain"
 
       module T = struct
-        type query = State_hash.Stable.V1.t list [@@deriving sexp, to_yojson]
+        type query = State_hash.t list [@@deriving sexp, to_yojson]
 
-        type response = External_transition.Stable.V1.t list option
+        type response = External_transition.t list option
       end
 
       module Caller = T
@@ -171,10 +166,9 @@ module Rpcs = struct
       let name = "get_transition_chain_proof"
 
       module T = struct
-        type query = State_hash.Stable.V1.t [@@deriving sexp, to_yojson]
+        type query = State_hash.t [@@deriving sexp, to_yojson]
 
-        type response =
-          (State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list) option
+        type response = (State_hash.t * State_body_hash.t list) option
       end
 
       module Caller = T
@@ -218,14 +212,13 @@ module Rpcs = struct
       let name = "get_ancestry"
 
       module T = struct
-        (* "master" types, do not change *)
         type query = Consensus.Data.Consensus_state.Value.t
         [@@deriving sexp, to_yojson]
 
         type response =
-          ( External_transition.Stable.V1.t
+          ( External_transition.t
           , State_body_hash.t list * External_transition.t )
-          Proof_carrying_data.Stable.V1.t
+          Proof_carrying_data.t
           option
       end
 
@@ -274,10 +267,8 @@ module Rpcs = struct
       let name = "ban_notify"
 
       module T = struct
-        (* "master" types, do not change *)
-
         (* banned until this time *)
-        type query = Core.Time.Stable.V1.t [@@deriving sexp]
+        type query = Core.Time.t [@@deriving sexp]
 
         type response = unit
       end
@@ -321,15 +312,13 @@ module Rpcs = struct
       let name = "get_bootstrappable_best_tip"
 
       module T = struct
-        (* "master" types, do not change *)
         type query = Consensus.Data.Consensus_state.Value.t
         [@@deriving sexp, to_yojson]
 
         type response =
-          ( External_transition.Stable.V1.t
-          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
-          )
-          Proof_carrying_data.Stable.V1.t
+          ( External_transition.t
+          , State_body_hash.t list * External_transition.t )
+          Proof_carrying_data.t
           option
       end
 
@@ -376,24 +365,24 @@ end
 
 module Make_message (Inputs : sig
   module Snark_pool_diff : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson, version]
+          type t [@@deriving bin_io, sexp, version]
         end
       end
       with type V1.t = t
   end
 
   module Transaction_pool_diff : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson, version]
+          type t [@@deriving bin_io, sexp, version]
         end
       end
       with type V1.t = t
@@ -404,12 +393,11 @@ struct
 
   module Master = struct
     module T = struct
-      (* "master" types, do not change *)
       type msg =
-        | New_state of External_transition.Stable.V1.t
-        | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
-        | Transaction_pool_diff of Transaction_pool_diff.Stable.V1.t
-      [@@deriving bin_io, sexp, to_yojson]
+        | New_state of External_transition.t
+        | Snark_pool_diff of Snark_pool_diff.t
+        | Transaction_pool_diff of Transaction_pool_diff.t
+      [@@deriving sexp, to_yojson]
     end
 
     let name = "message"

@@ -349,6 +349,7 @@ end = struct
 
       type ('magnitude, 'sgn) t = ('magnitude, 'sgn) Stable.Latest.t =
         {magnitude: 'magnitude; sgn: 'sgn}
+      [@@deriving sexp, hash, compare, eq, yojson]
     end
 
     module Stable_outer = Stable
@@ -363,8 +364,7 @@ end = struct
       end
     end]
 
-    (* bin_io, version omitted *)
-    type t = (Stable_outer.V1.t, Sgn.Stable.V1.t) Poly.Stable.V1.t
+    type t = (Stable_outer.Latest.t, Sgn.t) Poly.t
     [@@deriving sexp, hash, compare, eq, yojson]
 
     (* = Stable.Latest.t *)

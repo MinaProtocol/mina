@@ -11,7 +11,7 @@ end) :
   with type breadcrumb := Inputs.Breadcrumb.t = struct
   open Inputs
 
-  (* TODO: Remove New_frontier. 
+  (* TODO: Remove New_frontier.
      Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type t =
     | New_breadcrumb of {previous: Breadcrumb.t; added: Breadcrumb.t}
@@ -88,28 +88,50 @@ end) :
 
     module Key = struct
       module New_frontier = struct
-        (* TODO: version *)
-        type t =
-          ( External_transition.Validated.Stable.V1.t
-          , Staged_ledger.Scan_state.Stable.V1.t
-          , Pending_coinbase.Stable.V1.t )
-          Root.Poly.Stable.V1.t
-        [@@deriving bin_io]
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t =
+              ( External_transition.Validated.Stable.V1.t
+              , Staged_ledger.Scan_state.Stable.V1.t
+              , Pending_coinbase.Stable.V1.t )
+              Root.Poly.Stable.V1.t
+
+            let to_latest = Fn.id
+          end
+        end]
+
+        type t = Stable.Latest.t
       end
 
       module Add_transition = struct
-        (* TODO: version *)
-        type t = External_transition.Validated.Stable.V1.t [@@deriving bin_io]
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t = External_transition.Validated.Stable.V1.t
+
+            let to_latest = Fn.id
+          end
+        end]
+
+        type t = Stable.Latest.t
       end
 
       module Update_root = struct
-        (* TODO: version *)
-        type t =
-          ( State_hash.Stable.V1.t
-          , Staged_ledger.Scan_state.Stable.V1.t
-          , Pending_coinbase.Stable.V1.t )
-          Root.Poly.Stable.V1.t
-        [@@deriving bin_io]
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t =
+              ( State_hash.Stable.V1.t
+              , Staged_ledger.Scan_state.Stable.V1.t
+              , Pending_coinbase.Stable.V1.t )
+              Root.Poly.Stable.V1.t
+
+            let to_latest = Fn.id
+          end
+        end]
+
+        type t = Stable.Latest.t
       end
     end
 
@@ -259,10 +281,10 @@ end) :
       (* HACK:  This makes the existential type easily binable *)
       include Binable.Of_binable (struct
                   type t =
-                    [ `New_frontier of Key.New_frontier.t
-                    | `Add_transition of Key.Add_transition.t
-                    | `Remove_transitions of State_hash.Stable.V1.t list
-                    | `Update_root of Key.Update_root.t ]
+                    [ `New_frontier of Key.New_frontier.Stable.Latest.t
+                    | `Add_transition of Key.Add_transition.Stable.Latest.t
+                    | `Remove_transitions of State_hash.Stable.Latest.t list
+                    | `Update_root of Key.Update_root.Stable.Latest.t ]
                   [@@deriving bin_io]
                 end)
                 (struct
