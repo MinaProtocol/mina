@@ -13,12 +13,7 @@ module Styles = {
   let hero = {
     style([display(`flex), flexDirection(`row)]);
   };
-  let fadeIn =
-    keyframes([
-      (0, [opacity(0.), top(`px(50))]),
-      (100, [opacity(1.), top(`px(0))]),
-    ]);
-
+ 
   let heroLeft = {
     style([
       display(`flex),
@@ -36,7 +31,6 @@ module Styles = {
       Theme.Text.Header.h1,
       style([
         fontSize(`rem(2.70)),
-        animation(fadeIn, ~duration=1000, ~iterationCount=`count(1)),
       ]),
     ]);
   };
@@ -44,13 +38,10 @@ module Styles = {
     merge([
       Theme.Text.Body.regularLight,
       style([
-        opacity(0.),
         marginTop(`rem(2.)),
         marginBottom(`rem(3.)),
         maxWidth(`rem(28.)),
         color(Theme.Colors.midnightBlue),
-        animation(fadeIn, ~duration=1050, ~iterationCount=`count(1)),
-        animationDelay(250),
         animationFillMode(`forwards),
       ]),
     ]);
@@ -153,12 +144,16 @@ let make = (~nextStep) => {
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
         <h1 className=Styles.header>
-          {React.string("Welcome to Coda Wallet!")}
+          <FadeIn duration=500 delay=0>
+            {React.string("Welcome to Coda Wallet!")}
+          </FadeIn>
         </h1>
         <p className=Styles.heroBody>
-          {React.string(
-             {|Coda swaps the traditional blockchain for a tiny cryptographic proof, enabling a cryptocurrency that stays the same size forever. With the Coda Wallet you can send, recieve and view transactions on the Coda network.|},
-           )}
+          <FadeIn duration=500 delay=150>
+            {React.string(
+              {|Coda swaps the traditional blockchain for a tiny cryptographic proof, enabling a cryptocurrency that stays the same size forever. With the Coda Wallet you can send, recieve and view transactions on the Coda network.|},
+            )}
+          </FadeIn>
         </p>
         <div> <Button label="Continue" onClick={_ => nextStep()} /> </div>
       </div>

@@ -38,7 +38,7 @@ module Styles = {
   let header = {
     merge([
       Theme.Text.Header.h1,
-      style([animation(fadeIn, ~duration=1000, ~iterationCount=`count(1))]),
+      style([animation(fadeIn, ~duration=500, ~iterationCount=`count(1))]),
     ]);
   };
   let heroBody = {
@@ -48,7 +48,7 @@ module Styles = {
         opacity(0.),
         maxWidth(`rem(21.5)),
         color(Theme.Colors.midnightBlue),
-        animation(fadeIn, ~duration=1050, ~iterationCount=`count(1)),
+        animation(fadeIn, ~duration=500, ~iterationCount=`count(1)),
         animationDelay(250),
         animationFillMode(`forwards),
       ]),
@@ -60,7 +60,7 @@ module Styles = {
   let textFields = {
     style([
       opacity(0.),
-      animation(fadeIn, ~duration=1050, ~iterationCount=`count(1)),
+      animation(fadeIn, ~duration=500, ~iterationCount=`count(1)),
       animationDelay(500),
       animationFillMode(`forwards),
     ]);
@@ -81,15 +81,20 @@ let make = (~nextStep, ~prevStep) => {
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
         <h1 className=Styles.header>
+        <FadeIn duration=500>
           {React.string("Create Your Account")}
+        </FadeIn> 
         </h1>
         <Spacer height=1. />
         <p className=Styles.heroBody>
+        <FadeIn duration=500>
           {React.string(
              "Create your first account to complete setting up Coda Wallet. Please be sure to choose a secure password.",
            )}
+        </FadeIn>
         </p>
         <div className=Styles.textFields>
+        <FadeIn duration=500>
           <Spacer height=1. />
           <TextField
             label="Name"
@@ -104,6 +109,7 @@ let make = (~nextStep, ~prevStep) => {
             value=password
           />
           <Spacer height=2. />
+          </FadeIn>
         </div>
         <div className=Styles.buttonRow>
           <Button
@@ -146,9 +152,6 @@ let make = (~nextStep, ~prevStep) => {
           </AddAccountMutation>
         </div>
       </div>
-      <div
-        // Graphic goes here
-      />
     </div>
   </div>;
 };

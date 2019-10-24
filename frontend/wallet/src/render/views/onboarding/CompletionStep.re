@@ -25,7 +25,7 @@ module Styles = {
   let header = {
     merge([
       Theme.Text.Header.h1,
-      style([animation(fadeIn, ~duration=1000, ~iterationCount=`count(1))]),
+      //style([animation(fadeIn, ~duration=1000, ~iterationCount=`count(1))]),
     ]);
   };
 
@@ -36,7 +36,7 @@ module Styles = {
         opacity(0.),
         maxWidth(`rem(21.5)),
         color(Theme.Colors.midnightBlue),
-        animation(fadeIn, ~duration=1050, ~iterationCount=`count(1)),
+        animation(fadeIn, ~duration=500, ~iterationCount=`count(1)),
         animationDelay(250),
         animationFillMode(`forwards),
       ]),

@@ -29,21 +29,16 @@ module Styles = {
   let header = {
     merge([
       Theme.Text.Header.h1,
-      style([animation(fadeIn, ~duration=1000, ~iterationCount=`count(1))]),
     ]);
   };
   let heroBody =
     merge([
       Theme.Text.Body.regularLight,
       style([
-        opacity(0.),
         marginTop(`rem(2.)),
         marginBottom(`rem(2.)),
         maxWidth(`rem(24.)),
         color(Theme.Colors.midnightBlue),
-        animation(fadeIn, ~duration=1050, ~iterationCount=`count(1)),
-        animationDelay(250),
-        animationFillMode(`forwards),
       ]),
     ]);
 
@@ -75,12 +70,17 @@ let make = (~nextStep, ~prevStep) => {
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
         <h1 className=Styles.header>
+        <FadeIn duration=500>
           {React.string("Setting Up Your Node")}
+                  </FadeIn>
+
         </h1>
         <p className=Styles.heroBody>
+         <FadeIn duration=500 delay=150>
           {React.string(
              "First, let's install and configure the Coda daemon. This will allow you to connect to the Coda network and make transactions. Follow the instructions at the link below to begin.",
            )}
+          </FadeIn> 
         </p>
         <Link
           kind=Link.Blue
