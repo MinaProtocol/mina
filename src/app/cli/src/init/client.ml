@@ -1002,15 +1002,7 @@ let pooled_user_commands =
          print_string (Yojson.Safe.to_string json_response) ))
 
 let to_signed_fee_exn sign magnitude =
-  let sgn =
-    match sign with
-    | "+" ->
-        Sgn.Pos
-    | "-" ->
-        Neg
-    | _ ->
-        failwith (sprintf "Invalid sign in signed fee: %s" sign)
-  in
+  let sgn = match sign with `PLUS -> Sgn.Pos | `MINUS -> Neg in
   let magnitude = Currency.Fee.of_uint64 magnitude in
   Currency.Fee.Signed.create ~sgn ~magnitude
 
@@ -1038,7 +1030,8 @@ let pending_snark_work =
                           in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id= w#work_id
-                          ; fee_excess= to_signed_fee_exn f#sign f#fee
+                          ; fee_excess=
+                              to_signed_fee_exn f#sign f#fee_magnitude
                           ; supply_increase=
                               Currency.Amount.of_uint64 w#supply_increase
                           ; source_ledger_hash=

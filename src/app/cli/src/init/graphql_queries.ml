@@ -83,7 +83,7 @@ query pendingSnarkWork {
       target_ledger_hash: targetLedgerHash
       fee_excess: feeExcess {
         sign
-        fee @bsDecoder(fn: "Decoders.uint64")
+        fee_magnitude: feeMagnitude @bsDecoder(fn: "Decoders.uint64")
       }
       supply_increase: supplyIncrease @bsDecoder(fn: "Decoders.uint64")
       work_id: workId

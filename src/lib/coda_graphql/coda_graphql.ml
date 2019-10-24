@@ -370,14 +370,17 @@ module Types = struct
             ~resolve:(fun _ {Transaction_snark_work.Info.work_ids; _} ->
               One_or_two.to_list work_ids ) ] )
 
+  let sign =
+    enum "sign"
+      ~values:
+        [enum_value "PLUS" ~value:Sgn.Pos; enum_value "MINUS" ~value:Sgn.Neg]
+
   let signed_fee =
     obj "SignedFee" ~doc:"Signed fee" ~fields:(fun _ ->
-        [ field "sign" ~typ:(non_null string) ~doc:"+/-"
+        [ field "sign" ~typ:(non_null sign) ~doc:"+/-"
             ~args:Arg.[]
-            ~resolve:(fun _ fee ->
-              if Sgn.equal (Currency.Fee.Signed.sgn fee) Sgn.Pos then "+"
-              else "-" )
-        ; field "fee" ~typ:(non_null uint64) ~doc:"Fee"
+            ~resolve:(fun _ fee -> Currency.Fee.Signed.sgn fee)
+        ; field "feeMagnitude" ~typ:(non_null uint64) ~doc:"Fee"
             ~args:Arg.[]
             ~resolve:(fun _ fee ->
               Currency.Fee.(to_uint64 (Signed.magnitude fee)) ) ] )

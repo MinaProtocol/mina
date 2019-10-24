@@ -1430,6 +1430,29 @@
           "possibleTypes": null
         },
         {
+          "kind": "ENUM",
+          "name": "sign",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": [
+            {
+              "name": "PLUS",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "MINUS",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "SignedFee",
           "description": "Signed fee",
@@ -1442,8 +1465,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
+                  "kind": "ENUM",
+                  "name": "sign",
                   "ofType": null
                 }
               },
@@ -1451,7 +1474,7 @@
               "deprecationReason": null
             },
             {
-              "name": "fee",
+              "name": "feeMagnitude",
               "description": "Fee",
               "args": [],
               "type": {
@@ -1511,7 +1534,7 @@
             },
             {
               "name": "feeExcess",
-              "description": "Total transaction fee that is not applied to the ledger in this transition",
+              "description": "Total transaction fee that is not accounted for in the transition from source ledger to target ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1527,7 +1550,7 @@
             },
             {
               "name": "supplyIncrease",
-              "description": "Total supply increase in this transition",
+              "description": "Increase in total coinbase reward ",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1566,7 +1589,7 @@
         {
           "kind": "OBJECT",
           "name": "PendingSnarkWork",
-          "description": "Snark work that is yet to be done",
+          "description": "Snark work bundles that are not available in the pool yet",
           "fields": [
             {
               "name": "workBundle",
@@ -2836,6 +2859,113 @@
         },
         {
           "kind": "OBJECT",
+          "name": "AddrsAndPorts",
+          "description": null,
+          "fields": [
+            {
+              "name": "externalIp",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "bindIp",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "discoveryPort",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "clientPort",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "libp2pPort",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "communicationPort",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "ConsensusConfiguration",
           "description": null,
           "fields": [
@@ -3643,6 +3773,38 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "ConsensusConfiguration",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "addrsAndPorts",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AddrsAndPorts",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "libp2pPeerId",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
                   "ofType": null
                 }
               },
