@@ -195,20 +195,19 @@ module Receipt_chain_hash = struct
   Receipt.Chain_hash.(cons, empty)]
 end
 
-module Payment_verifier =
-  Receipt_chain_database_lib.Verifier.Make (User_command) (Receipt_chain_hash)
-
 let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
-    (verifying_txn : User_command.t) proof =
+    (verifying_txn : User_command.t) (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
   let resulting_receipt = account.Account.Poly.receipt_chain_hash in
   let open Or_error.Let_syntax in
-  let%bind () = Payment_verifier.verify ~resulting_receipt proof in
-  if
-    List.exists (Payment_proof.payments proof) ~f:(fun txn ->
-        User_command.equal verifying_txn txn )
+  let%bind (_ : Receipt.Chain_hash.t Non_empty_list.t) =
+    Result.of_option
+      (Receipt_chain_database.verify ~init:init_receipt proof resulting_receipt)
+      ~error:(Error.createf "Merkle list proof of payment is invalid")
+  in
+  if List.exists proof ~f:(fun txn -> User_command.equal verifying_txn txn)
   then Ok ()
   else
     Or_error.errorf
@@ -245,8 +244,7 @@ let schedule_user_commands t (txns : User_command.t list) :
             "Failure in schedule_user_commands: $error. This is not yet \
              reported to the client, see #1143" )
 
-let prove_receipt t ~proving_receipt ~resulting_receipt :
-    Payment_proof.t Deferred.Or_error.t =
+let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in
   (* TODO: since we are making so many reads to `receipt_chain_database`,
      reads should be async to not get IO-blocked. See #1125 *)
@@ -287,8 +285,9 @@ let get_status ~flag t =
   let snark_work_fee = Currency.Fee.to_int @@ Coda_lib.snark_work_fee t in
   let propose_pubkeys = Coda_lib.propose_public_keys t in
   let consensus_mechanism = Consensus.name in
+  let time_controller = (Coda_lib.config t).time_controller in
   let consensus_time_now =
-    Consensus.time_hum (Block_time.now (Coda_lib.config t).time_controller)
+    Consensus.time_hum (Block_time.now time_controller)
   in
   let consensus_configuration = Consensus.Configuration.t in
   let r = Perf_histograms.report in
@@ -395,10 +394,10 @@ let get_status ~flag t =
   in
   let next_proposal =
     let str time =
-      let open Time in
-      let time = Int64.to_float time |> Span.of_ms |> of_span_since_epoch in
-      let diff = diff time (now ()) in
-      if Span.(zero < diff) then sprintf "in %s" (Time.Span.to_string_hum diff)
+      let open Block_time in
+      let since_epoch_time = time |> Span.of_ms |> of_span_since_epoch in
+      let diff = diff since_epoch_time (now time_controller) in
+      if Span.(zero < diff) then sprintf "in %s" (Span.to_string_hum diff)
       else "Computing next proposal state..."
     in
     Option.map (Coda_lib.next_proposal t) ~f:(function
@@ -408,6 +407,16 @@ let get_status ~flag t =
           str time
       | `Check_again time ->
           sprintf "None this epoch… checking at %s" (str time) )
+  in
+  let libp2p_peer_id =
+    Option.value ~default:"<not connected to libp2p>"
+      Option.(
+        Coda_lib.net t |> Coda_networking.net2 >>= Coda_net2.me
+        >>| Coda_net2.Keypair.to_peerid >>| Coda_net2.PeerID.to_string)
+  in
+  let addrs_and_ports =
+    Kademlia.Node_addrs_and_ports.to_display
+      (Coda_lib.config t).net_config.gossip_net_params.addrs_and_ports
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
@@ -430,7 +439,9 @@ let get_status ~flag t =
   ; next_proposal
   ; consensus_time_now
   ; consensus_mechanism
-  ; consensus_configuration }
+  ; consensus_configuration
+  ; libp2p_peer_id
+  ; addrs_and_ports }
 
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
@@ -455,8 +466,8 @@ module For_tests = struct
           (Fn.compose
              Auxiliary_database.Filtered_external_transition.user_commands
              With_hash.data)
-      @@ Auxiliary_database.External_transition_database.get_values
-           external_transition_database public_key
+      @@ Auxiliary_database.External_transition_database.get_all_values
+           external_transition_database (Some public_key)
     in
     let participants_user_commands =
       User_command.filter_by_participant user_commands public_key

@@ -14,8 +14,7 @@ end]
 
 module T = struct
   type t = Stable.Latest.t =
-    { public_key: Public_key.Stable.V1.t
-    ; private_key: Private_key.Stable.V1.t sexp_opaque }
+    {public_key: Public_key.t; private_key: Private_key.t sexp_opaque}
   [@@deriving sexp]
 
   let compare {public_key= pk1; private_key= _}

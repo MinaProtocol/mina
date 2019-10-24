@@ -3,8 +3,8 @@ let make = () => {
   let settingsValue = AddressBookProvider.createContext();
   let (isOnboarding, _) as onboardingValue =
     OnboardingProvider.createContext();
-
   let dispatch = CodaProcess.useHook();
+  let toastValue = ToastProvider.createContext();
 
   <AddressBookProvider value=settingsValue>
     <OnboardingProvider value=onboardingValue>

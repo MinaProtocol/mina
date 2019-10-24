@@ -1,3 +1,5 @@
+open Tc;
+
 module Styles = {
   open Css;
 
@@ -105,8 +107,13 @@ let make = (~nextStep, ~prevStep) => {
             onClick={_ => {
               dispatchToMain(
                 CodaProcess.Action.StartCoda([
-                  "-peer",
-                  "seared-kobe.o1test.net:8303",
+                  "-discovery-port",
+                  "8303",
+                  ...List.foldl(
+                       ~f=(peer, acc) => ["-peer", peer, ...acc],
+                       ~init=[],
+                       CodaProcess.defaultPeers,
+                     ),
                 ]),
               );
               setState(_ => Loading);
