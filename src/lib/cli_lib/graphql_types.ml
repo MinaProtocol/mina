@@ -25,5 +25,5 @@ module Pending_snark_work = struct
     [@@deriving yojson]
   end
 
-  type t = Work.t list list [@@deriving yojson]
+  type t = Work.t array array [@@deriving yojson]
 end

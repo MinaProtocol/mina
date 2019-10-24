@@ -1001,6 +1001,19 @@ let pooled_user_commands =
          in
          print_string (Yojson.Safe.to_string json_response) ))
 
+let to_signed_fee_exn sign magnitude =
+  let sgn =
+    match sign with
+    | "+" ->
+        Sgn.Pos
+    | "-" ->
+        Neg
+    | _ ->
+        failwith (sprintf "Invalid sign in signed fee: %s" sign)
+  in
+  let magnitude = Currency.Fee.of_uint64 magnitude in
+  Currency.Fee.Signed.create ~sgn ~magnitude
+
 let pending_snark_work =
   let open Command.Param in
   Command.async
@@ -1015,29 +1028,24 @@ let pending_snark_work =
            ~f:(fun response ->
              let lst =
                [%to_yojson: Cli_lib.Graphql_types.Pending_snark_work.t]
-                 (Array.to_list
-                    (Array.map
-                       ~f:(fun bundle ->
-                         Array.to_list
-                           (Array.map bundle#workBundle ~f:(fun w ->
-                                let f = w#fee_excess in
-                                let hash_of_string =
-                                  Coda_graphql.Types.Stringable
-                                  .Frozen_ledger_hash
-                                  .of_base58_check_exn
-                                in
-                                { Cli_lib.Graphql_types.Pending_snark_work.Work
-                                  .work_id= w#work_id
-                                ; fee_excess=
-                                    Coda_graphql.Types.to_signed_fee_exn f#sign
-                                      f#fee
-                                ; supply_increase=
-                                    Currency.Amount.of_uint64 w#supply_increase
-                                ; source_ledger_hash=
-                                    hash_of_string w#source_ledger_hash
-                                ; target_ledger_hash=
-                                    hash_of_string w#target_ledger_hash } )) )
-                       response#pendingSnarkWork))
+                 (Array.map
+                    ~f:(fun bundle ->
+                      Array.map bundle#workBundle ~f:(fun w ->
+                          let f = w#fee_excess in
+                          let hash_of_string =
+                            Coda_graphql.Types.Stringable.Frozen_ledger_hash
+                            .of_base58_check_exn
+                          in
+                          { Cli_lib.Graphql_types.Pending_snark_work.Work
+                            .work_id= w#work_id
+                          ; fee_excess= to_signed_fee_exn f#sign f#fee
+                          ; supply_increase=
+                              Currency.Amount.of_uint64 w#supply_increase
+                          ; source_ledger_hash=
+                              hash_of_string w#source_ledger_hash
+                          ; target_ledger_hash=
+                              hash_of_string w#target_ledger_hash } ) )
+                    response#pendingSnarkWork)
              in
              print_string (Yojson.Safe.to_string lst) ) ))
 

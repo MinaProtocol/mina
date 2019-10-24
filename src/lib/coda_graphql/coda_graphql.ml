@@ -129,19 +129,6 @@ module Types = struct
     scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
       ~coerce:(fun key -> `String (Public_key.Compressed.to_base58_check key))
 
-  let to_signed_fee_exn sign magnitude =
-    let sgn =
-      match sign with
-      | "+" ->
-          Sgn.Pos
-      | "-" ->
-          Neg
-      | _ ->
-          failwith (sprintf "Invalid sign in signed fee: %s" sign)
-    in
-    let magnitude = Currency.Fee.of_uint64 magnitude in
-    Currency.Fee.Signed.create ~sgn ~magnitude
-
   let uint32 =
     unsigned_scalar_scalar ~to_string:Unsigned.UInt32.to_string "UInt32"
 
