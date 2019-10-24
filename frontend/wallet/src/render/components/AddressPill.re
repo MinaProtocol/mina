@@ -68,10 +68,10 @@ module Styles = {
 
 [@react.component]
 let make = (~pubkey) => {
-  let activeWallet = Hooks.useActiveWallet();
+  let activeAccount = Hooks.useActiveAccount();
   let (addressBook, updateAddressBook) =
     React.useContext(AddressBookProvider.context);
-  let isActive = activeWallet === Some(pubkey);
+  let isActive = activeAccount === Some(pubkey);
 
   let (hovered, setHovered) = React.useState(() => false);
   let (editing, setEditing) = React.useState(() => false);
@@ -109,7 +109,7 @@ let make = (~pubkey) => {
     onMouseLeave={_ => setHovered(_ => false)}>
     <Pill mode=pillMode>
       <span className={Styles.pillContents(hovered, isActive)}>
-        <WalletName pubkey />
+        <AccountName pubkey />
       </span>
     </Pill>
     {switch (hovered, editing) {

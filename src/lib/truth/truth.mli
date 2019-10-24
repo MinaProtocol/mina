@@ -29,8 +29,8 @@ type false_ = False.t
 module Stable : sig
   module V1 : sig
     type ('witness, _) t =
-      | True : 'witness -> ('witness, True.Stable.Latest.t) t
-      | False : ('witness, False.Stable.Latest.t) t
+      | True : 'witness -> ('witness, True.Stable.V1.t) t
+      | False : ('witness, False.Stable.V1.t) t
     [@@deriving version]
   end
 
@@ -38,8 +38,8 @@ module Stable : sig
 end
 
 type ('witness, 'b) t = ('witness, 'b) Stable.Latest.t =
-  | True : 'witness -> ('witness, true_) t
-  | False : ('witness, false_) t
+  | True : 'witness -> ('witness, True.Stable.V1.t) t
+  | False : ('witness, False.Stable.V1.t) t
 
 type 'witness true_t = ('witness, true_) t
 

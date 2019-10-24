@@ -8,36 +8,35 @@ If you're running a Coda node on a home or office machine, you'll have to set up
 
 ### Using UPnP
 
+!!!note
+    As of Release 0.0.10.-beta, Coda now uses libp2p for peer discovery. With this change, only port 8303 needs to be forwarded for TCP. If you previously forwarded both ports for both TCP and UDP, you may need to reconfigure your settings.
+
 Follow the steps below to use [MiniUPnP](https://github.com/miniupnp/miniupnp) to forward ports on your router:
 
 Run the following command:
 
-        $ sudo upnpc -r 8302 TCP 8303 UDP
+        $ sudo upnpc -r 8303 TCP
 
 If this command succeeds, you'll see a response indicating that the ports have been successfully redirected:
 
 ```
 ...
-InternalIP:Port = 192.168.101.7:8302
-external 148.64.99.117:8302 TCP is redirected to internal 192.168.101.7:8302 (duration=0)
-...
 InternalIP:Port = 192.168.101.7:8303
-external 148.64.99.117:8303 UDP is redirected to internal 192.168.101.7:8303 (duration=0)
+external 148.64.99.117:8302 TCP is redirected to internal 192.168.101.7:8302 (duration=0)
 ```
 
 If you are on a shared network (like an office wireless network), you may get the following error if someone else on the same network has already redirected these ports:
 
 ```
-AddPortMapping(8302, 8302, 192.168.101.7) failed with code 718 (ConflictInMappingEntry)
+AddPortMapping(8303, 8303, 192.168.101.7) failed with code 718 (ConflictInMappingEntry)
 ```
 
 If this happens, you can forward different ports, as long as they are unused by another application:
 
-        $ sudo upnpc -r <custom-port> TCP <custom-port + 1> UDP
+        $ sudo upnpc -r <custom-port> TCP
 
 If you forward custom ports, keep in mind:
 
-- The UDP port forwarded has to be the next consecutive port from the TCP mapping.
 - When running Coda daemon commands in the [next step](/docs/my-first-transaction#start-up-a-node), you'll need to add the flag `-external-port <custom-port>` passing in the TCP port you forwarded above.
 
 ### Manual port forwarding
@@ -47,7 +46,7 @@ Depending on your router, you may see one of the following errors:
 - `No IGD UPnP Device found on the network!`
 - `connect: Connection refused`
 
-If so, find your router model and search for `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Coda node. You'll need to open the TCP port 8302, and the UDP port 8303 by default.
+If so, find your router model and search for `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Coda node. You'll need to open the TCP port 8303 by default.
 
 ### Issues determining IP address
 

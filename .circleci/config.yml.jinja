@@ -61,7 +61,7 @@ jobs:
 
     build-archive:
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
               environment: 
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -91,7 +91,7 @@ jobs:
                   command: ls && ./scripts/archive/make_hasura_configurations.sh     
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
         steps:
             - checkout
             - run:
@@ -123,6 +123,21 @@ jobs:
             - run:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
+
+    build-auxiliary:
+        docker:
+            - image: nixos/nix
+        steps:
+            - checkout
+            - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
 
     build-macos:
       # only run when there's a 'release' tag
@@ -232,11 +247,14 @@ jobs:
                     mkdir -p package/keys
                     cp /var/lib/coda/* package/keys/.
             - run:
-                name: Collect and rewrite aux binaries (kademlia + logproc)
+                name: Collect and rewrite aux binaries (kademlia + libp2p_helper + logproc)
                 command: |
                     cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
                     chmod +w package/kademlia
                     ./scripts/librewrite-macos.sh package/kademlia
+                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
+                    chmod +w package/coda-libp2p_helper
+                    ./scripts/librewrite-macos.sh package/coda-libp2p_helper
                     cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
             - run:
@@ -268,7 +286,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
         steps:
             - checkout
             - run:
@@ -326,7 +344,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -367,7 +385,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -386,7 +404,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
         steps:
             - checkout
             - run:
@@ -405,7 +423,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
         steps:
             - checkout
             - run:
@@ -428,6 +446,7 @@ workflows:
     coda_parallel:
         jobs:
             - lint
+            - build-auxiliary
             - update-branch-protection:
                 filters:
                   branches:

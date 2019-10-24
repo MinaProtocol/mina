@@ -106,8 +106,7 @@ let run_test () : unit Deferred.t =
       trace_database_initialization "receipt_chain_database" __LOC__
         receipt_chain_dir_name ;
       let receipt_chain_database =
-        Coda_base.Receipt_chain_database.create
-          ~directory:receipt_chain_dir_name
+        Receipt_chain_database.create ~directory:receipt_chain_dir_name
       in
       let%bind transaction_database_dir =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "transaction_database")

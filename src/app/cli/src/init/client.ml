@@ -3,6 +3,14 @@ open Async
 open Signature_lib
 open Coda_base
 
+module Client = Graphql_client_lib.Make (struct
+  let address = "graphql"
+
+  let preprocess_variables_string = Fn.id
+
+  let headers = String.Map.empty
+end)
+
 let print_rpc_error error =
   eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
 
@@ -345,7 +353,8 @@ let verify_receipt =
                     (sprintf "Payment file %s has invalid json format"
                        payment_path)
            and proof =
-             Payment_proof.of_yojson proof_json
+             [%of_yojson: Receipt.Chain_hash.t * User_command.t list]
+               proof_json
              |> to_deferred_or_error
                   ~error:
                     (sprintf "Proof file %s has invalid json format" proof_path)
