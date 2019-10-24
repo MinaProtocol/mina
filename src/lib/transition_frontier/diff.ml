@@ -276,17 +276,28 @@ end) :
       hash_mutant t mutant diff_contents_hash
 
     module E = struct
+      (* TODO : version, because it's bin_io *)
       type t = E : 'output diff_mutant -> t
 
+      module Key_ops = struct
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t =
+              [ `New_frontier of Key.New_frontier.Stable.V1.t
+              | `Add_transition of Key.Add_transition.Stable.V1.t
+              | `Remove_transitions of State_hash.Stable.V1.t list
+              | `Update_root of Key.Update_root.Stable.V1.t ]
+
+            let to_latest = Fn.id
+          end
+        end]
+      end
+
       (* HACK:  This makes the existential type easily binable *)
-      include Binable.Of_binable (struct
-                  type t =
-                    [ `New_frontier of Key.New_frontier.Stable.Latest.t
-                    | `Add_transition of Key.Add_transition.Stable.Latest.t
-                    | `Remove_transitions of State_hash.Stable.Latest.t list
-                    | `Update_root of Key.Update_root.Stable.Latest.t ]
-                  [@@deriving bin_io]
-                end)
+      (* once type t is versioned, this 'Of_binable' should not change for specific versions *)
+      include Binable.Of_binable
+                (Key_ops.Stable.V1)
                 (struct
                   type nonrec t = t
 
