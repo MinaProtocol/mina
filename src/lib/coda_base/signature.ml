@@ -71,7 +71,11 @@ module Stable = struct
   end
 end
 
-include Stable.Latest
+type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
+
+[%%define_locally
+Stable.Latest.(of_base58_check_exn, of_base58_check, of_yojson, to_yojson)]
+
 open Snark_params.Tick
 
 type var = Field.Var.t * Inner_curve.Scalar.var
