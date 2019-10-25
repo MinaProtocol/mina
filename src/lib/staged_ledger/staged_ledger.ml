@@ -225,17 +225,6 @@ module T = struct
   let of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash ~ledger
       ~scan_state ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
-    let verify_snarked_ledger t snarked_ledger_hash =
-      match
-        materialized_snarked_ledger_hash t ~expected_target:snarked_ledger_hash
-      with
-      | Ok _ ->
-          Ok ()
-      | Error e ->
-          Or_error.error_string
-            ( "Error verifying snarked ledger hash from the ledger.\n"
-            ^ Error.to_string_hum e )
-    in
     let t = {ledger; scan_state; pending_coinbase_collection} in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants scan_state
@@ -244,9 +233,6 @@ module T = struct
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
-    in
-    let%bind () =
-      Deferred.return (verify_snarked_ledger t snarked_ledger_hash)
     in
     return t
 
