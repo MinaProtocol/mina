@@ -98,9 +98,20 @@ module Make (Inputs : Intf.Inputs_intf) :
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
       let log_and_retry label error =
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          !"Error %s: %{sexp:Error.t}"
-          label error ;
+        let error_str = Error.to_string_hum error in
+        (* HACK: the bind before the call to go () produces an evergrowing
+           backtrace history which takes forever to print and fills our disks.
+           If the string becomes too long, chop off the first 10 lines and include
+           only that *)
+        ( if String.length error_str < 4096 then
+          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            !"Error %s: %{sexp:Error.t}"
+            label error
+        else
+          let lines = String.split ~on:'\n' error_str in
+          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            !"Error %s: %s" label
+            (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
         let%bind () = wait ~sec:30.0 () in
         (* FIXME: Use a backoff algo here *)
         go ()
