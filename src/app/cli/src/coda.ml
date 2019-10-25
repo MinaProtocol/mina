@@ -400,10 +400,10 @@ let daemon logger =
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "Jemalloc memory statistics (in bytes)"
               ~metadata:
-                [ ("active", `Int (active * 1024))
-                ; ("resident", `Int (resident * 1024))
-                ; ("allocated", `Int (allocated * 1024))
-                ; ("mapped", `Int (mapped * 1024)) ]
+                [ ("active", `Int active)
+                ; ("resident", `Int resident)
+                ; ("allocated", `Int allocated)
+                ; ("mapped", `Int mapped) ]
           in
           let rec loop () =
             log_stats "before major gc" ;
