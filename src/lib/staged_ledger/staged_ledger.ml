@@ -111,18 +111,13 @@ module T = struct
             Error
               (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
 
-  module M = struct
-    include Monad.Ident
-    module Or_error = Or_error
-  end
-
   module Statement_scanner = struct
     include Scan_state.Make_statement_scanner
-              (M)
+              (Deferred)
               (struct
                 type t = unit
 
-                let verify ~verifier:() ~proof:_ ~statement:_ ~message:_ = true
+                let verify ~verifier:() ~proof:_ ~statement:_ ~message:_ = Deferred.return true
               end)
   end
 
@@ -217,7 +212,8 @@ module T = struct
     res
 
   let statement_exn t =
-    match Statement_scanner.scan_statement t.scan_state ~verifier:() with
+    let open Deferred.Let_syntax in
+    match%map Statement_scanner.scan_statement t.scan_state ~verifier:() with
     | Ok s ->
         `Non_empty s
     | Error `Empty ->
@@ -696,11 +692,10 @@ module T = struct
       coinbase_for_blockchain_snark coinbases |> Deferred.return
     in
     let%map () =
-      Deferred.return
-        ( verify_scan_state_after_apply
+        Deferred.( verify_scan_state_after_apply
             (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
             scan_state'
-        |> to_staged_ledger_or_error )
+        >>| to_staged_ledger_or_error )
     in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
