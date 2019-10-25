@@ -104,7 +104,9 @@ struct
   module Transition_frontier =
     Transition_frontier.Make (Transition_frontier_inputs)
 
-  let gen_breadcrumb ~logger ~pids ~trust_system ~accounts_with_secret_keys :
+  (* TODO: Make gen_payments a parameter for unit tests in Nathan's huge transition_frontier_diff PR *)
+  let gen_breadcrumb ?(gen_payments = gen_payments) ~logger ~pids ~trust_system
+      accounts_with_secret_keys :
       (   Transition_frontier.Breadcrumb.t Deferred.t
        -> Transition_frontier.Breadcrumb.t Deferred.t)
       Quickcheck.Generator.t =
@@ -360,12 +362,20 @@ struct
         let%bind breadcrumb = deferred_breadcrumb in
         Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
 
-  let gen_linear_breadcrumbs ~logger ~pids ~trust_system ~size
-      ~accounts_with_secret_keys root_breadcrumb =
+  let gen_linear_breadcrumbs ?(gen_payments = gen_payments) ~logger ~pids
+      ~trust_system ~size ~accounts_with_secret_keys root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_list
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~pids ~trust_system ~accounts_with_secret_keys)
+         (gen_breadcrumb ~gen_payments ~logger ~pids ~trust_system
+            accounts_with_secret_keys)
+
+  let instantiate_linear_breadcrumbs ?(gen_payments = gen_payments) ~logger
+      ~pids ~trust_system ~accounts_with_secret_keys size root =
+    Deferred.all
+    @@ Quickcheck.random_value
+         (gen_linear_breadcrumbs ~gen_payments ~logger ~pids ~trust_system
+            ~accounts_with_secret_keys ~size root)
 
   let add_linear_breadcrumbs ~logger ~pids ~trust_system ~size
       ~accounts_with_secret_keys ~frontier ~parent =
@@ -381,7 +391,7 @@ struct
   let add_child ~logger ~pids ~trust_system ~accounts_with_secret_keys
       ~frontier ~parent =
     let%bind new_node =
-      ( gen_breadcrumb ~logger ~pids ~trust_system ~accounts_with_secret_keys
+      ( gen_breadcrumb ~logger ~pids ~trust_system accounts_with_secret_keys
       |> Quickcheck.random_value )
       @@ Deferred.return parent
     in
@@ -393,14 +403,14 @@ struct
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_rose_tree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~pids ~trust_system ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~pids ~trust_system accounts_with_secret_keys)
 
   let gen_tree_list ~logger ~pids ~trust_system ~size
       ~accounts_with_secret_keys root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_ktree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~pids ~trust_system ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~pids ~trust_system accounts_with_secret_keys)
 
   module Best_tip_prover = Best_tip_prover.Make (struct
     include Transition_frontier_inputs

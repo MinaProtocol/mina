@@ -53,7 +53,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             @@ Quickcheck_lib.gen_imperative_ktree
                  (root_breadcrumb |> return |> Quickcheck.Generator.return)
                  (gen_breadcrumb ~logger ~pids ~trust_system
-                    ~accounts_with_secret_keys) )
+                    accounts_with_secret_keys) )
           frontier
       in
       frontier

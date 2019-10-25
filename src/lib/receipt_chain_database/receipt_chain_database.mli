@@ -2,6 +2,8 @@ open Coda_base
 
 module Tree_node : Intf.Tree_node
 
+module Intf = Intf
+
 module Make
     (Monad : Key_value_database.Monad.S) (Config : sig
         type t

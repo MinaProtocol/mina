@@ -295,8 +295,8 @@ let generate_receipt =
     (Cli_lib.Background_daemon.rpc_init
        (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
-         dispatch_with_message Prove_receipt.rpc (receipt_chain_hash, pk) port
-           ~success:Cli_lib.Render.Prove_receipt.to_text
+         dispatch_with_message Receipt_chain.Prove.rpc (receipt_chain_hash, pk)
+           port ~success:Cli_lib.Render.Prove_receipt.to_text
            ~error:Error.to_string_hum ~join_error:Or_error.join ))
 
 let read_json filepath ~flag =
@@ -337,8 +337,8 @@ let verify_receipt =
        ~f:(fun port (payment_path, proof_path, pk) ->
          let dispatch_result =
            let open Deferred.Or_error.Let_syntax in
-           let%bind payment_json =
-             read_json payment_path ~flag:"payment-path"
+           let%bind payment_payload =
+             read_json payment_path ~flag:"payment-payload-path"
            in
            let%bind proof_json = read_json proof_path ~flag:"proof-path" in
            let to_deferred_or_error result ~error =
@@ -346,20 +346,20 @@ let verify_receipt =
                  Error.of_string (sprintf "%s: %s" error s) )
              |> Deferred.return
            in
-           let%bind payment =
-             User_command.of_yojson payment_json
+           let%bind payload =
+             User_command_payload.of_yojson payment_payload
              |> to_deferred_or_error
                   ~error:
-                    (sprintf "Payment file %s has invalid json format"
+                    (sprintf "Payment payload file %s has invalid json format"
                        payment_path)
            and proof =
-             [%of_yojson: Receipt.Chain_hash.t * User_command.t list]
+             [%of_yojson: Receipt.Chain_hash.t * User_command_payload.t list]
                proof_json
              |> to_deferred_or_error
                   ~error:
                     (sprintf "Proof file %s has invalid json format" proof_path)
            in
-           dispatch Verify_proof.rpc (pk, payment, proof) port
+           dispatch Receipt_chain.Verify.rpc (pk, payload, proof) port
          in
          match%map dispatch_result with
          | Ok (Ok ()) ->

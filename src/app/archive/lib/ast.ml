@@ -102,8 +102,7 @@ and fee_transfers_arr_rel_insert_input =
 and receipt_chain_hashes_insert_input =
   < blocks_user_commands: blocks_user_commands_arr_rel_insert_input option
   ; hash: string option
-  ; receipt_chain_hash: receipt_chain_hashes_obj_rel_insert_input option
-  ; receipt_chain_hashes: receipt_chain_hashes_arr_rel_insert_input option >
+  ; receipt_chain_hash: receipt_chain_hashes_obj_rel_insert_input option >
 
 and receipt_chain_hashes_obj_rel_insert_input =
   ( receipt_chain_hashes_insert_input

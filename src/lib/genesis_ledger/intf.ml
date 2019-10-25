@@ -16,6 +16,10 @@ module type S = sig
 
   val largest_account_keypair_exn : unit -> Keypair.t
 
+  val largest_public_key_exn : unit -> Public_key.Compressed.t
+
+  val largest_private_key_exn : unit -> Private_key.t
+
   val keypair_of_account_record_exn :
     Private_key.t option * Account.t -> Keypair.t
 end

@@ -222,6 +222,8 @@ end
 (* bin_io omitted *)
 type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
+include Hashable.Make (Stable.Latest)
+
 let create ~fee ~nonce ~memo ~body : t = {common= {fee; nonce; memo}; body}
 
 let fold ({common; body} : t) = Fold.(Common.fold common +> Body.fold body)

@@ -23,7 +23,7 @@ struct
       (struct
         type value = Tree_node.t
 
-        type proof_elem = User_command.t
+        type proof_elem = User_command_payload.t
 
         type context = Key_value_db.t * Receipt.Chain_hash.t
 
@@ -39,46 +39,39 @@ struct
       end)
 
   module Verifier = Merkle_list_verifier.Make (struct
-    type proof_elem = User_command.t
+    type proof_elem = User_command_payload.t
 
     type hash = Receipt.Chain_hash.t [@@deriving eq]
 
     let hash parent_hash proof_elem =
-      Receipt.Chain_hash.cons (User_command.payload proof_elem) parent_hash
+      Receipt.Chain_hash.cons proof_elem parent_hash
   end)
 
   let prove t ~(proving_receipt : Receipt.Chain_hash.t)
       ~(resulting_receipt : Receipt.Chain_hash.t) =
     let open Monad.Let_syntax in
-    let%bind tree_node = Key_value_db.get t ~key:resulting_receipt in
-    let open Monad.Result.Let_syntax in
-    let%bind chain_value =
-      Monad.return
-      @@ Result.of_option tree_node
-           ~error:
+    match%bind Key_value_db.get t ~key:resulting_receipt with
+    | None ->
+        Monad.return
+          (Error
              (Error.createf
                 !"Could not retrieve resulting receipt \
                   %{sexp:Receipt.Chain_hash.t}"
-                resulting_receipt)
-    in
-    let%bind initial_value, proof =
-      Prover.prove ~context:(t, proving_receipt) chain_value
-      |> Monad.Result.lift
-    in
-    if Receipt.Chain_hash.equal initial_value.key proving_receipt then
-      Monad.return @@ Ok (initial_value.key, proof)
-    else
-      Monad.return
-      @@ Or_error.errorf
-           !"Cannot retrieve receipt: %{sexp: Receipt.Chain_hash.t}"
-           initial_value.key
+                resulting_receipt))
+    | Some tree_node ->
+        let%bind initial_value, proof =
+          Prover.prove ~context:(t, proving_receipt) tree_node
+        in
+        if Receipt.Chain_hash.equal initial_value.key proving_receipt then
+          Monad.return @@ Ok (initial_value.key, proof)
+        else
+          Monad.return
+          @@ Or_error.errorf
+               !"Cannot retrieve receipt: %{sexp: Receipt.Chain_hash.t}"
+               initial_value.key
 
-  let verify = Verifier.verify
-
-  let get_payment t ~receipt =
-    let open Monad.Option.Let_syntax in
-    let%map result = Key_value_db.get t ~key:receipt in
-    result.value
+  let verify ~init user_commands target_hash =
+    Option.is_some (Verifier.verify ~init user_commands target_hash)
 
   let add t ~previous (user_command : User_command.t) =
     let open Monad.Let_syntax in
@@ -86,20 +79,16 @@ struct
     let receipt_chain_hash = Receipt.Chain_hash.cons payload previous in
     let%bind tree_node = Key_value_db.get t ~key:receipt_chain_hash in
     let node, status =
+      let success_result =
+        Some
+          {Tree_node.parent= previous; value= payload; key= receipt_chain_hash}
+      in
       Option.value_map tree_node
-        ~default:
-          ( Some
-              { Tree_node.parent= previous
-              ; value= user_command
-              ; key= receipt_chain_hash }
-          , `Ok receipt_chain_hash )
+        ~default:(success_result, `Ok receipt_chain_hash)
         ~f:(fun {parent= retrieved_parent; _} ->
           if not (Receipt.Chain_hash.equal previous retrieved_parent) then
             (None, `Error_multiple_previous_receipts retrieved_parent)
-          else
-            ( Some
-                {parent= previous; value= user_command; key= receipt_chain_hash}
-            , `Duplicate receipt_chain_hash ) )
+          else (success_result, `Duplicate receipt_chain_hash) )
     in
     let%map () =
       Option.value_map node ~default:(Monad.return ()) ~f:(function node ->
@@ -144,7 +133,7 @@ let%test_module "receipt_database" =
           (Array.init 5 ~f:(fun (_ : int) -> Signature_lib.Keypair.create ()))
         ~max_amount:10000 ~max_fee:1000 ()
 
-    (* HACK: Limited tirals because tests were taking too long *)
+    (* HACK: Limited trials because tests were taking too long *)
     let%test_unit "Recording a sequence of user commands can generate a valid \
                    proof from the first user command to the last user command"
         =
@@ -161,7 +150,7 @@ let%test_module "receipt_database" =
                   Receipt_db.add db ~previous:prev_receipt_chain user_command
                 with
                 | `Ok new_receipt_chain ->
-                    (new_receipt_chain, user_command)
+                    (new_receipt_chain, User_command.payload user_command)
                 | `Duplicate _ ->
                     failwith
                       "Each receipt chain in a sequence should be unique"
@@ -176,7 +165,7 @@ let%test_module "receipt_database" =
               (User_command.payload @@ List.hd_exn user_commands)
               initial_receipt_chain
           in
-          [%test_result: Receipt.Chain_hash.t * User_command.t list]
+          [%test_result: Receipt.Chain_hash.t * User_command_payload.t list]
             ~message:"Proofs should be equal"
             ~expect:(proving_receipt, Non_empty_list.tail expected_merkle_path)
             ( Receipt_db.prove db ~proving_receipt ~resulting_receipt
@@ -226,8 +215,7 @@ let%test_module "receipt_database" =
               initial_receipt_chain ) ;
           assert (
             Receipt_db.verify ~init:generated_initial_receipt_chain
-              merkle_proof random_receipt_chain
-            |> Option.is_some ) )
+              merkle_proof random_receipt_chain ) )
 
     let%test_unit "A proof should not exist if a proving receipt does not \
                    exist in the database" =

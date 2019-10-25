@@ -20,7 +20,7 @@ open Coda_base
     preceding receipt_chain_hash.
 
     *)
-module type S = sig
+module type Read_only = sig
   type t
 
   type config
@@ -38,19 +38,20 @@ module type S = sig
        t
     -> proving_receipt:Receipt.Chain_hash.t
     -> resulting_receipt:Receipt.Chain_hash.t
-    -> (Receipt.Chain_hash.t * User_command.t list) Or_error.t M.t
+    -> (Receipt.Chain_hash.t * User_command_payload.t list) Or_error.t M.t
 
   (** [verify t ~init merkle_list receipt_chain] will verify the proof produced
       by `prove`. Namely, it will verify that a user has sent a series of user
       commands from a `resulting_receipt` to a `proving_receipt`. *)
   val verify :
        init:Receipt.Chain_hash.t
-    -> User_command.t sexp_list
+    -> User_command_payload.t sexp_list
     -> Receipt.Chain_hash.t
-    -> Receipt.Chain_hash.t Non_empty_list.t option
+    -> bool
+end
 
-  val get_payment :
-    t -> receipt:Receipt.Chain_hash.t -> User_command.t option M.t
+module type S = sig
+  include Read_only
 
   (** Add stores a payment into a client's database as a value.
       The key is computed by using the payment payload and the previous receipt_chain_hash.
@@ -71,7 +72,7 @@ module type Tree_node = sig
     module V1 : sig
       type t =
         { key: Receipt.Chain_hash.Stable.V1.t
-        ; value: User_command.Stable.V1.t
+        ; value: User_command_payload.Stable.V1.t
         ; parent: Receipt.Chain_hash.Stable.V1.t }
       [@@deriving bin_io, sexp, version]
     end
@@ -81,7 +82,7 @@ module type Tree_node = sig
 
   type t = Stable.Latest.t =
     { key: Receipt.Chain_hash.Stable.V1.t
-    ; value: User_command.Stable.V1.t
+    ; value: User_command_payload.Stable.V1.t
     ; parent: Receipt.Chain_hash.Stable.V1.t }
   [@@deriving sexp]
 end

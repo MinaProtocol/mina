@@ -1,37 +1,15 @@
 open Core_kernel
+open Async_kernel
 
 module Monad = struct
   module type S = sig
     type 'a t
 
     include Monad.S with type 'a t := 'a t
-
-    module Result : sig
-      val lift : 'value t -> ('value, 'err) Result.t t
-
-      type nonrec ('value, 'err) t = ('value, 'err) Result.t t
-
-      include Monad.S2 with type ('value, 'err) t := ('value, 'err) t
-    end
-
-    module Option : sig
-      type nonrec 'a t = 'a option t
-
-      include Monad.S with type 'a t := 'a t
-    end
   end
 
-  module Ident = struct
-    include Monad.Ident
-
-    module Result = struct
-      let lift = Result.return
-
-      include Result
-    end
-
-    module Option = Option
-  end
+  module Deferred = Deferred
+  module Ident = Monad.Ident
 end
 
 module Intf = struct

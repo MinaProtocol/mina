@@ -119,9 +119,8 @@ module User_command = struct
       (encode user_command_with_hash first_seen)
       Ast.On_conflict.user_commands
 
-  let decode obj =
-    let receiver = (obj#publicKeyByReceiver)#value in
-    let sender = (obj#public_key)#value in
+  let decode_payload obj =
+    let receiver = (obj#receiver)#value in
     let body =
       let open User_command_payload.Body in
       match obj#typ with
@@ -130,10 +129,12 @@ module User_command = struct
       | `Payment ->
           Payment {receiver; amount= obj#amount}
     in
-    let payload =
-      User_command_payload.create ~fee:obj#fee ~nonce:obj#nonce ~memo:obj#memo
-        ~body
-    in
+    User_command_payload.create ~fee:obj#fee ~nonce:obj#nonce ~memo:obj#memo
+      ~body
+
+  let decode obj =
+    let sender = (obj#sender)#value in
+    let payload = decode_payload obj in
     ( Coda_base.{User_command.Poly.Stable.V1.payload; sender; signature= ()}
     , obj#first_seen )
 end
@@ -182,8 +183,6 @@ module Snark_job = struct
 
       method job2 = job2
 
-      method prover = None
-
       method public_key =
         some @@ Public_key.encode_as_obj_rel_insert_input prover
     end
@@ -203,9 +202,8 @@ module Receipt_chain_hash = struct
 
       method hash = value
 
-      method receipt_chain_hash = None
-
-      method receipt_chain_hashes = parent
+      (* Hasura auto generated this name *)
+      method receipt_chain_hash = parent
     end
 
   let encode t =
@@ -217,7 +215,7 @@ module Receipt_chain_hash = struct
     let encoded_receipt_chain =
       to_obj value
         ( some
-        @@ encode_as_arr_rel_insert_input [parent]
+        @@ encode_as_obj_rel_insert_input parent
              Ast.On_conflict.receipt_chain_hash )
     in
     encode_as_obj_rel_insert_input encoded_receipt_chain

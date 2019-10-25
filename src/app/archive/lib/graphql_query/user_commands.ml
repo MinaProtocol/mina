@@ -39,10 +39,10 @@ module Query =
             hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
             memo @bsDecoder(fn: "User_command_memo.of_string")
             nonce @bsDecoder (fn: "Base_types.Nonce.deserialize")
-            public_key {
-                value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
+            sender: public_key {
+              value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
             }
-            publicKeyByReceiver {
+            receiver : publicKeyByReceiver {
               value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
             } 
             typ @bsDecoder (fn: "Base_types.User_command_type.decode")
