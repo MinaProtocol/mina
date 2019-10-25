@@ -4,7 +4,11 @@ module Styles = {
   open Css;
 
   let hero = style([display(`flex), width(`percent(100.))]);
-
+  let fadeIn =
+    keyframes([
+      (0, [opacity(0.), top(`px(50))]),
+      (100, [opacity(1.), top(`px(0))]),
+    ]);
   let heroLeft =
     style([
       display(`flex),
@@ -24,12 +28,16 @@ module Styles = {
       width(`percent(100.)),
       color(Theme.Colors.slateAlpha(0.4)),
     ]);
-
+  let header = {
+    merge([
+      Theme.Text.Header.h1,
+    ]);
+  };
   let heroBody =
     merge([
-      Theme.Text.Body.regular,
+      Theme.Text.Body.regularLight,
       style([
-        marginTop(`rem(2.)),
+        marginTop(`rem(1.)),
         marginBottom(`rem(2.)),
         maxWidth(`rem(24.)),
         color(Theme.Colors.midnightBlue),
@@ -63,21 +71,28 @@ let make = (~nextStep, ~prevStep) => {
   <div className=Theme.Onboarding.main>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
-        <h1 className=Theme.Text.Header.h1>
+        <h1 className=Styles.header>
+        <FadeIn duration=500>
           {React.string("Setting Up Your Node")}
+                  </FadeIn>
+
         </h1>
         <p className=Styles.heroBody>
+         <FadeIn duration=500 delay=150>
           {React.string(
              "First, let's install and configure the Coda daemon. This will allow you to connect to the Coda network and make transactions. Follow the instructions at the link below to begin.",
            )}
+          </FadeIn> 
         </p>
-        <Link
-          kind=Link.Blue
-          onClick={_ =>
-            openExternal("https://codaprotocol.com/docs/getting-started/")
-          }>
-          {React.string("Getting started")}
-        </Link>
+        <FadeIn duration=500 delay=250>
+          <Link
+            kind=Link.Blue
+            onClick={_ =>
+              openExternal("https://codaprotocol.com/docs/getting-started/")
+            }>
+            {React.string("Getting started")}
+          </Link>
+        </FadeIn> 
         <Spacer height=2.0 />
         <div className=Styles.buttonRow>
           <Button
