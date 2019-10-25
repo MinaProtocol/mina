@@ -606,7 +606,8 @@ let create (config : Config.t) =
                 (`Call
                   (fun exn ->
                     Logger.warn config.logger
-                      "unhandled exception from daemon-side verifier server: $exn"
+                      "unhandled exception from daemon-side verifier server: \
+                       $exn"
                       ~module_:__MODULE__ ~location:__LOC__
                       ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
               (fun () ->
