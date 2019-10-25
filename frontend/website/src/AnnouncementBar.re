@@ -100,7 +100,7 @@ let make = () => {
           ]),
         ])
       )>
-      {React.string({j|Read Here\u00A0→|j})}
+      {React.string({j|Join Now\u00A0→|j})}
     </p>
   </A>;
 };

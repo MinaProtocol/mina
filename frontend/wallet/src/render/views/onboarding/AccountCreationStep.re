@@ -19,6 +19,12 @@ module Styles = {
     style([display(`flex), flexDirection(`row)]);
   };
 
+  let fadeIn =
+    keyframes([
+      (0, [opacity(0.), top(`px(50))]),
+      (100, [opacity(1.), top(`px(0))]),
+    ]);
+
   let heroLeft = {
     style([
       display(`flex),
@@ -29,15 +35,35 @@ module Styles = {
       marginLeft(`px(80)),
     ]);
   };
-
+  let header = {
+    merge([
+      Theme.Text.Header.h1,
+      style([animation(fadeIn, ~duration=500, ~iterationCount=`count(1))]),
+    ]);
+  };
   let heroBody = {
     merge([
-      Theme.Text.Body.regular,
-      style([maxWidth(`rem(21.5)), color(Theme.Colors.midnightBlue)]),
+      Theme.Text.Body.regularLight,
+      style([
+        opacity(0.),
+        maxWidth(`rem(21.5)),
+        color(Theme.Colors.midnightBlue),
+        animation(fadeIn, ~duration=500, ~iterationCount=`count(1)),
+        animationDelay(250),
+        animationFillMode(`forwards),
+      ]),
     ]);
   };
   let buttonRow = {
     style([display(`flex), flexDirection(`row)]);
+  };
+  let textFields = {
+    style([
+      opacity(0.),
+      animation(fadeIn, ~duration=500, ~iterationCount=`count(1)),
+      animationDelay(500),
+      animationFillMode(`forwards),
+    ]);
   };
 };
 
@@ -54,17 +80,22 @@ let make = (~nextStep, ~prevStep) => {
   <div className=Theme.Onboarding.main>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
-        <h1 className=Theme.Text.Header.h1>
+        <h1 className=Styles.header>
+        <FadeIn duration=500>
           {React.string("Create Your Account")}
+        </FadeIn> 
         </h1>
-        <Spacer height=1. />
+        <Spacer height=0.5 />
         <p className=Styles.heroBody>
+        <FadeIn duration=500 delay=150>
           {React.string(
              "Create your first account to complete setting up Coda Wallet. Please be sure to choose a secure password.",
            )}
+        </FadeIn>
         </p>
-        <div>
-          <Spacer height=1. />
+        <div className=Styles.textFields>
+        <FadeIn duration=500 delay=200>
+          <Spacer height=0.5 />
           <TextField
             label="Name"
             onChange={value => setName(_ => value)}
@@ -78,6 +109,7 @@ let make = (~nextStep, ~prevStep) => {
             value=password
           />
           <Spacer height=2. />
+          </FadeIn>
         </div>
         <div className=Styles.buttonRow>
           <Button
@@ -112,9 +144,6 @@ let make = (~nextStep, ~prevStep) => {
                     updateAddressBook(
                       AddressBook.set(~key, ~name=accountName),
                     );
-                    ReasonReact.Router.push(
-                      "/account/" ++ PublicKey.uriEncode(key),
-                    );
                     nextStep();
                     React.null;
                   | _ => React.null
@@ -123,9 +152,6 @@ let make = (~nextStep, ~prevStep) => {
           </AddAccountMutation>
         </div>
       </div>
-      <div
-        // Graphic goes here
-      />
     </div>
   </div>;
 };
