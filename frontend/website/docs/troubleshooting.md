@@ -15,14 +15,16 @@ Follow the steps below to use [MiniUPnP](https://github.com/miniupnp/miniupnp) t
 
 Run the following command:
 
-        $ sudo upnpc -r 8303 TCP
+        $ sudo upnpc -r 8302 TCP 8303 TCP
 
 If this command succeeds, you'll see a response indicating that the ports have been successfully redirected:
 
 ```
 ...
-InternalIP:Port = 192.168.101.7:8303
+InternalIP:Port = 192.168.101.7:8302
 external 148.64.99.117:8302 TCP is redirected to internal 192.168.101.7:8302 (duration=0)
+InternalIP:Port = 192.168.101.7:8303
+external 148.64.99.117:8303 TCP is redirected to internal 192.168.101.7:8303 (duration=0)
 ```
 
 If you are on a shared network (like an office wireless network), you may get the following error if someone else on the same network has already redirected these ports:
