@@ -4,15 +4,18 @@ module Intf = Intf
 module Tree_node = Tree_node
 
 module Make
-    (Monad : Key_value_database.Monad.S)
+    (Monad : Key_value_database.Monad.S) (Config : sig
+        type t
+    end)
     (Key_value_db : Key_value_database.Intf.S
                     with module M := Monad
                      and type key := Receipt.Chain_hash.t
-                     and type value := Tree_node.t) =
+                     and type value := Tree_node.t
+                     and type config := Config.t) =
 struct
   type t = Key_value_db.t
 
-  let create ~directory = Key_value_db.create ~directory
+  let create config = Key_value_db.create config
 
   module Prover =
     Merkle_list_prover.Make
@@ -118,7 +121,7 @@ let%test_module "receipt_database" =
           type t = Tree_node.t [@@deriving sexp]
         end)
 
-    module Receipt_db = Make_ident (Key_value_db)
+    module Receipt_db = Make_ident (Unit) (Key_value_db)
 
     let populate_random_path ~db user_commands initial_receipt_hash =
       List.fold user_commands ~init:[initial_receipt_hash]
@@ -150,7 +153,7 @@ let%test_module "receipt_database" =
         Quickcheck.Generator.(
           tuple2 Receipt.Chain_hash.gen (list_non_empty user_command_gen))
         ~f:(fun (initial_receipt_chain, user_commands) ->
-          let db = Receipt_db.create ~directory:"" in
+          let db = Receipt_db.create () in
           let resulting_receipt, expected_merkle_path =
             List.fold_map user_commands ~init:initial_receipt_chain
               ~f:(fun prev_receipt_chain user_command ->
@@ -189,7 +192,7 @@ let%test_module "receipt_database" =
           tuple3 Receipt.Chain_hash.gen user_command_gen
             (list_non_empty user_command_gen))
         ~f:(fun (prev_receipt_chain, initial_user_command, user_commands) ->
-          let db = Receipt_db.create ~directory:"" in
+          let db = Receipt_db.create () in
           let initial_receipt_chain =
             match
               Receipt_db.add db ~previous:prev_receipt_chain
@@ -237,7 +240,7 @@ let%test_module "receipt_database" =
             (list_non_empty user_command_gen))
         ~f:
           (fun (initial_receipt_chain, unrecorded_user_command, user_commands) ->
-          let db = Receipt_db.create ~directory:"" in
+          let db = Receipt_db.create () in
           populate_random_path ~db user_commands initial_receipt_chain ;
           let nonexisting_receipt_chain =
             let receipt_chains = Hashtbl.keys (Receipt_db.database db) in
@@ -275,4 +278,4 @@ module Rocksdb =
   Rocksdb.Serializable.Make
     (Receipt.Chain_hash.Stable.V1)
     (Tree_node.Stable.V1)
-include Make_ident (Rocksdb)
+include Make_ident (String) (Rocksdb)

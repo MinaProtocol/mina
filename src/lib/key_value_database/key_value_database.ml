@@ -42,9 +42,11 @@ module Intf = struct
 
     type value
 
+    type config
+
     module M : Monad.S
 
-    val create : directory:string -> t
+    val create : config -> t
 
     val close : t -> unit
 
@@ -79,7 +81,8 @@ module Make_mock
   Intf.Mock
   with type t = Value.t Key.Table.t
    and type key := Key.t
-   and type value := Value.t = struct
+   and type value := Value.t
+   and type config := unit = struct
   type t = Value.t Key.Table.t
 
   let to_sexp t ~key_sexp ~value_sexp =
@@ -88,7 +91,7 @@ module Make_mock
            [%sexp_of: Sexp.t * Sexp.t] (key_sexp key, value_sexp value) )
     |> [%sexp_of: Sexp.t list]
 
-  let create ~directory:_ = Key.Table.create ()
+  let create _ = Key.Table.create ()
 
   let get t ~key = Key.Table.find t key
 
