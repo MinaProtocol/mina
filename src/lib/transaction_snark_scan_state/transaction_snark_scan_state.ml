@@ -31,32 +31,19 @@ module type Monad_with_Or_error_intf = sig
 end
 
 module Transaction_with_witness = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-        type t =
-          { transaction_with_info: Ledger.Undo.Stable.V1.t
-          ; statement: Transaction_snark.Statement.Stable.V1.t
-          ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
-        [@@deriving sexp, bin_io, version]
-      end
+      (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
+      type t =
+        { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
+        ; statement: Transaction_snark.Statement.Stable.V1.t
+        ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
+      [@@deriving sexp]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_snark_scan_state_transaction_with_witness"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t =
     { transaction_with_info: Ledger.Undo.t
@@ -66,28 +53,15 @@ module Transaction_with_witness = struct
 end
 
 module Ledger_proof_with_sok_message = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
-        [@@deriving sexp, bin_io, version]
-      end
+      type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
+      [@@deriving sexp, bin_io, version]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_snark_scan_state_ledger_proof_with_sok_message"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Ledger_proof.t * Sok_message.t [@@deriving sexp]
 end

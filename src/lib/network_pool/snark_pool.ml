@@ -464,6 +464,7 @@ let%test_module "random set test" =
         let%bind verifier =
           Verifier.create ~logger
             ~pids:(Child_processes.Termination.create_pid_table ())
+            ~conf_dir:None
         in
         let config = config verifier in
         let resource_pool =
@@ -607,6 +608,7 @@ let%test_module "random set test" =
           let%bind verifier =
             Verifier.create ~logger
               ~pids:(Child_processes.Termination.create_pid_table ())
+              ~conf_dir:None
           in
           let config = config verifier in
           let network_pool =
@@ -676,6 +678,7 @@ let%test_module "random set test" =
             let%bind verifier =
               Verifier.create ~logger
                 ~pids:(Child_processes.Termination.create_pid_table ())
+                ~conf_dir:None
             in
             let config = config verifier in
             let network_pool =
@@ -721,6 +724,7 @@ let%test_module "random set test" =
           let%bind verifier =
             Verifier.create ~logger
               ~pids:(Child_processes.Termination.create_pid_table ())
+              ~conf_dir:None
           in
           let config = config verifier in
           let network_pool =

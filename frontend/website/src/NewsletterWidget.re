@@ -38,17 +38,23 @@ module Styles = {
       height(px(40)),
       borderRadius(px(4)),
       width(`percent(100.)),
+      fontSize(rem(1.)),
       color(Style.Colors.teal),
       padding(px(12)),
       border(px(1), `solid, Style.Colors.hyperlinkAlpha(0.3)),
       active([
         outline(px(0), `solid, `transparent),
-        borderColor(Style.Colors.hyperlinkAlpha(0.7)),
+        padding(px(11)),
+        borderWidth(px(2)),
+        borderColor(Style.Colors.hyperlinkAlpha(1.)),
       ]),
       focus([
         outline(px(0), `solid, `transparent),
-        borderColor(Style.Colors.hyperlinkAlpha(0.7)),
+        padding(px(11)),
+        borderWidth(px(2)),
+        borderColor(Style.Colors.hyperlinkAlpha(1.)),
       ]),
+      hover([borderColor(Style.Colors.hyperlinkAlpha(1.))]),
       media(Style.MediaQuery.notMobile, [width(px(272))]),
     ]);
 
@@ -58,16 +64,18 @@ module Styles = {
       alignItems(`center),
       justifyContent(`center),
       color(white),
-      backgroundColor(Style.Colors.jungle),
+      backgroundColor(Style.Colors.clover),
       border(px(0), `solid, `transparent),
       marginTop(`rem(0.5)),
       marginLeft(`zero),
       height(px(40)),
       width(px(120)),
+      fontWeight(`semiBold),
       borderRadius(px(4)),
       cursor(`pointer),
       active([outline(px(0), `solid, `transparent)]),
       focus([outline(px(0), `solid, `transparent)]),
+      hover([backgroundColor(Style.Colors.jungle)]),
       disabled([backgroundColor(Style.Colors.slateAlpha(0.3))]),
       media(
         Style.MediaQuery.notMobile,
@@ -83,10 +91,16 @@ let uniqueId = () => {
 };
 
 [@react.component]
-let make = () => {
+let make = (~center as centerText=false) => {
   let formId = uniqueId();
   <form id={"subscribe-form-" ++ formId} className=Styles.container>
-    <div className=Css.(style([marginBottom(px(8))]))>
+    <div
+      className=Css.(
+        style([
+          marginBottom(px(8)),
+          textAlign(centerText ? `center : `left),
+        ])
+      )>
       {React.string("Subscribe to our newsletter for updates")}
     </div>
     <div id={"success-message-" ++ formId} className=Styles.successMessage>

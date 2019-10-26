@@ -15,6 +15,8 @@ module Make (Transaction : sig
   val accounts_accessed : t -> Public_key.Compressed.t list
 end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
+
+  include Hashable.S with type t := t
 end) =
 struct
   module Database = Rocksdb.Serializable.Make (Transaction) (Time)
@@ -36,7 +38,7 @@ struct
   let close {database; _} = Database.close database
 
   let add {database; pagination; logger} transaction date =
-    match Hashtbl.find pagination.all_values transaction with
+    match Hashtbl.find pagination.all_values.table transaction with
     | Some _retrieved_transaction ->
         Logger.trace logger
           !"Not adding transaction into transaction database since it already \
@@ -49,14 +51,9 @@ struct
 
   let get_total_values {pagination; _} = Pagination.get_total_values pagination
 
-  let get_values {pagination; _} = Pagination.get_values pagination
-
   let get_all_values {pagination; _} = Pagination.get_all_values pagination
 
-  let get_earlier_values {pagination; _} =
-    Pagination.get_earlier_values pagination
-
-  let get_later_values {pagination; _} = Pagination.get_later_values pagination
+  let query {pagination; _} = Pagination.query pagination
 end
 
 module Block_time = Coda_base.Block_time

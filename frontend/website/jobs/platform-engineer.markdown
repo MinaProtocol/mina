@@ -1,10 +1,10 @@
 ---
-title: Senior Product Engineer (Full-stack)
-date: 2019-08-04
+title: Senior Platform Engineer (Frontend Product)
+date: 2019-10-23
 ---
 Help us build accessible, usable, delightful products on top of the Coda Protocol!
 
-We’re seeking a full-stack product engineer who is also excited about building productivity tools for developers. While it's hard to say exactly what we'll work on given that we are such an early-stage startup, we expect projects to include:
+We’re seeking a frontend platform engineer who is also excited about building productivity tools for developers. While it's hard to say exactly what we'll work on given that we are such an early-stage startup, we expect projects to include:
 
 - Developer tools and SDKs to build applications on top of Coda
 - The command-line interface (CLI) to interact with the Coda client and daemon
@@ -19,12 +19,14 @@ We’re seeking a full-stack product engineer who is also excited about building
     - Bonus: Experience with React Hooks or GraphQL
 - Experience with AWS or other public cloud providers
 - Familiarity with functional programming, know your way around map and reduce.
+- Willingness to learn to work with our OCaml protocol daemon code
 - Experience working on collaborative projects with a product team
 
 ## Nice to have
 
 - Exposure to working with cryptocurrencies
 - Experience with ReasonML, OCaml, Haskell, or Rust
+- Experience with GraphQL
 - Early stage startup experience
 - Experience with contributing to Open Source
 
