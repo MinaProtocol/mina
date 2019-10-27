@@ -5,6 +5,8 @@
     "/blog",
     "/docs",
     "/docs/**",
+    "/snapps",
+    "/snapps/**",
     "/jobs",
     "/testnet"
   ]
