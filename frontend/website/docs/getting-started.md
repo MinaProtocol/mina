@@ -81,7 +81,7 @@ If you are running a firewall, you should allow traffic on TCP port 8303. Additi
 
 You may need to configure your router's port forwarding to allow inbound traffic to the following ports through your **external** IP address.
 
-- `TCP` port `8303`
+- `TCP` port `8302` and `8303`
 
 For walk-through instructions see [this guide](/docs/troubleshooting/#port-forwarding).
 ## Next
