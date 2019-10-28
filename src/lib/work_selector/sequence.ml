@@ -5,7 +5,7 @@ struct
   let work ~snark_pool ~fee ~logger (staged_ledger : Inputs.Staged_ledger.t)
       (state : Lib.State.t) =
     let state = Lib.State.remove_old_assignments state ~logger in
-    let unseen_jobs = Lib.all_works staged_ledger state in
+    let unseen_jobs = Lib.all_unseen_works staged_ledger state in
     match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
     | [] ->
         (None, state)
@@ -13,6 +13,8 @@ struct
         (Some x, Lib.State.set state x)
 
   let remove = Lib.State.remove
+
+  let pending_work_statements = Lib.pending_work_statements
 end
 
 let%test_module "test" =
