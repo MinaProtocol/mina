@@ -106,7 +106,8 @@ module Time = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    include Stable.Latest
+    type t = Stable.Latest.t [@@deriving sexp, compare]
+
     module Bits = B.UInt64
     include B.Snarkable.UInt64 (Tick)
 
@@ -114,6 +115,8 @@ module Time = struct
 
     let to_time_ns_span s =
       Time_ns.Span.of_ms (Int64.to_float (UInt64.to_int64 s))
+
+    let to_string_hum s = to_time_ns_span s |> Time_ns.Span.to_string_hum
 
     let to_ms = UInt64.to_int64
 
@@ -136,6 +139,8 @@ module Time = struct
     let ( >= ) = UInt64.( >= )
 
     let min = UInt64.min
+
+    let zero = UInt64.zero
   end
 
   include Comparable.Make (Stable.Latest)

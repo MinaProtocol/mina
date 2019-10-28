@@ -5,7 +5,7 @@ module type Inputs_intf = sig
 
   module Location : Location_intf.S
 
-  module Kvdb : Intf.Key_value_database
+  module Kvdb : Intf.Key_value_database with type config := string
 
   module Storage_locations : Intf.Storage_locations
 end
@@ -56,7 +56,7 @@ module Make (Inputs : Inputs_intf) :
       | Some name ->
           name
     in
-    let kvdb = Kvdb.create ~directory in
+    let kvdb = Kvdb.create directory in
     {uuid; kvdb}
 
   let close {uuid= _; kvdb} = Kvdb.close kvdb
