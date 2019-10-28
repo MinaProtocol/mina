@@ -9,10 +9,23 @@ module Single = struct
       [@@deriving sexp, compare, eq, yojson, hash]
 
       let to_latest = Fn.id
+
+      let description = "Fee transfer Single"
+
+      let version_byte = Base58_check.Version_bytes.fee_transfer_single
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson, hash]
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
+
+  include Comparable.Make (Stable.Latest)
+  module Base58_check = Codable.Make_base58_check (Stable.Latest)
+
+  [%%define_locally
+  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
+
+  [%%define_locally
+  Base58_check.String_ops.(to_string, of_string)]
 end
 
 [%%versioned
@@ -30,7 +43,9 @@ end]
 type t = Stable.Latest.t =
   | One of Single.Stable.V1.t
   | Two of Single.Stable.V1.t * Single.Stable.V1.t
-[@@deriving sexp, compare, eq, yojson, hash]
+[@@deriving sexp, compare, yojson, hash]
+
+include Comparable.Make (Stable.Latest)
 
 let to_list = function One x -> [x] | Two (x, y) -> [x; y]
 

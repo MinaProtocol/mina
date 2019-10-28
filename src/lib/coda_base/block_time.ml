@@ -17,6 +17,14 @@ module Time = struct
       type t = UInt64.t [@@deriving sexp, compare, eq, hash, yojson]
 
       let to_latest = Fn.id
+
+      module T = struct
+        type typ = t [@@deriving sexp, compare, hash]
+
+        type t = typ [@@deriving sexp, compare, hash]
+      end
+
+      include Hashable.Make (T)
     end
   end]
 
@@ -53,7 +61,6 @@ module Time = struct
     [%%endif]
   end
 
-  (* DO NOT add bin_io the deriving list *)
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   module B = Bits
