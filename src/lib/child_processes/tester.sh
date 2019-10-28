@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Script used to test the custom process handling logic
+
 set -euo pipefail
 
 for _ in $(seq 1 10)

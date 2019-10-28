@@ -105,7 +105,8 @@ let get_coda_binary () =
    *not* be used to kill a process that was started during this run of the
    daemon.
 *)
-let maybe_kill_and_unlock : string -> string -> Logger.t -> unit Deferred.t =
+let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
+    =
  fun name lockpath logger ->
   let open Deferred.Let_syntax in
   match%bind Sys.file_exists lockpath with

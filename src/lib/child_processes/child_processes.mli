@@ -3,6 +3,7 @@
 open Async
 open Pipe_lib
 
+(** A managed child process *)
 type t
 
 exception Child_died
@@ -23,17 +24,22 @@ val termination_status : t -> Unix.Exit_or_signal.t option
     component is [`Log] and the process outputs valid messages in our JSON
     format they will be passed through unmodified regardless of the level.
     Otherwise they'll be wrapped and logged at the specified level.
+    If the second argument is [`Pipe] the lines will be written into the
+    appropriate strict pipe, accessible via [stdout_lines] or [stderr_lines].
+    Otherwise the pipe will be empty, and reading from it will raise an
+    exception.
 *)
 type output_handling =
   [`Log of Logger.Level.t | `Don't_log] * [`Pipe | `No_pipe]
 
 (** Start a process, handling a lock file, termination, optional logging, and
-    the standard in, out and error fds. *)
+    the standard in, out and error fds. This is for "custom" processes, as
+    opposed to ones that are built using RPC parallel. *)
 val start_custom :
      logger:Logger.t
   -> name:string
      (** The name of the executable file, without any coda- prefix *)
-  -> checkout_relative_path:string
+  -> git_root_relative_path:string
      (** Path to the built executable, relative to the root of a source checkout
      *)
   -> conf_dir:string
