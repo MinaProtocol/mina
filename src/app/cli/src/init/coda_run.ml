@@ -209,11 +209,12 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           return (Coda_commands.get_trust_status_all coda) )
     ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
           return (Coda_commands.reset_trust_status coda ip_address) )
-    ; implement Daemon_rpcs.Verify_proof.rpc (fun () (pk, tx, proof) ->
+    ; implement Daemon_rpcs.Receipt_chain.Verify.rpc (fun () (pk, tx, proof) ->
           return
             ( Coda_commands.verify_payment coda pk tx proof
             |> Participating_state.active_error |> Or_error.join ) )
-    ; implement Daemon_rpcs.Prove_receipt.rpc (fun () (proving_receipt, pk) ->
+    ; implement Daemon_rpcs.Receipt_chain.Prove.rpc
+        (fun () (proving_receipt, pk) ->
           let open Deferred.Or_error.Let_syntax in
           let%bind acc_opt =
             Coda_commands.get_account coda pk

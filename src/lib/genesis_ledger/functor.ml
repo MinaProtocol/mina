@@ -60,6 +60,15 @@ module Make_from_base (Base : Base_intf) : Intf.S = struct
 
   let largest_account_keypair_exn =
     Memo.unit (fun () -> keypair_of_account_record_exn (largest_account_exn ()))
+
+  let largest_public_key_exn =
+    Memo.unit (fun () ->
+        (largest_account_keypair_exn ()).public_key |> Public_key.compress )
+
+  let largest_private_key_exn =
+    Memo.unit (fun () ->
+        let largest_private_key_opt, _ = largest_account_exn () in
+        Option.value_exn largest_private_key_opt )
 end
 
 module With_private = struct

@@ -596,76 +596,80 @@ module Reset_trust_status = struct
       ~bin_response:Response.Stable.Latest.bin_t
 end
 
-module Verify_proof = struct
-  module Query = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          Public_key.Compressed.Stable.V1.t
-          * User_command.Stable.V1.t
-          * (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list)
+module Receipt_chain = struct
+  module Prove = struct
+    module Query = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t =
+            Receipt.Chain_hash.Stable.V1.t * Public_key.Compressed.Stable.V1.t
 
-        let to_latest = Fn.id
-      end
-    end]
+          let to_latest = Fn.id
+        end
+      end]
 
-    type t = Stable.Latest.t
+      type t = Stable.Latest.t
+    end
+
+    module Response = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t =
+            ( Receipt.Chain_hash.Stable.V1.t
+            * User_command_payload.Stable.V1.t list )
+            Core_kernel.Or_error.Stable.V1.t
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type t = Stable.Latest.t
+    end
+
+    let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Prove_receipt" ~version:0
+        ~bin_query:Query.Stable.Latest.bin_t
+        ~bin_response:Response.Stable.Latest.bin_t
   end
 
-  module Response = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = unit Core_kernel.Or_error.Stable.V1.t
+  module Verify = struct
+    module Query = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t =
+            Public_key.Compressed.Stable.V1.t
+            * User_command_payload.Stable.V1.t
+            * ( Receipt.Chain_hash.Stable.V1.t
+              * User_command_payload.Stable.V1.t list )
 
-        let to_latest = Fn.id
-      end
-    end]
+          let to_latest = Fn.id
+        end
+      end]
 
-    type t = Stable.Latest.t
+      type t = Stable.Latest.t
+    end
+
+    module Response = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = unit Core_kernel.Or_error.Stable.V1.t
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type t = Stable.Latest.t
+    end
+
+    let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Verify_proof" ~version:0
+        ~bin_query:Query.Stable.Latest.bin_t
+        ~bin_response:Response.Stable.Latest.bin_t
   end
-
-  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Verify_proof" ~version:0
-      ~bin_query:Query.Stable.Latest.bin_t
-      ~bin_response:Response.Stable.Latest.bin_t
-end
-
-module Prove_receipt = struct
-  module Query = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          Receipt.Chain_hash.Stable.V1.t * Public_key.Compressed.Stable.V1.t
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    type t = Stable.Latest.t
-  end
-
-  module Response = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list)
-          Core_kernel.Or_error.Stable.V1.t
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    type t = Stable.Latest.t
-  end
-
-  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Prove_receipt" ~version:0
-      ~bin_query:Query.Stable.Latest.bin_t
-      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Get_inferred_nonce = struct

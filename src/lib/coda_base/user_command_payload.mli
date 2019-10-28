@@ -49,7 +49,7 @@ module Common : sig
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
+  type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -100,7 +100,9 @@ module Stable : sig
   module Latest = V1
 end
 
-type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
+type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
+
+include Hashable.S with type t := t
 
 val create :
      fee:Currency.Fee.t

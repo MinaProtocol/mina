@@ -1,7 +1,6 @@
 open Core
 open Async
 open Pipe_lib
-open Coda_transition
 open Coda_base
 open Signature_lib
 
@@ -11,35 +10,15 @@ let%test_module "Processor" =
       let max_length = 4
     end)
 
-    module Processor = Processor.Make (struct
-      let address = "v1/graphql"
-
-      let headers = String.Map.of_alist_exn []
-
-      let preprocess_variables_string =
-        String.substr_replace_all ~pattern:{|"constraint_"|}
-          ~with_:{|"constraint"|}
-    end)
-
     let logger = Logger.null ()
 
-    let t = {Processor.port= 9000}
+    let pids = Pid.Table.create ()
 
-    let try_with ~f =
-      Deferred.Or_error.ok_exn
-      @@ let%bind result =
-           Monitor.try_with_or_error ~name:"Write Processor" f
-         in
-         let%map clear_action =
-           Processor.Client.query (Graphql_query.Clear_data.make ()) t.port
-         in
-         Or_error.all_unit
-           [ result
-           ; Result.map_error clear_action ~f:(fun error ->
-                 Error.createf
-                   !"Issue clearing data in database: %{sexp:Error.t}"
-                 @@ Graphql_client_lib.Connection_error.to_error error )
-             |> Result.ignore ]
+    let trust_system = Trust_system.null ()
+
+    let t = Processor.create Test_setup.port ~logger
+
+    let try_with = Test_setup.try_with t.port
 
     let assert_user_command
         ((user_command, block_time) :
@@ -79,7 +58,7 @@ let%test_module "Processor" =
 
     let query_participants (t : Processor.t) hashes =
       let%map response =
-        Processor.Client.query_exn
+        Graphql_client.query_exn
           (Graphql_query.User_commands.Query_participants.make
              ~hashes:(Array.of_list hashes) ())
           t.port
@@ -156,7 +135,7 @@ let%test_module "Processor" =
                      [(user_command1, max_block_time)])
               in
               let%bind public_keys =
-                Processor.Client.query_exn
+                Graphql_client.query_exn
                   (Graphql_query.Public_keys.Query.make ())
                   t.port
               in
@@ -179,7 +158,7 @@ let%test_module "Processor" =
                 ~expect:accessed_accounts queried_public_keys ;
               let query_user_command hash =
                 let%map query_result =
-                  Processor.Client.query_exn
+                  Graphql_client.query_exn
                     (Graphql_query.User_commands.Query.make ~hash ())
                     t.port
                 in
@@ -232,40 +211,6 @@ let%test_module "Processor" =
 
     open Stubs
 
-    let pids = Pid.Table.create ()
-
-    let trust_system = Trust_system.null ()
-
-    let create_added_breadcrumb_diff breadcrumb =
-      let ((block, _) as validated_block) =
-        Transition_frontier.Breadcrumb.validated_transition breadcrumb
-      in
-      let user_commands =
-        External_transition.Validated.user_commands validated_block
-      in
-      let sender_receipt_chains_from_parent_ledger =
-        let user_commands = User_command.Set.of_list user_commands in
-        let senders =
-          Public_key.Compressed.Set.map user_commands ~f:User_command.sender
-        in
-        let ledger =
-          Staged_ledger.ledger
-          @@ Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-        in
-        Set.to_map senders ~f:(fun sender ->
-            Option.value_exn
-              (let open Option.Let_syntax in
-              let%bind ledger_location =
-                Ledger.location_of_key ledger sender
-              in
-              let%map {receipt_chain_hash; _} =
-                Ledger.get ledger ledger_location
-              in
-              receipt_chain_hash) )
-      in
-      Diff.Transition_frontier.Breadcrumb_added
-        {block; sender_receipt_chains_from_parent_ledger}
-
     (* TODO: make other tests that queries components of a block by testing other queries, such prove_receipt_chain and block pagination *)
     let%test_unit "Write a external transition diff successfully" =
       Backtrace.elide := false ;
@@ -291,11 +236,9 @@ let%test_module "Processor" =
           in
           let processing_deferred_job = Processor.run t reader in
           let diffs =
-            List.map
-              ~f:(fun breadcrumb ->
-                Diff.Transition_frontier
-                  (create_added_breadcrumb_diff breadcrumb) )
-              (root_breadcrumb :: successors)
+            Test_setup.create_added_breadcrumb_diff
+              (module Stubs.Transition_frontier)
+              ~root:root_breadcrumb successors
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
           Strict_pipe.Writer.close writer ;

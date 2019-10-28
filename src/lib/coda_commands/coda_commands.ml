@@ -196,22 +196,25 @@ module Receipt_chain_hash = struct
 end
 
 let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
-    (verifying_txn : User_command.t) (init_receipt, proof) =
+    (verifying_txn : User_command_payload.t) (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
   let resulting_receipt = account.Account.Poly.receipt_chain_hash in
   let open Or_error.Let_syntax in
-  let%bind (_ : Receipt.Chain_hash.t Non_empty_list.t) =
-    Result.of_option
+  let%bind () =
+    Result.ok_if_true
       (Receipt_chain_database.verify ~init:init_receipt proof resulting_receipt)
       ~error:(Error.createf "Merkle list proof of payment is invalid")
   in
-  if List.exists proof ~f:(fun txn -> User_command.equal verifying_txn txn)
+  if
+    List.exists proof ~f:(fun txn_payload ->
+        User_command_payload.equal verifying_txn txn_payload )
   then Ok ()
   else
     Or_error.errorf
-      !"Merkle list proof does not contain payment %{sexp:User_command.t}"
+      !"Merkle list proof does not contain payment \
+        %{sexp:User_command_payload.t}"
       verifying_txn
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)

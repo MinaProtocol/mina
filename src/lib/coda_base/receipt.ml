@@ -25,6 +25,10 @@ module Chain_hash = struct
     let of_string = of_string
   end)
 
+  let sexp_of_t t = to_string t |> Sexp.of_string
+
+  let t_of_sexp sexp = Sexp.to_string sexp |> of_string
+
   let empty =
     of_hash (Pedersen.(State.salt "CodaReceiptEmpty") |> Pedersen.State.digest)
 

@@ -8344,16 +8344,95 @@
           "description": "columns and relationships of \"receipt_chain_hashes\"",
           "fields": [
             {
-              "args": [],
+              "args": [
+                {
+                  "name": "distinct_on",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "ENUM",
+                        "name": "blocks_user_commands_select_column",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "distinct select on columns"
+                },
+                {
+                  "name": "limit",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "limit the nuber of rows returned"
+                },
+                {
+                  "name": "offset",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "skip the first n rows. Use only with order_by"
+                },
+                {
+                  "name": "order_by",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "INPUT_OBJECT",
+                        "name": "blocks_user_commands_order_by",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "sort the rows by one or more columns"
+                },
+                {
+                  "name": "where",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "blocks_user_commands_bool_exp",
+                    "ofType": null
+                  },
+                  "description": "filter the rows returned"
+                }
+              ],
               "isDeprecated": false,
               "deprecationReason": null,
               "name": "blocks_user_commands",
               "type": {
-                "kind": "OBJECT",
-                "name": "blocks_user_commands",
-                "ofType": null
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "blocks_user_commands",
+                      "ofType": null
+                    }
+                  }
+                }
               },
-              "description": "An object relationship"
+              "description": "An array relationship"
             },
             {
               "args": [],
@@ -8585,7 +8664,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "blocks_user_commands_obj_rel_insert_input",
+                "name": "blocks_user_commands_arr_rel_insert_input",
                 "ofType": null
               },
               "description": null
@@ -8754,16 +8833,6 @@
         },
         {
           "inputFields": [
-            {
-              "name": "blocks_user_commands",
-              "defaultValue": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "blocks_user_commands_order_by",
-                "ofType": null
-              },
-              "description": null
-            },
             {
               "name": "hash",
               "defaultValue": null,
@@ -9258,16 +9327,6 @@
         {
           "inputFields": [
             {
-              "name": "id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
               "name": "job1",
               "defaultValue": null,
               "type": {
@@ -9340,16 +9399,6 @@
             },
             {
               "name": "job2",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "prover",
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
@@ -9625,16 +9674,6 @@
         {
           "inputFields": [
             {
-              "name": "id",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
               "name": "job1",
               "defaultValue": null,
               "type": {
@@ -9680,12 +9719,6 @@
           "interfaces": null,
           "name": "snark_jobs_update_column",
           "enumValues": [
-            {
-              "isDeprecated": false,
-              "deprecationReason": null,
-              "name": "id",
-              "description": "column name"
-            },
             {
               "isDeprecated": false,
               "deprecationReason": null,

@@ -2,6 +2,7 @@ module Base_types = Base_types
 module Blocks = Blocks
 module Fee_transfers = Fee_transfers
 module Public_keys = Public_keys
+module Receipt_chain = Receipt_chain
 module User_commands = User_commands
 
 module Clear_data =
@@ -18,6 +19,10 @@ module Clear_data =
     }
     
     delete_blocks_snark_jobs (where: {}) {
+      affected_rows
+    }
+
+    delete_snark_jobs(where: {}) {
       affected_rows
     }
 
