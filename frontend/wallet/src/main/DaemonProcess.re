@@ -49,9 +49,9 @@ let fakerCommand = (~port) => {
 [@bs.module "os"] external tmpdir: unit => string = "";
 
 module Process = {
+  let logfileName = tmpdir() ++ "/daemon.log";
   let start = (command: Command.t) => {
     let {Command.executable, args} = command;
-    let logfileName = tmpdir() ++ "/daemon.log";
     print_endline(
       {j|Starting $executable with $args. Logging to `$logfileName`|j},
     );
