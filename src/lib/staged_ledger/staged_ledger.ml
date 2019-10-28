@@ -171,47 +171,6 @@ module T = struct
           ~error_prefix ~ledger_hash_end:ledger
           ~ledger_hash_begin:(Some (get_target proof))
 
-  (* TODO: Remove this. This is deprecated *)
-  let materialized_snarked_ledger_hash :
-         t
-      -> expected_target:Frozen_ledger_hash.t
-      -> Frozen_ledger_hash.t Or_error.t =
-   fun {ledger; scan_state; _} ~expected_target ->
-    let open Or_error.Let_syntax in
-    let txns_still_being_worked_on = Scan_state.staged_undos scan_state in
-    let snarked_ledger = Ledger.register_mask ledger (Ledger.Mask.create ()) in
-    let res =
-      let%bind () =
-        Scan_state.Staged_undos.apply txns_still_being_worked_on snarked_ledger
-      in
-      let snarked_ledger_hash =
-        Ledger.merkle_root snarked_ledger |> Frozen_ledger_hash.of_ledger_hash
-      in
-      if not (Frozen_ledger_hash.equal snarked_ledger_hash expected_target)
-      then
-        Or_error.errorf
-          !"Error materializing the snarked ledger with hash \
-            %{sexp:Frozen_ledger_hash.t} got %{sexp:Frozen_ledger_hash.t}: "
-          expected_target snarked_ledger_hash
-      else
-        match Scan_state.latest_ledger_proof scan_state with
-        | None ->
-            return snarked_ledger_hash
-        | Some proof ->
-            let target = get_target proof in
-            if Frozen_ledger_hash.equal snarked_ledger_hash target then
-              return snarked_ledger_hash
-            else
-              Or_error.errorf
-                !"Last snarked ledger (%{sexp: Frozen_ledger_hash.t}) is \
-                  different from the one being requested ((%{sexp: \
-                  Frozen_ledger_hash.t}))"
-                target expected_target
-    in
-    (* Make sure we don't leak this mask. *)
-    Ledger.unregister_mask_exn ledger snarked_ledger |> ignore ;
-    res
-
   let statement_exn t =
     let open Deferred.Let_syntax in
     match%map Statement_scanner.scan_statement t.scan_state ~verifier:() with
@@ -1268,10 +1227,6 @@ module T = struct
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self
     ; state_body_hash }
-
-  module For_tests = struct
-    let materialized_snarked_ledger_hash = materialized_snarked_ledger_hash
-  end
 end
 
 include T
@@ -1803,34 +1758,6 @@ let%test_module "test" =
               in
               (*Note: if this fails, try increasing the number of trials*)
               assert checked ) )
-
-    let%test_unit "Snarked ledger" =
-      let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_table () in
-      Quickcheck.test (gen_below_capacity ()) ~trials:20
-        ~f:(fun (ledger_init_state, cmds, iters) ->
-          async_with_ledgers ledger_init_state (fun sl _test_mask ->
-              iter_cmds cmds iters (fun _cmds_left _count_opt cmds_this_iter ->
-                  let%map proof_opt, diff =
-                    create_and_apply sl logger pids cmds_this_iter
-                      stmt_to_work_random_prover
-                  in
-                  ( match proof_opt with
-                  | None ->
-                      ()
-                  | Some proof ->
-                      let last_snarked_ledger_hash =
-                        (Ledger_proof.statement (fst proof)).target
-                      in
-                      let materialized_snarked_ledger_hash =
-                        Or_error.ok_exn
-                        @@ Sl.For_tests.materialized_snarked_ledger_hash !sl
-                             ~expected_target:last_snarked_ledger_hash
-                      in
-                      assert (
-                        Frozen_ledger_hash.equal last_snarked_ledger_hash
-                          materialized_snarked_ledger_hash ) ) ;
-                  diff ) ) )
 
     let stmt_to_work_restricted work_list provers
         (stmts : Transaction_snark_work.Statement.t) :
