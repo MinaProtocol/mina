@@ -194,9 +194,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
         Blockchain_state.staged_ledger_hash @@ blockchain_state protocol_state)
 
   let with_database ~directory_name ~f =
-    let transition_storage =
-      Transition_storage.create ~directory:directory_name
-    in
+    let transition_storage = Transition_storage.create directory_name in
     let%map result = f transition_storage in
     Transition_storage.close transition_storage ;
     result

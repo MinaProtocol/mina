@@ -482,6 +482,8 @@ let request_work t =
   Option.map instances_opt ~f:(fun instances ->
       {Snark_work_lib.Work.Spec.instances; fee} )
 
+let work_selection_method t = t.config.work_selection_method
+
 let add_work t (work : Snark_worker_lib.Work.Result.t) =
   let (module Work_selection_method) = t.config.work_selection_method in
   let spec = work.spec.instances in
