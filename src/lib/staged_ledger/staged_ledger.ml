@@ -117,7 +117,8 @@ module T = struct
               (struct
                 type t = unit
 
-                let verify ~verifier:() ~proof:_ ~statement:_ ~message:_ = Deferred.return true
+                let verify ~verifier:() ~proof:_ ~statement:_ ~message:_ =
+                  Deferred.return true
               end)
   end
 
@@ -692,10 +693,11 @@ module T = struct
       coinbase_for_blockchain_snark coinbases |> Deferred.return
     in
     let%map () =
-        Deferred.( verify_scan_state_after_apply
-            (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
-            scan_state'
-        >>| to_staged_ledger_or_error )
+      Deferred.(
+        verify_scan_state_after_apply
+          (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
+          scan_state'
+        >>| to_staged_ledger_or_error)
     in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
