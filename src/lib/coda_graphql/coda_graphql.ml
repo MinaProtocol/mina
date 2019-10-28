@@ -678,11 +678,8 @@ module Types = struct
       let to_string (fqe : Fqe.t) =
         let vector = Fqe.to_vector fqe in
         List.init (Fq.Vector.length vector) ~f:(fun i ->
-            (* TODO: visually display string better *)
-            let string_value =
-              Binable.to_string (module Fq) (Fq.Vector.get vector i)
-            in
-            string_value )
+            let fq = Fq.Vector.get vector i in
+            Crypto_params.Tick0.Field.to_string fq )
       in
       List.map [x; y] ~f:to_string
     in
@@ -704,8 +701,8 @@ module Types = struct
         ; string_list_field "c" ~resolve:(fun (proof : Proof.t) -> proof.c)
         ; string_list_list_field "delta_prime"
             ~resolve:(fun (proof : Proof.t) -> proof.delta_prime)
-        ; string_list_field "z" ~resolve:(fun (proof : Proof.t) ->
-              proof.z ) ] )
+        ; string_list_field "z" ~resolve:(fun (proof : Proof.t) -> proof.z) ]
+    )
 
   let block :
       ( Coda_lib.t
