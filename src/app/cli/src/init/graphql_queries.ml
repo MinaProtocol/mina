@@ -77,7 +77,7 @@ module Set_staking =
 [%graphql
 {|
 mutation ($public_key: PublicKey) {
-  setStaking(input : {wallets: [$public_key]}) {
+  setStaking(input : {publicKeys: [$public_key]}) {
     lastStaking
     }
   }
@@ -87,7 +87,7 @@ module Set_snark_worker =
 [%graphql
 {|
 mutation ($wallet: PublicKey) {
-  setSnarkWorker (input : {wallet: $wallet}) {
+  setSnarkWorker (input : {publicKey: $wallet}) {
       lastSnarkWorker @bsDecoder(fn: "Decoders.optional_public_key")
     }
   }

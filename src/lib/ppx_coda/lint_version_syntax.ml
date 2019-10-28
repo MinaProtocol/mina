@@ -3,6 +3,7 @@
    - "deriving bin_io" and "deriving version" never appear in types defined inside functor bodies
    - otherwise, "bin_io" may appear in a "deriving" attribute only if "version" also appears in that extension
    - versioned types only appear in versioned type definitions
+   - the construct "include Stable.Latest" is prohibited
 *)
 
 open Core_kernel
@@ -83,6 +84,13 @@ let validate_version_if_bin_io =
   make_deriving_validator
     ~pred:(fun has_bin_io has_version -> has_bin_io && not has_version)
     "Must have deriving version if deriving bin_io"
+
+let is_stable_latest_inc_decl inc_decl =
+  match inc_decl.pincl_mod.pmod_desc with
+  | Pmod_ident {txt= Ldot (Lident "Stable", "Latest"); _} ->
+      true
+  | _ ->
+      false
 
 let versioned_in_functor_error loc =
   (loc, "Cannot use versioned extension within a functor body")
@@ -206,6 +214,9 @@ let get_versioned_type_misuses type_decl =
     (params_types @ cstr_types @ manifest_types)
     ~f:get_core_type_versioned_type_misuses
 
+let include_stable_latest_error loc =
+  (loc, "Cannot use \"include Stable.Latest\"")
+
 (* traverse AST, collect errors *)
 let lint_ast =
   object (self)
@@ -259,6 +270,8 @@ let lint_ast =
         when String.equal name.txt "test_module" ->
           (* don't check for errors in test code *)
           acc
+      | Pstr_include inc_decl when is_stable_latest_inc_decl inc_decl ->
+          (in_functor, errors @ [include_stable_latest_error str.pstr_loc])
       | _ ->
           let acc' = super#structure_item str acc in
           acc_with_errors acc acc'.errors

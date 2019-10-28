@@ -276,7 +276,9 @@ module With_valid_signature = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
+
+  module Gen = Stable.Latest.Gen
   include Comparable.Make (Stable.Latest)
 end
 

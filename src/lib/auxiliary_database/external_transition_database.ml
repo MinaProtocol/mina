@@ -47,7 +47,7 @@ let add_user_blocks (pagination : Pagination.t)
     state_hash external_transition time
 
 let create ~logger directory =
-  let database = Database.create ~directory in
+  let database = Database.create directory in
   let pagination = Pagination.create () in
   List.iter (Database.to_alist database) ~f:(fun (hash, (block_data, time)) ->
       add_user_blocks pagination ({With_hash.hash; data= block_data}, time) ) ;
