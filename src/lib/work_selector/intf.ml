@@ -101,7 +101,8 @@ module type Lib_intf = sig
        One_or_two.t
        list
 
-  val all_works :
+  (**Jobs that have not been assigned yet*)
+  val all_unseen_works :
        Staged_ledger.t
     -> State.t
     -> ( Transaction.t
@@ -110,6 +111,13 @@ module type Lib_intf = sig
        Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
+
+  (**jobs that are not in the snark pool yet*)
+  val pending_work_statements :
+       snark_pool:Snark_pool.t
+    -> fee:Fee.t
+    -> staged_ledger:Staged_ledger.t
+    -> Transaction_snark.Statement.t One_or_two.t list
 
   module For_tests : sig
     val does_not_have_better_fee :
@@ -142,6 +150,12 @@ module type Selection_method_intf = sig
     -> staged_ledger
     -> State.t
     -> work One_or_two.t option * State.t
+
+  val pending_work_statements :
+       snark_pool:snark_pool
+    -> fee:Currency.Fee.t
+    -> staged_ledger:staged_ledger
+    -> Transaction_snark.Statement.t One_or_two.t list
 end
 
 module type Make_selection_method_intf = functor
