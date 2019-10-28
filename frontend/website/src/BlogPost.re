@@ -100,18 +100,18 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
         <div className="db dn-l">
           <div className="mw65-ns ibmplex f5 center blueblack">
             <h1
-              className="f2 f1-ns tracked-tightish pt2 pt3-m pt4-l mb1"
+              className="f2 f1-ns tracked-tightish pt2 pt3-m pt4-l mb1 title"
               dangerouslySetInnerHTML={"__html": metadata.title}
             />
             {switch (metadata.subtitle) {
              | None => <div className="mt0 mb4" />
              | Some(subtitle) =>
                <h2
-                 className="f4 f3-ns mt0 mb4 fw4"
+                 className="f4 f3-ns mt0 mb4 fw4 subtitle"
                  dangerouslySetInnerHTML={"__html": subtitle}
                />
              }}
-            <h4 className="f7 fw4 tracked-supermega ttu mt0 mb1">
+            <h4 className="f7 fw4 tracked-supermega ttu mt0 mb1 author">
               {switch (metadata.authorWebsite) {
                | None =>
                  <span className="mr2">
@@ -136,7 +136,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
                }}
             </h4>
             <h4
-              className="f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45">
+              className="f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45 date">
               {React.string(metadata.date)}
             </h4>
             <div className="blog-content lh-copy">
@@ -152,18 +152,18 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
           <div className="mw7 center ibmplex blueblack side-footnotes">
             <div className="mw65-ns f5 center blueblack">
               <h1
-                className="f2 f1-ns tracked-tightish pt2 pt3-m pt4-l mb1"
+                className="f2 f1-ns tracked-tightish pt2 pt3-m pt4-l mb1 title"
                 dangerouslySetInnerHTML={"__html": metadata.title}
               />
               {switch (metadata.subtitle) {
                | None => <div className="mt0 mb4" />
                | Some(subtitle) =>
                  <h2
-                   className="f4 f3-ns mt0 mb4 fw4"
+                   className="f4 f3-ns mt0 mb4 fw4 subtitle"
                    dangerouslySetInnerHTML={"__html": subtitle}
                  />
                }}
-              <h4 className="f7 fw4 tracked-supermega ttu metropolis mt0 mb1">
+              <h4 className="f7 fw4 tracked-supermega ttu metropolis mt0 mb1 author">
                 {switch (metadata.authorWebsite) {
                  | None =>
                    <span className="mr2">
@@ -188,7 +188,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
                  }}
               </h4>
               <h4
-                className="f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45">
+                className="f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45 date">
                 {React.string(metadata.date)}
               </h4>
               <div className="blog-content lh-copy">
