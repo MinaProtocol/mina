@@ -1,8 +1,7 @@
 open Core
 open Snark_params.Tick
 
-type t = Field.t * Inner_curve.Scalar.t
-[@@deriving sexp, eq, bin_io, compare, hash]
+type t = Field.t * Inner_curve.Scalar.t [@@deriving sexp, eq, compare, hash]
 
 include Codable.S with type t := t
 

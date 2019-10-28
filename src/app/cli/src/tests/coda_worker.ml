@@ -93,7 +93,7 @@ module T = struct
     ; prove_receipt:
         ( 'worker
         , Receipt.Chain_hash.t * Receipt.Chain_hash.t
-        , Payment_proof.t )
+        , Receipt.Chain_hash.t * User_command.t list )
         Rpc_parallel.Function.t
     ; new_block:
         ( 'worker
@@ -152,7 +152,7 @@ module T = struct
         -> Transition_frontier.Diff.Root_diff.view Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
-        -> Payment_proof.t Deferred.t
+        -> (Receipt.Chain_hash.t * User_command.t list) Deferred.t
     ; coda_get_all_transitions:
            Public_key.Compressed.t
         -> ( Auxiliary_database.Filtered_external_transition.t
@@ -283,7 +283,9 @@ module T = struct
         ~bin_input:
           [%bin_type_class:
             Receipt.Chain_hash.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t]
-        ~bin_output:Payment_proof.Stable.V1.bin_t ()
+        ~bin_output:
+          [%bin_type_class:
+            Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list] ()
 
     let new_block =
       C.create_pipe ~f:new_block_impl ~name:"new_block"
@@ -422,12 +424,11 @@ module T = struct
               ~location typ
           in
           let receipt_chain_database =
-            Coda_base.Receipt_chain_database.create
-              ~directory:receipt_chain_dir_name
+            Receipt_chain_database.create receipt_chain_dir_name
           in
           trace_database_initialization "receipt_chain_database" __LOC__
             receipt_chain_dir_name ;
-          let trust_system = Trust_system.create ~db_dir:trust_dir in
+          let trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let transaction_database =
             Auxiliary_database.Transaction_database.create ~logger
@@ -531,8 +532,8 @@ module T = struct
             let external_transition_database =
               Coda_lib.external_transition_database coda
             in
-            Auxiliary_database.External_transition_database.get_values
-              external_transition_database pk
+            Auxiliary_database.External_transition_database.get_all_values
+              external_transition_database (Some pk)
             |> Deferred.return
           in
           let coda_get_balance pk =

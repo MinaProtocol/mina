@@ -47,7 +47,7 @@ let add_user_blocks (pagination : Pagination.t)
     state_hash external_transition time
 
 let create ~logger directory =
-  let database = Database.create ~directory in
+  let database = Database.create directory in
   let pagination = Pagination.create () in
   List.iter (Database.to_alist database) ~f:(fun (hash, (block_data, time)) ->
       add_user_blocks pagination ({With_hash.hash; data= block_data}, time) ) ;
@@ -56,7 +56,7 @@ let create ~logger directory =
 let add {database; pagination; logger}
     ( {With_hash.hash= state_hash; data= filtered_external_transition} as
     transition_with_hash ) date =
-  match Hashtbl.find pagination.all_values state_hash with
+  match Hashtbl.find pagination.all_values.table state_hash with
   | Some _ ->
       Logger.trace logger
         !"Not adding transition into external transition database since it \
@@ -70,13 +70,8 @@ let add {database; pagination; logger}
 
 let get_total_values {pagination; _} = Pagination.get_total_values pagination
 
-let get_values {pagination; _} = Pagination.get_values pagination
-
 let get_all_values {pagination; _} = Pagination.get_all_values pagination
 
-let get_earlier_values {pagination; _} =
-  Pagination.get_earlier_values pagination
-
-let get_later_values {pagination; _} = Pagination.get_later_values pagination
+let query {pagination; _} = Pagination.query pagination
 
 let close {database; _} = Database.close database

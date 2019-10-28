@@ -146,7 +146,7 @@ module Haskell_process = struct
               ()
           | Error err ->
               (* There is a race where it dies in between the check and kill
-               starting. *)
+                 starting. *)
               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                 "Killing kademlia helper failed: %s, hopefully it already died."
                 (Error.to_string_hum err)
@@ -692,7 +692,7 @@ let%test_module "Tests" =
       at_exit (fun () -> Sys.command_exn @@ "rm -rf '" ^ tmpdir ^ "'") ;
       tmpdir
 
-    let create_trust_system () = Trust_system.create ~db_dir:(get_temp_dir ())
+    let create_trust_system () = Trust_system.create (get_temp_dir ())
 
     let%test_unit "connect" =
       (* This flakes 1 in 20 times, so try a couple times if it fails *)

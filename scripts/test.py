@@ -81,6 +81,7 @@ required_blacklist = [
 extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
+    "ci/circleci: build-auxiliary",
     # "ci/circleci: build-wallet",
 ]
 
@@ -216,6 +217,7 @@ def run(args):
             log = os.path.join(profile_dir, '%s.log' % test)
             cmd = 'set -o pipefail && %s integration-test %s 2>&1 ' % (coda_exe, test)
             cmd += '| tee \'%s\' | %s -f \'%s\' ' % (log, logproc_exe, logproc_filter)
+            cmd += '; ./scripts/link-subprocess-logs.sh \'%s\' ' % profile_dir
             print('Running: %s' % (cmd))
             run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
 

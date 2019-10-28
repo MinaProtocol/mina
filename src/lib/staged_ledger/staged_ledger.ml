@@ -111,18 +111,14 @@ module T = struct
             Error
               (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
 
-  module M = struct
-    include Monad.Ident
-    module Or_error = Or_error
-  end
-
   module Statement_scanner = struct
     include Scan_state.Make_statement_scanner
-              (M)
+              (Deferred)
               (struct
                 type t = unit
 
-                let verify ~verifier:() ~proof:_ ~statement:_ ~message:_ = true
+                let verify ~verifier:() ~proof:_ ~statement:_ ~message:_ =
+                  Deferred.return true
               end)
   end
 
@@ -217,7 +213,8 @@ module T = struct
     res
 
   let statement_exn t =
-    match Statement_scanner.scan_statement t.scan_state ~verifier:() with
+    let open Deferred.Let_syntax in
+    match%map Statement_scanner.scan_statement t.scan_state ~verifier:() with
     | Ok s ->
         `Non_empty s
     | Error `Empty ->
@@ -264,11 +261,11 @@ module T = struct
       Scan_state.staged_transactions scan_state |> Deferred.return
     in
     let%bind () =
-      List.fold_result
-        ~f:(fun _ tx ->
-          Ledger.apply_transaction snarked_ledger tx |> Or_error.ignore )
-        ~init:() txs
-      |> Deferred.return
+      Deferred.List.fold txs ~init:(Ok ()) ~f:(fun acc tx ->
+          Deferred.map (Async.Scheduler.yield ()) ~f:(fun () ->
+              Or_error.bind acc ~f:(fun () ->
+                  Ledger.apply_transaction snarked_ledger tx |> Or_error.ignore
+              ) ) )
     in
     let%bind () =
       let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
@@ -696,11 +693,11 @@ module T = struct
       coinbase_for_blockchain_snark coinbases |> Deferred.return
     in
     let%map () =
-      Deferred.return
-        ( verify_scan_state_after_apply
-            (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
-            scan_state'
-        |> to_staged_ledger_or_error )
+      Deferred.(
+        verify_scan_state_after_apply
+          (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
+          scan_state'
+        >>| to_staged_ledger_or_error)
     in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
@@ -1310,7 +1307,7 @@ let%test_module "test" =
           ~state_body_hash:State_body_hash.dummy
       in
       let diff' = Staged_ledger_diff.forget diff in
-      let%bind verifier = Verifier.create ~logger ~pids in
+      let%bind verifier = Verifier.create ~logger ~pids ~conf_dir:None in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
@@ -1795,7 +1792,9 @@ let%test_module "test" =
                         (Sequence.to_list cmds_this_iter :> User_command.t list)
                         work_done partitions
                     in
-                    let%bind verifier = Verifier.create ~logger ~pids in
+                    let%bind verifier =
+                      Verifier.create ~logger ~pids ~conf_dir:None
+                    in
                     let%bind apply_res = Sl.apply !sl diff ~logger ~verifier in
                     let checked', diff' =
                       match apply_res with
