@@ -1,5 +1,5 @@
 ---
-title: What are zK-SNARKs?
+title: What are zk-SNARKs?
 subtitle: The Complete Guide to Crypto's Most Powerful Proofs 
 date: 2019-10-25
 author: O(1) Labs
