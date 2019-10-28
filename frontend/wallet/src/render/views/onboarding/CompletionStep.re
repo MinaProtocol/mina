@@ -60,11 +60,11 @@ let make = (~closeOnboarding, ~prevStep) => {
         </FadeIn>
         <Spacer height=0.5 />
         <FadeIn duration=500 delay=250>
-        <Link
-          kind=Link.Blue
-          onClick={_ => openExternal("https://discord.gg/JN75xk")}>
-          {React.string("Open Discord")}
-        </Link>
+          <Link
+            kind=Link.Blue
+            onClick={_ => openExternal("https://discord.gg/JN75xk")}>
+            {React.string("Open Discord")}
+          </Link>
         </FadeIn> 
         <Spacer height=2. />
         <div className=Styles.buttonRow>
