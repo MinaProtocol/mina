@@ -122,7 +122,7 @@ module Haskell_process = struct
       Child_processes.start_custom
         ~logger:(Logger.extend logger [("helper-process", `String "kademlia")])
         ~name:"kademlia"
-        ~checkout_relative_path:"src/app/kademlia-haskell/result/bin/kademlia"
+        ~git_root_relative_path:"src/app/kademlia-haskell/result/bin/kademlia"
         ~conf_dir ~args
         ~stdout:(`Log Logger.Level.Trace, `Pipe)
         ~stderr:(`Log Logger.Level.Error, `No_pipe)
@@ -419,7 +419,7 @@ let%test_module "Tests" =
 
       let create ~initial_peers:_ ~node_addrs_and_ports:_ ~logger ~conf_dir =
         Child_processes.start_custom ~logger ~name:"dummy.sh"
-          ~checkout_relative_path:"src/dummy.sh" ~conf_dir ~args:[]
+          ~git_root_relative_path:"src/dummy.sh" ~conf_dir ~args:[]
           ~stdout:(`Don't_log, `Pipe)
           ~stderr:(`Don't_log, `No_pipe)
           ~termination:`Always_raise

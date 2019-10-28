@@ -644,7 +644,7 @@ module Helper = struct
     let outstanding_requests = Hashtbl.create (module Int) in
     match%bind
       Child_processes.start_custom ~logger ~name:"libp2p_helper"
-        ~checkout_relative_path:
+        ~git_root_relative_path:
           "src/app/libp2p_helper/result/bin/libp2p_helper" ~conf_dir ~args:[]
         ~stdout:(`Log Logger.Level.Trace, `Pipe)
         ~stderr:

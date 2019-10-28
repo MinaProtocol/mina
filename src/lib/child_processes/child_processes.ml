@@ -216,7 +216,7 @@ let reader_to_strict_pipe_with_logging :
 let start_custom :
        logger:Logger.t
     -> name:string
-    -> checkout_relative_path:string
+    -> git_root_relative_path:string
     -> conf_dir:string
     -> args:string list
     -> stdout:output_handling
@@ -227,7 +227,7 @@ let start_custom :
                      killed:bool -> Unix.Exit_or_signal.t -> unit Deferred.t
                    | `Ignore ]
     -> t Deferred.Or_error.t =
- fun ~logger ~name ~checkout_relative_path ~conf_dir ~args ~stdout ~stderr
+ fun ~logger ~name ~git_root_relative_path ~conf_dir ~args ~stdout ~stderr
      ~termination ->
   let open Deferred.Or_error.Let_syntax in
   let%bind () =
@@ -253,7 +253,7 @@ let start_custom :
       (List.filter_opt
          [ Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
          ; get_project_root ()
-           |> Option.map ~f:(fun root -> root ^/ checkout_relative_path)
+           |> Option.map ~f:(fun root -> root ^/ git_root_relative_path)
          ; Some (Filename.dirname coda_binary_path ^/ name)
          ; Some ("coda-" ^ name) ])
       ~f:(fun prog -> Process.create ~prog ~args ())
@@ -349,13 +349,13 @@ let%test_module _ =
 
     let name = "tester.sh"
 
-    let checkout_relative_path = "src/lib/child_processes/tester.sh"
+    let git_root_relative_path = "src/lib/child_processes/tester.sh"
 
     let%test_unit "can launch and get stdout" =
       async_with_temp_dir (fun conf_dir ->
           let open Deferred.Let_syntax in
           let%bind process =
-            start_custom ~logger ~name ~checkout_relative_path ~conf_dir
+            start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:["exit"]
               ~stdout:(`Log Logger.Level.Debug, `Pipe)
               ~stderr:(`Log Logger.Level.Error, `No_pipe)
@@ -378,7 +378,7 @@ let%test_module _ =
       async_with_temp_dir (fun conf_dir ->
           let open Deferred.Let_syntax in
           let%bind process =
-            start_custom ~logger ~name ~checkout_relative_path ~conf_dir
+            start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:["loop"]
               ~stdout:(`Don't_log, `Pipe)
               ~stderr:(`Don't_log, `No_pipe)
@@ -422,7 +422,7 @@ let%test_module _ =
       async_with_temp_dir (fun conf_dir ->
           let open Deferred.Let_syntax in
           let mk_process () =
-            start_custom ~logger ~name ~checkout_relative_path ~conf_dir
+            start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:["loop"]
               ~stdout:(`Don't_log, `No_pipe)
               ~stderr:(`Don't_log, `No_pipe)
