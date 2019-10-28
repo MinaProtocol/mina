@@ -271,7 +271,7 @@ let lint_ast =
           (* don't check for errors in test code *)
           acc
       | Pstr_include inc_decl when is_stable_latest_inc_decl inc_decl ->
-          (in_functor, errors @ [include_stable_latest_error str.pstr_loc])
+          acc_with_errors acc [include_stable_latest_error str.pstr_loc]
       | _ ->
           let acc' = super#structure_item str acc in
           acc_with_errors acc acc'.errors
