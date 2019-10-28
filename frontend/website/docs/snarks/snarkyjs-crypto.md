@@ -5,6 +5,7 @@ Schnorr signatures suitable for use inside of SNARKs. You can install it with
 npm install snarkyjs-crypto
 ```
 
+For usage of the API, please see the example [here.](https://github.com/o1-labs/snarkyjs-crypto/blob/master/example.js)
 
 ## API documentation 
 ```reasonml
@@ -75,6 +76,13 @@ module type S = {
     let ofArray: ('a => Hash.t, 'a, array('a)) => t('a);
   };
 
+  module Group: {
+    type t
+
+    let toAffine : t => (Field.t, Field.t);
+    let ofAffine : (Field.t, Field.t) => t;
+  };
+
   module Schnorr: {
     module PrivateKey: {
       type t;
@@ -86,7 +94,7 @@ module type S = {
     };
 
     module PublicKey: {
-      type t;
+      type t = Group.t;
 
       /* Derive the public key corresponding to a given private key. */
       let ofPrivateKey: PrivateKey.t => t;
