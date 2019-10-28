@@ -1,0 +1,21 @@
+{
+  "name": "verifier_demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "bsb -make-world",
+    "clean": "bsb -clean-world",
+    "serve": "moduleserve ./ --port 8000"
+  },
+  "author": "",
+  "dependencies": {
+    "bs-css": "^10.0.1",
+    "reason-react": "^0.7.0"
+  },
+  "devDependencies": {
+    "bs-platform": "^6.2.1",
+    "moduleserve": "https://github.com/marijnh/moduleserve#032b477"
+  },
+  "license": "ISC"
+}
