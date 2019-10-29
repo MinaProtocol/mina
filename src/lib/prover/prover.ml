@@ -308,6 +308,23 @@ let create ~logger ~pids ~conf_dir =
 let initialized {connection; _} =
   Worker.Connection.run connection ~f:Worker.functions.initialized ~arg:()
 
+let prove_from_input_sexp {connection; logger; _} sexp =
+  let input = Extend_blockchain_input.t_of_sexp sexp in
+  match%map
+    Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
+      ~arg:input
+    >>| Or_error.join
+  with
+  | Ok _ ->
+      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        "prover succeeded :)" ;
+      true
+  | Error e ->
+      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        "prover errored :("
+        ~metadata:[("error", `String (Error.to_string_hum e))] ;
+      false
+
 let extend_blockchain {connection; logger; _} chain next_state block
     prover_state pending_coinbase =
   let input =

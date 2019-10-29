@@ -889,7 +889,23 @@ let snark_hashes =
 
 let internal_commands =
   [ (Snark_worker.Intf.command_name, Snark_worker.command)
-  ; ("snark-hashes", snark_hashes) ]
+  ; ("snark-hashes", snark_hashes)
+  ; ( "run-prover"
+    , Command.async
+        ~summary:"Run prover on a sexp provided on a single line of stdin"
+        (Command.Param.return (fun () ->
+             let logger = Logger.create () in
+             Parallel.init_master () ;
+             match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
+             | `Ok sexp ->
+                 File_system.with_temp_dir "coda-prover" ~f:(fun conf_dir ->
+                     let%bind prover =
+                       Prover.create ~logger ~pids:(Pid.Table.create ())
+                         ~conf_dir
+                     in
+                     Prover.prove_from_input_sexp prover sexp >>| ignore )
+             | `Eof ->
+                 failwith "early EOF while reading sexp" )) ) ]
 
 let coda_commands logger =
   [ ("accounts", Client.accounts)
