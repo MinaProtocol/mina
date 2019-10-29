@@ -356,7 +356,7 @@ module Network = struct
     if Rpc_latency_map.mem rpc_latency_table name then
       Rpc_latency_map.find_exn rpc_latency_table name
     else
-      let help = "time elapsed while doing rpc calls in ms" in
+      let help = "time elapsed while doing RPC calls in ms" in
       let rpc_gauge =
         Gauge.v (name ^ "_latency") ~help ~namespace ~subsystem
       in
@@ -367,7 +367,7 @@ module Network = struct
     if Rpc_size_map.mem rpc_size_table name then
       Rpc_size_map.find_exn rpc_size_table name
     else
-      let help = "size for while reponse in bytes" in
+      let help = "size for RPC reponse in bytes" in
       let rpc_histogram =
         Rpc_size_histogram.v (name ^ "_size") ~help ~namespace ~subsystem
       in
@@ -375,7 +375,7 @@ module Network = struct
       rpc_histogram
 
   let rpc_latency_ms_summary : Rpc_latency_histogram.t =
-    let help = "A histogram for all rpc call latencies" in
+    let help = "A histogram for all RPC call latencies" in
     Rpc_latency_histogram.v "rpc_latency_ms_summary" ~help ~namespace
       ~subsystem
 end
