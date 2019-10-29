@@ -43,35 +43,33 @@ module Plain = struct
         (f |> deocorate_impl ~name)
   end
 
-  module Decorate_bin_io (Rpc : Intf.Versioned_rpc.S) : Intf.Versioned_rpc.S =
-  struct
-    include Rpc
-
+  module Decorate_bin_io (Rpc : Intf.Versioned_rpc.S) = struct
     let bin_read_response buf ~pos_ref =
-      let response = bin_read_response buf ~pos_ref in
+      let response = Rpc.bin_read_response buf ~pos_ref in
       Coda_metrics.(
         Network.Rpc_size_histogram.observe
-          (Network.rpc_size_bytes ~name)
-          (bin_size_response response |> Float.of_int)) ;
+          (Network.rpc_size_bytes ~name:Rpc.name)
+          (Rpc.bin_size_response response |> Float.of_int)) ;
       response
 
     let bin_reader_response =
       { Bin_prot.Type_class.read= bin_read_response
-      ; vtag_read= __bin_read_response__ }
+      ; vtag_read= Rpc.__bin_read_response__ }
 
     let bin_write_response buf ~pos response =
       Coda_metrics.(
         Network.Rpc_size_histogram.observe
-          (Network.rpc_size_bytes ~name)
-          (bin_size_response response |> Float.of_int)) ;
-      bin_write_response buf ~pos response
+          (Network.rpc_size_bytes ~name:Rpc.name)
+          (Rpc.bin_size_response response |> Float.of_int)) ;
+      Rpc.bin_write_response buf ~pos response
 
     let bin_writer_response =
-      {Bin_prot.Type_class.write= bin_write_response; size= bin_size_response}
+      { Bin_prot.Type_class.write= bin_write_response
+      ; size= Rpc.bin_size_response }
 
     let bin_response =
       { Bin_prot.Type_class.reader= bin_reader_response
       ; writer= bin_writer_response
-      ; shape= bin_shape_response }
+      ; shape= Rpc.bin_shape_response }
   end
 end

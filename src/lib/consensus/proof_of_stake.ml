@@ -2219,8 +2219,19 @@ module Hooks = struct
           let caller_model_of_response = Fn.id
         end
 
+        module T_bin_io = Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+          let name = name
+
+          include T
+        end)
+
         include T
-        include Register (T)
+        include T_bin_io
+
+        include Register (struct
+          include T
+          include T_bin_io
+        end)
       end
 
       let implementation ~logger ~local_state conn ~version:_ ledger_hash =

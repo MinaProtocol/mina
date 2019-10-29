@@ -8,6 +8,18 @@ module Rpc : sig
        and type callee_response := Rpc.Callee.response
        and type caller_query := Rpc.Caller.query
        and type caller_response := Rpc.Caller.response
+
+    module Decorate_bin_io (Rpc : Intf.Versioned_rpc.S) : sig
+      val bin_write_response : Rpc.response Bin_prot.Write.writer
+
+      val bin_writer_response : Rpc.response Bin_prot.Type_class.writer
+
+      val bin_read_response : Rpc.response Bin_prot.Read.reader
+
+      val bin_reader_response : Rpc.response Bin_prot.Type_class.reader
+
+      val bin_response : Rpc.response Bin_prot.Type_class.t
+    end
   end
 end
 
