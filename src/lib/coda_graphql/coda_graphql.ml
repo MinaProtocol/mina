@@ -726,6 +726,11 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.hash; _} ->
               Stringable.State_hash.to_base58_check hash )
+        ; field "stateHashField" ~typ:(non_null string)
+            ~doc:"Bigint field-element representation of stateHash"
+            ~args:Arg.[]
+            ~resolve:(fun _ {With_hash.hash; _} ->
+              State_hash.to_decimal_string hash )
         ; field "protocolState" ~typ:(non_null protocol_state)
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.protocol_state)
@@ -1182,6 +1187,8 @@ module Types = struct
           ; last_cursor }
         in
         {Connection.edges= queried_transactions; page_info; total_count}
+
+      (* let hi = State_hash. *)
 
       let query =
         io_field query_name
