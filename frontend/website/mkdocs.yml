@@ -27,6 +27,7 @@ nav:
     - Getting started using SNARKs: snarks/snarky.md
     - Which SNARK is right for me?: snarks/constructions.md
     - The snarkyjs-crypto library: snarks/snarkyjs-crypto.md
+    - The snarky-universe library: snarks/snarkyjs-crypto.md
   - GUI Wallet: gui-wallet.md
   - CLI Reference: cli-reference.md
   - Troubleshooting: troubleshooting.md

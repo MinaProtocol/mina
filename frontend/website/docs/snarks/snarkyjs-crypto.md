@@ -33,8 +33,11 @@ module type S = {
 
     let ofString: string => t;
     let ofInt: int => t;
+    let ofBits: array(bool) => t;
 
     let toString: t => string;
+
+    let testBit : (t, int) => bool;
   };
 
   module Hash: {
