@@ -1188,8 +1188,6 @@ module Types = struct
         in
         {Connection.edges= queried_transactions; page_info; total_count}
 
-      (* let hi = State_hash. *)
-
       let query =
         io_field query_name
           ~args:
