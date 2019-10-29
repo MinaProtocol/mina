@@ -71,19 +71,18 @@ let make = (~nextStep, ~prevStep) => {
   <div className=Theme.Onboarding.main>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
-        <h1 className=Styles.header>
         <FadeIn duration=500>
-          {React.string("Setting Up Your Node")}
-                  </FadeIn>
-
-        </h1>
-        <p className=Styles.heroBody>
-         <FadeIn duration=500 delay=150>
-          {React.string(
-             "First, let's install and configure the Coda daemon. This will allow you to connect to the Coda network and make transactions. Follow the instructions at the link below to begin.",
-           )}
-          </FadeIn> 
-        </p>
+          <h1 className=Styles.header>
+            {React.string("Setting Up Your Node")}
+          </h1>
+        </FadeIn>
+        <FadeIn duration=500 delay=150>
+          <p className=Styles.heroBody>
+            {React.string(
+              "First, let's install and configure the Coda daemon. This will allow you to connect to the Coda network and make transactions. Follow the instructions at the link below to begin.",
+            )}
+          </p>
+        </FadeIn> 
         <FadeIn duration=500 delay=250>
           <Link
             kind=Link.Blue
