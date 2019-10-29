@@ -44,6 +44,8 @@ val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
 val request_work : t -> Snark_worker.Work.Spec.t option
 
+val work_selection_method : t -> (module Work_selector.Selection_method_intf)
+
 val add_work : t -> Snark_worker.Work.Result.t -> unit Deferred.t
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
