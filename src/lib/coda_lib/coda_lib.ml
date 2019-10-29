@@ -482,6 +482,8 @@ let request_work t =
   Option.map instances_opt ~f:(fun instances ->
       {Snark_work_lib.Work.Spec.instances; fee} )
 
+let work_selection_method t = t.config.work_selection_method
+
 let add_work t (work : Snark_worker_lib.Work.Result.t) =
   let (module Work_selection_method) = t.config.work_selection_method in
   let spec = work.spec.instances in
@@ -586,14 +588,35 @@ let create (config : Config.t) =
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
           let%bind prover =
-            trace "prover" (fun () ->
-                Prover.create ~logger:config.logger ~pids:config.pids
-                  ~conf_dir:config.conf_dir )
+            Monitor.try_with
+              ~rest:
+                (`Call
+                  (fun exn ->
+                    Logger.warn config.logger
+                      "unhandled exception from daemon-side prover server: $exn"
+                      ~module_:__MODULE__ ~location:__LOC__
+                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
+              (fun () ->
+                trace "prover" (fun () ->
+                    Prover.create ~logger:config.logger ~pids:config.pids
+                      ~conf_dir:config.conf_dir ) )
+            >>| Result.ok_exn
           in
           let%bind verifier =
-            trace "verifier" (fun () ->
-                Verifier.create ~logger:config.logger ~pids:config.pids
-                  ~conf_dir:(Some config.conf_dir) )
+            Monitor.try_with
+              ~rest:
+                (`Call
+                  (fun exn ->
+                    Logger.warn config.logger
+                      "unhandled exception from daemon-side verifier server: \
+                       $exn"
+                      ~module_:__MODULE__ ~location:__LOC__
+                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
+              (fun () ->
+                trace "verifier" (fun () ->
+                    Verifier.create ~logger:config.logger ~pids:config.pids
+                      ~conf_dir:(Some config.conf_dir) ) )
+            >>| Result.ok_exn
           in
           let snark_worker =
             Option.value_map

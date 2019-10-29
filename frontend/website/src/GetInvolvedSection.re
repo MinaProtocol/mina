@@ -394,7 +394,7 @@ let make = (~posts) => {
           ),
         ])
       )>
-      <NewsletterWidget />
+      <NewsletterWidget center=true />
     </div>
     <div
       className=Css.(
