@@ -1456,21 +1456,6 @@ let%test_module "test" =
           in
           iter_cmds_acc (List.drop cmds cmds_applied_count) counts_rest acc' f
 
-    (** Same as iter_cmds_acc but with no accumulator. *)
-    let iter_cmds :
-           User_command.With_valid_signature.t list
-        -> int option list
-        -> (   User_command.With_valid_signature.t list
-            -> int option
-            -> User_command.With_valid_signature.t Sequence.t
-            -> Staged_ledger_diff.t Deferred.t)
-        -> unit Deferred.t =
-     fun cmds cmd_iters f ->
-      iter_cmds_acc cmds cmd_iters ()
-        (fun cmds_left count_opt cmds_this_iter () ->
-          let%map diff = f cmds_left count_opt cmds_this_iter in
-          (diff, ()) )
-
     (** Generic test framework. *)
     let test_simple :
            Ledger.init_state
