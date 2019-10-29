@@ -17,18 +17,7 @@ module Inputs = struct
     (* x^10 *)
     res * x
 
-  module Operations = struct
-    let apply_matrix rows v =
-      Array.map rows ~f:(fun row ->
-          let res = ref Fq.zero in
-          Array.iteri row ~f:(fun i r -> res := Fq.(!res + (r * v.(i)))) ;
-          !res )
-
-    let add_block ~state block =
-      Array.iteri block ~f:(fun i b -> state.(i) <- Fq.(state.(i) + b))
-
-    let copy a = Array.map a ~f:Fn.id
-  end
+  module Operations = Sponge.Make_operations (Fq)
 end
 
 module Poseidon = Sponge.Make (Sponge.Poseidon (Inputs))
