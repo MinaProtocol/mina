@@ -316,7 +316,7 @@ let prove_from_input_sexp {connection; logger; _} sexp =
     >>| Or_error.join
   with
   | Ok _ ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "prover succeeded :)" ;
       true
   | Error e ->
