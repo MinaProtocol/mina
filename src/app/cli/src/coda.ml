@@ -898,12 +898,13 @@ let internal_commands =
              Parallel.init_master () ;
              match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
              | `Ok sexp ->
-                 File_system.with_temp_dir "coda-prover" ~f:(fun conf_dir ->
-                     let%bind prover =
-                       Prover.create ~logger ~pids:(Pid.Table.create ())
-                         ~conf_dir
-                     in
-                     Prover.prove_from_input_sexp prover sexp >>| ignore )
+                 let%bind conf_dir = Unix.mkdtemp "/tmp/coda-prover" in
+                 Logger.info logger "Prover state being logged to %s" conf_dir
+                   ~module_:__MODULE__ ~location:__LOC__ ;
+                 let%bind prover =
+                   Prover.create ~logger ~pids:(Pid.Table.create ()) ~conf_dir
+                 in
+                 Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
                  failwith "early EOF while reading sexp" )) ) ]
 
