@@ -230,7 +230,7 @@ let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
   let x1, x2, x3 = M.potential_xs t in
   List.find_map [x1; x2; x3] ~f:try_decode |> Option.value_exn
 
-let%test_module "test" =
+(* let%test_module "test" =
   ( module struct
     module Fp = struct
       include Snarkette.Fields.Make_fp
@@ -375,4 +375,4 @@ let%test_module "test" =
 
     module T0 = Make_tests (F13)
     module T1 = Make_tests (Fp)
-  end )
+  end ) *)

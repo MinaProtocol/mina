@@ -4,5 +4,6 @@
   (preprocess (pps ppx_coda -lint-version-syntax-warnings ppx_jane ppx_deriving.eq))
   (inline_tests)
   (libraries
-    snarkette ; This is actually just needed in tests
+    ; TODO removed for demo
+    ; snarkette 
     core_kernel ))
