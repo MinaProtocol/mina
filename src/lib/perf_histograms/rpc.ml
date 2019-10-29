@@ -43,6 +43,10 @@ module Plain = struct
         (f |> deocorate_impl ~name)
   end
 
+  (* Since currently we are using the same version of data type for all the
+     nodes in the testnet, so the sizes of decoding and encoding should be
+     the same. If in the future, we have different versions, we need to make
+     the metrics record sizes of decoding and encoding separately. *)
   module Decorate_bin_io (Rpc : Intf.Versioned_rpc.S) = struct
     let bin_read_response buf ~pos_ref =
       let response = Rpc.bin_read_response buf ~pos_ref in
