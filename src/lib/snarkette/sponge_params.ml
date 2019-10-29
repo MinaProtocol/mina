@@ -1,6 +1,10 @@
 [%%import
 "../../config.mlh"]
 
+(* TODO : this file is here to break a cyclic dependency, just for the demo
+   use the original in lib/sponge-params/ for production
+ *)
+
 open Mnt6753
 module Field = Fq
 
