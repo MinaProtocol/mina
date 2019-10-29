@@ -57,7 +57,8 @@ module Stable = struct
         { creator: Public_key.Compressed.Stable.V1.t
         ; protocol_state: Protocol_state.Stable.V1.t
         ; transactions: Transactions.Stable.V1.t
-        ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list }
+        ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list
+        ; proof: Proof.Stable.V1.t }
       [@@deriving bin_io, version {unnumbered}]
     end
 
@@ -71,7 +72,8 @@ type t = Stable.Latest.t =
   { creator: Public_key.Compressed.t
   ; protocol_state: Protocol_state.t
   ; transactions: Transactions.t
-  ; snark_jobs: Transaction_snark_work.Info.t list }
+  ; snark_jobs: Transaction_snark_work.Info.t list
+  ; proof: Proof.t }
 
 let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
     =
@@ -157,4 +159,7 @@ let of_transition tracked_participants external_transition =
       (Staged_ledger_diff.completed_works staged_ledger_diff)
       ~f:Transaction_snark_work.info
   in
-  {creator; protocol_state; transactions; snark_jobs}
+  let proof =
+    External_transition.Validated.protocol_state_proof external_transition
+  in
+  {creator; protocol_state; transactions; snark_jobs; proof}
