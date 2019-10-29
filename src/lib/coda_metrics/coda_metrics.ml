@@ -218,24 +218,24 @@ module Runtime = struct
 
   let jemalloc_active_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_active_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.active))
+      (fun () -> float_of_int !current_jemalloc.active)
       ~help:"active memory in bytes"
 
   let jemalloc_resident_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_resident_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.resident))
+      (fun () -> float_of_int !current_jemalloc.resident)
       ~help:
         "resident memory in bytes (may be zero depending on jemalloc compile \
          options)"
 
   let jemalloc_allocated_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_allocated_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.allocated))
+      (fun () -> float_of_int !current_jemalloc.allocated)
       ~help:"memory allocated to heap objects in bytes"
 
   let jemalloc_mapped_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_mapped_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.mapped))
+      (fun () -> float_of_int !current_jemalloc.mapped)
       ~help:"memory mapped into process address space in bytes"
 
   let process_cpu_seconds_total =

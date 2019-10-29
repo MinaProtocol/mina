@@ -59,7 +59,7 @@ module Vector = struct
     let set t i b = if b then t lor (one lsl i) else t land lognot (one lsl i)
   end
 
-  module Make (V : S) : Bits_intf.Convertable_bits with type t = V.t = struct
+  module Make (V : S) : Bits_intf.Convertible_bits with type t = V.t = struct
     type t = V.t
 
     let fold t =
@@ -82,10 +82,10 @@ module Vector = struct
   end
 end
 
-module UInt64 : Bits_intf.Convertable_bits with type t := Unsigned.UInt64.t =
+module UInt64 : Bits_intf.Convertible_bits with type t := Unsigned.UInt64.t =
   Vector.Make (Vector.UInt64)
 
-module UInt32 : Bits_intf.Convertable_bits with type t := Unsigned.UInt32.t =
+module UInt32 : Bits_intf.Convertible_bits with type t := Unsigned.UInt32.t =
   Vector.Make (Vector.UInt32)
 
 module type Big_int_intf = sig

@@ -81,5 +81,6 @@ Most snark fees earned:
 
 The entire team at O(1) Labs would like to express our sincere gratitude and appreciation to our growing and thriving community!
 
-<div id="disclaimer" />
+<p id="disclaimer">
 \* *Testnet Points (abbreviated pts) are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.*
+</p>

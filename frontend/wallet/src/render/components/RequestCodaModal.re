@@ -25,9 +25,12 @@ let make = (~accounts, ~setModalState) => {
   let activePublicKey = Hooks.useActiveAccount();
   let (selectedAccount, setSelectedAccount) =
     React.useState(() => activePublicKey);
-  let handleClipboard = (~account, _) =>
+  let toast = Hooks.useToast();
+  let handleClipboard = (~account, _) => {
     Bindings.Navigator.Clipboard.writeTextTask(PublicKey.toString(account))
     |> Task.perform(~f=() => setModalState(_ => false));
+    toast("Copied public key to clipboard", ToastProvider.Default);
+  };
   <Modal title="Request Coda" onRequestClose={() => setModalState(_ => false)}>
     <div className=Modal.Styles.default>
       <div className=Styles.bodyMargin>

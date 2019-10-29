@@ -6,7 +6,6 @@ open Snark_bits
 open Bitstring_lib
 open Fold_lib
 open Tuple_lib
-open Module_version
 
 type uint64 = Unsigned.uint64
 
@@ -30,7 +29,7 @@ module type Basic = sig
     module Latest = V1
   end
 
-  include Bits_intf.Convertable_bits with type t := t
+  include Bits_intf.Convertible_bits with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 
@@ -225,38 +224,34 @@ end = struct
 
   let length_in_triples = (length_in_bits + 2) / 3
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
+      type t = Unsigned.t [@@deriving sexp, compare, hash]
+
+      let to_latest = Fn.id
+
       module T = struct
-        type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash, version]
+        type typ = t [@@deriving sexp, compare, hash]
+
+        type t = typ [@@deriving sexp, compare, hash]
 
         let of_int = Unsigned.of_int
 
         let to_int = Unsigned.to_int
       end
 
-      include T
-      include Registration.Make_latest_version (T)
       include Codable.Make_of_int (T)
       include Hashable.Make (T)
       include Comparable.Make (T)
     end
+  end]
 
-    module Latest = V1
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
 
-    module Module_decl = struct
-      let name = "make_currency"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io, version omitted *)
-  (*  type t = Stable.Latest.t  [@@deriving sexp, compare, hash] *)
-  include Stable.Latest
+  include Codable.Make_of_int (Stable.Latest.T)
+  include Hashable.Make (Stable.Latest.T)
+  include Comparable.Make (Stable.Latest.T)
 
   let to_uint64 = Unsigned.to_uint64
 
@@ -297,7 +292,7 @@ end = struct
   end
 
   include (
-    Bits.Vector.Make (Vector) : Bits_intf.Convertable_bits with type t := t)
+    Bits.Vector.Make (Vector) : Bits_intf.Convertible_bits with type t := t)
 
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
   include Unpacked
@@ -332,7 +327,7 @@ end = struct
   let var_of_t t =
     List.init M.length ~f:(fun i -> Boolean.var_of_value (Vector.get t i))
 
-  type magnitude = t [@@deriving sexp, bin_io, hash, compare, yojson]
+  type magnitude = t [@@deriving sexp, hash, compare, yojson]
 
   let fold_bits = fold
 
@@ -344,18 +339,13 @@ end = struct
 
   module Signed = struct
     module Poly = struct
+      [%%versioned
       module Stable = struct
         module V1 = struct
-          module T = struct
-            type ('magnitude, 'sgn) t = {magnitude: 'magnitude; sgn: 'sgn}
-            [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
-          end
-
-          include T
+          type ('magnitude, 'sgn) t = {magnitude: 'magnitude; sgn: 'sgn}
+          [@@deriving sexp, hash, compare, eq, yojson]
         end
-
-        module Latest = V1
-      end
+      end]
 
       type ('magnitude, 'sgn) t = ('magnitude, 'sgn) Stable.Latest.t =
         {magnitude: 'magnitude; sgn: 'sgn}
@@ -363,28 +353,15 @@ end = struct
 
     module Stable_outer = Stable
 
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t = (Stable.V1.t, Sgn.Stable.V1.t) Poly.Stable.V1.t
-          [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
-        end
+        type t = (Stable.V1.t, Sgn.Stable.V1.t) Poly.Stable.V1.t
+        [@@deriving sexp, hash, compare, eq, yojson]
 
-        include T
-        include Registration.Make_latest_version (T)
+        let to_latest = Fn.id
       end
-
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "currency_signed"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
+    end]
 
     (* bin_io, version omitted *)
     type t = (Stable_outer.V1.t, Sgn.Stable.V1.t) Poly.Stable.V1.t

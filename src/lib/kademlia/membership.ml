@@ -504,7 +504,7 @@ let%test_module "Tests" =
       at_exit (fun () -> Sys.command_exn @@ "rm -rf '" ^ tmpdir ^ "'") ;
       tmpdir
 
-    let create_trust_system () = Trust_system.create ~db_dir:(get_temp_dir ())
+    let create_trust_system () = Trust_system.create (get_temp_dir ())
 
     let%test_unit "connect" =
       (* This flakes 1 in 20 times, so try a couple times if it fails *)
