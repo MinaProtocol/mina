@@ -783,6 +783,11 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.hash; _} ->
               Stringable.State_hash.to_base58_check hash )
+        ; field "stateHashField" ~typ:(non_null string)
+            ~doc:"Bigint field-element representation of stateHash"
+            ~args:Arg.[]
+            ~resolve:(fun _ {With_hash.hash; _} ->
+              State_hash.to_decimal_string hash )
         ; field "protocolState" ~typ:(non_null protocol_state)
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.protocol_state)
