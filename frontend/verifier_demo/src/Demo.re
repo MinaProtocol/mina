@@ -3,9 +3,11 @@
 [@react.component]
 let make = () => {
   <div> 
-    <Background/>
-    <Banner time="42"/>
-    <Spacer height=5.0/>
-    <BlockRow/>
+    <ReasonApollo.Provider client=Apollo.client>
+      <Background/>
+      <Banner time="42"/>
+      <Spacer height=5.0/>
+      <BlockRow/>
+    </ReasonApollo.Provider>
   </div>;
 };

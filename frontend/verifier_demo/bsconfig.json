@@ -7,6 +7,7 @@
   },
   "bs-dependencies": [
     "reason-react",
+    "reason-apollo",
     "bs-css"
   ],
   "warnings": {

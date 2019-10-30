@@ -11,10 +11,11 @@
   "author": "",
   "dependencies": {
     "bs-css": "^10.0.1",
-    "reason-react": "^0.7.0"
+    "reason-react": "^0.7.0",
+    "reason-apollo": "^0.16.0"
   },
   "devDependencies": {
-    "bs-platform": "^6.2.1",
+    "bs-platform": "^5.0.3",
     "moduleserve": "https://github.com/marijnh/moduleserve#032b477"
   },
   "license": "ISC"
