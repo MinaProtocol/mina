@@ -12,7 +12,7 @@ author: O(1) Labs
         width: 100vw;
         top: 0;
         left: 0;
-        background: url(https://media.discordapp.net/attachments/621415579370127371/638444096326991922/squares-texture_1_1.png) no-repeat center center;
+        background: url("https://cdn.codaprotocol.com/website/static/blog/zkp-guide/square-texture-02514419102fe2c115d32784e87d7db659bcd8e8f1be53286ec3a5fad0c8e0f7.png") no-repeat center center;
         background-size: cover;
         z-index: -2;
         
