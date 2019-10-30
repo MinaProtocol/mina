@@ -55,12 +55,59 @@ module type Backend_intf = sig
      and module Fq_target := Fq_target
 end
 
+module Verification_key = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('target, 'g2, 'g1) t =
+        {alpha_beta: 'target; delta: 'g2; query: 'g1 array}
+      [@@deriving sexp]
+    end
+  end]
+
+  type ('target, 'g2, 'g1) t = ('target, 'g2, 'g1) Stable.Latest.t =
+    {alpha_beta: 'target; delta: 'g2; query: 'g1 array}
+  [@@deriving sexp]
+
+  module Processed = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('target, 'pc, 'g1) t =
+          {alpha_beta: 'target; delta_pc: 'pc; query: 'g1 array}
+        [@@deriving sexp]
+      end
+    end]
+
+    type ('target, 'pc, 'g1) t = ('target, 'pc, 'g1) Stable.Latest.t =
+      {alpha_beta: 'target; delta_pc: 'pc; query: 'g1 array}
+    [@@deriving sexp]
+  end
+end
+
+module Proof = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('g1, 'g2) t = {a: 'g1; b: 'g2; c: 'g1; delta_prime: 'g2; z: 'g1}
+      [@@deriving sexp]
+    end
+  end]
+
+  type ('g1, 'g2) t = ('g1, 'g2) Stable.Latest.t =
+    {a: 'g1; b: 'g2; c: 'g1; delta_prime: 'g2; z: 'g1}
+  [@@deriving sexp]
+end
+
 module Make (Backend : Backend_intf) = struct
   open Backend
 
   module Verification_key = struct
-    type t = {alpha_beta: Fq_target.t; delta: G2.t; query: G1.t array}
-    [@@deriving bin_io, sexp]
+    (* type synonym to make record labels available *)
+    type ('target, 'g2, 'g1) typ = ('target, 'g2, 'g1) Verification_key.t =
+      {alpha_beta: 'target; delta: 'g2; query: 'g1 array}
+
+    type t = (Fq_target.t, G2.t, G1.t) typ
 
     let map_to_two t ~f =
       let xs, ys =
@@ -70,7 +117,7 @@ module Make (Backend : Backend_intf) = struct
       in
       (List.rev xs, List.rev ys)
 
-    let fold_bits {alpha_beta; delta; query} =
+    let fold_bits {Verification_key.alpha_beta; delta; query} =
       let g1s = Array.to_list query in
       let g2s = [delta] in
       let gts = [Fq_target.unitary_inverse alpha_beta] in
@@ -109,23 +156,30 @@ module Make (Backend : Backend_intf) = struct
 
     module Processed = struct
       type t =
-        { alpha_beta: Fq_target.t
-        ; delta_pc: Pairing.G2_precomputation.t
-        ; query: G1.t array }
-      [@@deriving bin_io, sexp]
+        ( Fq_target.t
+        , Pairing.G2_precomputation.t
+        , G1.t )
+        Verification_key.Processed.t
+      [@@deriving sexp]
 
       let create {alpha_beta; delta; query} =
-        {alpha_beta; delta_pc= Pairing.G2_precomputation.create delta; query}
+        { Verification_key.Processed.alpha_beta
+        ; delta_pc= Pairing.G2_precomputation.create delta
+        ; query }
     end
   end
 
   let check b lab = if b then Ok () else Or_error.error_string lab
 
   module Proof = struct
-    type t = {a: G1.t; b: G2.t; c: G1.t; delta_prime: G2.t; z: G1.t}
-    [@@deriving bin_io, sexp]
+    (* type synonym to get record labels *)
+    type ('g1, 'g2) typ = ('g1, 'g2) Proof.t =
+      {a: 'g1; b: 'g2; c: 'g1; delta_prime: 'g2; z: 'g1}
+    [@@deriving sexp]
 
-    let is_well_formed {a; b; c; delta_prime; z} =
+    type t = (G1.t, G2.t) typ [@@deriving sexp]
+
+    let is_well_formed {Proof.a; b; c; delta_prime; z} =
       let open Or_error.Let_syntax in
       let err x =
         sprintf "proof was not well-formed (%s was off its curve)" x
