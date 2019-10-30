@@ -216,10 +216,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
         let open Tick in
         let open Cached.Let_syntax in
         let%map verification =
-          Cached.component ~label:"verification" ~f:Keypair.vk
+          Cached.component ~label:"step_verification" ~f:Keypair.vk
             (module Verification_key)
         and proving =
-          Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+          Cached.component ~label:"step_proving" ~f:Keypair.pk
+            (module Proving_key)
         in
         (verification, {proving with value= ()})
       in
@@ -245,10 +246,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
           let open Tock in
           let open Cached.Let_syntax in
           let%map verification =
-            Cached.component ~label:"verification" ~f:Keypair.vk
+            Cached.component ~label:"wrap_verification" ~f:Keypair.vk
               (module Verification_key)
           and proving =
-            Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+            Cached.component ~label:"wrap_proving" ~f:Keypair.pk
+              (module Proving_key)
           in
           (verification, {proving with value= ()})
         in

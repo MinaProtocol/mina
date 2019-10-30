@@ -30,7 +30,8 @@ module type S = sig
       val is_base_hash : Hash.var -> (Boolean.var, _) Checked.t
 
       val update :
-           Hash.var * var
+           logger:Logger.t
+        -> Hash.var * var
         -> Update.var
         -> (Hash.var * var * [`Success of Boolean.var], _) Checked.t
     end
@@ -142,7 +143,7 @@ struct
       let%bind prev_state_hash = State.Checked.hash prev_state in
       let%bind next_state_hash, _next_state, `Success success =
         with_label __LOC__
-          (State.Checked.update (prev_state_hash, prev_state) update)
+          (State.Checked.update ~logger (prev_state_hash, prev_state) update)
       in
       let%bind wrap_vk =
         exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
@@ -200,6 +201,25 @@ struct
         with_label __LOC__ Boolean.(prev_state_valid && success)
       in
       let%bind is_base_case = State.Checked.is_base_hash next_state_hash in
+      let%bind () =
+        as_prover
+          As_prover.(
+            Let_syntax.(
+              let%map prev_valid = read Boolean.typ prev_state_valid
+              and success = read Boolean.typ success
+              and is_base_case = read Boolean.typ is_base_case in
+              let result = (prev_valid && success) || is_base_case in
+              Logger.trace logger
+                "transition system debug state: (previous valid=$prev_valid \
+                 ∧ update success=$success) ∨ base case=$is_base_case = \
+                 $result"
+                ~location:__LOC__ ~module_:__MODULE__
+                ~metadata:
+                  [ ("prev_valid", `Bool prev_valid)
+                  ; ("success", `Bool success)
+                  ; ("is_base_case", `Bool is_base_case)
+                  ; ("result", `Bool result) ]))
+      in
       with_label __LOC__
         (Boolean.Assert.any [is_base_case; inductive_case_passed])
   end
