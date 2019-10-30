@@ -19,7 +19,7 @@ A SNAPP (or snarkified app) has two parts:
 ## An example app
 
 Let's build a simple app for proving we know a pre-image to a hash function.
-You can find the completed app [here]().
+You can find the completed app [here](https://github.com/o1-labs/sfbw-workshop/tree/master/solutions/ex_preimage).
 
 ### Building the SNARK
 This first step in building our SNAPP is to define our SNARK. In this case, our SNARK
@@ -27,9 +27,9 @@ will prove, given a hash value **h**
 
 > I know a field element **x** such that **hash(x) = h**.
 
-where **hash** is the Poseidon hash function provided in [snarky-universe]().
+where **hash** is the Poseidon hash function provided in snarky-universe.
 
-The snarky component -- [defined in this file]() -- is as follows:
+The snarky component -- [defined in this file](https://github.com/o1-labs/sfbw-workshop/blob/master/solutions/ex_preimage/ex_preimage.re) -- is as follows:
 
 ```reasonml
 module Universe = (val Snarky_universe.default());
@@ -52,7 +52,7 @@ module Universe = (val Snarky_universe.default());
 open! Universe.Impl;
 open! Universe;
 ```
-are just a preamble which brings in scope all the functions we need. It uses the "default" [SNARK construction backend](),
+are just a preamble which brings in scope all the functions we need. It uses the "default" SNARK construction backend,
 which is the Groth16 SNARK instantiated using the bn128 curve.
 
 The next line
