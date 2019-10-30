@@ -146,6 +146,12 @@ module Data = struct
   module Epoch_seed = struct
     include Coda_base.Data_hash.Make_full_size ()
 
+    module Base58_check = Codable.Make_base58_check (struct
+      include Stable.Latest
+
+      let description = "Epoch Seed"
+    end)
+
     let initial : t = of_hash Tick.Pedersen.zero_hash
 
     let update (seed : t) vrf_result =
@@ -160,6 +166,9 @@ module Data = struct
           hash ~init:Hash_prefix_states.Random_oracle.epoch_seed
             [|var_to_hash_packed seed; vrf_result|]
           |> var_of_hash_packed )
+
+    [%%define_locally
+    Base58_check.(to_base58_check)]
   end
 
   module Epoch = struct
@@ -594,6 +603,10 @@ module Data = struct
       lazy
         { Poly.hash= Lazy.force genesis_ledger_hash
         ; total_currency= Lazy.force genesis_ledger_total_currency }
+
+    let hash (t : Value.t) = t.hash
+
+    let total_currency (t : Value.t) = t.total_currency
   end
 
   module Vrf = struct
@@ -713,6 +726,9 @@ module Data = struct
             end
 
             include T
+
+            let version_byte = Base58_check.Version_bytes.vrf_truncated_output
+
             include Registration.Make_latest_version (T)
           end
 
@@ -729,6 +745,12 @@ module Data = struct
         end
 
         type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
+
+        include Codable.Make_base58_check (struct
+          include Stable.Latest
+
+          let description = "Vrf Truncated Output"
+        end)
 
         let length_in_bytes = 32
 
@@ -1108,7 +1130,8 @@ module Data = struct
               ; start_checkpoint: 'start_checkpoint
               ; lock_checkpoint: 'lock_checkpoint
               ; epoch_length: 'length }
-            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+            [@@deriving
+              sexp, bin_io, eq, compare, hash, to_yojson, version, fields]
           end
 
           include T
@@ -1134,7 +1157,7 @@ module Data = struct
         ; start_checkpoint: 'start_checkpoint
         ; lock_checkpoint: 'lock_checkpoint
         ; epoch_length: 'length }
-      [@@deriving sexp, compare, hash, to_yojson]
+      [@@deriving sexp, compare, hash, to_yojson, fields]
     end
 
     type var =
@@ -1307,6 +1330,9 @@ module Data = struct
           ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
           ; lock_checkpoint= Lock_checkpoint.null
           ; epoch_length= Length.of_int 1 }
+
+      [%%define_locally
+      Poly.(ledger, seed, start_checkpoint, lock_checkpoint, epoch_length)]
     end
 
     module Staking = Make (struct
@@ -1386,7 +1412,18 @@ module Data = struct
   end
 
   module Checkpoints = struct
-    module Hash = Coda_base.Data_hash.Make_full_size ()
+    module Hash = struct
+      include Coda_base.Data_hash.Make_full_size ()
+
+      module Base58_check = Codable.Make_base58_check (struct
+        include Stable.Latest
+
+        let description = "State hash"
+      end)
+
+      [%%define_locally
+      Base58_check.(to_base58_check)]
+    end
 
     let merge (s : Coda_base.State_hash.t) (h : Hash.t) =
       Snark_params.Tick.Pedersen.digest_fold
@@ -1509,6 +1546,8 @@ module Data = struct
         ~there:(fun (t : t) -> t.hash)
         ~back:(fun hash -> {hash; data= {prefix= Fqueue.empty; tail= hash}})
 
+    let hash (t : t) = t.hash
+
     module Checked = struct
       let if_ = Hash.if_
 
@@ -1561,7 +1600,8 @@ module Data = struct
               ; next_epoch_data: 'next_epoch_data
               ; has_ancestor_in_same_checkpoint_window: 'bool
               ; checkpoints: 'checkpoints }
-            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+            [@@deriving
+              sexp, bin_io, eq, compare, hash, to_yojson, version, fields]
           end
 
           include T
@@ -1598,7 +1638,7 @@ module Data = struct
         ; next_epoch_data: 'next_epoch_data
         ; has_ancestor_in_same_checkpoint_window: 'bool
         ; checkpoints: 'checkpoints }
-      [@@deriving sexp, compare, hash, to_yojson]
+      [@@deriving sexp, compare, hash, to_yojson, fields]
     end
 
     module Value = struct
@@ -1651,8 +1691,7 @@ module Data = struct
         module Registered_V1 = Registrar.Register (V1)
       end
 
-      type t = Stable.Latest.t (* bin_io omitted intentionally *)
-      [@@deriving sexp, eq, compare, hash]
+      type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
       let to_yojson = Stable.Latest.to_yojson
     end
@@ -2097,8 +2136,6 @@ module Data = struct
           ; has_ancestor_in_same_checkpoint_window
           ; checkpoints } )
 
-    let blockchain_length (t : Value.t) = t.blockchain_length
-
     let to_lite = None
 
     type display =
@@ -2130,9 +2167,19 @@ module Data = struct
 
     let curr_slot = curr_ Global_slot.slot
 
-    let global_slot (t : Value.t) = Global_slot.to_int t.curr_global_slot
+    let global_slot (t : Value.t) = Global_slot.to_uint32 t.curr_global_slot
 
-    let total_currency (t : Value.t) : Amount.t = t.total_currency
+    [%%define_locally
+    Poly.
+      ( blockchain_length
+      , epoch_count
+      , min_epoch_length
+      , last_vrf_output
+      , total_currency
+      , staking_epoch_data
+      , next_epoch_data
+      , has_ancestor_in_same_checkpoint_window
+      , checkpoints )]
   end
 
   module Prover_state = struct
