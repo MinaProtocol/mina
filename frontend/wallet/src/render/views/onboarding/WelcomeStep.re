@@ -145,18 +145,16 @@ let make = (~nextStep) => {
       <div className=Styles.heroLeft>
       <FadeIn duration=500 delay=0>
         <h1 className=Styles.header>
-
             {React.string("Welcome to Coda Wallet!")}
-        
         </h1>
-          </FadeIn>
+      </FadeIn>
+      <FadeIn duration=500 delay=150>
         <p className=Styles.heroBody>
-          <FadeIn duration=500 delay=150>
             {React.string(
               {|Coda swaps the traditional blockchain for a tiny cryptographic proof, enabling a cryptocurrency that stays the same size forever. With the Coda Wallet you can send, recieve and view transactions on the Coda network.|},
             )}
-          </FadeIn>
         </p>
+      </FadeIn>
         <div> <Button label="Continue" onClick={_ => nextStep()} /> </div>
       </div>
       <div />

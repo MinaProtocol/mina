@@ -9,20 +9,22 @@ If you're running a Coda node on a home or office machine, you'll have to set up
 ### Using UPnP
 
 !!!note
-    As of Release 0.0.10.-beta, Coda now uses libp2p for peer discovery. With this change, only port 8303 needs to be forwarded for TCP. If you previously forwarded both ports for both TCP and UDP, you may need to reconfigure your settings.
+    As of Release 0.0.10.-beta, Coda now uses libp2p for peer discovery. With this change, both ports 8302 and 8303 need to be forwarded for TCP. If you previously forwarded 8302 for UDP, you may need to reconfigure your settings.
 
 Follow the steps below to use [MiniUPnP](https://github.com/miniupnp/miniupnp) to forward ports on your router:
 
 Run the following command:
 
-        $ sudo upnpc -r 8303 TCP
+        $ sudo upnpc -r 8302 TCP 8303 TCP
 
 If this command succeeds, you'll see a response indicating that the ports have been successfully redirected:
 
 ```
 ...
-InternalIP:Port = 192.168.101.7:8303
+InternalIP:Port = 192.168.101.7:8302
 external 148.64.99.117:8302 TCP is redirected to internal 192.168.101.7:8302 (duration=0)
+InternalIP:Port = 192.168.101.7:8303
+external 148.64.99.117:8303 TCP is redirected to internal 192.168.101.7:8303 (duration=0)
 ```
 
 If you are on a shared network (like an office wireless network), you may get the following error if someone else on the same network has already redirected these ports:
