@@ -42,6 +42,12 @@ let getLocalStorageNetwork = () => {
   );
 };
 
+let defaultPeers = [
+  "/ip4/52.39.56.50/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs",
+  "/ip4/18.212.230.102/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF",
+  "/ip4/52.13.17.206/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7",
+];
+
 let useHook = () => {
   let (_state, dispatch) =
     Hooks.Reducer.useReducer(reduce, {State.args: [], mode: Stable});

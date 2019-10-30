@@ -108,13 +108,6 @@ val apply_diff_unchecked :
      , Staged_ledger_error.t )
      Deferred.Result.t
 
-module For_tests : sig
-  val materialized_snarked_ledger_hash :
-       t
-    -> expected_target:Frozen_ledger_hash.t
-    -> Frozen_ledger_hash.t Or_error.t
-end
-
 val current_ledger_proof : t -> Ledger_proof.t option
 
 (* This should memoize the snark verifications *)
@@ -129,7 +122,8 @@ val create_diff :
   -> state_body_hash:State_body_hash.t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
-val statement_exn : t -> [`Non_empty of Transaction_snark.Statement.t | `Empty]
+val statement_exn :
+  t -> [`Non_empty of Transaction_snark.Statement.t | `Empty] Deferred.t
 
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t

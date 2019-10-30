@@ -400,10 +400,10 @@ let daemon logger =
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "Jemalloc memory statistics (in bytes)"
               ~metadata:
-                [ ("active", `Int (active * 1024))
-                ; ("resident", `Int (resident * 1024))
-                ; ("allocated", `Int (allocated * 1024))
-                ; ("mapped", `Int (mapped * 1024)) ]
+                [ ("active", `Int active)
+                ; ("resident", `Int resident)
+                ; ("allocated", `Int allocated)
+                ; ("mapped", `Int mapped) ]
           in
           let rec loop () =
             log_stats "before major gc" ;
@@ -640,7 +640,7 @@ let daemon logger =
          let transition_frontier_location =
            conf_dir ^/ "transition_frontier"
          in
-         let trust_system = Trust_system.create ~db_dir:trust_dir in
+         let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let time_controller =
            Block_time.Controller.create @@ Block_time.Controller.basic ~logger
@@ -682,7 +682,7 @@ let daemon logger =
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
          let receipt_chain_database =
-           Receipt_chain_database.create ~directory:receipt_chain_dir_name
+           Receipt_chain_database.create receipt_chain_dir_name
          in
          trace_database_initialization "receipt_chain_database" __LOC__
            receipt_chain_dir_name ;
@@ -705,6 +705,7 @@ let daemon logger =
              external_transition_database_dir
          in
          (* log terminated child processes *)
+         (* FIXME adapt to new system, move into child_processes lib *)
          let pids = Child_processes.Termination.create_pid_table () in
          let rec terminated_child_loop () =
            match

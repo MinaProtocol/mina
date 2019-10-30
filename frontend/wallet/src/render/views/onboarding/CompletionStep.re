@@ -5,6 +5,12 @@ module Styles = {
     style([display(`flex), flexDirection(`row)]);
   };
 
+  let fadeIn =
+    keyframes([
+      (0, [opacity(0.), top(`px(50))]),
+      (100, [opacity(1.), top(`px(0))]),
+    ]);
+
   let heroLeft = {
     style([
       display(`flex),
@@ -16,10 +22,19 @@ module Styles = {
     ]);
   };
 
+  let header = {
+    merge([
+      Theme.Text.Header.h1,
+    ]);
+  };
+
   let heroBody = {
     merge([
-      Theme.Text.Body.regular,
-      style([maxWidth(`rem(21.5)), color(Theme.Colors.midnightBlue)]),
+      Theme.Text.Body.regularLight,
+      style([
+        maxWidth(`rem(21.5)),
+        color(Theme.Colors.midnightBlue),     
+      ]),
     ]);
   };
   let buttonRow = {
@@ -34,21 +49,23 @@ let make = (~closeOnboarding, ~prevStep) => {
   <div className=Theme.Onboarding.main>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
-        <h1 className=Theme.Text.Header.h1>
-          {React.string("Setup Complete!")}
-        </h1>
-        <Spacer height=1. />
-        <p className=Styles.heroBody>
-          {React.string(
-             "You've successfully set up Coda Wallet. Head over to the Faucet to request funds to start sending transactions on the Coda network.",
-           )}
-        </p>
+        <h1 className=Styles.header> {React.string("Setup Complete!")} </h1>
+        <Spacer height=0.25 />
+        <FadeIn duration=500 delay=150>
+          <p className=Styles.heroBody>
+            {React.string(
+              "You've successfully set up Coda Wallet. Head over to the Faucet to request funds to start sending transactions on the Coda network.",
+            )}
+          </p>
+        </FadeIn>
         <Spacer height=0.5 />
-        <Link
-          kind=Link.Blue
-          onClick={_ => openExternal("https://discord.gg/JN75xk")}>
-          {React.string("Open Discord")}
-        </Link>
+        <FadeIn duration=500 delay=250>
+          <Link
+            kind=Link.Blue
+            onClick={_ => openExternal("https://discord.gg/JN75xk")}>
+            {React.string("Open Discord")}
+          </Link>
+        </FadeIn> 
         <Spacer height=2. />
         <div className=Styles.buttonRow>
           <Button

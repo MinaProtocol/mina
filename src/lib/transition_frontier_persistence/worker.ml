@@ -21,7 +21,7 @@ module Make (Inputs : Intf.Worker_inputs) :
       | Some name ->
           name
     in
-    let transition_storage = Transition_storage.create ~directory in
+    let transition_storage = Transition_storage.create directory in
     {transition_storage; logger}
 
   let close {transition_storage; _} =
