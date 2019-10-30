@@ -400,10 +400,10 @@ let daemon logger =
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "Jemalloc memory statistics (in bytes)"
               ~metadata:
-                [ ("active", `Int (active * 1024))
-                ; ("resident", `Int (resident * 1024))
-                ; ("allocated", `Int (allocated * 1024))
-                ; ("mapped", `Int (mapped * 1024)) ]
+                [ ("active", `Int active)
+                ; ("resident", `Int resident)
+                ; ("allocated", `Int allocated)
+                ; ("mapped", `Int mapped) ]
           in
           let rec loop () =
             log_stats "before major gc" ;
@@ -705,6 +705,7 @@ let daemon logger =
              external_transition_database_dir
          in
          (* log terminated child processes *)
+         (* FIXME adapt to new system, move into child_processes lib *)
          let pids = Child_processes.Termination.create_pid_table () in
          let rec terminated_child_loop () =
            match
