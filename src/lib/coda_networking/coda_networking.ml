@@ -68,19 +68,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      module T_bin_io = Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-        let name = name
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
 
-        include T
-      end)
-
-      include T
-      include T_bin_io
-
-      include Register (struct
-        include T
-        include T_bin_io
-      end)
+      include T'
+      include Register (T')
     end
   end
 
@@ -127,19 +123,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      module T_bin_io = Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-        let name = name
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
 
-        include T
-      end)
-
-      include T
-      include T_bin_io
-
-      include Register (struct
-        include T
-        include T_bin_io
-      end)
+      include T'
+      include Register (T')
     end
   end
 
@@ -183,19 +175,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      module T_bin_io = Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-        let name = name
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
 
-        include T
-      end)
-
-      include T
-      include T_bin_io
-
-      include Register (struct
-        include T
-        include T_bin_io
-      end)
+      include T'
+      include Register (T')
     end
   end
 
@@ -241,19 +229,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      module T_bin_io = Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-        let name = name
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
 
-        include T
-      end)
-
-      include T
-      include T_bin_io
-
-      include Register (struct
-        include T
-        include T_bin_io
-      end)
+      include T'
+      include Register (T')
     end
   end
 
@@ -308,19 +292,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      module T_bin_io = Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-        let name = name
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
 
-        include T
-      end)
-
-      include T
-      include T_bin_io
-
-      include Register (struct
-        include T
-        include T_bin_io
-      end)
+      include T'
+      include Register (T')
     end
   end
 
@@ -366,19 +346,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      module T_bin_io = Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-        let name = name
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
 
-        include T
-      end)
-
-      include T
-      include T_bin_io
-
-      include Register (struct
-        include T
-        include T_bin_io
-      end)
+      include T'
+      include Register (T')
     end
   end
 
@@ -434,19 +410,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      module T_bin_io = Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-        let name = name
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
 
-        include T
-      end)
-
-      include T
-      include T_bin_io
-
-      include Register (struct
-        include T
-        include T_bin_io
-      end)
+      include T'
+      include Register (T')
     end
   end
 end

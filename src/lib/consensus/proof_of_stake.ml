@@ -2178,7 +2178,7 @@ module Hooks = struct
     open Async
 
     module Get_epoch_ledger = struct
-      module T = struct
+      module Master = struct
         let name = "get_epoch_ledger"
 
         module T = struct
@@ -2191,13 +2191,13 @@ module Hooks = struct
         module Callee = T
       end
 
-      include T.T
-      module M = Versioned_rpc.Both_convert.Plain.Make (T)
+      include Master.T
+      module M = Versioned_rpc.Both_convert.Plain.Make (Master)
       include M
 
       include Perf_histograms.Rpc.Plain.Extend (struct
         include M
-        include T
+        include Master
       end)
 
       module V1 = struct
@@ -2219,19 +2219,15 @@ module Hooks = struct
           let caller_model_of_response = Fn.id
         end
 
-        module T_bin_io = Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-          let name = name
+        module T' =
+          Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+              include M
+              include Master
+            end)
+            (T)
 
-          include T
-        end)
-
-        include T
-        include T_bin_io
-
-        include Register (struct
-          include T
-          include T_bin_io
-        end)
+        include T'
+        include Register (T')
       end
 
       let implementation ~logger ~local_state conn ~version:_ ledger_hash =
