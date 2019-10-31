@@ -620,12 +620,13 @@ let daemon logger =
              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                ~metadata:
                  [ ("long_async_job", `Float secs)
-                 ; ( "backtrace"
+                 ; ( "most_recent_2_backtrace"
                    , `String
                        (String.concat ~sep:"␤"
                           (List.map ~f:Backtrace.to_string
-                             (Execution_context.backtrace_history context))) )
-                 ]
+                             (List.take
+                                (Execution_context.backtrace_history context)
+                                2))) ) ]
                "Long async job, $long_async_job seconds" ;
              Coda_metrics.(
                Runtime.Long_job_histogram.observe Runtime.long_async_job secs)
