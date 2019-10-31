@@ -496,10 +496,12 @@ module Base = struct
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Keypair.vk
+        Cached.component ~label:"transaction_snark_base_verification"
+          ~f:Keypair.vk
           (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+        Cached.component ~label:"transaction_snark_base_proving" ~f:Keypair.pk
+          (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -785,10 +787,12 @@ module Merge = struct
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Keypair.vk
+        Cached.component ~label:"transaction_snark_merge_verification"
+          ~f:Keypair.vk
           (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+        Cached.component ~label:"transaction_snark_merge_proving" ~f:Keypair.pk
+          (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -1033,10 +1037,12 @@ struct
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Keypair.vk
+        Cached.component ~label:"transaction_snark_wrap_verification"
+          ~f:Keypair.vk
           (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+        Cached.component ~label:"transaction_snark_wrap_proving" ~f:Keypair.pk
+          (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -1338,7 +1344,7 @@ module Keys = struct
     module Location = Per_snark_location
 
     let checksum ~base ~merge ~wrap =
-      checksum ~prefix:"verification" ~base ~merge ~wrap
+      checksum ~prefix:"transaction_snark_verification" ~base ~merge ~wrap
 
     let load ({merge; base; wrap} : Location.t) =
       let open Storage in
@@ -1373,7 +1379,7 @@ module Keys = struct
     module Location = Per_snark_location
 
     let checksum ~base ~merge ~wrap =
-      checksum ~prefix:"proving" ~base ~merge ~wrap
+      checksum ~prefix:"transaction_snark_proving" ~base ~merge ~wrap
 
     let load ({merge; base; wrap} : Location.t) =
       let open Storage in
