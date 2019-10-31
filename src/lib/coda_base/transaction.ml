@@ -1,20 +1,17 @@
 open Core
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        | User_command of User_command.With_valid_signature.Stable.V1.t
-        | Fee_transfer of Fee_transfer.Stable.V1.t
-        | Coinbase of Coinbase.Stable.V1.t
-      [@@deriving bin_io, sexp, version, compare, eq, hash, yojson]
-    end
+    type t =
+      | User_command of User_command.With_valid_signature.Stable.V1.t
+      | Fee_transfer of Fee_transfer.Stable.V1.t
+      | Coinbase of Coinbase.Stable.V1.t
+    [@@deriving sexp, compare, eq, hash, yojson]
 
-    include T
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-end
+end]
 
 module T = struct
   module T0 = struct
