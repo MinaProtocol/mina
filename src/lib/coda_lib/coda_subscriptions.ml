@@ -79,7 +79,8 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
               Filtered_external_transition.of_transition external_transition
                 `All transactions
             in
-            Pipe.write_without_pushback writer {With_hash.data; hash} ) )
+            if not (Pipe.is_closed writer) then
+              Pipe.write_without_pushback writer {With_hash.data; hash} ) )
       ~if_not_found:ignore
   in
   trace_task "subscriptions new block loop" (fun () ->
