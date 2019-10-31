@@ -1548,12 +1548,14 @@ module Subscriptions = struct
     subscription_field "newBlock"
       ~doc:
         "Event that triggers when a new block is created that either contains \
-         a transaction with the specified public key, or was produced by it"
+         a transaction with the specified public key, or was produced by it. \
+         If no public key is provided, then the event will trigger for every \
+         new block received"
       ~typ:(non_null Types.block)
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key that is included in the block"
-              ~typ:(non_null Types.Input.public_key_arg) ]
+              ~typ:Types.Input.public_key_arg ]
       ~resolve:(fun {ctx= coda; _} public_key ->
         Deferred.Result.return
         @@ Coda_commands.Subscriptions.new_block coda public_key )
