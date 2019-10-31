@@ -484,22 +484,22 @@ module Transition_frontier = struct
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
 
-  module TPS_10min = Moving_average (struct
-    let tick_interval = Core.Time.Span.of_min 1.
+  module TPS_30min = Moving_average (struct
+    let tick_interval = Core.Time.Span.of_min 3.
 
-    let rolling_interval = Core.Time.Span.of_min 10.
+    let rolling_interval = Core.Time.Span.of_min 30.
 
     let display total_txns =
       total_txns /. Core.Time.Span.to_sec rolling_interval
   end)
 
-  let tps_10min =
-    let name = "tps_10min" in
+  let tps_30min =
+    let name = "tps_30min" in
     let help =
       "moving average for transaction per second, the rolling interval is set \
-       to 10 min"
+       to 30 min"
     in
-    TPS_10min.create ~name ~help ~namespace ~subsystem ()
+    TPS_30min.create ~name ~help ~namespace ~subsystem ()
 
   let recently_finalized_staged_txns : Gauge.t =
     let help =
