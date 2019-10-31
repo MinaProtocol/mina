@@ -159,7 +159,8 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
                   Deferred.unit ) )) ;
   Strict_pipe.Reader.iter reader ~f:(fun () ->
       List.iter t.reorganization_subscription ~f:(fun (_, writer) ->
-          Pipe.write_without_pushback writer `Changed ) ;
+          if not (Pipe.is_closed writer) then
+            Pipe.write_without_pushback writer `Changed ) ;
       Deferred.unit )
   |> don't_wait_for ;
   t
@@ -167,8 +168,24 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
 (* When you subscribe to a block, you will also subscribe to it's payments *)
 let add_block_subscriber t public_key =
   let block_reader, block_writer = Pipe.create () in
-  Hashtbl.add_multi t.subscribed_block_users ~key:public_key
-    ~data:(block_reader, block_writer) ;
+  let rw_pair = (block_reader, block_writer) in
+  Hashtbl.add_multi t.subscribed_block_users ~key:public_key ~data:rw_pair ;
+  don't_wait_for
+  @@ ( Pipe.closed block_reader
+     >>| fun () ->
+     Hashtbl.change t.subscribed_block_users public_key ~f:(function
+       | None ->
+           None
+       | Some pipes -> (
+         match
+           List.filter pipes ~f:(fun rw_pair' ->
+               (* Intentionally using pointer equality *)
+               rw_pair <> rw_pair' )
+         with
+         | [] ->
+             None
+         | l ->
+             Some l ) ) ) ;
   block_reader
 
 let add_payment_subscriber t public_key =
