@@ -9,7 +9,7 @@ If you're running a Coda node on a home or office machine, you'll have to set up
 ### Using UPnP
 
 !!!note
-    As of Release 0.0.10.-beta, Coda now uses libp2p for peer discovery. With this change, only port 8303 needs to be forwarded for TCP. If you previously forwarded both ports for both TCP and UDP, you may need to reconfigure your settings.
+    As of Release 0.0.10.-beta, Coda now uses libp2p for peer discovery. With this change, both ports 8302 and 8303 need to be forwarded for TCP. If you previously forwarded 8302 for UDP, you may need to reconfigure your settings.
 
 Follow the steps below to use [MiniUPnP](https://github.com/miniupnp/miniupnp) to forward ports on your router:
 
