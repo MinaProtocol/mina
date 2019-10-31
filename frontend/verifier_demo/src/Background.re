@@ -1,12 +1,18 @@
 module Styles = {
     open Css;
      let container = style([
-    width(`vw(100.)),
-    maxHeight(`vh(100.)),
-    overflow(`hidden),
-  ]);
+      width(`vw(100.)),
+      maxHeight(`vh(100.)),
+      overflow(`hidden),
+    ]);
   
-  let curveRotation =
+  let ringRotation =
+    keyframes([
+      (0, [transform(rotate(`deg(359.)))]),
+      (100, [transform(rotate(`deg(0.)))]),
+    ]);
+    
+    let curveRotation =
     keyframes([
       (0, [transform(rotate(`deg(0.)))]),
       (100, [transform(rotate(`deg(359.)))]),
@@ -16,7 +22,7 @@ module Styles = {
     position(`absolute),
     top(`calc(`sub, `percent(50.), `px(1000))),
     left(`calc(`sub, `percent(50.), `px(1000))),
-     animation(curveRotation, ~duration=20000, ~iterationCount=`infinite, ~timingFunction=`linear), 
+     animation(curveRotation, ~duration=100000, ~iterationCount=`infinite, ~timingFunction=`linear), 
      height(`px(2000)),
   ]);
   
@@ -24,7 +30,7 @@ module Styles = {
     position(`absolute),
     top(`calc(`sub, `percent(50.), `rem(16.0))),
     left(`calc(`sub, `percent(50.), `rem(16.0))),
-     animation(curveRotation, ~duration=20000, ~iterationCount=`infinite, ~timingFunction=`linear), 
+     animation(ringRotation, ~duration=70000, ~iterationCount=`infinite, ~timingFunction=`linear), 
      height(`rem(32.)),
   ]);
 

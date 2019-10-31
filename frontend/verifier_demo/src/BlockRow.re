@@ -37,13 +37,24 @@
  
 }
 
+let firstText = {
+  <div>
+    <p> {React.string("Block Height: 140")} </p> 
+    <p> {React.string("Date: 2019-10-26 12:15:00")} </p>
+  </div>
+};
+
+let stateHash = {
+  {React.string("4ApWEzSMKEsaPF6rYx6Vh6VBbHmxupj8C1EzQDyQDtcbqfmg3pnwtaFrAXWZs4QrhNHj8UtFhp3Af66M1uvoqTBy5RPe3JQmHHwYcPooZSMZgppvrCRxQ1c3DaoQh3heBXCuNAofL8hQv")}
+};
+
 [@react.component]
 let make = () => {
  <div className=Styles.blockRow> 
-      <Square bgColor=Colors.firstBg textColor=Colors.saville borderColor=Colors.navyBlue heading="Last Block" text="Time Since" timer=true/>
+      <Square bgColor=Colors.firstBg textColor=Colors.saville borderColor=Colors.navyBlue heading="Last Block" text=firstText/>
         <span className=Styles.firstLine></span>
-      <Square bgColor=Colors.secondBg textColor=Colors.hyperlink borderColor=Colors.secondBorder heading="Latest Snark" text="4ApWEzSMKEsaPF6rYx6Vh6VBbHmxupj8C1EzQDyQDtcbqfmg3pnwtaFrAXWZs4QrhNHj8UtFhp3Af66M1uvoqTBy5RPe3JQmHHwYcPooZSMZgppvrCRxQ1c3DaoQh3heBXCuNAofL8hQv"/>
+      <Square bgColor=Colors.secondBg textColor=Colors.hyperlink borderColor=Colors.secondBorder heading="Latest Snark" text=stateHash/>
         <span className=Styles.secondLine></span>
-      <Square bgColor=Colors.thirdBg textColor=Colors.jungle borderColor=Colors.thirdBg heading="Verified!" text="4ApWEzSMKEsaPF6rYx6Vh6VBbHmxupj8C1EzQDyQDtcbqfmg3pnwtaFrAXWZs4QrhNHj8UtFhp3Af66M1uvoqTBy5RPe3JQmHHwYcPooZSMZgppvrCRxQ1c3DaoQh3heBXCuNAofL8hQv"/>
+      <Square bgColor=Colors.thirdBg textColor=Colors.jungle borderColor=Colors.thirdBg heading="Verified!" text=stateHash/>
 </div>
     };
