@@ -3,78 +3,15 @@
 open Core
 open Util
 open Snark_params.Tick
-open Snark_bits
 open Bitstring_lib
-open Tuple_lib
 open Fold_lib
 open Module_version
 
-module type Basic = sig
-  type t = private Pedersen.Digest.t [@@deriving sexp, compare, hash, yojson]
+module type Basic = Data_hash_intf.Basic
 
-  val gen : t Quickcheck.Generator.t
+module type Full_size = Data_hash_intf.Full_size
 
-  val to_bytes : t -> string
-
-  val length_in_triples : int
-
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t
-      [@@deriving bin_io, sexp, compare, hash, yojson, version]
-
-      val version_byte : char (* for base58_check *)
-
-      include Hashable_binable with type t := t
-
-      include Comparable.S with type t := t
-    end
-
-    module Latest : module type of V1
-  end
-
-  type var
-
-  val var_of_hash_unpacked : Pedersen.Checked.Digest.Unpacked.var -> var
-
-  val var_to_hash_packed : var -> Pedersen.Checked.Digest.var
-
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
-
-  val typ : (var, t) Typ.t
-
-  val assert_equal : var -> var -> (unit, _) Checked.t
-
-  val equal_var : var -> var -> (Boolean.var, _) Checked.t
-
-  val var_of_t : t -> var
-
-  include Bits_intf.S with type t := t
-
-  include Hashable with type t := t
-
-  include Comparable.S with type t := t
-
-  val fold : t -> bool Triple.t Fold.t
-end
-
-module type Full_size = sig
-  include Basic
-
-  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
-
-  val var_of_hash_packed : Pedersen.Checked.Digest.var -> var
-
-  val of_hash : Pedersen.Digest.t -> t
-end
-
-module type Small = sig
-  include Basic
-
-  val var_of_hash_packed : Pedersen.Checked.Digest.var -> (var, _) Checked.t
-
-  val of_hash : Pedersen.Digest.t -> t Or_error.t
-end
+module type Small = Data_hash_intf.Small
 
 module Make_basic (M : sig
   val length_in_bits : int
@@ -112,6 +49,9 @@ struct
 
   include Comparable.Make (Stable.Latest)
   include Hashable.Make (Stable.Latest)
+
+  let to_decimal_string (t : Pedersen.Digest.t) =
+    Crypto_params.Tick0.Field.to_string t
 
   let to_bytes t =
     Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))

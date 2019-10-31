@@ -5,7 +5,8 @@ open Snark_params.Tick
 module type Update_intf = sig
   module Checked : sig
     val update :
-         State_hash.var * Protocol_state.var
+         logger:Logger.t
+      -> State_hash.var * Protocol_state.var
       -> Snark_transition.var
       -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
          , _ )

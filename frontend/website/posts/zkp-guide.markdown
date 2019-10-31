@@ -15,7 +15,6 @@ author: O(1) Labs
         background: url("https://cdn.codaprotocol.com/website/static/blog/zkp-guide/square-texture-02514419102fe2c115d32784e87d7db659bcd8e8f1be53286ec3a5fad0c8e0f7.png") no-repeat center center;
         background-size: cover;
         z-index: -2;
-        image-rendering: -webkit-optimize-contrast;
     }
     
     .hero:after {
@@ -91,10 +90,10 @@ The central vision of cryptocurrencies is to enable indivduals to decrease their
 First, Izaak and Vanishree, two members of our cryptography team who have devoted their lives to the study of zk-SNARKS, will get you started with an introduction.
 
 [Zero-knowledge Proofs: An Intuitive Explanation](https://codaprotocol.com/blog/zkp.html)  
-  Vanishee Rao, a cryptographer working on Coda Protocol, offers up this explanation, using the classic 3 coloring problem to introduce key concepts including soundness, zero-knowledgness, and verifiers. Highly visual, this short (<5 minute) read is a great place to start. 
+Vanishee Rao, a cryptographer working on Coda Protocol, offers up this explanation, using the classic 3 coloring problem to introduce key concepts including soundness, zero-knowledgness, and verifiers. Highly visual, this short (<5 minute) read is a great place to start. 
 
 [Using zk-SNARKs For A Constant Sized Blockchain](https://www.youtube.com/watch?v=fjdDbE_fgww&feature=youtu.be)  
-  In this presentation, Izaak Meckler, co-founder and CTO of O(1) Labs, and principal cryptographer working on Coda Protocol, provides an overview and introduction not only of the concepts behind zk-SNARKs but complete with practical examples of why they matter. 
+In this presentation, Izaak Meckler, co-founder and CTO of O(1) Labs, and principal cryptographer working on Coda Protocol, provides an overview and introduction not only of the concepts behind zk-SNARKs but complete with practical examples of why they matter. 
 
 
 <h1 id="learn-more"> Learn More </h1>

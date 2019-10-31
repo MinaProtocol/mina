@@ -93,7 +93,7 @@ let shareItems =
   </>;
 
 [@react.component]
-let make = (~name, ~html, ~metadata, ~showComments=true) => {
+let make = (~name, ~html, ~metadata) => {
   <div>
     <div className="ph2-m ph3-l">
       <div>
@@ -201,7 +201,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true) => {
             </div>
           </div>
         </div>
-        {showComments ? <Comments name /> : React.null}
+        <Comments name />
       </div>
     </div>
     renderKatex
