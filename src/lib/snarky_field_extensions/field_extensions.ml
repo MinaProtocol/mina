@@ -206,7 +206,13 @@ struct
 
       let order = Snarkette.Nat.of_string (Bigint.to_string Impl.Field.size)
 
-      let to_yojson t = `String (to_string t)
+      let to_yojson x = `String (to_string x)
+
+      let of_yojson = function
+        | `String s ->
+            Ok (of_string s)
+        | _ ->
+            Error "Field.of_yojson: expected string"
     end
 
     module Impl = Impl
@@ -221,6 +227,14 @@ struct
 
       module Unchecked = struct
         type t = Field.t t_
+
+        let to_yojson x = `String (Field.to_string x)
+
+        let of_yojson = function
+          | `String s ->
+              Ok (Field.of_string s)
+          | _ ->
+              Error "Field.of_yojson: expected string"
       end
 
       type t = Field.Var.t t_
