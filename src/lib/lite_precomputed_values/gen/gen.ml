@@ -54,9 +54,17 @@ let wrap_vk ~loc =
     let loc = loc
   end) in
   let open E in
+  (* TODO: the generated Verification_key module should match the to-be-versioned one above *)
   [%expr
+    let module Verification_key = struct
+      open Lite_base.Crypto_params.Tock
+
+      type t =
+        (Fq6.t, G2.t, G1.t) Snarkette.Bowe_gabizon.Verification_key.Stable.V1.t
+      [@@deriving bin_io]
+    end in
     Core_kernel.Binable.of_string
-      (module Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key)
+      (module Verification_key)
       (Base58_check.decode_exn [%e estring vk_base58])]
 
 let protocol_state (s : Protocol_state.Value.t) : Lite_base.Protocol_state.t =
