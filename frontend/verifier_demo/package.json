@@ -11,8 +11,10 @@
   "author": "",
   "dependencies": {
     "bs-css": "^10.0.1",
-    "reason-react": "^0.7.0",
-    "reason-apollo": "^0.16.0"
+    "graphql_ppx": "^0.2.8",
+    "promise-worker": "^2.0.1",
+    "reason-apollo": "^0.16.0",
+    "reason-react": "^0.7.0"
   },
   "devDependencies": {
     "bs-platform": "^5.0.3",
