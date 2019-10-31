@@ -400,10 +400,10 @@ let daemon logger =
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "Jemalloc memory statistics (in bytes)"
               ~metadata:
-                [ ("active", `Int (active * 1024))
-                ; ("resident", `Int (resident * 1024))
-                ; ("allocated", `Int (allocated * 1024))
-                ; ("mapped", `Int (mapped * 1024)) ]
+                [ ("active", `Int active)
+                ; ("resident", `Int resident)
+                ; ("allocated", `Int allocated)
+                ; ("mapped", `Int mapped) ]
           in
           let rec loop () =
             log_stats "before major gc" ;
@@ -620,12 +620,13 @@ let daemon logger =
              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                ~metadata:
                  [ ("long_async_job", `Float secs)
-                 ; ( "backtrace"
+                 ; ( "most_recent_2_backtrace"
                    , `String
                        (String.concat ~sep:"␤"
                           (List.map ~f:Backtrace.to_string
-                             (Execution_context.backtrace_history context))) )
-                 ]
+                             (List.take
+                                (Execution_context.backtrace_history context)
+                                2))) ) ]
                "Long async job, $long_async_job seconds" ;
              Coda_metrics.(
                Runtime.Long_job_histogram.observe Runtime.long_async_job secs)
@@ -640,7 +641,7 @@ let daemon logger =
          let transition_frontier_location =
            conf_dir ^/ "transition_frontier"
          in
-         let trust_system = Trust_system.create ~db_dir:trust_dir in
+         let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let time_controller =
            Block_time.Controller.create @@ Block_time.Controller.basic ~logger
@@ -682,7 +683,7 @@ let daemon logger =
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
          let receipt_chain_database =
-           Receipt_chain_database.create ~directory:receipt_chain_dir_name
+           Receipt_chain_database.create receipt_chain_dir_name
          in
          trace_database_initialization "receipt_chain_database" __LOC__
            receipt_chain_dir_name ;
@@ -705,6 +706,7 @@ let daemon logger =
              external_transition_database_dir
          in
          (* log terminated child processes *)
+         (* FIXME adapt to new system, move into child_processes lib *)
          let pids = Child_processes.Termination.create_pid_table () in
          let rec terminated_child_loop () =
            match
@@ -888,7 +890,24 @@ let snark_hashes =
 
 let internal_commands =
   [ (Snark_worker.Intf.command_name, Snark_worker.command)
-  ; ("snark-hashes", snark_hashes) ]
+  ; ("snark-hashes", snark_hashes)
+  ; ( "run-prover"
+    , Command.async
+        ~summary:"Run prover on a sexp provided on a single line of stdin"
+        (Command.Param.return (fun () ->
+             let logger = Logger.create () in
+             Parallel.init_master () ;
+             match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
+             | `Ok sexp ->
+                 let%bind conf_dir = Unix.mkdtemp "/tmp/coda-prover" in
+                 Logger.info logger "Prover state being logged to %s" conf_dir
+                   ~module_:__MODULE__ ~location:__LOC__ ;
+                 let%bind prover =
+                   Prover.create ~logger ~pids:(Pid.Table.create ()) ~conf_dir
+                 in
+                 Prover.prove_from_input_sexp prover sexp >>| ignore
+             | `Eof ->
+                 failwith "early EOF while reading sexp" )) ) ]
 
 let coda_commands logger =
   [ ("accounts", Client.accounts)

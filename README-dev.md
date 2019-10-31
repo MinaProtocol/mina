@@ -157,12 +157,17 @@ installed via the script `src/external/ocaml-rocksdb/install_rocksdb.sh`.
 
 ## Steps for adding a new dependency
 
-Rarely, you may edit one of our forked opam pacakages, or add a new system
-dependency (like libsodium).
+Rarely, you may edit one of our forked opam-pinned packages, or add a new system
+dependency (like libsodium). Some of the pinned packages are git submodules,
+others inhabit the git Coda repository.
 
-In that case, you must do all of the following:
+If an existing pinned package is updated, either in the Coda repository or in the
+the submodule's repository, it will be automatically re-pinned in CI.
 
-1. Update [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) as required
+If you add a new package in the Coda repository or as a submodule, you must do all of the following:
+
+1. Update [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) as required; there are
+    comments that distinguish the treatment of submodules from other packages
 2. Update [`scripts/macos-setup.sh`](scripts/macos-setup.sh) with the required commands for Darwin systems
 3. Bust the circle-ci Darwin cache by incrementing the version number in the cache keys as required inside [`.circleci/config.yml.jinja`](.circleci/config.yml.jinja)
 4. Commit your changes
@@ -172,6 +177,9 @@ In that case, you must do all of the following:
 Rebuilding the docker toolchain will take a long time. Running circleci for
 macos once you've busted the cache will also take a long time. However, only
 you have to do the waiting and all other developers will get the fast path.
+
+The automatic re-pinning of modified packages does take some CI time, so eventually,
+you'll want to rebuild the Docker toolchain to save that time.
 
 ## Common dune tasks
 
