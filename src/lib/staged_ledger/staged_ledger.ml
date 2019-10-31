@@ -787,18 +787,101 @@ module T = struct
       ; user_commands_rev: User_command.With_valid_signature.t Sequence.t
       ; completed_work_rev: Transaction_snark_work.Checked.t Sequence.t
       ; fee_transfers: Fee.t Public_key.Compressed.Map.t
+      ; add_coinbase: bool
       ; coinbase:
           (Public_key.Compressed.t * Fee.t) Staged_ledger_diff.At_most_two.t
       ; self_pk: Public_key.Compressed.t
       ; budget: Fee.t Or_error.t
       ; discarded: Discarded.t
-      ; logger: Logger.t }
+      ; logger: Logger.t sexp_opaque }
+    [@@deriving sexp_of]
 
     let coinbase_ft (cw : Transaction_snark_work.t) =
       (* Here we could not add the fee transfer if the prover=self but
       retaining it to preserve that information in the
       staged_ledger_diff. It will be checked in apply_diff before adding*)
       Option.some_if (cw.fee > Fee.zero) (cw.prover, cw.fee)
+
+    let cheapest_two_work (works : Transaction_snark_work.Checked.t Sequence.t)
+        =
+      Sequence.fold works ~init:(None, None) ~f:(fun (w1, w2) w ->
+          match (w1, w2) with
+          | None, _ ->
+              (Some w, None)
+          | Some x, None ->
+              if Currency.Fee.compare w.fee x.fee < 0 then (Some w, w1)
+              else (w1, Some w)
+          | Some x, Some y ->
+              if Currency.Fee.compare w.fee x.fee < 0 then (Some w, w1)
+              else if Currency.Fee.compare w.fee y.fee < 0 then (w1, Some w)
+              else (w1, w2) )
+
+    let coinbase_work ?(is_two = false)
+        (works : Transaction_snark_work.Checked.t Sequence.t) =
+      let statement = Transaction_snark_work.Checked.statement in
+      let min1, min2 = cheapest_two_work works in
+      let _compare_work w1 w2 =
+        Transaction_snark_work.Statement.compare (statement w1) (statement w2)
+      in
+      let diff ws ws' =
+        Sequence.filter ws ~f:(fun w ->
+            Sequence.mem ws'
+              (Transaction_snark_work.statement w)
+              ~equal:Transaction_snark_work.Statement.equal
+            |> not )
+      in
+      let stmt = Transaction_snark_work.statement in
+      if is_two then
+        match (min1, min2) with
+        | None, _ ->
+            None
+        | Some w, None ->
+            (*Todo add only if proof fees is less than the coinbase reward*)
+            let cb =
+              Staged_ledger_diff.At_most_two.Two
+                (Option.map (coinbase_ft w) ~f:(fun ft -> (ft, None)))
+            in
+            Some (cb, diff works (Sequence.of_list [stmt w]))
+        | Some w1, Some w2 ->
+            let cb =
+              Staged_ledger_diff.At_most_two.Two
+                (Option.map (coinbase_ft w1) ~f:(fun ft -> (ft, coinbase_ft w2)))
+              (*Always add work? where does this get checked if this really is needed?*)
+            in
+            Some (cb, diff works (Sequence.of_list [stmt w1; stmt w2]))
+      else
+        Option.map min1 ~f:(fun w ->
+            let cb = Staged_ledger_diff.At_most_two.One (coinbase_ft w) in
+            (cb, diff works (Sequence.of_list [stmt w])) )
+
+    (*TODO: need to keep track of the works separately?*)
+
+    let init_coinbase_and_fee_transfers cw_seq ~add_coinbase ~job_count ~slots
+        =
+      let cw_unchecked work =
+        Sequence.map work ~f:Transaction_snark_work.forget
+      in
+      let coinbase, rem_cw =
+        match (add_coinbase, coinbase_work cw_seq) with
+        | true, Some (ft, rem_cw) ->
+            (ft, rem_cw)
+        | true, None ->
+            if job_count = 0 || slots - job_count >= 1 then
+              (*Either no jobs are required or there is a free slot that can be filled without having to include any work*)
+              (One None, cw_seq)
+            else (Zero, cw_seq)
+              (*TODO:Error Coinbase could not be added before all the work fees > coinbase amount*)
+        | _ ->
+            (Zero, cw_seq)
+      in
+      let rem_cw = cw_unchecked rem_cw in
+      let singles =
+        Sequence.filter_map rem_cw
+          ~f:(fun {Transaction_snark_work.fee; prover; _} ->
+            if Fee.equal fee Fee.zero then None else Some (prover, fee) )
+        |> Sequence.to_list_rev
+      in
+      (coinbase, singles)
 
     let init (uc_seq : User_command.With_valid_signature.t Sequence.t)
         (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
@@ -813,25 +896,8 @@ module T = struct
         in
         go seq Sequence.empty
       in
-      let cw_unchecked =
-        Sequence.map cw_seq ~f:Transaction_snark_work.forget
-      in
-      let coinbase, rem_cw =
-        match (add_coinbase, Sequence.next cw_unchecked) with
-        | true, Some (cw, rem_cw) ->
-            (Staged_ledger_diff.At_most_two.One (coinbase_ft cw), rem_cw)
-        | true, None ->
-            if job_count = 0 || slots - job_count >= 1 then
-              (One None, cw_unchecked)
-            else (Zero, cw_unchecked)
-        | _ ->
-            (Zero, cw_unchecked)
-      in
-      let singles =
-        Sequence.filter_map rem_cw
-          ~f:(fun {Transaction_snark_work.fee; prover; _} ->
-            if Fee.equal fee Fee.zero then None else Some (prover, fee) )
-        |> Sequence.to_list_rev
+      let coinbase, singles =
+        init_coinbase_and_fee_transfers cw_seq ~add_coinbase ~job_count ~slots
       in
       let fee_transfers =
         Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
@@ -861,12 +927,58 @@ module T = struct
       ; completed_work_rev= seq_rev cw_seq
       ; fee_transfers
       ; self_pk
+      ; add_coinbase
       ; coinbase
       ; budget
       ; discarded
       ; logger }
 
-    let re_budget t =
+    let reselect_coinbase_work t =
+      let cw_unchecked work =
+        Sequence.map work ~f:Transaction_snark_work.forget
+      in
+      let coinbase, rem_cw =
+        match t.coinbase with
+        | Staged_ledger_diff.At_most_two.Zero ->
+            (t.coinbase, t.completed_work_rev)
+        | One _ -> (
+          match coinbase_work t.completed_work_rev with
+          | None ->
+              (One None, t.completed_work_rev)
+          | Some (ft, rem_cw) ->
+              (ft, rem_cw) )
+        | Two _ -> (
+          match coinbase_work t.completed_work_rev ~is_two:true with
+          | None ->
+              (Two None, t.completed_work_rev)
+              (*Check for work constraint needs to be done else where*)
+          | Some (fts', rem_cw) ->
+              (fts', rem_cw) )
+        (*match (add_coinbase, coinbase_work cw_seq) with
+        | true, Some (ft, rem_cw) ->
+            (Staged_ledger_diff.At_most_two.One ft, rem_cw)
+        | true, None ->
+            if job_count = 0 || slots - job_count >= 1 then
+              (One None, cw_seq)
+            else (Zero, cw_seq) (*TODO:Error Coinbase could not be added before all the work fees > coinbase amount*)
+        | _ ->
+            (Zero, cw_seq)*)
+      in
+      let rem_cw = cw_unchecked rem_cw in
+      let singles =
+        Sequence.filter_map rem_cw
+          ~f:(fun {Transaction_snark_work.fee; prover; _} ->
+            if Fee.equal fee Fee.zero then None else Some (prover, fee) )
+        |> Sequence.to_list_rev
+      in
+      let fee_transfers =
+        Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
+            Option.value_exn (Fee.add f1 f2) )
+      in
+      {t with coinbase; fee_transfers}
+
+    let rebudget t =
+      (*get the correct coinbase and calculate the fee transfers*)
       let open Or_error.Let_syntax in
       let payment_fees =
         sum_fees (Sequence.to_list t.user_commands_rev) ~f:(fun t ->
@@ -942,62 +1054,20 @@ module T = struct
 
     let available_space t = t.max_space - slots_occupied t
 
-    let incr_coinbase_part_by t count =
-      let open Or_error.Let_syntax in
-      let incr = function
-        | Staged_ledger_diff.At_most_two.Zero, ft_opt ->
-            Ok (Staged_ledger_diff.At_most_two.One ft_opt)
-        | One None, None ->
-            Ok (Two None)
-        | One (Some ft), ft_opt ->
-            Ok (Two (Some (ft, ft_opt)))
-        | _ ->
-            Or_error.error_string "Coinbase count cannot be more than two"
-      in
-      let by_one res =
-        let res' =
-          match Sequence.next res.discarded.completed_work with
-          | Some (w, rem_work) ->
-              let w' = Transaction_snark_work.forget w in
-              let%map coinbase = incr (res.coinbase, coinbase_ft w') in
-              { res with
-                completed_work_rev=
-                  Sequence.append (Sequence.singleton w) res.completed_work_rev
-              ; discarded= {res.discarded with completed_work= rem_work}
-              ; coinbase }
-          | None ->
-              let%bind coinbase = incr (res.coinbase, None) in
-              let res = {res with coinbase} in
-              if work_done res then Ok res
-              else
-                Or_error.error_string
-                  "Could not increment coinbase transaction count because of \
-                   insufficient work"
-        in
-        match res' with
-        | Ok res'' ->
-            res''
-        | Error e ->
-            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-              "Error when increasing coinbase: $error"
-              ~metadata:[("error", `String (Error.to_string_hum e))] ;
-            res
-      in
-      match count with `One -> by_one t | `Two -> by_one (by_one t)
-
     let discard_last_work t =
       match Sequence.next t.completed_work_rev with
       | None ->
-          t
+          t (*TODO: Need to update coinbase fee transfers*)
       | Some (w, rem_seq) ->
           let to_be_discarded = Transaction_snark_work.forget w in
-          let current_fee =
+          (*let current_fee =
             Option.value
               (Public_key.Compressed.Map.find t.fee_transfers
                  to_be_discarded.prover)
               ~default:Fee.zero
           in
           let updated_map =
+            (*TODO: select a new coinbase work if this is the one added to the coinbase*)
             match Fee.sub current_fee to_be_discarded.fee with
             | None ->
                 Public_key.Compressed.Map.remove t.fee_transfers
@@ -1009,20 +1079,18 @@ module T = struct
                 else
                   Public_key.Compressed.Map.remove t.fee_transfers
                     to_be_discarded.prover
-          in
+          in*)
           let discarded = Discarded.add_completed_work t.discarded w in
           let new_t =
-            { t with
-              completed_work_rev= rem_seq
-            ; fee_transfers= updated_map
-            ; discarded }
+            reselect_coinbase_work
+              {t with completed_work_rev= rem_seq; discarded}
           in
           let budget =
             match t.budget with
             | Ok b ->
                 option "Currency overflow" (Fee.add b to_be_discarded.fee)
             | _ ->
-                re_budget new_t
+                rebudget new_t
           in
           {new_t with budget}
 
@@ -1033,11 +1101,12 @@ module T = struct
           let updated_fee_transfers =
             Public_key.Compressed.Map.update t.fee_transfers (fst ft)
               ~f:(fun _ -> snd ft)
+            (*TODO: update the fee? No, because all user commands will have been deleted and the work that's present would be only for coinbase *)
           in
           let new_t =
             {t with coinbase; fee_transfers= updated_fee_transfers}
           in
-          let updated_budget = re_budget new_t in
+          let updated_budget = rebudget new_t in
           {new_t with budget= updated_budget}
         in
         match t.coinbase with
@@ -1067,23 +1136,74 @@ module T = struct
                 option "Fee insufficient"
                   (Fee.sub b (User_command.fee (uc :> User_command.t)))
             | _ ->
-                re_budget new_t
+                rebudget new_t
           in
           {new_t with budget}
+
+    let worked_more resources =
+      (*Is the work constraint satisfied even after discarding a work bundle?
+         We reach here after having more than enough work*)
+      let more_work t =
+        let slots = slots_occupied t in
+        let cw_count = Sequence.length t.completed_work_rev in
+        cw_count > 0 && cw_count >= slots
+      in
+      let r = discard_last_work resources in
+      more_work r && space_constraint_satisfied r
+
+    (*TODO: this should be or?? Actually shouldn't matter if the space constraint is satisfied or not. We should discard extra work and not spend the transaction fee unnecessarily. Unless the work is for free?*)
+
+    let incr_coinbase_part_by t count =
+      let open Or_error.Let_syntax in
+      let incr = function
+        | Staged_ledger_diff.At_most_two.Zero ->
+            Ok (Staged_ledger_diff.At_most_two.One None)
+        | One None ->
+            Ok (Two None)
+        | One (Some ft) ->
+            Ok (Two (Some (ft, None)))
+        | _ ->
+            Or_error.error_string "Coinbase count cannot be more than two"
+      in
+      let by_one res =
+        let res' =
+          match Sequence.next res.discarded.completed_work with
+          (*TODO: get the latest one from the discarded and then select a work from the list of all work except the one already used*)
+          | Some (w, rem_work) ->
+              (*let w' = Transaction_snark_work.forget w in*)
+              let%map coinbase = incr res.coinbase in
+              let res' =
+                { res with
+                  completed_work_rev=
+                    Sequence.append (Sequence.singleton w)
+                      res.completed_work_rev
+                ; discarded= {res.discarded with completed_work= rem_work}
+                ; coinbase }
+              in
+              reselect_coinbase_work res'
+          | None ->
+              let%bind coinbase = incr res.coinbase in
+              let res = {res with coinbase} in
+              if work_done res then Ok res
+              else
+                Or_error.error_string
+                  "Could not increment coinbase transaction count because of \
+                   insufficient work"
+        in
+        match res' with
+        | Ok res'' ->
+            res''
+        | Error e ->
+            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+              "Error when increasing coinbase: $error"
+              ~metadata:[("error", `String (Error.to_string_hum e))] ;
+            res
+      in
+      match count with `One -> by_one t | `Two -> by_one (by_one t)
   end
 
-  let worked_more (resources : Resources.t) =
-    (*Is the work constraint satisfied even after discarding a work bundle?
-       We reach here after having more than enough work*)
-    let more_work t =
-      let slots = Resources.slots_occupied t in
-      let cw_count = Sequence.length t.completed_work_rev in
-      cw_count > 0 && cw_count >= slots
-    in
-    let r = Resources.discard_last_work resources in
-    more_work r && Resources.space_constraint_satisfied r
-
   let rec check_constraints_and_update (resources : Resources.t) =
+    (*Core.printf !"Resources:\n %{sexp: Resources.t}%!\n" resources; *)
     if Resources.slots_occupied resources = 0 then resources
     else if Resources.work_constraint_satisfied resources then
       if
@@ -1091,7 +1211,7 @@ module T = struct
         Resources.budget_sufficient resources
       then
         if Resources.space_constraint_satisfied resources then resources
-        else if worked_more resources then
+        else if Resources.worked_more resources then
           (*There are too many fee_transfers(from the proofs) occupying the slots. discard one and check*)
           check_constraints_and_update (Resources.discard_last_work resources)
         else
@@ -2006,5 +2126,169 @@ let%test_module "test" =
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_random_number_of_proofs ledger_init_state cmds iters
-                proofs_available sl test_mask `One_prover ) )
+                proofs_available sl test_mask `One_prover ) )*)
+
+    let stmt_to_work_random_fee work_list provers
+        (stmts : Transaction_snark_work.Statement.t) :
+        Transaction_snark_work.Checked.t option =
+      let prover =
+        match provers with
+        | `Many_provers ->
+            stmt_to_prover stmts
+        | `One_prover ->
+            snark_worker_pk
+      in
+      Option.map
+        (List.find work_list ~f:(fun (s, _) ->
+             Transaction_snark_work.Statement.compare s stmts = 0 ))
+        ~f:(fun (_, fee) ->
+          {Transaction_snark_work.Checked.fee; proofs= proofs stmts; prover} )
+
+    (** Like test_random_number_of_proofs but with random proof fees.
+    *)
+    let test_random_proof_fee :
+           Ledger.init_state
+        -> User_command.With_valid_signature.t list
+        -> int option list
+        -> (int * Fee.t list) list
+        -> Sl.t ref
+        -> Ledger.Mask.Attached.t
+        -> [`One_prover | `Many_provers]
+        -> unit Deferred.t =
+     fun init_state cmds cmd_iters proofs_available sl test_mask provers ->
+      let logger = Logger.null () in
+      let pids = Child_processes.Termination.create_pid_table () in
+      let%map proofs_available_left =
+        iter_cmds_acc cmds cmd_iters proofs_available
+          (fun cmds_left _count_opt cmds_this_iter proofs_available_left ->
+            let work_list : Transaction_snark_work.Statement.t list =
+              Sl.Scan_state.work_statements_for_new_diff (Sl.scan_state !sl)
+              (*in
+              List.map spec_list ~f:(fun specs ->
+                  One_or_two.map specs
+                    ~f:Snark_work_lib.Work.Single.Spec.statement )*)
+            in
+            let proofs_available_this_iter, fees_for_each =
+              List.hd_exn proofs_available_left
+            in
+            let work_to_be_done =
+              let work_list = List.take work_list proofs_available_this_iter in
+              List.(zip_exn work_list (take fees_for_each (length work_list)))
+            in
+            let%map proof, diff =
+              create_and_apply sl logger pids cmds_this_iter
+                (stmt_to_work_random_fee work_to_be_done provers)
+            in
+            let sorted_work_from_diff1
+                (pre_diff :
+                  Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t) =
+              List.sort pre_diff.completed_works ~compare:(fun w w' ->
+                  Fee.compare w.fee w'.fee )
+            in
+            let sorted_work_from_diff2
+                (pre_diff :
+                  Staged_ledger_diff.Pre_diff_with_at_most_one_coinbase.t
+                  option) =
+              Option.value_map pre_diff ~default:[] ~f:(fun p ->
+                  List.sort p.completed_works ~compare:(fun w w' ->
+                      Fee.compare w.fee w'.fee ) )
+            in
+            let _budget_sufficient = if false then failwith "" in
+            let () =
+              let assert_ft ft ft' =
+                Core.printf
+                  !"ft from diff %{sexp:Fee_transfer.Single.t} expected ft \
+                    %{sexp:Fee_transfer.Single.t} \n\
+                    %!"
+                  ft ft' ;
+                assert (Fee_transfer.Single.equal ft ft')
+              in
+              let first_pre_diff, second_pre_diff_opt = diff.diff in
+              match
+                ( first_pre_diff.coinbase
+                , Option.value_map second_pre_diff_opt
+                    ~default:Staged_ledger_diff.At_most_one.Zero ~f:(fun d ->
+                      d.coinbase ) )
+              with
+              | ( Staged_ledger_diff.At_most_two.Zero
+                , Staged_ledger_diff.At_most_one.Zero )
+              | Two None, Zero ->
+                  ()
+              | One ft_opt, Zero ->
+                  Option.value_map ft_opt ~default:() ~f:(fun single ->
+                      let work =
+                        List.hd_exn (sorted_work_from_diff1 first_pre_diff)
+                        |> Transaction_snark_work.forget
+                      in
+                      assert_ft single (work.prover, work.fee) )
+              | Zero, One ft_opt ->
+                  Option.value_map ft_opt ~default:() ~f:(fun single ->
+                      let work =
+                        List.hd_exn
+                          (sorted_work_from_diff2 second_pre_diff_opt)
+                        |> Transaction_snark_work.forget
+                      in
+                      assert_ft single (work.prover, work.fee) )
+              | Two (Some (ft, ft_opt)), Zero ->
+                  let work_done = sorted_work_from_diff1 first_pre_diff in
+                  let work =
+                    List.hd_exn work_done |> Transaction_snark_work.forget
+                  in
+                  assert_ft ft (work.prover, work.fee) ;
+                  Option.value_map ft_opt ~default:() ~f:(fun single ->
+                      let work =
+                        List.hd_exn (List.drop work_done 1)
+                        |> Transaction_snark_work.forget
+                      in
+                      assert_ft single (work.prover, work.fee) )
+              | _ ->
+                  failwith
+                    (sprintf
+                       !"Incorrect coinbase in the diff %{sexp: \
+                         Staged_ledger_diff.t}"
+                       diff)
+            in
+            assert_fee_excess proof ;
+            let cmds_applied_this_iter =
+              List.length @@ Staged_ledger_diff.user_commands diff
+            in
+            let cb = coinbase_fee_transfers diff in
+            assert (proofs_available_this_iter = 0 || cb > 0) ;
+            ( match provers with
+            | `One_prover ->
+                assert (cb <= 1)
+            | `Many_provers ->
+                assert (cb <= 2) ) ;
+            assert_ledger test_mask !sl cmds_left cmds_applied_this_iter
+              (init_pks init_state) ;
+            (diff, List.tl_exn proofs_available_left) )
+      in
+      assert (List.is_empty proofs_available_left)
+
+    let%test_unit "max throughput-random number of proofs-worst case provers" =
+      (* Always at worst case number of provers *)
+      let g =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind ledger_init_state, cmds, iters = gen_at_capacity in
+        (* How many proofs will be available at each iteration. *)
+        let%bind proofs_available =
+          Quickcheck_lib.map_gens iters ~f:(fun _ ->
+              let%bind number_of_proofs =
+                Int.gen_incl 0 (transaction_capacity * 2)
+              in
+              let%map fees =
+                Quickcheck.Generator.list_with_length number_of_proofs
+                  Fee.(
+                    gen_incl (of_int 1)
+                      (of_int Coda_compile_config.coinbase_int))
+              in
+              (number_of_proofs, fees) )
+        in
+        return (ledger_init_state, cmds, iters, proofs_available)
+      in
+      Quickcheck.test g ~trials:10
+        ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->
+          async_with_ledgers ledger_init_state (fun sl test_mask ->
+              test_random_proof_fee ledger_init_state cmds iters
+                proofs_available sl test_mask `Many_provers ) )
   end )
