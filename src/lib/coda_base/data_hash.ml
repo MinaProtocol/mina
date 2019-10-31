@@ -21,7 +21,7 @@ struct
     module V1 = struct
       module T = struct
         type t = Pedersen.Digest.Stable.V1.t
-        [@@deriving bin_io, eq, sexp, compare, hash, yojson, version]
+        [@@deriving bin_io, sexp, compare, hash, yojson, version]
       end
 
       include T
