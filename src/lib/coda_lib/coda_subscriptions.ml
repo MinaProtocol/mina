@@ -8,22 +8,31 @@ open O1trace
 
 type 'a reader_and_writer = 'a Pipe.Reader.t * 'a Pipe.Writer.t
 
+module Optional_public_key = struct
+  module T = struct
+    type t = Public_key.Compressed.t option [@@deriving hash, compare, sexp]
+  end
+
+  include Hashable.Make (T)
+end
+
 type t =
   { subscribed_payment_users:
       User_command.t reader_and_writer Public_key.Compressed.Table.t
   ; subscribed_block_users:
       (Filtered_external_transition.t, State_hash.t) With_hash.t
       reader_and_writer
-      Public_key.Compressed.Table.t
+      list
+      Optional_public_key.Table.t
   ; mutable reorganization_subscription: [`Changed] reader_and_writer list }
 
 let create ~logger ~wallets ~time_controller ~external_transition_database
     ~new_blocks ~transition_frontier ~is_storing_all =
   let subscribed_block_users =
-    Public_key.Compressed.Table.of_alist_exn
+    Optional_public_key.Table.of_alist_multi
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
            let reader, writer = Pipe.create () in
-           (wallet, (reader, writer)) )
+           (Some wallet, (reader, writer)) )
   in
   let subscribed_payment_users =
     Public_key.Compressed.Table.of_alist_exn
@@ -31,53 +40,89 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
            let reader, writer = Pipe.create () in
            (wallet, (reader, writer)) )
   in
+  let update_external_transition_database
+      filtered_external_transition_with_hash block_time =
+    External_transition_database.add external_transition_database
+      filtered_external_transition_with_hash block_time
+  in
+  let update_payment_subscriptions filtered_external_transition participants =
+    Set.iter participants ~f:(fun participant ->
+        Hashtbl.find_and_call subscribed_payment_users participant
+          ~if_not_found:ignore ~if_found:(fun (_, writer) ->
+            let user_commands =
+              User_command.filter_by_participant
+                (Filtered_external_transition.user_commands
+                   filtered_external_transition)
+                participant
+            in
+            List.iter user_commands ~f:(fun user_command ->
+                Pipe.write_without_pushback writer user_command ) ) )
+  in
+  let update_block_subscriptions {With_hash.data= external_transition; hash}
+      transactions participants =
+    Set.iter participants ~f:(fun participant ->
+        Hashtbl.find_and_call subscribed_block_users (Some participant)
+          ~if_found:(fun pipes ->
+            List.iter pipes ~f:(fun (_, writer) ->
+                let data =
+                  Filtered_external_transition.of_transition
+                    external_transition
+                    (`Some (Public_key.Compressed.Set.singleton participant))
+                    transactions
+                in
+                Pipe.write_without_pushback writer {With_hash.data; hash} ) )
+          ~if_not_found:ignore ) ;
+    Hashtbl.find_and_call subscribed_block_users None
+      ~if_found:(fun pipes ->
+        List.iter pipes ~f:(fun (_, writer) ->
+            let data =
+              Filtered_external_transition.of_transition external_transition
+                `All transactions
+            in
+            Pipe.write_without_pushback writer {With_hash.data; hash} ) )
+      ~if_not_found:ignore
+  in
   trace_task "subscriptions new block loop" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
           let hash =
             new_block
             |> Coda_transition.External_transition.Validated.state_hash
           in
-          let filtered_external_transition_result =
-            if is_storing_all then
-              Filtered_external_transition.of_transition `All new_block
-            else
-              Filtered_external_transition.of_transition
-                (`Some
-                  ( Public_key.Compressed.Set.of_list
-                  @@ Hashtbl.keys subscribed_block_users ))
-                new_block
-          in
-          match filtered_external_transition_result with
-          | Ok filtered_external_transition ->
-              let block_time = Block_time.now time_controller in
+          match
+            Filtered_external_transition.validate_transactions new_block
+          with
+          | Ok verified_transactions ->
+              let unfiltered_external_transition =
+                lazy
+                  (Filtered_external_transition.of_transition new_block `All
+                     verified_transactions)
+              in
+              let filtered_external_transition =
+                if is_storing_all then
+                  Lazy.force unfiltered_external_transition
+                else
+                  Filtered_external_transition.of_transition new_block
+                    (`Some
+                      ( Public_key.Compressed.Set.of_list
+                      @@ List.filter_opt (Hashtbl.keys subscribed_block_users)
+                      ))
+                    verified_transactions
+              in
               let filtered_external_transition_with_hash =
-                {With_hash.data= filtered_external_transition; hash}
+                {With_hash.hash; data= filtered_external_transition}
               in
               let participants =
                 Filtered_external_transition.participants
                   filtered_external_transition
               in
-              Set.iter participants ~f:(fun participant ->
-                  (* Send block to subscribed partipants *)
-                  Hashtbl.find_and_call subscribed_block_users participant
-                    ~if_found:(fun (_, writer) ->
-                      Pipe.write_without_pushback writer
-                        filtered_external_transition_with_hash )
-                    ~if_not_found:ignore ;
-                  (* Send payments to subscribed partipants *)
-                  Hashtbl.find_and_call subscribed_payment_users participant
-                    ~if_found:(fun (_, writer) ->
-                      let user_commands =
-                        User_command.filter_by_participant
-                          (Filtered_external_transition.user_commands
-                             filtered_external_transition)
-                          participant
-                      in
-                      List.iter user_commands ~f:(fun user_command ->
-                          Pipe.write_without_pushback writer user_command ) )
-                    ~if_not_found:ignore ) ;
-              External_transition_database.add external_transition_database
+              let block_time = Block_time.now time_controller in
+              update_external_transition_database
                 filtered_external_transition_with_hash block_time ;
+              update_payment_subscriptions filtered_external_transition
+                participants ;
+              update_block_subscriptions
+                {With_hash.data= new_block; hash}
+                verified_transactions participants ;
               Deferred.unit
           | Error e ->
               Logger.error logger
@@ -122,7 +167,7 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
 (* When you subscribe to a block, you will also subscribe to it's payments *)
 let add_block_subscriber t public_key =
   let block_reader, block_writer = Pipe.create () in
-  Hashtbl.set t.subscribed_block_users ~key:public_key
+  Hashtbl.add_multi t.subscribed_block_users ~key:public_key
     ~data:(block_reader, block_writer) ;
   block_reader
 
