@@ -36,6 +36,8 @@ module Stable = struct
       ; ciphertext: Bytes.t }
     [@@deriving sexp]
   end
+
+  module Latest = V1
 end
 
 module Json : sig
@@ -64,7 +66,14 @@ end = struct
     {Stable.V1.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
 end
 
-include Stable.V1
+type t = Stable.Latest.t =
+  { box_primitive: string
+  ; pw_primitive: string
+  ; nonce: Bytes.t
+  ; pwsalt: Bytes.t
+  ; pwdiff: Int64.t * int
+  ; ciphertext: Bytes.t }
+[@@deriving sexp]
 
 let to_yojson t : Yojson.Safe.json = Json.to_yojson (Json.of_stable t)
 

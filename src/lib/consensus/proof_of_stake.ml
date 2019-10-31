@@ -503,19 +503,14 @@ module Data = struct
 
   module Epoch_ledger = struct
     module Poly = struct
+      [%%versioned
       module Stable = struct
         module V1 = struct
-          module T = struct
-            type ('ledger_hash, 'amount) t =
-              {hash: 'ledger_hash; total_currency: 'amount}
-            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
-          end
-
-          include T
+          type ('ledger_hash, 'amount) t =
+            {hash: 'ledger_hash; total_currency: 'amount}
+          [@@deriving sexp, eq, compare, hash, to_yojson]
         end
-
-        module Latest = V1
-      end
+      end]
 
       type ('ledger_hash, 'amount) t =
             ('ledger_hash, 'amount) Stable.Latest.t =
@@ -524,31 +519,18 @@ module Data = struct
     end
 
     module Value = struct
+      [%%versioned
       module Stable = struct
         module V1 = struct
-          module T = struct
-            type t =
-              ( Coda_base.Frozen_ledger_hash.Stable.V1.t
-              , Amount.Stable.V1.t )
-              Poly.Stable.V1.t
-            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
-          end
+          type t =
+            ( Coda_base.Frozen_ledger_hash.Stable.V1.t
+            , Amount.Stable.V1.t )
+            Poly.Stable.V1.t
+          [@@deriving sexp, eq, compare, hash, to_yojson]
 
-          include T
-          include Module_version.Registration.Make_latest_version (T)
+          let to_latest = Fn.id
         end
-
-        module Latest = V1
-
-        module Module_decl = struct
-          let name = "epoch_ledger_data_proof_of_stake"
-
-          type latest = Latest.t
-        end
-
-        module Registrar = Module_version.Registration.Make (Module_decl)
-        module Registered_V1 = Registrar.Register (V1)
-      end
+      end]
 
       type t = Stable.Latest.t [@@deriving sexp, compare, hash, to_yojson]
     end
@@ -718,36 +700,21 @@ module Data = struct
 
     module Output = struct
       module Truncated = struct
+        [%%versioned
         module Stable = struct
           module V1 = struct
-            module T = struct
-              type t = string
-              [@@deriving sexp, bin_io, eq, compare, hash, yojson, version]
-            end
+            type t = string [@@deriving sexp, eq, compare, hash, yojson]
 
-            include T
-
-            let version_byte = Base58_check.Version_bytes.vrf_truncated_output
-
-            include Registration.Make_latest_version (T)
+            let to_latest = Fn.id
           end
-
-          module Latest = V1
-
-          module Module_decl = struct
-            let name = "random_oracle_digest"
-
-            type latest = Latest.t
-          end
-
-          module Registrar = Registration.Make (Module_decl)
-          module Registered_V1 = Registrar.Register (V1)
-        end
+        end]
 
         type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
         include Codable.Make_base58_check (struct
           include Stable.Latest
+
+          let version_byte = Base58_check.Version_bytes.vrf_truncated_output
 
           let description = "Vrf Truncated Output"
         end)
@@ -1082,19 +1049,15 @@ module Data = struct
   end
 
   module Optional_state_hash = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t = Coda_base.State_hash.Stable.V1.t option
-          [@@deriving
-            sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
-        end
+        type t = Coda_base.State_hash.Stable.V1.t option
+        [@@deriving sexp, eq, compare, hash, to_yojson]
 
-        include T
+        let to_latest = Fn.id
       end
-
-      module Latest = V1
-    end
+    end]
 
     type t = Stable.Latest.t [@@deriving sexp, compare, hash, to_yojson]
 
@@ -1116,29 +1079,23 @@ module Data = struct
 
   module Epoch_data = struct
     module Poly = struct
+      [%%versioned
       module Stable = struct
         module V1 = struct
-          module T = struct
-            type ( 'epoch_ledger
-                 , 'epoch_seed
-                 , 'start_checkpoint
-                 , 'lock_checkpoint
-                 , 'length )
-                 t =
-              { ledger: 'epoch_ledger
-              ; seed: 'epoch_seed
-              ; start_checkpoint: 'start_checkpoint
-              ; lock_checkpoint: 'lock_checkpoint
-              ; epoch_length: 'length }
-            [@@deriving
-              sexp, bin_io, eq, compare, hash, to_yojson, version, fields]
-          end
-
-          include T
+          type ( 'epoch_ledger
+               , 'epoch_seed
+               , 'start_checkpoint
+               , 'lock_checkpoint
+               , 'length )
+               t =
+            { ledger: 'epoch_ledger
+            ; seed: 'epoch_seed
+            ; start_checkpoint: 'start_checkpoint
+            ; lock_checkpoint: 'lock_checkpoint
+            ; epoch_length: 'length }
+          [@@deriving sexp, eq, compare, hash, to_yojson, fields]
         end
-
-        module Latest = V1
-      end
+      end]
 
       type ( 'epoch_ledger
            , 'epoch_seed
@@ -1239,34 +1196,21 @@ module Data = struct
       open Snark_params
 
       module Value = struct
+        [%%versioned
         module Stable = struct
           module V1 = struct
-            module T = struct
-              type t =
-                ( Epoch_ledger.Value.Stable.V1.t
-                , Epoch_seed.Stable.V1.t
-                , Coda_base.State_hash.Stable.V1.t
-                , Lock_checkpoint.Stable.V1.t
-                , Length.Stable.V1.t )
-                Poly.Stable.V1.t
-              [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
-            end
+            type t =
+              ( Epoch_ledger.Value.Stable.V1.t
+              , Epoch_seed.Stable.V1.t
+              , Coda_base.State_hash.Stable.V1.t
+              , Lock_checkpoint.Stable.V1.t
+              , Length.Stable.V1.t )
+              Poly.Stable.V1.t
+            [@@deriving sexp, eq, compare, hash, to_yojson]
 
-            include T
-            include Module_version.Registration.Make_latest_version (T)
+            let to_latest = Fn.id
           end
-
-          module Latest = V1
-
-          module Module_decl = struct
-            let name = "epoch_data_proof_of_stake"
-
-            type latest = Latest.t
-          end
-
-          module Registrar = Module_version.Registration.Make (Module_decl)
-          module Registered_V1 = Registrar.Register (V1)
-        end
+        end]
 
         type t =
           ( Epoch_ledger.Value.Stable.Latest.t
@@ -1434,29 +1378,27 @@ module Data = struct
     let length = Constants.Checkpoint_window.per_year
 
     module Repr = struct
+      [%%versioned
       module Stable = struct
         module V1 = struct
-          module T = struct
-            type t =
-              { (* TODO: Make a nice way to force this to have bounded (or fixed) size for
+          type t =
+            { (* TODO: Make a nice way to force this to have bounded (or fixed) size for
                    bin_io reasons *)
-                prefix:
-                  Coda_base.State_hash.Stable.V1.t Core.Fqueue.Stable.V1.t
-              ; tail: Hash.Stable.V1.t }
-            [@@deriving sexp, bin_io, compare, version {unnumbered}]
+              prefix: Coda_base.State_hash.Stable.V1.t Core.Fqueue.Stable.V1.t
+            ; tail: Hash.Stable.V1.t }
+          [@@deriving sexp, compare]
 
-            let digest ({prefix; tail} : t) =
-              let rec go acc p =
-                match Fqueue.dequeue p with
-                | None ->
-                    acc
-                | Some (h, p) ->
-                    go (merge h acc) p
-              in
-              go tail prefix
-          end
+          let to_latest = Fn.id
 
-          include T
+          let digest ({prefix; tail} : t) =
+            let rec go acc p =
+              match Fqueue.dequeue p with
+              | None ->
+                  acc
+              | Some (h, p) ->
+                  go (merge h acc) p
+            in
+            go tail prefix
 
           module Yojson = struct
             type t =
@@ -1468,9 +1410,7 @@ module Data = struct
           let to_yojson ({prefix; tail} : t) =
             Yojson.to_yojson {prefix= Fqueue.to_list prefix; tail}
         end
-
-        module Latest = V1
-      end
+      end]
 
       type t = Stable.Latest.t =
         {prefix: Coda_base.State_hash.t Fqueue.t; tail: Hash.t}
@@ -1578,37 +1518,32 @@ module Data = struct
   *)
   module Consensus_state = struct
     module Poly = struct
+      [%%versioned
       module Stable = struct
         module V1 = struct
-          module T = struct
-            type ( 'length
-                 , 'vrf_output
-                 , 'amount
-                 , 'global_slot
-                 , 'staking_epoch_data
-                 , 'next_epoch_data
-                 , 'bool
-                 , 'checkpoints )
-                 t =
-              { blockchain_length: 'length
-              ; epoch_count: 'length
-              ; min_epoch_length: 'length
-              ; last_vrf_output: 'vrf_output
-              ; total_currency: 'amount
-              ; curr_global_slot: 'global_slot
-              ; staking_epoch_data: 'staking_epoch_data
-              ; next_epoch_data: 'next_epoch_data
-              ; has_ancestor_in_same_checkpoint_window: 'bool
-              ; checkpoints: 'checkpoints }
-            [@@deriving
-              sexp, bin_io, eq, compare, hash, to_yojson, version, fields]
-          end
-
-          include T
+          type ( 'length
+               , 'vrf_output
+               , 'amount
+               , 'global_slot
+               , 'staking_epoch_data
+               , 'next_epoch_data
+               , 'bool
+               , 'checkpoints )
+               t =
+            { blockchain_length: 'length
+            ; epoch_count: 'length
+            ; min_epoch_length: 'length
+            ; last_vrf_output: 'vrf_output
+            ; total_currency: 'amount
+            ; curr_global_slot: 'global_slot
+            ; staking_epoch_data: 'staking_epoch_data
+            ; next_epoch_data: 'next_epoch_data
+            ; has_ancestor_in_same_checkpoint_window: 'bool
+            ; checkpoints: 'checkpoints }
+          [@@deriving
+            sexp, bin_io, eq, compare, hash, to_yojson, version, fields]
         end
-
-        module Latest = V1
-      end
+      end]
 
       type ( 'length
            , 'vrf_output
@@ -1642,54 +1577,40 @@ module Data = struct
     end
 
     module Value = struct
+      [%%versioned
       module Stable = struct
         module V1 = struct
-          module T = struct
-            type t =
-              ( Length.Stable.V1.t
-              , Vrf.Output.Truncated.Stable.V1.t
-              , Amount.Stable.V1.t
-              , Global_slot.Stable.V1.t
-              , Epoch_data.Staking.Value.Stable.V1.t
-              , Epoch_data.Next.Value.Stable.V1.t
-              , bool
-              , Checkpoints.Stable.V1.t )
-              Poly.Stable.V1.t
-            [@@deriving sexp, bin_io, eq, compare, hash, version]
+          type t =
+            ( Length.Stable.V1.t
+            , Vrf.Output.Truncated.Stable.V1.t
+            , Amount.Stable.V1.t
+            , Global_slot.Stable.V1.t
+            , Epoch_data.Staking.Value.Stable.V1.t
+            , Epoch_data.Next.Value.Stable.V1.t
+            , bool
+            , Checkpoints.Stable.V1.t )
+            Poly.Stable.V1.t
+          [@@deriving sexp, bin_io, eq, compare, hash, version]
 
-            let to_yojson t =
-              `Assoc
-                [ ( "blockchain_length"
-                  , Length.to_yojson t.Poly.blockchain_length )
-                ; ("epoch_count", Length.to_yojson t.epoch_count)
-                ; ("min_epoch_length", Length.to_yojson t.min_epoch_length)
-                ; ("last_vrf_output", `String "<opaque>")
-                ; ("total_currency", Amount.to_yojson t.total_currency)
-                ; ("curr_global_slot", Global_slot.to_yojson t.curr_global_slot)
-                ; ( "staking_epoch_data"
-                  , Epoch_data.Staking.Value.to_yojson t.staking_epoch_data )
-                ; ( "next_epoch_data"
-                  , Epoch_data.Next.Value.to_yojson t.next_epoch_data )
-                ; ( "has_ancestor_in_same_checkpoint_window"
-                  , `Bool t.has_ancestor_in_same_checkpoint_window )
-                ; ("checkpoints", Checkpoints.to_yojson t.checkpoints) ]
-          end
+          let to_latest = Fn.id
 
-          include T
-          include Registration.Make_latest_version (T)
+          let to_yojson t =
+            `Assoc
+              [ ("blockchain_length", Length.to_yojson t.Poly.blockchain_length)
+              ; ("epoch_count", Length.to_yojson t.epoch_count)
+              ; ("min_epoch_length", Length.to_yojson t.min_epoch_length)
+              ; ("last_vrf_output", `String "<opaque>")
+              ; ("total_currency", Amount.to_yojson t.total_currency)
+              ; ("curr_global_slot", Global_slot.to_yojson t.curr_global_slot)
+              ; ( "staking_epoch_data"
+                , Epoch_data.Staking.Value.to_yojson t.staking_epoch_data )
+              ; ( "next_epoch_data"
+                , Epoch_data.Next.Value.to_yojson t.next_epoch_data )
+              ; ( "has_ancestor_in_same_checkpoint_window"
+                , `Bool t.has_ancestor_in_same_checkpoint_window )
+              ; ("checkpoints", Checkpoints.to_yojson t.checkpoints) ]
         end
-
-        module Latest = V1
-
-        module Module_decl = struct
-          let name = "consensus_state_proof_of_stake"
-
-          type latest = Latest.t
-        end
-
-        module Registrar = Registration.Make (Module_decl)
-        module Registered_V1 = Registrar.Register (V1)
-      end
+      end]
 
       type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
