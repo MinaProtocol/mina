@@ -15,7 +15,9 @@ module Database = struct
     end]
   end
 
-  include Rocksdb.Serializable.Make (State_hash.Stable.V1) (Value.Stable.V1)
+  include Rocksdb.Serializable.Make
+            (State_hash.Stable.Latest)
+            (Value.Stable.Latest)
 end
 
 module Pagination =
@@ -24,7 +26,7 @@ module Pagination =
     (struct
       type t = (Filtered_external_transition.t, State_hash.t) With_hash.t
     end)
-    (Block_time.Stable.V1)
+    (Block_time)
 
 let fee_transfer_participants (pk, _) = [pk]
 
