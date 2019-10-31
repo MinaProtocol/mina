@@ -129,7 +129,8 @@ val create_diff :
   -> state_body_hash:State_body_hash.t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
-val statement_exn : t -> [`Non_empty of Transaction_snark.Statement.t | `Empty] Deferred.t
+val statement_exn :
+  t -> [`Non_empty of Transaction_snark.Statement.t | `Empty] Deferred.t
 
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t
