@@ -4,24 +4,18 @@
 open Core
 open Import
 open Coda_numbers
-open Module_version
 module Fee = Currency.Fee
 module Payload = User_command_payload
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('payload, 'pk, 'signature) t =
-          {payload: 'payload; sender: 'pk; signature: 'signature}
-        [@@deriving bin_io, compare, sexp, hash, yojson, version, eq]
-      end
-
-      include T
+      type ('payload, 'pk, 'signature) t =
+        {payload: 'payload; sender: 'pk; signature: 'signature}
+      [@@deriving compare, sexp, hash, yojson, eq]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('payload, 'pk, 'signature) t =
         ('payload, 'pk, 'signature) Stable.Latest.t =
@@ -29,41 +23,36 @@ module Poly = struct
   [@@deriving compare, eq, sexp, hash, yojson]
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        ( Payload.Stable.V1.t
-        , Public_key.Stable.V1.t
-        , Signature.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving compare, bin_io, sexp, hash, yojson, version]
-    end
+    type t =
+      ( Payload.Stable.V1.t
+      , Public_key.Stable.V1.t
+      , Signature.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving compare, sexp, hash, yojson]
+
+    let to_latest = Fn.id
 
     let description = "User command"
 
     let version_byte = Base58_check.Version_bytes.user_command
 
-    include T
-    include Registration.Make_latest_version (T)
+    module T = struct
+      (* can't use nonrec + deriving *)
+      type typ = t [@@deriving compare, sexp, hash]
+
+      type t = typ [@@deriving compare, sexp, hash]
+    end
+
     include Comparable.Make (T)
     include Hashable.Make (T)
 
     let accounts_accessed ({payload; sender; _} : t) =
       Public_key.compress sender :: Payload.accounts_accessed payload
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "user_command"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
@@ -249,32 +238,18 @@ module Gen = struct
 end
 
 module With_valid_signature = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Stable.V1.t
-        [@@deriving sexp, eq, bin_io, yojson, version, hash]
-      end
+      type t = Stable.V1.t [@@deriving sexp, eq, yojson, hash]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
 
       let compare = Stable.V1.compare
 
       module Gen = Gen
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "user_command_with_valid_signature"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 

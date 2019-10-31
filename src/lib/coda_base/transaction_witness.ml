@@ -1,18 +1,13 @@
-open Module_version
+open Core_kernel
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = {ledger: Sparse_ledger.Stable.V1.t}
-      [@@deriving sexp, bin_io, version]
-    end
+    type t = {ledger: Sparse_ledger.Stable.V1.t} [@@deriving sexp]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t = {ledger: Sparse_ledger.Stable.V1.t}
 [@@deriving sexp]

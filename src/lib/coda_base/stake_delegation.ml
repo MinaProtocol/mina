@@ -1,32 +1,16 @@
 open Core_kernel
 open Signature_lib
-open Module_version
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        | Set_delegate of {new_delegate: Public_key.Compressed.Stable.V1.t}
-      [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
-    end
+    type t = Set_delegate of {new_delegate: Public_key.Compressed.Stable.V1.t}
+    [@@deriving compare, eq, sexp, hash, yojson]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
   end
+end]
 
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "stake_delegation"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
-
-(* bin_io omitted *)
 type t = Stable.Latest.t =
   | Set_delegate of {new_delegate: Public_key.Compressed.Stable.V1.t}
 [@@deriving eq, sexp, hash, yojson]
