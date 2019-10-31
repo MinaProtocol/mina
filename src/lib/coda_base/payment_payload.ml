@@ -2,54 +2,33 @@ open Core
 open Fold_lib
 open Snark_params.Tick
 open Import
-open Module_version
 module Amount = Currency.Amount
 module Fee = Currency.Fee
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('pk, 'amount) t = {receiver: 'pk; amount: 'amount}
-        [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
-      end
-
-      include T
+      type ('pk, 'amount) t = {receiver: 'pk; amount: 'amount}
+      [@@deriving eq, sexp, hash, yojson, compare]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('pk, 'amount) t = ('pk, 'amount) Stable.Latest.t =
     {receiver: 'pk; amount: 'amount}
   [@@deriving eq, sexp, hash, yojson, compare]
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        ( Public_key.Compressed.Stable.V1.t
-        , Amount.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving bin_io, compare, eq, sexp, hash, compare, yojson, version]
-    end
+    type t =
+      (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
+    [@@deriving compare, eq, sexp, hash, compare, yojson]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "payment_payload"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 (* bin_io, version omitted *)
 type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
