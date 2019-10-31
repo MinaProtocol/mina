@@ -9,7 +9,8 @@ open Coda_state
 module type Update_intf = sig
   module Checked : sig
     val update :
-         State_hash.var * Protocol_state.var
+         logger:Logger.t
+      -> State_hash.var * Protocol_state.var
       -> Snark_transition.var
       -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
          , _ )
@@ -46,7 +47,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
       | _ ->
           fun _ _ _ _ _ _ _ -> Checked.return Boolean.true_
 
-    let%snarkydef update
+    let%snarkydef update ~(logger : Logger.t)
         ((previous_state_hash, previous_state) :
           State_hash.var * Protocol_state.var)
         (transition : Snark_transition.var) :
@@ -113,8 +114,38 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         let%bind correct_snark =
           Boolean.(correct_transaction_snark || nothing_changed)
         in
-        Boolean.all
-          [correct_snark; updated_consensus_state; correct_coinbase_status]
+        let%bind result =
+          Boolean.all
+            [correct_snark; updated_consensus_state; correct_coinbase_status]
+        in
+        let%map () =
+          as_prover
+            As_prover.(
+              Let_syntax.(
+                let%map correct_transaction_snark =
+                  read Boolean.typ correct_transaction_snark
+                and nothing_changed = read Boolean.typ nothing_changed
+                and updated_consensus_state =
+                  read Boolean.typ updated_consensus_state
+                and correct_coinbase_status =
+                  read Boolean.typ correct_coinbase_status
+                and result = read Boolean.typ result in
+                Logger.trace logger
+                  "blockchain snark update success: $result = \
+                   (correct_transaction_snark=$correct_transaction_snark ∨ \
+                   nothing_changed=$nothing_changed) ∧ \
+                   updated_consensus_state=$updated_consensus_state ∧ \
+                   correct_coinbase_status=$correct_coinbase_status"
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ( "correct_transaction_snark"
+                      , `Bool correct_transaction_snark )
+                    ; ("nothing_changed", `Bool nothing_changed)
+                    ; ("updated_consensus_state", `Bool updated_consensus_state)
+                    ; ("correct_coinbase_status", `Bool correct_coinbase_status)
+                    ; ("result", `Bool result) ]))
+        in
+        result
       in
       let new_state =
         Protocol_state.create_var ~previous_state_hash
