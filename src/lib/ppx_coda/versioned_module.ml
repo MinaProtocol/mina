@@ -165,7 +165,7 @@ let version_type version stri =
                       buf ~pos_ref
                   in
                   (* sanity check *)
-                  assert (Int.equal read_version version) ;
+                  assert (Core_kernel.Int.equal read_version version) ;
                   t]]]
     ; [%stri
         let __bin_read_t__ =
@@ -178,7 +178,7 @@ let version_type version stri =
                       buf ~pos_ref i
                   in
                   (* sanity check *)
-                  assert (Int.equal read_version version) ;
+                  assert (Core_kernel.Int.equal read_version version) ;
                   t]]]
     ; [%stri
         let bin_size_t =
