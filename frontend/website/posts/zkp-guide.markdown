@@ -15,7 +15,6 @@ author: O(1) Labs
         background: url("https://cdn.codaprotocol.com/website/static/blog/zkp-guide/square-texture-02514419102fe2c115d32784e87d7db659bcd8e8f1be53286ec3a5fad0c8e0f7.png") no-repeat center center;
         background-size: cover;
         z-index: -2;
-        
     }
     
     .hero:after {
@@ -60,6 +59,23 @@ author: O(1) Labs
         margin-top: 11rem;
     }
     
+    a { 
+        display: inline-block;
+        font-weight:500;
+        margin-bottom:15px;
+        margin-right:-50px;
+        margin-top: 20px;
+    }
+    
+    .customLink1 {
+        margin-right: 0px;
+        margin-bottom: 0px;
+    }
+    
+    .customLink2 {
+        margin-top: 0px;
+    }
+    
     main { position: relative; }
 </style>
 
@@ -76,7 +92,7 @@ First, Izaak and Vanishree, two members of our cryptography team who have devote
 [Zero-knowledge Proofs: An Intuitive Explanation](https://codaprotocol.com/blog/zkp.html)  
 Vanishee Rao, a cryptographer working on Coda Protocol, offers up this explanation, using the classic 3 coloring problem to introduce key concepts including soundness, zero-knowledgness, and verifiers. Highly visual, this short (<5 minute) read is a great place to start. 
 
-[Using zk-SNARKs For A Constant Sized Blockchain ](https://www.youtube.com/watch?v=fjdDbE_fgww&feature=youtu.be)  
+[Using zk-SNARKs For A Constant Sized Blockchain](https://www.youtube.com/watch?v=fjdDbE_fgww&feature=youtu.be)  
 In this presentation, Izaak Meckler, co-founder and CTO of O(1) Labs, and principal cryptographer working on Coda Protocol, provides an overview and introduction not only of the concepts behind zk-SNARKs but complete with practical examples of why they matter. 
 
 
@@ -99,7 +115,9 @@ If the video above is the 101-level starter for ZKPs, think of this as the 102-l
 [Zero Knowledge Proofs: An illustrated primer - 1 & 2](https://blog.cryptographyengineering.com/2014/11/27/zero-knowledge-proofs-illustrated-primer/)  
 Alright, now we’re getting into the good stuff! This two part series comes from Matthew Green, who has been involved with Zcash since the beginning of the project and who spends most of his time as a cryptographer and professor at Johns Hopkins University. Part one does a few things. First, it goes deeper into the origins and background of ZKPs - including a discussion of why we got interested in them in the first place. Second, it uses a set of real world examples including a telecommunications-themed version of the graph three-coloring problem to explain what makes these types of interaction “zero-knowledge.” Third, it introduces additional important concepts like commitment schemes. While part 1 is distinctly non-technical, part 2 veers into some technical territory that’s still relatively easy to follow. 
 
-[WTF is Zero-Knowledge Proof](https://hackernoon.com/wtf-is-zero-knowledge-proof-be5b49735f27) & [Introduction to Zero Knowledge Proof: The protocol of next generation Blockchain](https://medium.com/coinmonks/introduction-to-zero-knowledge-proof-the-protocol-of-next-generation-blockchain-305b2fc7f8e5)  
+<a href="https://hackernoon.com/wtf-is-zero-knowledge-proof-be5b49735f27" class="customLink1"> WTF is Zero-Knowledge Proof </a>
+& 
+<a href="https://medium.com/coinmonks/introduction-to-zero-knowledge-proof-the-protocol-of-next-generation-blockchain-305b2fc7f8e5" class="customLink2">Introduction to Zero Knowledge Proof: The protocol of next generation Blockchain </a>  
 Now that you’ve had a chance to really wrap your head around the basic idea of zero knowledge proofs, and have been seen a number of different visual metaphors, let’s introduce a few additional concepts. Both of these pieces are very similar, and work as a pair. While they’re still very 101, they will expand your perspective to include: 1) the difference between interactive and non-interactive zero knowledge proofs and 2) zk-SNARKS. The second piece in particular does a nice job of breaking down each part of the acronym as a way to begin understanding the concepts involved. 
 
 [Zero Knowledge Proofs Part One: The Cryptographic Protocols and Their Variations](https://www.bitrates.com/news/p/zero-knowledge-proofs-part-one-the-cryptographic-protocols-and-their-variations)  
