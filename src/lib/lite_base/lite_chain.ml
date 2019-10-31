@@ -1,7 +1,7 @@
 (* TODO: version *)
 type t =
   { protocol_state: Protocol_state.Stable.V1.t
-  ; proof: Proof.t
+  ; proof: Proof.Stable.V1.t
   ; ledger:
       ( Pedersen.Digest.t
       , Public_key.Compressed.Stable.V1.t

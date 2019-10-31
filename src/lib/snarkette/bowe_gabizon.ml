@@ -85,6 +85,16 @@ module Verification_key = struct
   end
 end
 
+module Proof = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('g1, 'g2) t = {a: 'g1; b: 'g2; c: 'g1; delta_prime: 'g2; z: 'g1}
+      [@@deriving sexp]
+    end
+  end]
+end
+
 module Make (Backend : Backend_intf) = struct
   open Backend
 
@@ -158,8 +168,11 @@ module Make (Backend : Backend_intf) = struct
   let check b lab = if b then Ok () else Or_error.error_string lab
 
   module Proof = struct
-    type t = {a: G1.t; b: G2.t; c: G1.t; delta_prime: G2.t; z: G1.t}
-    [@@deriving bin_io, sexp]
+    type ('g1, 'g2) typ = ('g1, 'g2) Proof.Stable.Latest.t =
+      {a: 'g1; b: 'g2; c: 'g1; delta_prime: 'g2; z: 'g1}
+    [@@deriving sexp]
+
+    type t = (G1.t, G2.t) typ [@@deriving sexp]
 
     let is_well_formed {a; b; c; delta_prime; z} =
       let open Or_error.Let_syntax in
