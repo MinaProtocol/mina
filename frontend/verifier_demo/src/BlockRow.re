@@ -41,6 +41,19 @@ module Styles = {
     ]);
 };
 
+let firstText = {
+  <div>
+    <p> {React.string("Block Height: 140")} </p>
+    <p> {React.string("Date: 2019-10-26 12:15:00")} </p>
+  </div>;
+};
+
+let stateHash = {
+  React.string(
+    "4ApWEzSMKEsaPF6rYx6Vh6VBbHmxupj8C1EzQDyQDtcbqfmg3pnwtaFrAXWZs4QrhNHj8UtFhp3Af66M1uvoqTBy5RPe3JQmHHwYcPooZSMZgppvrCRxQ1c3DaoQh3heBXCuNAofL8hQv",
+  );
+};
+
 [@react.component]
 let make = (~verified as _) => {
   <div className=Styles.blockRow>
@@ -49,8 +62,7 @@ let make = (~verified as _) => {
       textColor=Colors.saville
       borderColor=Colors.navyBlue
       heading="Last Block"
-      text="Time Since"
-      timer=true
+      text=firstText
     />
     <span className=Styles.firstLine />
     <Square
@@ -58,7 +70,7 @@ let make = (~verified as _) => {
       textColor=Colors.hyperlink
       borderColor=Colors.secondBorder
       heading="Latest Snark"
-      text="4ApWEzSMKEsaPF6rYx6Vh6VBbHmxupj8C1EzQDyQDtcbqfmg3pnwtaFrAXWZs4QrhNHj8UtFhp3Af66M1uvoqTBy5RPe3JQmHHwYcPooZSMZgppvrCRxQ1c3DaoQh3heBXCuNAofL8hQv"
+      text=stateHash
     />
     <span className=Styles.secondLine />
     <Square
@@ -66,7 +78,7 @@ let make = (~verified as _) => {
       textColor=Colors.jungle
       borderColor=Colors.thirdBg
       heading="Verified!"
-      text="4ApWEzSMKEsaPF6rYx6Vh6VBbHmxupj8C1EzQDyQDtcbqfmg3pnwtaFrAXWZs4QrhNHj8UtFhp3Af66M1uvoqTBy5RPe3JQmHHwYcPooZSMZgppvrCRxQ1c3DaoQh3heBXCuNAofL8hQv"
+      text=stateHash
     />
   </div>;
 };

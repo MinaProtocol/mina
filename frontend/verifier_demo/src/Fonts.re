@@ -3,7 +3,7 @@ open Css;
   let ocrastud = 
     fontFace(
         ~fontFamily="OCR A Std",
-        ~src=[`url("/static/fonts/OCR A Std Regular.otf")],
+        ~src=[`url("/static/fonts/OCRAStdRegular.otf")],
         ~fontStyle=`normal,
         ~fontWeight=`normal,
         (),

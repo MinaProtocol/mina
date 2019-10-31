@@ -13,7 +13,7 @@ module Styles = {
       selector("h1", [color(textColor), fontFamily(Fonts.ibmplexsans)]),
       borderRadius(`px(6)),
       border(`px(2), `solid, borderColor),
-      /* boxShadow(~x=`zero,~y=`px(10),~blur=`px(30),`rgba((61,88,120,0.25))), */
+      boxShadow(Shadow.box(~x=`zero,~y=`px(10),~blur=`px(30),`rgba((61,88,120,0.25)))),
     ]);
     
     let blockText = (textColor) => style([
@@ -26,19 +26,18 @@ module Styles = {
     color(textColor),
     ]);
   
+    let heading = style([
+      fontFamily("Aktiv Grotesk Bold"),
+    ]);
   };
    
   [@react.component]
-  let make = (~bgColor, ~textColor, ~borderColor, ~heading, ~text, ~active=false, ~timer=false) => 
+  let make = (~bgColor, ~textColor, ~borderColor, ~heading, ~text, ~active=false) => 
   <div className={
     {switch (active) {
       | true =>  Styles.square(Colors.thirdBgActive, Colors.offWhite, Colors.thirdBgActive)
       | false =>  Styles.square(bgColor, textColor, borderColor)
     }}}>
-    <h1> {React.string(heading)} </h1>
-    <p className=Styles.blockText(textColor)> {React.string(text)} </p>
-    {switch (timer) {
-      | true => <div> {React.string("Timer placeholder")}</div>
-      | false => React.null
-    }}
+    <h1 className=Styles.heading> {React.string(heading)} </h1>
+    <div className=Styles.blockText(textColor)> text </div>
   </div>;
