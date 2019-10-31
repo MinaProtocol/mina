@@ -355,7 +355,7 @@ module Blocks = struct
         some @@ Ledger_hash.to_string @@ Staged_ledger_hash.ledger_hash
         @@ Blockchain_state.staged_ledger_hash blockchain_state
 
-      method global_slot = some global_slot
+      method global_slot = some @@ Unsigned.UInt32.to_int global_slot
 
       (* TODO: Need to implement *)
       method ledger_proof_nonce = some 0
