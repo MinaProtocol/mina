@@ -7,8 +7,8 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`flexStart),
       alignItems(`center),
-      height(`rem(23.)),
-      width(`rem(23.)),
+      height(`rem(24.)),
+      width(`rem(24.)),
       backgroundColor(bgColor),
       selector("h1", [color(textColor), fontFamily(Fonts.ibmplexsans)]),
       borderRadius(`px(6)),
@@ -23,14 +23,14 @@ module Styles = {
       ),
     ]);
 
-  let blockText = textColor =>
+  let blockText = (textColor, textSize, top) =>
     style([
-      marginTop(`zero),
+      marginTop(top),
       height(`rem(20.)),
       width(`rem(20.)),
       overflowWrap(`breakWord),
       fontFamily(Fonts.ocrastud),
-      fontSize(`rem(1.56)),
+      fontSize(textSize),
       color(textColor),
     ]);
 
@@ -39,7 +39,16 @@ module Styles = {
 
 [@react.component]
 let make =
-    (~bgColor, ~textColor, ~borderColor, ~heading, ~text, ~active=false) =>
+    (
+      ~bgColor,
+      ~textColor,
+      ~borderColor,
+      ~heading,
+      ~text,
+      ~active=false,
+      ~textSize=`rem(1.56),
+      ~marginTop=`zero,
+    ) =>
   <div
     className={
       active
@@ -51,5 +60,12 @@ let make =
         : Styles.square(bgColor, textColor, borderColor)
     }>
     <h1 className=Styles.heading> {React.string(heading)} </h1>
-    <div className={Styles.blockText(textColor)}> text </div>
+    <div
+      className={
+        active
+          ? Styles.blockText(Colors.offWhite, textSize, marginTop)
+          : Styles.blockText(textColor, textSize, marginTop)
+      }>
+      text
+    </div>
   </div>;

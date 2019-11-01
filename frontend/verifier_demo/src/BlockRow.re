@@ -41,12 +41,40 @@ module Styles = {
     ]);
 };
 
-module LastBlock =
-    [%graphql
-      {|
+type bigint;
+[@bs.val] external createBigInt: string => bigint = "BigInt";
+[@bs.send] external bigIntToString: (bigint, int) => string = "toString";
+
+let decToB64: string => string = [%bs.raw
+  {|
+  function decToB64(n) {
+  var hex = BigInt(n).toString(16);
+  if (hex.length % 2) { hex = '0' + hex; }
+  var bin = [];
+  var i = 0;
+  var d, b;
+  while (i < hex.length) {
+    d = parseInt(hex.slice(i, i + 2), 16);
+    b = String.fromCharCode(d);
+    bin.push(b);
+    i += 2;
+  }
+  return btoa(bin.join(''));
+} |}
+];
+
+module LastBlock = [%graphql
+  {|
       query LastBlock {
         blocks(last: 1) {
           nodes {
+            protocolStateProof {
+              a
+              b
+              c
+              delta_prime
+              z
+            }
             creator @bsDecoder(fn:"Apollo.Decoders.string")
             stateHash
             protocolState {
@@ -60,32 +88,69 @@ module LastBlock =
             }
           }
         }
-      }
    |}
-    ];
+];
 
 module LastBlockQuery = ReasonApollo.CreateQuery(LastBlock);
 
 [@react.component]
-let make = (~verified as _) => {
+let make = (~verified) => {
   <div className=Styles.blockRow>
     <LastBlockQuery>
       {({result}) =>
          switch (result) {
          | Loading
-         | Error(_) => {React.string("Error")}
-         | Data(data) when Array.length(data##blocks##nodes) == 0 => React.string("No blocks")
+         | Error(_) => React.string("We out here loading")
+         | Data(data) when Array.length(data##blocks##nodes) == 0 =>
+           React.string("No blocks")
          | Data(data) =>
-           let node = Array.get(data##blocks##nodes, 0);
+           let node = data##blocks##nodes[0];
            let firstText =
              <div>
                <p>
                  {React.string(
-                    "Blockchain Length: " ++ node##protocolState##consensusState##blockchainLength,
+                    "Blockchain Length: "
+                    ++
+                    node##protocolState##consensusState##blockchainLength,
                   )}
                </p>
-                <p> {React.string("Creator: " ++ node##creator)} </p>
-               <p> {React.string("Date: " ++ Js.Date.toString(node##protocolState##blockchainState##date))} </p>
+               <p>
+                 {React.string(
+                    "Date: "
+                    ++ Js.Date.toString(
+                         node##protocolState##blockchainState##date,
+                       ),
+                  )}
+               </p>
+             </div>;
+
+           let g1 = values =>
+             String.concat("", Array.to_list(Array.map(decToB64, values)));
+           let g2 = values =>
+             String.concat(
+               "",
+               Array.to_list(
+                 Array.map(
+                   l =>
+                     String.concat(
+                       "",
+                       Array.to_list(Array.map(decToB64, l)),
+                     ),
+                   values,
+                 ),
+               ),
+             );
+           let snarkText =
+             <div>
+               <p>
+                 {React.string(
+                    g1(node##protocolStateProof##a)
+                    ++ g2(node##protocolStateProof##b)
+                    ++ g1(node##protocolStateProof##c)
+                    ++ g2(node##protocolStateProof##delta_prime)
+                    ++ g1(node##protocolStateProof##z),
+                  )}
+               </p>
              </div>;
            <>
              <Square
@@ -101,15 +166,18 @@ let make = (~verified as _) => {
                textColor=Colors.hyperlink
                borderColor=Colors.secondBorder
                heading="Latest Snark"
-               text={React.string(node##stateHash)}
+               text=snarkText
+               textSize={`rem(0.005)}
+               marginTop={`rem(-1.8)}
              />
              <span className=Styles.secondLine />
              <Square
                bgColor=Colors.thirdBg
-               textColor=Colors.jungle
                borderColor=Colors.thirdBg
-               heading="Verified!"
+               textColor=Colors.jungle
                text={React.string(node##stateHash)}
+               heading={verified ? "Verified!" : "Verifying..."}
+               active=verified
              />
            </>;
          }}
