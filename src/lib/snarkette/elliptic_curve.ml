@@ -2,6 +2,17 @@ open Core_kernel
 
 let ( = ) = `Don't_use_polymorphic_compare
 
+module T = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'fq t = {x: 'fq; y: 'fq; z: 'fq} [@@deriving sexp]
+    end
+  end]
+
+  type 'fq t = 'fq Stable.Latest.t = {x: 'fq; y: 'fq; z: 'fq} [@@deriving sexp]
+end
+
 module Make (N : sig
   type t
 
@@ -15,9 +26,11 @@ end)
     val b : Fq.t
 end) =
 struct
-  type t = {x: Fq.t; y: Fq.t; z: Fq.t} [@@deriving bin_io, sexp]
+  type 'fq typ = 'fq T.t = {x: 'fq; y: 'fq; z: 'fq} [@@deriving sexp]
 
-  let zero = {x= Fq.zero; y= Fq.one; z= Fq.zero}
+  type t = Fq.t typ [@@deriving sexp]
+
+  let zero = {T.x= Fq.zero; y= Fq.one; z= Fq.zero}
 
   module Coefficients = Coefficients
 
@@ -27,9 +40,9 @@ struct
 
   let of_affine (x, y) = {x; y; z= Fq.one}
 
-  let is_zero t = Fq.(equal zero t.x) && Fq.(equal zero t.z)
+  let is_zero t = Fq.(equal zero t.x) && Fq.(equal zero t.T.z)
 
-  let to_affine_exn {x; y; z} =
+  let to_affine_exn {T.x; y; z} =
     let z_inv = Fq.inv z in
     Fq.(x * z_inv, y * z_inv)
 

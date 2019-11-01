@@ -32,13 +32,13 @@ module type S = sig
   end
 
   module G1_precomputation : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp]
 
     val create : G1.t -> t
   end
 
   module G2_precomputation : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp]
 
     val create : G2.t -> t
   end
@@ -50,6 +50,77 @@ module type S = sig
   val unreduced_pairing : G1.t -> G2.t -> Fq_target.t
 
   val reduced_pairing : G1.t -> G2.t -> Fq_target.t
+end
+
+module G1_precomputation_ = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('fq, 'fq_twist) t =
+        {px: 'fq; py: 'fq; px_twist: 'fq_twist; py_twist: 'fq_twist}
+      [@@deriving sexp]
+    end
+  end]
+
+  type ('fq, 'fq_twist) t = ('fq, 'fq_twist) Stable.Latest.t =
+    {px: 'fq; py: 'fq; px_twist: 'fq_twist; py_twist: 'fq_twist}
+  [@@deriving sexp]
+end
+
+module Dbl_coeffs = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'fq_twist t =
+        {c_H: 'fq_twist; c_4C: 'fq_twist; c_J: 'fq_twist; c_L: 'fq_twist}
+      [@@deriving sexp]
+    end
+  end]
+
+  type 'fq_twist t = 'fq_twist Stable.Latest.t =
+    {c_H: 'fq_twist; c_4C: 'fq_twist; c_J: 'fq_twist; c_L: 'fq_twist}
+  [@@deriving sexp]
+end
+
+module Add_coeffs = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'fq_twist t = {c_L1: 'fq_twist; c_RZ: 'fq_twist} [@@deriving sexp]
+    end
+  end]
+
+  type 'fq_twist t = 'fq_twist Stable.Latest.t =
+    {c_L1: 'fq_twist; c_RZ: 'fq_twist}
+  [@@deriving sexp]
+end
+
+module G2_precomputation_ = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('fq_twist, 'dbl_coeffs, 'add_coeffs) t =
+        { qx: 'fq_twist
+        ; qy: 'fq_twist
+        ; qy2: 'fq_twist
+        ; qx_over_twist: 'fq_twist
+        ; qy_over_twist: 'fq_twist
+        ; dbl_coeffs: 'dbl_coeffs array
+        ; add_coeffs: 'add_coeffs array }
+      [@@deriving sexp]
+    end
+  end]
+
+  type ('fq_twist, 'dbl_coeffs, 'add_coeffs) t =
+        ('fq_twist, 'dbl_coeffs, 'add_coeffs) Stable.Latest.t =
+    { qx: 'fq_twist
+    ; qy: 'fq_twist
+    ; qy2: 'fq_twist
+    ; qx_over_twist: 'fq_twist
+    ; qy_over_twist: 'fq_twist
+    ; dbl_coeffs: 'dbl_coeffs array
+    ; add_coeffs: 'add_coeffs array }
+  [@@deriving sexp]
 end
 
 module Make
@@ -83,10 +154,13 @@ module Make
   S with module G1 := G1 and module G2 := G2 and module Fq_target := Fq_target =
 struct
   module G1_precomputation = struct
-    type t_ = {px: Fq.t; py: Fq.t; px_twist: Fq_twist.t; py_twist: Fq_twist.t}
-    [@@deriving bin_io, sexp]
+    type ('fq, 'fq_twist) typ_ = ('fq, 'fq_twist) G1_precomputation_.t =
+      {px: 'fq; py: 'fq; px_twist: 'fq_twist; py_twist: 'fq_twist}
+    [@@deriving sexp]
 
-    type t = t_ option [@@deriving bin_io, sexp]
+    type t_ = (Fq.t, Fq_twist.t) typ_ [@@deriving sexp]
+
+    type t = t_ option [@@deriving sexp]
 
     let create (p : G1.t) =
       Option.map (G1.to_affine p) ~f:(fun (px, py) ->
@@ -97,29 +171,38 @@ struct
   end
 
   module Dbl_coeffs = struct
-    type t =
-      {c_H: Fq_twist.t; c_4C: Fq_twist.t; c_J: Fq_twist.t; c_L: Fq_twist.t}
-    [@@deriving bin_io, sexp]
+    type 'fq_twist typ = 'fq_twist Dbl_coeffs.t =
+      {c_H: 'fq_twist; c_4C: 'fq_twist; c_J: 'fq_twist; c_L: 'fq_twist}
+    [@@deriving sexp]
+
+    type t = Fq_twist.t typ [@@deriving sexp]
   end
 
   module Add_coeffs = struct
-    type t = {c_L1: Fq_twist.t; c_RZ: Fq_twist.t} [@@deriving bin_io, sexp]
+    type 'fq_twist typ = 'fq_twist Add_coeffs.t =
+      {c_L1: 'fq_twist; c_RZ: 'fq_twist}
+    [@@deriving sexp]
+
+    type t = Fq_twist.t typ [@@deriving sexp]
   end
 
   let loop_count_size_in_bits = Fq.Nat.num_bits Info.loop_count
 
   module G2_precomputation = struct
-    type t_ =
-      { qx: Fq_twist.t
-      ; qy: Fq_twist.t
-      ; qy2: Fq_twist.t
-      ; qx_over_twist: Fq_twist.t
-      ; qy_over_twist: Fq_twist.t
-      ; dbl_coeffs: Dbl_coeffs.t array
-      ; add_coeffs: Add_coeffs.t array }
-    [@@deriving bin_io, sexp]
+    type ('fq_twist, 'dbl_coeffs, 'add_coeffs) typ_ =
+          ('fq_twist, 'dbl_coeffs, 'add_coeffs) G2_precomputation_.t =
+      { qx: 'fq_twist
+      ; qy: 'fq_twist
+      ; qy2: 'fq_twist
+      ; qx_over_twist: 'fq_twist
+      ; qy_over_twist: 'fq_twist
+      ; dbl_coeffs: 'dbl_coeffs array
+      ; add_coeffs: 'add_coeffs array }
+    [@@deriving sexp]
 
-    type t = t_ option [@@deriving bin_io, sexp]
+    type t_ = (Fq_twist.t, Dbl_coeffs.t, Add_coeffs.t) typ_ [@@deriving sexp]
+
+    type t = t_ option [@@deriving sexp]
 
     let twist_inv = Fq_twist.inv Info.twist
 
