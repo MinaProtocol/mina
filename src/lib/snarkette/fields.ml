@@ -185,7 +185,7 @@ module T = struct
     end
   end]
 
-  type 'a t = 'a
+  type 'a t = 'a Stable.Latest.t [@@deriving eq, sexp, to_yojson, compare]
 end
 
 module Make_fp
@@ -200,7 +200,7 @@ module Make_fp
 
     let order = Info.order
 
-    type t = N.t T.Stable.Latest.t [@@deriving eq, sexp, to_yojson, compare]
+    type t = N.t T.t [@@deriving eq, sexp, to_yojson, compare]
 
     let zero = N.of_int 0
 
@@ -378,8 +378,7 @@ end = struct
 
     let order = Nat.(Fp.order * Fp.order * Fp.order)
 
-    type t = Fp.t * Fp.t * Fp.t T.Stable.Latest.t
-    [@@deriving eq, bin_io, sexp, to_yojson, compare]
+    type t = (Fp.t * Fp.t * Fp.t) T.t [@@deriving eq, sexp, to_yojson, compare]
 
     let ( + ) = componentwise Fp.( + )
 
@@ -461,7 +460,7 @@ end = struct
   let componentwise f (x1, x2) (y1, y2) = (f x1 y1, f x2 y2)
 
   module T = struct
-    type t = Fp.t * Fp.t [@@deriving eq, to_yojson, bin_io, sexp, compare]
+    type t = (Fp.t * Fp.t) T.t [@@deriving eq, to_yojson, sexp, compare]
 
     module Nat = Fp.Nat
 
@@ -548,7 +547,7 @@ end = struct
 
     let componentwise f (x1, x2) (y1, y2) = (f x1 y1, f x2 y2)
 
-    type t = Fp3.t * Fp3.t [@@deriving eq, to_yojson, bin_io, sexp, compare]
+    type t = (Fp3.t * Fp3.t) T.t [@@deriving eq, to_yojson, sexp, compare]
 
     let order =
       let open Nat in
