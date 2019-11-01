@@ -1,6 +1,5 @@
 module Styles = {
   open Css;
-
   let square = (bgColor, textColor, borderColor) =>
     style([
       display(`flex),
@@ -23,14 +22,6 @@ module Styles = {
       ),
     ]);
 
-  let blink = keyframes([(0, []), (100, [opacity(0.)])]);
-
-  let blinkingSquare = (bgColor, textColor, borderColor) =>
-    merge([
-      square(bgColor, textColor, borderColor),
-      style([animation(blink, ~duration=1000, ~iterationCount=`infinite)]),
-    ]);
-
   let blockText = (textColor, textSize, top) =>
     style([
       marginTop(top),
@@ -41,8 +32,26 @@ module Styles = {
       fontSize(textSize),
       color(textColor),
     ]);
-
   let heading = style([fontFamily("Aktiv Grotesk Bold")]);
+  
+  let blink = keyframes([(0, [opacity(1.)]), (100, [opacity(0.3)])]);
+
+  let blinkingSquare = (bgColor, textColor, borderColor) =>
+    merge([
+      square(bgColor, textColor, borderColor),
+      style([animation(blink, ~duration=1000, ~iterationCount=`infinite), animationDirection(`alternate)]),
+    ]);
+  let blinkingText = (textColor, textSize, top) =>
+    merge([
+      blockText(textColor, textSize, top),
+      style([animation(blink, ~duration=1000, ~iterationCount=`infinite), animationDirection(`alternate)]),
+    ]);
+  let blinkingHeading =
+    merge([
+      heading,
+      style([animation(blink, ~duration=1000, ~iterationCount=`infinite), animationDirection(`alternate)]),
+    ]);
+ let blinking = style([animation(blink, ~duration=1000, ~iterationCount=`infinite), animationDirection(`alternate)]);
 };
 
 [@react.component]
@@ -52,14 +61,15 @@ let make =
       ~textColor,
       ~borderColor,
       ~heading="",
-      ~text={
-              React.string("");
-            },
-      ~active=false,
+      ~text={React.string("")},
       ~textSize=`rem(1.56),
-      ~marginTop=`zero,
+      ~marginTop=`zero, 
+      ~active,
     ) =>
-  <div
+    {
+            Js.log(active);
+
+    <div
     className={
       active
         ? Styles.square(
@@ -67,15 +77,19 @@ let make =
             Colors.offWhite,
             Colors.thirdBgActive,
           )
-        : Styles.square(bgColor, textColor, borderColor)
+        : Styles.blinkingSquare(bgColor, textColor, borderColor)
     }>
-    <h1 className=Styles.heading> {React.string(heading)} </h1>
+    
+        <h1 className={ active ? Styles.heading : Styles.blinkingHeading}> {React.string(heading)} </h1>
+    
     <div
       className={
         active
           ? Styles.blockText(Colors.offWhite, textSize, marginTop)
-          : Styles.blockText(textColor, textSize, marginTop)
+          : Styles.blinkingText(textColor, textSize, marginTop)
       }>
       text
     </div>
-  </div>;
+  </div>
+    }
+;
