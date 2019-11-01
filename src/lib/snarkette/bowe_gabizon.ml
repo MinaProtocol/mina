@@ -143,12 +143,15 @@ module Make (Backend : Backend_intf) = struct
   let verify ?message (vk : Verification_key.Processed.t) input
       ({Proof.a; b; c; delta_prime; z} as proof) =
     let open Or_error.Let_syntax in
+    Core_kernel.printf !"input %d, query -1: %d\n%!" (List.length input) (Array.length vk.query - 1);
     let%bind () =
       check
         (Int.equal (List.length input) (Array.length vk.query - 1))
         "Input length was not as expected"
     in
+    print_endline  "proff is well formed?";
     let%bind () = Proof.is_well_formed proof in
+    print_endline  "proff is well formed";
     let input_acc =
       List.foldi input ~init:vk.query.(0) ~f:(fun i acc x ->
           let q = vk.query.(1 + i) in
@@ -172,7 +175,9 @@ module Make (Backend : Backend_intf) = struct
       in
       Fq_target.(equal test one)
     in
+    print_endline  "first pairing check?";
     let%bind () = check test1 "First pairing check failed" in
+    print_endline  "first pairing check";
     let test2 =
       let ys = hash ?message ~a ~b ~c ~delta_prime in
       let l =
