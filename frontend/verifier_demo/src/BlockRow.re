@@ -47,15 +47,16 @@ module LastBlock =
       query LastBlock {
         blocks(last: 1) {
           nodes {
+            creator @bsDecoder(fn:"Apollo.Decoders.string")
             stateHash
-            creator
             protocolState {
               consensusState {
                 blockchainLength @bsDecoder(fn:"Apollo.Decoders.string")
               }
               blockchainState {
-                date
+                date @bsDecoder(fn:"Apollo.Decoders.date")
               }
+            }
             }
           }
         }
@@ -84,7 +85,7 @@ let make = (~verified as _) => {
                   )}
                </p>
                 <p> {React.string("Creator: " ++ node##creator)} </p>
-               <p> {React.string("Date: " ++ node##protocolState##blockchainState##date)} </p>
+               <p> {React.string("Date: " ++ Js.Date.toString(node##protocolState##blockchainState##date))} </p>
              </div>;
            <>
              <Square
