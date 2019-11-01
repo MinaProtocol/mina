@@ -19,6 +19,17 @@ Visualizations will be judged on the following criteria:
 - Design & UI
 - Efficiency of implementation
 
+Here are some Example Project Ideas we'd *love* to see: 
+
+- Node Dashboard (Monitor Your Node)
+  - Peer Map
+- Block Visualization w/ slots (like [this](https://connerswann.me/2019/09/weekend-project-coda-blockchain.html) but better)
+- TPS Meter
+  - Count new blocks as they come in, compare with slot + epoch + timestamp 
+- Calculate Fee Transfer Waste 
+- Block Explorer 
+- Tools for Node Operators
+
 There is a total of $2500 in prizes to be won.
 
 ### Connect to the Testnet
