@@ -9,6 +9,7 @@ module Styles = {
       top(`percent(5.0)),
       left(`calc((`sub, `percent(50.), `rem(48.0)))),
       width(`rem(96.)),
+      whiteSpace(`nowrap),
     ]);
 
   let logo = style([maxHeight(`rem(3.))]);
