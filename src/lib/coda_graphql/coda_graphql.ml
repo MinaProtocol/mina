@@ -25,6 +25,23 @@ let result_field_no_inputs ~resolve =
   Schema.io_field ~resolve:(fun resolve_info src ->
       Deferred.return @@ resolve resolve_info src )
 
+let verification_key =
+  lazy
+    (let open Async in
+    let%map vk = Snark_keys.blockchain_verification () in
+    let open Crypto_params.Tock_backend.Verification_key in
+    let open Lite_compat_algebra in
+    let key =
+      { Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key.alpha_beta=
+          alpha_beta vk.wrap |> target_field
+      ; delta= delta vk.wrap |> g2
+      ; query= query vk.wrap |> g1_vector }
+    in
+    sprintf
+      !"%{sexp:\n\
+       \    Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key.t}\n"
+      key)
+
 module Doc = struct
   let date =
     sprintf
@@ -724,6 +741,43 @@ module Types = struct
             ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
         ] )
 
+  let protocol_state_proof : (Coda_lib.t, Proof.t option) typ =
+    let display_g1_elem (g1 : Crypto_params.Tick_backend.Inner_curve.t) =
+      let x, y = Crypto_params.Tick_backend.Inner_curve.to_affine_exn g1 in
+      List.map [x; y] ~f:Crypto_params.Tick0.Field.to_string
+    in
+    let display_g2_elem (g2 : Curve_choice.Tock_full.G2.t) =
+      let open Curve_choice.Tock_full in
+      let x, y = G2.to_affine_exn g2 in
+      let to_string (fqe : Fqe.t) =
+        let vector = Fqe.to_vector fqe in
+        List.init (Fq.Vector.length vector) ~f:(fun i ->
+            let fq = Fq.Vector.get vector i in
+            Crypto_params.Tick0.Field.to_string fq )
+      in
+      List.map [x; y] ~f:to_string
+    in
+    let string_list_field ~resolve =
+      field
+        ~typ:(non_null @@ list (non_null string))
+        ~args:Arg.[]
+        ~resolve:(fun _ (proof : Proof.t) -> display_g1_elem (resolve proof))
+    in
+    let string_list_list_field ~resolve =
+      field
+        ~typ:(non_null @@ list (non_null @@ list @@ non_null string))
+        ~args:Arg.[]
+        ~resolve:(fun _ (proof : Proof.t) -> display_g2_elem (resolve proof))
+    in
+    obj "protocolStateProof" ~fields:(fun _ ->
+        [ string_list_field "a" ~resolve:(fun (proof : Proof.t) -> proof.a)
+        ; string_list_list_field "b" ~resolve:(fun (proof : Proof.t) -> proof.b)
+        ; string_list_field "c" ~resolve:(fun (proof : Proof.t) -> proof.c)
+        ; string_list_list_field "delta_prime"
+            ~resolve:(fun (proof : Proof.t) -> proof.delta_prime)
+        ; string_list_field "z" ~resolve:(fun (proof : Proof.t) -> proof.z) ]
+    )
+
   let block :
       ( Coda_lib.t
       , (Filtered_external_transition.t, State_hash.t) With_hash.t option )
@@ -746,9 +800,19 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.hash; _} ->
               Stringable.State_hash.to_base58_check hash )
+        ; field "stateHashField" ~typ:(non_null string)
+            ~doc:"Bigint field-element representation of stateHash"
+            ~args:Arg.[]
+            ~resolve:(fun _ {With_hash.hash; _} ->
+              State_hash.to_decimal_string hash )
         ; field "protocolState" ~typ:(non_null protocol_state)
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.protocol_state)
+        ; field "protocolStateProof"
+            ~typ:(non_null protocol_state_proof)
+            ~doc:"Snark proof of blockchain state"
+            ~args:Arg.[]
+            ~resolve:(fun _ {With_hash.data; _} -> data.proof)
         ; field "transactions" ~typ:(non_null transactions)
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.transactions)
@@ -1764,6 +1828,14 @@ module Queries = struct
       ~doc:"The version of the node (git commit hash)"
       ~resolve:(fun _ _ -> Some Coda_version.commit_id)
 
+  let blockchain_verification_key =
+    io_field "blockchainVerificationKey" ~typ:(non_null string)
+      ~args:Arg.[]
+      ~doc:"Experimental: Verification key for blockchain snark"
+      ~resolve:(fun _ _ ->
+        let%map key = Lazy.force verification_key in
+        Ok key )
+
   let tracked_accounts_resolver {ctx= coda; _} () =
     let wallets = Coda_lib.wallets coda in
     let propose_public_keys = Coda_lib.propose_public_keys coda in
@@ -1898,6 +1970,7 @@ module Queries = struct
     ; trust_status
     ; trust_status_all
     ; snark_pool
+    ; blockchain_verification_key
     ; pending_snark_work ]
 end
 

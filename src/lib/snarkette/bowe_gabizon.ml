@@ -27,6 +27,8 @@ module type Backend_intf = sig
   module G2 : sig
     type t [@@deriving sexp, bin_io]
 
+    val one : t
+
     val to_affine_exn : t -> Fqe.t * Fqe.t
 
     val ( + ) : t -> t -> t
@@ -111,11 +113,14 @@ module Make (Backend : Backend_intf) = struct
       type t =
         { alpha_beta: Fq_target.t
         ; delta_pc: Pairing.G2_precomputation.t
+        ; g2_generator_pc: Pairing.G2_precomputation.t
         ; query: G1.t array }
       [@@deriving bin_io, sexp]
 
       let create {alpha_beta; delta; query} =
-        {alpha_beta; delta_pc= Pairing.G2_precomputation.create delta; query}
+        {alpha_beta
+        ; g2_generator_pc= Pairing.G2_precomputation.create G2.one
+        ; delta_pc= Pairing.G2_precomputation.create delta; query}
     end
   end
 
@@ -167,7 +172,7 @@ module Make (Backend : Backend_intf) = struct
       let r2 =
         Pairing.miller_loop
           (Pairing.G1_precomputation.create input_acc)
-          vk.delta_pc
+          vk.g2_generator_pc
       in
       let r3 =
         Pairing.miller_loop (Pairing.G1_precomputation.create c) delta_prime_pc
