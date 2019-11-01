@@ -3,5 +3,5 @@
  (public_name verifier_demo)
  (package verifier_demo)
  (preprocess (pps js_of_ocaml-ppx ppx_jane))
- (libraries snarkette)
+ (libraries snarkette group_map)
   (js_of_ocaml (flags +nat.js)))
