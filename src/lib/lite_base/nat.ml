@@ -1,5 +1,18 @@
+open Core_kernel
+
+module T = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'typ t = 'typ [@@deriving eq, sexp, to_yojson, compare]
+    end
+  end]
+
+  type 'typ t = 'typ Stable.Latest.t [@@deriving eq, sexp, to_yojson, compare]
+end
+
 module Make (Type : sig
-  type t [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
+  type t [@@deriving eq, sexp, to_yojson, compare]
 end)
 (Impl : sig
           type t
@@ -16,20 +29,7 @@ end)
         end
         with type t := Type.t) =
 struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type t = Type.t
-        [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
-      end
-
-      include T
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving eq, sexp, to_yojson, compare]
+  type t = Type.t T.t [@@deriving eq, sexp, to_yojson, compare]
 
   let length_in_triples = (Impl.length_in_bits + 2) / 3
 
@@ -47,32 +47,28 @@ struct
   let fold t = Fold_lib.Fold.group3 ~default:false (fold t)
 
   module Impl = struct
-    type t = Stable.Latest.t [@@deriving eq, sexp, compare]
-
     let length_in_triples, fold = (length_in_triples, fold)
   end
 end
 
-module Input_32 = struct
+module Inputs_32 = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        open Core_kernel
+      type t = int32 [@@deriving eq, sexp, to_yojson, compare]
 
-        type t = int32
-        [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
-      end
-
-      include T
+      let to_latest = Fn.id
     end
-  end
+  end]
+
+  type t = Stable.Latest.t [@@deriving eq, sexp, to_yojson, compare]
 
   module Impl = struct
     let to_string = Int32.to_string
 
     let of_string = Int32.of_string
 
-    let logand = Int32.logand
+    let logand = Int32.( land )
 
     let one = Int32.one
 
@@ -85,31 +81,27 @@ module Input_32 = struct
 end
 
 module Make32 () = struct
-  module Stable = struct
-    module V1 = Make (Input_32.Stable.V1) (Input_32.Impl)
-  end
+  include Make (Inputs_32) (Inputs_32.Impl)
 end
 
 module Inputs_64 = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        open Core_kernel
+      type t = int64 [@@deriving eq, sexp, to_yojson, compare]
 
-        type t = int64
-        [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
-      end
-
-      include T
+      let to_latest = Fn.id
     end
-  end
+  end]
+
+  type t = Stable.Latest.t [@@deriving eq, sexp, to_yojson, compare]
 
   module Impl = struct
     let to_string = Int64.to_string
 
     let of_string = Int64.of_string
 
-    let logand = Int64.logand
+    let logand = Int64.( land )
 
     let one = Int64.one
 
@@ -120,7 +112,5 @@ module Inputs_64 = struct
 end
 
 module Make64 () = struct
-  module Stable = struct
-    module V1 = Make (Inputs_64.Stable.V1) (Inputs_64.Impl)
-  end
+  include Make (Inputs_64) (Inputs_64.Impl)
 end

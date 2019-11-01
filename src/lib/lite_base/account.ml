@@ -1,56 +1,31 @@
 open Core_kernel
-open Module_version
 
 module Balance = struct
-  module V1_make_0 = Nat.Make64 ()
-
-  module V1_make = V1_make_0.Stable.V1
-
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      include V1_make.Stable.V1
-      include Registration.Make_latest_version (V1_make.Stable.V1)
+      type t = Nat.Inputs_64.Stable.V1.t Nat.T.Stable.V1.t
+      [@@deriving eq, sexp, to_yojson, compare]
+
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "balance_lite"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  include V1_make.Impl
+  include Nat.Make64 ()
 end
 
 module Nonce = struct
-  module V1_make_0 = Nat.Make32 ()
-
-  module V1_make = V1_make_0.Stable.V1
-
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      include V1_make.Stable.V1
-      include Registration.Make_latest_version (V1_make.Stable.V1)
+      type t = Nat.Inputs_32.Stable.V1.t Nat.T.Stable.V1.t
+      [@@deriving eq, sexp, to_yojson, compare]
+
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "nonce_lite"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  include V1_make.Impl
+  include Nat.Make32 ()
 end
 
 module Stable = struct

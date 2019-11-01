@@ -1,25 +1,15 @@
-open Module_version
+(* length.ml *)
 
-module V1_make_0 = Nat.Make32 ()
+open Core_kernel
 
-module V1_make = V1_make_0.Stable.V1
-
+[%%versioned
 module Stable = struct
   module V1 = struct
-    include V1_make.Stable.V1
-    include Registration.Make_latest_version (V1_make.Stable.V1)
+    type t = Nat.Inputs_32.Stable.V1.t Nat.T.Stable.V1.t
+    [@@deriving eq, sexp, to_yojson, compare]
+
+    let to_latest = Fn.id
   end
+end]
 
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "length_lite"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
-
-include V1_make.Impl
+include Nat.Make32 ()
