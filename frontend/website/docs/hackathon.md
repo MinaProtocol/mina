@@ -5,7 +5,8 @@
 
 ## GraphQL Workshop
 
-We will be hosting the GraphQL workshop at 10pm PST on Friday, 11/1.
+We will be hosting the GraphQL workshop at 10pm PST on Friday, 11/1, at the Terra stage. 
+The link to our GraphQL API is [here]("http://graphql.o1test.net/graphql"). 
 
 ## Hackathon Challenges
 
