@@ -44,6 +44,10 @@ let bigint_of_string s = Snarkette.Nat.of_string (Js.to_string s)
 
 let bigint_to_string bi = Js.string (Snarkette.Nat.to_string bi)
 
+let check_result r = match r with
+  | Error e -> consolelog (Js.string (Core_kernel.Error.to_string_hum e)); false
+  | Ok () -> true
+
 let verify = ref None
 
 let verify_state_hash verification_key state_hash proof =
@@ -60,6 +64,10 @@ let verify_state_hash verification_key state_hash proof =
   consolelog "deserialize state_hash" ;
   let input = Snarkette.Mnt6753.Fq.of_string (Js.to_string state_hash) in
   let res = verify input proof in
+  consolelog (Js.string "\n\n\n\n");
+  consolelog (Js.string (Sexp.to_string (Demo.Proof.sexp_of_t proof)));
+  consolelog (Js.string "\n\n\n\n");
+  consolelog state_hash;
   consolelog res ; res
 
 let () =

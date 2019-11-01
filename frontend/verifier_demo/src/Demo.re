@@ -20,6 +20,7 @@ module Block = [%graphql
 
 module BlockQuery = ReasonApollo.CreateQuery(Block);
 
+
 module DemoInternal = {
   [@react.component]
   let make = (~worker, ~blocks) => {
@@ -43,8 +44,6 @@ module DemoInternal = {
             "z": proof##z,
             "stateHashField": block##stateHashField,
           };
-          Js.log(msg);
-
           let _ =
             Worker.Promise.postMessage(worker, msg)
             |> Js.Promise.then_(response => {
@@ -62,7 +61,7 @@ module DemoInternal = {
 
     let (verified, verifiedTime) =
       switch (isVerified) {
-      | Some((v, time)) => (v, string_of_int(time))
+      | Some((v, time)) => (v, string_of_int(time / 1000))
       | None => (false, "?")
       };
 

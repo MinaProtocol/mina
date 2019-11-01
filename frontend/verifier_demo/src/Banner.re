@@ -32,7 +32,7 @@ let make = (~time) => {
     <p className=Styles.headerSaville>
       {React.string("was verified in the browser in ")}
       <span className=Styles.headerRed>
-        {React.string(time ++ " milliseconds")}
+        {React.string(time ++ " seconds")}
       </span>
     </p>
   </div>;
