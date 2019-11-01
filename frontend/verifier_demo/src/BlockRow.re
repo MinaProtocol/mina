@@ -48,6 +48,7 @@ module LastBlock =
         blocks(last: 1) {
           nodes {
             stateHash
+            creator
             protocolState {
               consensusState {
                 blockchainLength @bsDecoder(fn:"Apollo.Decoders.string")
@@ -82,6 +83,7 @@ let make = (~verified as _) => {
                     "Blockchain Length: " ++ node##protocolState##consensusState##blockchainLength,
                   )}
                </p>
+                <p> {React.string("Creator: " ++ node##creator)} </p>
                <p> {React.string("Date: " ++ node##protocolState##blockchainState##date)} </p>
              </div>;
            <>
