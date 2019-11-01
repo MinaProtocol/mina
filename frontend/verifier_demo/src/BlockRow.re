@@ -100,7 +100,29 @@ let make = (~verified) => {
       {({result}) =>
          switch (result) {
          | Loading
-         | Error(_) => React.string("We out here loading")
+         | Error(_) => <>
+             <Square
+               bgColor=Colors.firstBg
+               textColor=Colors.saville
+               borderColor=Colors.navyBlue
+               heading="Last Block"
+             />
+             <span className=Styles.firstLine />
+             <Square
+               bgColor=Colors.secondBg
+               textColor=Colors.hyperlink
+               borderColor=Colors.secondBorder
+               heading="Latest Snark"
+             />
+             <span className=Styles.secondLine />
+             <Square
+               bgColor=Colors.thirdBg
+               borderColor=Colors.thirdBg
+               textColor=Colors.jungle
+               heading={verified ? "Verified!" : "Verifying..."}
+               active=verified
+             />
+           </>
          | Data(data) when Array.length(data##blocks##nodes) == 0 =>
            React.string("No blocks")
          | Data(data) =>
