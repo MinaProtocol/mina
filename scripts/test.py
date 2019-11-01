@@ -75,7 +75,6 @@ ci_blacklist = [
 # of all the generated CI jobs, allow these specific ones to fail (extra blacklist on top of ci_blacklist)
 required_blacklist = [
     'test_postake_five_even_snarkless:*',
-    'test_postake_holy_grail:*',
     'test_postake_catchup:*',
 ]
 
