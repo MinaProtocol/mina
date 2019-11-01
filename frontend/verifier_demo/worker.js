@@ -1,5 +1,6 @@
 importScripts('https://unpkg.com/promise-worker/dist/promise-worker.register.js');
-// importScripts("/verifier.bc.js");
+importScripts("/verifier.bc.js");
+// while ((new Date() - before) < msg) { }
 
 // msg: {
 //  key : sexp str,
@@ -10,14 +11,14 @@ importScripts('https://unpkg.com/promise-worker/dist/promise-worker.register.js'
 //  z : str,
 //  stateHashField : str,
 // }
-registerPromiseWorker(function (msg) {
-  // var key = snarkette.createVerificationKey(msg.key);
-  // var proof = snarkette.constructProof(a, b, c, delta_prime, z);
-  // return snarkette.verifyStateHashField(key, msg.stateHashField, proof)
+//
 
+registerPromiseWorker(function (msg) {
   var before = new Date();
-  while ((new Date() - before) < msg) { }
+  var key = snarkette.createVerificationKey(msg.key);
+  var proof = snarkette.constructProof(msg.a, msg.b, msg.c, msg.delta_prime, msg.z);
+  var verified = snarkette.verifyStateHash(key, msg.stateHashField, proof)
   var after = new Date();
 
-  return {verified: true, time: after - before};
+  return {verified: verified, time: after - before};
 });
