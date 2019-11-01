@@ -1,0 +1,27 @@
+{
+  "name": "verifier_demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "bsb -make-world",
+    "pack": "fpack build lib/js/src/Index.js  --dev",
+    "clean": "bsb -clean-world",
+    "//serve": "moduleserve ./ --port 8000",
+    "serve": "yarn run pack && python3 -m http.server 8000"
+  },
+  "author": "",
+  "dependencies": {
+    "bs-css": "^10.0.1",
+    "graphql_ppx": "^0.2.8",
+    "promise-worker": "^2.0.1",
+    "reason-apollo": "^0.16.0",
+    "reason-react": "^0.7.0"
+  },
+  "devDependencies": {
+    "bs-platform": "^5.0.3",
+    "fastpack": "^0.9.1",
+    "moduleserve": "https://github.com/marijnh/moduleserve#032b477"
+  },
+  "license": "ISC"
+}

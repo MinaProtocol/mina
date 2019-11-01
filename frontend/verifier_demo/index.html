@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Browser Verifier</title>
+</head>
+<body>
+  <script>
+    // stub a variable ReactJS checks. ReactJS assumes you're using a bundler, NodeJS or similar system that provides it the `process.env.NODE_ENV` variable.
+    window.process = {
+      env: {
+        NODE_ENV: 'development'
+      }
+    };
+  </script>
+  <div id="demo"></div>
+  <!-- <script src="/moduleserve/load.js" data-module="./lib/js/src/Index.js"></script> -->
+  <script src="bundle/index.js"></script>
+</body>
+</html>
