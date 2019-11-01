@@ -28,7 +28,7 @@ module Styles = {
       zIndex(-1),
     ]);
 
-  let blink = keyframes([(0, []), (100, [opacity(0.)])]);
+  let blink = keyframes([(0, [opacity(1.)]), (100, [opacity(0.3)])]);
 
   let secondLine =
     style([
@@ -38,6 +38,7 @@ module Styles = {
       margin2(~v=`rem(11.0), ~h=`zero),
       zIndex(-1),
       animation(blink, ~duration=1000, ~iterationCount=`infinite),
+      animationDirection(`alternate),
     ]);
 };
 
@@ -115,12 +116,13 @@ let make = (~verified) => {
                heading="Latest Snark"
              />
              <span className=Styles.secondLine />
-             <Square
+             <VerifySquare
                bgColor=Colors.thirdBg
                borderColor=Colors.thirdBg
                textColor=Colors.jungle
                heading={verified ? "Verified!" : "Verifying..."}
                active=verified
+               animation={!verified}
              />
            </>
          | Data(data) when Array.length(data##blocks##nodes) == 0 =>

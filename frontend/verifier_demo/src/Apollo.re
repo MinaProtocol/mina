@@ -1,6 +1,6 @@
 let client = {
   let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
-  let uri = "http://34.217.71.29:10900/graphql";
+  let uri = "http://graphql.o1test.net/graphql";
   let codaLink = ApolloLinks.createHttpLink(~uri, ());
   ReasonApollo.createApolloClient(~link=codaLink, ~cache=inMemoryCache, ());
 };

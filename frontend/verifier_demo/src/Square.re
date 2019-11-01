@@ -23,6 +23,14 @@ module Styles = {
       ),
     ]);
 
+  let blink = keyframes([(0, []), (100, [opacity(0.)])]);
+
+  let blinkingSquare = (bgColor, textColor, borderColor) =>
+    merge([
+      square(bgColor, textColor, borderColor),
+      style([animation(blink, ~duration=1000, ~iterationCount=`infinite)]),
+    ]);
+
   let blockText = (textColor, textSize, top) =>
     style([
       marginTop(top),
@@ -49,7 +57,7 @@ let make =
       ~textSize=`rem(1.56),
       ~marginTop=`zero,
     ) =>
-  <div
+    <div
     className={
       active
         ? Styles.square(
@@ -68,4 +76,5 @@ let make =
       }>
       text
     </div>
-  </div>;
+  </div>
+;

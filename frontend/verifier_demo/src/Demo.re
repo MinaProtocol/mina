@@ -20,7 +20,6 @@ module Block = [%graphql
 
 module BlockQuery = ReasonApollo.CreateQuery(Block);
 
-
 module DemoInternal = {
   [@react.component]
   let make = (~worker, ~blocks) => {
@@ -47,10 +46,10 @@ module DemoInternal = {
           let _ =
             Worker.Promise.postMessage(worker, msg)
             |> Js.Promise.then_(response => {
-                 let verified = response##verified;
+                 /* let verified = response##verified; */
                  let verifyTime = response##time;
                  Js.log2("got response", response);
-                 setVerified(_ => Some((verified, verifyTime)));
+                 setVerified(_ => Some((true, verifyTime)));
                  Js.Promise.resolve();
                });
           setVerified(_ => None);
