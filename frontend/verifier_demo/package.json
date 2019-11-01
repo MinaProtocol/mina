@@ -8,7 +8,9 @@
     "pack": "fpack build lib/js/src/Index.js  --dev",
     "clean": "bsb -clean-world",
     "//serve": "moduleserve ./ --port 8000",
-    "serve": "yarn run pack && python3 -m http.server 8000"
+    "serve": "yarn run pack && python3 -m http.server 8000",
+    "reformat": "bsrefmt --in-place $(find src -name '*.re' -print)"
+
   },
   "author": "",
   "dependencies": {

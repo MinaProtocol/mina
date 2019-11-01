@@ -41,44 +41,78 @@ module Styles = {
     ]);
 };
 
-let firstText = {
-  <div>
-    <p> {React.string("Block Height: 140")} </p>
-    <p> {React.string("Date: 2019-10-26 12:15:00")} </p>
-  </div>;
-};
+module LastBlock =
+    [%graphql
+      {|
+      query LastBlock {
+        blocks(last: 1) {
+          nodes {
+            creator @bsDecoder(fn:"Apollo.Decoders.string")
+            stateHash
+            protocolState {
+              consensusState {
+                blockchainLength @bsDecoder(fn:"Apollo.Decoders.string")
+              }
+              blockchainState {
+                date @bsDecoder(fn:"Apollo.Decoders.date")
+              }
+            }
+            }
+          }
+        }
+      }
+   |}
+    ];
 
-let stateHash = {
-  React.string(
-    "4ApWEzSMKEsaPF6rYx6Vh6VBbHmxupj8C1EzQDyQDtcbqfmg3pnwtaFrAXWZs4QrhNHj8UtFhp3Af66M1uvoqTBy5RPe3JQmHHwYcPooZSMZgppvrCRxQ1c3DaoQh3heBXCuNAofL8hQv",
-  );
-};
+module LastBlockQuery = ReasonApollo.CreateQuery(LastBlock);
 
 [@react.component]
 let make = (~verified as _) => {
   <div className=Styles.blockRow>
-    <Square
-      bgColor=Colors.firstBg
-      textColor=Colors.saville
-      borderColor=Colors.navyBlue
-      heading="Last Block"
-      text=firstText
-    />
-    <span className=Styles.firstLine />
-    <Square
-      bgColor=Colors.secondBg
-      textColor=Colors.hyperlink
-      borderColor=Colors.secondBorder
-      heading="Latest Snark"
-      text=stateHash
-    />
-    <span className=Styles.secondLine />
-    <Square
-      bgColor=Colors.thirdBg
-      textColor=Colors.jungle
-      borderColor=Colors.thirdBg
-      heading="Verified!"
-      text=stateHash
-    />
+    <LastBlockQuery>
+      {({result}) =>
+         switch (result) {
+         | Loading
+         | Error(_) => {React.string("Error")}
+         | Data(data) when Array.length(data##blocks##nodes) == 0 => React.string("No blocks")
+         | Data(data) =>
+           let node = Array.get(data##blocks##nodes, 0);
+           let firstText =
+             <div>
+               <p>
+                 {React.string(
+                    "Blockchain Length: " ++ node##protocolState##consensusState##blockchainLength,
+                  )}
+               </p>
+                <p> {React.string("Creator: " ++ node##creator)} </p>
+               <p> {React.string("Date: " ++ Js.Date.toString(node##protocolState##blockchainState##date))} </p>
+             </div>;
+           <>
+             <Square
+               bgColor=Colors.firstBg
+               textColor=Colors.saville
+               borderColor=Colors.navyBlue
+               heading="Last Block"
+               text=firstText
+             />
+             <span className=Styles.firstLine />
+             <Square
+               bgColor=Colors.secondBg
+               textColor=Colors.hyperlink
+               borderColor=Colors.secondBorder
+               heading="Latest Snark"
+               text={React.string(node##stateHash)}
+             />
+             <span className=Styles.secondLine />
+             <Square
+               bgColor=Colors.thirdBg
+               textColor=Colors.jungle
+               borderColor=Colors.thirdBg
+               heading="Verified!"
+               text={React.string(node##stateHash)}
+             />
+           </>;
+         }}
+    </LastBlockQuery>
   </div>;
 };
