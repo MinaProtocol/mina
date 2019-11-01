@@ -3,7 +3,7 @@
    - "deriving bin_io" and "deriving version" never appear in types defined inside functor bodies
    - otherwise, "bin_io" may appear in a "deriving" attribute only if "version" also appears in that extension
    - versioned types only appear in versioned type definitions
-   - the construct "include Stable.Latest" is prohibited
+   - the constructs "include Stable.Latest" and "include Stable.Vn" are prohibited
 *)
 
 open Core_kernel
@@ -85,9 +85,17 @@ let validate_version_if_bin_io =
     ~pred:(fun has_bin_io has_version -> has_bin_io && not has_version)
     "Must have deriving version if deriving bin_io"
 
-let is_stable_latest_inc_decl inc_decl =
+let is_version_module vn =
+  let len = String.length vn in
+  len >= 2
+  && Char.equal vn.[0] 'V'
+  && (not @@ Char.equal vn.[1] '0')
+  && String.for_all (String.sub vn ~pos:1 ~len:(len - 1)) ~f:Char.is_digit
+
+let is_versioned_module_inc_decl inc_decl =
   match inc_decl.pincl_mod.pmod_desc with
-  | Pmod_ident {txt= Ldot (Lident "Stable", "Latest"); _} ->
+  | Pmod_ident {txt= Ldot (Lident "Stable", name); _}
+    when String.equal name "Latest" || is_version_module name ->
       true
   | _ ->
       false
@@ -214,8 +222,8 @@ let get_versioned_type_misuses type_decl =
     (params_types @ cstr_types @ manifest_types)
     ~f:get_core_type_versioned_type_misuses
 
-let include_stable_latest_error loc =
-  (loc, "Cannot use \"include Stable.Latest\"")
+let include_versioned_module_error loc =
+  (loc, "Cannot include a stable versioned module")
 
 (* traverse AST, collect errors *)
 let lint_ast =
@@ -270,8 +278,8 @@ let lint_ast =
         when String.equal name.txt "test_module" ->
           (* don't check for errors in test code *)
           acc
-      | Pstr_include inc_decl when is_stable_latest_inc_decl inc_decl ->
-          acc_with_errors acc [include_stable_latest_error str.pstr_loc]
+      | Pstr_include inc_decl when is_versioned_module_inc_decl inc_decl ->
+          acc_with_errors acc [include_versioned_module_error str.pstr_loc]
       | _ ->
           let acc' = super#structure_item str acc in
           acc_with_errors acc acc'.errors

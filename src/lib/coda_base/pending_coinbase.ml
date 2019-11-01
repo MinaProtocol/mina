@@ -8,7 +8,6 @@ open Tuple_lib
 open Let_syntax
 open Currency
 open Fold_lib
-open Module_version
 
 (* A pending coinbase is basically a Merkle tree of "stacks", each of which contains two hashes. The first hash
    is computed from the components in the coinbase via a "push" operation. The second hash, a protocol
@@ -122,27 +121,14 @@ module Stack_id : sig
 
   val ( > ) : t -> t -> bool
 end = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = int [@@deriving sexp, to_yojson, compare, eq, bin_io, version]
-      end
+      type t = int [@@deriving sexp, to_yojson, compare, eq]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "pending_coinbase_stack_id"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, compare]
 
@@ -244,19 +230,15 @@ module Coinbase_stack_data = struct
 end
 
 module Coinbase_stack_state_hash = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = State_hash.Stable.V1.t
-        [@@deriving
-          bin_io, sexp, eq, compare, hash, yojson, version {unnumbered}]
-      end
+      type t = State_hash.Stable.V1.t
+      [@@deriving sexp, eq, compare, hash, yojson, version]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
 
@@ -360,36 +342,29 @@ struct
 
   module Stack = struct
     module Poly = struct
+      [%%versioned
       module Stable = struct
         module V1 = struct
-          module T = struct
-            type ('data, 'state_hash) t = {data: 'data; state_hash: 'state_hash}
-            [@@deriving bin_io, eq, yojson, hash, sexp, compare, version]
-          end
-
-          include T
+          type ('data, 'state_hash) t = {data: 'data; state_hash: 'state_hash}
+          [@@deriving eq, yojson, hash, sexp, compare]
         end
-
-        module Latest = V1
-      end
+      end]
 
       type ('data, 'state_hash) t = ('data, 'state_hash) Stable.Latest.t =
         {data: 'data; state_hash: 'state_hash}
       [@@deriving yojson, hash, sexp, compare]
     end
 
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t =
-            ( Coinbase_stack_data.Stable.V1.t
-            , Coinbase_stack_state_hash.Stable.V1.t )
-            Poly.Stable.V1.t
-          [@@deriving bin_io, eq, yojson, hash, sexp, compare, version]
-        end
+        type t =
+          ( Coinbase_stack_data.Stable.V1.t
+          , Coinbase_stack_state_hash.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving eq, yojson, hash, sexp, compare]
 
-        include T
-        include Registration.Make_latest_version (T)
+        let to_latest = Fn.id
 
         let fold t =
           let open Fold in
@@ -400,18 +375,7 @@ struct
           Tick.Pedersen.digest_fold Hash_prefix.coinbase_stack (fold t)
           |> Hash_builder.of_digest
       end
-
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "pending_coinbase_stack"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
+    end]
 
     (* bin_io, version omitted *)
     type t = Stable.Latest.t [@@deriving yojson, eq, compare, sexp, hash]
@@ -539,34 +503,20 @@ struct
   end
 
   module Hash = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t = Hash_builder.Stable.V1.t
-          [@@deriving bin_io, eq, compare, sexp, version, yojson, hash]
-        end
-
-        include T
-        include Registration.Make_latest_version (T)
+        type t = Hash_builder.Stable.V1.t
+        [@@deriving eq, compare, sexp, yojson, hash]
 
         type var = Hash_builder.var
 
+        let to_latest = Fn.id
+
         let merge = Hash_builder.merge
       end
+    end]
 
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "pending_coinbase_hash"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
-
-    (* bin_io, version omitted *)
     type t = Stable.Latest.t [@@deriving eq, compare, sexp, yojson, hash]
 
     type var = Stable.Latest.var
@@ -600,18 +550,14 @@ struct
       (Stack.Stable.V1)
 
   module Merkle_tree = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t = V1_make.Stable.V1.t
-          [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
-        end
+        type t = V1_make.Stable.V1.t [@@deriving sexp, to_yojson]
 
-        include T
+        let to_latest = Fn.id
       end
-
-      module Latest = V1
-    end
+    end]
 
     module Latest_make = V1_make
 
@@ -786,22 +732,17 @@ struct
   end
 
   module Poly = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type ('tree, 'stack_id, 'state_hash) t =
-            { tree: 'tree
-            ; pos_list: 'stack_id list
-            ; new_pos: 'stack_id
-            ; previous_state_hash: 'state_hash }
-          [@@deriving bin_io, sexp, to_yojson, version]
-        end
-
-        include T
+        type ('tree, 'stack_id, 'state_hash) t =
+          { tree: 'tree
+          ; pos_list: 'stack_id list
+          ; new_pos: 'stack_id
+          ; previous_state_hash: 'state_hash }
+        [@@deriving sexp, to_yojson]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type ('tree, 'stack_id, 'state_hash) t =
           ('tree, 'stack_id, 'state_hash) Stable.Latest.t =
@@ -811,22 +752,19 @@ struct
       ; previous_state_hash: 'state_hash }
   end
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          ( Merkle_tree.Stable.V1.t
-          , Stack_id.Stable.V1.t
-          , State_hash.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
-      end
+      type t =
+        ( Merkle_tree.Stable.V1.t
+        , Stack_id.Stable.V1.t
+        , State_hash.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, to_yojson]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 

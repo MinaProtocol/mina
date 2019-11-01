@@ -6,6 +6,10 @@ val create : epoch:Epoch.t -> slot:Slot.t -> t
 
 val of_epoch_and_slot : Epoch.t * Slot.t -> t
 
+val to_uint32 : t -> Unsigned.uint32
+
+val of_uint32 : Unsigned.uint32 -> t
+
 val epoch : t -> Epoch.t
 
 val slot : t -> Slot.t

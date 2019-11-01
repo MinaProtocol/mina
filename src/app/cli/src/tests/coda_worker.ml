@@ -606,7 +606,8 @@ module T = struct
             Coda_lib.stop_snark_worker ~should_wait_kill:true coda
           in
           let coda_new_block key =
-            Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
+            Deferred.return
+            @@ Coda_commands.Subscriptions.new_block coda (Some key)
           in
           (* TODO: #2836 Remove validated_transitions_keyswaptest once the refactoring of broadcast pipe enters the code base *)
           let ( validated_transitions_keyswaptest_reader
