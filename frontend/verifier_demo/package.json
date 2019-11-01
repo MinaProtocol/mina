@@ -5,8 +5,10 @@
   "main": "index.js",
   "scripts": {
     "build": "bsb -make-world",
+    "pack": "fpack build lib/js/src/Index.js  --dev",
     "clean": "bsb -clean-world",
-    "serve": "moduleserve ./ --port 8000"
+    "//serve": "moduleserve ./ --port 8000",
+    "serve": "yarn run pack && python3 -m http.server 8000"
   },
   "author": "",
   "dependencies": {
@@ -18,6 +20,7 @@
   },
   "devDependencies": {
     "bs-platform": "^5.0.3",
+    "fastpack": "^0.9.1",
     "moduleserve": "https://github.com/marijnh/moduleserve#032b477"
   },
   "license": "ISC"

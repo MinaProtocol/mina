@@ -587,6 +587,13 @@ fast-json-stable-stringify@^2.0.0:
   resolved "https://registry.yarnpkg.com/fast-json-stable-stringify/-/fast-json-stable-stringify-2.0.0.tgz#d5142c0caee6b1189f87d3a76111064f86c8bbf2"
   integrity sha1-1RQsDK7msRifh9OnYREGT4bIu/I=
 
+fastpack@^0.9.1:
+  version "0.9.1"
+  resolved "https://registry.yarnpkg.com/fastpack/-/fastpack-0.9.1.tgz#791f5a30a707ae25567f1a9e47607c1c4d1bff0b"
+  integrity sha512-Pons5DJAfBCMkaFQ2Sx08PapmrTYmbgA+cMq5efjsJiOHQLwmRbiFN3oUcIH3lfDFfiHOhtKlrfl1C8+wjApHQ==
+  dependencies:
+    loader-runner "^3.0.0"
+
 fbjs-css-vars@^1.0.0:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/fbjs-css-vars/-/fbjs-css-vars-1.0.2.tgz#216551136ae02fe255932c3ec8775f18e2c078b8"
@@ -846,6 +853,11 @@ lcid@^2.0.0:
   integrity sha512-avPEb8P8EGnwXKClwsNUgryVjllcRqtMYa49NTsbQagYuT1DcXnl1915oxWjoyGrXR6zH/Y0Zc96xWsPcoDKeA==
   dependencies:
     invert-kv "^2.0.0"
+
+loader-runner@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/loader-runner/-/loader-runner-3.0.0.tgz#c86f303af2dacbd27eabd2ea3aaa957291562e23"
+  integrity sha512-BlinBEAJYOUubaKH9hMxshD1FltYLTd3FA4DoxEh/82C0Rc4cmcqI61bEUj0/osbmW9FCTXTpMAO/jHZDZC5Fw==
 
 locate-path@^2.0.0:
   version "2.0.0"

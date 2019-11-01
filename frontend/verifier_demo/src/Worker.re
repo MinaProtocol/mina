@@ -4,8 +4,8 @@ type t;
 module Promise = {
   type promiseWorker;
 
-  [@bs.module "promise-worker"] [@bs.new]
-  external create: t => promiseWorker = "PromiseWorker";
+  [@bs.module] [@bs.new]
+  external create: t => promiseWorker = "promise-worker";
 
   // danger: untyped
   [@bs.send]
