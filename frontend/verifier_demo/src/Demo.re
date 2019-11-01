@@ -12,6 +12,11 @@ module Block = [%graphql
             delta_prime
             z
           }
+          protocolState {
+            consensusState {
+              blockchainLength @bsDecoder(fn:"Apollo.Decoders.string")
+            }
+          }
         }
       }
     }
@@ -32,7 +37,20 @@ module DemoInternal = {
         | Some(data) when Array.length(data##blocks##nodes) == 0 => None
         | Some(data) =>
           Js.log("posting message");
-          let block = data##blocks##nodes[0];
+          let nodes = data##blocks##nodes;
+          Array.fast_sort(
+            (a, b) =>
+              compare(
+                int_of_string(
+                  a##protocolState##consensusState##blockchainLength,
+                ),
+                int_of_string(
+                  b##protocolState##consensusState##blockchainLength,
+                ),
+              ),
+            nodes,
+          );
+          let block = nodes[Array.length(nodes) - 1];
           let proof = block##protocolStateProof;
           let msg = {
             "key": data##blockchainVerificationKey,
