@@ -27,7 +27,7 @@ module type Basic_intf = sig
 end
 
 module type Intf = sig
-  type t [@@deriving bin_io, sexp, to_yojson, compare]
+  type t [@@deriving sexp, to_yojson, compare]
 
   include Basic_intf with type t := t
 
@@ -177,6 +177,17 @@ module Extend (F : Basic_intf) = struct
       x
 end
 
+module T = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'a t = 'a [@@deriving eq, sexp, to_yojson, compare]
+    end
+  end]
+
+  type 'a t = 'a
+end
+
 module Make_fp
     (N : Nat_intf.S) (Info : sig
         val order : N.t
@@ -189,8 +200,7 @@ module Make_fp
 
     let order = Info.order
 
-    (* TODO version *)
-    type t = N.t [@@deriving eq, bin_io, sexp, to_yojson, compare]
+    type t = N.t T.Stable.Latest.t [@@deriving eq, sexp, to_yojson, compare]
 
     let zero = N.of_int 0
 
@@ -368,7 +378,7 @@ end = struct
 
     let order = Nat.(Fp.order * Fp.order * Fp.order)
 
-    type t = Fp.t * Fp.t * Fp.t
+    type t = Fp.t * Fp.t * Fp.t T.Stable.Latest.t
     [@@deriving eq, bin_io, sexp, to_yojson, compare]
 
     let ( + ) = componentwise Fp.( + )
