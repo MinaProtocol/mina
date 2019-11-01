@@ -20,7 +20,7 @@
 
 [%%define genesis_ledger "van_helsing"]
 
-[%%define genesis_state_timestamp "2019-10-31 16:30:00-07:00"]
+[%%define genesis_state_timestamp "2019-11-01 17:00:00-07:00"]
 [%%define block_window_duration 180000]
 
 [%%define integration_tests false]
