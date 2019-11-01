@@ -104,7 +104,21 @@ let make = (~verified) => {
          | Data(data) when Array.length(data##blocks##nodes) == 0 =>
            React.string("No blocks")
          | Data(data) =>
-           let node = data##blocks##nodes[0];
+           let nodes = data##blocks##nodes;
+           Array.fast_sort(
+             (a, b) =>
+               compare(
+                 int_of_string(
+                   a##protocolState##consensusState##blockchainLength,
+                 ),
+                 int_of_string(
+                   b##protocolState##consensusState##blockchainLength,
+                 ),
+               ),
+             nodes,
+           );
+           let node = nodes[Array.length(nodes) - 1];
+           /* let node = nodes[0]; */
            let firstText =
              <div>
                <p>
