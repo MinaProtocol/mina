@@ -19,7 +19,7 @@ Visualizations will be judged on the following criteria:
 - Design & UI
 - Efficiency of implementation
 
-Here are some Example Project Ideas we'd *love* to see: 
+Here are some example project ideas we'd *love* to see: 
 
 - Node Dashboard (Monitor Your Node)
   - Peer Map
