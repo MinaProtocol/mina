@@ -10,10 +10,7 @@ let create_verification_key key_string =
   let key = Js.to_string key_string in
   let sexp = Core_kernel.Sexp.of_string key in
   consolelog "deserialize key" ;
-  let key =
-    Demo.Verification_key.t_of_sexp sexp
-    |> Demo.Verification_key.Processed.create
-  in
+  let key = Demo.Verification_key.t_of_sexp sexp in
   consolelog key ; key
 
 let decode_g1 a =
@@ -47,36 +44,23 @@ let bigint_of_string s = Snarkette.Nat.of_string (Js.to_string s)
 
 let bigint_to_string bi = Js.string (Snarkette.Nat.to_string bi)
 
+let verify = ref None
+
 let verify_state_hash verification_key state_hash proof =
+  let open Core_kernel in
+  let verify =
+    match !verify with
+    | None ->
+        let v = unstage (Demo.verify verification_key) in
+        verify := Some v ;
+        v
+    | Some v ->
+        v
+  in
   consolelog "deserialize state_hash" ;
-  let input_nat = bigint_of_string state_hash in
-  let open Snarkette in
-  (* ... *)
-  consolelog "run verify" ;
-  let v =
-    Demo.verify verification_key
-      [Nat.shift_left input_nat 1; Nat.of_int 1]
-      proof
-  in
-  consolelog v ;
-  let v =
-    Demo.verify verification_key
-      [Nat.shift_left input_nat 1; Nat.of_int 1]
-      proof
-  in
-  consolelog v ;
-  let v =
-    Demo.verify verification_key
-      [Nat.shift_right input_nat 1; Nat.of_int 0]
-      proof
-  in
-  consolelog v ;
-  let v =
-    Demo.verify verification_key
-      [Nat.shift_right input_nat 1; Nat.of_int 0]
-      proof
-  in
-  consolelog v ; consolelog "ran verify" ; v
+  let input = Snarkette.Mnt6753.Fq.of_string (Js.to_string state_hash) in
+  let res = verify input proof in
+  consolelog res ; res
 
 let () =
   let window = Js.Unsafe.global in
