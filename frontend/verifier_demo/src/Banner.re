@@ -3,7 +3,7 @@ module Styles = {
   let banner =
     style([
       display(`flex),
-      justifyContent(`spaceAround),
+      justifyContent(`center),
       alignItems(`center),
       position(`absolute),
       top(`percent(5.0)),
