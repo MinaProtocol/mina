@@ -93,6 +93,9 @@ module Proof = struct
       [@@deriving sexp]
     end
   end]
+
+  type ('g1, 'g2) t = ('g1, 'g2) Stable.Latest.t =
+    {a: 'g1; b: 'g2; c: 'g1; delta_prime: 'g2; z: 'g1}
 end
 
 module Make (Backend : Backend_intf) = struct
@@ -168,7 +171,7 @@ module Make (Backend : Backend_intf) = struct
   let check b lab = if b then Ok () else Or_error.error_string lab
 
   module Proof = struct
-    type ('g1, 'g2) typ = ('g1, 'g2) Proof.Stable.Latest.t =
+    type ('g1, 'g2) typ = ('g1, 'g2) Proof.t =
       {a: 'g1; b: 'g2; c: 'g1; delta_prime: 'g2; z: 'g1}
     [@@deriving sexp]
 
