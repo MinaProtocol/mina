@@ -1,14 +1,14 @@
 module Block = [%graphql
   {|
-    query {
-      version
-      blocks(last: 1) {
-        nodes {
-          stateHash
-        }
-      }
-    }
-  |}
+         query {
+           version
+           blocks(last: 1) {
+             nodes {
+               stateHash
+             }
+           }
+         }
+       |}
 ];
 
 module BlockQuery = ReasonApollo.CreateQuery(Block);
