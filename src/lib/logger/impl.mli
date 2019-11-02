@@ -45,6 +45,9 @@ module Metadata : sig
   type t = Stable.V1.t
 end
 
+(** Used only when dealing with the raw logging function *)
+val metadata : t -> Metadata.t
+
 module Message : sig
   type t =
     { timestamp: Time.t
@@ -116,6 +119,8 @@ val null : unit -> t
 val extend : t -> (string, Yojson.Safe.json) List.Assoc.t -> t
 
 val change_id : t -> id:string -> t
+
+val raw : t -> Message.t -> unit
 
 val trace : _ log_function
 

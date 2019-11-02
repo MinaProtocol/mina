@@ -21,3 +21,5 @@ let zero = Snark_params.Tick.Pedersen.zero_hash
 let raw_hash_bytes = to_bytes
 
 let to_bytes = `Use_to_base58_check_or_raw_hash_bytes
+
+let to_decimal_string = to_decimal_string
