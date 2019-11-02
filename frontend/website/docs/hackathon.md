@@ -12,7 +12,7 @@ We will be hosting the GraphQL workshop at 10pm PST on Friday, 11/1.
 ### Painting with Coda
 Build the coolest visualization on top of the [Coda GraphQL API](https://codaprotocol.com/docs/developers/graphql-api/). 
 
-We've spun up a [public GraphQL read-only endpoint](graphql.o1test.net/graphql) to make it easier for you to get started!
+We've spun up a [public GraphQL read-only endpoint](https://graphql.o1test.net/graphql) to make it easier for you to get started!
 
 Visualizations will be judged on the following criteria:
 
