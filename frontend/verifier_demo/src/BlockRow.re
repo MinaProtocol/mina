@@ -67,7 +67,7 @@ let decToB64: string => string = [%bs.raw
 module LastBlock = [%graphql
   {|
       query LastBlock {
-        blocks(last: 1) {
+        blocks {
           nodes {
             protocolStateProof {
               a
@@ -143,7 +143,7 @@ let make = (~verified) => {
            );
            let node = nodes[Array.length(nodes) - 1];
            /* let node = nodes[0]; */
-           let stateHash = {React.string(node##stateHash)};
+           let stateHash = React.string(node##stateHash);
            let firstText =
              <div>
                <p>
@@ -210,7 +210,7 @@ let make = (~verified) => {
                marginTop={`rem(-1.8)}
              />
              <span className=Styles.secondLine />
-            <VerifySquare
+             <VerifySquare
                bgColor=Colors.thirdBg
                borderColor=Colors.thirdBg
                textColor=Colors.jungle

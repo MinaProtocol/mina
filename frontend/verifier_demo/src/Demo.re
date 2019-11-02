@@ -2,7 +2,7 @@ module Block = [%graphql
   {|
     query {
       blockchainVerificationKey
-      blocks(last: 1) {
+      blocks {
         nodes {
           stateHashField
           protocolStateProof {
