@@ -1,4 +1,14 @@
-(* versioned.ml -- static enforcement of versioned types via ppx
+[%%import
+"../../config.mlh"]
+
+(* versioned_types.ml -- static enforcement of versioned types via ppx *)
+
+(* If the dune profile defines "print_versioned_types" to be true, this deriver
+   prints a representation of each versioned type to stdout. The driver "run_ppx_coda"
+   can be used to print the types from a particular OCaml source file. This facility is
+   meant to be used in CI to detect changes to versioned types.
+
+   Otherwise, we use this deriver as follows:
 
    1) check that versioned type always in valid module hierarchy
    2) versioned types depend only on other versioned types or OCaml built-in types
@@ -60,8 +70,6 @@ open Ppxlib
 
 let deriver = "version"
 
-type generation_kind = Plain | Wrapped | Rpc
-
 let validate_module_version module_version loc =
   let len = String.length module_version in
   if not (Char.equal module_version.[0] 'V' && len > 1) then
@@ -81,6 +89,98 @@ let validate_module_version module_version loc =
         "Versioning module name must be Vn, for a number n, which cannot \
          begin with 0, got: \"%s\""
         module_version
+
+[%%if
+print_versioned_types]
+
+let contains_deriving_bin_io (attrs : attributes) =
+  match
+    List.find attrs ~f:(fun ({txt; _}, _) -> String.equal txt "deriving")
+  with
+  | Some (_deriving, payload) -> (
+    match payload with
+    (* always have a tuple here; any deriving items are in addition to `version` *)
+    | PStr [{pstr_desc= Pstr_eval ({pexp_desc= Pexp_tuple items; _}, _); _}] ->
+        List.exists items ~f:(fun item ->
+            match item with
+            | {pexp_desc= Pexp_ident {txt= Lident "bin_io"; _}; _} ->
+                true
+            | _ ->
+                false )
+    | _ ->
+        false )
+  | None ->
+      (* unreachable *)
+      false
+
+(* singleton attribute *)
+let just_bin_io =
+  let loc = Location.none in
+  [ ( {txt= "deriving"; loc}
+    , PStr
+        [ { pstr_desc=
+              Pstr_eval
+                ( { pexp_desc= Pexp_ident {txt= Lident "bin_io"; loc}
+                  ; pexp_loc= loc
+                  ; pexp_attributes= [] }
+                , [] )
+          ; pstr_loc= loc } ] ) ]
+
+(* filter attributes from types, except for bin_io, don't care about changes to others *)
+let filter_type_decls_attrs type_decl =
+  (* retain `deriving bin_io` *)
+  let attrs = type_decl.ptype_attributes in
+  let ptype_attributes =
+    if contains_deriving_bin_io attrs then just_bin_io else []
+  in
+  {type_decl with ptype_attributes}
+
+(* convert type_decls to structure item so we can print it *)
+let type_decls_to_stri type_decls =
+  (* type derivers only work with recursive types *)
+  {pstr_desc= Pstr_type (Ast.Recursive, type_decls); pstr_loc= Location.none}
+
+(* replace newlines in standard formmatter with a space, so type is all on one line *)
+let formatter =
+  let std_formatter = Format.std_formatter in
+  let funs = Format.pp_get_formatter_out_functions std_formatter () in
+  let funs' =
+    { funs with
+      out_newline= (fun () -> funs.out_spaces 1)
+    ; out_indent= (fun _ -> ()) }
+  in
+  Format.pp_set_formatter_out_functions std_formatter funs' ;
+  std_formatter
+
+(* prints module_path:type_definition *)
+let print_type ~options:_ ~path type_decls =
+  let path_len = List.length path in
+  List.iteri path ~f:(fun i s ->
+      printf "%s" s ;
+      if i < path_len - 1 then printf "." ) ;
+  printf ":%!" ;
+  let type_decls_filtered_attrs =
+    List.map type_decls ~f:filter_type_decls_attrs
+  in
+  let stri = type_decls_to_stri type_decls_filtered_attrs in
+  Pprintast.structure_item formatter stri ;
+  Format.print_flush () ;
+  printf "\n%!" ;
+  []
+
+(* we're worried about changes to the serialization of types, which can occur via changes to implementations,
+   so nothing to do for signatures
+ *)
+let gen_empty_sig ~options:_ ~path:_ _type_decls = []
+
+let () =
+  Ppx_deriving.(
+    register
+      (create deriver ~type_decl_str:print_type () ~type_decl_sig:gen_empty_sig))
+
+[%%else]
+
+type generation_kind = Plain | Wrapped | Rpc
 
 let validate_rpc_type_decl inner3_modules type_decl =
   match List.take inner3_modules 2 with
@@ -528,3 +628,5 @@ let () =
     register
       (create deriver ~type_decl_str:generate_let_bindings_for_type_decl_str
          ~type_decl_sig:generate_val_decls_for_type_decl_sig ()))
+
+[%%endif]
