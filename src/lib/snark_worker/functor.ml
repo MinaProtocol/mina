@@ -96,6 +96,8 @@ module Make (Inputs : Intf.Inputs_intf) :
   let main ~logger daemon_address shutdown_on_disconnect =
     let%bind state = Worker_state.create () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
+    (* retry interval with jitter *)
+    let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0) in
     let log_and_retry label error sec k =
       let error_str = Error.to_string_hum error in
       (* HACK: the bind before the call to go () produces an evergrowing
@@ -121,7 +123,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           daemon_address
       with
       | Error e ->
-          log_and_retry "getting work" e 10.0 go
+          log_and_retry "getting work" e (retry_pause 10.) go
       | Ok None ->
           let random_delay =
             Worker_state.worker_wait_time
@@ -139,7 +141,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           (* Pause to wait for stdout to flush *)
           match perform state public_key work with
           | Error e ->
-              log_and_retry "performing work" e 10.0 go
+              log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics logger ;
               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -153,7 +155,8 @@ module Make (Inputs : Intf.Inputs_intf) :
                     result daemon_address
                 with
                 | Error e ->
-                    log_and_retry "submitting work" e 10.0 submit_work
+                    log_and_retry "submitting work" e (retry_pause 10.)
+                      submit_work
                 | Ok () ->
                     go ()
               in
