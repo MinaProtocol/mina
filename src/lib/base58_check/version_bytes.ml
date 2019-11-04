@@ -36,6 +36,8 @@ let transaction_hash : t = '\x9E'
 
 let fee_transfer_single : t = '\x9F'
 
+let vrf_truncated_output : t = '\xA3'
+
 let secret_box_byteswr : t = '\x02'
 
 let ledger_hash : t = '\x63'

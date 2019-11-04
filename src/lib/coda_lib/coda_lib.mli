@@ -28,7 +28,7 @@ val replace_snark_worker_key :
 
 val add_block_subscriber :
      t
-  -> Public_key.Compressed.t
+  -> Public_key.Compressed.t option
   -> ( Auxiliary_database.Filtered_external_transition.t
      , State_hash.t )
      With_hash.t

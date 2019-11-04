@@ -165,7 +165,7 @@ let version_type version stri =
                       buf ~pos_ref
                   in
                   (* sanity check *)
-                  assert (Int.equal read_version version) ;
+                  assert (Core_kernel.Int.equal read_version version) ;
                   t]]]
     ; [%stri
         let __bin_read_t__ =
@@ -178,7 +178,7 @@ let version_type version stri =
                       buf ~pos_ref i
                   in
                   (* sanity check *)
-                  assert (Int.equal read_version version) ;
+                  assert (Core_kernel.Int.equal read_version version) ;
                   t]]]
     ; [%stri
         let bin_size_t =
@@ -255,7 +255,7 @@ let convert_module_stri last_version stri =
           "Expected a statement of the form `module Vn = struct ... end`." )
       (fun name str -> (name, str))
   in
-  Versioned.validate_module_version name.txt name.loc ;
+  Versioned_type.validate_module_version name.txt name.loc ;
   let version =
     String.sub name.txt ~pos:1 ~len:(String.length name.txt - 1)
     |> int_of_string
