@@ -17,7 +17,7 @@ A non-consensus node should perform the following operations:
         a) Seen (added to the pool?)
         b) Processed
         c) Finalized
-    4. View payments sent and received 
+    4. View payments sent and received
         1. by querying an archive node maybe? (current wallet feature)
     5. Delegate an account's stake to a block producer
 
@@ -36,7 +36,7 @@ A block header needs to have:
     1. Blockchain SNARK- A Proof that the state is valid
     2. Protocol_state:
         a) Previous state hash
-        b) Blockchain State: 
+        b) Blockchain State:
             a) Staged ledger hash
             b) Snarked ledger hash
         c) Consensus State
@@ -71,13 +71,13 @@ On startup, a non-consensus node will request from its peers the block header at
 
 With the block header at the root, non-consensus nodes can query the account state from the staged ledger materialized from the snarked ledger.
 
-The value `v` in full nodes (called `k`) is currently 2160 which means, for a transaction to be finalized with a really high probability, it would take 10 days. That does not seem like a good user experience. Transactions on Bitcoin and Ethereum are finalized after 6 (~an hour) and 30 (~7mins) block respectively.
+The value `v` in full nodes (called `k`) is currently 2160 which means, for a transaction to be finalized with a really high probability, it would take 10 days. That does not seem like a good user experience. Transactions on Bitcoin and Ethereum are finalized after 6 (~an hour) and 30 (~7mins) block respectively. They are able to achieve this because they have economic finality in that it becomes expensive to create a mallicious competing fork and therefore have low probablities at these values. However, that is not the case with proof of stake and therefore we have to pick a `v` at which there is a good enough probability.
 
 Here are the probabilities that there will be a fork of length `v` assuming 40% of adversarial stake (\(\epsilon\)). `b` is the block_window_duration :
 
 | v | fork probability ||| wait-time||||
 |---|----------|--------|----------|----------|------|-----|-----|
-||**$\epsilon =0.4$**|**$\epsilon =0.34$**|**$\epsilon =0.1$**(bitcoin)| **$b = 6 mins$**(current) | **$b = 2 mins$** | **$b = 1 min$** | **$b = 30 secs$** |
+||**$\epsilon =0.4$**|**$\epsilon =0.34$**|**$\epsilon =0.1$**| **$b = 6 mins$**(current) | **$b = 2 mins$** | **$b = 1 min$** | **$b = 30 secs$** |
 | 5 | 0.49024 |0.386024|0.04501 |30m| 10m| 5m|2.5m|
 | 30| 0.313376 |0.127204|2.3263e-06 |3h| 1 | 30m |15m|
 | 50| 0.228895 |0.057254|1.04804e-09|5h| 1h 40m | 50m| 25m|
@@ -96,16 +96,16 @@ Here are the probabilities that there will be a fork of length `v` assuming 40% 
 Whatever value of `v` we choose, the selection mechanism between the two blocks would still use the `k` defined for full nodes and therefore, the fork resolution rules will not be affected even in the case of forks of length greater than `v`.
 Also, the above probabilities are for forks that are caused by adversarial behaviors. There can be forks due to random network partitions and since `v` is going to very small compared to `k` we have to consider forks due to short network partitions and determine their frequency/length in some heuristic way.
 
-But within a parition, there is an assumption that all the nodes will resolve any fork of length 1 i.e., every node will be in sync on the best chain within `2*delta` slots if they hear about it. So `v` should be at least `2*delta` blocks (not using slots here to avoid cases when there are no blocks at all within this period since delta is small enough for that to be possible). The value of delta we want is ~4 therefore `v` >= 8 blocks. With the above probabilities for $\epsilon =0.34$ (which is the lowest Vanishree would like it to be), `v` = 50 seems good enough.
+But within a parition, there is an assumption that all the nodes will resolve any fork of length 1 i.e., every node will be in sync on the best chain within `2*delta` slots if they hear about it. So `v` should be at least `2*delta` blocks (not using slots here to avoid cases when there are no blocks at all within this period since delta is small enough for that to be possible). The value of delta we want is ~4 therefore `v` >= 8 blocks. With the above probabilities for $\epsilon =0.34$, `v` = 50 seems good enough.
 
 ### Gossip layer
 
 The gossip protocol for non-consensus nodes should be separated from the one for full nodes because messages like blocks, transactions, and snark works are not required and having a different gossip layer for messages pertaining to the non-consensus nodes will reduce the bandwidth usage significantly.
 
-    1. Layer 1: Existing gossip layer that includes broadcasting blocks and snark pool diffs.
-    2. Layer 2: New layer for gossiping information needed by non-consensus nodes- 
+    1. Block Layer : Existing gossip layer that includes broadcasting blocks and snark pool diffs.
+    2. Header Layer: New layer for gossiping information needed by non-consensus nodes- 
         a) Block headers
-    3 Layer 3: For transactions that nodes can send. This is a separate layer because we don't want non-consensus nodes (or archive nodes/snark workers) to receive any.
+    3 Transaction Layer: For transactions that nodes can send. This is a separate layer because we don't want non-consensus nodes (or archive nodes/snark workers) to receive any transaction.
 
 We can achieve this using the Publish/Subscribe mechanism implemented in libp2p.
 Publish/Subscribe mechanism basically allows for sending and receiving messages corresponging to a specific `topic`. The interface for that is defined in `coda_net2.mli`:
@@ -151,19 +151,17 @@ module Pubsub : sig
 end
     ```
 
-The way we would use this to implement layer-2 of our gossip net is as follows:
+The way we would use this to implement different layers of our gossip net is as follows:
 
-New topic strings for gossipping block headers and transactions will be created. A non-consensus node, to receive block headers, would first broadcast a subscription request to a certain topic created for block-headers, say `block-headers` using `Pubsub.subscribe`.
+New topic strings for gossipping blocks, block headers, and transactions will be created. A non-consensus node, to receive block headers, would first broadcast a subscription request to a certain topic created for block-headers, say `block-header` using `Pubsub.subscribe`.
 
 Any node on receiving a subscription request would add the non-consensus node to its subscribers list corresponding to the topic.
 
-Full nodes would then `Pubsub.publish` the block-header (A block without the staged-ledger-diff) to the topic `block-headers` on receiving/producing a block. Other non-consensus nodes would forward the block-headers it received after validating it.
+Full nodes would then `Pubsub.publish` the block-header (A block without the staged-ledger-diff) to the topic `block-headers` on receiving/producing a block. [Why would they?](#Incentivizing-full-nodes) Other non-consensus nodes and full-nodes would forward the block-headers it received after validating it.
 
-Full nodes will not subscribe to `block-headers` but would only publish to it. [Why would they?](#Incentivizing-full-nodes)
+Similarly there can be another topic string, say `transaction`, for non-consensus nodes to broadcast transactions to block producers. Non-consensus nodes would only publish to this topic and full-nodes would publish and subscribe to the topic. Snark workers or archive nodes can choose to not subscribe to this topic since they don't produce blocks.
 
-Similarly there can be another topic string for non-consensus nodes to broadcast transactions to block producers. Non-consensus nodes would only publish to this topic and full-nodes would publish and subscribe to the topic. Snark workers or archive nodes can choose to not subscribe to this topic since they don't produce blocks.
-
-We could also have another topic for gossipping snark work since only block producers and snark workers would want to subscribe and publish to it respectively.
+All other data such as snark works and blocks are gossiped in the `block` layer. We could have a separate topic for gossipping snark work since only block producers and snark workers would want to subscribe and publish to it respectively but by default full-nodes will subscribe and publish to both `transaction` layer and `block` layer.
 
 Here's a network state that shows messages that would be gossiped
 ![](../docs/res/non_consensus_gossip.png)
