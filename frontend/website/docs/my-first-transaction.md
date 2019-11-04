@@ -8,9 +8,9 @@ Run the following command to start up a Coda node instance and connect to the ne
 
     coda daemon \
         -discovery-port 8303 \
-        -peer /ip4/52.39.56.50/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs \
-        -peer /ip4/18.212.230.102/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF \
-        -peer /ip4/52.13.17.206/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7
+        -peer /dns4/peer1-van-helsing.o1test.net/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs \
+        -peer /dns4/peer2-van-helsing.o1test.net/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF \
+        -peer /dns4/peer3-van-helsing.o1test.net/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7
 
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8303 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
 
