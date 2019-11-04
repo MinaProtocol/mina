@@ -39,8 +39,7 @@ let verification_key =
     in
     sprintf
       !"%{sexp:\n\
-       \    (LTock.Fq6.t, LTock.G2.t, LTock.G1.t)\n\
-        Snarkette.Bowe_gabizon.Verification_key.t}\n"
+       \    Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key.t}\n"
       key)
 
 module Doc = struct
