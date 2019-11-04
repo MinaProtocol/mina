@@ -1,45 +1,18 @@
 module True : sig
-  module Stable : sig
-    module V1 : sig
-      type t [@@deriving version]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.V1.t
+  type t
 end
 
 module False : sig
-  module Stable : sig
-    module V1 : sig
-      type t [@@deriving version]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.V1.t
+  type t
 end
 
 type true_ = True.t
 
 type false_ = False.t
 
-module Stable : sig
-  module V1 : sig
-    type ('witness, _) t =
-      | True : 'witness -> ('witness, True.Stable.V1.t) t
-      | False : ('witness, False.Stable.V1.t) t
-    [@@deriving version]
-  end
-
-  module Latest = V1
-end
-
-type ('witness, 'b) t = ('witness, 'b) Stable.Latest.t =
-  | True : 'witness -> ('witness, True.Stable.V1.t) t
-  | False : ('witness, False.Stable.V1.t) t
+type ('witness, 'b) t =
+  | True : 'witness -> ('witness, True.t) t
+  | False : ('witness, False.t) t
 
 type 'witness true_t = ('witness, true_) t
 
