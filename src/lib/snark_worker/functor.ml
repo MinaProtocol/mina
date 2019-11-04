@@ -96,32 +96,32 @@ module Make (Inputs : Intf.Inputs_intf) :
   let main ~logger daemon_address shutdown_on_disconnect =
     let%bind state = Worker_state.create () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
-    let rec go () =
-      let log_and_retry label error =
-        let error_str = Error.to_string_hum error in
-        (* HACK: the bind before the call to go () produces an evergrowing
+    let log_and_retry label error sec k =
+      let error_str = Error.to_string_hum error in
+      (* HACK: the bind before the call to go () produces an evergrowing
            backtrace history which takes forever to print and fills our disks.
            If the string becomes too long, chop off the first 10 lines and include
            only that *)
-        ( if String.length error_str < 4096 then
-          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-            !"Error %s: %{sexp:Error.t}"
-            label error
-        else
-          let lines = String.split ~on:'\n' error_str in
-          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-            !"Error %s: %s" label
-            (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
-        let%bind () = wait ~sec:30.0 () in
-        (* FIXME: Use a backoff algo here *)
-        go ()
-      in
+      ( if String.length error_str < 4096 then
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          !"Error %s: %{sexp:Error.t}"
+          label error
+      else
+        let lines = String.split ~on:'\n' error_str in
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          !"Error %s: %s" label
+          (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
+      let%bind () = wait ~sec () in
+      (* FIXME: Use a backoff algo here *)
+      k ()
+    in
+    let rec go () =
       match%bind
         dispatch Rpcs.Get_work.Latest.rpc shutdown_on_disconnect ()
           daemon_address
       with
       | Error e ->
-          log_and_retry "getting work" e
+          log_and_retry "getting work" e 10.0 go
       | Ok None ->
           let random_delay =
             Worker_state.worker_wait_time
@@ -139,22 +139,25 @@ module Make (Inputs : Intf.Inputs_intf) :
           (* Pause to wait for stdout to flush *)
           match perform state public_key work with
           | Error e ->
-              log_and_retry "performing work" e
-          | Ok result -> (
-              match%bind
-                emit_proof_metrics result.metrics logger ;
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Submitted completed SNARK work to $address"
-                  ~metadata:
-                    [ ( "address"
-                      , `String (Host_and_port.to_string daemon_address) ) ] ;
-                dispatch Rpcs.Submit_work.Latest.rpc shutdown_on_disconnect
-                  result daemon_address
-              with
-              | Error e ->
-                  log_and_retry "submitting work" e
-              | Ok () ->
-                  go () ) )
+              log_and_retry "performing work" e 10.0 go
+          | Ok result ->
+              emit_proof_metrics result.metrics logger ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Submitted completed SNARK work to $address"
+                ~metadata:
+                  [ ( "address"
+                    , `String (Host_and_port.to_string daemon_address) ) ] ;
+              let rec submit_work () =
+                match%bind
+                  dispatch Rpcs.Submit_work.Latest.rpc shutdown_on_disconnect
+                    result daemon_address
+                with
+                | Error e ->
+                    log_and_retry "submitting work" e 10.0 submit_work
+                | Ok () ->
+                    go ()
+              in
+              submit_work () )
     in
     go ()
 
