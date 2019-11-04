@@ -181,6 +181,41 @@ module DeleteButton = {
   };
 };
 
+module BlockRewards = {
+  [@react.component]
+  let make = () => {
+    let (modalState, updateModal) = React.useState(() => None);
+    <div>
+      <h3 className=Theme.Text.Header.h3>
+        {React.string("Consensus Settings")}
+      </h3>
+      <Spacer height=0.5 />
+      <Well disabled=true>
+        <div className=Css.(style([display(`flex), alignItems(`flexEnd)]))>
+          <div className=Css.(style([flexGrow(1.)]))>
+            <div className=Styles.label> {React.string("Delegating to")} </div>
+            <TextField
+              label="Key"
+              value=""
+              mono=true
+              onChange={_ => ()}
+              disabled=true
+            />
+          </div>
+          <Spacer width=1. />
+          <Button
+            width=8.
+            height=2.5
+            style=Button.Green
+            label="Change"
+            onClick={_ => route("/settings/wallet/:id/conesnsus")}
+          />
+        </div>
+      </Well>
+    </div>;
+  };
+};
+  
 [@bs.scope "window"] [@bs.val] external showItemInFolder: string => unit = "";
 
 module KeypathQueryString = [%graphql
@@ -298,7 +333,7 @@ let make = (~publicKey) => {
       </KeypathQuery>
     </div>
     <Spacer height=1.5 />
-    <ConsensusSettings />
+    <BlockRewards />
     <Spacer height=1.5 />
     <DeleteButton publicKey />
   </div>;
