@@ -818,11 +818,8 @@ module T = struct
 
     let coinbase_work ?(is_two = false)
         (works : Transaction_snark_work.Checked.t Sequence.t) =
-      let statement = Transaction_snark_work.Checked.statement in
+      let open Option.Let_syntax in
       let min1, min2 = cheapest_two_work works in
-      let _compare_work w1 w2 =
-        Transaction_snark_work.Statement.compare (statement w1) (statement w2)
-      in
       let diff ws ws' =
         Sequence.filter ws ~f:(fun w ->
             Sequence.mem ws'
@@ -836,25 +833,42 @@ module T = struct
         | None, _ ->
             None
         | Some w, None ->
-            (*Todo add only if proof fees is less than the coinbase reward*)
-            let cb =
-              Staged_ledger_diff.At_most_two.Two
-                (Option.map (coinbase_ft w) ~f:(fun ft -> (ft, None)))
-            in
-            Some (cb, diff works (Sequence.of_list [stmt w]))
+            if Amount.(of_fee w.fee <= Coda_compile_config.coinbase) then
+              let cb =
+                Staged_ledger_diff.At_most_two.Two
+                  (Option.map (coinbase_ft w) ~f:(fun ft -> (ft, None)))
+              in
+              Some (cb, diff works (Sequence.of_list [stmt w]))
+            else
+              let cb = Staged_ledger_diff.At_most_two.Two None in
+              Some (cb, works)
         | Some w1, Some w2 ->
-            let cb =
-              Staged_ledger_diff.At_most_two.Two
-                (Option.map (coinbase_ft w1) ~f:(fun ft -> (ft, coinbase_ft w2)))
-              (*Always add work? where does this get checked if this really is needed?*)
-            in
-            Some (cb, diff works (Sequence.of_list [stmt w1; stmt w2]))
+            let%map sum = Fee.add w1.fee w2.fee in
+            if Amount.(of_fee sum <= Coda_compile_config.coinbase) then
+              let cb =
+                Staged_ledger_diff.At_most_two.Two
+                  (Option.map (coinbase_ft w1) ~f:(fun ft ->
+                       (ft, coinbase_ft w2) ))
+                (*Why add work without checking if work constraints are satisfied? If we reach here then it means that we are trying to fill the last two slots of the tree with coinbase trnasactions and if there's any work in [works] then that has to be included, either in the coinbase or as fee transfers that gets paid by the transaction fees. So having it as coinbase ft will atleast get reduce the slots occupied by fee transfers*)
+              in
+              (cb, diff works (Sequence.of_list [stmt w1; stmt w2]))
+            else if Amount.(of_fee w1.fee <= Coda_compile_config.coinbase) then
+              let cb =
+                Staged_ledger_diff.At_most_two.Two
+                  (Option.map (coinbase_ft w1) ~f:(fun ft -> (ft, None)))
+              in
+              (cb, diff works (Sequence.of_list [stmt w1]))
+            else
+              let cb = Staged_ledger_diff.At_most_two.Two None in
+              (cb, works)
       else
         Option.map min1 ~f:(fun w ->
-            let cb = Staged_ledger_diff.At_most_two.One (coinbase_ft w) in
-            (cb, diff works (Sequence.of_list [stmt w])) )
-
-    (*TODO: need to keep track of the works separately?*)
+            if Amount.(of_fee w.fee <= Coda_compile_config.coinbase) then
+              let cb = Staged_ledger_diff.At_most_two.One (coinbase_ft w) in
+              (cb, diff works (Sequence.of_list [stmt w]))
+            else
+              let cb = Staged_ledger_diff.At_most_two.One None in
+              (cb, works) )
 
     let init_coinbase_and_fee_transfers cw_seq ~add_coinbase ~job_count ~slots
         =
@@ -866,11 +880,11 @@ module T = struct
         | true, Some (ft, rem_cw) ->
             (ft, rem_cw)
         | true, None ->
+            (*Coinbase could not be added because work-fees > coinbase-amount*)
             if job_count = 0 || slots - job_count >= 1 then
               (*Either no jobs are required or there is a free slot that can be filled without having to include any work*)
               (One None, cw_seq)
             else (Zero, cw_seq)
-              (*TODO:Error Coinbase could not be added before all the work fees > coinbase amount*)
         | _ ->
             (Zero, cw_seq)
       in
@@ -951,18 +965,9 @@ module T = struct
           match coinbase_work t.completed_work_rev ~is_two:true with
           | None ->
               (Two None, t.completed_work_rev)
-              (*Check for work constraint needs to be done else where*)
+              (*Check for work constraint needs will be done in [check_constraints_and_update]*)
           | Some (fts', rem_cw) ->
               (fts', rem_cw) )
-        (*match (add_coinbase, coinbase_work cw_seq) with
-        | true, Some (ft, rem_cw) ->
-            (Staged_ledger_diff.At_most_two.One ft, rem_cw)
-        | true, None ->
-            if job_count = 0 || slots - job_count >= 1 then
-              (One None, cw_seq)
-            else (Zero, cw_seq) (*TODO:Error Coinbase could not be added before all the work fees > coinbase amount*)
-        | _ ->
-            (Zero, cw_seq)*)
       in
       let rem_cw = cw_unchecked rem_cw in
       let singles =
@@ -1057,29 +1062,9 @@ module T = struct
     let discard_last_work t =
       match Sequence.next t.completed_work_rev with
       | None ->
-          t (*TODO: Need to update coinbase fee transfers*)
+          t
       | Some (w, rem_seq) ->
           let to_be_discarded = Transaction_snark_work.forget w in
-          (*let current_fee =
-            Option.value
-              (Public_key.Compressed.Map.find t.fee_transfers
-                 to_be_discarded.prover)
-              ~default:Fee.zero
-          in
-          let updated_map =
-            (*TODO: select a new coinbase work if this is the one added to the coinbase*)
-            match Fee.sub current_fee to_be_discarded.fee with
-            | None ->
-                Public_key.Compressed.Map.remove t.fee_transfers
-                  to_be_discarded.prover
-            | Some fee ->
-                if fee > Fee.zero then
-                  Public_key.Compressed.Map.update t.fee_transfers
-                    to_be_discarded.prover ~f:(fun _ -> fee)
-                else
-                  Public_key.Compressed.Map.remove t.fee_transfers
-                    to_be_discarded.prover
-          in*)
           let discarded = Discarded.add_completed_work t.discarded w in
           let new_t =
             reselect_coinbase_work
@@ -1101,7 +1086,6 @@ module T = struct
           let updated_fee_transfers =
             Public_key.Compressed.Map.update t.fee_transfers (fst ft)
               ~f:(fun _ -> snd ft)
-            (*TODO: update the fee? No, because all user commands will have been deleted and the work that's present would be only for coinbase *)
           in
           let new_t =
             {t with coinbase; fee_transfers= updated_fee_transfers}
@@ -1149,9 +1133,7 @@ module T = struct
         cw_count > 0 && cw_count >= slots
       in
       let r = discard_last_work resources in
-      more_work r && space_constraint_satisfied r
-
-    (*TODO: this should be or?? Actually shouldn't matter if the space constraint is satisfied or not. We should discard extra work and not spend the transaction fee unnecessarily. Unless the work is for free?*)
+      more_work r
 
     let incr_coinbase_part_by t count =
       let open Or_error.Let_syntax in
@@ -1168,9 +1150,8 @@ module T = struct
       let by_one res =
         let res' =
           match Sequence.next res.discarded.completed_work with
-          (*TODO: get the latest one from the discarded and then select a work from the list of all work except the one already used*)
+          (*add one from the discarded list to [completed_work_rev] and then select a work from [completed_work_rev] except the one already used*)
           | Some (w, rem_work) ->
-              (*let w' = Transaction_snark_work.forget w in*)
               let%map coinbase = incr res.coinbase in
               let res' =
                 { res with
@@ -1203,7 +1184,6 @@ module T = struct
   end
 
   let rec check_constraints_and_update (resources : Resources.t) =
-    (*Core.printf !"Resources:\n %{sexp: Resources.t}%!\n" resources; *)
     if Resources.slots_occupied resources = 0 then resources
     else if Resources.work_constraint_satisfied resources then
       if
@@ -1295,7 +1275,7 @@ module T = struct
         let incr_coinbase_and_compute res count =
           let new_res = Resources.incr_coinbase_part_by res count in
           if Resources.space_available new_res then
-            (*Don't create the second prediff instead recompute first diff with just once coinbase*)
+            (*All slots could not be filled either because of budget constraints or not enough work done. Don't create the second prediff instead recompute first diff with just once coinbase*)
             ( one_prediff cw_seq_1 ts_seq self partitions.first
                 ~add_coinbase:true logger
             , None )
@@ -1310,25 +1290,30 @@ module T = struct
               , None )
             else (new_res, Some res2)
         in
+        let try_with_coinbase () : Resources.t =
+          one_prediff cw_seq_1 ts_seq self partitions.first ~add_coinbase:true
+            logger
+        in
         let res1, res2 =
-          match Resources.available_space res with
-          | 0 ->
-              (*generate the next prediff with a coinbase at least*)
-              let res2 = second_pre_diff res y ~add_coinbase:true cw_seq_2 in
-              (res, Some res2)
-          | 1 ->
-              (*There's a slot available in the first partition, fill it with coinbase and create another pre_diff for the slots in the second partiton with the remaining user commands and work *)
-              incr_coinbase_and_compute res `One
-          | 2 ->
-              (*There are two slots which cannot be filled using user commands, so we split the coinbase into two parts and fill those two spots*)
-              incr_coinbase_and_compute res `Two
-          | _ ->
-              (* Too many slots left in the first partition. Either there wasn't enough work to add transactions or there weren't enough transactions. Create a new pre_diff for just the first partition*)
-              let new_res =
-                one_prediff cw_seq_1 ts_seq self partitions.first
-                  ~add_coinbase:true logger
-              in
-              (new_res, None)
+          if Sequence.is_empty res.user_commands_rev then
+            let res = try_with_coinbase () in
+            (res, None)
+          else
+            match Resources.available_space res with
+            | 0 ->
+                (*generate the next prediff with a coinbase at least*)
+                let res2 = second_pre_diff res y ~add_coinbase:true cw_seq_2 in
+                (res, Some res2)
+            | 1 ->
+                (*There's a slot available in the first partition, fill it with coinbase and create another pre_diff for the slots in the second partiton with the remaining user commands and work *)
+                incr_coinbase_and_compute res `One
+            | 2 ->
+                (*There are two slots which cannot be filled using user commands, so we split the coinbase into two parts and fill those two spots*)
+                incr_coinbase_and_compute res `Two
+            | _ ->
+                (* Too many slots left in the first partition. Either there wasn't enough work to add transactions or there weren't enough transactions. Create a new pre_diff for just the first partition*)
+                let res = try_with_coinbase () in
+                (res, None)
         in
         let coinbase_added =
           Resources.coinbase_added res1
@@ -1337,10 +1322,7 @@ module T = struct
         if coinbase_added > 0 then make_diff res1 res2
         else
           (*Coinbase takes priority over user-commands. Create a diff in partitions.first with coinbase first and user commands if possible*)
-          let res =
-            one_prediff cw_seq_1 ts_seq self partitions.first
-              ~add_coinbase:true logger
-          in
+          let res = try_with_coinbase () in
           make_diff res None
 
   let create_diff t ~self ~logger
@@ -2126,7 +2108,7 @@ let%test_module "test" =
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_random_number_of_proofs ledger_init_state cmds iters
-                proofs_available sl test_mask `One_prover ) )*)
+                proofs_available sl test_mask `One_prover ) )
 
     let stmt_to_work_random_fee work_list provers
         (stmts : Transaction_snark_work.Statement.t) :
@@ -2163,10 +2145,6 @@ let%test_module "test" =
           (fun cmds_left _count_opt cmds_this_iter proofs_available_left ->
             let work_list : Transaction_snark_work.Statement.t list =
               Sl.Scan_state.work_statements_for_new_diff (Sl.scan_state !sl)
-              (*in
-              List.map spec_list ~f:(fun specs ->
-                  One_or_two.map specs
-                    ~f:Snark_work_lib.Work.Single.Spec.statement )*)
             in
             let proofs_available_this_iter, fees_for_each =
               List.hd_exn proofs_available_left
@@ -2193,16 +2171,8 @@ let%test_module "test" =
                   List.sort p.completed_works ~compare:(fun w w' ->
                       Fee.compare w.fee w'.fee ) )
             in
-            let _budget_sufficient = if false then failwith "" in
             let () =
-              let assert_ft ft ft' =
-                Core.printf
-                  !"ft from diff %{sexp:Fee_transfer.Single.t} expected ft \
-                    %{sexp:Fee_transfer.Single.t} \n\
-                    %!"
-                  ft ft' ;
-                assert (Fee_transfer.Single.equal ft ft')
-              in
+              let assert_ft ft ft' = assert (Fee.equal (snd ft) (snd ft')) in
               let first_pre_diff, second_pre_diff_opt = diff.diff in
               match
                 ( first_pre_diff.coinbase
@@ -2278,15 +2248,43 @@ let%test_module "test" =
               in
               let%map fees =
                 Quickcheck.Generator.list_with_length number_of_proofs
-                  Fee.(
-                    gen_incl (of_int 1)
-                      (of_int Coda_compile_config.coinbase_int))
+                  Fee.(gen_incl (of_int 1) (of_int 20))
               in
               (number_of_proofs, fees) )
         in
         return (ledger_init_state, cmds, iters, proofs_available)
       in
       Quickcheck.test g ~trials:10
+        ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->
+          async_with_ledgers ledger_init_state (fun sl test_mask ->
+              test_random_proof_fee ledger_init_state cmds iters
+                proofs_available sl test_mask `Many_provers ) )
+
+    let%test_unit "Max throughput" =
+      let g =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind ledger_init_state, cmds, iters = gen_at_capacity in
+        let%bind proofs_available =
+          Quickcheck_lib.map_gens iters ~f:(fun _ ->
+              let number_of_proofs =
+                transaction_capacity
+                (*All proofs are available*)
+              in
+              let%map fees =
+                Quickcheck.Generator.list_with_length number_of_proofs
+                  Fee.(gen_incl (of_int 1) (of_int 20))
+              in
+              (number_of_proofs, fees) )
+        in
+        return (ledger_init_state, cmds, iters, proofs_available)
+      in
+      Quickcheck.test g
+        ~sexp_of:
+          [%sexp_of:
+            Ledger.init_state
+            * Coda_base.User_command.With_valid_signature.t list
+            * int option list
+            * (int * Fee.t list) list] ~trials:15
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_random_proof_fee ledger_init_state cmds iters
