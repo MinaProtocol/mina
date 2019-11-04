@@ -28,6 +28,24 @@ module Rpc = struct
   end
 end
 
+module Versioned_rpc (M : Rpc.S) = struct
+  module type S = sig
+    type query [@@deriving bin_io]
+
+    type response [@@deriving bin_io]
+
+    val version : int
+
+    val query_of_caller_model : M.Caller.query -> query
+
+    val callee_model_of_query : query -> M.Callee.query
+
+    val response_of_callee_model : M.Callee.response -> response
+
+    val caller_model_of_response : response -> M.Caller.response
+  end
+end
+
 module Patched = struct
   module type S = sig
     type callee_query
