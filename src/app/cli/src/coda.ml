@@ -487,7 +487,7 @@ let daemon logger =
            if
              or_from_config YJ.Util.to_bool_option "max-concurrent-connections"
                ~default:true limit_connections
-           then Some 10
+           then Some 40
            else None
          in
          let work_selection_method =
