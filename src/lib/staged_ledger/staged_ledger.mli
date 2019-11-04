@@ -108,13 +108,6 @@ val apply_diff_unchecked :
      , Staged_ledger_error.t )
      Deferred.Result.t
 
-module For_tests : sig
-  val materialized_snarked_ledger_hash :
-       t
-    -> expected_target:Frozen_ledger_hash.t
-    -> Frozen_ledger_hash.t Or_error.t
-end
-
 val current_ledger_proof : t -> Ledger_proof.t option
 
 (* This should memoize the snark verifications *)

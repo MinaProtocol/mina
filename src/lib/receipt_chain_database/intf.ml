@@ -23,7 +23,11 @@ open Coda_base
 module type S = sig
   type t
 
-  val create : directory:string -> t
+  type config
+
+  module M : Key_value_database.Monad.S
+
+  val create : config -> t
 
   (** [prove t ~proving_receipt ~resulting_receipt] will provide a proof of a
       `proving_receipt` hash up to an underlying `resulting_receipt` hash. The
@@ -34,7 +38,7 @@ module type S = sig
        t
     -> proving_receipt:Receipt.Chain_hash.t
     -> resulting_receipt:Receipt.Chain_hash.t
-    -> (Receipt.Chain_hash.t * User_command.t list) Or_error.t
+    -> (Receipt.Chain_hash.t * User_command.t list) Or_error.t M.t
 
   (** [verify t ~init merkle_list receipt_chain] will verify the proof produced
       by `prove`. Namely, it will verify that a user has sent a series of user
@@ -45,7 +49,8 @@ module type S = sig
     -> Receipt.Chain_hash.t
     -> Receipt.Chain_hash.t Non_empty_list.t option
 
-  val get_payment : t -> receipt:Receipt.Chain_hash.t -> User_command.t option
+  val get_payment :
+    t -> receipt:Receipt.Chain_hash.t -> User_command.t option M.t
 
   (** Add stores a payment into a client's database as a value.
       The key is computed by using the payment payload and the previous receipt_chain_hash.
@@ -58,6 +63,7 @@ module type S = sig
     -> [ `Ok of Receipt.Chain_hash.t
        | `Duplicate of Receipt.Chain_hash.t
        | `Error_multiple_previous_receipts of Receipt.Chain_hash.t ]
+       M.t
 end
 
 module type Tree_node = sig

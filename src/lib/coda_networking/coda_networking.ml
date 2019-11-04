@@ -68,8 +68,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -116,8 +123,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -161,8 +175,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -208,8 +229,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -264,8 +292,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -311,8 +346,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -368,8 +410,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 end

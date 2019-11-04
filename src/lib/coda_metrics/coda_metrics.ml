@@ -218,24 +218,24 @@ module Runtime = struct
 
   let jemalloc_active_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_active_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.active))
+      (fun () -> float_of_int !current_jemalloc.active)
       ~help:"active memory in bytes"
 
   let jemalloc_resident_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_resident_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.resident))
+      (fun () -> float_of_int !current_jemalloc.resident)
       ~help:
         "resident memory in bytes (may be zero depending on jemalloc compile \
          options)"
 
   let jemalloc_allocated_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_allocated_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.allocated))
+      (fun () -> float_of_int !current_jemalloc.allocated)
       ~help:"memory allocated to heap objects in bytes"
 
   let jemalloc_mapped_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_mapped_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.mapped))
+      (fun () -> float_of_int !current_jemalloc.mapped)
       ~help:"memory mapped into process address space in bytes"
 
   let process_cpu_seconds_total =
@@ -337,25 +337,47 @@ module Network = struct
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
-  module Rpc_map = Hashtbl.Make (String)
+  module Rpc_latency_map = Hashtbl.Make (String)
+  module Rpc_size_map = Hashtbl.Make (String)
 
-  module Rpc_histogram = Histogram (struct
+  module Rpc_latency_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 1000. 10. 5
+  end)
+
+  module Rpc_size_histogram = Histogram (struct
     let spec = Histogram_spec.of_exponential 500. 2. 7
   end)
 
-  let rpc_table = Rpc_map.of_alist_exn []
+  let rpc_latency_table = Rpc_latency_map.of_alist_exn []
+
+  let rpc_size_table = Rpc_size_map.of_alist_exn []
 
   let rpc_latency_ms ~name : Gauge.t =
-    if Rpc_map.mem rpc_table name then Rpc_map.find_exn rpc_table name
+    if Rpc_latency_map.mem rpc_latency_table name then
+      Rpc_latency_map.find_exn rpc_latency_table name
     else
-      let help = "time elapsed while doing rpc calls in ms" in
-      let rpc_gauge = Gauge.v name ~help ~namespace ~subsystem in
-      Rpc_map.add_exn rpc_table ~key:name ~data:rpc_gauge ;
+      let help = "time elapsed while doing RPC calls in ms" in
+      let rpc_gauge =
+        Gauge.v (name ^ "_latency") ~help ~namespace ~subsystem
+      in
+      Rpc_latency_map.add_exn rpc_latency_table ~key:name ~data:rpc_gauge ;
       rpc_gauge
 
-  let rpc_latency_ms_summary : Rpc_histogram.t =
-    let help = "A histogram for all rpc call latencies" in
-    Rpc_histogram.v "rpc_latency_ms_summary" ~help ~namespace ~subsystem
+  let rpc_size_bytes ~name : Rpc_size_histogram.t =
+    if Rpc_size_map.mem rpc_size_table name then
+      Rpc_size_map.find_exn rpc_size_table name
+    else
+      let help = "size for RPC reponse in bytes" in
+      let rpc_histogram =
+        Rpc_size_histogram.v (name ^ "_size") ~help ~namespace ~subsystem
+      in
+      Rpc_size_map.add_exn rpc_size_table ~key:name ~data:rpc_histogram ;
+      rpc_histogram
+
+  let rpc_latency_ms_summary : Rpc_latency_histogram.t =
+    let help = "A histogram for all RPC call latencies" in
+    Rpc_latency_histogram.v "rpc_latency_ms_summary" ~help ~namespace
+      ~subsystem
 end
 
 module Snark_work = struct

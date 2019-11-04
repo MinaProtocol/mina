@@ -48,7 +48,8 @@ module Stable = struct
       { creator: Public_key.Compressed.Stable.V1.t
       ; protocol_state: Protocol_state.Stable.V1.t
       ; transactions: Transactions.Stable.V1.t
-      ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list }
+      ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list
+      ; proof: Proof.Stable.V1.t }
 
     let to_latest = Fn.id
   end
@@ -58,7 +59,8 @@ type t = Stable.Latest.t =
   { creator: Public_key.Compressed.t
   ; protocol_state: Protocol_state.t
   ; transactions: Transactions.t
-  ; snark_jobs: Transaction_snark_work.Info.t list }
+  ; snark_jobs: Transaction_snark_work.Info.t list
+  ; proof: Proof.t }
 
 let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
     =
@@ -75,7 +77,14 @@ let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
 let user_commands {transactions= {Transactions.user_commands; _}; _} =
   user_commands
 
-let of_transition tracked_participants external_transition =
+let validate_transactions external_transition =
+  let staged_ledger_diff =
+    External_transition.Validated.staged_ledger_diff external_transition
+  in
+  Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
+
+let of_transition external_transition tracked_participants
+    (calculated_transactions : Transaction.t list) =
   let open External_transition.Validated in
   let creator = proposer external_transition in
   let protocol_state =
@@ -84,11 +93,6 @@ let of_transition tracked_participants external_transition =
         External_transition.Validated.blockchain_state external_transition
     ; consensus_state=
         External_transition.Validated.consensus_state external_transition }
-  in
-  let open Result.Let_syntax in
-  let staged_ledger_diff = staged_ledger_diff external_transition in
-  let%map calculated_transactions =
-    Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
   in
   let transactions =
     List.fold calculated_transactions
@@ -141,7 +145,12 @@ let of_transition tracked_participants external_transition =
   in
   let snark_jobs =
     List.map
-      (Staged_ledger_diff.completed_works staged_ledger_diff)
+      ( Staged_ledger_diff.completed_works
+      @@ External_transition.Validated.staged_ledger_diff external_transition
+      )
       ~f:Transaction_snark_work.info
   in
-  {creator; protocol_state; transactions; snark_jobs}
+  let proof =
+    External_transition.Validated.protocol_state_proof external_transition
+  in
+  {creator; protocol_state; transactions; snark_jobs; proof}

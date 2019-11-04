@@ -15,7 +15,9 @@ module Database = struct
     end]
   end
 
-  include Rocksdb.Serializable.Make (State_hash.Stable.V1) (Value.Stable.V1)
+  include Rocksdb.Serializable.Make
+            (State_hash.Stable.Latest)
+            (Value.Stable.Latest)
 end
 
 module Pagination =
@@ -24,7 +26,7 @@ module Pagination =
     (struct
       type t = (Filtered_external_transition.t, State_hash.t) With_hash.t
     end)
-    (Block_time.Stable.V1)
+    (Block_time)
 
 let fee_transfer_participants (pk, _) = [pk]
 
@@ -47,7 +49,7 @@ let add_user_blocks (pagination : Pagination.t)
     state_hash external_transition time
 
 let create ~logger directory =
-  let database = Database.create ~directory in
+  let database = Database.create directory in
   let pagination = Pagination.create () in
   List.iter (Database.to_alist database) ~f:(fun (hash, (block_data, time)) ->
       add_user_blocks pagination ({With_hash.hash; data= block_data}, time) ) ;
