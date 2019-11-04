@@ -8,7 +8,7 @@
     "@glennsl/bs-json": "^3.0.0",
     "apollo-link-retry": "^2.2.13",
     "bs-css": "^8.0.2",
-    "bs-electron": "github:Schmavery/bs-electron#ae44a7a509cbed92c032be2302a4e9cf12c11797",
+    "bs-electron": "github:Schmavery/bs-electron#0cf39124417bc3157b7a675154f591bf6e4b79ba",
     "bs-platform": "5.0.3",
     "graphql_ppx": "^0.2.8",
     "node-fetch": "^2.5.0",
@@ -46,10 +46,13 @@
     "regen-sdl": "node generate-schema.js http://localhost:8080/graphql > schema.graphql"
   },
   "build": {
-    "appId": "FOO.org.codaprotocol.prowallet",
+    "appId": "org.codaprotocol.wallet",
     "asarUnpack": [
       "lib"
     ],
+    "directories": {
+      "buildResources": "public/build"
+    },
     "files": [
       "lib/**/*",
       "!node_modules/electron",
@@ -66,25 +69,26 @@
       "bundle/**/*",
       "public/**/*"
     ],
+    "productName": "CodaWallet",
     "compression": "store",
     "dmg": {
       "contents": [
         {
-          "x": 110,
-          "y": 150
+          "x": 160,
+          "y": 220
         },
         {
-          "x": 240,
-          "y": 150,
+          "x": 370,
+          "y": 220,
           "type": "link",
           "path": "/Applications"
         }
       ]
     },
     "linux": {
+      "executableName": "coda-wallet",
       "target": [
-        "AppImage",
-        "deb"
+        "AppImage"
       ]
     },
     "win": {

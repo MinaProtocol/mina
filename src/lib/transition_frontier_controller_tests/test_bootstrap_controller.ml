@@ -38,7 +38,7 @@ let%test_module "Bootstrap Controller" =
     let trust_system = Trust_system.null ()
 
     let f_with_verifier ~f ~logger ~pids ~trust_system =
-      let%map verifier = Verifier.create ~logger ~pids in
+      let%map verifier = Verifier.create ~logger ~pids ~conf_dir:None in
       f ~logger ~trust_system ~verifier
 
     let%test "`bootstrap_controller` caches all transitions it is passed \
@@ -47,7 +47,7 @@ let%test_module "Bootstrap Controller" =
         Bootstrap_controller.For_tests.Transition_cache.create ()
       in
       let num_breadcrumbs = (Transition_frontier.max_length * 2) + 2 in
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let network =
         Network.create_stub ~logger
           ~ip_table:(Hashtbl.create (module Unix.Inet_addr))
@@ -162,7 +162,7 @@ let%test_module "Bootstrap Controller" =
 
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let num_breadcrumbs = 10 in
       let accounts = Genesis_ledger.accounts in
       heartbeat_flag := true ;
@@ -190,7 +190,9 @@ let%test_module "Bootstrap Controller" =
               let pending_coinbases =
                 Staged_ledger.pending_coinbase_collection staged_ledger
               in
-              let%bind verifier = Verifier.create ~logger ~pids in
+              let%bind verifier =
+                Verifier.create ~logger ~pids ~conf_dir:None
+              in
               let%map actual_staged_ledger =
                 Staged_ledger
                 .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
@@ -236,7 +238,7 @@ let%test_module "Bootstrap Controller" =
       Backtrace.elide := false ;
       heartbeat_flag := true ;
       Printexc.record_backtrace true ;
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
@@ -276,7 +278,7 @@ let%test_module "Bootstrap Controller" =
       Backtrace.elide := false ;
       heartbeat_flag := true ;
       Printexc.record_backtrace true ;
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let num_breadcrumbs = (2 * max_length) + Consensus.Constants.delta + 2 in
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
@@ -311,7 +313,7 @@ let%test_module "Bootstrap Controller" =
     let%test "when eagerly syncing to multiple nodes, you should sync to the \
               node with the highest transition_frontier" =
       heartbeat_flag := true ;
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let unsynced_peer_num_breadcrumbs = 6 in
       let unsynced_peers_accounts =
         List.take Genesis_ledger.accounts
@@ -357,7 +359,7 @@ let%test_module "Bootstrap Controller" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       heartbeat_flag := true ;
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let small_peer_num_breadcrumbs = 6 in
       let large_peer_num_breadcrumbs = small_peer_num_breadcrumbs * 2 in
       let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
@@ -414,7 +416,7 @@ let%test_module "Bootstrap Controller" =
 
     let%test "`on_transition` should deny outdated transitions" =
       heartbeat_flag := true ;
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;

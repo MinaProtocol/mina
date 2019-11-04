@@ -70,10 +70,10 @@ module Keys = struct
 
     let dummy =
       { step=
-          Tick_backend.Verification_key.dummy
+          Tick_backend.Verification_key.get_dummy
             ~input_size:Coda_base.Transition_system.step_input_size
       ; wrap=
-          Tock_backend.Bowe_gabizon.Verification_key.dummy
+          Tock_backend.Bowe_gabizon.Verification_key.get_dummy
             ~input_size:Wrap_input.size }
 
     let load ({step; wrap} : Location.t) =
@@ -216,10 +216,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
         let open Tick in
         let open Cached.Let_syntax in
         let%map verification =
-          Cached.component ~label:"verification" ~f:Keypair.vk
+          Cached.component ~label:"step_verification" ~f:Keypair.vk
             (module Verification_key)
         and proving =
-          Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+          Cached.component ~label:"step_proving" ~f:Keypair.pk
+            (module Proving_key)
         in
         (verification, {proving with value= ()})
       in
@@ -245,10 +246,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
           let open Tock in
           let open Cached.Let_syntax in
           let%map verification =
-            Cached.component ~label:"verification" ~f:Keypair.vk
+            Cached.component ~label:"wrap_verification" ~f:Keypair.vk
               (module Verification_key)
           and proving =
-            Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+            Cached.component ~label:"wrap_proving" ~f:Keypair.pk
+              (module Proving_key)
           in
           (verification, {proving with value= ()})
         in

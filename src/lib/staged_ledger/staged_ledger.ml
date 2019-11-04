@@ -111,18 +111,14 @@ module T = struct
             Error
               (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
 
-  module M = struct
-    include Monad.Ident
-    module Or_error = Or_error
-  end
-
   module Statement_scanner = struct
     include Scan_state.Make_statement_scanner
-              (M)
+              (Deferred)
               (struct
                 type t = unit
 
-                let verify ~verifier:() ~proof:_ ~statement:_ ~message:_ = true
+                let verify ~verifier:() ~proof:_ ~statement:_ ~message:_ =
+                  Deferred.return true
               end)
   end
 
@@ -175,49 +171,9 @@ module T = struct
           ~error_prefix ~ledger_hash_end:ledger
           ~ledger_hash_begin:(Some (get_target proof))
 
-  (* TODO: Remove this. This is deprecated *)
-  let materialized_snarked_ledger_hash :
-         t
-      -> expected_target:Frozen_ledger_hash.t
-      -> Frozen_ledger_hash.t Or_error.t =
-   fun {ledger; scan_state; _} ~expected_target ->
-    let open Or_error.Let_syntax in
-    let txns_still_being_worked_on = Scan_state.staged_undos scan_state in
-    let snarked_ledger = Ledger.register_mask ledger (Ledger.Mask.create ()) in
-    let res =
-      let%bind () =
-        Scan_state.Staged_undos.apply txns_still_being_worked_on snarked_ledger
-      in
-      let snarked_ledger_hash =
-        Ledger.merkle_root snarked_ledger |> Frozen_ledger_hash.of_ledger_hash
-      in
-      if not (Frozen_ledger_hash.equal snarked_ledger_hash expected_target)
-      then
-        Or_error.errorf
-          !"Error materializing the snarked ledger with hash \
-            %{sexp:Frozen_ledger_hash.t} got %{sexp:Frozen_ledger_hash.t}: "
-          expected_target snarked_ledger_hash
-      else
-        match Scan_state.latest_ledger_proof scan_state with
-        | None ->
-            return snarked_ledger_hash
-        | Some proof ->
-            let target = get_target proof in
-            if Frozen_ledger_hash.equal snarked_ledger_hash target then
-              return snarked_ledger_hash
-            else
-              Or_error.errorf
-                !"Last snarked ledger (%{sexp: Frozen_ledger_hash.t}) is \
-                  different from the one being requested ((%{sexp: \
-                  Frozen_ledger_hash.t}))"
-                target expected_target
-    in
-    (* Make sure we don't leak this mask. *)
-    Ledger.unregister_mask_exn ledger snarked_ledger |> ignore ;
-    res
-
   let statement_exn t =
-    match Statement_scanner.scan_statement t.scan_state ~verifier:() with
+    let open Deferred.Let_syntax in
+    match%map Statement_scanner.scan_statement t.scan_state ~verifier:() with
     | Ok s ->
         `Non_empty s
     | Error `Empty ->
@@ -228,17 +184,6 @@ module T = struct
   let of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash ~ledger
       ~scan_state ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
-    let verify_snarked_ledger t snarked_ledger_hash =
-      match
-        materialized_snarked_ledger_hash t ~expected_target:snarked_ledger_hash
-      with
-      | Ok _ ->
-          Ok ()
-      | Error e ->
-          Or_error.error_string
-            ( "Error verifying snarked ledger hash from the ledger.\n"
-            ^ Error.to_string_hum e )
-    in
     let t = {ledger; scan_state; pending_coinbase_collection} in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants scan_state
@@ -247,9 +192,6 @@ module T = struct
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
-    in
-    let%bind () =
-      Deferred.return (verify_snarked_ledger t snarked_ledger_hash)
     in
     return t
 
@@ -264,11 +206,11 @@ module T = struct
       Scan_state.staged_transactions scan_state |> Deferred.return
     in
     let%bind () =
-      List.fold_result
-        ~f:(fun _ tx ->
-          Ledger.apply_transaction snarked_ledger tx |> Or_error.ignore )
-        ~init:() txs
-      |> Deferred.return
+      Deferred.List.fold txs ~init:(Ok ()) ~f:(fun acc tx ->
+          Deferred.map (Async.Scheduler.yield ()) ~f:(fun () ->
+              Or_error.bind acc ~f:(fun () ->
+                  Ledger.apply_transaction snarked_ledger tx |> Or_error.ignore
+              ) ) )
     in
     let%bind () =
       let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
@@ -696,11 +638,11 @@ module T = struct
       coinbase_for_blockchain_snark coinbases |> Deferred.return
     in
     let%map () =
-      Deferred.return
-        ( verify_scan_state_after_apply
-            (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
-            scan_state'
-        |> to_staged_ledger_or_error )
+      Deferred.(
+        verify_scan_state_after_apply
+          (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
+          scan_state'
+        >>| to_staged_ledger_or_error)
     in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
@@ -1227,7 +1169,8 @@ module T = struct
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
-         -> Transaction_snark_work.Checked.t option) =
+         -> Transaction_snark_work.Checked.t option)
+      ~(state_body_hash : State_body_hash.t) =
     O1trace.trace_event "curr_hash" ;
     let validating_ledger = Transaction_validator.create t.ledger in
     O1trace.trace_event "done mask" ;
@@ -1281,11 +1224,9 @@ module T = struct
       "Number of proofs ready for purchase: $proof_count"
       ~metadata:[("proof_count", `Int proof_count)] ;
     trace_event "prediffs done" ;
-    {Staged_ledger_diff.With_valid_signatures_and_proofs.diff; creator= self}
-
-  module For_tests = struct
-    let materialized_snarked_ledger_hash = materialized_snarked_ledger_hash
-  end
+    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
+    ; creator= self
+    ; state_body_hash }
 end
 
 include T
@@ -1304,9 +1245,10 @@ let%test_module "test" =
       let diff =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
+          ~state_body_hash:State_body_hash.dummy
       in
       let diff' = Staged_ledger_diff.forget diff in
-      let%bind verifier = Verifier.create ~logger ~pids in
+      let%bind verifier = Verifier.create ~logger ~pids ~conf_dir:None in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
@@ -1514,21 +1456,6 @@ let%test_module "test" =
           in
           iter_cmds_acc (List.drop cmds cmds_applied_count) counts_rest acc' f
 
-    (** Same as iter_cmds_acc but with no accumulator. *)
-    let iter_cmds :
-           User_command.With_valid_signature.t list
-        -> int option list
-        -> (   User_command.With_valid_signature.t list
-            -> int option
-            -> User_command.With_valid_signature.t Sequence.t
-            -> Staged_ledger_diff.t Deferred.t)
-        -> unit Deferred.t =
-     fun cmds cmd_iters f ->
-      iter_cmds_acc cmds cmd_iters ()
-        (fun cmds_left count_opt cmds_this_iter () ->
-          let%map diff = f cmds_left count_opt cmds_this_iter in
-          (diff, ()) )
-
     (** Generic test framework. *)
     let test_simple :
            Ledger.init_state
@@ -1545,7 +1472,7 @@ let%test_module "test" =
      fun init_state cmds cmd_iters sl ?(expected_proof_count = None) test_mask
          provers stmt_to_work ->
       let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let%map total_ledger_proofs =
         iter_cmds_acc cmds cmd_iters 0
           (fun cmds_left count_opt cmds_this_iter proof_count ->
@@ -1723,7 +1650,8 @@ let%test_module "test" =
                   ; user_commands= List.take txns slots
                   ; coinbase= Zero }
                 , None )
-            ; creator= self_pk }
+            ; creator= self_pk
+            ; state_body_hash= State_body_hash.dummy }
         | Some (_, _) ->
             let txns_in_second_diff = List.drop txns slots in
             let diff : Staged_ledger_diff.Diff.t =
@@ -1737,7 +1665,7 @@ let%test_module "test" =
                   ; user_commands= txns_in_second_diff
                   ; coinbase= Zero } )
             in
-            {diff; creator= self_pk}
+            {diff; creator= self_pk; state_body_hash= State_body_hash.dummy}
       in
       let empty_diff : Staged_ledger_diff.t =
         { diff=
@@ -1745,7 +1673,8 @@ let%test_module "test" =
               ; user_commands= []
               ; coinbase= Staged_ledger_diff.At_most_two.Zero }
             , None )
-        ; creator= self_pk }
+        ; creator= self_pk
+        ; state_body_hash= State_body_hash.dummy }
       in
       Quickcheck.test (gen_below_capacity ())
         ~sexp_of:
@@ -1765,7 +1694,7 @@ let%test_module "test" =
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               let logger = Logger.null () in
-              let pids = Child_processes.Termination.create_pid_set () in
+              let pids = Child_processes.Termination.create_pid_table () in
               let%map checked =
                 iter_cmds_acc cmds iters true
                   (fun _cmds_left _count_opt cmds_this_iter checked ->
@@ -1789,7 +1718,9 @@ let%test_module "test" =
                         (Sequence.to_list cmds_this_iter :> User_command.t list)
                         work_done partitions
                     in
-                    let%bind verifier = Verifier.create ~logger ~pids in
+                    let%bind verifier =
+                      Verifier.create ~logger ~pids ~conf_dir:None
+                    in
                     let%bind apply_res = Sl.apply !sl diff ~logger ~verifier in
                     let checked', diff' =
                       match apply_res with
@@ -1812,34 +1743,6 @@ let%test_module "test" =
               in
               (*Note: if this fails, try increasing the number of trials*)
               assert checked ) )
-
-    let%test_unit "Snarked ledger" =
-      let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_set () in
-      Quickcheck.test (gen_below_capacity ()) ~trials:20
-        ~f:(fun (ledger_init_state, cmds, iters) ->
-          async_with_ledgers ledger_init_state (fun sl _test_mask ->
-              iter_cmds cmds iters (fun _cmds_left _count_opt cmds_this_iter ->
-                  let%map proof_opt, diff =
-                    create_and_apply sl logger pids cmds_this_iter
-                      stmt_to_work_random_prover
-                  in
-                  ( match proof_opt with
-                  | None ->
-                      ()
-                  | Some proof ->
-                      let last_snarked_ledger_hash =
-                        (Ledger_proof.statement (fst proof)).target
-                      in
-                      let materialized_snarked_ledger_hash =
-                        Or_error.ok_exn
-                        @@ Sl.For_tests.materialized_snarked_ledger_hash !sl
-                             ~expected_target:last_snarked_ledger_hash
-                      in
-                      assert (
-                        Frozen_ledger_hash.equal last_snarked_ledger_hash
-                          materialized_snarked_ledger_hash ) ) ;
-                  diff ) ) )
 
     let stmt_to_work_restricted work_list provers
         (stmts : Transaction_snark_work.Statement.t) :
@@ -1873,7 +1776,7 @@ let%test_module "test" =
         -> unit Deferred.t =
      fun init_state cmds cmd_iters proofs_available sl test_mask provers ->
       let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_set () in
+      let pids = Child_processes.Termination.create_pid_table () in
       let%map proofs_available_left =
         iter_cmds_acc cmds cmd_iters proofs_available
           (fun cmds_left _count_opt cmds_this_iter proofs_available_left ->

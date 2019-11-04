@@ -1,5 +1,0 @@
-(executable
-  (name test)
-  (modules test)
-  (libraries graphql-cohttp graphql-async coda_graphql coda_digestif)
-  (modes native))

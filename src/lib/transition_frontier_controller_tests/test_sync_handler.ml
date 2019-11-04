@@ -20,12 +20,12 @@ let%test_module "Sync_handler" =
 
     let hb_logger = Logger.create ()
 
-    let pids = Child_processes.Termination.create_pid_set ()
+    let pids = Child_processes.Termination.create_pid_table ()
 
     let trust_system = Trust_system.null ()
 
     let f_with_verifier ~f ~logger ~pids =
-      let%map verifier = Verifier.create ~logger ~pids in
+      let%map verifier = Verifier.create ~logger ~pids ~conf_dir:None in
       f ~logger ~verifier
 
     let%test "sync with ledgers from another peer via glue_sync_ledger" =

@@ -26,7 +26,7 @@ module type Basic = sig
     module Latest = V1
   end
 
-  include Bits_intf.S with type t := t
+  include Bits_intf.Convertible_bits with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 

@@ -13,7 +13,8 @@ module Ledger_inner = struct
 
   module Location_at_depth = Location0
 
-  module Kvdb : Intf.Key_value_database = Rocksdb.Database
+  module Kvdb : Intf.Key_value_database with type config := string =
+    Rocksdb.Database
 
   module Storage_locations : Intf.Storage_locations = struct
     let key_value_db_dir = "coda_key_value_db"
@@ -28,6 +29,8 @@ module Ledger_inner = struct
 
     include T
     include Hashable.Make_binable (T)
+
+    let to_string = Ledger_hash.to_string
 
     let merge = Ledger_hash.merge
 

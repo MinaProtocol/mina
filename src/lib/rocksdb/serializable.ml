@@ -1,31 +1,14 @@
 open Core_kernel
 
-module type S = sig
-  include Key_value_database.S
-
-  module T : sig
-    type nonrec t = t
-  end
-
-  module Batch : sig
-    type t
-
-    val get : t -> key:key -> value option
-
-    val set : t -> key:key -> data:value -> unit
-
-    val remove : t -> key:key -> unit
-
-    val with_batch : T.t -> f:(t -> 'a) -> 'a
-  end
-end
-
 module Make (Key : Binable.S) (Value : Binable.S) :
-  Key_value_database.S with type key := Key.t and type value := Value.t =
-struct
+  Key_value_database.Intf.S
+  with module M := Key_value_database.Monad.Ident
+   and type key := Key.t
+   and type value := Value.t
+   and type config := string = struct
   type t = Database.t
 
-  let create ~directory = Database.create ~directory
+  let create directory = Database.create directory
 
   let close = Database.close
 
@@ -83,7 +66,7 @@ module GADT = struct
       type nonrec t = t
     end
 
-    val create : directory:string -> t
+    val create : string -> t
 
     val close : t -> unit
 
@@ -133,7 +116,7 @@ module GADT = struct
         Database.remove t ~key:(bin_key_dump key)
     end
 
-    let create ~directory = Database.create ~directory
+    let create directory = Database.create directory
 
     let close = Database.close
 

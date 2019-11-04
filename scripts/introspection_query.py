@@ -1,3 +1,4 @@
+import argparse
 import http.client
 import json
 
@@ -93,12 +94,44 @@ query IntrospectionQuery {
     }
   }"""
 
-conn = http.client.HTTPConnection("localhost", 8080)
-headers = {"Content-type": "application/json","Accept": "text/plain"}
-conn.request("POST", "/graphql", body="{query: \"%s\"}" % introspection_query, headers=headers)
-response = conn.getresponse()
-data = response.read()
-conn.close()
 
-parsed = json.loads(data)
-print(json.dumps(parsed, indent=2))
+def print_schema(port, uri, extra_headers):
+    conn = http.client.HTTPConnection("localhost", port)
+    headers = {"Content-type": "application/json",
+               "Accept": "text/plain"}
+    headers.update(extra_headers)
+
+    json_body = {
+      'query': introspection_query,
+      'variables': None,
+      'operationName': "IntrospectionQuery"
+    }
+
+    conn.request("POST", uri, body=json.dumps(json_body), headers=headers)
+    response = conn.getresponse()
+    data = response.read()
+    conn.close()
+    
+    parsed = json.loads(data.decode('utf-8'))
+    print(json.dumps(parsed, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+      '-p', '--port', default=8080, type=int,
+      help='The port of the graphql server to run introspection_query')
+
+    parser.add_argument(
+      '--uri', default='/graphql', type=str,
+      help='The path to communicate to the graphql server')
+
+    parser.add_argument('--headers', nargs='*', default=[])
+
+    args = parser.parse_args()
+    headers = [key_value.split(':') for key_value in args.headers]
+    print_schema(args.port, args.uri, headers)
+
+if __name__ == "__main__":
+    main()

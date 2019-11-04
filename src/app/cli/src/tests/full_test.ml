@@ -79,7 +79,7 @@ let print_heartbeat logger =
 
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
-  let pids = Child_processes.Termination.create_pid_set () in
+  let pids = Child_processes.Termination.create_pid_table () in
   setup_time_offsets () ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
@@ -98,7 +98,7 @@ let run_test () : unit Deferred.t =
           typ
       in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
-      let trust_system = Trust_system.create ~db_dir:trust_dir in
+      let trust_system = Trust_system.create trust_dir in
       trace_database_initialization "trust_system" __LOC__ trust_dir ;
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
@@ -106,8 +106,7 @@ let run_test () : unit Deferred.t =
       trace_database_initialization "receipt_chain_database" __LOC__
         receipt_chain_dir_name ;
       let receipt_chain_database =
-        Coda_base.Receipt_chain_database.create
-          ~directory:receipt_chain_dir_name
+        Receipt_chain_database.create receipt_chain_dir_name
       in
       let%bind transaction_database_dir =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "transaction_database")
@@ -250,7 +249,7 @@ let run_test () : unit Deferred.t =
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
       let build_payment amount sender_sk receiver_pk fee =
-        trace_recurring_task "build_payment" (fun () ->
+        trace_recurring "build_payment" (fun () ->
             let nonce =
               Option.value_exn
                 ( Coda_commands.get_nonce coda (pk_of_sk sender_sk)
@@ -285,8 +284,9 @@ let run_test () : unit Deferred.t =
         in
         let%bind p1_res =
           Coda_commands.send_user_command coda (payment :> User_command.t)
+          |> Participating_state.to_deferred_or_error
         in
-        assert_ok (p1_res |> Participating_state.active_exn) ;
+        assert_ok (Or_error.join p1_res) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
@@ -294,8 +294,9 @@ let run_test () : unit Deferred.t =
         in
         let%bind p2_res =
           Coda_commands.send_user_command coda (payment' :> User_command.t)
+          |> Participating_state.to_deferred_or_error
         in
-        assert_ok (p2_res |> Participating_state.active_exn) ;
+        assert_ok @@ Or_error.join p2_res ;
         (* The payment fails, but the rpc command doesn't indicate that because that
            failure comes from the network. *)
         (* Let the system settle, mine some blocks *)
@@ -328,8 +329,9 @@ let run_test () : unit Deferred.t =
         in
         let%map p_res =
           Coda_commands.send_user_command coda (payment :> User_command.t)
+          |> Participating_state.to_deferred_or_error
         in
-        p_res |> Participating_state.active_exn |> assert_ok ;
+        p_res |> Or_error.join |> assert_ok ;
         new_balance_sheet'
       in
       let pks accounts =

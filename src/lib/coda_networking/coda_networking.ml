@@ -68,8 +68,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -116,8 +123,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -161,8 +175,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -208,8 +229,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -264,8 +292,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -311,8 +346,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -368,8 +410,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 end
@@ -554,6 +603,8 @@ module Make (Inputs : Inputs_intf) = struct
     let inet_addr = Unix.Inet_addr.of_string conn.Host_and_port.host in
     let sender = Envelope.Sender.Remote inet_addr in
     Envelope.Incoming.wrap ~data ~sender
+
+  let net2 t = Gossip_net.net2 t.gossip_net
 
   let create (config : Config.t)
       ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
@@ -756,7 +807,8 @@ module Make (Inputs : Inputs_intf) = struct
           match Envelope.Incoming.data envelope with
           | New_state state ->
               Perf_histograms.add_span ~name:"external_transition_latency"
-                (Core.Time.abs_diff (Core.Time.now ())
+                (Core.Time.abs_diff
+                   Block_time.(now config.time_controller |> to_time)
                    ( External_transition.protocol_state state
                    |> Protocol_state.blockchain_state
                    |> Blockchain_state.timestamp |> Block_time.to_time )) ;

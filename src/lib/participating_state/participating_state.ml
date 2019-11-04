@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 
 module T = struct
   type 'a t = [`Active of 'a | `Bootstrapping]
@@ -37,17 +38,25 @@ end
 
 let active = function `Active x -> Some x | `Bootstrapping -> None
 
+let bootstrap_err_msg = "Node is still bootstrapping"
+
 let active_exn = function
   | `Active x ->
       x
   | `Bootstrapping ->
-      failwith "Node is still bootstrapping"
+      failwith bootstrap_err_msg
 
 let active_error = function
   | `Active x ->
       Ok x
   | `Bootstrapping ->
-      Or_error.error_string "Node is still bootstrapping"
+      Or_error.error_string bootstrap_err_msg
+
+let to_deferred_or_error : 'a Deferred.t t -> 'a Deferred.Or_error.t = function
+  | `Active x ->
+      Deferred.map ~f:Or_error.return x
+  | `Bootstrapping ->
+      Deferred.Or_error.error_string bootstrap_err_msg
 
 let rec sequence (list : 'a T.t List.t) : 'a List.t T.t =
   match list with

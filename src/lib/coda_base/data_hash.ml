@@ -3,79 +3,15 @@
 open Core
 open Util
 open Snark_params.Tick
-open Snark_bits
 open Bitstring_lib
-open Tuple_lib
 open Fold_lib
 open Module_version
 
-module type Basic = sig
-  type t = private Pedersen.Digest.t
-  [@@deriving sexp, eq, compare, hash, yojson]
+module type Basic = Data_hash_intf.Basic
 
-  val gen : t Quickcheck.Generator.t
+module type Full_size = Data_hash_intf.Full_size
 
-  val to_bytes : t -> string
-
-  val length_in_triples : int
-
-  val ( = ) : t -> t -> bool
-
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t
-      [@@deriving bin_io, sexp, compare, hash, yojson, version]
-
-      val version_byte : char (* for base58_check *)
-
-      include Hashable_binable with type t := t
-
-      include Comparable.S with type t := t
-    end
-
-    module Latest : module type of V1
-  end
-
-  type var
-
-  val var_of_hash_unpacked : Pedersen.Checked.Digest.Unpacked.var -> var
-
-  val var_to_hash_packed : var -> Pedersen.Checked.Digest.var
-
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
-
-  val typ : (var, t) Typ.t
-
-  val assert_equal : var -> var -> (unit, _) Checked.t
-
-  val equal_var : var -> var -> (Boolean.var, _) Checked.t
-
-  val var_of_t : t -> var
-
-  include Bits_intf.S with type t := t
-
-  include Hashable with type t := t
-
-  val fold : t -> bool Triple.t Fold.t
-end
-
-module type Full_size = sig
-  include Basic
-
-  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
-
-  val var_of_hash_packed : Pedersen.Checked.Digest.var -> var
-
-  val of_hash : Pedersen.Digest.t -> t
-end
-
-module type Small = sig
-  include Basic
-
-  val var_of_hash_packed : Pedersen.Checked.Digest.var -> (var, _) Checked.t
-
-  val of_hash : Pedersen.Digest.t -> t Or_error.t
-end
+module type Small = Data_hash_intf.Small
 
 module Make_basic (M : sig
   val length_in_bits : int
@@ -109,22 +45,26 @@ struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
+  include Comparable.Make (Stable.Latest)
   include Hashable.Make (Stable.Latest)
+
+  let to_decimal_string (t : Pedersen.Digest.t) =
+    Crypto_params.Tick0.Field.to_string t
 
   let to_bytes t =
     Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
 
   let length_in_bits = M.length_in_bits
 
-  let () = assert (length_in_bits <= Field.size_in_bits)
+  let () = assert (Int.(length_in_bits <= Field.size_in_bits))
 
   let length_in_triples = bit_length_to_triple_length length_in_bits
 
   let gen : t Quickcheck.Generator.t =
     let m =
-      if length_in_bits = Field.size_in_bits then
+      if Int.(length_in_bits = Field.size_in_bits) then
         Bignum_bigint.(Field.size - one)
       else Bignum_bigint.(pow (of_int 2) (of_int length_in_bits) - one)
     in
@@ -188,10 +128,10 @@ struct
       let open Typ.Store.Let_syntax in
       let n = Bigint.of_field t in
       let rec go i acc =
-        if i < 0 then return (Bitstring.Lsb_first.of_list acc)
+        if Int.(i < 0) then return (Bitstring.Lsb_first.of_list acc)
         else
           let%bind b = Boolean.typ.store (Bigint.test_bit n i) in
-          go (i - 1) (b :: acc)
+          go Int.(i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
       {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
@@ -200,10 +140,10 @@ struct
     let alloc =
       let open Typ.Alloc.Let_syntax in
       let rec go i acc =
-        if i < 0 then return (Bitstring.Lsb_first.of_list acc)
+        if Int.(i < 0) then return (Bitstring.Lsb_first.of_list acc)
         else
           let%bind b = Boolean.typ.alloc in
-          go (i - 1) (b :: acc)
+          go Int.(i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
       {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
@@ -244,14 +184,14 @@ struct
     let%map bits = unpack digest in
     {digest; bits= Some (Bitstring.Lsb_first.of_list bits)}
 
-  let max = Bignum_bigint.(two_to_the length_in_bits - one)
+  let max_size = Bignum_bigint.(two_to_the length_in_bits - one)
 
   let of_hash x =
-    if Bignum_bigint.( <= ) Bigint.(to_bignum_bigint (of_field x)) max then
-      Ok x
+    if Bignum_bigint.( <= ) Bigint.(to_bignum_bigint (of_field x)) max_size
+    then Ok x
     else
       Or_error.errorf
         !"Data_hash.of_hash: %{sexp:Pedersen.Digest.t} > \
           %{sexp:Bignum_bigint.t}"
-        x max
+        x max_size
 end

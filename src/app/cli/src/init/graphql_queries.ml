@@ -73,11 +73,30 @@ query snarkPool {
 }
 |}]
 
+module Pending_snark_work =
+[%graphql
+{|
+query pendingSnarkWork {
+  pendingSnarkWork {
+    workBundle {
+      source_ledger_hash: sourceLedgerHash
+      target_ledger_hash: targetLedgerHash
+      fee_excess: feeExcess {
+        sign
+        fee_magnitude: feeMagnitude @bsDecoder(fn: "Decoders.uint64")
+      }
+      supply_increase: supplyIncrease @bsDecoder(fn: "Decoders.uint64")
+      work_id: workId
+      }
+    }
+    }
+|}]
+
 module Set_staking =
 [%graphql
 {|
 mutation ($public_key: PublicKey) {
-  setStaking(input : {wallets: [$public_key]}) {
+  setStaking(input : {publicKeys: [$public_key]}) {
     lastStaking
     }
   }
@@ -87,7 +106,7 @@ module Set_snark_worker =
 [%graphql
 {|
 mutation ($wallet: PublicKey) {
-  setSnarkWorker (input : {wallet: $wallet}) {
+  setSnarkWorker (input : {publicKey: $wallet}) {
       lastSnarkWorker @bsDecoder(fn: "Decoders.optional_public_key")
     }
   }
@@ -147,3 +166,23 @@ query nonce($public_key: PublicKey) {
   }
 }
 |}]
+
+module Pooled_user_commands = struct
+  open Graphql_client.User_command
+
+  include [%graphql
+  {|
+query user_commands($public_key: PublicKey) {
+  pooledUserCommands(publicKey: $public_key) @bsRecord {
+    id
+    isDelegation
+    nonce
+    from @bsDecoder(fn: "Decoders.public_key")
+    to_: to @bsDecoder(fn: "Decoders.public_key")
+    amount @bsDecoder(fn: "Decoders.amount")
+    fee @bsDecoder(fn: "Decoders.fee")
+    memo @bsDecoder(fn: "Coda_base.User_command_memo.of_string")
+  }
+}
+|}]
+end

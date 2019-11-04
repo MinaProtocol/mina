@@ -25,7 +25,7 @@ let%test_module "Transition Frontier Persistence" =
 
     let hb_logger = Logger.create ()
 
-    let pids = Child_processes.Termination.create_pid_set ()
+    let pids = Child_processes.Termination.create_pid_table ()
 
     let trust_system = Trust_system.null ()
 
@@ -202,7 +202,7 @@ let%test_module "Transition Frontier Persistence" =
         Transition_frontier_persistence.close_and_finish_copy
           frontier_persistence
       in
-      let%bind verifier = Verifier.create ~logger ~pids in
+      let%bind verifier = Verifier.create ~logger ~pids ~conf_dir:None in
       let%map deserialized_frontier =
         Transition_frontier_persistence.deserialize ~directory_name ~logger
           ~trust_system ~verifier ~root_snarked_ledger

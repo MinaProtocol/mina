@@ -54,6 +54,16 @@ genesis_ledger = "testnet_postake_many_proposers"]
 
 include Testnet_postake_ledger_many_proposers
 
+[%%elif
+genesis_ledger = "seared_kobe"]
+
+include Seared_kobe_ledger
+
+[%%elif
+genesis_ledger = "van_helsing"]
+
+include Van_helsing_ledger
+
 [%%else]
 
 [%%error

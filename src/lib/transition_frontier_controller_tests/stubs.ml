@@ -145,7 +145,7 @@ struct
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~self:largest_account_public_key ~transactions_by_fee:transactions
-          ~get_completed_work
+          ~get_completed_work ~state_body_hash:State_body_hash.dummy
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
@@ -204,7 +204,7 @@ struct
             next_verified_external_transition) =
         External_transition.Validated.create_unsafe next_external_transition
       in
-      let%bind verifier = Verifier.create ~logger ~pids in
+      let%bind verifier = Verifier.create ~logger ~pids ~conf_dir:None in
       match%map
         Transition_frontier.Breadcrumb.build ~logger ~trust_system ~verifier
           ~parent:parent_breadcrumb
@@ -270,7 +270,8 @@ struct
             ; user_commands= []
             ; coinbase= Staged_ledger_diff.At_most_two.Zero }
           , None )
-      ; creator }
+      ; creator
+      ; state_body_hash= State_body_hash.dummy }
     in
     (* the genesis transition is assumed to be valid *)
     let (`I_swear_this_is_safe_see_my_comment root_transition) =
@@ -283,7 +284,7 @@ struct
     in
     let open Deferred.Let_syntax in
     let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
-    let%bind verifier = Verifier.create ~logger ~pids in
+    let%bind verifier = Verifier.create ~logger ~pids ~conf_dir:None in
     match%bind
       Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
         ~verifier ~scan_state:root_transaction_snark_scan_state
@@ -665,6 +666,8 @@ struct
     let transaction_pool_diffs _ = failwith "stub"
 
     let snark_pool_diffs _ = failwith "stub"
+
+    let net2 _ = None
   end
 
   module Network_builder = struct

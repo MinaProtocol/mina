@@ -29,7 +29,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let hb_logger = Logger.create ()
 
-    let pids = Child_processes.Termination.create_pid_set ()
+    let pids = Child_processes.Termination.create_pid_table ()
 
     let trust_system = Trust_system.null ()
 
@@ -68,7 +68,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       Rose_tree.T (root, children)
 
     let create_catchup_scheduler () =
-      let%map verifier = Verifier.create ~logger ~pids in
+      let%map verifier = Verifier.create ~logger ~pids ~conf_dir:None in
       Catchup_scheduler.create ~verifier
 
     let%test_unit "after the timeout expires, the missing node still doesn't \

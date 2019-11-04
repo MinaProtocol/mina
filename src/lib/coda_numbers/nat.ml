@@ -3,6 +3,7 @@ open Snark_bits
 open Fold_lib
 open Module_version
 include Intf
+module Intf = Intf
 
 let zero_checked =
   Snarky_integer.Integer.constant ~m:Snark_params.Tick.m Bigint.zero
@@ -14,7 +15,7 @@ module Make (N : sig
 
   val random : unit -> t
 end)
-(Bits : Bits_intf.S with type t := N.t) =
+(Bits : Bits_intf.Convertible_bits with type t := N.t) =
 struct
   module Stable = struct
     module V1 = struct
@@ -142,6 +143,10 @@ struct
   let typ = Checked.typ
 
   module Bits = Bits
+
+  let to_bits = Bits.to_bits
+
+  let of_bits = Bits.of_bits
 
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 

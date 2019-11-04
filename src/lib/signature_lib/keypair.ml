@@ -1,24 +1,20 @@
 open Core_kernel
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        { public_key: Public_key.Stable.V1.t
-        ; private_key: Private_key.Stable.V1.t sexp_opaque }
-      [@@deriving sexp, bin_io]
-    end
+    type t =
+      { public_key: Public_key.Stable.V1.t
+      ; private_key: Private_key.Stable.V1.t sexp_opaque }
+    [@@deriving sexp]
 
-    include T
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-end
+end]
 
 module T = struct
   type t = Stable.Latest.t =
-    { public_key: Public_key.Stable.V1.t
-    ; private_key: Private_key.Stable.V1.t sexp_opaque }
+    {public_key: Public_key.t; private_key: Private_key.t sexp_opaque}
   [@@deriving sexp]
 
   let compare {public_key= pk1; private_key= _}
