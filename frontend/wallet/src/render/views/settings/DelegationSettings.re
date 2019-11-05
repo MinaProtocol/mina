@@ -16,7 +16,7 @@ type modalState = {
 };
 
 [@react.component]
-let make = () => {
+let make = (~publicKey) => {
   let (state, updateModal) =
     React.useState(() => {delegate: None, fee: Some(Int64.of_int(5))});
   <div>
@@ -61,7 +61,7 @@ let make = () => {
       <Button
         label="Cancel"
         style=Button.Gray
-        onClick={_ => updateModal(_ => None)}
+        onClick={_ => ReasonReact.Router.push("/settings/" ++ PublicKey.uriEncode(publicKey))}
       />
       <Spacer width=1. />
       <Button label="Save" style=Button.Green />
