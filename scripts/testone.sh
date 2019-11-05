@@ -1,4 +1,4 @@
-set -e
+set -ex
 
 # File assumes tat you are running the program at the program at the root directory of the coda repo
 
@@ -22,6 +22,6 @@ else
     TEST_CASE="$TEST_FILE:$2"
 fi
 ulimit -s 65532 && (ulimit -n 10240 || true) && \
-dune exec $TEST_RUNNER_PROG -- \
+dune exec $TEST_RUNNER_PROG --profile=$DUNE_PROFILE -- \
     inline-test-runner $LIBRARY_NAME \
     -only-test $TEST_CASE
