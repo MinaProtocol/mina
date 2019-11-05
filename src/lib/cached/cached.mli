@@ -33,10 +33,19 @@ module Spec : sig
     -> autogen_path:string
     -> manual_install_path:string
     -> brew_install_path:string
+    -> s3_install_path:string
     -> digest_input:('input -> string)
     -> create_env:('input -> 'env)
     -> input:'input
     -> 'a t
 end
 
-val run : 'a Spec.t -> 'a Deferred.t
+(** A Semigroup for tracking the "dirty bit" of whether or not we've generated something or only received cache hits *)
+module Regenerated : sig
+  type t = [`Generated_something | `Cache_hit]
+
+  val ( + ) : t -> t -> t
+  (** Generated_something overrides caches hits *)
+end
+
+val run : 'a Spec.t -> ('a * Regenerated.t) Deferred.t
