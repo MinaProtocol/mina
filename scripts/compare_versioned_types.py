@@ -40,7 +40,10 @@ def compare_types (fn,original,modified) :
     types_mod = create_dict (modified)
     for path in types_orig :
         orig = types_orig[path]
-        mod = types_mod[path]
+        try :
+            mod = types_mod[path]
+        except :
+            mod = None
         if not (mod is None or mod == orig) :
             print ('In file: ' + fn)
             print ('  Versioned type changed at module path: ' + path)
