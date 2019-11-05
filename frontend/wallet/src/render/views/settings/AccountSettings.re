@@ -534,7 +534,7 @@ let make = (~publicKey) => {
       </div>
     </div>
     <Spacer height=1.5 />
-    <BlockRewards />
+    <BlockRewards publicKey />
     <Spacer height=1.5 />
     <DeleteButton publicKey />
   </div>;
