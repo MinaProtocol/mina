@@ -9,13 +9,15 @@ let make = () => {
     <OnboardingProvider value=onboardingValue>
       <ProcessDispatchProvider value=dispatch>
         <ReasonApollo.Provider client=Apollo.client>
-          {isOnboarding
-             ? <Onboarding />
-             : <>
-                 <Header />
-                 <Main> <SideBar /> <Router /> </Main>
-                 <Footer />
-               </>}
+          <ReactIntl.IntlProvider>
+            {isOnboarding
+               ? <Onboarding />
+               : <>
+                   <Header />
+                   <Main> <SideBar /> <Router /> </Main>
+                   <Footer />
+                 </>}
+          </ReactIntl.IntlProvider>
         </ReasonApollo.Provider>
       </ProcessDispatchProvider>
     </OnboardingProvider>

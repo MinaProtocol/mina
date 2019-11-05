@@ -19,7 +19,8 @@
     "reason-apollo",
     "bs-css",
     "tablecloth-bucklescript",
-    "@glennsl/bs-json"
+    "@glennsl/bs-json",
+    "bs-react-intl"
   ],
   "bs-dev-dependencies": [
     "@glennsl/bs-jest"
