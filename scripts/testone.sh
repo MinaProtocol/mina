@@ -1,6 +1,12 @@
+#!/bin/bash
 set -e
 
 # File assumes tat you are running the program at the program at the root directory of the coda repo
+
+if [[ "$#" -eq "0" ]]; then 
+    echo "This script needs at least one argument, TEST-FILE, to run"
+    exit 1
+fi
 
 if [[ "$DUNE_PROFILE" -eq "" ]]; then
     DUNE_PROFILE=dev
@@ -12,8 +18,8 @@ cd src
 TEST_FILE=${ABSOLUTE_FILE_PATH#"$(pwd)/"}
 
 
-DIRPATH=$(dirname $TEST_FILE)
-LIBRARY_NAME=$(basename $DIRPATH)
+DIRPATH=$(dirname "$TEST_FILE")
+LIBRARY_NAME=$(basename "$DIRPATH")
 
 TEST_RUNNER_PROG="$DIRPATH/.$LIBRARY_NAME.inline-tests/run.exe"
 if [[ "$#" -eq "1" ]]; then 
@@ -22,6 +28,6 @@ else
     TEST_CASE="$TEST_FILE:$2"
 fi
 ulimit -s 65532 && (ulimit -n 10240 || true) && \
-dune exec $TEST_RUNNER_PROG -- \
-    inline-test-runner $LIBRARY_NAME \
-    -only-test $TEST_CASE
+dune exec "$TEST_RUNNER_PROG" --profile=$DUNE_PROFILE -- \
+    inline-test-runner "$LIBRARY_NAME" \
+    -only-test "$TEST_CASE"
