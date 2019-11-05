@@ -30,17 +30,10 @@ let wrap_vk ~loc =
   let vk = keys.wrap in
   let vk = Lite_compat.verification_key vk in
   let vk_base58 =
-    (* TODO: this should be a versioned module
-       need to version-assert Fq6, G1, G2
-     *)
-    let module Verification_key = struct
-      open Lite_base.Crypto_params.Tock
-
-      type t =
-        (Fq6.t, G2.t, G1.t) Snarkette.Bowe_gabizon.Verification_key.Stable.V1.t
-      [@@deriving bin_io]
-    end in
-    Base58_check.encode (Binable.to_string (module Verification_key) vk)
+    Base58_check.encode
+      (Binable.to_string
+         (module Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key)
+         vk)
   in
   let%map () =
     if not key_generation then Deferred.unit
@@ -54,17 +47,9 @@ let wrap_vk ~loc =
     let loc = loc
   end) in
   let open E in
-  (* TODO: the generated Verification_key module should match the to-be-versioned one above *)
   [%expr
-    let module Verification_key = struct
-      open Lite_base.Crypto_params.Tock
-
-      type t =
-        (Fq6.t, G2.t, G1.t) Snarkette.Bowe_gabizon.Verification_key.Stable.V1.t
-      [@@deriving bin_io]
-    end in
     Core_kernel.Binable.of_string
-      (module Verification_key)
+      (module Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key)
       (Base58_check.decode_exn [%e estring vk_base58])]
 
 let protocol_state (s : Protocol_state.Value.t) : Lite_base.Protocol_state.t =

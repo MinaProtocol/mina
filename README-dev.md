@@ -171,7 +171,8 @@ If you add a new package in the Coda repository or as a submodule, you must do a
 2. Update [`scripts/macos-setup.sh`](scripts/macos-setup.sh) with the required commands for Darwin systems
 3. Bust the circle-ci Darwin cache by incrementing the version number in the cache keys as required inside [`.circleci/config.yml.jinja`](.circleci/config.yml.jinja)
 4. Commit your changes
-5. Re-render the jinja template and recreate the docker toolchains `make update-deps`
+5. Rebuild the container with `make docker-toolchain`.
+5. Re-render the jinja template `make update-deps`
 6. Commit your changes again
 
 Rebuilding the docker toolchain will take a long time. Running circleci for
