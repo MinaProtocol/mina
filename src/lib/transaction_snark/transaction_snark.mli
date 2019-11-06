@@ -142,7 +142,7 @@ module Keys : sig
 
   val cached :
        unit
-    -> ((Location.t * Verification.t * Checksum.t) * Cached.Regenerated.t)
+    -> ((Location.t * Verification.t * Checksum.t) * Cached.Track_generated.t)
        Async.Deferred.t
 end
 

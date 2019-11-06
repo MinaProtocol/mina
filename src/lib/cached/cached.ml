@@ -150,7 +150,7 @@ end
  * of the type-glue easier later *)
 exception Http_status_not_ok
 
-module Regenerated = struct
+module Track_generated = struct
   type t = [`Generated_something | `Cache_hit]
 
   let ( + ) x y =
@@ -176,6 +176,9 @@ let run
       ; input }) =
   let open Deferred.Let_syntax in
   let hash = digest_input input in
+  let s3_bucket_prefix =
+    "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
+  in
   let base_path directory = directory ^/ hash in
   match%bind
     Deferred.List.fold
@@ -185,7 +188,8 @@ let run
         else
           match%map With_components.load load ~base_path:(base_path path) with
           | Ok x ->
-              Core.printf "Loaded %s from the following path %s\n" name path ;
+              Core.printf "Loaded %s from the following path %s\n" name
+                (base_path path) ;
               Some x
           | Error _ ->
               None )
@@ -200,8 +204,12 @@ let run
          %s\n\
          %s\n\
         \ \n\
-        \ Trying to hit the s3 bucket...\n"
-        name manual_install_path brew_install_path s3_install_path ;
+        \ Trying to hit the s3 bucket @ %s...\n"
+        name
+        (base_path manual_install_path)
+        (base_path brew_install_path)
+        (base_path s3_install_path)
+        (base_path s3_bucket_prefix) ;
       (* Attempt load from s3 *)
       let open Cohttp_async in
       let open Deferred.Let_syntax in
@@ -212,8 +220,7 @@ let run
           @@ Monitor.try_with (fun () ->
                  let open Deferred.Let_syntax in
                  let%bind resp, body =
-                   Client.get
-                     (Uri.of_string (base_path "todo/path/to/s3/bucket"))
+                   Client.get (Uri.of_string (base_path s3_bucket_prefix))
                  in
                  let body_pipe = Body.to_pipe body in
                  if resp.status = `OK then
@@ -228,24 +235,27 @@ let run
       | Ok x ->
           Core.printf
             "Successfully loaded keys from s3 and placed them in %s\n"
-            s3_install_path ;
+            (base_path s3_install_path) ;
           return (x, `Cache_hit)
       | Error e -> (
           Core.printf "Failed to load keys from s3: %s, looking at %s\n"
             (Error.to_string_hum e) autogen_path ;
-          let base_path = base_path autogen_path in
-          match%bind With_components.load load ~base_path with
+          match%bind
+            With_components.load load ~base_path:(base_path autogen_path)
+          with
           | Ok x ->
-              Core.printf "Loaded %s from autogen path %s\n" name autogen_path ;
+              Core.printf "Loaded %s from autogen path %s\n" name
+                (base_path autogen_path) ;
               (* We consider this a "cache miss" for the purposes of tracking
                * that we need to push to s3 *)
               return (x, `Generated_something)
           | Error _e ->
               Core.printf
                 "Could not load %s from autogen path %s. Autogenerating...\n"
-                name autogen_path ;
+                name (base_path autogen_path) ;
               let%bind () = Unix.mkdir ~p:() autogen_path in
               let%map x =
-                With_components.store load ~base_path ~env:(create_env input)
+                With_components.store load ~base_path:(base_path autogen_path)
+                  ~env:(create_env input)
               in
               (x, `Generated_something) ) )

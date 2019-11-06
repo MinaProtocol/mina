@@ -172,7 +172,7 @@ let location_expr key_location =
                 key_location)])]
 
 let gen_keys () =
-  let%bind (tx_keys_location, tx_keys, tx_keys_checksum), r1 =
+  let%bind (tx_keys_location, tx_keys, tx_keys_checksum), dirty1 =
     Transaction_snark.Keys.cached ()
   in
   let module M =
@@ -182,7 +182,7 @@ let gen_keys () =
                                                  (struct
     let keys = tx_keys
   end)) in
-  let%bind (bc_keys_location, _bc_keys, bc_keys_checksum), r2 =
+  let%bind (bc_keys_location, _bc_keys, bc_keys_checksum), dirty2 =
     M.Keys.cached ()
   in
   let acc =
@@ -201,7 +201,7 @@ let gen_keys () =
     , Transaction_snark_keys.Verification.key_location ~loc
         tx_keys_location.verification )
   in
-  match Cached.Regenerated.(r1 + r2) with
+  match Cached.Track_generated.(dirty1 + dirty2) with
   | `Generated_something -> (
     (* TODO: Check if circleci and die *)
     match Sys.getenv "CI" with
