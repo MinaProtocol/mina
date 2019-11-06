@@ -5,6 +5,9 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`row),
+      position(`relative),
+      background(`url("bg-texture.png")),
+      backgroundColor(`hex("f2f2f2")),
       paddingTop(Theme.Spacing.headerHeight),
       paddingBottom(Theme.Spacing.footerHeight),
       height(`vh(100.)),

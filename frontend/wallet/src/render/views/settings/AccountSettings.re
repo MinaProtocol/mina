@@ -3,14 +3,7 @@ open Tc;
 module Styles = {
   open Css;
 
-  let container =
-    style([
-      height(`percent(100.)),
-      padding(`rem(2.)),
-      borderTop(`px(1), `solid, white),
-      borderLeft(`px(1), `solid, white),
-      overflow(`scroll),
-    ]);
+  let container = SettingsPage.Styles.container;
 
   let backHeader = style([display(`flex), alignItems(`center)]);
 
@@ -48,6 +41,16 @@ module Styles = {
     ]);
 
   let buttonWrapper = style([display(`flex)]);
+
+  let blockRewards =
+    style([
+      display(`flex),
+      flexDirection(`row),
+      alignItems(`center),
+      justifyContent(`spaceBetween),
+    ]);
+
+  let delegating = style([display(`flex), flexDirection(`column)]);
 };
 
 module DeleteAccount = [%graphql
@@ -83,13 +86,17 @@ module DeleteButton = {
       ++ "? \
       This can't be undone, and you may lose the funds in this account.";
     <>
-      <Link
-        kind=Link.Red
+      <h3 className=Theme.Text.Header.h3>
+        {React.string("Account Removal")}
+      </h3>
+      <Spacer height=1. />
+      <Button
+        style=Button.Red
         onClick={_ =>
           updateModal(x => Option.or_(Some({text: "", error: None}), x))
-        }>
-        {React.string("Delete account")}
-      </Link>
+        }
+        label="Delete account"
+      />
       {switch (modalState) {
        | None => React.null
        | Some({text, error}) =>
@@ -181,114 +188,150 @@ module DeleteButton = {
   };
 };
 
-type accounts = 
- {
-   stakingActive: bool,
-   publicKey: PublicKey.t, 
-   delegateAccount: option({. "publicKey": PublicKey.t})
- };
+type accounts = {
+  stakingActive: bool,
+  publicKey: PublicKey.t,
+  delegateAccount: option({. "publicKey": PublicKey.t}),
+};
 
 module AccountInfo = [%graphql
   {|
-    query getAccountInfo ($publicKey: PublicKey){
+    query getAccountInfo ($publicKey: PublicKey!){
       account(publicKey: $publicKey) @bsRecord {
         stakingActive
         publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
         delegateAccount {
            publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+        }
     }
   }
-}|}];
+|}
+];
 module AccountInfoQuery = ReasonApollo.CreateQuery(AccountInfo);
-
 
 module StakingConfig = [%graphql
   {|
     mutation ($publicKey: [PublicKey!]!){
       setStaking(input: $publicKey) {
-        lastStaking 
+        lastStaking
       }
     }
-  |}];
+  |}
+];
 
-module StakingMutation = ReasonApollo.CreateMutation(StakingConfig); 
-         
+module StakingMutation = ReasonApollo.CreateMutation(StakingConfig);
+
+module StakingToggle = {
+  [@react.component]
+  let make = (~publicKey as _pubkey, ~active) => {
+    <Toggle
+      //    let variables =
+      //      StakingConfig.make(
+      //        ~publicKey=[|Apollo.Encoders.publicKey(publicKey)|],
+      //        (),
+      //      )##variables;
+      //    <StakingMutation>
+      //      {(mutation, _) =>
+      value=active
+      onChange={_ => ReasonReact.Router.push("/settings/:id/stake")}
+    />;
+  };
+  //    </StakingMutation>;
+  //  };
+};
+
 module BlockRewards = {
   [@react.component]
-  let make = (~publicKey) => {  
-    let accountInfoVariables = AccountInfo.make(
-      ~publicKey=Apollo.Encoders.publicKey(publicKey),
-      (),
-    )##variables;
-    let stakingVariables = StakingConfig.make(
-      ~publicKey=[| Apollo.Encoders.publicKey(publicKey) |],
-      (),
-    )##variables;
+  let make = (~publicKey) => {
+    let accountInfoVariables =
+      AccountInfo.make(~publicKey=Apollo.Encoders.publicKey(publicKey), ())##variables;
     <div>
       <h3 className=Theme.Text.Header.h3>
         {React.string("Block Rewards")}
       </h3>
       <Spacer height=0.5 />
       <Well>
-      <AccountInfoQuery variables=accountInfoVariables> 
-          (
-           response =>
+        <AccountInfoQuery variables=accountInfoVariables>
+          {response =>
              switch (response.result) {
-             | Loading
-             | Error(_) => React.null
+             | Loading => <Loader />
+             | Error(err) => <span> {React.string(err##message)} </span>
              | Data(data) =>
-                switch(data##account) {
-                  | Some({stakingActive, delegateAccount: None}) => 
-                  <div>
-                  <p className=Theme.Text.Header.h6> {stakingActive ? {React.string("Staking is ON")} :  {React.string("Staking is OFF")}} </p>
-                  <StakingMutation>
-                    {(mutation, _) =>
-                      <Toggle value=stakingActive onChange={_ => {mutation(
-                          ~variables=stakingVariables, 
-                          ~refetchQueries=[|"getAccountInfo"|],
-                          (),
-                        ) 
-                        |> ignore 
-                      }} />
-                    }
-                  </StakingMutation> 
-                  <Button
-                    width=8.
-                    height=2.5
-                    style=Button.Green
-                    label="Delegate"
-                    onClick={_ => ReasonReact.Router.push("/settings/" ++ PublicKey.uriEncode(publicKey) ++ "/delegate")}
-                  />
-                  </div>
-                  | Some({delegateAccount: Some(delegateAccount)}) => 
-                  <div> 
-                  <p> {React.string("Delegating to: " ++ PublicKey.toString(delegateAccount##publicKey))} </p>
-                  <Button
-                    width=8.
-                    height=2.5
-                    style=Button.Green
-                    label="Change Delegation"
-                    onClick={_ => ReasonReact.Router.push("/settings/" ++ PublicKey.uriEncode(publicKey) ++ "/delegate")}
-                  />
-                  <Button
-                    width=8.
-                    height=2.5
-                    style=Button.Gray
-                    label="Stake"
-                    onClick={_ => ReasonReact.Router.push("/settings/:id/stake")}
-                  />
-                  </div>
-                  | None => {React.string("Account doesn't exist")}
-              }
-             }
-           )
-          </AccountInfoQuery>
+               let account = Option.getExn(data##account);
+               let delegate = Option.getExn(account.delegateAccount);
+               delegate##publicKey == publicKey
+                 ? <div className=Styles.blockRewards>
+                     <div
+                       className=Css.(
+                         style([display(`flex), alignItems(`center)])
+                       )>
+                       <p className=Theme.Text.Body.regular>
+                         {account.stakingActive
+                            ? {
+                              React.string("Staking is ON");
+                            }
+                            : {
+                              React.string("Staking is OFF");
+                            }}
+                       </p>
+                       <Spacer width=1. />
+                       <StakingToggle
+                         publicKey
+                         active={account.stakingActive}
+                       />
+                     </div>
+                     <Button
+                       width=8.
+                       height=2.5
+                       style=Button.Green
+                       label="Delegate"
+                       onClick={_ =>
+                         ReasonReact.Router.push(
+                           "/settings/"
+                           ++ PublicKey.uriEncode(publicKey)
+                           ++ "/delegate",
+                         )
+                       }
+                     />
+                   </div>
+                 : <div className=Styles.delegating>
+                     <span className=Theme.Text.Body.regular>
+                       {React.string("Delegating to: ")}
+                       <AccountName pubkey=delegate##publicKey />
+                     </span>
+                     <Spacer height=1. />
+                     <div className=Css.(style([display(`flex), justifyContent(`spaceBetween)]))>
+                       <Button
+                         width=12.
+                         height=2.5
+                         style=Button.Green
+                         label="Change Delegation"
+                         onClick={_ =>
+                           ReasonReact.Router.push(
+                             "/settings/"
+                             ++ PublicKey.uriEncode(publicKey)
+                             ++ "/delegate",
+                           )
+                         }
+                       />
+                       <Button
+                         width=12.
+                         height=2.5
+                         style=Button.Gray
+                         label="Stake"
+                         onClick={_ =>
+                           ReasonReact.Router.push("/settings/:id/stake")
+                         }
+                       />
+                     </div>
+                   </div>;
+             }}
+        </AccountInfoQuery>
       </Well>
-      </div>
-};
+    </div>;
+  };
 };
 
-  
 [@bs.scope "window"] [@bs.val] external showItemInFolder: string => unit = "";
 
 module KeypathQueryString = [%graphql

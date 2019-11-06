@@ -18,8 +18,16 @@ module Styles = {
 
   let container =
     style([
+      position(`absolute),
+      top(`rem(4.)),
+      left(`zero),
+      right(`zero),
+      bottom(`rem(-5.)),
+      zIndex(99),
+      background(`url("bg-texture.png")),
+      backgroundColor(`hex("f2f2f2")),
       height(`percent(100.)),
-      padding(`rem(2.)),
+      padding2(~v=`rem(2.), ~h=`rem(12.)),
       borderTop(`px(1), `solid, white),
       borderLeft(`px(1), `solid, white),
       overflow(`scroll),

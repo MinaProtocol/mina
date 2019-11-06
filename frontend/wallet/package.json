@@ -26,7 +26,7 @@
     "node": "^8.15.0"
   },
   "scripts": {
-    "fake": "graphql-faker --port 8080 -- schema.graphql",
+    "fake": "graphql-faker --port 3085 -- schema.graphql",
     "real": "./_build/coda-daemon-macos/coda.exe daemon -rest-port 8080 &> /dev/tty",
     "fake-inspector": "graphql-faker --open -- schema.graphql",
     "build": "yarn copy-schema && bsb -make-world",
