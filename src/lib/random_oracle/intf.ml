@@ -25,3 +25,25 @@ module type S = sig
 
   val pack_input : (field, bool) Input.t -> field array
 end
+
+module Full (Field : sig
+  type t
+end) =
+struct
+  module type S = sig
+    include
+      S
+      with type field := Field.t
+       and type field_constant := Field.t
+       and type bool := bool
+
+    val salt : string -> Field.t State.t
+
+    module Checked :
+      S
+      with type field := Field.t Snarky.Cvar.t
+       and type field_constant := Field.t
+       and type bool := Field.t Snarky.Cvar.t Snarky.Boolean.t
+       and module State := State
+  end
+end

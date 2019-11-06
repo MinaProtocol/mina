@@ -4,7 +4,7 @@ module Input = Input
 open Curve_choice
 
 let params : _ Sponge.Params.t =
-  let open Sponge_params in
+  let open Sponge_params.Tick in
   {mds; round_constants}
 
 module Field = Tick0.Field
@@ -63,7 +63,7 @@ module Inputs = struct
 
   let _alphath_root =
     let inv_alpha =
-      Bigint.of_string Sponge_params.inv_alpha |> Bigint.to_zarith_bigint
+      Bigint.of_string Sponge_params.Tick.inv_alpha |> Bigint.to_zarith_bigint
     in
     let k = 4 in
     let chunks = (Tick0.Field.size_in_bits + (k - 1)) / k in
