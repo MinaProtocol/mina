@@ -12,8 +12,8 @@ let seed = "CodaPedersenParams"
 
 let random_bool = Crs.create ~seed
 
-module Impl = Curve_choice.Tick0
-module Group = Curve_choice.Tick_backend.Inner_curve
+module Impl = Tick0.Tick0
+module Group = Tick0.Tick_backend.Inner_curve
 
 let bigint_of_bits bits =
   List.foldi bits ~init:Bigint.zero ~f:(fun i acc b ->
@@ -40,8 +40,8 @@ let rec random_point () =
   let y2 =
     let open Impl.Field in
     (x * square x)
-    + (Curve_choice.Tick_backend.Inner_curve.Coefficients.a * x)
-    + Curve_choice.Tick_backend.Inner_curve.Coefficients.b
+    + (Tick0.Tick_backend.Inner_curve.Coefficients.a * x)
+    + Tick0.Tick_backend.Inner_curve.Coefficients.b
   in
   if Impl.Field.is_square y2 then
     let a, b = sqrt y2 in
@@ -89,26 +89,28 @@ let affine_params_ast ~loc =
                     [ estring (Impl.Field.to_string x)
                     ; estring (Impl.Field.to_string y) ] )) ))
   in
-  let%expr conv (x, y) = (Tick0.Field.of_string x, Tick0.Field.of_string y) in
+  let%expr conv (x, y) =
+    (Tick0.Tick0.Field.of_string x, Tick0.Tick0.Field.of_string y)
+  in
   Array.map
     (fun (g1, g2, g3, g4) -> (conv g1, conv g2, conv g3, conv g4))
     [%e arr]
 
 let params_ast affine_params ~loc =
-  let%expr conv = Tick_backend.Inner_curve.of_affine in
+  let%expr conv = Tick0.Tick_backend.Inner_curve.of_affine in
   Array.map
     (fun (g1, g2, g3, g4) -> (conv g1, conv g2, conv g3, conv g4))
     [%e affine_params]
 
 let group_map_params =
   Group_map.Params.create
-    (module Curve_choice.Tick0.Field)
-    ~a:Curve_choice.Tick_backend.Inner_curve.Coefficients.a
-    ~b:Curve_choice.Tick_backend.Inner_curve.Coefficients.b
+    (module Curve_choice.Tock0.Field)
+    ~a:Curve_choice.Tock_backend.Inner_curve.Coefficients.a
+    ~b:Curve_choice.Tock_backend.Inner_curve.Coefficients.b
 
 let group_map_params_structure ~loc =
   let module T = struct
-    type t = Curve_choice.Tick_backend.Field.t Group_map.Params.t
+    type t = Curve_choice.Tock_backend.Field.t Group_map.Params.t
     [@@deriving bin_io]
   end in
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -118,7 +120,7 @@ let group_map_params_structure ~loc =
   [%str
     let params =
       let module T = struct
-        type t = Curve_choice.Tick_backend.Field.t Group_map.Params.t
+        type t = Curve_choice.Tock_backend.Field.t Group_map.Params.t
         [@@deriving bin_io]
       end in
       Binable.of_string
@@ -131,8 +133,6 @@ let params_structure ~loc =
   end) in
   let open E in
   [%str
-    open Curve_choice
-
     let affine = [%e affine_params_ast ~loc]
 
     let params = [%e params_ast [%expr affine] ~loc]]
@@ -211,7 +211,7 @@ let chunk_table_structure ~loc =
   let open E in
   [%str
     open Core
-    module Group = Curve_choice.Tick_backend.Inner_curve
+    module Group = Tick0.Tick_backend.Inner_curve
 
     let chunk_table =
       lazy

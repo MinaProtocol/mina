@@ -1,0 +1,6 @@
+(library
+  (name tick0)
+  (public_name crypto_params.tick0)
+  (libraries bowe_gabizon_hash group_map hash_prefixes curve_choice sponge_params random_oracle_make)
+  (preprocess (pps ppx_coda -lint-version-syntax-warnings ppx_jane)))
+

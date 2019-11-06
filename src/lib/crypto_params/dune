@@ -13,7 +13,9 @@
   curve_choice
   chunk_table
   bowe_gabizon_hash
-  random_oracle
+  random_oracle_make
+  sponge_params
+  tick0
   tuple_lib)
  (preprocess
   (pps ppx_coda ppx_jane bisect_ppx -- -conditional))
