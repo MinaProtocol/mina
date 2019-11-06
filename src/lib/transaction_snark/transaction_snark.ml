@@ -63,7 +63,10 @@ module Statement = struct
         ; supply_increase: Currency.Amount.Stable.V1.t
         ; pending_coinbase_stack_state:
             Pending_coinbase_stack_state.Stable.V1.t
-        ; fee_excess: Currency.Fee.Signed.Stable.V1.t
+        ; fee_excess:
+            ( Currency.Fee.Stable.V1.t
+            , Sgn.Stable.V1.t )
+            Currency.Signed.Stable.V1.t
         ; proof_type: Proof_type.Stable.V1.t }
       [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -72,12 +75,12 @@ module Statement = struct
   end]
 
   type t = Stable.Latest.t =
-    { source: Frozen_ledger_hash.Stable.V1.t
-    ; target: Frozen_ledger_hash.Stable.V1.t
-    ; supply_increase: Currency.Amount.Stable.V1.t
+    { source: Frozen_ledger_hash.t
+    ; target: Frozen_ledger_hash.t
+    ; supply_increase: Currency.Amount.t
     ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-    ; fee_excess: Currency.Fee.Signed.Stable.V1.t
-    ; proof_type: Proof_type.Stable.V1.t }
+    ; fee_excess: Currency.Fee.Signed.t
+    ; proof_type: Proof_type.t }
   [@@deriving sexp, hash, compare, yojson]
 
   let option lab =
@@ -133,7 +136,8 @@ module Stable = struct
       ; proof_type: Proof_type.Stable.V1.t
       ; supply_increase: Amount.Stable.V1.t
       ; pending_coinbase_stack_state: Pending_coinbase_stack_state.Stable.V1.t
-      ; fee_excess: Amount.Signed.Stable.V1.t
+      ; fee_excess:
+          (Amount.Stable.V1.t, Sgn.Stable.V1.t) Currency.Signed.Stable.V1.t
       ; sok_digest: Sok_message.Digest.Stable.V1.t
       ; proof: Proof.Stable.V1.t }
     [@@deriving compare, fields, sexp, version]
@@ -156,14 +160,14 @@ module Stable = struct
 end]
 
 type t = Stable.Latest.t =
-  { source: Frozen_ledger_hash.Stable.V1.t
-  ; target: Frozen_ledger_hash.Stable.V1.t
-  ; proof_type: Proof_type.Stable.V1.t
-  ; supply_increase: Amount.Stable.V1.t
+  { source: Frozen_ledger_hash.t
+  ; target: Frozen_ledger_hash.t
+  ; proof_type: Proof_type.t
+  ; supply_increase: Amount.t
   ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-  ; fee_excess: Amount.Signed.Stable.V1.t
-  ; sok_digest: Sok_message.Digest.Stable.V1.t
-  ; proof: Proof.Stable.V1.t }
+  ; fee_excess: (Amount.t, Sgn.t) Currency.Signed.t
+  ; sok_digest: Sok_message.Digest.t
+  ; proof: Proof.t }
 [@@deriving fields, sexp]
 
 let to_yojson = Stable.Latest.to_yojson
