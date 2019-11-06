@@ -249,6 +249,8 @@ jobs:
                 command: |
                     bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h
+                # We want the build to fail here if we generated PVkeys so no
+                # rebuild after a regen causes the build to exit
             - run:
                 name: Collect PV Keys
                 command: |
@@ -310,6 +312,13 @@ jobs:
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
+                  no_output_timeout: 20m
+            # TODO: Insert logic to push to s3 if necessary here
+            - run:
+                  name: Rebuild for pvkey changes
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                   no_output_timeout: 20m
