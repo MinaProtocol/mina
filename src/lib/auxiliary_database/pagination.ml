@@ -11,7 +11,7 @@ module Make (Cursor : sig
 end) (Value : sig
   type t
 end) (Time : sig
-  type t [@@deriving compare, sexp]
+  type t [@@deriving bin_io, compare, sexp]
 
   include Hashable.S with type t := t
 end) =
