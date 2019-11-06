@@ -45,8 +45,8 @@ end
 module Track_generated : sig
   type t = [`Generated_something | `Cache_hit]
 
-  val ( + ) : t -> t -> t
   (** Generated_something overrides caches hits *)
+  val ( + ) : t -> t -> t
 end
 
 val run : 'a Spec.t -> ('a * Track_generated.t) Deferred.t
