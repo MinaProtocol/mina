@@ -298,11 +298,50 @@ module Tock = struct
   module Proof = struct
     include Tock0.Proof
 
-    let dummy = Dummy_values.Tock.Bowe_gabizon18.proof
+    let dummy = Dummy_values.Tock.Groth16.proof
   end
 
-  module Groth_verifier = struct
-    include Snarky_verifier.Groth.Make (Pairing)
+  module Verifier = struct
+    include Snarky_verifier.Bowe_gabizon.Make (struct
+      include Pairing
+      module Run = Crypto_params.Runners.Tock
+
+      module H = Bowe_gabizon_hash.Make (struct
+        open Run
+        module Field = Field
+        module Fqe = Pairing.Fqe
+
+        module G1 = struct
+          type t = Field.t * Field.t
+
+          let to_affine_exn = Fn.id
+
+          let of_affine = Fn.id
+        end
+
+        module G2 = struct
+          type t = Fqe.t * Fqe.t
+
+          let to_affine_exn = Fn.id
+        end
+
+        let hash xs =
+          Crypto_params.Tock_random_oracle.Checked.hash
+            ~init:(Lazy.force Tick_backend.bg_salt)
+            xs
+
+        let group_map =
+          Snarky_group_map.Checked.to_group
+            (module Run)
+            ~params:Tick_backend.bg_params
+      end)
+
+      let make_checked c =
+        with_state (As_prover.return ()) (Run.make_checked c)
+
+      let hash ?message ~a ~b ~c ~delta_prime =
+        make_checked (fun () -> H.hash ?message ~a ~b ~c ~delta_prime)
+    end)
 
     let conv_fqe v =
       let v = Tick_backend.Full.Fqe.to_vector v in
@@ -320,12 +359,11 @@ module Tock = struct
       in
       (f 0, f 1)
 
-    let proof_of_backend_proof p =
-      let open Tick_backend.Full.Groth16_proof_accessors in
-      {Proof.a= a p; b= conv_g2 (b p); c= c p}
+    let proof_of_backend_proof {Tick_backend.Proof.a; b; c; delta_prime; z} =
+      {Proof.a; b= conv_g2 b; c; delta_prime= conv_g2 delta_prime; z}
 
-    let vk_of_backend_vk vk =
-      let open Tick_backend.Full.Groth16_verification_key_accessors in
+    let vk_of_backend_vk (vk : Tick_backend.Verification_key.t) =
+      let open Tick_backend.Verification_key in
       let open Inner_curve.Vector in
       let q = query vk in
       { Verification_key.query_base= get q 0
@@ -680,9 +718,9 @@ module Tick = struct
   let make_checked c = with_state (As_prover.return ()) (Run.make_checked c)
 
   module Verifier = struct
-    include Snarky_verifier.Bowe_gabizon.Make (struct
-      include Pairing
+    include Snarky_verifier.Groth.Make (Pairing)
 
+    (*
       module H = Bowe_gabizon_hash.Make (struct
         open Run
         module Field = Field
@@ -712,8 +750,7 @@ module Tick = struct
       end)
 
       let hash ?message ~a ~b ~c ~delta_prime =
-        make_checked (fun () -> H.hash ?message ~a ~b ~c ~delta_prime)
-    end)
+        make_checked (fun () -> H.hash ?message ~a ~b ~c ~delta_prime) *)
 
     let conv_fqe v =
       let v = Tock_backend.Full.Fqe.to_vector v in
@@ -731,9 +768,8 @@ module Tick = struct
       in
       (f 0, f 1)
 
-    let proof_of_backend_proof
-        ({a; b; c; delta_prime; z} : Tock_backend.Proof.t) =
-      {Proof.a; b= conv_g2 b; c; delta_prime= conv_g2 delta_prime; z}
+    let proof_of_backend_proof ({a; b; c} : Tock_backend.Proof.t) =
+      {Proof.a; b= conv_g2 b; c}
 
     let vk_of_backend_vk (vk : Tock_backend.Verification_key.t) =
       let open Tock_backend.Verification_key in
@@ -809,13 +845,19 @@ let target_bit_length = Tick.Field.size_in_bits - 8
 module type Snark_intf = Snark_intf.S
 
 module Group_map = struct
-  let to_group =
-    Group_map.to_group (module Tick.Field) ~params:Tock_backend.bg_params
+  let params =
+    lazy
+      (Group_map.Params.create
+         (module Tick.Field)
+         ~a:Tick.Inner_curve.Coefficients.a ~b:Tick.Inner_curve.Coefficients.b)
+
+  let to_group x =
+    Group_map.to_group (module Tick.Field) ~params:(Lazy.force params) x
 
   module Checked = struct
-    let to_group =
+    let to_group x =
       Snarky_group_map.Checked.to_group
         (module Tick.Run)
-        ~params:Tock_backend.bg_params
+        ~params:(Lazy.force params) x
   end
 end
