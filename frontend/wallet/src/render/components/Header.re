@@ -158,9 +158,9 @@ let make = () => {
         onClick={_e =>
           ReasonReact.Router.push(onSettingsPage ? "/" : "/settings")
         }>
-        <Icon kind=Icon.Settings />
+        {onSettingsPage ? <Icon kind=Icon.Cross /> : <Icon kind=Icon.Settings />}
         <Spacer width=0.25 />
-        {React.string("Settings")}
+        {onSettingsPage ? {React.string("Close")} : {React.string("Settings")}}
       </a>
     </div>
   </header>;
