@@ -895,10 +895,7 @@ module Types = struct
     obj "protocolStateProof" ~fields:(fun _ ->
         [ string_list_field "a" ~resolve:(fun (proof : Proof.t) -> proof.a)
         ; string_list_list_field "b" ~resolve:(fun (proof : Proof.t) -> proof.b)
-        ; string_list_field "c" ~resolve:(fun (proof : Proof.t) -> proof.c)
-        ; string_list_list_field "delta_prime"
-            ~resolve:(fun (proof : Proof.t) -> proof.delta_prime)
-        ; string_list_field "z" ~resolve:(fun (proof : Proof.t) -> proof.z) ]
+        ; string_list_field "c" ~resolve:(fun (proof : Proof.t) -> proof.c) ]
     )
 
   let block :

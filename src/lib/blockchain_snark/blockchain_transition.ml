@@ -29,8 +29,8 @@ module Keys = struct
     type t = {step: Tick.Proving_key.t; wrap: Tock.Proving_key.t}
 
     let dummy =
-      { step= Dummy_values.Tick.Groth16.proving_key
-      ; wrap= Dummy_values.Tock.Bowe_gabizon18.proving_key }
+      { step= Dummy_values.Tick.Bowe_gabizon18.proving_key
+      ; wrap= Dummy_values.Tock.Groth16.proving_key }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
@@ -73,8 +73,8 @@ module Keys = struct
           Tick_backend.Verification_key.get_dummy
             ~input_size:Coda_base.Transition_system.step_input_size
       ; wrap=
-          Tock_backend.Bowe_gabizon.Verification_key.get_dummy
-            ~input_size:Wrap_input.size }
+          Tock_backend.Verification_key.get_dummy ~input_size:Wrap_input.size
+      }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in

@@ -1,1 +1,1 @@
-include Crypto_params.Tock.Bowe_gabizon.Proof
+include Crypto_params.Tock.Groth16.Proof

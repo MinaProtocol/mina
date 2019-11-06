@@ -84,7 +84,7 @@ struct
       | Bowe_gabizon18 ->
           sprintf "Crypto_params.%s_backend" curve_name
       | Groth16 ->
-          sprintf "Crypto_params.%s_backend.Full.Default" curve_name
+          sprintf "Crypto_params.%s_backend" curve_name
     in
     let of_string_expr submodule_name str =
       [%expr
@@ -117,17 +117,17 @@ type spec = Curve_name.t * Proof_system_name.t
 
 let proof_system_of_curve : Curve_name.t -> Proof_system_name.t = function
   | Tick ->
-      Groth16
-  | Tock ->
       Bowe_gabizon18
+  | Tock ->
+      Groth16
 
 let backend_of_curve (s : Curve_name.t) =
   match s with
   | Tick ->
-      assert (proof_system_of_curve Tick = Groth16) ;
+      assert (proof_system_of_curve Tick = Bowe_gabizon18) ;
       (module Crypto_params.Tick_backend : Snarky.Backend_intf.S)
   | Tock ->
-      assert (proof_system_of_curve Tock = Bowe_gabizon18) ;
+      assert (proof_system_of_curve Tock = Groth16) ;
       (module Crypto_params.Tock_backend : Snarky.Backend_intf.S)
 
 let structure_item_of_spec ((curve, proof_system) : spec) =

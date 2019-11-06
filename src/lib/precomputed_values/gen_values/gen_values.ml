@@ -31,7 +31,7 @@ module Dummy = struct
 
   let base_hash_expr = [%expr Snark_params.Tick.Field.zero]
 
-  let base_proof_expr = [%expr Dummy_values.Tock.Bowe_gabizon18.proof]
+  let base_proof_expr = [%expr Dummy_values.Tock.Groth16.proof]
 end
 
 module Make_real (Keys : Keys_lib.Keys.S) = struct

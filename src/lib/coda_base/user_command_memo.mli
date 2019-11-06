@@ -91,4 +91,4 @@ val fold : t -> bool Tuple_lib.Triple.t Fold_lib.Fold.t
 val length_in_triples : int
 
 (** typ representation *)
-val typ : (Checked.t, t) Curve_choice.Tick0.Typ.t
+val typ : (Checked.t, t) Tick.Typ.t

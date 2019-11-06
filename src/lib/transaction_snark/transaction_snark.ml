@@ -243,9 +243,9 @@ module Keys0 = struct
       ; merge: Tick.Proving_key.t }
 
     let dummy =
-      { merge= Dummy_values.Tick.Groth16.proving_key
-      ; base= Dummy_values.Tick.Groth16.proving_key
-      ; wrap= Dummy_values.Tock.Bowe_gabizon18.proving_key }
+      { merge= Dummy_values.Tick.Bowe_gabizon18.proving_key
+      ; base= Dummy_values.Tick.Bowe_gabizon18.proving_key
+      ; wrap= Dummy_values.Tock.Groth16.proving_key }
   end
 
   module T = struct
@@ -975,7 +975,6 @@ module Wrap (Vk : sig
 end) =
 struct
   open Tock
-  module Verifier = Tock.Groth_verifier
 
   let merge_vk = Verifier.vk_of_backend_vk Vk.merge
 

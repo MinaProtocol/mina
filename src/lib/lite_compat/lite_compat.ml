@@ -8,9 +8,9 @@ let verification_key (vk : Crypto_params.Tock_backend.Verification_key.t) =
   ; delta= delta vk |> g2
   ; query= query vk |> g1_vector }
 
-let proof {Crypto_params.Tock_backend.Proof.a; b; c; delta_prime; z} :
-    Lite_base.Crypto_params.Tock.Bowe_gabizon.Proof.t =
-  {a= g1 a; b= g2 b; c= g1 c; delta_prime= g2 delta_prime; z= g1 z}
+let proof {Crypto_params.Tock_backend.Proof.a; b; c} :
+    Lite_base.Crypto_params.Tock.Groth16.Proof.t =
+  {a= g1 a; b= g2 b; c= g1 c}
 
 let merkle_path :
        Coda_base.Ledger.Path.t

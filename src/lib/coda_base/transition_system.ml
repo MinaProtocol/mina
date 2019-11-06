@@ -238,8 +238,6 @@ struct
 
     let input = Tock.Data_spec.[Wrap_input.typ]
 
-    module Verifier = Tock.Groth_verifier
-
     module Prover_state = struct
       type t = {proof: Tick.Proof.t} [@@deriving fields]
     end
