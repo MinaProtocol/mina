@@ -26,7 +26,7 @@ module Pagination =
     (struct
       type t = (Filtered_external_transition.t, State_hash.t) With_hash.t
     end)
-    (Block_time)
+    (Block_time.Stable.V1)
 
 let fee_transfer_participants (pk, _) = [pk]
 
