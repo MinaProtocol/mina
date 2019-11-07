@@ -258,9 +258,10 @@ module BlockRewards = {
              | Error(err) => <span> {React.string(err##message)} </span>
              | Data(data) =>
                let account = Option.getExn(data##account);
-               let delegate = Option.getExn(account.delegateAccount);
-               delegate##publicKey == publicKey
-                 ? <div className=Styles.blockRewards>
+               switch(account.delegateAccount) {
+               | None => <Alert kind=`Warning message="Wait until fully synced..." />
+               | Some(delegate) when delegate##publicKey == publicKey =>
+                 <div className=Styles.blockRewards>
                      <div
                        className=Css.(
                          style([display(`flex), alignItems(`center)])
@@ -294,7 +295,7 @@ module BlockRewards = {
                        }
                      />
                    </div>
-                 : <div className=Styles.delegating>
+                 | Some(delegate) => <div className=Styles.delegating>
                      <span className=Theme.Text.Body.regular>
                        {React.string("Delegating to: ")}
                        <AccountName pubkey=delegate##publicKey />
@@ -324,7 +325,8 @@ module BlockRewards = {
                          }
                        />
                      </div>
-                   </div>;
+                   </div>
+               };
              }}
         </AccountInfoQuery>
       </Well>
