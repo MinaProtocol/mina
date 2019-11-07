@@ -1,7 +1,7 @@
 open Tc;
 
 module UnlockAccount = [%graphql
-  {| mutation unlock($password: String, $publicKey: PublicKey) {
+  {| mutation unlock($password: String!, $publicKey: PublicKey!) {
       unlockWallet(input: {password: $password, publicKey: $publicKey}) {
           publicKey
         }

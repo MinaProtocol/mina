@@ -162,7 +162,7 @@ module AccountSettingsItem = {
        ? <UnlockModal
            account={publicKey}
            onClose={() =>  setModalOpen(_ => false)}
-           onSuccess={() => setModalOpen(_ => false)}
+           onSuccess={() => {setModalOpen(_ => false); ReasonReact.Router.push(route);}}
          />
        : React.null}
     </div>;
