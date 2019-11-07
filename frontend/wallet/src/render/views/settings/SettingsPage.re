@@ -129,14 +129,25 @@ module Version = {
   };
 };
 
+type ownedAccounts =
+  Account.t = {
+    locked: option(bool),
+    publicKey: PublicKey.t,
+    balance: {. "total": int64},
+  };
+  
 module AccountSettingsItem = {
   [@react.component]
-  let make = (~publicKey) => {
+  let make = (~publicKey, ~account) => {
     let keyStr = PublicKey.toString(publicKey);
     let route = "/settings/" ++ Js.Global.encodeURIComponent(keyStr);
+    let isLocked = Option.withDefault(~default=true, account##locked);
+    let (showModal, setModalOpen) = React.useState(() => false);
     <div
       className=Styles.accountItem
-      onClick={_ => ReasonReact.Router.push(route)}>
+      onClick={_ => 
+        isLocked ? setModalOpen(_ => true) : ReasonReact.Router.push(route);
+      }>
       <div className=Styles.accountName>
         <AccountName pubkey=publicKey />
       </div>
@@ -147,6 +158,13 @@ module AccountSettingsItem = {
       <span className=Styles.accountChevron>
         <Icon kind=Icon.EmptyChevronRight />
       </span>
+       {showModal
+       ? <UnlockModal
+           account={publicKey}
+           onClose={() =>  setModalOpen(_ => false)}
+           onSuccess={() => setModalOpen(_ => false)}
+         />
+       : React.null}
     </div>;
   };
 };
@@ -155,6 +173,7 @@ module AccountsQueryString = [%graphql
   {|
     query getWallets {
       ownedWallets {
+        locked
         publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
       }
     }
@@ -186,10 +205,10 @@ let make = () => {
            | Error(_) => React.null
            | Data(data) =>
              data##ownedWallets
-             |> Array.map(~f=w =>
+             |> Array.map(~f=account=>
                   <AccountSettingsItem
-                    key={PublicKey.toString(w##publicKey)}
-                    publicKey=w##publicKey
+                    publicKey=account##publicKey
+                    account
                   />
                 )
              |> React.array
