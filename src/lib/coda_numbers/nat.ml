@@ -1,7 +1,6 @@
 open Core_kernel
 open Snark_bits
 open Fold_lib
-open Module_version
 include Intf
 module Intf = Intf
 
@@ -9,7 +8,7 @@ let zero_checked =
   Snarky_integer.Integer.constant ~m:Snark_params.Tick.m Bigint.zero
 
 module Make (N : sig
-  type t [@@deriving bin_io, sexp, compare, hash, version]
+  type t [@@deriving sexp, compare, hash]
 
   include Unsigned_extended.S with type t := t
 
@@ -17,32 +16,9 @@ module Make (N : sig
 end)
 (Bits : Bits_intf.Convertible_bits with type t := N.t) =
 struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type t = N.t
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-      end
+  type t = N.t [@@deriving sexp, compare, hash, yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
-    end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = sprintf "nat_make"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
-  include Comparable.Make (Stable.Latest)
+  include Comparable.Make (N)
 
   include (N : module type of N with type t := t)
 
@@ -160,8 +136,18 @@ struct
 end
 
 module Make32 () : UInt32 = struct
+  open Unsigned_extended
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = UInt32.t [@@deriving sexp, eq, compare, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
   include Make (struct
-              open Unsigned_extended
               include UInt32
 
               let random () =
@@ -179,8 +165,18 @@ module Make32 () : UInt32 = struct
 end
 
 module Make64 () : UInt64 = struct
+  open Unsigned_extended
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = UInt64.t [@@deriving sexp, eq, compare, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
   include Make (struct
-              open Unsigned_extended
               include UInt64
 
               let random () =
