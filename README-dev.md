@@ -126,13 +126,13 @@ You should probably use `USEDOCKER=TRUE` unless you've done the [building withou
 
 These are the most important `make` targets:
 
-* `kademlia`: build the kademlia helper
 * `build`: build everything
 * `docker`: build the container
 * `container`: restart the development container (or start it if it's not yet)
 * `dev`: does `docker`, `container`, and `build`
 * `test`: run the tests
 * `web`: build the website, including the state explorer
+* `libp2p_helper`: build just the helper Go program
 
 We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.
 

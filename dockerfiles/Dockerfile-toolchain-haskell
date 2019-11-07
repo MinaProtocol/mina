@@ -1,6 +1,6 @@
 FROM nixos/nix:latest
 
-# Simple toolchain & build container that compiles and patches a kademlia binary for coda use
+# Simple toolchain & build container that compiles and patches a libp2p_helper binary for coda use
 
 # Add OS tools
 RUN apk add patchelf dpkg tar
@@ -11,7 +11,6 @@ RUN nix-channel --update && \
     nix-env -iA cachix -f https://cachix.org/api/v1/install
 
 # Source tree nix-built haskell kademlia
-ADD /src/app/kademlia-haskell /src/kademlia
 ADD /src/app/libp2p_helper /src/libp2p
 
 # Generate a unique signature for the source tree path
@@ -19,13 +18,10 @@ RUN cd /src ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut 
 
 # Build
 RUN cachix use codaprotocol \
-    && cd /src/kademlia ; nix-build release2.nix \
-    && ls -l /src/kademlia/result/bin \
     && cd /src/libp2p ; nix-build default.nix \
     && ls -l /src/libp2p/result/bin
 
 # Adjust elf headers (de-nix)
-RUN patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 /src/kademlia/result/bin/kademlia
 RUN patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 /src/libp2p/result/bin/libp2p_helper
 
 # Deb staging
@@ -38,13 +34,12 @@ RUN echo "Package: coda-discovery" > /src/build/DEBIAN/control && \
   echo "Section: base" >> /src/build/DEBIAN/control && \
   echo "Priority: optional" >> /src/build/DEBIAN/control && \
   echo "Architecture: amd64" >> /src/build/DEBIAN/control && \
-  echo "License: BSD 3-Clause" >> /src/build/DEBIAN/control && \
+  echo "License: Apache-2.0" >> /src/build/DEBIAN/control && \
   echo "Homepage: https://codaprotocol.com/" >> /src/build/DEBIAN/control && \
   echo "Maintainer: o\(1\)Labs <build@o1labs.org>" >> /src/build/DEBIAN/control && \
   echo "Description: Coda Protocol Discovery Tools" >> /src/build/DEBIAN/control && \
-  echo " Coda Protocol Kademlia binary and libp2p helper" >> /src/build/DEBIAN/control
+  echo " Coda Protocol libp2p helper" >> /src/build/DEBIAN/control
 RUN mkdir -p /src/build/usr/local/bin
-RUN cp /src/kademlia/result/bin/kademlia /src/build//usr/local/bin/coda-kademlia
 RUN cp /src/libp2p/result/bin/libp2p_helper /src/build//usr/local/bin/coda-libp2p_helper
 
 # Build and copy deb

@@ -6,19 +6,16 @@
 set -eou pipefail
 
 if [[ $# -ne 3 ]]; then
-  echo "Usage: $0 <path-to-coda.exe> <path-to-kademlia-binary> <outdir>"
+  echo "Usage: $0 <path-to-coda.exe> <outdir>"
   exit 1
 fi
 
 LOCAL_CODA_EXE="$(basename "$1")"
-LOCAL_KADEMLIA="$(basename "$2")"
 DIST_DIR="$3"
 
 mkdir -p "$DIST_DIR"
 
 cp "$1" "$DIST_DIR/$LOCAL_CODA_EXE"
-cp "$2" "$DIST_DIR/$LOCAL_KADEMLIA"
-chmod +w "$DIST_DIR/$LOCAL_KADEMLIA"
 
 pushd "$DIST_DIR"
 
@@ -57,13 +54,5 @@ fixup() {
   done
 }
 
-# Start with coda.exe
+# Fix coda.exe
 fixup "$LOCAL_CODA_EXE"
-
-# Fixup kademlia
-K_LIBS=$(otool -l kademlia | grep -E '\s+name' | grep '/nix' | grep -v '\-osx\-' | awk '{print $2}')
-echo "$K_LIBS" | while read lib; do
-  # we already have all the libs from coda.exe thankfully
-  install_name_tool -change "$lib" "@executable_path/$(basename $lib)" "$LOCAL_KADEMLIA"
-done
-

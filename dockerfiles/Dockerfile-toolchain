@@ -129,7 +129,7 @@ RUN cd /async_kernel && opam pin -y add .
 RUN cd /coda_base58 && opam pin -y add .
 RUN cd /graphql_ppx && opam pin -y add .
 
-# Get coda-kademlia from packages repo
+# Get coda-discovery from packages repo
 RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
       echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
       sudo apt-get update && \
