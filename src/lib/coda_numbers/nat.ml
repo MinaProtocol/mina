@@ -141,7 +141,7 @@ module Make32 () : UInt32 = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = UInt32.t [@@deriving sexp, eq, compare, hash, yojson]
+      type t = UInt32.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -170,7 +170,7 @@ module Make64 () : UInt64 = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = UInt64.t [@@deriving sexp, eq, compare, hash, yojson]
+      type t = UInt64.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
 
       let to_latest = Fn.id
     end

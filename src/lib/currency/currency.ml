@@ -584,20 +584,15 @@ end
 let currency_length = 64
 
 module Fee = struct
-  (* TODO : version Unsigned_extended.UInt64, use %%versioned here *)
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Unsigned_extended.UInt64.t
-        [@@deriving
-          bin_io, sexp, compare, hash, eq, yojson, version {asserted}]
-      end
+      type t = Unsigned_extended.UInt64.Stable.V1.t
+      [@@deriving sexp, compare, hash, eq, yojson]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   module T =
     Make
@@ -611,20 +606,15 @@ module Fee = struct
 end
 
 module Amount = struct
-  (* TODO : version Unsigned_extended.UInt64, use %%versioned here *)
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Unsigned_extended.UInt64.t
-        [@@deriving
-          bin_io, sexp, compare, hash, eq, yojson, version {asserted}]
-      end
+      type t = Unsigned_extended.UInt64.Stable.V1.t
+      [@@deriving sexp, compare, hash, eq, yojson]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   module T =
     Make
