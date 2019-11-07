@@ -161,8 +161,7 @@ let apply_fee_transfer_exn =
           Option.value_exn
             (Balance.add_amount account.balance (Amount.of_fee fee)) }
   in
-  fun t transfer ->
-    List.fold (Fee_transfer.to_list transfer) ~f:apply_single ~init:t
+  fun t transfer -> One_or_two.fold transfer ~f:apply_single ~init:t
 
 let apply_coinbase_exn t
     ({proposer; fee_transfer; amount= coinbase_amount; state_body_hash= _} :
