@@ -61,6 +61,8 @@ module Styles = {
         display(`block),
       ]),
     ]);
+  
+  let breadcrumbText = merge([Theme.Text.Body.semiBold, style([color(Theme.Colors.hyperlink), marginBottom(`rem(0.5))])]);
 };
 
 module DeleteAccount = [%graphql
@@ -374,16 +376,11 @@ let make = (~publicKey) => {
 
   <div className=Styles.container>
     <div className=Styles.backHeader>
-      <span
-        className=Styles.backIcon
-        onClick={_ => ReasonReact.Router.push("/settings")}>
-        <Icon kind=Icon.BackArrow />
-      </span>
-      <Spacer width=0.5 />
-      <span className=Styles.backHeaderText>
-        <AccountName pubkey=publicKey className=Styles.headerAccountName />
-        {React.string(" settings")}
-      </span>
+     <a className=Styles.breadcrumbText onClick={_ => ReasonReact.Router.push("/settings")}>
+      {React.string("Global Settings >")}
+      </a> 
+      <Spacer width=0.2/>
+      <AccountName pubkey=publicKey className=Styles.breadcrumbText/>
     </div>
     <Spacer height=1. />
     <div className=Styles.label> {React.string("Account name")} </div>

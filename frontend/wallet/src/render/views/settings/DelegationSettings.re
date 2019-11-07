@@ -8,6 +8,10 @@ module Styles = {
       Theme.Text.Body.semiBold,
       style([color(Theme.Colors.midnight), marginBottom(`rem(0.5))]),
     ]);
+    
+  let backHeader = style([display(`flex), alignItems(`center)]);
+  let breadcrumbText = merge([Theme.Text.Body.semiBold, style([color(Theme.Colors.hyperlink), marginBottom(`rem(2.3))])]);
+
 };
 
 type feeSelection =
@@ -85,6 +89,13 @@ let make = (~publicKey) => {
   <ChangeDelegationMutation>
     {(mutate, {loading, result}) =>
        <div className=SettingsPage.Styles.container>
+       <div className=Styles.backHeader>
+     <a className=Styles.breadcrumbText onClick={_ => ReasonReact.Router.push("/settings")}>
+      {React.string("Global Settings >")}
+      </a> 
+      <Spacer width=0.2/>
+      <AccountName pubkey=publicKey className=Styles.breadcrumbText/>
+    </div>
          {switch (result) {
           | NotCalled
           | Loading => React.null
