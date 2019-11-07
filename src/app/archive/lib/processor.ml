@@ -147,12 +147,9 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
       List.bind (External_transition.transactions block) ~f:(function
         | User_command checked_user_command ->
             [`User_command (User_command.forget_check checked_user_command)]
-        | Fee_transfer fee_transfer -> (
-          match fee_transfer with
-          | One fee_transfer ->
-              [`Fee_transfer fee_transfer]
-          | Two (fee_transfer1, fee_transfer2) ->
-              [`Fee_transfer fee_transfer1; `Fee_transfer fee_transfer2] )
+        | Fee_transfer fee_transfer ->
+            One_or_two.map ~f:(fun ft -> `Fee_transfer ft) fee_transfer
+            |> One_or_two.to_list
         | Coinbase _ ->
             [] )
     in

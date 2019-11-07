@@ -78,7 +78,7 @@ let%test_module "transaction_status" =
       single_async_test user_command_gen ~f:(fun user_command ->
           let frontier_broadcast_pipe, _ = Broadcast_pipe.create None in
           let%bind transaction_pool = create_pool ~frontier_broadcast_pipe in
-          let%map () = Transaction_pool.add transaction_pool user_command in
+          let%map () = Transaction_pool.add transaction_pool [user_command] in
           Logger.info logger "Hello" ~module_:__MODULE__ ~location:__LOC__ ;
           heartbeat_flag := false ;
           [%test_eq: Transaction_status.State.t]
@@ -98,7 +98,7 @@ let%test_module "transaction_status" =
             Broadcast_pipe.create (Some frontier)
           in
           let%bind transaction_pool = create_pool ~frontier_broadcast_pipe in
-          let%map () = Transaction_pool.add transaction_pool user_command in
+          let%map () = Transaction_pool.add transaction_pool [user_command] in
           Logger.info logger "Computing status" ~module_:__MODULE__
             ~location:__LOC__ ;
           heartbeat_flag := false ;
@@ -132,7 +132,7 @@ let%test_module "transaction_status" =
           in
           let%map () =
             Deferred.List.iter pool_user_commands ~f:(fun user_command ->
-                Transaction_pool.add transaction_pool user_command )
+                Transaction_pool.add transaction_pool [user_command] )
           in
           Logger.info logger "Computing status" ~module_:__MODULE__
             ~location:__LOC__ ;

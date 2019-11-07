@@ -26,14 +26,21 @@ end
 open Input
 
 module Send_payment_input = struct
-  (* TODO : version *)
-  type t =
-    Private_key.Stable.V1.t
-    * Public_key.Compressed.Stable.V1.t
-    * Currency.Amount.Stable.V1.t
-    * Currency.Fee.Stable.V1.t
-    * User_command_memo.Stable.V1.t
-  [@@deriving bin_io]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        Private_key.Stable.V1.t
+        * Public_key.Compressed.Stable.V1.t
+        * Currency.Amount.Stable.V1.t
+        * Currency.Fee.Stable.V1.t
+        * User_command_memo.Stable.V1.t
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t
 end
 
 module T = struct
@@ -298,7 +305,7 @@ module T = struct
 
     let send_user_command =
       C.create_rpc ~name:"send_user_command" ~f:send_payment_impl
-        ~bin_input:Send_payment_input.bin_t
+        ~bin_input:Send_payment_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 

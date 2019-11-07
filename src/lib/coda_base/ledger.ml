@@ -21,32 +21,56 @@ module Ledger_inner = struct
   end
 
   module Hash = struct
-    (* TODO : version *)
-    module T = struct
-      type t = Ledger_hash.Stable.V1.t
-      [@@deriving bin_io, sexp, compare, hash, eq, yojson]
-    end
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Ledger_hash.Stable.V1.t
+        [@@deriving sexp, compare, hash, eq, yojson]
 
-    include T
-    include Hashable.Make_binable (T)
+        let to_latest = Fn.id
 
-    let to_string = Ledger_hash.to_string
+        (* TODO: move T outside V1 when %%versioned ppx allows it *)
+        module T = struct
+          type typ = t [@@deriving sexp, compare, hash, bin_io]
 
-    let merge = Ledger_hash.merge
+          type t = typ [@@deriving sexp, compare, hash, bin_io]
+        end
 
-    let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+        include Hashable.Make_binable (T) [@@deriving
+                                            sexp, compare, hash, eq, yojson]
 
-    let empty_account = hash_account Account.empty
+        let to_string = Ledger_hash.to_string
+
+        let merge = Ledger_hash.merge
+
+        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+
+        let empty_account = hash_account Account.empty
+      end
+    end]
+
+    type t = Stable.Latest.t
   end
 
   module Account = struct
-    type t = Account.Stable.V1.t [@@deriving bin_io, eq, compare, sexp]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Account.Stable.V1.t [@@deriving eq, compare, sexp]
 
-    let empty = Account.empty
+        let to_latest = Fn.id
 
-    let public_key = Account.public_key
+        let public_key = Account.public_key
 
-    let balance Account.Poly.{balance; _} = balance
+        let balance Account.Poly.{balance; _} = balance
+
+        let empty = Account.empty
+      end
+    end]
+
+    type t = Stable.Latest.t
+
+    let empty = Stable.Latest.empty
 
     let initialize = Account.initialize
   end
@@ -54,8 +78,8 @@ module Ledger_inner = struct
   module Inputs = struct
     module Key = Public_key.Compressed
     module Balance = Currency.Balance
-    module Account = Account
-    module Hash = Hash
+    module Account = Account.Stable.Latest
+    module Hash = Hash.Stable.Latest
     module Depth = Depth
     module Kvdb = Kvdb
     module Location = Location_at_depth
