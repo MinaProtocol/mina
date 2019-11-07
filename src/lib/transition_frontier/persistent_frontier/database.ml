@@ -29,7 +29,14 @@ module Schema = struct
     module String = String
 
     module Prefixed_state_hash = struct
-      type t = string * State_hash.Stable.V1.t [@@deriving bin_io]
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = string * State_hash.Stable.V1.t
+
+          let to_latest = Fn.id
+        end
+      end]
     end
   end
 
@@ -102,12 +109,12 @@ module Schema = struct
           ~of_gadt:(fun Db_version -> "db_version")
     | Transition _ ->
         gadt_input_type_class
-          (module Keys.Prefixed_state_hash)
+          (module Keys.Prefixed_state_hash.Stable.V1)
           ~to_gadt:(fun (_, hash) -> Transition hash)
           ~of_gadt:(fun (Transition hash) -> ("transition", hash))
     | Arcs _ ->
         gadt_input_type_class
-          (module Keys.Prefixed_state_hash)
+          (module Keys.Prefixed_state_hash.Stable.V1)
           ~to_gadt:(fun (_, hash) -> Arcs hash)
           ~of_gadt:(fun (Arcs hash) -> ("arcs", hash))
     | Root ->
