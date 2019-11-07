@@ -32,13 +32,6 @@
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules define_locally_good))
 
-;; define existing
-
-(library
-  (name define_existing_good)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
-  (modules define_existing_good))
-
 ;; module versioning
 (executable
   (name versioned_module_good)

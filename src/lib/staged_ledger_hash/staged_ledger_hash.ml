@@ -184,29 +184,9 @@ module Stable = struct
     [@@deriving sexp, eq, compare, hash, yojson]
 
     let to_latest = Fn.id
-
-    module T = struct
-      type typ = t [@@deriving sexp, compare, hash]
-
-      type t = typ [@@deriving sexp, compare, hash]
-
-      (* can't use derive bin_io which will trigger the linter *)
-      [%%define_existing
-      bin_size_t
-      , bin_write_t
-      , bin_read_t
-      , __bin_read_t__
-      , bin_shape_t
-      , bin_writer_t
-      , bin_reader_t
-      , bin_t]
-    end
-
-    include Hashable.Make_binable (T)
   end
 end]
 
-(* bin_io, version omitted *)
 type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
 type ('a, 'b) t_ = ('a, 'b) Poly.t
