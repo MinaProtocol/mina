@@ -29,7 +29,7 @@ module Make (Depth : Intf.Depth) = struct
       let get, length, equal, create, to_string, set, blit, sub =
         Bigstring.(get, length, equal, create, to_string, set, blit, sub)
 
-      type tt = Bigstring.Stable.V1.t [@@deriving sexp, compare]
+      type tt = Bigstring.t [@@deriving sexp, compare]
 
       let hash t = Bigstring.to_string t |> String.hash
 
