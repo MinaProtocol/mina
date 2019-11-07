@@ -40,14 +40,10 @@ module ChangeDelegationMutation =
 module EnableStaking = [%graphql
   {|
     mutation changeDelegation(
-      $from: PublicKey!,
-      $to_: PublicKey!,
-      $fee: UInt64!
+      $publicKey: PublicKey!
     ) {
-      sendDelegation(input: {from: $from, to: $to_, fee: $fee}) {
-        delegation {
-          nonce
-        }
+      setStaking(input: {publicKeys: [$publicKey]}) {
+        lastStaking
       }
     }
   |}
@@ -100,6 +96,12 @@ let make = (~publicKey, ~stakingActive=false) => {
 
   // Mutation variables and handlers
   let variables =
+    EnableStaking.make(
+      ~publicKey=Apollo.Encoders.publicKey(publicKey),
+      ()
+    )##variables;
+
+  let _changeVariables =
     ChangeDelegation.make(
       ~from=Apollo.Encoders.publicKey(publicKey),
       ~to_=Apollo.Encoders.publicKey(publicKey),
@@ -128,7 +130,7 @@ let make = (~publicKey, ~stakingActive=false) => {
           }
         />
       | Data(accountInfo) =>
-        <ChangeDelegationMutation>
+        <EnableStakingMutation>
           (
             (mutate, {loading, result}) =>
               <div className=SettingsPage.Styles.container>
@@ -230,7 +232,7 @@ let make = (~publicKey, ~stakingActive=false) => {
                 </div>
               </div>
           )
-        </ChangeDelegationMutation>
+        </EnableStakingMutation>
       }
     }
   </AccountInfoQuery>;
