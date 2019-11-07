@@ -208,7 +208,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     ; disconnected_peers: Peer.Hash_set.t
     ; ban_notification_reader: ban_notification Linear_pipe.Reader.t
     ; ban_notification_writer: ban_notification Linear_pipe.Writer.t
-    ; mutable haskell_membership: Membership.t option
     ; peer_event_writer: Peer.Event.t Linear_pipe.Writer.t
     ; peer_event_reader: Peer.Event.t Linear_pipe.Reader.t
     ; mutable libp2p_membership: Coda_net2.net option
@@ -370,41 +369,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                (Option.value_exn t.config.max_concurrent_connections))
         else call ()
 
-  and record_peer_events t =
-    trace_recurring "peer events" (fun () ->
-        Option.map t.haskell_membership ~f:(fun membership ->
-            Linear_pipe.transfer_id
-              (Membership.changes membership)
-              t.peer_event_writer )
-        |> ignore )
-
   and restart_kademlia t addl_peers =
-    match t.haskell_membership with
-    | Some membership -> (
-        t.haskell_membership <- None ;
-        Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-          "Restarting Kademlia" ;
-        let%bind () = Membership.stop membership in
-        let%map new_membership =
-          let initial_peers =
-            List.dedup_and_sort ~compare:Host_and_port.compare
-            @@ t.config.initial_peers @ addl_peers
-          in
-          Membership.connect ~node_addrs_and_ports:t.config.addrs_and_ports
-            ~initial_peers ~conf_dir:t.config.conf_dir ~logger:t.config.logger
-            ~trust_system:t.config.trust_system
-        in
-        match new_membership with
-        | Ok membership ->
-            t.haskell_membership <- Some membership ;
-            record_peer_events t
-        | Error _ ->
-            failwith "Could not restart Kademlia" )
-    | None ->
-        (* If we try to restart twice simultaneously, or we try to restart
-           before it's first launched we'll see this condition. *)
-        Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
-          "Can't restart kademlia, it's not running" ;
         Deferred.unit
 
   and unmark_all_disconnected_peers t =
@@ -583,26 +548,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 List.iter peers ~f:(mark_peer_disconnected t) ;
                 Deferred.unit )
         |> don't_wait_for ;
-        let%bind haskell_membership =
-          if not config.disable_haskell then
-            match%map
-              Monitor.try_with
-                (fun () ->
-                  trace "membership" (fun () ->
-                      Membership.connect ~initial_peers:config.initial_peers
-                        ~node_addrs_and_ports:config.addrs_and_ports
-                        ~conf_dir:config.conf_dir ~logger:config.logger
-                        ~trust_system:config.trust_system ) )
-                ~rest:(`Call handle_exn)
-            with
-            | Ok (Ok membership) ->
-                Some membership
-            | Ok (Error e) ->
-                fail (Error.to_string_hum e)
-            | Error e ->
-                fail (Exn.to_string e)
-          else Deferred.return None
-        in
         let%bind libp2p_membership =
           if config.enable_libp2p then
             match%bind
@@ -718,7 +663,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; disconnected_peers= Peer.Hash_set.create ()
           ; ban_notification_reader
           ; ban_notification_writer
-          ; haskell_membership
           ; libp2p_membership
           ; connections= Hashtbl.create (module Unix.Inet_addr)
           ; peer_event_writer
@@ -803,7 +747,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           Rpc.Implementations.create_exn ~implementations
             ~on_unknown_rpc:(`Call handle_unknown_rpc)
         in
-        record_peer_events t ;
         let%map _ =
           Tcp.Server.create
             ~on_handler_error:
