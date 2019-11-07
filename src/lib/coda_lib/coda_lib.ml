@@ -452,7 +452,8 @@ module Root_diff = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.Latest.t =
+    {user_commands: User_command.Stable.V1.t list; root_length: int}
 end
 
 (* TODO: this is a bad pattern for two reasons:

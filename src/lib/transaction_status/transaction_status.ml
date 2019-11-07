@@ -28,7 +28,8 @@ module State = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.Latest.t = Pending | Included | Unknown
+  [@@deriving equal, sexp, compare]
 
   let to_string = function
     | Pending ->

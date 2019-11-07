@@ -28,7 +28,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     type network_interface =
       { broadcast_message_writer:
-          ( Message.t Envelope.Incoming.t
+          ( Message.msg Envelope.Incoming.t
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -92,9 +92,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; peer_table: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
       ; initial_peers: Host_and_port.t list
       ; received_message_reader:
-          Message.t Envelope.Incoming.t Strict_pipe.Reader.t
+          Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
       ; received_message_writer:
-          ( Message.t Envelope.Incoming.t
+          ( Message.msg Envelope.Incoming.t
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t

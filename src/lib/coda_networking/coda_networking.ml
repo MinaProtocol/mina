@@ -836,7 +836,7 @@ let on_first_received_message {first_received_message_signal; _} ~f =
 (* TODO: Have better pushback behavior *)
 let broadcast t msg =
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:[("message", Gossip_net.Message.to_yojson msg)]
+    ~metadata:[("message", Gossip_net.Message.msg_to_yojson msg)]
     !"Broadcasting %s over gossip net"
     (Gossip_net.Message.summary msg) ;
   Gossip_net.Any.broadcast t.gossip_net msg

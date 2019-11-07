@@ -189,7 +189,7 @@ type t = {directory: string; logger: Logger.t; db: Rocks.t}
 let create ~logger ~directory =
   if not (Result.is_ok (Unix.access directory [`Exists])) then
     Unix.mkdir ~perm:0o766 directory ;
-  {directory; logger; db= Rocks.create ~directory}
+  {directory; logger; db= Rocks.create directory}
 
 let close t = Rocks.close t.db
 

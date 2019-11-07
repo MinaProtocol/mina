@@ -135,7 +135,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; peer_event_reader: Peer.Event.t Linear_pipe.Reader.t
       ; mutable libp2p_membership: Coda_net2.net option
       ; connections:
-          (Unix.Inet_addr.t, (Uuid.t, Rpc.Connection.t) Hashtbl.t) Hashtbl.t
+          ( Unix.Inet_addr.t
+          , (Uuid.t, Rpc.Connection.t Ivar.t) Hashtbl.t )
+          Hashtbl.t
       ; first_connect_signal: unit Ivar.t }
 
     (* OPTIMIZATION: use fast n choose k implementation - see python or old flow code *)
@@ -224,6 +226,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let rec try_call_rpc_with_dispatch : type r q.
         t -> Peer.t -> (r, q) dispatch -> r -> q Deferred.Or_error.t =
+     fun t peer dispatch query ->
       match setup_track_connection t peer.host with
       | `Banned ->
           (* The peer set should never include banned peers, so this should never

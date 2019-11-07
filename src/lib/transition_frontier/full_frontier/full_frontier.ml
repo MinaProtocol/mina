@@ -459,7 +459,7 @@ let update_metrics_with_diff (type mutant) t
       in
       let global_slot =
         Consensus.Data.Consensus_state.global_slot consensus_state
-        |> Unsigned.UInt32.to_int |> Float.to_int
+        |> Unsigned.UInt32.to_int |> Float.of_int
       in
       Coda_metrics.(
         let num_breadcrumbs_removed =
