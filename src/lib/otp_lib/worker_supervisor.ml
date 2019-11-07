@@ -1,6 +1,13 @@
+(** This module provides a functor for instantiating async supervisors which is
+ *  capable of monitoring and dispatching work to a single worker. The module
+ *  allows synchronous checking of the worker's state (is it processing work
+ *  or not), and prevents parallel dispatching of work to that worker.
+ *)
+
 open Async_kernel
 open Core_kernel
 
+(** The interface shared by both the worker and the supervisor which wraps it. *)
 module type Base_intf = sig
   type t
 
@@ -15,12 +22,16 @@ module type Base_intf = sig
   val close : t -> unit Deferred.t
 end
 
+(** The interface of the worker. Extends the base interface with a [perform]
+ *  function.
+ *)
 module type Worker_intf = sig
   include Base_intf
 
   val perform : t -> input -> output Deferred.t
 end
 
+(** The interface of the supervisor constructed by the [Make] functor. *)
 module type S = sig
   include Base_intf
 
@@ -29,6 +40,7 @@ module type S = sig
   val dispatch : t -> input -> output Deferred.t
 end
 
+(** [Make (Worker)] creates a supervisor which wraps dispatches to [Worker]. *)
 module Make (Worker : Worker_intf) :
   S
   with type create_args := Worker.create_args

@@ -1,3 +1,10 @@
+(** The transition frontier is the data structure for tracking active forks
+ *  at the "frontier" of the blockchain being constructed by the network.
+ *  It includes support for extensions (incremental views on top of this
+ *  data structure), persistence (saving/loading the data structure
+ *  to/from disk), and various queries.
+ *)
+
 open Async_kernel
 open Coda_base
 open Frontier_base

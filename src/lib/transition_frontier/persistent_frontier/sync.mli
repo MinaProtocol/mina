@@ -1,3 +1,9 @@
+(** This module provides the implementation for actively "syncing" the
+ *  persistent frontier database. A [Sync] job can be created, and can
+ *  then be sent diffs to accumulate and apply to the databse in chunks
+ *  (using the [Diff_buffer]).
+ *)
+
 open Async_kernel
 open Coda_base
 open Frontier_base

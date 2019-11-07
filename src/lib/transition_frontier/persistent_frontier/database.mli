@@ -1,3 +1,12 @@
+(** This module implements the RocksDB interface for interacting with the
+ *  persistent frontier's database. This interface includes all of the
+ *  basic low level interactions with the database, as well as functionality
+ *  for checking the database for structural errors (corruption). Errors
+ *  returned from this module come in the form of polymorphic variants.
+ *  The [Error] module is provided as a simple interface for converting
+ *  these polymorphic variant errors into human readable strings.
+ *)
+
 open Async_kernel
 open Core_kernel
 open Coda_base

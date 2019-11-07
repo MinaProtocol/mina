@@ -1,3 +1,8 @@
+(** A breadcrumb is a "full node" in the transition frontier. It contains the
+ *  fully expanded state from an external transition, including the full
+ *  staged ledger at that state of the blockchain.
+ *)
+
 open Async_kernel
 open Core_kernel
 open Signature_lib

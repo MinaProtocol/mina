@@ -1,3 +1,14 @@
+(** Transition frontier extensions defines the set of extensions which are
+ *  attached to an instance of a transition frontier. A transition frontier
+ *  extension is an incrementally computed view on the transition frontier's
+ *  contents. Extensions synchronously recieve diffs applied to the transition
+ *  frontier. Every extension is associated with a broadcast pipe, which allows
+ *  outside consumers of extensions to recieve updates a extension's view.
+ *  Calling [notify] from this module will update all extensions with the new
+ *  transition frontier diffs, waiting for all consumers of each extensions'
+ *  broadcast pipes to finish handling any view updates that may occur.
+ *)
+
 open Async_kernel
 open Pipe_lib
 open Frontier_base

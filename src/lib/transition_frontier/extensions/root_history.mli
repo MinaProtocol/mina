@@ -1,3 +1,8 @@
+(** The root history extension provides a historical view into previous roots the
+ *  transition frontier has maintained. The root history will store at most the
+ *  [2*k] historical roots.
+ *)
+
 open Coda_base
 open Frontier_base
 

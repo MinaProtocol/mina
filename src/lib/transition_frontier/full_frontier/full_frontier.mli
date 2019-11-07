@@ -1,3 +1,14 @@
+(** This module is the core implementation of the in memory "full frontier".
+ *  In this context, "full" refers to the fact that this frontier contains
+ *  "fully expanded blockchain states" (i.e. [Breadcrumb]s). By comparison,
+ *  the persistent frontier only contains "light blockchain states" (i.e.
+ *  [External_transition]s). This module is only concerned with the core
+ *  data structure of the frontier, and is further wrapped with logic to
+ *  integrate the core data structure with the various other concerns of
+ *  the transition frontier (e.g. extensions, persistence, etc...) in the
+ *  externally available [Transition_frontier] module.
+ *)
+
 open Coda_base
 open Frontier_base
 

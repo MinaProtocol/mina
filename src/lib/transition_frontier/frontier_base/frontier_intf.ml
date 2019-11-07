@@ -1,5 +1,8 @@
 open Coda_base
 
+(** This is the base signature for a full frontier, shared by any implementation
+ *  of a full frontier. Currently, this includes the internal [Full_frontier]
+ *  and external [Transition_frontier] modules. *)
 module type S = sig
   type t
 
