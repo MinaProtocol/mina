@@ -78,6 +78,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
 let%test_module "transaction_status" =
   ( module struct
     open Async
+    open Coda_numbers
 
     let max_length = 10
 
@@ -102,7 +103,7 @@ let%test_module "transaction_status" =
 
     let gen_user_command =
       User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
-        ~key_gen ()
+        ~key_gen ~nonce:(Account_nonce.of_int 1) ()
 
     let create_pool ~frontier_broadcast_pipe =
       let incoming_diffs, _ = Linear_pipe.create () in
