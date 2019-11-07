@@ -31,41 +31,22 @@ end
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t =
-      | One of Single.Stable.V1.t
-      | Two of Single.Stable.V1.t * Single.Stable.V1.t
+    type t = Single.Stable.V1.t One_or_two.Stable.V1.t
     [@@deriving sexp, compare, eq, yojson, hash]
 
     let to_latest = Fn.id
   end
 end]
 
-type t = Stable.Latest.t =
-  | One of Single.Stable.V1.t
-  | Two of Single.Stable.V1.t * Single.Stable.V1.t
+type t = Single.Stable.Latest.t One_or_two.Stable.Latest.t
 [@@deriving sexp, compare, yojson, hash]
 
 include Comparable.Make (Stable.Latest)
 
-let to_list = function One x -> [x] | Two (x, y) -> [x; y]
-
-let of_single s = One s
-
-let of_single_list xs =
-  let rec go acc = function
-    | x1 :: x2 :: xs ->
-        go (Two (x1, x2) :: acc) xs
-    | [] ->
-        acc
-    | [x] ->
-        One x :: acc
-  in
-  go [] xs
-
 let fee_excess = function
-  | One (_, fee) ->
+  | `One (_, fee) ->
       Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned fee)
-  | Two ((_, fee1), (_, fee2)) -> (
+  | `Two ((_, fee1), (_, fee2)) -> (
     match Currency.Fee.add fee1 fee2 with
     | None ->
         Or_error.error_string "Fee_transfer.fee_excess: overflow"
@@ -73,4 +54,4 @@ let fee_excess = function
         Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned res)
     )
 
-let receivers t = List.map (to_list t) ~f:(fun (pk, _) -> pk)
+let receivers t = One_or_two.map t ~f:(fun (pk, _) -> pk)
