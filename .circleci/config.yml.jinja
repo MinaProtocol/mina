@@ -328,7 +328,7 @@ jobs:
                   {%- endif %}
             - run:
                   name: Upload generated keys
-                  command: aws s3 sync /tmp/coda_cache_dir/ s3://snark-keys.o1test.net/
+                  command: aws s3 sync --acl public-read /tmp/coda_cache_dir/ s3://snark-keys.o1test.net/
             {# - run:
                   name: Rebuild for pvkey changes
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'

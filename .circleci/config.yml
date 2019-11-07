@@ -316,7 +316,7 @@ jobs:
                   no_output_timeout: 20m
             - run:
                   name: Upload generated keys
-                  command: aws s3 sync /tmp/coda_cache_dir/ s3://snark-keys.o1test.net/
+                  command: aws s3 sync --acl public-read /tmp/coda_cache_dir/ s3://snark-keys.o1test.net/
             
             - run:
                   name: Build deb package with PV keys and PV key tar
