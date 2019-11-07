@@ -1,8 +1,20 @@
 open Core
 
-type t =
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t =
+      { trust: float
+      ; trust_last_updated: Core.Time.Stable.V1.t
+      ; banned_until_opt: Core.Time.Stable.V1.t Core_kernel.Option.Stable.V1.t
+      }
+
+    let to_latest = Fn.id
+  end
+end]
+
+type t = Stable.Latest.t =
   {trust: float; trust_last_updated: Time.t; banned_until_opt: Time.t Option.t}
-[@@deriving bin_io]
 
 module type S = sig
   val init : unit -> t
