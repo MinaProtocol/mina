@@ -89,7 +89,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
               , Snark_transition.coinbase_amount transition
               , Snark_transition.coinbase_state_body_hash transition )
           in
-          (new_root, deleted_stack)
+          if Coda_compile_config.pending_coinbase_hack then
+            (new_root, Pending_coinbase.Stack.Checked.empty)
+          else (new_root, deleted_stack)
         in
         let%bind correct_coinbase_status =
           let new_root =
@@ -97,7 +99,11 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
             |> Blockchain_state.staged_ledger_hash
             |> Staged_ledger_hash.pending_coinbase_hash_var
           in
-          Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
+          (*TODO: disabling the pending coinbase check until the prover crash is fixed*)
+          if Coda_compile_config.pending_coinbase_hack then
+            Checked.return Boolean.true_
+          else
+            Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
         in
         let%bind correct_transaction_snark =
           verify_complete_merge
@@ -131,7 +137,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                   read Boolean.typ correct_coinbase_status
                 and result = read Boolean.typ result in
                 Logger.trace logger
-                  "blockchain snark update success: $result = \
+                  "blockchain snark update success (check pending coinbase = \
+                   $check): $result = \
                    (correct_transaction_snark=$correct_transaction_snark ∨ \
                    nothing_changed=$nothing_changed) ∧ \
                    updated_consensus_state=$updated_consensus_state ∧ \
@@ -143,7 +150,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                     ; ("nothing_changed", `Bool nothing_changed)
                     ; ("updated_consensus_state", `Bool updated_consensus_state)
                     ; ("correct_coinbase_status", `Bool correct_coinbase_status)
-                    ; ("result", `Bool result) ]))
+                    ; ("result", `Bool result)
+                    ; ("check", `Bool Coda_compile_config.pending_coinbase_hack)
+                    ]))
         in
         result
       in
