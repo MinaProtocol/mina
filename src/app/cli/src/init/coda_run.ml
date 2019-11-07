@@ -65,11 +65,7 @@ let get_lite_chain :
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
 (*TODO check deferred now and copy theose files to the temp directory*)
-let log_shutdown ~conf_dir:_ ~top_logger:_ _coda_ref =
-  (* [new] TODO: !important add visualization logging back in *)
-  ()
-
-(*
+let log_shutdown ~conf_dir ~top_logger coda_ref =
   let logger =
     Logger.extend top_logger
       [("coda_run", `String "Logging state before program ends")]
@@ -93,7 +89,6 @@ let log_shutdown ~conf_dir:_ ~top_logger:_ _coda_ref =
     | `Bootstrapping ->
         Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
           (Visualization_message.bootstrap "transition frontier") )
-  *)
 
 let remove_prev_crash_reports ~conf_dir =
   Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*" conf_dir)
