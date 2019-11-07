@@ -21,7 +21,7 @@ module Make (Inputs : Inputs_intf) :
     let%map root_data = Root_history.lookup root_history state_hash in
     root_data.transition
 
-  module Merkle_list = Merkle_list_prover.Make (struct
+  module Merkle_list = Merkle_list_prover.Make_ident (struct
     type value = External_transition.Validated.t
 
     type context = Transition_frontier.t

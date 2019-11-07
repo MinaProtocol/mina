@@ -9,7 +9,16 @@ module type S = S
 module Extend : F
 
 module UInt64 : sig
-  include S with type t = Unsigned.UInt64.t
+  module Stable : sig
+    module V1 : sig
+      type t = Unsigned.UInt64.t
+      [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
+    end
+
+    module Latest = V1
+  end
+
+  include S with type t = Stable.Latest.t
 
   val to_uint64 : t -> uint64
 
@@ -17,7 +26,16 @@ module UInt64 : sig
 end
 
 module UInt32 : sig
-  include S with type t = Unsigned.UInt32.t
+  module Stable : sig
+    module V1 : sig
+      type t = Unsigned.UInt32.t
+      [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
+    end
+
+    module Latest = V1
+  end
+
+  include S with type t = Stable.Latest.t
 
   val to_uint32 : t -> uint32
 

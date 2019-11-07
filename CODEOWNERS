@@ -97,7 +97,6 @@
 /src/lib/snark_bits/ @bkase @mrmr1993 @imeckler
 /src/lib/snark_worker/ @cmr @nholland94 @imeckler
 /src/lib/snark_keys/ @mrmr1993 @imeckler
-/src/lib/snarkette/ @bkase @imeckler @mrmr1993
 /src/lib/snarky/ @mrmr1993 @imeckler
 /src/lib/snarky_blake2/ @rbkhmrcr @vanishreerao @imeckler @mrmr1993
 /src/lib/snarky_curves/ @rbkhmrcr @vanishreerao @imeckler @mrmr1993

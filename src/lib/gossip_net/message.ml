@@ -5,13 +5,11 @@ open Network_pool
 
 module Master = struct
   module T = struct
-    (* "master" types, do not change *)
     type msg =
-      | New_state of External_transition.Stable.V1.t
-      | Snark_pool_diff of Snark_pool.Resource_pool.Diff.Stable.V1.t
-      | Transaction_pool_diff of
-          Transaction_pool.Resource_pool.Diff.Stable.V1.t
-    [@@deriving bin_io, sexp, to_yojson]
+      | New_state of External_transition.t
+      | Snark_pool_diff of Snark_pool_diff.t
+      | Transaction_pool_diff of Transaction_pool_diff.t
+    [@@deriving sexp, to_yojson]
   end
 
   let name = "message"
@@ -23,15 +21,12 @@ end
 include Master.T
 include Versioned_rpc.Both_convert.One_way.Make (Master)
 
-type t = msg [@@deriving sexp, to_yojson]
-
 module V1 = struct
   module T = struct
     type msg = Master.T.msg =
       | New_state of External_transition.Stable.V1.t
-      | Snark_pool_diff of Snark_pool.Resource_pool.Diff.Stable.V1.t
-      | Transaction_pool_diff of
-          Transaction_pool.Resource_pool.Diff.Stable.V1.t
+      | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
+      | Transaction_pool_diff of Transaction_pool_diff.Stable.V1.t
     [@@deriving bin_io, sexp, version {rpc}]
 
     let callee_model_of_msg = Fn.id

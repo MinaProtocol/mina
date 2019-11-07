@@ -117,19 +117,14 @@ let jobOpenings = [|
   ("product-manager", "Product Manager (San Francisco)"),
   ("senior-designer", "Senior Designer (San Francisco)"),
   (
-    "senior-frontend-engineer",
-    "Senior Product Engineer (Frontend) (San Francisco)",
-  ),
-  (
-    "fullstack-engineer",
-    "Senior Product Engineer (Full-stack) (San Francisco)",
+    "platform-engineer",
+    "Senior Platform Engineer (Frontend Product) (San Francisco)",
   ),
   (
     "marketing-and-communications-manager",
     "Marketing and Communications Manager (San Francisco)",
   ),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)"),
-  ("cryptography-engineer", "Cryptography Engineer (San Francisco)"),
 |];
 
 Rimraf.sync("site");
@@ -206,6 +201,13 @@ Router.(
           name =>
             <Page page=`Testnet name extraHeaders={Testnet.extraHeaders()}>
               <Wrapped> <Testnet /> </Wrapped>
+            </Page>,
+        ),
+        File(
+          "sfbw",
+          name =>
+            <Page page=`Sfbw name extraHeaders={Testnet.extraHeaders()}>
+              <Wrapped> <Sfbw /> </Wrapped>
             </Page>,
         ),
         RawFile(

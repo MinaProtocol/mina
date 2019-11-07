@@ -70,7 +70,7 @@ let schedule_user_command t (txn : User_command.t) account_opt :
     @@ Or_error.error_string "Invalid user command: account balance is too low"
   else
     let txn_pool = Coda_lib.transaction_pool t in
-    let%map () = Network_pool.Transaction_pool.add txn_pool txn in
+    let%map () = Network_pool.Transaction_pool.add txn_pool [txn] in
     let logger =
       Logger.extend
         (Coda_lib.top_level_logger t)
@@ -219,32 +219,17 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let schedule_user_commands t (txns : User_command.t list) :
     unit Deferred.t Participating_state.t =
-  let open Participating_state.Let_syntax in
-  (* The ordering is important here. We need to create *one* deferred inside the
-     Participating_state monad, if we create multiple and sequence them
-     afterward the run order is undefined. *)
-  let%map account_txn_pairs =
-    List.map txns ~f:(fun txn ->
-        get_account t (Public_key.compress txn.sender) >>| fun acc -> (acc, txn)
-    )
-    |> Participating_state.sequence
+  Participating_state.return
+  @@
+  let txn_pool = Coda_lib.transaction_pool t in
+  let logger =
+    Logger.extend
+      (Coda_lib.top_level_logger t)
+      [("coda_command", `String "scheduling a batch of user transactions")]
   in
-  Deferred.List.iter ~how:`Sequential account_txn_pairs
-    ~f:(fun (account_opt, txn) ->
-      let open Deferred.Let_syntax in
-      match%map schedule_user_command t txn account_opt with
-      | Ok () ->
-          ()
-      | Error err ->
-          let logger =
-            Logger.extend
-              (Coda_lib.top_level_logger t)
-              [("coda_command", `String "scheduling a user command")]
-          in
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:[("error", `String (Error.to_string_hum err))]
-            "Failure in schedule_user_commands: $error. This is not yet \
-             reported to the client, see #1143" )
+  Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+    "batch-send-payments does not yet report errors" ;
+  Network_pool.Transaction_pool.add txn_pool txns
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in

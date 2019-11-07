@@ -458,8 +458,8 @@ let update_metrics_with_diff (type mutant) t
           |> Coda_numbers.Length.to_int )
       in
       let global_slot =
-        Int.to_float
-          (Consensus.Data.Consensus_state.global_slot consensus_state)
+        Consensus.Data.Consensus_state.global_slot consensus_state
+        |> Unsigned.UInt32.to_int |> Float.to_int
       in
       Coda_metrics.(
         let num_breadcrumbs_removed =
@@ -478,7 +478,7 @@ let update_metrics_with_diff (type mutant) t
         Counter.inc_one Transition_frontier.root_transitions ;
         Gauge.set Transition_frontier.slot_fill_rate
           (blockchain_length /. global_slot) ;
-        Transition_frontier.TPS_10min.update num_finalized_staged_txns)
+        Transition_frontier.TPS_30min.update num_finalized_staged_txns)
       (* TODO: optimize and add these metrics back in (#2850) *)
       (*
         let root_snarked_ledger_accounts =

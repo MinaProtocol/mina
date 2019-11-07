@@ -26,14 +26,21 @@ end
 open Input
 
 module Send_payment_input = struct
-  (* TODO : version *)
-  type t =
-    Private_key.Stable.V1.t
-    * Public_key.Compressed.Stable.V1.t
-    * Currency.Amount.Stable.V1.t
-    * Currency.Fee.Stable.V1.t
-    * User_command_memo.Stable.V1.t
-  [@@deriving bin_io]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        Private_key.Stable.V1.t
+        * Public_key.Compressed.Stable.V1.t
+        * Currency.Amount.Stable.V1.t
+        * Currency.Fee.Stable.V1.t
+        * User_command_memo.Stable.V1.t
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t
 end
 
 module T = struct
@@ -296,7 +303,7 @@ module T = struct
 
     let send_user_command =
       C.create_rpc ~name:"send_user_command" ~f:send_payment_impl
-        ~bin_input:Send_payment_input.bin_t
+        ~bin_input:Send_payment_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
@@ -421,11 +428,11 @@ module T = struct
               ~location typ
           in
           let receipt_chain_database =
-            Receipt_chain_database.create ~directory:receipt_chain_dir_name
+            Receipt_chain_database.create receipt_chain_dir_name
           in
           trace_database_initialization "receipt_chain_database" __LOC__
             receipt_chain_dir_name ;
-          let trust_system = Trust_system.create ~db_dir:trust_dir in
+          let trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let transaction_database =
             Auxiliary_database.Transaction_database.create ~logger
@@ -604,7 +611,8 @@ module T = struct
             Coda_lib.stop_snark_worker ~should_wait_kill:true coda
           in
           let coda_new_block key =
-            Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
+            Deferred.return
+            @@ Coda_commands.Subscriptions.new_block coda (Some key)
           in
           (* TODO: #2836 Remove validated_transitions_keyswaptest once the refactoring of broadcast pipe enters the code base *)
           let ( validated_transitions_keyswaptest_reader

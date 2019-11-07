@@ -52,8 +52,15 @@ module Get_chain_id = struct
       let caller_model_of_response = Fn.id
     end
 
-    include T
-    include Register (T)
+    module T' =
+      Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+          include M
+          include Master
+        end)
+        (T)
+
+    include T'
+    include Register (T')
   end
 end
 
@@ -83,13 +90,6 @@ module Peer_set = struct
 
   let high_connectivity_signal {high_connectivity_signal; _} =
     high_connectivity_signal
-end
-
-module Connection_with_state = struct
-  type t = Banned | Allowed of Rpc.Connection.t Ivar.t
-
-  let value_map ~when_allowed ~when_banned t =
-    match t with Allowed c -> when_allowed c | _ -> when_banned
 end
 
 module Config = struct
@@ -135,9 +135,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; peer_event_reader: Peer.Event.t Linear_pipe.Reader.t
       ; mutable libp2p_membership: Coda_net2.net option
       ; connections:
-          ( Unix.Inet_addr.t
-          , (Uuid.t, Connection_with_state.t) Hashtbl.t )
-          Hashtbl.t
+          (Unix.Inet_addr.t, (Uuid.t, Rpc.Connection.t) Hashtbl.t) Hashtbl.t
       ; first_connect_signal: unit Ivar.t }
 
     (* OPTIMIZATION: use fast n choose k implementation - see python or old flow code *)
@@ -185,114 +183,165 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     let is_unix_errno errno unix_errno =
       Int.equal (Unix.Error.compare errno unix_errno) 0
 
+    (** Attempt to prepare for a new connection. If the peer is unbanned and we're
+        not at the connection limit for that peer, return functions to be called
+        when the connection is established and closed.
+    *)
+    let setup_track_connection :
+           t
+        -> Unix.Inet_addr.t
+        -> [ `Banned
+           | `At_max_connections
+           | `Unbanned of
+             [`When_established of Rpc.Connection.t -> unit]
+             * [`When_closed of unit -> unit] ] =
+     fun t addr ->
+      match
+        (Trust_system.Peer_trust.lookup t.config.trust_system addr).banned
+      with
+      | Banned_until _ ->
+          `Banned
+      | Unbanned ->
+          let conn_map =
+            Hashtbl.find_or_add t.connections addr ~default:(fun () ->
+                Hashtbl.create (module Uuid) )
+          in
+          if
+            Hashtbl.length conn_map
+            >= Option.value_exn t.config.max_concurrent_connections
+          then `At_max_connections
+          else
+            let uuid = Uuid_unix.create () in
+            let ivar = Ivar.create () in
+            Hashtbl.add_exn conn_map ~key:uuid ~data:ivar ;
+            `Unbanned
+              ( `When_established (Ivar.fill ivar)
+              , `When_closed
+                  (fun () ->
+                    Hashtbl.remove conn_map uuid ;
+                    if Hashtbl.length conn_map = 0 then
+                      Hashtbl.remove t.connections addr ) )
+
     let rec try_call_rpc_with_dispatch : type r q.
         t -> Peer.t -> (r, q) dispatch -> r -> q Deferred.Or_error.t =
-     fun t peer dispatch query ->
-      let call () =
-        Rpc.Connection.with_client (to_where_to_connect t peer) (fun conn ->
-            Versioned_rpc.Connection_with_menu.create conn
-            >>=? fun conn' -> dispatch conn' query )
-        >>= function
-        | Ok (Ok result) ->
-            (* call succeeded, result is valid *)
-            let%map () =
-              if Hash_set.mem t.disconnected_peers peer then (
-                (* optimistically, mark all disconnected peers as peers *)
-                Logger.info t.config.logger ~module_:__MODULE__
-                  ~location:__LOC__
-                  ~metadata:[("peer", Peer.to_yojson peer)]
-                  !"On RPC call, reconnected to a disconnected peer: $peer" ;
-                unmark_all_disconnected_peers t )
-              else return ()
-            in
-            Ok result
-        | Ok (Error err) -> (
-            (* call succeeded, result is an error *)
-            Logger.error t.config.logger ~module_:__MODULE__ ~location:__LOC__
-              "RPC call error: $error, same error in machine format: \
-               $machine_error"
-              ~metadata:
-                [ ("error", `String (Error.to_string_hum err))
-                ; ("machine_error", `String (Error.to_string_mach err)) ] ;
-            match (Error.to_exn err, Error.sexp_of_t err) with
-            | ( _
-              , Sexp.List
-                  [ Sexp.Atom
-                      "src/connection.ml.Handshake_error.Handshake_error"
-                  ; _ ] ) ->
-                let%map () =
-                  Trust_system.(
-                    record t.config.trust_system t.config.logger peer.host
-                      Actions.
-                        ( Outgoing_connection_error
-                        , Some ("handshake error", []) ))
-                in
-                remove_peer t peer ; Error err
-            | ( _
-              , Sexp.List
-                  [ Sexp.List
-                      [ Sexp.Atom "rpc_error"
-                      ; Sexp.List [Sexp.Atom "Connection_closed"; _] ]
-                  ; _connection_description
-                  ; _rpc_tag
-                  ; _rpc_version ] ) ->
-                let%map () =
-                  Trust_system.(
-                    record t.config.trust_system t.config.logger peer.host
-                      Actions.
-                        ( Outgoing_connection_error
-                        , Some ("Closed connection", []) ))
-                in
-                remove_peer t peer ; Error err
-            | _ ->
-                let%map () =
-                  Trust_system.(
-                    record t.config.trust_system t.config.logger peer.host
-                      Actions.
-                        ( Violated_protocol
-                        , Some
-                            ( "RPC call failed, reason: $exn"
-                            , [("exn", `String (Error.to_string_hum err))] ) ))
-                in
-                remove_peer t peer ; Error err )
-        | Error monitor_exn -> (
-            (* call itself failed *)
-            (* TODO: learn what other exceptions are raised here *)
-            let exn = Monitor.extract_exn monitor_exn in
-            match exn with
-            | Unix.Unix_error (errno, _, _)
-              when is_unix_errno errno Unix.ECONNREFUSED ->
-                let%map () =
-                  Trust_system.(
-                    record t.config.trust_system t.config.logger peer.host
-                      Actions.
-                        ( Outgoing_connection_error
-                        , Some ("Connection refused", []) ))
-                in
-                mark_peer_disconnected t peer ;
-                Or_error.of_exn exn
-            | _ ->
-                Logger.error t.config.logger ~module_:__MODULE__
-                  ~location:__LOC__ "RPC call raised an exception: $exn"
-                  ~metadata:[("exn", `String (Exn.to_string exn))] ;
-                return (Or_error.of_exn exn) )
-      in
-      match Hashtbl.find t.connections peer.host with
-      | None ->
-          call ()
-      | Some conn_map ->
-          if
-            Option.is_some t.config.max_concurrent_connections
-            && Hashtbl.length conn_map
-               >= Option.value_exn t.config.max_concurrent_connections
-          then
-            Deferred.return
-              (Or_error.errorf
-                 !"Not connecting to peer %s. Number of open connections to \
-                   the peer equals the limit %d.\n"
-                 (Peer.to_string peer)
-                 (Option.value_exn t.config.max_concurrent_connections))
-          else call ()
+      match setup_track_connection t peer.host with
+      | `Banned ->
+          (* The peer set should never include banned peers, so this should never
+             be called with a banned peer. *)
+          Logger.fatal t.config.logger ~module_:__MODULE__ ~location:__LOC__
+            "Tried to connect to a banned peer in try_call_rpc. This should \
+             never happen." ;
+          Core.exit 121
+      | `At_max_connections ->
+          (* We could also block here until we're under the limit, but it's better
+           if progress is quick and retries happen in the caller. *)
+          Deferred.return
+            (Or_error.errorf
+               !"Not connecting to peer %s. Number of open connections to the \
+                 peer equals the limit %d.\n"
+               (Peer.to_string peer)
+               (Option.value_exn t.config.max_concurrent_connections))
+      | `Unbanned (`When_established store_conn, `When_closed cleanup_conn) ->
+          File_system.try_finally
+            ~finally:(fun () -> cleanup_conn () ; Deferred.unit)
+            ~f:(fun () ->
+              Rpc.Connection.with_client (to_where_to_connect t peer)
+                (fun conn ->
+                  store_conn conn ;
+                  Versioned_rpc.Connection_with_menu.create conn
+                  >>=? fun conn' -> dispatch conn' query )
+              >>= function
+              | Ok (Ok result) ->
+                  (* call succeeded, result is valid *)
+                  let%map () =
+                    if Hash_set.mem t.disconnected_peers peer then (
+                      (* optimistically, mark all disconnected peers as peers *)
+                      Logger.info t.config.logger ~module_:__MODULE__
+                        ~location:__LOC__
+                        ~metadata:[("peer", Peer.to_yojson peer)]
+                        !"On RPC call, reconnected to a disconnected peer: \
+                          $peer" ;
+                      unmark_all_disconnected_peers t )
+                    else return ()
+                  in
+                  Ok result
+              | Ok (Error err) -> (
+                  (* call succeeded, result is an error *)
+                  Logger.error t.config.logger ~module_:__MODULE__
+                    ~location:__LOC__
+                    "RPC call error: $error, same error in machine format: \
+                     $machine_error"
+                    ~metadata:
+                      [ ("error", `String (Error.to_string_hum err))
+                      ; ("machine_error", `String (Error.to_string_mach err))
+                      ] ;
+                  match (Error.to_exn err, Error.sexp_of_t err) with
+                  | ( _
+                    , Sexp.List
+                        [ Sexp.Atom
+                            "src/connection.ml.Handshake_error.Handshake_error"
+                        ; _ ] ) ->
+                      let%map () =
+                        Trust_system.(
+                          record t.config.trust_system t.config.logger
+                            peer.host
+                            Actions.
+                              ( Outgoing_connection_error
+                              , Some ("handshake error", []) ))
+                      in
+                      remove_peer t peer ; Error err
+                  | ( _
+                    , Sexp.List
+                        [ Sexp.List
+                            [ Sexp.Atom "rpc_error"
+                            ; Sexp.List [Sexp.Atom "Connection_closed"; _] ]
+                        ; _connection_description
+                        ; _rpc_tag
+                        ; _rpc_version ] ) ->
+                      let%map () =
+                        Trust_system.(
+                          record t.config.trust_system t.config.logger
+                            peer.host
+                            Actions.
+                              ( Outgoing_connection_error
+                              , Some ("Closed connection", []) ))
+                      in
+                      remove_peer t peer ; Error err
+                  | _ ->
+                      let%map () =
+                        Trust_system.(
+                          record t.config.trust_system t.config.logger
+                            peer.host
+                            Actions.
+                              ( Violated_protocol
+                              , Some
+                                  ( "RPC call failed, reason: $exn"
+                                  , [("exn", `String (Error.to_string_hum err))]
+                                  ) ))
+                      in
+                      remove_peer t peer ; Error err )
+              | Error monitor_exn -> (
+                  (* call itself failed *)
+                  (* TODO: learn what other exceptions are raised here *)
+                  let exn = Monitor.extract_exn monitor_exn in
+                  match exn with
+                  | Unix.Unix_error (errno, _, _)
+                    when is_unix_errno errno Unix.ECONNREFUSED ->
+                      let%map () =
+                        Trust_system.(
+                          record t.config.trust_system t.config.logger
+                            peer.host
+                            Actions.
+                              ( Outgoing_connection_error
+                              , Some ("Connection refused", []) ))
+                      in
+                      mark_peer_disconnected t peer ;
+                      Or_error.of_exn exn
+                  | _ ->
+                      Logger.error t.config.logger ~module_:__MODULE__
+                        ~location:__LOC__ "RPC call raised an exception: $exn"
+                        ~metadata:[("exn", `String (Exn.to_string exn))] ;
+                      return (Or_error.of_exn exn) ) )
 
     and record_peer_events t =
       trace_recurring "peer events" (fun () ->
@@ -688,19 +737,15 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                        ~location:__LOC__
                        !"Peer %s banned, disconnecting."
                        (Unix.Inet_addr.to_string addr) ;
-                     let%map () =
-                       Deferred.List.iter (Hashtbl.to_alist conn_tbl)
-                         ~f:(fun (_, conn_state) ->
-                           Connection_with_state.value_map conn_state
-                             ~when_allowed:(fun conn_ivar ->
-                               let%bind conn = Ivar.read conn_ivar in
-                               Rpc.Connection.close conn )
-                             ~when_banned:Deferred.unit )
-                     in
-                     Hashtbl.map_inplace conn_tbl ~f:(fun conn_state ->
-                         Connection_with_state.value_map conn_state
-                           ~when_allowed:(fun _ -> Connection_with_state.Banned)
-                           ~when_banned:Banned ) )) ;
+                     (* We only close the connections here, the code that added
+                        the entries to the table is responsible for removing them
+                        afterward. *)
+                     Deferred.List.iter (Hashtbl.to_alist conn_tbl)
+                       ~f:(fun (_, conn_ivar) ->
+                         (* We can't wait for the Ivar here, the connection might
+                            never actually come up. *)
+                         Option.value_map ~default:Deferred.unit
+                           ~f:Rpc.Connection.close (Ivar.peek conn_ivar) ) )) ;
           don't_wait_for (retry_disconnected_peer t) ;
           trace_task "rebroadcasting messages" (fun () ->
               Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
@@ -776,91 +821,55 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       client_inet_addr
                       Actions.(Connected, None))
                 in
-                let conn_map =
-                  Option.value_map
-                    ~default:(Hashtbl.create (module Uuid))
-                    (Hashtbl.find t.connections client_inet_addr)
-                    ~f:Fn.id
-                in
-                let is_client_banned =
-                  let peer_status =
-                    Trust_system.Peer_trust.lookup t.config.trust_system
-                      client_inet_addr
-                  in
-                  match peer_status.banned with
-                  | Banned_until _ ->
-                      true
-                  | Unbanned ->
-                      false
-                in
-                if is_client_banned then (
-                  Logger.info t.config.logger ~module_:__MODULE__
-                    ~location:__LOC__
-                    "Rejecting connection from banned peer %s"
-                    (Socket.Address.Inet.to_string client) ;
-                  Deferred.unit )
-                else if
-                  Option.is_some t.config.max_concurrent_connections
-                  && Hashtbl.length conn_map
-                     >= Option.value_exn t.config.max_concurrent_connections
-                then (
-                  Logger.error t.config.logger ~module_:__MODULE__
-                    ~location:__LOC__
-                    "Gossip net TCP server cannot open another connection. \
-                     Number of open connections from client $client equals \
-                     the limit $max_connections"
-                    ~metadata:
-                      [ ( "client"
-                        , `String (Socket.Address.Inet.to_string client) )
-                      ; ( "max_connections"
-                        , `Int
-                            (Option.value_exn
-                               t.config.max_concurrent_connections) ) ] ;
-                  Deferred.unit )
-                else
-                  let conn_id = Uuid_unix.create () in
-                  Hashtbl.add_exn conn_map ~key:conn_id
-                    ~data:(Allowed (Ivar.create ())) ;
-                  Hashtbl.set t.connections ~key:client_inet_addr
-                    ~data:conn_map ;
-                  let%map () =
-                    Rpc.Connection.server_with_close reader writer
-                      ~implementations
-                      ~connection_state:(fun conn ->
-                        (* connection state is the client's IP and ephemeral port
-                          when connecting to the server over TCP; the ephemeral
-                          port is distinct from the client's discovery and
-                          communication ports *)
-                        Connection_with_state.value_map
-                          (Hashtbl.find_exn conn_map conn_id)
-                          ~when_allowed:(fun ivar -> Ivar.fill ivar conn)
-                          ~when_banned:() ;
-                        Hashtbl.set t.connections
-                          ~key:(Socket.Address.Inet.addr client)
-                          ~data:conn_map ;
-                        Socket.Address.Inet.to_host_and_port client )
-                      ~on_handshake_error:
-                        (`Call
-                          (fun exn ->
-                            Trust_system.(
-                              record t.config.trust_system t.config.logger
-                                client_inet_addr
-                                Actions.
-                                  ( Incoming_connection_error
-                                  , Some
-                                      ( "Handshake error: $exn"
-                                      , [("exn", `String (Exn.to_string exn))]
-                                      ) )) ))
-                  in
-                  let conn_map =
-                    Hashtbl.find_exn t.connections client_inet_addr
-                  in
-                  Hashtbl.remove conn_map conn_id ;
-                  if Hashtbl.is_empty conn_map then
-                    Hashtbl.remove t.connections client_inet_addr
-                  else
-                    Hashtbl.set t.connections ~key:client_inet_addr
-                      ~data:conn_map )
+                match setup_track_connection t client_inet_addr with
+                | `Banned ->
+                    Logger.info t.config.logger ~module_:__MODULE__
+                      ~location:__LOC__
+                      "Rejecting connection from banned peer %s"
+                      (Socket.Address.Inet.to_string client) ;
+                    Deferred.unit
+                | `At_max_connections ->
+                    Logger.error t.config.logger ~module_:__MODULE__
+                      ~location:__LOC__
+                      "Gossip net TCP server cannot open another connection. \
+                       Number of open connections from client $client equals \
+                       the limit $max_connections"
+                      ~metadata:
+                        [ ( "client"
+                          , `String (Socket.Address.Inet.to_string client) )
+                        ; ( "max_connections"
+                          , `Int
+                              (Option.value_exn
+                                 t.config.max_concurrent_connections) ) ] ;
+                    Deferred.unit
+                | `Unbanned
+                    (`When_established store_conn, `When_closed cleanup_conn)
+                  ->
+                    File_system.try_finally
+                      ~finally:(fun () -> cleanup_conn () ; Deferred.unit)
+                      ~f:(fun () ->
+                        Rpc.Connection.server_with_close reader writer
+                          ~implementations
+                          ~connection_state:(fun conn ->
+                            (* connection state is the client's IP and ephemeral port
+                            when connecting to the server over TCP; the ephemeral
+                            port is distinct from the client's discovery and
+                            communication ports *)
+                            store_conn conn ;
+                            Socket.Address.Inet.to_host_and_port client )
+                          ~on_handshake_error:
+                            (`Call
+                              (fun exn ->
+                                Trust_system.(
+                                  record t.config.trust_system t.config.logger
+                                    client_inet_addr
+                                    Actions.
+                                      ( Incoming_connection_error
+                                      , Some
+                                          ( "Handshake error: $exn"
+                                          , [ ( "exn"
+                                              , `String (Exn.to_string exn) )
+                                            ] ) )) )) ) )
           in
           t )
 

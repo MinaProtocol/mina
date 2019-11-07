@@ -135,7 +135,7 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%map () =
-                Transaction_pool.add transaction_pool user_command
+                Transaction_pool.add transaction_pool [user_command]
               in
               Logger.info logger "Hello" ~module_:__MODULE__ ~location:__LOC__ ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
@@ -157,7 +157,7 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%map () =
-                Transaction_pool.add transaction_pool user_command
+                Transaction_pool.add transaction_pool [user_command]
               in
               Logger.info logger "Computing status" ~module_:__MODULE__
                 ~location:__LOC__ ;
@@ -192,7 +192,7 @@ let%test_module "transaction_status" =
               in
               let%map () =
                 Deferred.List.iter pool_user_commands ~f:(fun user_command ->
-                    Transaction_pool.add transaction_pool user_command )
+                    Transaction_pool.add transaction_pool [user_command] )
               in
               Logger.info logger "Computing status" ~module_:__MODULE__
                 ~location:__LOC__ ;

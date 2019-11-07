@@ -291,6 +291,8 @@ end
 
 type t = Stable.Latest.t = {null: bool; metadata: Metadata.t; id: string}
 
+let metadata t = t.metadata
+
 let create ?(metadata = []) ?(id = "default") () =
   let pid = lazy (Unix.getpid () |> Pid.to_int) in
   let metadata' = ("pid", `Int (Lazy.force pid)) :: metadata in
@@ -309,16 +311,15 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   ; message
   ; metadata= Metadata.extend t.metadata metadata }
 
-let log ({id; _} as t) ~level ~module_ ~location ?(metadata = []) fmt =
+let raw ({id; _} as t) msg =
+  if t.null then ()
+  else if Message.check_invariants msg then
+    Consumer_registry.broadcast_log_message ~id msg
+  else failwith "invalid log call"
+
+let log t ~level ~module_ ~location ?(metadata = []) fmt =
   let f message =
-    if t.null then ()
-    else
-      let message =
-        make_message t ~level ~module_ ~location ~metadata ~message
-      in
-      if Message.check_invariants message then
-        Consumer_registry.broadcast_log_message ~id message
-      else failwith "invalid log call"
+    raw t @@ make_message t ~level ~module_ ~location ~metadata ~message
   in
   ksprintf f fmt
 

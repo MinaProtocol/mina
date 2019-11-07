@@ -23,7 +23,7 @@ module type Basic = sig
     val map_ : 'a t_ -> f:('a -> 'b) -> 'b t_
 
     module Unchecked : sig
-      type t = Field.t t_
+      type t = Field.t t_ [@@deriving yojson]
     end
 
     type t = Field.Var.t t_

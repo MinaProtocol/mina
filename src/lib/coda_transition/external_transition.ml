@@ -140,23 +140,19 @@ module Validation = struct
           * 'delta_transition_chain
           * 'frontier_dependencies
           * 'staged_ledger_diff
-          constraint
-            'time_received =
-            [`Time_received] * (unit, _) Truth.Stable.V1.t
-          constraint 'proof = [`Proof] * (unit, _) Truth.Stable.V1.t
+          constraint 'time_received = [`Time_received] * (unit, _) Truth.t
+          constraint 'proof = [`Proof] * (unit, _) Truth.t
           constraint
             'delta_transition_chain =
             [`Delta_transition_chain]
-            * ( State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
-              , _ )
-              Truth.Stable.V1.t
+            * (State_hash.Stable.V1.t Non_empty_list.Stable.V1.t, _) Truth.t
           constraint
             'frontier_dependencies =
-            [`Frontier_dependencies] * (unit, _) Truth.Stable.V1.t
+            [`Frontier_dependencies] * (unit, _) Truth.t
           constraint
             'staged_ledger_diff =
-            [`Staged_ledger_diff] * (unit, _) Truth.Stable.V1.t
-        [@@deriving version]
+            [`Staged_ledger_diff] * (unit, _) Truth.t
+        [@@deriving version {of_binable}]
       end
 
       include T
@@ -541,19 +537,16 @@ module Validated = struct
       module T = struct
         type t =
           (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
-          * ( [`Time_received]
-              * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
-            , [`Proof] * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
+          * ( [`Time_received] * (unit, Truth.True.t) Truth.t
+            , [`Proof] * (unit, Truth.True.t) Truth.t
             , [`Delta_transition_chain]
               * ( State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
-                , Truth.True.Stable.V1.t )
-                Truth.Stable.V1.t
-            , [`Frontier_dependencies]
-              * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t
-            , [`Staged_ledger_diff]
-              * (unit, Truth.True.Stable.V1.t) Truth.Stable.V1.t )
+                , Truth.True.t )
+                Truth.t
+            , [`Frontier_dependencies] * (unit, Truth.True.t) Truth.t
+            , [`Staged_ledger_diff] * (unit, Truth.True.t) Truth.t )
             Validation.Stable.V1.t
-        [@@deriving version]
+        [@@deriving version {of_binable}]
 
         module Erased = struct
           (* if this type receives a new version, that changes the serialization of

@@ -61,17 +61,17 @@ jobs:
 
     build-archive:
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
               environment: 
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
             - image: postgres:12
-              environment: 
+              environment:
                 POSTGRES_PASSWORD: codarules
                 POSTGRES_USER: admin
                 POSTGRES_DB: archiver
             - image: hasura/graphql-engine:v1.0.0-beta.6
-              environment: 
+              environment:
                 HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
                 HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
                 HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
@@ -86,12 +86,12 @@ jobs:
             - run:
                   name: Build Archive Process
                   command:  bash -c 'eval `opam config env` && make build_archive'
-            - run: 
+            - run:
                   name: Configure Hasura
-                  command: ls && ./scripts/archive/make_hasura_configurations.sh     
+                  command: ls && ./scripts/archive/make_hasura_configurations.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -112,6 +112,14 @@ jobs:
             - run:
                   name: Require ppx_coda preprocessing for linting
                   command: ./scripts/require-ppx-coda.py
+    lint-opt:
+        docker:
+            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+        steps:
+            - checkout
+            - run:
+                  name: Compare versioned types in PR
+                  command: ./scripts/compare_pr_diff_types.sh
     update-branch-protection:
         docker:
             - image: python:3
@@ -123,6 +131,21 @@ jobs:
             - run:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
+
+    build-auxiliary:
+        docker:
+            - image: nixos/nix
+        steps:
+            - checkout
+            - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
 
     build-macos:
       # only run when there's a 'release' tag
@@ -265,7 +288,7 @@ jobs:
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -314,7 +337,7 @@ jobs:
     test-unit--test_postake_snarkless_unittest:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -352,7 +375,7 @@ jobs:
     test-unit--dev:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -390,7 +413,7 @@ jobs:
     test-unit--dev_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -406,7 +429,7 @@ jobs:
     test--fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -420,7 +443,7 @@ jobs:
     test--test_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -437,7 +460,7 @@ jobs:
     test--test_postake_bootstrap:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -454,7 +477,7 @@ jobs:
     test--test_postake_catchup:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -468,7 +491,7 @@ jobs:
     test--test_postake_delegation:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -482,7 +505,7 @@ jobs:
     test--test_postake_five_even_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -496,7 +519,7 @@ jobs:
     test--test_postake_five_even_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -510,7 +533,7 @@ jobs:
     test--test_postake_holy_grail:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -527,7 +550,7 @@ jobs:
     test--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -544,7 +567,7 @@ jobs:
     test--test_postake_split:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -558,7 +581,7 @@ jobs:
     test--test_postake_split_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -593,7 +616,7 @@ jobs:
     test--test_postake_three_proposers:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -607,7 +630,7 @@ jobs:
     test--test_postake_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -624,7 +647,7 @@ jobs:
     test--test_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -643,7 +666,7 @@ jobs:
     test--test_postake_snarkless_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -660,7 +683,7 @@ jobs:
     test--test_postake_split_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-a915de6257621221537f2448dc73f0b46f6f2042
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -677,6 +700,8 @@ workflows:
     coda_parallel:
         jobs:
             - lint
+            - lint-opt
+            - build-auxiliary
             - update-branch-protection:
                 filters:
                   branches:

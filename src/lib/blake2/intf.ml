@@ -8,8 +8,6 @@ module type S = sig
   module Stable : sig
     module V1 : sig
       type t [@@deriving bin_io, version, sexp, compare, hash]
-
-      include Hashable.S with type t := t
     end
 
     module Latest = V1

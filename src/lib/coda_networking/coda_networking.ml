@@ -32,13 +32,10 @@ module Rpcs = struct
       let name = "get_staged_ledger_aux_and_pending_coinbases_at_hash"
 
       module T = struct
-        (* "master" types, do not change *)
-        type query = State_hash.Stable.V1.t
+        type query = State_hash.t
 
         type response =
-          ( Staged_ledger.Scan_state.Stable.V1.t
-          * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.Stable.V1.t )
+          (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
           option
       end
 
@@ -75,8 +72,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -85,11 +89,9 @@ module Rpcs = struct
       let name = "answer_sync_ledger_query"
 
       module T = struct
-        (* "master" types, do not change *)
-        type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
+        type query = Ledger_hash.t * Sync_ledger.Query.t
 
-        type response =
-          Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
+        type response = Sync_ledger.Answer.t Core.Or_error.t
       end
 
       module Caller = T
@@ -123,8 +125,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -133,9 +142,9 @@ module Rpcs = struct
       let name = "get_transition_chain"
 
       module T = struct
-        type query = State_hash.Stable.V1.t list [@@deriving sexp, to_yojson]
+        type query = State_hash.t list [@@deriving sexp, to_yojson]
 
-        type response = External_transition.Stable.V1.t list option
+        type response = External_transition.t list option
       end
 
       module Caller = T
@@ -168,8 +177,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -178,10 +194,9 @@ module Rpcs = struct
       let name = "get_transition_chain_proof"
 
       module T = struct
-        type query = State_hash.Stable.V1.t [@@deriving sexp, to_yojson]
+        type query = State_hash.t [@@deriving sexp, to_yojson]
 
-        type response =
-          (State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list) option
+        type response = (State_hash.t * State_body_hash.t list) option
       end
 
       module Caller = T
@@ -215,8 +230,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -225,14 +247,13 @@ module Rpcs = struct
       let name = "get_ancestry"
 
       module T = struct
-        (* "master" types, do not change *)
         type query = Consensus.Data.Consensus_state.Value.t
         [@@deriving sexp, to_yojson]
 
         type response =
-          ( External_transition.Stable.V1.t
+          ( External_transition.t
           , State_body_hash.t list * External_transition.t )
-          Proof_carrying_data.Stable.V1.t
+          Proof_carrying_data.t
           option
       end
 
@@ -271,8 +292,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -281,10 +309,8 @@ module Rpcs = struct
       let name = "ban_notify"
 
       module T = struct
-        (* "master" types, do not change *)
-
         (* banned until this time *)
-        type query = Core.Time.Stable.V1.t [@@deriving sexp]
+        type query = Core.Time.t [@@deriving sexp]
 
         type response = unit
       end
@@ -318,8 +344,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
@@ -328,15 +361,13 @@ module Rpcs = struct
       let name = "get_bootstrappable_best_tip"
 
       module T = struct
-        (* "master" types, do not change *)
         type query = Consensus.Data.Consensus_state.Value.t
         [@@deriving sexp, to_yojson]
 
         type response =
-          ( External_transition.Stable.V1.t
-          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
-          )
-          Proof_carrying_data.Stable.V1.t
+          ( External_transition.t
+          , State_body_hash.t list * External_transition.t )
+          Proof_carrying_data.t
           option
       end
 
@@ -375,8 +406,15 @@ module Rpcs = struct
         let caller_model_of_response = Fn.id
       end
 
-      include T
-      include Register (T)
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
     end
   end
 
