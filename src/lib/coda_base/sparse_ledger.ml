@@ -2,38 +2,39 @@ open Core
 open Import
 open Snark_params.Tick
 
-module V1_make =
-  Sparse_ledger_lib.Sparse_ledger.Make (struct
-      include Ledger_hash.Stable.V1
-
-      let merge = Ledger_hash.merge
-    end)
-    (Public_key.Compressed.Stable.V1)
-    (struct
-      include Account.Stable.V1
-
-      let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
-    end)
-
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = V1_make.Stable.V1.t
-      [@@deriving bin_io, to_yojson, sexp, version {unnumbered}]
-    end
+    type t =
+      ( Ledger_hash.Stable.V1.t
+      , Public_key.Compressed.Stable.V1.t
+      , Account.Stable.V1.t )
+      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+    [@@deriving to_yojson, sexp]
 
-    include T
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t [@@deriving sexp]
 
-module Latest_make = V1_make
+module Hash = struct
+  include Ledger_hash
+
+  let merge = Ledger_hash.merge
+end
+
+module Account = struct
+  include Account
+
+  let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
+end
+
+module M =
+  Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Public_key.Compressed) (Account)
 
 [%%define_locally
-Latest_make.
+M.
   ( of_hash
   , to_yojson
   , get_exn
