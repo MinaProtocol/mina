@@ -418,7 +418,7 @@ let get_status ~flag t =
   in
   let addrs_and_ports =
     Kademlia.Node_addrs_and_ports.to_display
-      (Coda_lib.config t).net_config.gossip_net_params.addrs_and_ports
+      (Coda_lib.config t).gossip_net_params.addrs_and_ports
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status

@@ -6,16 +6,18 @@ module Queue = Hash_queue.Make (State_hash)
 
 module T = struct
   type t =
-    { history: Root_data.Limited.t Queue.t
+    { history: Root_data.Historical.t Queue.t
     ; capacity: int
-    ; mutable current_root: Root_data.Limited.t }
+    ; mutable current_root: Root_data.Historical.t }
 
   type view = t
 
   let create ~logger:_ frontier =
     let capacity = 2 * Full_frontier.max_length frontier in
     let history = Queue.create () in
-    let current_root = Root_data.limit (Full_frontier.root_data frontier) in
+    let current_root =
+      Root_data.Historical.of_breadcrumb (Full_frontier.root frontier)
+    in
     let t = {history; capacity; current_root} in
     (t, t)
 
@@ -36,12 +38,8 @@ module T = struct
         (* TODO: send full diffs to extensions to avoid extra lookups in frontier *)
         | Full.E.E (Root_transitioned {new_root; _}) ->
             let open Root_data.Minimal.Stable.Latest in
-            let new_root_transition =
-              Breadcrumb.validated_transition
-                (Full_frontier.find_exn frontier new_root.hash)
-            in
-            enqueue root_history
-              (Root_data.Minimal.upgrade new_root new_root_transition) ;
+            Full_frontier.find_exn frontier new_root.hash
+            |> Root_data.Historical.of_breadcrumb |> enqueue root_history ;
             true
         | Full.E.E _ ->
             false )

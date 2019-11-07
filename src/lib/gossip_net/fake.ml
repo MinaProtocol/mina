@@ -183,6 +183,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     let broadcast t msg = Network.broadcast t.network ~sender:t.me msg
 
     let broadcast_all _ = failwith "TODO stub"
+
+    let net2 _ = None
   end
 
   type network = Network.t

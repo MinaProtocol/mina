@@ -67,24 +67,24 @@ module Make (Inputs : Inputs_intf) :
   let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier state_hash
       =
     let open Option.Let_syntax in
-    let%map scan_state, pending_coinbases =
-      Option.merge
-        (let%map breadcrumb = Transition_frontier.find frontier state_hash in
-         let staged_ledger =
-           Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-         in
-         let scan_state = Staged_ledger.scan_state staged_ledger in
-         let pending_coinbase =
-           Staged_ledger.pending_coinbase_collection staged_ledger
-         in
-         (scan_state, pending_coinbase))
-        (let%map {scan_state; pending_coinbase; _} =
-           find_in_root_history frontier state_hash
-         in
-         (scan_state, pending_coinbase))
-        ~f:Fn.const
-    in
-    (scan_state, pending_coinbases)
+    Option.merge
+      (let%map breadcrumb = Transition_frontier.find frontier state_hash in
+       let staged_ledger =
+         Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+       in
+       let scan_state = Staged_ledger.scan_state staged_ledger in
+       let merkle_root =
+         Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
+       in
+       let pending_coinbase =
+         Staged_ledger.pending_coinbase_collection staged_ledger
+       in
+       (scan_state, merkle_root, pending_coinbase))
+      (let%map root = find_in_root_history frontier state_hash in
+       ( root.scan_state
+       , root.staged_ledger_target_ledger_hash
+       , root.pending_coinbase ))
+      ~f:Fn.const
 
   let get_transition_chain ~frontier hashes =
     let open Option.Let_syntax in

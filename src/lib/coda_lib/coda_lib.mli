@@ -69,11 +69,20 @@ val client_port : t -> int
 val validated_transitions :
   t -> External_transition.Validated.t Strict_pipe.Reader.t
 
-type root_diff =
-  {user_commands: User_command.Stable.V1.t list; root_length: int}
-[@@deriving bin_io]
+module Root_diff : sig
+  module Stable : sig
+    module V1 : sig
+      type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
+      [@@deriving bin_io]
+    end
 
-val root_diff : t -> root_diff Strict_pipe.Reader.t
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t
+end
+
+val root_diff : t -> Root_diff.t Strict_pipe.Reader.t
 
 val dump_tf : t -> string Or_error.t
 

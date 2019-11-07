@@ -516,8 +516,6 @@ let wrap_rpc_data_in_envelope conn data =
   let sender = Envelope.Sender.Remote inet_addr in
   Envelope.Incoming.wrap ~data ~sender
 
-let net2 t = Gossip_net.net2 t.gossip_net
-
 let create (config : Config.t)
     ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
           State_hash.t Envelope.Incoming.t
@@ -868,6 +866,8 @@ let get_bootstrappable_best_tip =
 
 let ban_notify t peer banned_until =
   query_peer t peer Rpcs.Ban_notify banned_until
+
+let net2 t = Gossip_net.Any.net2 t.gossip_net
 
 let try_non_preferred_peers t input peers ~rpc =
   let max_current_peers = 8 in

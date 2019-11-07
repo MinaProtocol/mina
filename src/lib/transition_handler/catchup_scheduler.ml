@@ -301,7 +301,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let test_delta = Block_time.Span.of_ms 100L in
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~pids )
+            Verifier.create ~logger ~conf_dir:None ~pids )
       in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
@@ -354,7 +354,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let test_delta = Block_time.Span.of_ms 100L in
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~pids )
+            Verifier.create ~logger ~conf_dir:None ~pids )
       in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
@@ -438,7 +438,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let timeout_duration = Block_time.Span.of_ms 400L in
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~pids )
+            Verifier.create ~logger ~conf_dir:None ~pids )
       in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length

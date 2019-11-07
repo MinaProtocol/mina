@@ -88,7 +88,7 @@ module T = struct
     ; root_diff:
         ( 'worker
         , unit
-        , Coda_lib.root_diff Pipe.Reader.t )
+        , Coda_lib.Root_diff.t Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; prove_receipt:
         ( 'worker
@@ -147,7 +147,7 @@ module T = struct
     ; coda_validated_transitions_keyswaptest:
            unit
         -> External_transition.Validated.Stable.V1.t Pipe.Reader.t Deferred.t
-    ; coda_root_diff: unit -> Coda_lib.root_diff Pipe.Reader.t Deferred.t
+    ; coda_root_diff: unit -> Coda_lib.Root_diff.t Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> (Receipt.Chain_hash.t * User_command.t list) Deferred.t
@@ -313,7 +313,7 @@ module T = struct
 
     let root_diff =
       C.create_pipe ~name:"root_diff" ~f:root_diff_impl ~bin_input:Unit.bin_t
-        ~bin_output:[%bin_type_class: Coda_lib.root_diff] ()
+        ~bin_output:[%bin_type_class: Coda_lib.Root_diff.Stable.V1.t] ()
 
     let sync_status =
       C.create_pipe ~name:"sync_status" ~f:sync_status_impl

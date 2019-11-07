@@ -198,6 +198,8 @@ val initial_peers : t -> Host_and_port.t list
 
 val peers_by_ip : t -> Unix.Inet_addr.t -> Network_peer.Peer.t list
 
+val net2 : t -> Coda_net2.net option
+
 val ban_notification_reader :
   t -> Gossip_net.ban_notification Linear_pipe.Reader.t
 

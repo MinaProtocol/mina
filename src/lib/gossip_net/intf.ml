@@ -43,4 +43,6 @@ module type Gossip_net_intf = sig
     t -> Message.t Envelope.Incoming.t Strict_pipe.Reader.t
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
+
+  val net2 : t -> Coda_net2.net option
 end

@@ -442,7 +442,7 @@ let%test_module "Ledger_catchup tests" =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
       let pids = Child_processes.Termination.create_pid_table () in
-      let%map verifier = Verifier.create ~logger ~pids in
+      let%map verifier = Verifier.create ~logger ~conf_dir:None ~pids in
       run ~logger ~verifier ~trust_system ~network ~frontier
         ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;

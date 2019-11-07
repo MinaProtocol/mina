@@ -73,19 +73,11 @@ let setup (type n) ?(logger = Logger.null ())
                   let input = Envelope.Incoming.data query_env in
                   Deferred.return
                     (let open Option.Let_syntax in
-                    let%map scan_state, pending_coinbases =
+                    let%map scan_state, expected_merkle_root, pending_coinbases
+                        =
                       Sync_handler
                       .get_staged_ledger_aux_and_pending_coinbases_at_hash
                         ~frontier input
-                    in
-                    let expected_merkle_root =
-                      Option.value
-                        (Option.map
-                           (Staged_ledger.Scan_state.target_merkle_root
-                              scan_state)
-                           ~f:Frozen_ledger_hash.to_ledger_hash)
-                        ~default:
-                          (Ledger.merkle_root (Lazy.force Genesis_ledger.t))
                     in
                     let staged_ledger_hash =
                       Staged_ledger_hash.of_aux_ledger_and_coinbase_hash

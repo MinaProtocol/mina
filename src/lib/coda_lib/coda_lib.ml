@@ -10,6 +10,7 @@ open Strict_pipe
 open Signature_lib
 open O1trace
 open Otp_lib
+open Module_version
 module Config = Config
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
@@ -426,9 +427,33 @@ let staged_ledger_ledger_proof t =
 
 let validated_transitions t = t.pipes.validated_transitions_reader
 
-type root_diff =
-  {user_commands: User_command.Stable.V1.t list; root_length: int}
-[@@deriving bin_io]
+module Root_diff = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t =
+          {user_commands: User_command.Stable.V1.t list; root_length: int}
+        [@@deriving bin_io, version]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "transition_frontier_diff_node_list"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  include Stable.Latest
+end
 
 (* TODO: this is a bad pattern for two reasons:
  *   - uses an abstraction leak to patch new functionality instead of making a new extension
@@ -456,6 +481,7 @@ let root_diff t =
                       Deferred.unit
                   | Transition_frontier.Diff.Full.E.E
                       (Root_transitioned {new_root; _}) ->
+                      let open Root_diff.Stable.V1 in
                       Strict_pipe.Writer.write root_diff_writer
                         { user_commands=
                             Transition_frontier.Breadcrumb.user_commands
@@ -772,97 +798,93 @@ let create (config : Config.t) =
                   let%map _ =
                     Coda_networking.ban_notify net peer banned_until
                   in
-                  () ) ;
-              let snark_pool_config =
-                Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-                  ~trust_system:config.trust_system
-              in
-              let%bind snark_pool =
-                Network_pool.Snark_pool.load ~config:snark_pool_config
-                  ~logger:config.logger
-                  ~disk_location:config.snark_pool_disk_location
-                  ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
-                  ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              in
-              let%bind wallets =
-                Secrets.Wallets.load ~logger:config.logger
-                  ~disk_location:config.wallets_disk_location
-              in
-              trace_task "snark pool broadcast loop" (fun () ->
-                  Linear_pipe.iter
-                    (Network_pool.Snark_pool.broadcasts snark_pool)
-                    ~f:(fun x ->
-                      Coda_networking.broadcast_snark_pool_diff net x ;
-                      Deferred.unit ) ) ;
-              let propose_keypairs =
-                Agent.create
-                  ~f:(fun kps ->
-                    Keypair.Set.to_list kps
-                    |> List.map ~f:(fun kp ->
-                           (kp, Public_key.compress kp.Keypair.public_key) )
-                    |> Keypair.And_compressed_pk.Set.of_list )
-                  config.initial_propose_keypairs
-              in
-              let subscriptions =
-                Coda_subscriptions.create ~logger:config.logger
-                  ~time_controller:config.time_controller ~new_blocks ~wallets
-                  ~external_transition_database:
-                    config.external_transition_database
-                  ~transition_frontier:frontier_broadcast_pipe_r
-                  ~is_storing_all:config.is_archive_node
-              in
-              let open Coda_incremental.Status in
-              let transition_frontier_incr =
-                Var.watch @@ of_broadcast_pipe frontier_broadcast_pipe_r
-              in
-              let transition_frontier_and_catchup_signal_incr =
-                transition_frontier_incr
-                >>= function
-                | Some transition_frontier ->
-                    of_broadcast_pipe Ledger_catchup.Catchup_jobs.reader
-                    |> Var.watch
-                    >>| fun catchup_signal ->
-                    Some (transition_frontier, catchup_signal)
-                | None ->
-                    return None
-              in
-              let sync_status =
-                create_sync_status_observer ~logger:config.logger
-                  ~transition_frontier_and_catchup_signal_incr
-                  ~online_status_incr:
-                    ( Var.watch @@ of_broadcast_pipe
-                    @@ Coda_networking.online_status net )
-                  ~first_connection_incr:
-                    ( Var.watch @@ of_deferred
-                    @@ Coda_networking.on_first_connect net ~f:Fn.id )
-                  ~first_message_incr:
-                    ( Var.watch @@ of_deferred
-                    @@ Coda_networking.on_first_received_message net ~f:Fn.id
-                    )
-              in
-              Deferred.return
-                { config
-                ; next_proposal= None
-                ; processes= {prover; verifier; snark_worker}
-                ; components=
-                    { net
-                    ; transaction_pool
-                    ; snark_pool
-                    ; transition_frontier= frontier_broadcast_pipe_r
-                    ; most_recent_valid_block= most_recent_valid_block_reader
-                    }
-                ; pipes=
-                    { validated_transitions_reader= valid_transitions_for_api
-                    ; proposer_transition_writer
-                    ; external_transitions_writer=
-                        Strict_pipe.Writer.to_linear_pipe
-                          external_transitions_writer }
-                ; wallets
-                ; propose_keypairs
-                ; seen_jobs=
-                    Work_selector.State.init
-                      ~reassignment_wait:config.work_reassignment_wait
-                ; subscriptions
-                ; sync_status } ) ) )
+                  () ) ) ;
+          let snark_pool_config =
+            Network_pool.Snark_pool.Resource_pool.make_config ~verifier
+              ~trust_system:config.trust_system
+          in
+          let%bind snark_pool =
+            Network_pool.Snark_pool.load ~config:snark_pool_config
+              ~logger:config.logger
+              ~disk_location:config.snark_pool_disk_location
+              ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+          in
+          let%bind wallets =
+            Secrets.Wallets.load ~logger:config.logger
+              ~disk_location:config.wallets_disk_location
+          in
+          trace_task "snark pool broadcast loop" (fun () ->
+              Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
+                ~f:(fun x ->
+                  Coda_networking.broadcast_snark_pool_diff net x ;
+                  Deferred.unit ) ) ;
+          let propose_keypairs =
+            Agent.create
+              ~f:(fun kps ->
+                Keypair.Set.to_list kps
+                |> List.map ~f:(fun kp ->
+                       (kp, Public_key.compress kp.Keypair.public_key) )
+                |> Keypair.And_compressed_pk.Set.of_list )
+              config.initial_propose_keypairs
+          in
+          let subscriptions =
+            Coda_subscriptions.create ~logger:config.logger
+              ~time_controller:config.time_controller ~new_blocks ~wallets
+              ~external_transition_database:config.external_transition_database
+              ~transition_frontier:frontier_broadcast_pipe_r
+              ~is_storing_all:config.is_archive_node
+          in
+          let open Coda_incremental.Status in
+          let transition_frontier_incr =
+            Var.watch @@ of_broadcast_pipe frontier_broadcast_pipe_r
+          in
+          let transition_frontier_and_catchup_signal_incr =
+            transition_frontier_incr
+            >>= function
+            | Some transition_frontier ->
+                of_broadcast_pipe Ledger_catchup.Catchup_jobs.reader
+                |> Var.watch
+                >>| fun catchup_signal ->
+                Some (transition_frontier, catchup_signal)
+            | None ->
+                return None
+          in
+          let sync_status =
+            create_sync_status_observer ~logger:config.logger
+              ~transition_frontier_and_catchup_signal_incr
+              ~online_status_incr:
+                ( Var.watch @@ of_broadcast_pipe
+                @@ Coda_networking.online_status net )
+              ~first_connection_incr:
+                ( Var.watch @@ of_deferred
+                @@ Coda_networking.on_first_connect net ~f:Fn.id )
+              ~first_message_incr:
+                ( Var.watch @@ of_deferred
+                @@ Coda_networking.on_first_received_message net ~f:Fn.id )
+          in
+          Deferred.return
+            { config
+            ; next_proposal= None
+            ; processes= {prover; verifier; snark_worker}
+            ; components=
+                { net
+                ; transaction_pool
+                ; snark_pool
+                ; transition_frontier= frontier_broadcast_pipe_r
+                ; most_recent_valid_block= most_recent_valid_block_reader }
+            ; pipes=
+                { validated_transitions_reader= valid_transitions_for_api
+                ; proposer_transition_writer
+                ; external_transitions_writer=
+                    Strict_pipe.Writer.to_linear_pipe
+                      external_transitions_writer }
+            ; wallets
+            ; propose_keypairs
+            ; seen_jobs=
+                Work_selector.State.init
+                  ~reassignment_wait:config.work_reassignment_wait
+            ; subscriptions
+            ; sync_status } ) )
 
 let net {components= {net; _}; _} = net

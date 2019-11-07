@@ -14,7 +14,6 @@ module Make (Inputs : Inputs_intf) :
 
   let find_in_root_history frontier state_hash =
     let open Transition_frontier.Extensions in
-    let open Transition_frontier.Root_data.Limited.Stable.Latest in
     let open Option.Let_syntax in
     let root_history =
       get_extension (Transition_frontier.extensions frontier) Root_history

@@ -215,7 +215,7 @@ module For_tests = struct
           verifier
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger
+              Verifier.create ~logger ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let gen_slot_advancement = Int.gen_incl 1 10 in

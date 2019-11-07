@@ -219,7 +219,8 @@ module type Sync_handler_intf = sig
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        frontier:transition_frontier
     -> State_hash.t
-    -> (Staged_ledger.Scan_state.t * Pending_coinbase.t) Option.t
+    -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
+       Option.t
 
   val get_transition_chain :
        frontier:transition_frontier

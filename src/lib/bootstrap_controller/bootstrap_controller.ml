@@ -513,7 +513,7 @@ let%test_module "Bootstrap_controller tests" =
     let make_non_running_bootstrap ~genesis_root ~network =
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~pids )
+            Verifier.create ~logger ~conf_dir:None ~pids )
       in
       let transition =
         genesis_root

@@ -298,13 +298,6 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
                    | Ok () ->
                        ()
                    | Error err ->
-                       List.iter breadcrumb_subtrees ~f:(fun tree ->
-                           Rose_tree.iter tree ~f:(fun cached_breadcrumb ->
-                               let (_ : Transition_frontier.Breadcrumb.t) =
-                                 Cached.invalidate_with_failure
-                                   cached_breadcrumb
-                               in
-                               () ) ) ;
                        Logger.error logger ~module_:__MODULE__
                          ~location:__LOC__
                          ~metadata:
@@ -357,7 +350,9 @@ let%test_module "Transition_handler.Processor tests" =
           assert (
             Thread_safe.block_on_async_exn (fun () ->
                 let pids = Child_processes.Termination.create_pid_table () in
-                let%bind verifier = Verifier.create ~logger ~pids in
+                let%bind verifier =
+                  Verifier.create ~logger ~conf_dir:None ~pids
+                in
                 let valid_transition_reader, valid_transition_writer =
                   Strict_pipe.create
                     (Buffered (`Capacity branch_size, `Overflow Drop_head))
