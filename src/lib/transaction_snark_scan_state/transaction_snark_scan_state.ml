@@ -198,7 +198,9 @@ let create_expected_statement
   let pending_coinbase_after =
     match transaction with
     | Coinbase c ->
-        Pending_coinbase.Stack.push pending_coinbase_before c
+        if Coda_compile_config.pending_coinbase_hack then
+          Pending_coinbase.Stack.empty
+        else Pending_coinbase.Stack.push pending_coinbase_before c
     | _ ->
         pending_coinbase_before
   in
