@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries core coda_intf envelope pipe_lib logger async async_extra
-  kademlia unix_timestamp debug_assert o1trace consensus
+  unix_timestamp debug_assert o1trace consensus
   transition_frontier_persistence incremental secrets
   auxiliary_database work_selector coda_networking proposer
   sync_handler transition_router otp_lib snark_worker

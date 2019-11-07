@@ -1082,7 +1082,7 @@ let create ~logger ~conf_dir =
     let libp2p_helper_binary =
       "src/app/libp2p_helper/result/bin/libp2p_helper"
     in
-    (* This is where you'd manually install kademlia *)
+    (* This is where you'd manually install libp2p *)
     let coda_libp2p_helper = "coda-libp2p_helper" in
     let open Deferred.Let_syntax in
     match%map
