@@ -20,28 +20,18 @@ end
 
 module Stable : sig
   module V1 : sig
-    type t =
-      | One of Single.Stable.V1.t
-      | Two of Single.Stable.V1.t * Single.Stable.V1.t
+    type t = Single.Stable.V1.t One_or_two.Stable.V1.t
     [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
   end
 
   module Latest = V1
 end
 
-type t = Stable.Latest.t =
-  | One of Single.Stable.V1.t
-  | Two of Single.Stable.V1.t * Single.Stable.V1.t
+type t = Single.Stable.Latest.t One_or_two.Stable.Latest.t
 [@@deriving sexp, compare, yojson, hash]
 
 include Comparable.S with type t := t
 
-val to_list : t -> Single.t list
-
-val of_single : Single.t -> t
-
-val of_single_list : Single.t list -> t list
-
 val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
 
-val receivers : t -> Public_key.Compressed.t list
+val receivers : t -> Public_key.Compressed.t One_or_two.t

@@ -10,7 +10,7 @@
 (* custom consensus parameters for the testnet release *)
 [%%define consensus_mechanism "proof_of_stake"]
 [%%define k 10]
-[%%define c 8]
+[%%define c 32]
 [%%define delta 3]
 
 [%%define record_async_backtraces true]
@@ -31,3 +31,5 @@
 [%%define print_versioned_types false]
 
 [%%define daemon_expiry "2019-11-30 12:00:00-07:00"]
+
+[%%define pending_coinbase_hack true]
