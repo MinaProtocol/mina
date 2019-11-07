@@ -20,7 +20,6 @@ name and the label name. For example, `area-snark` or `priority-critical`.
   - `daemon`
   - `docs`
   - `gossip`
-  - `kademlia`
   - `monitoring`
   - `proposer`
   - `protocol`

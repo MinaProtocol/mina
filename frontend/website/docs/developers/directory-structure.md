@@ -63,8 +63,8 @@ files play:
         - `logproc/`    
             This utility reads from `stdin` and can filter and pretty print the log messages emitted by the coda daemon.
         
-        - `kademlia-haskell/`   
-            This is a simple wrapper around a Haskell implementation of the kademlia DHT.
+        - `libp2p_helper/`   
+            This Go program bridges a Coda daemon to go-libp2p using a JSON protocol over stdin/stdout.
 
     - `external/`   
         Local copies of external libraries which we've had to make some tweaks to.
