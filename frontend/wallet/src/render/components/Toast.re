@@ -12,12 +12,16 @@ module Styles = {
 
 [@react.component]
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> add onClick to toast
 let make =
     (
       ~defaultText=?,
       ~style as styleOverride=ToastProvider.Default,
       ~onClick: unit => unit=() => (),
     ) => {
+<<<<<<< HEAD
   let (value, _) = React.useContext(ToastProvider.context);
   let value =
     Option.map(value, ~f=({ToastProvider.text, style}) => (text, style));
@@ -30,6 +34,12 @@ let make = (~defaultText=?) => {
   let default =
     Option.map(defaultText, ~f=text => (text, ToastProvider.Default));
 >>>>>>> Wallet: add default toast
+=======
+  let (value, _) = React.useContext(ToastProvider.context);
+  let value =
+    Option.map(value, ~f=({ToastProvider.text, style}) => (text, style));
+  let default = Option.map(defaultText, ~f=text => (text, styleOverride));
+>>>>>>> add onClick to toast
 
   // The second arg to orElse has precedence
   switch (Option.orElse(default, value)) {

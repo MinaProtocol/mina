@@ -163,6 +163,9 @@ module DefaultToast = {
               | Some({delegateAccount: Some(delegate), stakingActive: false})
                   when delegate##publicKey == pk =>
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> add onClick to toast
                 <Toast
                   onClick={() =>
                     ReasonReactRouter.push(
@@ -172,9 +175,12 @@ module DefaultToast = {
                   style=ToastProvider.Success
                   defaultText={js|Participate in consensus to earn coda →|js}
                 />
+<<<<<<< HEAD
 =======
                 <Toast defaultText="Either delegate or stake this account" />
 >>>>>>> Wallet: add default toast
+=======
+>>>>>>> add onClick to toast
               | _ => <Toast />
               }
             | Loading
