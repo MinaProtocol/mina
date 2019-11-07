@@ -5,9 +5,8 @@ module Styles = {
     style([
       padding2(~v=`rem(0.75), ~h=`rem(1.)),
       border(`px(1), `solid, Theme.Colors.slateAlpha(0.4)),
-      background(rgba(255, 255, 255, 0.8)),
       borderRadius(`px(6)),
-      width(`rem(32.)),
+      minWidth(`rem(32.)),
     ]);
 
   let disabled = style([opacity(0.5), pointerEvents(`none)]);

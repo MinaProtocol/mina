@@ -51,6 +51,16 @@ module Styles = {
     ]);
 
   let delegating = style([display(`flex), flexDirection(`column)]);
+
+  let delegatingLabel =
+    merge([
+      Theme.Text.Body.regular,
+      style([
+        color(Theme.Colors.slate),
+        textAlign(`right),
+        display(`block),
+      ]),
+    ]);
 };
 
 module DeleteAccount = [%graphql
@@ -209,35 +219,18 @@ module AccountInfo = [%graphql
 ];
 module AccountInfoQuery = ReasonApollo.CreateQuery(AccountInfo);
 
-module StakingConfig = [%graphql
-  {|
-    mutation ($publicKey: [PublicKey!]!){
-      setStaking(input: $publicKey) {
-        lastStaking
-      }
-    }
-  |}
-];
-
-module StakingMutation = ReasonApollo.CreateMutation(StakingConfig);
-
 module StakingToggle = {
   [@react.component]
-  let make = (~publicKey as _pubkey, ~active) => {
+  let make = (~publicKey, ~active) => {
     <Toggle
-      //    let variables =
-      //      StakingConfig.make(
-      //        ~publicKey=[|Apollo.Encoders.publicKey(publicKey)|],
-      //        (),
-      //      )##variables;
-      //    <StakingMutation>
-      //      {(mutation, _) =>
       value=active
-      onChange={_ => ReasonReact.Router.push("/settings/:id/stake")}
+      onChange={_ =>
+        ReasonReact.Router.push(
+          "/settings/" ++ PublicKey.uriEncode(publicKey) ++ "/stake",
+        )
+      }
     />;
   };
-  //    </StakingMutation>;
-  //  };
 };
 
 module BlockRewards = {
@@ -250,42 +243,88 @@ module BlockRewards = {
         {React.string("Block Rewards")}
       </h3>
       <Spacer height=0.5 />
-      <Well>
-        <AccountInfoQuery variables=accountInfoVariables>
-          {response =>
-             switch (response.result) {
-             | Loading => <Loader />
-             | Error(err) => <span> {React.string(err##message)} </span>
-             | Data(data) =>
-               let account = Option.getExn(data##account);
-               switch(account.delegateAccount) {
-               | None => <Alert kind=`Warning message="Wait until fully synced..." />
-               | Some(delegate) when delegate##publicKey == publicKey =>
+      <AccountInfoQuery variables=accountInfoVariables>
+        {response =>
+           switch (response.result) {
+           | Loading => <Loader />
+           | Error(err) => <span> {React.string(err##message)} </span>
+           | Data(data) =>
+             let account = Option.getExn(data##account);
+             switch (account.delegateAccount) {
+             | None =>
+               <Well>
+                 <Alert kind=`Warning message="Wait until fully synced..." />
+               </Well>
+             | Some(delegate) when delegate##publicKey == publicKey =>
+               <Well>
                  <div className=Styles.blockRewards>
-                     <div
-                       className=Css.(
-                         style([display(`flex), alignItems(`center)])
-                       )>
-                       <p className=Theme.Text.Body.regular>
-                         {account.stakingActive
-                            ? {
-                              React.string("Staking is ON");
-                            }
-                            : {
-                              React.string("Staking is OFF");
-                            }}
-                       </p>
-                       <Spacer width=1. />
-                       <StakingToggle
-                         publicKey
-                         active={account.stakingActive}
-                       />
-                     </div>
+                   <div
+                     className=Css.(
+                       style([display(`flex), alignItems(`center)])
+                     )>
+                     <p className=Theme.Text.Body.regular>
+                       {account.stakingActive
+                          ? {
+                            React.string("Staking is ON");
+                          }
+                          : {
+                            React.string("Staking is OFF");
+                          }}
+                     </p>
+                     <Spacer width=1. />
+                     <StakingToggle publicKey active={account.stakingActive} />
+                   </div>
+                     <img
+                       src="https://cdn.discordapp.com/attachments/638495089232183306/641796805314478092/OR.png"
+                       height="40px"
+                     />
+                   <Button
+                     width=8.
+                     height=2.5
+                     style=Button.Green
+                     label="Delegate"
+                     onClick={_ =>
+                       ReasonReact.Router.push(
+                         "/settings/"
+                         ++ PublicKey.uriEncode(publicKey)
+                         ++ "/delegate",
+                       )
+                     }
+                   />
+                 </div>
+               </Well>
+             | Some(delegate) =>
+               <Well>
+                 <div className=Styles.delegating>
+                   <div
+                     className=Css.(
+                       style([
+                         display(`flex),
+                         justifyContent(`spaceBetween),
+                       ])
+                     )>
                      <Button
-                       width=8.
+                       width=12.
+                       height=2.5
+                       style=Button.Gray
+                       label="Stake"
+                       onClick={_ =>
+                         ReasonReact.Router.push(
+                           "/settings/"
+                           ++ PublicKey.uriEncode(publicKey)
+                           ++ "/stake",
+                         )
+                       }
+                     />
+                     <img
+                       src="https://cdn.discordapp.com/attachments/638495089232183306/641796805314478092/OR.png"
+                       height="40px"
+                     />
+                     <Button
+                       width=12.
                        height=2.5
                        style=Button.Green
-                       label="Delegate"
+                       label="Change Delegation"
                        onClick={_ =>
                          ReasonReact.Router.push(
                            "/settings/"
@@ -295,41 +334,16 @@ module BlockRewards = {
                        }
                      />
                    </div>
-                 | Some(delegate) => <div className=Styles.delegating>
-                     <span className=Theme.Text.Body.regular>
-                       {React.string("Delegating to: ")}
-                       <AccountName pubkey=delegate##publicKey />
-                     </span>
-                     <Spacer height=1. />
-                     <div className=Css.(style([display(`flex), justifyContent(`spaceBetween)]))>
-                       <Button
-                         width=12.
-                         height=2.5
-                         style=Button.Green
-                         label="Change Delegation"
-                         onClick={_ =>
-                           ReasonReact.Router.push(
-                             "/settings/"
-                             ++ PublicKey.uriEncode(publicKey)
-                             ++ "/delegate",
-                           )
-                         }
-                       />
-                       <Button
-                         width=12.
-                         height=2.5
-                         style=Button.Gray
-                         label="Stake"
-                         onClick={_ =>
-                           ReasonReact.Router.push("/settings/:id/stake")
-                         }
-                       />
-                     </div>
-                   </div>
-               };
-             }}
-        </AccountInfoQuery>
-      </Well>
+                 </div>
+                 <Spacer height=1. />
+                 <span className=Styles.delegatingLabel>
+                   {React.string("Delegating to: ")}
+                   <AccountName pubkey=delegate##publicKey />
+                 </span>
+               </Well>
+             };
+           }}
+      </AccountInfoQuery>
     </div>;
   };
 };

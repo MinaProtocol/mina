@@ -1,3 +1,5 @@
+open Tc;
+
 module Styles = {
   open Css;
 
@@ -50,16 +52,16 @@ module EnableStaking = [%graphql
     }
   |}
 ];
-module EnableStakingMutation =
-  ReasonApollo.CreateMutation(EnableStaking);
+module EnableStakingMutation = ReasonApollo.CreateMutation(EnableStaking);
 
-type delegateResponse = { publicKey: PublicKey.t };
+type delegateResponse = {publicKey: PublicKey.t};
 type accountResponse = {
   stakingActive: bool,
   delegateAccount: option(delegateResponse),
-}
+};
 
-module AccountInfo = [%graphql {|
+module AccountInfo = [%graphql
+  {|
     query stakingAccountInfo($publicKey: PublicKey!) {
       account(publicKey: $publicKey) @bsRecord {
         stakingActive
@@ -68,7 +70,8 @@ module AccountInfo = [%graphql {|
         }
       }
     }
-|}];
+|}
+];
 module AccountInfoQuery = ReasonApollo.CreateQuery(AccountInfo);
 
 [@react.component]
@@ -110,83 +113,125 @@ let make = (~publicKey, ~stakingActive=false) => {
       (),
     )##variables;
 
-  <ChangeDelegationMutation>
-    {(mutate, {loading, result}) =>
-       <div className=SettingsPage.Styles.container>
-         {switch (result) {
-          | NotCalled
-          | Loading => React.null
-          | Error(err) => <Alert kind=`Danger message=err##message />
-          | Data(_) =>
-            goBack();
-            React.null;
-          }}
-         <h3 className=Theme.Text.Header.h3>
-           {React.string("Staking Requirements")}
-         </h3>
-         <Spacer height=1. />
-         <span className=Theme.Text.Body.regularLight>
-           {React.string("To recieve your staking reward, your computer must be on and running this application 100% of the time.")}
-          </span>
-         <Spacer height=1. />
-         <div>
-           <div className=Styles.label>
-             {React.string("Transaction fee")}
-           </div>
-           <ToggleButton
-             options=[|"Standard: 5 Coda", "Custom Amount"|]
-             selected=feeSelectedValue
-             onChange=onChangeFee
-           />
-           {switch (state.fee) {
-            | DefaultAmount => React.null
-            | Custom(feeAmount) =>
-              <>
+  let queryVariables =
+    AccountInfo.make(~publicKey=Apollo.Encoders.publicKey(publicKey), ())##variables;
+
+  <AccountInfoQuery variables=queryVariables>
+    ...{({result}) =>
+      switch (result) {
+      | Loading => <Loader />
+      | Error(err) =>
+        <Alert
+          kind=`Danger
+          message={
+            err##message;
+          }
+        />
+      | Data(accountInfo) =>
+        <ChangeDelegationMutation>
+          (
+            (mutate, {loading, result}) =>
+              <div className=SettingsPage.Styles.container>
+                {switch (result) {
+                 | NotCalled
+                 | Loading => React.null
+                 | Error(err) => <Alert kind=`Danger message=err##message />
+                 | Data(_) =>
+                   goBack();
+                   React.null;
+                 }}
+                <h3 className=Theme.Text.Header.h3>
+                  {React.string("Enable Staking")}
+                </h3>
                 <Spacer height=1. />
-                <TextField.Currency
-                  label="Fee"
-                  value={
-                    feeAmount == Int64.zero ? "" : Int64.to_string(feeAmount)
-                  }
-                  placeholder="0"
-                  onChange={value => {
-                    let serializedValue =
-                      switch (value) {
-                      | "" => Int64.zero
-                      | nonEmpty => Int64.of_string(nonEmpty)
-                      };
-                    changeState(_ =>
-                      {
-                        delegate: state.delegate,
-                        fee: Custom(serializedValue),
-                      }
-                    );
-                  }}
-                />
-              </>
-            }}
-         </div>
-         <Spacer height=1. />
-         <span
-           className=Css.(
-             merge([
-               Theme.Text.Body.regular,
-               style([color(Theme.Colors.slate)]),
-             ])
-           )>
-           {React.string("Staking will take effect in 24-36 hours.")}
-         </span>
-         <Spacer height=2. />
-         <div className=Css.(style([display(`flex)]))>
-           <Button label="Cancel" style=Button.Gray onClick={_ => goBack()} />
-           <Spacer width=1. />
-           <Button
-             label="Turn Staking On"
-             style=Button.Green
-             disabled=loading
-             onClick={_ => mutate(~variables, ~refetchQueries=[|"getAccountInfo"|], ()) |> ignore}
-           />
-         </div>
-       </div>}
-  </ChangeDelegationMutation>;
+                <span className=Theme.Text.Body.regularLight>
+                  {React.string(
+                     "To recieve your staking reward, your computer must be on and running this application 100% of the time.",
+                   )}
+                </span>
+                <Spacer height=1. />
+                {Option.flatMap(accountInfo##account, account =>
+                   account.delegateAccount
+                 )
+                 |> Option.map(~f=delegate => delegate.publicKey == publicKey)
+                 |> Option.withDefault(~default=false)
+                   ? React.null
+                   : <div>
+                       <div className=Styles.label>
+                         {React.string("Transaction fee")}
+                       </div>
+                       <ToggleButton
+                         options=[|"Standard: 5 Coda", "Custom Amount"|]
+                         selected=feeSelectedValue
+                         onChange=onChangeFee
+                       />
+                       {switch (state.fee) {
+                        | DefaultAmount => React.null
+                        | Custom(feeAmount) =>
+                          <>
+                            <Spacer height=1. />
+                            <TextField.Currency
+                              label="Fee"
+                              value={
+                                feeAmount == Int64.zero
+                                  ? "" : Int64.to_string(feeAmount)
+                              }
+                              placeholder="0"
+                              onChange={value => {
+                                let serializedValue =
+                                  switch (value) {
+                                  | "" => Int64.zero
+                                  | nonEmpty => Int64.of_string(nonEmpty)
+                                  };
+                                changeState(_ =>
+                                  {
+                                    delegate: state.delegate,
+                                    fee: Custom(serializedValue),
+                                  }
+                                );
+                              }}
+                            />
+                          </>
+                        }}
+                       <Spacer height=1. />
+                       <span
+                         className=Css.(
+                           merge([
+                             Theme.Text.Body.regular,
+                             style([color(Theme.Colors.slate)]),
+                           ])
+                         )>
+                         {React.string(
+                            "Staking will take effect in 24-36 hours.",
+                          )}
+                       </span>
+                       <Spacer height=2. />
+                     </div>}
+                <div className=Css.(style([display(`flex)]))>
+                  <Button
+                    label="Cancel"
+                    style=Button.Gray
+                    onClick={_ => goBack()}
+                  />
+                  <Spacer width=1. />
+                  <Button
+                    label="Enable Staking"
+                    style=Button.Green
+                    disabled=loading
+                    onClick={_ =>
+                      mutate(
+                        ~variables,
+                        ~refetchQueries=[|"getAccountInfo"|],
+                        (),
+                      )
+                      |> ignore
+                    }
+                  />
+                </div>
+              </div>
+          )
+        </ChangeDelegationMutation>
+      }
+    }
+  </AccountInfoQuery>;
 };
