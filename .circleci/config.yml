@@ -304,24 +304,20 @@ jobs:
             - run:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
+            
             - run:
-                  name: Download candidate stable PV keys
-                  environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
-                  command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
+                  name: Install aws s3
+                  command: sudo pip install awscli
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                   no_output_timeout: 20m
-            # TODO: Insert logic to push to s3 if necessary here
             - run:
-                  name: Rebuild for pvkey changes
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
-                  environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
-                  no_output_timeout: 20m
+                  name: Upload generated keys
+                  command: aws s3 sync /tmp/coda_cache_dir/ s3://snark-keys.o1test.net/
+            
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
