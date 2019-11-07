@@ -33,7 +33,7 @@
     "build-ci": "yarn run query-fake && yarn run build",
     "clean": "bsb -clean-world",
     "pack": "fpack --development ./lib/js/src/render/Index.js",
-    "query": "send-introspection-query http://localhost:8080/graphql",
+    "query": "send-introspection-query http://localhost:3085/graphql",
     "query-fake": "concurrently --kill-others 'yarn run fake' 'sleep 5 && yarn run query' || true",
     "query-real": "concurrently --kill-others 'yarn run real' 'sleep 15 && yarn run query' || true",
     "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei' -print)",

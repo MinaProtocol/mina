@@ -11,12 +11,16 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~defaultText=?) => {
+let make =
+    (
+      ~defaultText=?,
+      ~style as styleOverride=ToastProvider.Default,
+      ~onClick: unit => unit=() => (),
+    ) => {
   let (value, _) = React.useContext(ToastProvider.context);
   let value =
     Option.map(value, ~f=({ToastProvider.text, style}) => (text, style));
-  let default =
-    Option.map(defaultText, ~f=text => (text, ToastProvider.Default));
+  let default = Option.map(defaultText, ~f=text => (text, styleOverride));
 
   // The second arg to orElse has precedence
   switch (Option.orElse(default, value)) {
@@ -30,7 +34,8 @@ let make = (~defaultText=?) => {
         | Warning => (yeezyAlpha(0.15), yeezy)
         }
       );
-    <div className={Styles.toast(bgColor, textColor)}>
+    <div
+      className={Styles.toast(bgColor, textColor)} onClick={_ => onClick()}>
       <p className=Theme.Text.Body.regular> {React.string(text)} </p>
     </div>;
   | None => React.null

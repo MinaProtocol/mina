@@ -162,7 +162,15 @@ module DefaultToast = {
               switch (d##account) {
               | Some({delegateAccount: Some(delegate), stakingActive: false})
                   when delegate##publicKey == pk =>
-                <Toast defaultText="Either delegate or stake this account" />
+                <Toast
+                  onClick={() =>
+                    ReasonReactRouter.push(
+                      "/settings/" ++ PublicKey.uriEncode(pk),
+                    )
+                  }
+                  style=ToastProvider.Success
+                  defaultText={js|Participate in consensus to earn coda →|js}
+                />
               | _ => <Toast />
               }
             | Loading
@@ -206,9 +214,16 @@ let make = () => {
         onClick={_e =>
           ReasonReact.Router.push(onSettingsPage ? "/" : "/settings")
         }>
-        {onSettingsPage ? <Icon kind=Icon.Cross /> : <Icon kind=Icon.Settings />}
+        {onSettingsPage
+           ? <Icon kind=Icon.Cross /> : <Icon kind=Icon.Settings />}
         <Spacer width=0.25 />
-        {onSettingsPage ? {React.string("Close")} : {React.string("Settings")}}
+        {onSettingsPage
+           ? {
+             React.string("Close");
+           }
+           : {
+             React.string("Settings");
+           }}
       </a>
     </div>
   </header>;
