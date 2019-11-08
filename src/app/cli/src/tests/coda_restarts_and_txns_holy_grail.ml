@@ -15,7 +15,8 @@ let main n () =
   let proposers n = if n < 3 then Some n else None in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Work_selection_method.Sequence
+      ~max_concurrent_connections:None
   in
   (* SEND TXNS *)
   let keypairs =
