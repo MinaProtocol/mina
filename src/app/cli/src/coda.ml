@@ -169,9 +169,6 @@ let daemon logger =
      and discovery_port =
        flag "discovery-port" (optional int)
          ~doc:"PORT Port to use for peer-to-peer discovery (default: 28675)"
-     and enable_old_discovery =
-       flag "enable-old-discovery" no_arg
-         ~doc:"Enable the old Haskell Kademlia discovery"
      and libp2p_keypair =
        flag "discovery-keypair" (optional string)
          ~doc:
@@ -581,7 +578,7 @@ let daemon logger =
            Option.value bind_ip_opt ~default:"0.0.0.0"
            |> Unix.Inet_addr.of_string
          in
-         let addrs_and_ports : Kademlia.Node_addrs_and_ports.t =
+         let addrs_and_ports : Node_addrs_and_ports.t =
            { external_ip
            ; bind_ip
            ; discovery_port= old_discovery_port
@@ -678,11 +675,21 @@ let daemon logger =
            ; trust_system
            ; time_controller
            ; consensus_local_state
-           ; log_gossip_heard
-           ; creatable_gossip_net=
-               Coda_networking.Gossip_net.(
-                 Any.Creatable ((module Real), Real.create gossip_net_params))
-           }
+           ; gossip_net_params=
+               { timeout= Time.Span.of_sec 3.
+               ; logger
+               ; target_peer_count= 8
+               ; conf_dir
+               ; chain_id= Lazy.force chain_id
+               ; initial_peers= initial_peers_cleaned
+               ; addrs_and_ports
+               ; trust_system
+               ; log_gossip_heard
+               ; enable_libp2p= not disable_libp2p
+               ; libp2p_keypair
+               ; libp2p_peers=
+                   List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+               ; max_concurrent_connections } }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in

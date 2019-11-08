@@ -49,10 +49,6 @@ Because staking coda requires nodes to be online, some nodes may desire to deleg
 
 A Coda node that is able to verify the state of the network trustlessly. In Coda, every node is a full node since all nodes can receive and verify zk-SNARKs.
 
-####Kademlia
-
-A distributed hash table (DHT) for decentralized peer-to-peer networks. Coda uses Kademlia for peer discovery, so that nodes can find neighbor nodes to share information about the network state.
-
 ####Node
 
 A node is a machine running the coda daemon. 
@@ -60,6 +56,11 @@ A node is a machine running the coda daemon.
 ####Peer-to-peer
 
 Networking systems that rely on peer nodes to distribute information amongst each other are called peer-to-peer networks. These networks are often distributed in nature, and unlike client-server networking models, do not rely on any centralized resource broker.
+
+####Libp2p
+
+A peer-to-peer networking library that provides things like transaction/block broadcast and
+filesharing. Coda uses this under the hood.
 
 ####Private Key
 

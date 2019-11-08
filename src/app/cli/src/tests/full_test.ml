@@ -165,14 +165,29 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; time_controller
           ; consensus_local_state
-          ; log_gossip_heard=
-              { snark_pool_diff= false
-              ; transaction_pool_diff= false
-              ; new_state= false }
-          ; creatable_gossip_net=
-              Coda_networking.Gossip_net.(
-                Any.Creatable ((module Real), Real.create gossip_net_params))
-          }
+          ; gossip_net_params=
+              { timeout= Time.Span.of_sec 3.
+              ; logger
+              ; target_peer_count= 8
+              ; initial_peers= []
+              ; conf_dir= temp_conf_dir
+              ; chain_id= "bogus chain id for testing"
+              ; addrs_and_ports=
+                  { external_ip= Unix.Inet_addr.localhost
+                  ; bind_ip= Unix.Inet_addr.localhost
+                  ; discovery_port
+                  ; communication_port
+                  ; libp2p_port
+                  ; client_port }
+              ; trust_system
+              ; enable_libp2p= false
+              ; libp2p_keypair= None
+              ; libp2p_peers= []
+              ; max_concurrent_connections= Some 10
+              ; log_gossip_heard=
+                  { snark_pool_diff= false
+                  ; transaction_pool_diff= false
+                  ; new_state= false } } }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;

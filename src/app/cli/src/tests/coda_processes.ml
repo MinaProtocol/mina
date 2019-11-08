@@ -20,7 +20,7 @@ let net_configs n =
         let discovery_port = base + 1 in
         let libp2p_port = base + 2 in
         let client_port = 20000 + i in
-        { Kademlia.Node_addrs_and_ports.external_ip= ip
+        { Node_addrs_and_ports.external_ip= ip
         ; bind_ip= ip
         ; discovery_port
         ; communication_port
@@ -29,7 +29,7 @@ let net_configs n =
   in
   let all_peers =
     List.map addrs_and_ports_list
-      ~f:Kademlia.Node_addrs_and_ports.to_discovery_host_and_port
+      ~f:Node_addrs_and_ports.to_discovery_host_and_port
   in
   let peers =
     List.init n ~f:(fun i -> List.take all_peers i @ List.drop all_peers (i + 1)
@@ -56,6 +56,9 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None)
         let public_key =
           Option.bind snark_worker_public_keys ~f:(fun keys ->
               List.nth_exn keys i )
+        in
+        let addrs_and_ports =
+          Node_addrs_and_ports.to_display addrs_and_ports
         in
         Coda_process.local_config ?proposal_interval ~addrs_and_ports ~peers
           ~snark_worker_key:public_key ~program_dir ~acceptable_delay
