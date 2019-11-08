@@ -204,10 +204,11 @@ let gen_keys () =
   match Cached.Track_generated.(dirty1 + dirty2) with
   | `Generated_something -> (
     (* TODO: Check if circleci and die *)
-    match Sys.getenv "CI" with
-    | Some _ ->
-        exit 0xc1 (* exit with code 0xc1, get it CI *)
-    | None ->
+    match (Sys.getenv "CI", Sys.getenv "DUNE_PROFILE") with
+    | Some _, Some profile
+      when String.is_substring ~substring:"testnet" profile ->
+        exit 0xc1 (* exit with code 0xc1, get it "CI" *)
+    | Some _, Some _ | _, None | None, _ ->
         return acc )
   | `Cache_hit ->
       return acc
