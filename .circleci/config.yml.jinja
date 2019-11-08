@@ -62,7 +62,7 @@ jobs:
     build-archive:
         docker:
             - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
-              environment: 
+              environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
             - image: postgres:12
@@ -323,7 +323,9 @@ jobs:
                   {%- endif %}
             - run:
                   name: Upload generated keys
-                  command: aws s3 sync --acl public-read /tmp/coda_cache_dir/ s3://snark-keys.o1test.net/
+                  command: |
+                      ls -l /tmp/coda_cache_dir/
+                      aws s3 sync --acl public-read /tmp/coda_cache_dir/ s3://snark-keys.o1test.net/
             - run:
                   name: Rebuild for pvkey changes
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
