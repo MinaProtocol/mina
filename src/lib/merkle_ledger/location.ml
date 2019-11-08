@@ -1,6 +1,51 @@
 open Core
 open Unsigned
 
+(* add functions to library module Bigstring so we can derive hash for the type t below *)
+module Bigstring = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Core_kernel.Bigstring.Stable.V1.t [@@deriving sexp, compare]
+
+      let to_latest = Fn.id
+
+      let equal = Bigstring.equal
+
+      let hash t = Bigstring.to_string t |> String.hash
+
+      let hash_fold_t hash_state t =
+        String.hash_fold_t hash_state (Bigstring.to_string t)
+    end
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare]
+
+  [%%define_locally
+  Bigstring.(get, length, equal, create, to_string, set, blit, sub)]
+
+  include Hashable.Make (Stable.Latest)
+end
+
+module T = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('bigstring, 'addr) t =
+        | Generic of 'bigstring
+        | Account of 'addr
+        | Hash of 'addr
+      [@@deriving hash, sexp, compare, eq]
+    end
+  end]
+
+  type ('bigstring, 'addr) t = ('bigstring, 'addr) Stable.Latest.t =
+    | Generic of 'bigstring
+    | Account of 'addr
+    | Hash of 'addr
+  [@@deriving hash, sexp, compare, eq]
+end
+
 module Make (Depth : Intf.Depth) = struct
   (* Locations are a bitstring prefixed by a byte. In the case of accounts, the prefix
    * byte is 0xfe. In the case of a hash node in the merkle tree, the prefix is between
@@ -21,30 +66,10 @@ module Make (Depth : Intf.Depth) = struct
     let hash depth = UInt8.of_int (Depth.depth - depth)
   end
 
-  (* add functions to library module Bigstring so we can derive hash for the type t below *)
-  module Bigstring = struct
-    module T = struct
-      include Bigstring.Stable.V1
-
-      let get, length, equal, create, to_string, set, blit, sub =
-        Bigstring.(get, length, equal, create, to_string, set, blit, sub)
-
-      type tt = Bigstring.t [@@deriving sexp, compare]
-
-      let hash t = Bigstring.to_string t |> String.hash
-
-      let hash_fold_t hash_state t =
-        String.hash_fold_t hash_state (Bigstring.to_string t)
-    end
-
-    include T
-    include Hashable.Make (T)
-  end
-
   (* TODO : version *)
   module T = struct
     type t =
-      | Generic of Bigstring.t
+      | Generic of Bigstring.Stable.V1.t
           [@printer
             fun fmt bstr ->
               Format.pp_print_string fmt (Bigstring.to_string bstr)]
