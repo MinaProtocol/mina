@@ -23,15 +23,21 @@ let%test_module "Processor" =
 
     let logger = Logger.null ()
 
-    let t = {Processor.port= 9000}
+    let port = 9000
 
     let try_with ~f =
       Deferred.Or_error.ok_exn
       @@ let%bind result =
-           Monitor.try_with_or_error ~name:"Write Processor" f
+           let open Deferred.Or_error.Let_syntax in
+           let%bind t =
+             Deferred.Result.map_error
+               ~f:Graphql_client_lib.Connection_error.to_error
+             @@ Processor.create port
+           in
+           Monitor.try_with_or_error ~name:"Write Processor" (fun () -> f t)
          in
          let%map clear_action =
-           Processor.Client.query (Graphql_query.Clear_data.make ()) t.port
+           Processor.Client.query (Graphql_query.Clear_data.make ()) port
          in
          Or_error.all_unit
            [ result
@@ -95,7 +101,7 @@ let%test_module "Processor" =
           ) )
       |> Array.reduce_exn ~f:validated_merge
 
-    let write_transaction_pool_diff user_commands =
+    let write_transaction_pool_diff t user_commands =
       let reader, writer =
         Strict_pipe.create ~name:"archive"
           (Buffered (`Capacity 10, `Overflow Crash))
@@ -127,7 +133,7 @@ let%test_module "Processor" =
       Backtrace.elide := false ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      try_with ~f:(fun () ->
+      try_with ~f:(fun t ->
           Async.Quickcheck.async_test
             ~sexp_of:
               [%sexp_of:
@@ -145,13 +151,13 @@ let%test_module "Processor" =
               let hash1 = serialized_hash user_command1 in
               let hash2 = serialized_hash user_command2 in
               let%bind () =
-                write_transaction_pool_diff
+                write_transaction_pool_diff t
                   (User_command.Map.of_alist_exn
                      [ (user_command1, min_block_time)
                      ; (user_command2, block_time2) ])
               in
               let%bind () =
-                write_transaction_pool_diff
+                write_transaction_pool_diff t
                   (User_command.Map.of_alist_exn
                      [(user_command1, max_block_time)])
               in
@@ -199,7 +205,7 @@ let%test_module "Processor" =
                    update serial id references of objects within that object" =
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      try_with ~f:(fun () ->
+      try_with ~f:(fun t ->
           Async.Quickcheck.async_test
             ~sexp_of:
               [%sexp_of:
@@ -212,7 +218,7 @@ let%test_module "Processor" =
               let hash1 = serialized_hash user_command1 in
               let hash2 = serialized_hash user_command2 in
               let%bind () =
-                write_transaction_pool_diff
+                write_transaction_pool_diff t
                   (User_command.Map.of_alist_exn
                      [ (user_command1, block_time1)
                      ; (user_command2, block_time2) ])
@@ -221,7 +227,7 @@ let%test_module "Processor" =
                 query_participants t [hash1; hash2]
               in
               let%bind () =
-                write_transaction_pool_diff
+                write_transaction_pool_diff t
                   (User_command.Map.of_alist_exn [(user_command1, block_time2)])
               in
               let%bind participants_map2 = query_participants t [hash1] in
@@ -268,8 +274,6 @@ let%test_module "Processor" =
 
     (* TODO: make other tests that queries components of a block by testing other queries, such prove_receipt_chain and block pagination *)
     let%test_unit "Write a external transition diff successfully" =
-      Backtrace.elide := false ;
-      Async.Scheduler.set_record_backtraces true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
       let%bind frontier =
@@ -284,7 +288,7 @@ let%test_module "Processor" =
       let successors =
         Transition_frontier.successors_rec frontier root_breadcrumb
       in
-      try_with ~f:(fun () ->
+      try_with ~f:(fun t ->
           let reader, writer =
             Strict_pipe.create ~name:"archive"
               (Buffered (`Capacity 10, `Overflow Crash))
@@ -300,4 +304,56 @@ let%test_module "Processor" =
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
           Strict_pipe.Writer.close writer ;
           processing_deferred_job )
+
+    let%test_unit "Can get the block height of all the blocks" =
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let%bind frontier =
+        Stubs.create_root_frontier ~logger ~pids Genesis_ledger.accounts
+      in
+      let root_breadcrumb = Transition_frontier.root frontier in
+      let%bind () =
+        Stubs.add_linear_breadcrumbs ~logger ~pids ~trust_system ~size:3
+          ~accounts_with_secret_keys:Genesis_ledger.accounts ~frontier
+          ~parent:root_breadcrumb
+      in
+      let expected_num_confirmations =
+        Transition_frontier.(Breadcrumb.state_hash @@ root frontier)
+        :: Transition_frontier.hash_path frontier
+             (Transition_frontier.best_tip frontier)
+        |> List.rev
+        |> List.mapi ~f:(fun i state_hash -> (state_hash, i))
+        |> State_hash.Map.of_alist_exn
+      in
+      let successors =
+        Transition_frontier.successors_rec frontier root_breadcrumb
+      in
+      try_with ~f:(fun t ->
+          let reader, writer =
+            Strict_pipe.create ~name:"archive"
+              (Buffered (`Capacity 10, `Overflow Crash))
+          in
+          let processing_deferred_job = Processor.run t reader in
+          let diffs =
+            List.map
+              ~f:(fun breadcrumb ->
+                Diff.Transition_frontier
+                  (create_added_breadcrumb_diff breadcrumb) )
+              (root_breadcrumb :: successors)
+          in
+          List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
+          Strict_pipe.Writer.close writer ;
+          let%bind () = processing_deferred_job in
+          let graphql = Graphql_query.Blocks.Get_all_pending_blocks.make () in
+          let%map response =
+            Processor.Client.query_exn graphql t.port
+            >>| (fun obj -> obj#blocks)
+            >>| Array.map ~f:(fun block ->
+                    ((block#state_hash)#value, block#status) )
+            >>| Array.to_list >>| State_hash.Map.of_alist_exn
+          in
+          [%test_eq: int State_hash.Map.t]
+            ~equal:(State_hash.Map.equal Int.equal)
+            ~message:"Block confirmations are not equal"
+            expected_num_confirmations response )
   end )

@@ -6,12 +6,23 @@ open Coda_state
 open Coda_base
 open Signature_lib
 
+module type Transition_cache_intf = sig
+  type t
+
+  val create : unit -> t
+
+  val add : t -> key:State_hash.t -> data:int -> unit
+
+  val get : t -> State_hash.t -> int
+end
+
 module Make (Config : Graphql_client_lib.Config_intf) = struct
-  type t = {port: int}
+  type t =
+    {port: int; pending_block_confirmations_cache: Block_confirmation_cache.t}
 
   module Client = Graphql_client_lib.Make (Config)
 
-  let added_transactions {port} added =
+  let added_transactions {port; _} added =
     let open Deferred.Result.Let_syntax in
     let user_commands_with_times = Map.to_alist added in
     let user_commands_with_hashes_and_times =
@@ -137,8 +148,28 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         , Option.value_map first_seen_in_db ~default:(Some default_block_time)
             ~f:Option.some ) )
 
-  let added_transition {port}
-      ({With_hash.data= block; _} as block_with_hash :
+  let update_block_confirmations t (parent_state_hash, state_hash) block_height
+      =
+    let new_updates =
+      Block_confirmation_cache.update t.pending_block_confirmations_cache
+        (state_hash, `Parent parent_state_hash)
+        block_height
+    in
+    let results =
+      List.map new_updates ~f:(fun (hash, {block_height; _}) ->
+          let consensus_status = Consensus_status.Pending block_height in
+          let hash = State_hash.to_base58_check hash in
+          let graphql =
+            Graphql_query.Blocks.Update_block_confirmations.make ~hash
+              ~status:(Consensus_status.to_int consensus_status)
+              ()
+          in
+          Client.query graphql t.port )
+    in
+    Deferred.Result.all results |> Deferred.Result.ignore
+
+  let added_transition t
+      ({With_hash.data= block; hash} as block_with_hash :
         (External_transition.t, State_hash.t) With_hash.t)
       (sender_receipt_chains_from_parent_ledger :
         Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
@@ -175,14 +206,14 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         ~get_first_seen:(fun hashes ->
           Graphql_query.User_commands.Query_first_seen.make ~hashes () )
         ~get_obj:(fun result -> result#user_commands)
-        user_commands block_time port
+        user_commands block_time t.port
     in
     let%bind fee_transfers_with_time =
       tag_with_first_seen
         ~get_first_seen:(fun hashes ->
           Graphql_query.Fee_transfers.Query_first_seen.make ~hashes () )
         ~get_obj:(fun result -> result#fee_transfers)
-        fee_transfers block_time port
+        fee_transfers block_time t.port
     in
     let encoded_block =
       Types.Blocks.serialize block_with_hash
@@ -195,10 +226,28 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         ~blocks:(Array.of_list [encoded_block])
         ()
     in
-    let%bind _ = Client.query graphql port in
-    Deferred.Result.return ()
+    let%bind _ = Client.query graphql t.port in
+    update_block_confirmations t
+      (External_transition.parent_hash block, hash)
+      0
 
-  let create port = {port}
+  let load_pending_blocks port =
+    let open Deferred.Result.Let_syntax in
+    let graphql = Graphql_query.Blocks.Get_all_pending_blocks.make () in
+    let%map pending_blocks_response =
+      Client.query graphql port >>| fun result -> result#blocks
+    in
+    Array.map pending_blocks_response ~f:(fun obj ->
+        let state_hash = (obj#state_hash)#value in
+        let block_height = obj#status in
+        let parent = Some (obj#parent_state_hash)#value in
+        (state_hash, {Block_confirmation_cache.block_height; parent}) )
+    |> Array.to_list |> Block_confirmation_cache.create
+
+  let create port =
+    let open Deferred.Result.Let_syntax in
+    let%map pending_block_confirmations_cache = load_pending_blocks port in
+    {port; pending_block_confirmations_cache}
 
   let run t reader =
     Strict_pipe.Reader.iter reader ~f:(function
