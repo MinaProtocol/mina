@@ -43,11 +43,6 @@ module type Config_intf = sig
     ; consensus_local_state: Consensus.Data.Local_state.t }
 end
 
-module Make (Inputs : Inputs_intf) :
-  Coda_intf.Network_intf
-  with type snark_pool_diff = Inputs.Snark_pool_diff.t
-   and type transaction_pool_diff = Inputs.Transaction_pool_diff.t
-
 include
   Coda_intf.Network_intf
   with type snark_pool_diff = Network_pool.Snark_pool.Resource_pool.Diff.t
