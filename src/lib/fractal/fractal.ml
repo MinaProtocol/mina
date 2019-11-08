@@ -1,28 +1,56 @@
 open Core_kernel
+let ( ! ) = `no_refs
 open Hlist
 
 module type F2 = Free_monad.Functor.S2
 
 type m = A | B | C
 
+let split_depth = 1
+let split_width = 1 lsl split_depth
 
 (* b from the paper *)
 let zk_margin = 1
 
 let gen_name =
   let r = ref (-1) in
-  fun () -> incr r ; sprintf "a%d" !r
+  fun () -> incr r ; sprintf "a%d" r.contents
 
-let reduce xs ( + ) f =
+let reducei xs ( + ) f =
   match xs with
   | [] ->
       assert false
   | x :: xs ->
-      List.fold ~init:(f x) ~f:(fun acc x -> acc + f x) xs
+      List.foldi ~init:(f 0 x) ~f:(fun i acc x -> acc + f i x) xs
+
+let reduce xs add f = reducei xs add (fun _ -> f)
 
 let sum xs f = reduce xs Arithmetic_expression.( + ) f
 
 let product xs f = reduce xs Arithmetic_expression.( * ) f
+
+let sumi xs = reducei xs Arithmetic_expression.( + )
+
+(* For simplicity we just handle 1 public input for now. *)
+let interpolate
+    (* The first element of the domain is 1 *)
+    (_domain : 'field Sequence.t) (values : 'field list) =
+  match values with
+  | [v] ->
+      fun x ->
+        let open Arithmetic_expression in
+        !v * (x - int 1)
+  | _ ->
+      assert false
+
+let u_ (type f) domain (alpha : f) =
+  let open Arithmetic_expression in
+  let open Arithmetic_circuit.E in
+  let v_H = Domain.vanishing domain in
+  let%map v_H_alpha = v_H !alpha in
+  fun x ->
+    let%map v_H_x = v_H x in
+    (!v_H_x - !v_H_alpha) / (x - !alpha)
 
 module AHIOP = struct
   module Arithmetic_computation = struct
@@ -40,8 +68,8 @@ module AHIOP = struct
         | Assert_equal (x, y, k) ->
             Assert_equal (x, y, f k)
 
-      let to_statement ~assert_equal ~constant ~int ~negate ~op =
-        let expr = Arithmetic_expression.to_expr ~constant ~int ~op ~negate in
+      let to_statement ~assert_equal ~constant ~int ~negate ~op ~pow =
+        let expr = Arithmetic_expression.to_expr ~constant ~int ~op ~negate ~pow in
         function
         | Eval (e, k) ->
             let name = gen_name () in
@@ -49,21 +77,21 @@ module AHIOP = struct
         | Assert_equal (x, y, k) ->
             (assert_equal (expr x) (expr y), k)
 
-      let to_program ~assert_equal ~constant ~int ~negate  ~op t =
-        let s, k = to_statement ~assert_equal ~constant ~int ~negate ~op t in
+      let to_program ~assert_equal ~constant ~int ~negate  ~op ~pow t =
+        let s, k = to_statement ~assert_equal ~constant ~int ~negate ~op ~pow t in
         ([s], k)
     end
 
     include Free_monad.Make2 (F)
 
-    let to_program ~assert_equal ~constant ~int ~negate ~op =
+    let to_program ~assert_equal ~constant ~int ~negate ~op ~pow =
       let rec go : type a. (a, 'f) t -> Program.t -> Program.t * a =
        fun t acc ->
         match t with
         | Pure x ->
             (List.rev acc, x)
         | Free f ->
-            let s, k = F.to_statement f ~assert_equal ~constant ~int ~negate ~op in
+            let s, k = F.to_statement f ~assert_equal ~constant ~int ~negate ~op ~pow in
             go k (s :: acc)
       in
       fun t -> go t []
@@ -189,7 +217,12 @@ module AHIOP = struct
             Add_poly (p, q, cont k)
     end
 
-    include Ip.T (Interaction) (Computation)
+    module Randomness = struct
+      type (_, _) t =
+        | () : ('field, < field: 'field; .. >) t
+    end
+
+    include Ip.T (Randomness)(Interaction) (Computation)
 
     let eval ps x = interact (Receive (Evals (ps, x), return))
 
@@ -235,7 +268,7 @@ module AHIOP = struct
         | Query (ps, x, k) ->
             let open Let_syntax in
             let%bind vs = eval ps x in
-            let%bind xi = sample in
+            let%bind xi = sample () in
             let%bind p =
               scaling ~scale:scale_poly ~add:add_poly xi (Vector.to_list ps)
             and v =
@@ -334,19 +367,17 @@ module AHIOP = struct
     end
 
     module Prover_message = struct
-      let ell : Domain.t = failwith "todo"
-
       type ('field, 'poly) basic =
         [`Field of 'field | `X | `Poly of 'poly | `M_hat of m * 'field]
 
       type ('a, 'env) t =
         | F_w :
             { input : 'field list
-            ; h: Domain.t }
+            ; h: Domain.t 
+            }
             -> ('poly, < poly: 'poly; field: 'field; .. >) t
         | Mz_random_extension :
             { m: m
-            ; b: int
             ; h : Domain.t }
             -> ('poly, < poly: 'poly ; .. >) t
         | Random_summing_to_zero :
@@ -357,10 +388,16 @@ module AHIOP = struct
             ('field * [`u of m * 'field]) list 
             -> ('poly, < poly: 'poly ; field: 'field; .. >) t
         | Eval : 'poly * 'field
-            -> ('poly, < poly: 'poly ; field: 'field; .. >) t
+            -> ('field, < poly: 'poly ; field: 'field; .. >) t
         | Sigma_residue
-          : { f : [`Field of 'field | `Poly of 'poly] Arithmetic_expression.t
-            ; q : [`Field of 'field | `Poly of 'poly] Arithmetic_expression.t
+          : { f : [ `Field of 'field
+                  | `Poly_times_x of 'poly
+                  | `Poly of 'poly 
+                  | `Vanishing_poly of Domain.t 
+                  | `Circuit of ('field -> 
+                                 ('field, 'field) Arithmetic_circuit.t)
+                  ] Arithmetic_expression.t as 'expr
+            ; q : 'expr
             ; domain : Domain.t }
         (* Given f, q, sigma, and domain H,
            compute g such that exists h such that
@@ -374,18 +411,58 @@ module AHIOP = struct
            ((r / q) - sigma / |H|) / X
         *)
             -> ('poly, < poly: 'poly ; field: 'field; .. >) t
+
+      let degree_bound : type e a. b:int -> Domain.t -> (a, e) t -> int option =
+        fun ~b h t ->
+        match t with
+        | F_w
+            { input
+            ; h } -> Some (Domain.size h - List.length input + b - 1)
+        | Mz_random_extension 
+            { m=_
+            ; h }
+            -> Some (Domain.size h + b - 1)
+        | Random_summing_to_zero 
+            { h=_
+            ; degree  } -> Some (degree)
+        | Linear_combination _terms ->
+          Some (Domain.size h - 1)
+        | Sigma_residue { f=_; q=_; domain } ->
+          Some (Domain.size domain - 2)
+        | Eval _ -> None
     end
 
-    module Basic_IP = struct
-      module Interaction = Messaging.F(Prover_message)
-      module Computation = Arithmetic_circuit.E.F
-      include Ip.T (Interaction) (Computation)
+    module Messaging_IP
+        (Randomness : T2)
+        (Computation : F2)
+        (Message : T2)
+      : sig
+      include Ip.S
+      with module Interaction := Messaging.F(Message)
+        and module Computation := Computation
+        and module Randomness := Randomness
+
+      val send : ('q, 'e) Type.t -> 'q -> ('r, 'e) Message.t -> ('r, 'e) t
+
+      val receive  : ('r, 'e) Message.t -> ('r, 'e) t
+
+      val challenge
+        : ('f, < field:'f; ..> as 'e) Randomness.t
+        -> ('r, 'e) Message.t
+        -> ('f * 'r, 'e) t
+
+      val interact
+        : send:('f, 'n) Vector.t
+        -> receive:('r, < field:'f; ..> as 'e) Message.t
+        -> ('r, 'e) t
+    end = struct
+      include Ip.T (Randomness)(Messaging.F(Message)) (Computation)
 
       let send t_q q t_r = interact (Send_and_receive (t_q, q, t_r, return))
 
-      let challenge m =
+      let challenge t m =
         let open Let_syntax in
-        let%bind c = sample in
+        let%bind c = sample t in
         let%map x = send Field c m in
         (c, x)
 
@@ -398,12 +475,424 @@ module AHIOP = struct
         send (Type.Vector (Field, n)) q receive
     end
 
+    module Evaluation_domain : sig
+      type t 
+
+      val pow : t -> t
+
+    end = struct
+      type t =
+        { log_split_width_size : int }
+
+      let pow { log_split_width_size } =
+        { log_split_width_size = log_split_width_size + 1 }
+    end
+
+    module Randomness = struct
+      type (_, _) t =
+        | () : ('field, < field: 'field; .. >) t
+        (* The domain L^i *)
+        | Evaluation_domain
+          : Evaluation_domain.t -> ('loc, < loc: 'loc; ..>) t
+    end
+
+    module Computation = Arithmetic_circuit.E.F
+
+    module Basic_IP = struct
+      module F = Ip.F(Randomness)(Messaging.F(Prover_message)) (Computation)
+      include Messaging_IP(Randomness)(Computation)(Prover_message)
+    end
+
+    type ('field, 'poly) virtual_oracle =
+      [ `Field of 'field 
+      | `Poly_times_x of 'poly
+      | `Poly of 'poly 
+      | `Vanishing_poly of Domain.t 
+      | `Circuit of ('field -> 
+                      ('field, 'field) Arithmetic_circuit.t)
+      ] Arithmetic_expression.t
+
+    module Oracle = struct
+      type ('field, 'poly) t =
+        | Poly of 'poly
+        | Virtual of ('field, 'poly) virtual_oracle
+    end
+
+    module FRI = struct
+      module Computation = struct
+        type ('a, 'e) t =
+          | Arithmetic of ('a, 'e) Arithmetic_circuit.E.F.t
+          | Assert_equal :
+              'field Arithmetic_expression.t * 'field Arithmetic_expression.t
+              * 'k -> ('k, < field: 'field; .. >) t
+          | Adapt_location
+            : Evaluation_domain.t * 'loc * ('loc -> 'k) -> ('k, < loc: 'loc; ..>) t
+          | Location_to_field
+            : 'loc * ('field -> 'k) -> ('k, < loc: 'loc; field: 'field; ..>) t
+
+        let map : type a b e. (a, e) t -> f:(a -> b) -> (b, e) t =
+          fun t ~f ->
+          let cont k = fun x -> f(k x) in
+          match t with
+          | Arithmetic a -> Arithmetic (Arithmetic_circuit.E.F.map a ~f)
+          | Assert_equal (x, y,k) -> Assert_equal (x, y, f k)
+          | Adapt_location (dom, l, k) ->
+            Adapt_location (dom, l, cont k)
+          | Location_to_field (l, k) ->
+            Location_to_field (l, cont k)
+      end
+
+      (* Split into 2^split_depth "coset polynomials" *)
+      let k = split_width
+
+      module Prover_message = struct
+        type (_, _) t =
+          | Coset_evals
+            : 'poly * 'loc
+          (* Let S be the two-adic subgroup of F^*, 
+
+             S = < omega_0 >
+             |S| = N = 2^n
+
+             Let L = g S for some g notin S of large order.
+
+             Let L_n = L.
+             Let L_{i - split_depth} = L_i ^ (2^split_depth) = L_i ^ split_width
+
+             So |L_i| = 2^i and L_i = g^{2^{n-i}} < omega_0^{2^{n - i}} >
+          *)
+
+          (* Given a polynomial f and x in a given domain, get
+              f( omega^i x ) for 0 <= i < k
+
+             We represent each oracle for domain L_t as a Merkle tree
+             with the the i^{th} leaf containing the coset
+
+             x_i * < omega_0^{N / split_width} >
+
+             which is what this message should be.
+          *)
+              -> ('field list, < field: 'field; poly: 'poly; loc: 'loc; ..>) t
+          | Sub_poly_constant
+            :  'poly * 'field
+              -> ('field, < field: 'field; poly: 'poly; ..>) t
+          | Sub_poly_commitment
+            : ('field, 'poly) Oracle.t * 'field * Evaluation_domain.t
+          (* Given a polynomial f and field elt a, commit on domain d to the polynomial
+
+             \sum_{i=0}^k a^i f_i
+
+             where the f_i are such that
+
+             f = \sum_{i=0}^k x^i f_i(x^k)
+          *)
+              -> ('poly, < field: 'field; poly: 'poly; ..>) t
+      end 
+
+      module IP = Messaging_IP(Randomness)(Computation)(Prover_message)
+
+      open IP
+
+      let eval t =
+        compute (Arithmetic (Eval (t, return)))
+
+      module Virtual_oracle = struct
+        type ('field, 'poly) t = ('field, 'poly) virtual_oracle
+
+        (* TODO: Not sure if the caching layer should go here. *)
+        let rec coset_evals (type loc field poly)
+            (evals : (poly, field list) Hashtbl.t)
+            (c : (field, poly) t)
+            (loc : loc)
+            (z_loc : field)
+          : 
+            (field list, < poly: poly; field: field; loc: loc; .. >) IP.t
+          =
+          (* Traversable would be nice... *)
+          let rec eval_expr i
+            : [ `Field of field 
+              | `Poly of poly 
+              | `Poly_times_x of poly 
+              | `Vanishing_poly of Domain.t 
+              | `Circuit of (field -> (field, field) Arithmetic_circuit.t)
+              ] Arithmetic_expression.t
+              -> (field Arithmetic_expression.t,  < field: field; poly:poly; ..> as 'env) IP.t =
+            let open Arithmetic_expression in
+            function
+            | Op (op, x, y) ->
+              let%bind x = eval_expr i x in
+              let%map y = eval_expr i y in
+              Op (op, x, y)
+            | Int n -> return (Int n)
+            | Pow (x,n) ->
+              let%map x = eval_expr i x in
+              Pow(x,n)
+            | Negate x -> let%map x = eval_expr i x in Negate x
+            | Constant (`Field f) -> return (Constant f)
+            | Constant (`Circuit c) ->
+              let%map x = circuit_eval (c z_loc) in
+              Constant x
+            | Constant (`Vanishing_poly (dom)) -> 
+              (* The vanishing poly takes on the same values everywhere in the coset. *)
+              return (Pow (Constant z_loc, Domain.size dom))
+            | Constant (`Poly_times_x p) ->
+              let%bind pz = eval_expr i (Constant (`Poly p)) in
+              eval (!z_loc * pz) >>| constant
+            | Constant (`Poly p) ->
+              match Hashtbl.find evals p with
+              | Some xs -> return (Constant (List.nth_exn xs i))
+              | None ->
+                let%map xs = receive (Coset_evals (p, loc)) in
+                Hashtbl.set evals ~key:p ~data:xs;
+                Constant (List.nth_exn xs i)
+          in
+          List.init split_width ~f:(fun i -> eval_expr i c >>= eval)
+          |> all
+        and
+          circuit_eval : type a field poly loc. (a, field) Arithmetic_circuit.t -> (a, < field: field; poly:poly; loc:loc; ..>) IP.t
+          =
+          fun c ->
+          match c with
+          | Pure x ->
+            return x
+          | Free (Eval (x, k)) ->
+            let%bind y = eval x in
+            circuit_eval (k y)
+
+        let of_oracle = function
+          | Oracle.Virtual c -> c
+          | Poly p ->
+            Arithmetic_expression.(! (`Poly p))
+      end
+
+      let pow (type field) (x : field) k =
+        let test_bit i = (k lsr i) land 1 = 1 in
+        let top_bit =
+          let open Sequence in
+          init Int.num_bits ~f:(fun i -> Int.num_bits - 1 - i)
+          |> filter ~f:test_bit
+          |> hd_exn
+        in
+        let open Arithmetic_expression in
+        let rec go (acc : field) i =
+          if i < 0
+          then return (!acc)
+          else 
+            let%bind acc =
+              if test_bit i then eval (!x * !acc)
+              else return acc
+            in
+            let%bind acc = eval (!acc * !acc) in
+            go acc Int.(i - 1)
+        in
+        if k = 0
+        then return (Int 1)
+        else go x Int.(top_bit - 1)
+
+      (* Compute x^0, x^1, ... x^{k - 1 } *)
+      let pows (type field) (x : field) k =
+        let (!) = Arithmetic_expression.(!) in
+        (* Can't be bothered with edge cases. *)
+        assert (k >= 2);
+        let rec go acc x_to_i_minus_1 i =
+          if i = k
+          then return (Array.of_list_rev acc)
+          else
+            let%bind x_to_i = eval Arithmetic_expression.(!x * !x_to_i_minus_1) in
+            go (!x_to_i :: acc) x_to_i (i + 1)
+        in
+        go [ !x; Int 1 ] x 2
+
+      (* TODO: omega^(row*col) should be precomputed *)
+      let phi_inverse omega_pows z = 
+        let open Arithmetic_expression in
+        let k = Array.length omega_pows in
+        let%map z_pows = pows z k in
+        List.init k ~f:(fun row ->
+          List.init k ~f:(fun col ->
+          int 1 / ( omega_pows.(Int.((row*col) mod k)) * z_pows.(row)) ))
+
+      (*
+        f_omega_zs = [ f (omega^i z), i in [0, K - 1] ]
+
+         u_i = f(omega^i z)
+         U = < u_i >
+
+         v_i = f_i(z^K)
+         V = < v_i >
+
+         phi : U -> V
+         f(omega^i z) = \sum_j omega^{i*j} z^j f_j(z^K)
+         u_i = \sum_j omega^{i*j} z^j v_j
+
+         phi is injective. 
+
+         We want to find phi^{-1}(v_j) for each j.
+
+         As a matrix phi looks like
+
+         columns(
+          { omega^{0*0} z^0, omega^{0*1} z^1, ... },
+          { omega^{1*0} z^0, omega^{1*1} z^1, ... },
+          { omega^{2*0} z^0, omega^{2*1} z^1, ... },
+          ... )
+
+         I found the expression in the below claim by computing the
+         inverse of this matrix for small K and extrapolating.
+
+         Claim:
+         v_t = \sum_i 1/(K w^{t*i} z^t) u_i
+
+         = \sum_i 1/(K w^{t*i} z^t) \sum_j w^{i*j} z^j v_j
+         = \sum_i \sum_j 1/(K w^{t*i} z^t) w^{i*j} z^j v_j
+         = \sum_j \sum_i 1/(K w^{t*i} z^t) w^{i*j} z^j v_j
+         =  \sum_i 1/(K w^{t*i} z^t) w^{t*i} z^t v_t
+          + \sum_{j != t} \sum_i 1/(K w^{t*i} z^t) w^{i*j} z^j v_j
+         =  (\sum_i 1/(K w^{t*i} z^t) w^{t*i} z^t) v_t
+          + \sum_{j != t} \sum_i 1/(K w^{t*i} z^t) w^{i*j} z^j v_j
+         =  (\sum_i 1/(K w^{t*i}) w^{t*i}) v_t
+          + \sum_{j != t} \sum_i 1/(K w^{t*i} z^t) w^{i*j} z^j v_j
+         =  v_t
+          + \sum_{j != t} \sum_i 1/(K w^{t*i} z^t) w^{i*j} z^j v_j
+         =  v_t
+          + 1/(K z^t) \sum_{j != t} z^j (\sum_i w^{i*(j - t)}) v_j
+         = v_t
+      *)
+      (* TODO: Optimization: Division by k can be done once *)
+      let fi_zks ~omega_pows ~z f_omegai_zs =
+        let open Arithmetic_expression in
+        let k = Array.length omega_pows in
+        let%bind z_inv = eval (Int 1 / ! z ) in
+        let%map z_inv_pows = pows z_inv k in
+        Array.init k ~f:(fun t ->
+          sumi f_omegai_zs (fun i u_i ->
+            omega_pows.(Int.((k - (t*i)) mod k)) * z_inv_pows.(t) * !u_i / int k
+              ))
+
+      let adapt_location dom l = compute (Adapt_location (dom, l, return))
+      let location_to_field l = compute (Location_to_field ( l, return))
+      let assert_equal x y = compute (Assert_equal (x, y, return ()))
+
+(* TODO: It's possible I need to use independent alphas here rather
+   than alpha, alpha^2, ... *)
+      let check_evaluation ~omega_pows ~alpha ~z f1_zk f_omega_zs =
+        let%bind fi_zks = (fi_zks ~omega_pows ~z f_omega_zs) in
+        let rec go acc i =
+          if i < 0
+          then acc
+          else
+            let open Arithmetic_expression in
+            (* Multiply by alpha, then add next term *)
+            go (!alpha * acc + fi_zks.(i)) Int.(i - 1)
+        in
+        let k = Array.length fi_zks in
+        let expected_f1_zk = go fi_zks.(k-1) (k-2)  in
+        assert_equal expected_f1_zk (Arithmetic_expression.constant f1_zk)
+
+(* TODO: I wonder if the rust compiler will insert "drops"
+   at the appropriate locations so that we deallocate as we compute.
+
+   May have to insert explicit scoping into the monad. 
+*)
+      (* I really need looping in the target language, otherwise the generated code is going to be huge. *)
+      let fri ~create_cache ~omega_pows f0 dom0 logk_d0 =
+        let query_phase commitments =
+          let%bind loc = sample (Evaluation_domain dom0) in
+          let cache = create_cache () in
+          let%bind evals =
+            List.map commitments ~f:(fun (f, dom, alpha) ->
+              let%bind loc = adapt_location dom loc in
+              let%bind z = location_to_field loc in
+              let%map evals = 
+                Virtual_oracle.(
+                  coset_evals cache
+                    (of_oracle f)
+                    loc z)
+              in
+              (evals, z, alpha)
+              )
+            |> all
+            >>| Array.of_list
+          in
+          List.init (Array.length evals - 1) ~f:(fun i ->
+            let f_loc, z, alpha = evals.(i) in
+            let f1_loc, _, _ = evals.(i+1) in
+            check_evaluation ~omega_pows ~alpha ~z
+              (List.hd_exn f1_loc) f_loc )
+          |> all
+        in
+        let rec commitments acc f dom logk_d =
+          (*
+            Test that f has degree less than k^log_d.
+          *)
+          if logk_d = 1
+          then
+            (* f is degree < k, so f's subpolynomial will be a constant *)
+            (* TODO: This is missing the last check. I.e., f is never checked for low degreeness *)
+            (*
+            let%bind alpha = sample () in
+            let%bind f1 =
+              receive (Sub_poly_constant (f, alpha))
+            in
+            let%bind loc = sample (Evaluation_domain dom0) in *)
+            return (List.rev acc)
+          else
+            let%bind alpha = sample () in
+            let dom2 = Evaluation_domain.pow dom in
+            let%bind f1 =
+              receive (Sub_poly_commitment (f, alpha, dom2))
+            in
+            commitments ((f, dom, alpha) :: acc) (Poly f1) dom2 (logk_d - 1)
+        in
+        commitments [] (Virtual f0) dom0 logk_d0 >>= query_phase
+    end
+
     open Basic_IP
 
+    let rec with_implicit_degree_constraints 
+      : type a field poly.
+        b:int
+        -> Domain.t
+        -> (poly * int) list
+        -> (a, < poly:poly; field:field >) t
+        -> (a * (poly * int) list, < poly:poly; field:field >) t
+      =
+      fun ~b h acc t ->
+      match t with
+      | Pure x -> Pure (x, acc)
+      | Free (Interact (Send_and_receive (t_q, q, t_r, k))) ->
+        Free (Interact (Send_and_receive (t_q, q, t_r, fun r ->
+          let acc =
+            let c : (poly * int) option =
+              match t_r with
+              | F_w
+                  { input
+                  ; h } -> Some (r, Domain.size h - List.length input + b - 1)
+              | Mz_random_extension 
+                  { m=_
+                  ; h }
+                  -> Some (r, Domain.size h + b - 1)
+              | Random_summing_to_zero 
+                  { h=_
+                  ; degree  } -> Some (r, degree)
+              | Linear_combination _terms ->
+                Some (r, Domain.size h - 1)
+              | Sigma_residue { f=_; q=_; domain } ->
+                Some (r, Domain.size domain - 2)
+              | Eval _ -> None
+            in
+            Option.value_map ~f:List.cons ~default:Fn.id c acc
+          in
+          with_implicit_degree_constraints ~b h acc (k r))))
+      | Free f -> Free (F.map f ~f:(with_implicit_degree_constraints ~b h acc))
+
+    let with_implicit_degree_constraints ~b h t =
+      with_implicit_degree_constraints ~b h [] t
+
     let sample_eta () =
-      let%map a = sample
-      and b = sample
-      and c = sample in
+      let%map a = sample ()
+      and b = sample ()
+      and c = sample () in
       abc a b c 
 
     (* Sigma_S(g, sigma) = X g(X) + sigma / |S| *)
@@ -425,13 +914,44 @@ module AHIOP = struct
       and c = f C in
       abc a b c
 
-    let protocol (type poly field) { Index.row; col; value } b domain_H domain_K (input : field list) : ('a, < field: field; poly: poly; ..>) t =
+    (* TODO: Assuming input has size 1 *)
+    let v_I x = Arithmetic_circuit.eval Arithmetic_expression.(!x - Int 1)
+
+    let ceil_div x k =
+      (x + (k - 1)) / k
+
+    let log_split_width x =
+      ceil_div (Int.ceil_log2 x) split_depth
+
+    let combine : type field poly.
+        ((field, poly) Oracle.t * int) list
+      -> ((field, poly) Oracle.t * int, < field: field; poly: poly; .. >) t
+      =
+      fun fds ->
+        let d = List.max_elt (List.map ~f:snd fds) ~compare:Int.compare |> Option.value_exn in
+        let log_split_width = log_split_width d in
+        let d0 = Int.pow split_width log_split_width in
+        let%map terms =
+          List.map fds ~f:(fun (fi,di) ->
+            let%map alpha = sample () in
+            let open Arithmetic_expression in
+            ! (`Field alpha)
+            * !(`Circuit (fun x -> Arithmetic_circuit.eval (Pow (!x, Int.(d0 - di)))) )
+            * FRI.Virtual_oracle.of_oracle fi )
+          |> all
+        in
+        ( Oracle.Virtual (List.reduce_exn terms ~f:Arithmetic_expression.(+)), log_split_width )
+
+    let protocol (type poly field) { Index.row; col; value } b domain_H domain_K (input : field list) =
+      (* TODO: Make parallelism explicit so the prover can utilize that. *)
       let%bind f_w = receive (F_w { input; h=domain_H })
-      and f_ = abc (fun m ->receive (Mz_random_extension { m; h=domain_H; b}) )
+      and f_ = abc (fun m ->receive (Mz_random_extension { m; h=domain_H }) )
       and (r : poly) = receive (Random_summing_to_zero { h=domain_H; degree=2 * Domain.size domain_H + b - 2 })
       in
-      let%bind alpha = sample in
-      let%bind eta = abc (fun _ -> sample) in
+      let open Arithmetic_expression in
+      let%bind alpha = sample () in
+      let%bind v_H_alpha = lift_compute (Domain.vanishing domain_H (!alpha)) in
+      let%bind eta = abc (fun _ -> sample ()) in
       let%bind t =
         interact ~send:[ alpha; eta A; eta B; eta C ]
           ~receive:(
@@ -439,24 +959,32 @@ module AHIOP = struct
                 (eta m, `u (m, alpha)))))
       in
       let open Arithmetic_expression in
-      let%bind (g_1 : poly) =
-        let f_x = failwith "TODO" in
-        let u_H _ = failwith "TODO" in
-        let f =
-          !(`Poly r) - !(`Poly t) * f_x + sum [A;B;C] (fun m ->
-            !(`Field (eta m)) * u_H alpha * !(`Poly(f_ m) ))
+      let f_1 =
+        let f_z = 
+          let f_x = let f = interpolate Sequence.empty input in
+            fun x -> Arithmetic_circuit.( eval (f (!x))
+              )
+          in
+          !(`Poly f_w) * !(`Circuit v_I) + !(`Circuit f_x)
         in
+        let u_x_alpha (x : field) = 
+          Arithmetic_circuit.(
+            let%bind v_H_x = Domain.vanishing0 domain_H (!x) in
+            eval (
+              (! v_H_x - ! v_H_alpha)
+              / (!x - !(alpha))))
+        in
+        !(`Poly r) - !(`Poly t) * f_z + sum [A;B;C] (fun m ->
+          !(`Field (eta m)) * !(`Circuit u_x_alpha ) * !(`Poly(f_ m) ))
+      in
+      let%bind (g_1 : poly) =
         receive
-          (Sigma_residue { f; q=Int 1; domain=domain_H })
+          (Sigma_residue { f=f_1
+                         ; q=Int 1; domain=domain_H })
       in
-      let%bind beta = sample in
-      let%bind gamma =
-        interact
-          ~send:[beta]
-          ~receive:(Eval (t, beta))
-      in
-      let%bind g_2 =
-        let%bind v_H_alpha_v_H_beta =
+      let%bind beta = sample () in
+      let%bind p, q =
+        let%map v_H_alpha_v_H_beta =
           let v_H x = Domain.vanishing domain_H x in
           lift_compute Arithmetic_circuit.E.(
               let%bind (a : field) = v_H (!alpha)
@@ -465,22 +993,54 @@ module AHIOP = struct
               eval (!a * !b)
             )
         in
-        let open Arithmetic_expression in
-        let f, q =
-          let top, bot =
-            reduce [A;B;C] Fof.add (fun m ->
-                let (/) = Tuple2.create in
-                (! (`Field (eta m)) * value m) / 
-                ((! (`Field alpha) - row m) * (! (`Field beta) - col m)) )
-          in
-          (Negate (! (`Field v_H_alpha_v_H_beta)) * top, bot)
+        let top, bot =
+          reduce [A;B;C] Fof.add (fun m ->
+              let (/) = Tuple2.create in
+              (! (`Field (eta m)) * value m) / 
+              ((! (`Field alpha) - row m) * (! (`Field beta) - col m)) )
         in
-        receive
-          (Sigma_residue { f; q; domain= domain_K })
+        (Negate (! (`Field v_H_alpha_v_H_beta)) * top, bot)
       in
-      return
-        [
-        ]
+      let%bind gamma =
+        interact
+          ~send:[beta]
+          ~receive:(Eval (t, beta))
+      and g_2 =
+        receive
+          (Sigma_residue { f=p; q; domain= domain_K })
+      in
+      let v_H = `Vanishing_poly domain_H in
+      let s =
+        let f_ m = !(`Poly (f_ m)) in
+        ( f_ A * f_ B - f_ C ) / !(v_H)
+      in
+      let h =
+        let sigma_H_g_1 = !(`Poly_times_x g_1) in
+        ( f_1 - sigma_H_g_1 ) / !(v_H )
+      in
+      let e = 
+        let sigma_K_g_2_gamma =
+          !(`Poly_times_x g_2) +
+            ((! (`Field gamma)) / Int (Domain.size domain_K))
+        in
+        ( sigma_K_g_2_gamma * q - p ) / !(`Vanishing_poly domain_K
+)
+      in
+      (* TODO: Random linear combination and "levelling off" *)
+      let%bind combined =
+        combine
+          [ (Virtual s, Int.(Domain.size domain_H + 2 * b - 2))
+          ; (Virtual h, Int.(Domain.size domain_H + b - 2))
+          ; (Virtual e, 
+            let k = Domain.size domain_K in
+            Int.(max (5*k - 5 - k) (6*k - 6 - 1)
+                ) )
+          ]
+      in
+      FRI.fri
+
+    let _ = protocol
+
   end
 
   module Marlin_prover_message = struct
@@ -844,18 +1404,6 @@ negligible amount (which is fine), and lets us reduce argument size by 9 group e
     let%bind x = sample in
     let%map r = send Field x t in
     (x, r)
-
-  (* For simplicity we just handle 1 public input for now. *)
-  let interpolate
-      (* The first element of the domain is 1 *)
-      (_domain : 'field Sequence.t) (values : 'field list) =
-    match values with
-    | [v] ->
-        fun x ->
-          let open Arithmetic_expression in
-          !v * (x - int 1)
-    | _ ->
-        assert false
 
   let vanishing_poly (_domain : 'field Sequence.t) (prefix_length : int) =
     assert (prefix_length = 1) ;
