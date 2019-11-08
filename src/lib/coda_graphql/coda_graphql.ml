@@ -456,16 +456,15 @@ module Types = struct
 
   module Next_epoch_data =
     Make_epoch_data (struct
-        type t = State_hash.t option
+        type t = State_hash.t
 
         type epoch_data = Consensus.Data.Epoch_data.Next.Value.t
 
         let field name ~f =
-          field name ~typ:string
+          field name ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun _ epoch_data ->
-              Option.map ~f:Stringable.State_hash.to_base58_check
-              @@ f epoch_data )
+              Stringable.State_hash.to_base58_check @@ f epoch_data )
       end)
       (Consensus.Data.Epoch_data.Next)
       (struct
