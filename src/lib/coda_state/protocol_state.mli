@@ -57,6 +57,8 @@ module Body : sig
   type ('a, 'b) t = ('a, 'b) Poly.t
 
   val hash : Value.t -> State_body_hash.t
+
+  val hash_checked : var -> (State_body_hash.var, _) Checked.t
 end
 
 module Value : sig

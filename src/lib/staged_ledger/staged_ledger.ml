@@ -1983,6 +1983,7 @@ let%test_module "test" =
         in
         let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
         Pending_coinbase.Checked.add_coinbase root_after_popping coinbase_var
+          (State_hash.var_of_t (previous_state_hash pending_coinbase_before))
       in
       let checked_root_after_update =
         let open Snark_params.Tick in

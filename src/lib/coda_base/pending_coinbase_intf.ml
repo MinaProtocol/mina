@@ -154,7 +154,7 @@ module type S = sig
   (** Delete the oldest stack*)
   val remove_coinbase_stack : t -> (Stack.t * t) Or_error.t
 
-  (**Root of the merkle tree that has stacks as leaves*)
+  (** Root of the merkle tree that has stacks as leaves*)
   val merkle_root : t -> Hash.t
 
   val handler : t -> is_new_stack:bool -> (request -> response) Staged.t
@@ -166,11 +166,14 @@ module type S = sig
   val latest_stack :
     t -> is_new_stack:bool -> update_state_hash:bool -> Stack.t Or_error.t
 
-  (**The stack that corresponds to the next ledger proof that is to be generated*)
+  (** The stack that corresponds to the next ledger proof that is to be generated*)
   val oldest_stack : t -> Stack.t Or_error.t
 
-  (**Hash of the auxilliary data (everything except the merkle tree)*)
+  (** Hash of the auxilliary data (everything except the merkle tree)*)
   val hash_extra : t -> string
+
+  (** hash of the previous protocol state that is currently being tracked*)
+  val previous_state_hash : t -> State_hash.t
 
   module Checked : sig
     type var = Hash.var
@@ -211,7 +214,8 @@ module type S = sig
        - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
        - returns a root [t'] of the tree
     *)
-    val add_coinbase : var -> Coinbase_data.var -> (var, 's) Tick.Checked.t
+    val add_coinbase :
+      var -> Coinbase_data.var -> State_hash.var -> (var, 's) Tick.Checked.t
 
     (**
        [pop_coinbases t pk updated_stack] implements the following spec:
