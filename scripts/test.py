@@ -237,7 +237,7 @@ def run(args):
                 coda_exe, test)
             cmd += '| tee \'%s\' | %s -f \'%s\' ' % (log, logproc_exe,
                                                      logproc_filter)
-            cmd += '; ./scripts/link-subprocess-logs.sh \'%s\' ' % profile_dir
+            cmd += '&& ./scripts/link-subprocess-logs.sh \'%s\' ' % profile_dir
             print('Running: %s' % (cmd))
             run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
 

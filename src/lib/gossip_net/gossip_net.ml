@@ -277,26 +277,28 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     with
     | Banned_until _ ->
         `Banned
-    | Unbanned ->
+    | Unbanned -> (
         let conn_map =
           Hashtbl.find_or_add t.connections addr ~default:(fun () ->
               Hashtbl.create (module Uuid) )
         in
-        if
-          Hashtbl.length conn_map
-          >= Option.value_exn t.config.max_concurrent_connections
-        then `At_max_connections
-        else
-          let uuid = Uuid_unix.create () in
-          let ivar = Ivar.create () in
-          Hashtbl.add_exn conn_map ~key:uuid ~data:ivar ;
-          `Unbanned
-            ( `When_established (Ivar.fill ivar)
-            , `When_closed
-                (fun () ->
-                  Hashtbl.remove conn_map uuid ;
-                  if Hashtbl.length conn_map = 0 then
-                    Hashtbl.remove t.connections addr ) )
+        match
+          (Hashtbl.length conn_map, t.config.max_concurrent_connections)
+        with
+        | conn_count, Some max_connections when conn_count >= max_connections
+          ->
+            `At_max_connections
+        | _ ->
+            let uuid = Uuid_unix.create () in
+            let ivar = Ivar.create () in
+            Hashtbl.add_exn conn_map ~key:uuid ~data:ivar ;
+            `Unbanned
+              ( `When_established (Ivar.fill ivar)
+              , `When_closed
+                  (fun () ->
+                    Hashtbl.remove conn_map uuid ;
+                    if Hashtbl.length conn_map = 0 then
+                      Hashtbl.remove t.connections addr ) ) )
 
   let rec try_call_rpc :
             'r 'q.    t -> Peer.t -> ('r, 'q) dispatch -> 'r
