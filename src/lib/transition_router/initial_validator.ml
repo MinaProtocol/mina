@@ -149,7 +149,7 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
     let open Deferred.Let_syntax in
     let duplicate_checker = Duplicate_proposal_detector.create () in
     Reader.iter transition_reader ~f:(fun network_transition ->
-        if Ivar.is_full initialization_finish_signal then (
+        if !initialization_finish_signal then (
           let `Transition transition_env, `Time_received time_received =
             network_transition
           in
