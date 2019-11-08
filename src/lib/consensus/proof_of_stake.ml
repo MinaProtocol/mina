@@ -966,14 +966,6 @@ module Data = struct
                       (Snarky.Request.Handler.run handlers
                          ["Ledger Handler"; "Pending Coinbase Handler"]
                          request)))
-
-      (* TODO):
-      let _vrf_output =
-        let _, sk = keypairs.(0) in
-        eval ~private_key:sk
-          { Message.global_slot= Global_slot.zero
-          ; seed= Epoch_seed.initial
-          ; delegator= 0 } *)
     end
 
     let check ~global_slot ~seed ~private_key ~public_key
@@ -1246,30 +1238,16 @@ module Data = struct
       Poly.(ledger, seed, start_checkpoint, lock_checkpoint, epoch_length)]
     end
 
-    module Staking = Make (struct
+    module T = struct
       include Coda_base.State_hash
 
       let to_input (t : t) = Random_oracle.Input.field (t :> Tick.Field.t)
 
       let null = Coda_base.State_hash.(of_hash zero)
-    end)
+    end
 
-    module Next = Make (struct
-      include Coda_base.State_hash
-
-      let to_input (t : t) = Random_oracle.Input.field (t :> Tick.Field.t)
-
-      let null = Coda_base.State_hash.(of_hash zero)
-
-      (*
-      include Optional_state_hash
-
-      let to_input (t : t) =
-        Random_oracle.Input.field
-          (Option.value ~default:Optional_state_hash.none t :> Tick.Field.t)
-
-      let null = None *)
-    end)
+    module Staking = Make (T)
+    module Next = Make (T)
 
     let next_to_staking (next : Next.Value.t) : Staking.Value.t = next
 
