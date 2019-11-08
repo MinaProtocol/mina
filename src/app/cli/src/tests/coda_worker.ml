@@ -8,7 +8,7 @@ open Init
 
 module Input = struct
   type t =
-    { addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+    { addrs_and_ports: Node_addrs_and_ports.Display.Stable.V1.t
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
     ; proposer: int option
@@ -393,9 +393,7 @@ module T = struct
       let logger =
         Logger.create
           ~metadata:
-            [ ( "host"
-              , `String (Unix.Inet_addr.to_string addrs_and_ports.external_ip)
-              )
+            [ ("host", `String addrs_and_ports.external_ip)
             ; ("port", `Int addrs_and_ports.communication_port) ]
           ()
       in
@@ -474,11 +472,11 @@ module T = struct
                 ; conf_dir
                 ; initial_peers= peers
                 ; chain_id= "bogus chain id for testing"
-                ; addrs_and_ports
+                ; addrs_and_ports=
+                    Node_addrs_and_ports.of_display addrs_and_ports
                 ; logger
                 ; trust_system
                 ; enable_libp2p= false
-                ; disable_haskell= false
                 ; libp2p_keypair= None
                 ; libp2p_peers= []
                 ; max_concurrent_connections

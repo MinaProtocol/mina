@@ -415,7 +415,7 @@ let get_status ~flag t =
         >>| Coda_net2.Keypair.to_peerid >>| Coda_net2.PeerID.to_string)
   in
   let addrs_and_ports =
-    Kademlia.Node_addrs_and_ports.to_display
+    Node_addrs_and_ports.to_display
       (Coda_lib.config t).net_config.gossip_net_params.addrs_and_ports
   in
   { Daemon_rpcs.Types.Status.num_accounts

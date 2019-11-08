@@ -263,7 +263,7 @@ module Types = struct
       let addrs_and_ports =
         let render conf =
           let fmt_field name op field = (name, op (Field.get field conf)) in
-          Kademlia.Node_addrs_and_ports.Display.Stable.V1.Fields.to_list
+          Node_addrs_and_ports.Display.Stable.V1.Fields.to_list
             ~external_ip:(fmt_field "External IP" Fn.id)
             ~bind_ip:(fmt_field "Bind IP" Fn.id)
             ~discovery_port:(fmt_field "Haskell Kademlia port" string_of_int)
@@ -299,7 +299,7 @@ module Types = struct
       ; consensus_time_now: string
       ; consensus_mechanism: string
       ; consensus_configuration: Consensus.Configuration.t
-      ; addrs_and_ports: Kademlia.Node_addrs_and_ports.Display.Stable.V1.t
+      ; addrs_and_ports: Node_addrs_and_ports.Display.Stable.V1.t
       ; libp2p_peer_id: string }
     [@@deriving to_yojson, bin_io, fields]
 

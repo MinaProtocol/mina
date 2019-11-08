@@ -75,7 +75,7 @@ let peek_frontier frontier_broadcast_pipe =
             "Cannot retrieve transition frontier now. Bootstrapping right now.")
 
 let client_port t =
-  let {Kademlia.Node_addrs_and_ports.client_port; _} =
+  let {Node_addrs_and_ports.client_port; _} =
     t.config.net_config.gossip_net_params.addrs_and_ports
   in
   client_port

@@ -512,14 +512,13 @@ struct
           { timeout: Time.Span.t
           ; target_peer_count: int
           ; initial_peers: Host_and_port.t list
-          ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+          ; addrs_and_ports: Node_addrs_and_ports.t
           ; conf_dir: string
           ; chain_id: string
           ; logger: Logger.t
           ; trust_system: Trust_system.t
           ; max_concurrent_connections: int option
           ; enable_libp2p: bool
-          ; disable_haskell: bool
           ; libp2p_keypair: Coda_net2.Keypair.t option
           ; libp2p_peers: Coda_net2.Multiaddr.t list
           ; log_gossip_heard: log_gossip_heard }

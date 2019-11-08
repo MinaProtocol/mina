@@ -222,13 +222,13 @@ module Types = struct
                ~acceptable_network_delay:nn_int )
 
     let addrs_and_ports :
-        (_, Kademlia.Node_addrs_and_ports.Display.Stable.V1.t option) typ =
+        (_, Node_addrs_and_ports.Display.Stable.V1.t option) typ =
       obj "AddrsAndPorts" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ Kademlia.Node_addrs_and_ports.Display.Stable.V1.Fields.fold
-               ~init:[] ~external_ip:nn_string ~bind_ip:nn_string
-               ~discovery_port:nn_int ~client_port:nn_int ~libp2p_port:nn_int
+          @@ Node_addrs_and_ports.Display.Stable.V1.Fields.fold ~init:[]
+               ~external_ip:nn_string ~bind_ip:nn_string ~discovery_port:nn_int
+               ~client_port:nn_int ~libp2p_port:nn_int
                ~communication_port:nn_int )
 
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =

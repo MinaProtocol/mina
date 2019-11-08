@@ -158,7 +158,6 @@ let run_test () : unit Deferred.t =
                   ; client_port }
               ; trust_system
               ; enable_libp2p= false
-              ; disable_haskell= false
               ; libp2p_keypair= None
               ; libp2p_peers= []
               ; max_concurrent_connections= Some 10

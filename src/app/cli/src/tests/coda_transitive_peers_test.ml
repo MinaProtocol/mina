@@ -26,7 +26,9 @@ let main () =
   let addrs_and_ports_list, peers = Coda_processes.net_configs (n + 1) in
   let expected_peers = List.nth_exn peers n in
   let peers = [List.hd_exn expected_peers] in
-  let addrs_and_ports = List.nth_exn addrs_and_ports_list n in
+  let addrs_and_ports =
+    List.nth_exn addrs_and_ports_list n |> Node_addrs_and_ports.to_display
+  in
   Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
     !"connecting to peers %{sexp: Host_and_port.t list}\n"
     peers ;

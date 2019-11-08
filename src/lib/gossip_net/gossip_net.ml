@@ -5,9 +5,7 @@ open Core
 open Async
 open Pipe_lib
 open Network_peer
-open Kademlia
 open O1trace
-module Membership = Membership.Haskell
 
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
@@ -76,14 +74,13 @@ module type Config_intf = sig
     { timeout: Time.Span.t
     ; target_peer_count: int
     ; initial_peers: Host_and_port.t list
-    ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+    ; addrs_and_ports: Node_addrs_and_ports.t
     ; conf_dir: string
     ; chain_id: string
     ; logger: Logger.t
     ; trust_system: Trust_system.t
     ; max_concurrent_connections: int option
     ; enable_libp2p: bool
-    ; disable_haskell: bool
     ; libp2p_keypair: Coda_net2.Keypair.t option
     ; libp2p_peers: Coda_net2.Multiaddr.t list
     ; log_gossip_heard: log_gossip_heard }
@@ -185,14 +182,13 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       { timeout: Time.Span.t
       ; target_peer_count: int
       ; initial_peers: Host_and_port.t list
-      ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+      ; addrs_and_ports: Node_addrs_and_ports.t
       ; conf_dir: string
       ; chain_id: string
       ; logger: Logger.t
       ; trust_system: Trust_system.t
       ; max_concurrent_connections: int option
       ; enable_libp2p: bool
-      ; disable_haskell: bool
       ; libp2p_keypair: Coda_net2.Keypair.t option
       ; libp2p_peers: Coda_net2.Multiaddr.t list
       ; log_gossip_heard: log_gossip_heard }
@@ -369,8 +365,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                (Option.value_exn t.config.max_concurrent_connections))
         else call ()
 
-  and restart_kademlia t addl_peers =
-        Deferred.unit
+  and restart_kademlia _t _addl_peers = Deferred.unit
 
   and unmark_all_disconnected_peers t =
     Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -480,40 +475,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     trace "gossip net" (fun () ->
         let fail m =
           failwithf "Failed to connect to Kademlia process: %s" m ()
-        in
-        let restart_counter = ref 0 in
-        let rec handle_exn e =
-          incr restart_counter ;
-          if !restart_counter > 5 then
-            failwithf
-              "Already restarted Kademlia subprocess 5 times, dying with \
-               exception %s"
-              (Exn.to_string e) () ;
-          match Monitor.extract_exn e with
-          | Kademlia.Membership.Child_died ->
-              let t = Option.value_exn (Deferred.peek t_for_restarting) in
-              let peers =
-                List.map (Peer_set.to_list t.peers)
-                  ~f:Peer.to_communications_host_and_port
-              in
-              ( match%map
-                  Monitor.try_with ~extract_exn:true
-                    (fun () ->
-                      let%bind () = after Time.Span.second in
-                      restart_kademlia t peers )
-                    ~rest:(`Call handle_exn)
-                with
-              | Error Kademlia.Membership.Child_died ->
-                  handle_exn Kademlia.Membership.Child_died
-              | Ok () ->
-                  ()
-              | Error e ->
-                  failwithf "Unhandled Membership.connect exception: %s"
-                    (Exn.to_string e) () )
-              |> don't_wait_for
-          | _ ->
-              failwithf "Unhandled Membership.connect exception: %s"
-                (Exn.to_string e) ()
         in
         let peer_event_reader, peer_event_writer = Linear_pipe.create () in
         Linear_pipe.iter_unordered peer_event_reader ~max_concurrency:64
