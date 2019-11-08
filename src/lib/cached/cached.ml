@@ -157,7 +157,7 @@ end
 
 (* Modelling the s3 get failure as an exception instead of an error makes some
  * of the type-glue easier later *)
-exception Http_status_not_ok
+exception Http_status_not_ok of string
 
 module Track_generated = struct
   type t = [`Generated_something | `Cache_hit]
@@ -240,7 +240,13 @@ let run
                    Async.Writer.with_file s3_install_path ~f:(fun writer ->
                        Pipe.transfer body_pipe (Writer.pipe writer) ~f:ident )
                    >>| fun () -> return @@ Ok ()
-                 else return (return @@ Error Http_status_not_ok) )
+                 else
+                   return
+                     ( return
+                     @@ Error
+                          (Http_status_not_ok
+                             ( Cohttp_async.Response.sexp_of_t resp
+                             |> Sexp.to_string_hum )) ) )
           |> Deferred.Result.map_error ~f:Error.of_exn
         in
         With_components.load load ~base_path:(base_path s3_install_path)
