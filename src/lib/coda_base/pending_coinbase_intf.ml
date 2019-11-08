@@ -45,6 +45,8 @@ module type S = sig
     val of_coinbase : Coinbase.t -> t
 
     val genesis : t
+
+    val var_of_t : t -> var
   end
 
   module type Data_hash_binable_intf = sig
@@ -149,18 +151,25 @@ module type S = sig
 
   val create : unit -> t Or_error.t
 
+  (** Delete the oldest stack*)
   val remove_coinbase_stack : t -> (Stack.t * t) Or_error.t
 
+  (**Root of the merkle tree that has stacks as leaves*)
   val merkle_root : t -> Hash.t
 
   val handler : t -> is_new_stack:bool -> (request -> response) Staged.t
 
+  (** Update the current working stack or if [is_new_stack] add as the new working stack*)
   val update_coinbase_stack : t -> Stack.t -> is_new_stack:bool -> t Or_error.t
 
-  val latest_stack : t -> is_new_stack:bool -> Stack.t Or_error.t
+  (** Stack that is currently being updated. if [is_new_stack] then a new stack is returned updated with previous protocol state hash if [update_state_hash] is true*)
+  val latest_stack :
+    t -> is_new_stack:bool -> update_state_hash:bool -> Stack.t Or_error.t
 
+  (**The stack that corresponds to the next ledger proof that is to be generated*)
   val oldest_stack : t -> Stack.t Or_error.t
 
+  (**Hash of the auxilliary data (everything except the merkle tree)*)
   val hash_extra : t -> string
 
   module Checked : sig

@@ -82,12 +82,32 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
             Pending_coinbase.Checked.pop_coinbases prev_pending_coinbase_root
               ~proof_emitted:(Boolean.not ledger_hash_didn't_change)
           in
+          let%bind correct_after_pop =
+            let%bind check =
+              Pending_coinbase.Hash.equal_var root_after_delete
+                prev_pending_coinbase_root
+            in
+            Boolean.if_
+              (Boolean.not ledger_hash_didn't_change)
+              ~then_:check ~else_:Boolean.true_
+          in
+          let%bind () =
+            as_prover
+              As_prover.(
+                Let_syntax.(
+                  let%map correct_after_pop =
+                    read Boolean.typ correct_after_pop
+                  in
+                  Core.printf !"Correct after pop %b\n%!" correct_after_pop))
+          in
+          let%bind () = Boolean.Assert.is_true correct_after_pop in
           (*new stack or update one*)
           let%map new_root =
             Pending_coinbase.Checked.add_coinbase root_after_delete
               ( Snark_transition.proposer transition
               , Snark_transition.coinbase_amount transition
               , Snark_transition.coinbase_state_body_hash transition )
+            (*Not using state_body previous_state to get the hash becuase it's cheaper outside snark?*)
           in
           (new_root, deleted_stack)
         in
@@ -96,6 +116,21 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
             transition |> Snark_transition.blockchain_state
             |> Blockchain_state.staged_ledger_hash
             |> Staged_ledger_hash.pending_coinbase_hash_var
+          in
+          let%bind () =
+            as_prover
+              As_prover.(
+                Let_syntax.(
+                  let%map new_root =
+                    read Pending_coinbase.Hash.typ new_pending_coinbase_hash
+                  and new_root_expected =
+                    read Pending_coinbase.Hash.typ new_root
+                  in
+                  Core.printf
+                    !"expected PC hash %{sexp: Pending_coinbase.Hash.t} got \
+                      %{sexp: Pending_coinbase.Hash.t}\n\
+                     \ %!"
+                    new_root_expected new_root))
           in
           Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
         in
