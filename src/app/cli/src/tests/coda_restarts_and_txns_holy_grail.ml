@@ -4,6 +4,9 @@ open Coda_base
 
 let name = "coda-restarts-and-txns-holy-grail"
 
+let _ =
+  "make some change in order to create a PR so that I can detect CI failures"
+
 let main n () =
   assert (n > 1) ;
   let logger = Logger.create () in
