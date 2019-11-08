@@ -227,26 +227,30 @@ let run
       let open Cohttp_async in
       let open Deferred.Let_syntax in
       match%bind
-        let open Deferred.Or_error.Let_syntax in
+        let open Deferred.Result.Let_syntax in
         let%bind () =
-          Deferred.Result.join
+          Deferred.map ~f:Result.join
           @@ Monitor.try_with (fun () ->
-                 let open Deferred.Let_syntax in
-                 let%bind resp, body =
-                   Client.get (Uri.of_string (base_path s3_bucket_prefix))
-                 in
-                 let body_pipe = Body.to_pipe body in
-                 if resp.status = `OK then
-                   Async.Writer.with_file s3_install_path ~f:(fun writer ->
-                       Pipe.transfer body_pipe (Writer.pipe writer) ~f:ident )
-                   >>| fun () -> return @@ Ok ()
-                 else
-                   return
-                     ( return
+                 let each_uri uri_string =
+                   let%bind resp, body =
+                     Client.get (Uri.of_string uri_string)
+                     |> Deferred.map ~f:Result.return
+                   in
+                   let body_pipe = Body.to_pipe body in
+                   if resp.status = `OK then
+                     Async.Writer.with_file s3_install_path ~f:(fun writer ->
+                         Pipe.transfer body_pipe (Writer.pipe writer) ~f:ident
+                     )
+                     |> Deferred.map ~f:Result.return
+                   else
+                     Deferred.return
                      @@ Error
                           (Http_status_not_ok
                              ( Cohttp_async.Response.sexp_of_t resp
-                             |> Sexp.to_string_hum )) ) )
+                             |> Sexp.to_string_hum ))
+                 in
+                 Deferred.List.map ~f:each_uri (full_paths s3_bucket_prefix)
+                 |> Deferred.map ~f:Result.all_unit )
           |> Deferred.Result.map_error ~f:Error.of_exn
         in
         With_components.load load ~base_path:(base_path s3_install_path)
