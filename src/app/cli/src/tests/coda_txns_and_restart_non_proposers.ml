@@ -21,12 +21,12 @@ let main () =
     List.map Genesis_ledger.accounts
       ~f:Genesis_ledger.keypair_of_account_record_exn
   in
+  let%bind () = after (Time.Span.of_min 2.) in
   Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs
     ~n:10
   |> don't_wait_for ;
   (* restart non-proposers *)
   let random_non_proposer () = Random.int 2 + 3 in
-  let%bind () = after (Time.Span.of_min 2.) in
   (* catchup *)
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger
