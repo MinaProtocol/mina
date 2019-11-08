@@ -385,18 +385,14 @@ end) :
           None
       | New_frontier root ->
           let blockchain_length =
-            Breadcrumb.consensus_state root
-            |> Consensus.Data.Consensus_state.blockchain_length
-            |> Unsigned.UInt32.to_int
+            Breadcrumb.blockchain_length root |> Unsigned.UInt32.to_int
           in
           Some
             { user_commands= Breadcrumb.user_commands root
             ; root_length= Some blockchain_length }
       | New_best_tip {old_root; new_root; _} ->
           let blockchain_length =
-            Breadcrumb.consensus_state new_root
-            |> Consensus.Data.Consensus_state.blockchain_length
-            |> Unsigned.UInt32.to_int
+            Breadcrumb.blockchain_length new_root |> Unsigned.UInt32.to_int
           in
           if
             State_hash.equal
