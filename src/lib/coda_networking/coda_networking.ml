@@ -461,34 +461,6 @@ module Message = struct
   V1.(summary)]
 end
 
-module type Inputs_intf = sig
-  module Snark_pool_diff : sig
-    type t [@@deriving sexp, to_yojson]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, to_yojson, version]
-        end
-      end
-      with type V1.t = t
-
-    val compact_json : t -> Yojson.Safe.json
-  end
-
-  module Transaction_pool_diff : sig
-    type t [@@deriving sexp, to_yojson]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, to_yojson, version]
-        end
-      end
-      with type V1.t = t
-  end
-end
-
 module type Config_intf = sig
   type gossip_config
 
