@@ -4,9 +4,6 @@ open Coda_base
 
 let name = "coda-restarts-and-txns-holy-grail"
 
-let _ =
-  "make some change in order to create a PR so that I can detect CI failures"
-
 let main n () =
   let wait_time = Time.Span.of_min 2. in
   assert (n > 1) ;
