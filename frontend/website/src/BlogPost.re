@@ -163,7 +163,8 @@ let make = (~name, ~html, ~metadata) => {
                    dangerouslySetInnerHTML={"__html": subtitle}
                  />
                }}
-              <h4 className="f7 fw4 tracked-supermega ttu metropolis mt0 mb1 author">
+              <h4
+                className="f7 fw4 tracked-supermega ttu metropolis mt0 mb1 author">
                 {switch (metadata.authorWebsite) {
                  | None =>
                    <span className="mr2">

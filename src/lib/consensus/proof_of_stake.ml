@@ -2150,7 +2150,7 @@ module Hooks = struct
         let name = "get_epoch_ledger"
 
         module T = struct
-          type query = Coda_base.Ledger_hash.Stable.V1.t
+          type query = Coda_base.Ledger_hash.t
 
           type response = (Coda_base.Sparse_ledger.t, string) Result.t
         end

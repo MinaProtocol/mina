@@ -114,7 +114,7 @@ module Stable = struct
 end]
 
 (* bin_io, version omitted *)
-type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare]
+type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
 
 [%%define_locally
 Stable.Latest.(public_key)]

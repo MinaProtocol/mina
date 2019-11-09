@@ -118,13 +118,7 @@ let of_transition external_transition tracked_participants
                 user_commands= user_command :: acc_transactions.user_commands
               } )
       | Fee_transfer fee_transfer ->
-          let fee_transfer_list =
-            match fee_transfer with
-            | One fee_transfer1 ->
-                [fee_transfer1]
-            | Two (fee_transfer1, fee_transfer2) ->
-                [fee_transfer1; fee_transfer2]
-          in
+          let fee_transfer_list = One_or_two.to_list fee_transfer in
           let fee_transfers =
             match tracked_participants with
             | `All ->

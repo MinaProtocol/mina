@@ -34,12 +34,12 @@ end
 
 module Statement : sig
   type t =
-    { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-    ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
-    ; supply_increase: Currency.Amount.Stable.V1.t
+    { source: Coda_base.Frozen_ledger_hash.t
+    ; target: Coda_base.Frozen_ledger_hash.t
+    ; supply_increase: Currency.Amount.t
     ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-    ; fee_excess: Currency.Fee.Signed.Stable.V1.t
-    ; proof_type: Proof_type.Stable.V1.t }
+    ; fee_excess: Currency.Fee.Signed.t
+    ; proof_type: Proof_type.t }
   [@@deriving compare, equal, hash, sexp, yojson]
 
   module Stable :
@@ -50,7 +50,10 @@ module Statement : sig
           ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
           ; supply_increase: Currency.Amount.Stable.V1.t
           ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-          ; fee_excess: Currency.Fee.Signed.Stable.V1.t
+          ; fee_excess:
+              ( Currency.Fee.Stable.V1.t
+              , Sgn.Stable.V1.t )
+              Currency.Signed.Stable.V1.t
           ; proof_type: Proof_type.Stable.V1.t }
         [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end

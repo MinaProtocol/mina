@@ -2,20 +2,20 @@ open Core
 open Import
 open Snark_params.Tick
 
-type t =
-  ( Ledger_hash.t
-  , Account.key
-  , Account.t )
-  Sparse_ledger_lib.Sparse_ledger.Poly.Stable.V1.t
-[@@deriving to_yojson, sexp]
-
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
+    type t =
+      ( Ledger_hash.Stable.V1.t
+      , Public_key.Compressed.Stable.V1.t
+      , Account.Stable.V1.t )
+      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+    [@@deriving bin_io, sexp, to_yojson, version]
   end
 
   module Latest = V1
 end
+
+type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
 val merkle_root : t -> Ledger_hash.t
 
