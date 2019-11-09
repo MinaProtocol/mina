@@ -5,5 +5,5 @@
 
 (rule
  (targets coda_version.ml)
- (deps (:< gen.sh))
+ (deps (:< gen.sh) (universe))
  (action (run %{<} %{targets})))
