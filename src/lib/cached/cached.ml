@@ -155,10 +155,6 @@ module Spec = struct
       ; input }
 end
 
-(* Modelling the s3 get failure as an exception instead of an error makes some
- * of the type-glue easier later *)
-exception Http_status_not_ok of string
-
 module Track_generated = struct
   type t = [`Generated_something | `Cache_hit]
 
@@ -224,7 +220,6 @@ let run
         (full_paths s3_install_path)
         (full_paths s3_bucket_prefix) ;
       (* Attempt load from s3 *)
-      let open Cohttp_async in
       let open Deferred.Let_syntax in
       match%bind
         let open Deferred.Result.Let_syntax in
@@ -232,22 +227,14 @@ let run
           Deferred.map ~f:Result.join
           @@ Monitor.try_with (fun () ->
                  let each_uri uri_string =
-                   let%bind resp, body =
-                     Client.get (Uri.of_string uri_string)
-                     |> Deferred.map ~f:Result.return
+                   let open Deferred.Let_syntax in
+                   let%map result =
+                     Process.run_exn ~prog:"curl"
+                       ~args:["-o"; s3_install_path; uri_string]
+                       ()
                    in
-                   let body_pipe = Body.to_pipe body in
-                   if resp.status = `OK then
-                     Async.Writer.with_file s3_install_path ~f:(fun writer ->
-                         Pipe.transfer body_pipe (Writer.pipe writer) ~f:ident
-                     )
-                     |> Deferred.map ~f:Result.return
-                   else
-                     Deferred.return
-                     @@ Error
-                          (Http_status_not_ok
-                             ( Cohttp_async.Response.sexp_of_t resp
-                             |> Sexp.to_string_hum ))
+                   Core.printf !"Curl finished: %s" result ;
+                   Result.return ()
                  in
                  Deferred.List.map ~f:each_uri (full_paths s3_bucket_prefix)
                  |> Deferred.map ~f:Result.all_unit )
