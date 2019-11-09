@@ -279,7 +279,10 @@ let of_aux_ledger_and_coinbase_hash aux_hash ledger_hash pending_coinbase : t =
 
 let genesis : t Lazy.t =
   lazy
-    (let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
+    (let pending_coinbase =
+       Pending_coinbase.create ~init_state_hash:State_hash.dummy
+       |> Or_error.ok_exn
+     in
      { non_snark= Lazy.force Non_snark.dummy
      ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase })
 

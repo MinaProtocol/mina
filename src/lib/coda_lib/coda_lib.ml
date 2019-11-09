@@ -510,7 +510,6 @@ let start t =
 
 let create_genesis_frontier (config : Config.t) ~verifier =
   let consensus_local_state = config.consensus_local_state in
-  let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
   let empty_diff =
     { Staged_ledger_diff.diff=
         ( { completed_works= []
@@ -522,6 +521,12 @@ let create_genesis_frontier (config : Config.t) ~verifier =
   in
   let genesis_protocol_state =
     With_hash.data (Lazy.force Genesis_protocol_state.t)
+  in
+  let pending_coinbases =
+    Pending_coinbase.create
+      ~init_state_hash:
+        (Protocol_state.previous_state_hash genesis_protocol_state)
+    |> Or_error.ok_exn
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment first_transition) =

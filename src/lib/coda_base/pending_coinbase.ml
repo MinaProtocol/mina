@@ -241,15 +241,22 @@ module Coinbase_stack_state_hash = struct
        `Protocol_state.hash_abstract', not available here because it would create
        a module dependency cycle
      *)
-    Random_oracle.hash ~init:Hash_prefix.Random_oracle.protocol_state
-      [|(state_hash :> Field.t); (state_body_hash :> Field.t)|]
-    |> State_hash.of_hash
+    let new_hash =
+      Random_oracle.hash ~init:Hash_prefix.Random_oracle.protocol_state
+        [|(state_hash :> Field.t); (state_body_hash :> Field.t)|]
+      |> State_hash.of_hash
+    in
+    Core.printf
+      !"In pending coinbase: Body hash: %{sexp: State_body_hash.t} previous \
+        state hash: %{sexp: State_hash.t} new hash: %{sexp: State_hash.t}\n\
+        %!"
+      state_body_hash state_hash new_hash ;
+    new_hash
 
   [%%define_locally
   State_hash.
     ( fold
-    , gen
-    , of_hash
+    , gen (*, of_hash*)
     , var_to_triples
     , length_in_triples
     , to_bits
@@ -262,10 +269,14 @@ module Coinbase_stack_state_hash = struct
 
   let push t cb =
     let _, _, state_body_hash = Coinbase_data.of_coinbase cb in
+    Core.printf
+      !"State body hash of coinbase %{sexp:State_body_hash.t}\n%!"
+      state_body_hash ;
     let state_hash = update_state_hash ~state_hash:t ~state_body_hash in
-    Pedersen.digest_fold Hash_prefix.coinbase_stack_state_hash
+    (*Pedersen.digest_fold Hash_prefix.coinbase_stack_state_hash
       Fold.(State_hash.fold state_hash +> fold t)
-    |> of_hash
+    |> of_hash*)
+    state_hash
 
   let empty = State_hash.dummy
 
@@ -285,15 +296,16 @@ module Coinbase_stack_state_hash = struct
           |> State_hash.var_of_hash_packed )
 
     let push (t : t) ((_, _, state_body_hash) : Coinbase_data.var) =
-      let%bind state_hash = update_state_hash ~state_hash:t ~state_body_hash in
-      let%bind update_triples = State_hash.(var_to_triples state_hash) in
+      let%map state_hash = update_state_hash ~state_hash:t ~state_body_hash in
+      (*let%bind update_triples = State_hash.(var_to_triples state_hash) in
       let%bind t_triples = State_hash.(var_to_triples t) in
       let%map digest =
         Pedersen.Checked.digest_triples
           ~init:Hash_prefix.coinbase_stack_state_hash
           (update_triples @ t_triples)
       in
-      State_hash.var_of_hash_packed digest
+      State_hash.var_of_hash_packed digest*)
+      state_hash
 
     let empty = var_of_t empty
   end
@@ -612,22 +624,11 @@ struct
       let typ = typ ~depth
     end
 
-    module Newest_stack_info = struct
-      type t = Address.value * State_hash.t * bool
-
-      type value = t
-
-      type var = Address.var * State_hash.var * Boolean.var
-
-      let typ : (var, value) Typ.t =
-        Typ.tuple3 Address.typ State_hash.typ Boolean.typ
-    end
-
     type _ Request.t +=
       | Coinbase_stack_path : Address.value -> path Request.t
       | Get_coinbase_stack : Address.value -> (Stack.t * path) Request.t
       | Set_coinbase_stack : Address.value * Stack.t -> unit Request.t
-      | Find_index_of_newest_stack : Newest_stack_info.t Request.t
+      | Find_index_of_newest_stack : Address.value Request.t
       | Find_index_of_oldest_stack : Address.value Request.t
 
     let reraise_merkle_requests (With {request; respond}) =
@@ -675,8 +676,8 @@ struct
 
     let%snarkydef add_coinbase t (pk, amount, state_body_hash)
         previous_state_hash (*This is previous_previous_state_hash*) =
-      let%bind addr, _previous_state_hash, _is_new_stack =
-        request_witness Newest_stack_info.typ
+      let%bind addr =
+        request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
       in
       let equal_to_zero x = Amount.(equal_var x (var_of_t zero)) in
@@ -850,6 +851,16 @@ struct
           As_prover.(
             map (read Address.typ addr) ~f:(fun a -> Get_coinbase_stack a))
       in
+      let%bind () =
+        as_prover
+          As_prover.(
+            Let_syntax.(
+              let%map oldest_stack = read Stack.typ prev
+              and proof_emitted = read Boolean.typ proof_emitted in
+              Core.printf
+                !"proof emitted? %b Oldest stack %{sexp: Stack.t}\n%!"
+                proof_emitted oldest_stack))
+      in
       let stack_hash = Stack.hash_var in
       let%bind prev_entry_hash = stack_hash prev in
       let%bind () =
@@ -860,6 +871,13 @@ struct
         Stack.if_ proof_emitted ~then_:Stack.Checked.empty ~else_:prev
       in
       let%bind next_entry_hash = stack_hash next in
+      let%bind () =
+        as_prover
+          As_prover.(
+            Let_syntax.(
+              let%map next = read Stack.typ next in
+              Core.printf !"updated oldest stack %{sexp: Stack.t}\n%!" next))
+      in
       let%bind () =
         perform
           (let open As_prover in
@@ -924,7 +942,7 @@ struct
         in
         ((height, merged) :: hashes, merged) )
 
-  let create_exn' () =
+  let create_exn' ~init_state_hash =
     let rec create_path height path key =
       if height < 0 then path
       else
@@ -947,12 +965,13 @@ struct
     { Poly.tree= make_tree (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
     ; pos_list= []
     ; new_pos= Stack_id.zero
-    ; previous_state_hash= Coinbase_stack_state_hash.empty }
+    ; previous_state_hash= init_state_hash }
 
   [%%define_locally
   Or_error.(try_with)]
 
-  let create () = try_with (fun () -> create_exn' ())
+  let create ~init_state_hash =
+    try_with (fun () -> create_exn' ~init_state_hash)
 
   let previous_state_hash ({previous_state_hash; _} : t) = previous_state_hash
 
@@ -1088,6 +1107,9 @@ struct
             let index =
               find_index !pending_coinbase stack_id |> Or_error.ok_exn
             in
+            Core.printf
+              !"pop id %{sexp: Stack_id.t} index %d\n%!"
+              stack_id index ;
             respond (Provide index)
         | Checked.Find_index_of_newest_stack ->
             let stack_id =
@@ -1110,8 +1132,7 @@ struct
                 previous state hash %{sexp:State_hash.t}  \n\
                \ is_new_stack %{sexp: bool} %!"
               stack_id index previous_state_hash is_new_stack ;
-            let tup = (index, previous_state_hash, is_new_stack) in
-            respond @@ Provide tup
+            respond @@ Provide index
         | Checked.Get_coinbase_stack idx ->
             let elt = get_stack !pending_coinbase idx |> Or_error.ok_exn in
             let path =
@@ -1133,7 +1154,9 @@ end)
 include T
 
 let%test_unit "add stack + remove stack = initial tree " =
-  let pending_coinbases = ref (create () |> Or_error.ok_exn) in
+  let pending_coinbases =
+    ref (create ~init_state_hash:State_hash.dummy |> Or_error.ok_exn)
+  in
   let coinbases_gen = Quickcheck.Generator.list_non_empty Coinbase.gen in
   Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -1205,7 +1228,9 @@ let%test_unit "Checked_stack = Unchecked_stack" =
 
 let%test_unit "Checked_tree = Unchecked_tree" =
   let open Quickcheck in
-  let pending_coinbases = create () |> Or_error.ok_exn in
+  let pending_coinbases =
+    create ~init_state_hash:State_hash.dummy |> Or_error.ok_exn
+  in
   test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let unchecked =
@@ -1238,7 +1263,9 @@ let%test_unit "Checked_tree = Unchecked_tree" =
 let%test_unit "Checked_tree = Unchecked_tree after pop" =
   let open Quickcheck in
   test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
-      let pending_coinbases = create () |> Or_error.ok_exn in
+      let pending_coinbases =
+        create ~init_state_hash:State_hash.dummy |> Or_error.ok_exn
+      in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let unchecked =
         add_coinbase_with_zero_checks
@@ -1336,7 +1363,9 @@ let%test_unit "push and pop multiple stacks" =
     updated_pending_coinbases
   in
   let add_remove_check coinbase_lists =
-    let pending_coinbases = Pending_coinbase.create_exn' () in
+    let pending_coinbases =
+      Pending_coinbase.create_exn' ~init_state_hash:State_hash.dummy
+    in
     let rec go coinbase_lists pc =
       if List.is_empty coinbase_lists then ()
       else

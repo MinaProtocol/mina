@@ -9,7 +9,8 @@ let create_with_custom_ledger ~genesis_consensus_state ~genesis_ledger =
   let staged_ledger_hash =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
       Staged_ledger_hash.Aux_hash.dummy root_ledger_hash
-      (Or_error.ok_exn (Pending_coinbase.create ()))
+      (Or_error.ok_exn
+         (Pending_coinbase.create ~init_state_hash:State_hash.dummy))
   in
   let snarked_ledger_hash =
     Frozen_ledger_hash.of_ledger_hash root_ledger_hash

@@ -255,7 +255,8 @@ module T = struct
     { scan_state= Scan_state.empty ()
     ; ledger
     ; pending_coinbase_collection=
-        Pending_coinbase.create () |> Or_error.ok_exn }
+        Pending_coinbase.create ~init_state_hash:State_hash.dummy
+        |> Or_error.ok_exn }
 
   let current_ledger_proof t =
     Option.map
@@ -288,7 +289,13 @@ module T = struct
   let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
     match t with
     | Coinbase c ->
-        Pending_coinbase.Stack.push current_stack c
+        let res = Pending_coinbase.Stack.push current_stack c in
+        Core.printf
+          !"pushing coinbase: Stack before %{sexp: Pending_coinbase.Stack.t} \
+            Stack after: %{sexp: Pending_coinbase.Stack.t}\n\
+            %!"
+          current_stack res ;
+        res
     | _ ->
         current_stack
 
@@ -458,6 +465,9 @@ module T = struct
         let%map data, updated_stack =
           update_ledger_and_get_statements ledger working_stack transactions
         in
+        Core.printf
+          !"Updated stack no partition: %{sexp: Pending_coinbase.Stack.t}\n%!"
+          updated_stack ;
         (is_new_stack, data, `Update_one updated_stack)
     | Some _ ->
         (*Two partition:
@@ -523,6 +533,7 @@ module T = struct
     let%bind pending_coinbase_collection_updated1 =
       match ledger_proof with
       | Some (proof, _) ->
+          Core.printf !"removing coinbase stack\n%!" ;
           let%bind oldest_stack, pending_coinbase_collection_updated1 =
             Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
             |> to_staged_ledger_or_error
@@ -2065,8 +2076,7 @@ let%test_module "test" =
       in
       assert (List.is_empty proofs_available_left)
 
-    let%test_unit "Random number of user_commands-random number of proofs-one \
-                   prover)" =
+    let pending_coinbase_test prover =
       let g =
         let open Quickcheck.Generator.Let_syntax in
         let%bind ledger_init_state, cmds, iters =
@@ -2082,7 +2092,7 @@ let%test_module "test" =
         return
           (ledger_init_state, cmds, iters, proofs_available, state_body_hashes)
       in
-      Quickcheck.test g ~trials:10
+      Quickcheck.test g ~trials:5
         ~f:(fun ( ledger_init_state
                 , cmds
                 , iters
@@ -2091,6 +2101,13 @@ let%test_module "test" =
            ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_pending_coinbase ledger_init_state cmds iters
-                proofs_available state_body_hashes sl test_mask `One_prover )
-      )
+                proofs_available state_body_hashes sl test_mask prover ) )
+
+    let%test_unit "Validate pending coinbase for random number of \
+                   user_commands-random number of proofs-one prover)" =
+      pending_coinbase_test `One_prover
+
+    let%test_unit "Validate pending coinbase for random number of \
+                   user_commands-random number of proofs-many provers)" =
+      pending_coinbase_test `Many_provers
   end )

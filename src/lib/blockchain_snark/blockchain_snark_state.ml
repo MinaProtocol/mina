@@ -92,15 +92,23 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
             State_body_hash.equal_var prev_state_body_hash
               (Snark_transition.coinbase_state_body_hash transition)
           in
-          let%bind () = Boolean.Assert.is_true same in
+          let%bind empty_hash =
+            State_body_hash.equal_var
+              (Snark_transition.coinbase_state_body_hash transition)
+              (State_body_hash.var_of_t State_body_hash.dummy)
+          in
+          let%bind () =
+            with_label __LOC__ (Boolean.Assert.any [same; empty_hash])
+          in
           let%bind correct_after_pop =
-            let%bind check =
-              Pending_coinbase.Hash.equal_var root_after_delete
-                prev_pending_coinbase_root
-            in
-            Boolean.if_
-              (Boolean.not ledger_hash_didn't_change)
-              ~then_:check ~else_:Boolean.true_
+            with_label __LOC__
+              (let%bind check =
+                 Pending_coinbase.Hash.equal_var root_after_delete
+                   prev_pending_coinbase_root
+               in
+               Boolean.if_
+                 (Boolean.not ledger_hash_didn't_change)
+                 ~then_:Boolean.true_ ~else_:check)
           in
           let%bind () =
             as_prover
@@ -114,11 +122,12 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           let%bind () = Boolean.Assert.is_true correct_after_pop in
           (*new stack or update one*)
           let%map new_root =
-            Pending_coinbase.Checked.add_coinbase root_after_delete
-              ( Snark_transition.proposer transition
-              , Snark_transition.coinbase_amount transition
-              , prev_state_body_hash )
-              prev_of_prev_state_hash
+            with_label __LOC__
+              (Pending_coinbase.Checked.add_coinbase root_after_delete
+                 ( Snark_transition.proposer transition
+                 , Snark_transition.coinbase_amount transition
+                 , prev_state_body_hash )
+                 prev_of_prev_state_hash)
             (*Not using state_body previous_state to get the hash becuase it's cheaper outside snark?*)
           in
           (new_root, deleted_stack)
