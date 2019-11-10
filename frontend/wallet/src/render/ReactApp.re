@@ -9,7 +9,9 @@ let make = () => {
     <OnboardingProvider value=onboardingValue>
       <ProcessDispatchProvider value=dispatch>
         <ReasonApollo.Provider client=Apollo.client>
-          <ReactIntl.IntlProvider>
+          <ReactIntl.IntlProvider 
+            locale={"en"}
+          >
             {isOnboarding
                ? <Onboarding />
                : <>
