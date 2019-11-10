@@ -1,3 +1,12 @@
-{
-    "hello.world": "Xin chào thế giới i18n"
-}
+[
+    {
+        "id": "global.recipient",
+        "defaultMessage": "recipient",
+        "message": "người nhận"
+    },
+    {
+        "id": "global.sender",
+        "defaultMessage": "sender",
+        "message": "người gửi"
+    }
+]

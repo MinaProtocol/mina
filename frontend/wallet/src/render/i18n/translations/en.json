@@ -1,3 +1,10 @@
-{
-    "hello.world": "Hello world i18n!"
-}
+[
+    {
+        "id": "global.recipient",
+        "defaultMessage": "recipient"
+    },
+    {
+        "id": "global.sender",
+        "defaultMessage": "sender"
+    },
+]

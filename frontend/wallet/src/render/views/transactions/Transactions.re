@@ -1,4 +1,5 @@
 open Tc;
+open ReactIntl;
 
 module Styles = {
   open Css;
@@ -167,11 +168,11 @@ let make = () => {
   <div className=Styles.container>
     <div className=Styles.headerRow>
       <span className=Css.(style([display(`flex), alignItems(`center)]))>
-        {React.string("Sender")}
+        <FormattedMessage id="global.sender" defaultMessage="sender" />
         <span className=Styles.icon> <Icon kind=Icon.BentArrow /> </span>
-        {React.string("recipient")}
+        <FormattedMessage id="global.recipient" defaultMessage="recipient" />
       </span>
-      <span> {ReasonReact.string("Memo")} </span>
+      <span> {ReasonReact.string("Memos")} </span>
       <span className=Css.(style([textAlign(`right)]))>
         {ReasonReact.string("Date / Amount")}
       </span>
