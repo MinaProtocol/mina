@@ -36,6 +36,18 @@ module Styles = {
         active([backgroundColor(Theme.Colors.marine), color(white)]),
       ]),
     ]);
+    
+  let hyperlinkBlue =
+    merge([
+      base,
+      style([
+        color(Theme.Colors.hyperlink),
+        backgroundColor(Theme.Colors.hyperlinkAlpha(0.15)),
+        hover([backgroundColor(Theme.Colors.hyperlink), color(white)]),
+        focus([backgroundColor(Theme.Colors.hyperlink), color(white)]),
+        active([backgroundColor(Theme.Colors.hyperlink), color(white)]),
+      ]),
+    ]);
 
   let hyperlinkBlue =
     merge([
