@@ -57,7 +57,7 @@ module type S = sig
      and type resource_pool_diff := Resource_pool.Diff.t
      and type config := Resource_pool.Config.t
 
-  val add : t -> User_command.t -> unit Deferred.t
+  val add : t -> User_command.t list -> unit Deferred.t
 end
 
 (* Functor over user command, base ledger and transaction validator for
@@ -705,7 +705,7 @@ struct
 
   (* TODO: This causes the signature to get checked twice as it is checked
      below before feeding it to add *)
-  let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
+  let add t txns = apply_and_broadcast t (Envelope.Incoming.local txns)
 end
 
 (* Use this one in downstream consumers *)

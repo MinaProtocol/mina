@@ -14,7 +14,7 @@ module Time = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = UInt64.t [@@deriving sexp, compare, eq, hash, yojson]
+      type t = UInt64.Stable.V1.t [@@deriving sexp, compare, eq, hash, yojson]
 
       let to_latest = Fn.id
 
@@ -78,7 +78,7 @@ module Time = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = UInt64.t [@@deriving sexp, compare]
+        type t = UInt64.Stable.V1.t [@@deriving sexp, compare]
 
         let to_latest = Fn.id
       end

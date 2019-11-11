@@ -286,7 +286,9 @@ module T = struct
   let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
     match t with
     | Coinbase c ->
-        Pending_coinbase.Stack.push current_stack c
+        if Coda_compile_config.pending_coinbase_hack then
+          Pending_coinbase.Stack.empty
+        else Pending_coinbase.Stack.push current_stack c
     | _ ->
         current_stack
 
@@ -319,14 +321,14 @@ module T = struct
     let open Deferred.Let_syntax in
     let public_keys = function
       | Transaction.Fee_transfer t ->
-          Fee_transfer.receivers t
+          Fee_transfer.receivers t |> One_or_two.to_list
       | User_command t ->
           let t = (t :> User_command.t) in
           User_command.accounts_accessed t
       | Coinbase c ->
           let ft_receivers =
             Option.value_map c.fee_transfer ~default:[] ~f:(fun ft ->
-                Fee_transfer.receivers (Fee_transfer.of_single ft) )
+                Fee_transfer.receivers (`One ft) |> One_or_two.to_list )
           in
           c.proposer :: ft_receivers
     in
