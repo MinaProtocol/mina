@@ -29,8 +29,8 @@ module Styles = {
 
   let deleteAlert = style([margin2(~v=`rem(0.5), ~h=`zero)]);
 
-  let textBox = style([width(`rem(21.))]);
-
+  let textBox = style([width(`rem(21.)), selector("input",[maxWidth(`rem(12.0))])]);
+  let fields = style([marginLeft(`rem(3.0))]);
   let modalContainer =
     style([
       width(`rem(22.)),
@@ -47,7 +47,7 @@ module Styles = {
       display(`flex),
       flexDirection(`row),
       alignItems(`center),
-      justifyContent(`spaceBetween),
+      justifyContent(`flexStart),
     ]);
 
   let delegating = style([display(`flex), flexDirection(`column)]);
@@ -57,13 +57,15 @@ module Styles = {
       Theme.Text.Body.regular,
       style([
         color(Theme.Colors.slate),
-        textAlign(`right),
         display(`block),
+        marginLeft(`rem(19.)),
       ]),
     ]);
   
   let breadcrumbText = merge([Theme.Text.Body.semiBold, style([color(Theme.Colors.hyperlink), marginBottom(`rem(0.5))])]);
-};
+  
+  let keys = style([display(`flex), justifyContent(`spaceBetween), alignItems(`center)]);
+  };
 
 module DeleteAccount = [%graphql
   {|
@@ -102,6 +104,7 @@ module DeleteButton = {
         {React.string("Account Removal")}
       </h3>
       <Spacer height=1. />
+      <div className=Styles.fields>
       <Button
         style=Button.Red
         onClick={_ =>
@@ -109,6 +112,7 @@ module DeleteButton = {
         }
         label="Delete account"
       />
+      </div>
       {switch (modalState) {
        | None => React.null
        | Some({text, error}) =>
@@ -221,30 +225,31 @@ module AccountInfo = [%graphql
 ];
 module AccountInfoQuery = ReasonApollo.CreateQuery(AccountInfo);
 
-module StakingToggle = {
-  [@react.component]
-  let make = (~publicKey, ~active) => {
-    <Toggle
-      value=active
-      onChange={_ =>
-        ReasonReact.Router.push(
-          "/settings/" ++ PublicKey.uriEncode(publicKey) ++ "/stake",
-        )
+module DisableStaking = [%graphql
+  {|
+    mutation disableStaking {
+      setStaking(input: {publicKeys: []}) {
+        lastStaking
       }
-    />;
-  };
-};
+    }
+  |}
+];
+module DisableStakingMutation = ReasonApollo.CreateMutation(DisableStaking);
 
 module BlockRewards = {
   [@react.component]
   let make = (~publicKey) => {
+    let (label, setLabel) = React.useState(() => "Staking Enabled");
+    let (delegateLabel, setDelegateLabel) = React.useState(() => "Delegation Enabled");
+    let (buttonStyle, setStyle) = React.useState(() => Button.Green);
+
     let accountInfoVariables =
       AccountInfo.make(~publicKey=Apollo.Encoders.publicKey(publicKey), ())##variables;
     <div>
       <h3 className=Theme.Text.Header.h3>
         {React.string("Block Rewards")}
       </h3>
-      <Spacer height=0.5 />
+      <Spacer height=1./>
       <AccountInfoQuery variables=accountInfoVariables>
         {response =>
            switch (response.result) {
@@ -264,26 +269,48 @@ module BlockRewards = {
                      className=Css.(
                        style([display(`flex), alignItems(`center)])
                      )>
-                     <p className=Theme.Text.Body.regular>
-                       {account.stakingActive
-                          ? {
-                            React.string("Staking is ON");
-                          }
-                          : {
-                            React.string("Staking is OFF");
-                          }}
-                     </p>
-                     <Spacer width=1. />
-                     <StakingToggle publicKey active={account.stakingActive} />
+                     {account.stakingActive ? 
+                     <DisableStakingMutation>
+                      ((mutate, _) =>
+                      <Button
+                       width=12.
+                       height=2.5
+                       label=label
+                       style=buttonStyle
+                       onMouseEnter={_ => {setLabel(_ => "Disable Staking"); setStyle(_ => Button.Red);}}
+                       onMouseLeave={_ => {setLabel(_ => "Staking Enabled"); setStyle(_ => Button.Green);}}
+                       onClick={_ =>
+                         mutate(
+                        (),
+                      ) |> ignore
+                       }
+                     />)
+                     </DisableStakingMutation> :
+                     <Button
+                       width=12.
+                       height=2.5
+                       style=Button.HyperlinkBlue
+                       label="Stake"
+                       onClick={_ =>
+                         ReasonReact.Router.push(
+                           "/settings/"
+                           ++ PublicKey.uriEncode(publicKey)
+                           ++ "/stake",
+                         )
+                       }
+                     />
+                      }
                    </div>
+                   <Spacer width=1./>
                      <img
                        src="https://cdn.discordapp.com/attachments/638495089232183306/641796805314478092/OR.png"
                        height="40px"
                      />
+                   <Spacer width=1./>
                    <Button
-                     width=8.
+                     width=12.
                      height=2.5
-                     style=Button.Green
+                     style=Button.HyperlinkBlue
                      label="Delegate"
                      onClick={_ =>
                        ReasonReact.Router.push(
@@ -296,19 +323,37 @@ module BlockRewards = {
                  </div>
                </Well>
              | Some(delegate) =>
+             <div>
                <Well>
                  <div className=Styles.delegating>
                    <div
                      className=Css.(
                        style([
                          display(`flex),
-                         justifyContent(`spaceBetween),
+                         justifyContent(`flexStart),
                        ])
                      )>
+                     {account.stakingActive ? 
+                     <DisableStakingMutation>
+                      ((mutate, _) =>
+                      <Button
+                       width=12.
+                       height=2.5
+                       label=label
+                       style=buttonStyle
+                       onMouseEnter={_ => {setLabel(_ => "Disable Staking"); setStyle(_ => Button.Red);}}
+                       onMouseLeave={_ => {setLabel(_ => "Staking Enabled"); setStyle(_ => Button.Green);}}
+                       onClick={_ =>
+                         mutate(
+                        (),
+                      ) |> ignore
+                       }
+                     />)
+                     </DisableStakingMutation> :
                      <Button
                        width=12.
                        height=2.5
-                       style=Button.Gray
+                       style=Button.HyperlinkBlue
                        label="Stake"
                        onClick={_ =>
                          ReasonReact.Router.push(
@@ -317,16 +362,20 @@ module BlockRewards = {
                            ++ "/stake",
                          )
                        }
-                     />
+                     /> }
+                   <Spacer width=1./>
                      <img
                        src="https://cdn.discordapp.com/attachments/638495089232183306/641796805314478092/OR.png"
                        height="40px"
                      />
+                   <Spacer width=1./>
                      <Button
                        width=12.
                        height=2.5
                        style=Button.Green
-                       label="Change Delegation"
+                       label=delegateLabel
+                       onMouseEnter={_ => {setDelegateLabel(_ => "Change Delegation");}}
+                       onMouseLeave={_ => {setDelegateLabel(_ => "Delegation Enabled");}}
                        onClick={_ =>
                          ReasonReact.Router.push(
                            "/settings/"
@@ -337,12 +386,13 @@ module BlockRewards = {
                      />
                    </div>
                  </div>
-                 <Spacer height=1. />
+               </Well>
+               <Spacer height=1. />
                  <span className=Styles.delegatingLabel>
                    {React.string("Delegating to: ")}
                    <AccountName pubkey=delegate##publicKey />
                  </span>
-               </Well>
+                 </div>
              };
            }}
       </AccountInfoQuery>
@@ -383,7 +433,12 @@ let make = (~publicKey) => {
       <AccountName pubkey=publicKey className=Styles.breadcrumbText/>
     </div>
     <Spacer height=1. />
-    <div className=Styles.label> {React.string("Account name")} </div>
+    <h3 className=Theme.Text.Header.h3>
+        {React.string("Account Basics")}
+      </h3>
+    <Spacer height=0.7 /> 
+    <div className=Styles.fields>
+    <div className=Styles.label> {React.string("Name")} </div>
     <div className=Styles.textBox>
       <TextField
         label="Name"
@@ -461,9 +516,10 @@ let make = (~publicKey) => {
          }}
       </KeypathQuery>
     </div>
+    </div>
     <Spacer height=1.5 />
     <BlockRewards publicKey />
-    <Spacer height=1.5 />
+    <Spacer height=4.0 />
     <DeleteButton publicKey />
   </div>;
 };

@@ -1,5 +1,6 @@
 type mode =
   | Blue
+  | HyperlinkBlue
   | Gray
   | Green
   | Red;
@@ -33,6 +34,18 @@ module Styles = {
         hover([backgroundColor(Theme.Colors.marine), color(white)]),
         focus([backgroundColor(Theme.Colors.marine), color(white)]),
         active([backgroundColor(Theme.Colors.marine), color(white)]),
+      ]),
+    ]);
+    
+  let hyperlinkBlue =
+    merge([
+      base,
+      style([
+        color(Theme.Colors.hyperlink),
+        backgroundColor(Theme.Colors.hyperlinkAlpha(0.15)),
+        hover([backgroundColor(Theme.Colors.hyperlink), color(white)]),
+        focus([backgroundColor(Theme.Colors.hyperlink), color(white)]),
+        active([backgroundColor(Theme.Colors.hyperlink), color(white)]),
       ]),
     ]);
 
@@ -86,10 +99,14 @@ let make =
       ~height=3.,
       ~icon=?,
       ~type_="button",
+      ~onMouseEnter=?,
+      ~onMouseLeave=?,
     ) =>
   <button
     disabled
     ?onClick
+    ?onMouseEnter
+    ?onMouseLeave
     className={Css.merge([
       disabled ? Styles.disabled : "",
       Css.style([Css.minWidth(`rem(width)), Css.height(`rem(height))]),
@@ -98,6 +115,7 @@ let make =
       | Green => Styles.green
       | Red => Styles.red
       | Gray => Styles.gray
+      | HyperlinkBlue => Styles.hyperlinkBlue
       },
     ])}
     type_>
