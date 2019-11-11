@@ -138,8 +138,8 @@ type ownedAccounts =
   
 module AccountSettingsItem = {
   [@react.component]
-  let make = (~publicKey, ~account) => {
-    let keyStr = PublicKey.toString(publicKey);
+  let make = (~account) => {
+    let keyStr = PublicKey.toString(account##publicKey);
     let route = "/settings/" ++ Js.Global.encodeURIComponent(keyStr);
     let isLocked = Option.withDefault(~default=true, account##locked);
     let (showModal, setModalOpen) = React.useState(() => false);
@@ -149,10 +149,10 @@ module AccountSettingsItem = {
         isLocked ? setModalOpen(_ => true) : ReasonReact.Router.push(route);
       }>
       <div className=Styles.accountName>
-        <AccountName pubkey=publicKey />
+        <AccountName pubkey=account##publicKey />
       </div>
       <span className=Styles.accountKey>
-        <Pill> {React.string(PublicKey.prettyPrint(publicKey))} </Pill>
+        <Pill> {React.string(PublicKey.prettyPrint(account##publicKey))} </Pill>
       </span>
       <Spacer width=5.0 />
       <span className=Styles.accountChevron>
@@ -160,7 +160,7 @@ module AccountSettingsItem = {
       </span>
        {showModal
        ? <UnlockModal
-           account={publicKey}
+           account={account##publicKey}
            onClose={() =>  setModalOpen(_ => false)}
            onSuccess={() => {setModalOpen(_ => false); ReasonReact.Router.push(route);}}
          />
@@ -207,7 +207,6 @@ let make = () => {
              data##ownedWallets
              |> Array.map(~f=account=>
                   <AccountSettingsItem
-                    publicKey=account##publicKey
                     account
                   />
                 )

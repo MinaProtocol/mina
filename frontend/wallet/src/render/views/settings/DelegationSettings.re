@@ -180,7 +180,7 @@ let make = (~publicKey) => {
              label="Delegate"
              style=Button.Green
              disabled=loading
-             onClick={_ => mutate(~variables, ~refetchQueries=[|"getAccountInfo"|], ()) |> ignore}
+             onClick={_ => mutate(~variables, ~refetchQueries=[|"getAccountInfo", "queryDelegation"|], ()) |> ignore}
            />
          </div>
        </div>}
