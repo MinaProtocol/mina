@@ -30,7 +30,9 @@ module Styles = {
   let deleteAlert = style([margin2(~v=`rem(0.5), ~h=`zero)]);
 
   let textBox = style([width(`rem(21.)), selector("input",[maxWidth(`rem(12.0))])]);
+  
   let fields = style([marginLeft(`rem(3.0))]);
+  
   let modalContainer =
     style([
       width(`rem(22.)),
@@ -262,66 +264,6 @@ module BlockRewards = {
                <Well>
                  <Alert kind=`Warning message="Wait until fully synced..." />
                </Well>
-             | Some(delegate) when delegate##publicKey == publicKey =>
-               <Well>
-                 <div className=Styles.blockRewards>
-                   <div
-                     className=Css.(
-                       style([display(`flex), alignItems(`center)])
-                     )>
-                     {account.stakingActive ? 
-                     <DisableStakingMutation>
-                      ((mutate, _) =>
-                      <Button
-                       width=12.
-                       height=2.5
-                       label=label
-                       style=buttonStyle
-                       onMouseEnter={_ => {setLabel(_ => "Disable Staking"); setStyle(_ => Button.Red);}}
-                       onMouseLeave={_ => {setLabel(_ => "Staking Enabled"); setStyle(_ => Button.Green);}}
-                       onClick={_ =>
-                         mutate(
-                        (),
-                      ) |> ignore
-                       }
-                     />)
-                     </DisableStakingMutation> :
-                     <Button
-                       width=12.
-                       height=2.5
-                       style=Button.HyperlinkBlue
-                       label="Stake"
-                       onClick={_ =>
-                         ReasonReact.Router.push(
-                           "/settings/"
-                           ++ PublicKey.uriEncode(publicKey)
-                           ++ "/stake",
-                         )
-                       }
-                     />
-                      }
-                   </div>
-                   <Spacer width=1./>
-                     <img
-                       src="https://cdn.discordapp.com/attachments/638495089232183306/641796805314478092/OR.png"
-                       height="40px"
-                     />
-                   <Spacer width=1./>
-                   <Button
-                     width=12.
-                     height=2.5
-                     style=Button.HyperlinkBlue
-                     label="Delegate"
-                     onClick={_ =>
-                       ReasonReact.Router.push(
-                         "/settings/"
-                         ++ PublicKey.uriEncode(publicKey)
-                         ++ "/delegate",
-                       )
-                     }
-                   />
-                 </div>
-               </Well>
              | Some(delegate) =>
              <div>
                <Well>
@@ -365,10 +307,25 @@ module BlockRewards = {
                      /> }
                    <Spacer width=1./>
                      <img
-                       src="https://cdn.discordapp.com/attachments/638495089232183306/641796805314478092/OR.png"
+                       src="or-divider.svg"
                        height="40px"
                      />
                    <Spacer width=1./>
+                   {if (delegate##publicKey == publicKey) {
+                     <Button
+                     width=12.
+                     height=2.5
+                     style=Button.HyperlinkBlue
+                     label="Delegate"
+                     onClick={_ =>
+                       ReasonReact.Router.push(
+                         "/settings/"
+                         ++ PublicKey.uriEncode(publicKey)
+                         ++ "/delegate",
+                       )
+                     }
+                   />
+                   } else {
                      <Button
                        width=12.
                        height=2.5
@@ -384,15 +341,18 @@ module BlockRewards = {
                          )
                        }
                      />
+                      };}
                    </div>
                  </div>
                </Well>
                <Spacer height=1. />
+               {if (delegate##publicKey == publicKey) {
                  <span className=Styles.delegatingLabel>
                    {React.string("Delegating to: ")}
                    <AccountName pubkey=delegate##publicKey />
                  </span>
-                 </div>
+               } else {React.null}}
+              </div>
              };
            }}
       </AccountInfoQuery>
