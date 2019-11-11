@@ -26,18 +26,27 @@ open Fold_lib
  *)
 
 module Coinbase_data = struct
-  type t =
-    Public_key.Compressed.Stable.V1.t
-    * Amount.Stable.V1.t
-    * State_body_hash.Stable.V1.t
-  [@@deriving bin_io, sexp]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        Public_key.Compressed.Stable.V1.t
+        * Amount.Stable.V1.t
+        * State_body_hash.Stable.V1.t
+      [@@deriving sexp]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t
 
   let of_coinbase (cb : Coinbase.t) : t =
     (cb.proposer, cb.amount, cb.state_body_hash)
 
   type var = Public_key.Compressed.var * Amount.var * State_body_hash.var
 
-  type value = t [@@deriving bin_io, sexp]
+  type value = Stable.Latest.t [@@deriving sexp]
 
   let length_in_triples =
     Public_key.Compressed.length_in_triples + Amount.length_in_triples
@@ -91,14 +100,14 @@ end
 module Stack_id : sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, to_yojson, compare, eq, version]
+      type t [@@deriving bin_io, sexp, to_yojson, compare, version]
     end
 
     module Latest = V1
   end
 
   (* bin_io, version omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq]
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq, to_yojson]
 
   val of_int : int -> t
 
@@ -115,13 +124,13 @@ end = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = int [@@deriving sexp, to_yojson, compare, eq]
+      type t = int [@@deriving sexp, to_yojson, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare]
+  type t = Stable.Latest.t [@@deriving sexp, compare, to_yojson]
 
   [%%define_locally
   Int.(( > ), to_string, zero, to_int, of_int, equal)]
@@ -536,24 +545,25 @@ struct
      versions yields a version of the result
    *)
 
-  module V1_make =
-    Sparse_ledger_lib.Sparse_ledger.Make (Hash.Stable.V1) (Stack_id.Stable.V1)
-      (Stack.Stable.V1)
-
   module Merkle_tree = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = V1_make.Stable.V1.t [@@deriving sexp, to_yojson]
+        type t =
+          ( Hash.Stable.V1.t
+          , Stack_id.Stable.V1.t
+          , Stack.Stable.V1.t )
+          Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+        [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
     end]
 
-    module Latest_make = V1_make
+    module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
 
     [%%define_locally
-    Latest_make.
+    M.
       ( of_hash
       , get_exn
       , path_exn

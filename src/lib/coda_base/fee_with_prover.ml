@@ -1,13 +1,19 @@
 open Core_kernel
 open Signature_lib
 
+[%%versioned
 module Stable = struct
   module V1 = struct
+    type t =
+      {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
+    [@@deriving sexp, yojson]
+
+    let to_latest = Fn.id
+
     module T = struct
-      type t =
-        { fee: Currency.Fee.Stable.V1.t
-        ; prover: Public_key.Compressed.Stable.V1.t }
-      [@@deriving bin_io, sexp, yojson, version]
+      type typ = t [@@deriving sexp]
+
+      type t = typ [@@deriving sexp]
 
       (* TODO: Compare in a better way than with public key, like in transaction pool *)
       let compare t1 t2 =
@@ -16,13 +22,12 @@ module Stable = struct
         else Public_key.Compressed.compare t1.prover t2.prover
     end
 
-    include T
     include Comparable.Make (T)
   end
-end
+end]
 
-type t = Stable.V1.t =
-  {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
+type t = Stable.Latest.t =
+  {fee: Currency.Fee.t; prover: Public_key.Compressed.t}
 [@@deriving sexp, yojson]
 
 include Comparable.Make (Stable.V1.T)
