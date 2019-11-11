@@ -181,7 +181,7 @@ let add_block_subscriber t public_key =
          match
            List.filter pipes ~f:(fun rw_pair' ->
                (* Intentionally using pointer equality *)
-               rw_pair <> rw_pair' )
+               not @@ phys_equal rw_pair rw_pair' )
          with
          | [] ->
              None

@@ -37,6 +37,9 @@ module Stable = struct
     let blockchain_state {protocol_state; _} =
       Protocol_state.blockchain_state protocol_state
 
+    let blockchain_length t =
+      consensus_state t |> Consensus.Data.Consensus_state.blockchain_length
+
     let state_hash {protocol_state; _} = Protocol_state.hash protocol_state
 
     let parent_hash {protocol_state; _} =
@@ -103,6 +106,7 @@ Stable.Latest.
   , protocol_state_proof
   , delta_transition_chain_proof
   , blockchain_state
+  , blockchain_length
   , staged_ledger_diff
   , consensus_state
   , state_hash
@@ -498,6 +502,8 @@ module With_validation = struct
 
   let blockchain_state t = lift blockchain_state t
 
+  let blockchain_length t = lift blockchain_length t
+
   let staged_ledger_diff t = lift staged_ledger_diff t
 
   let consensus_state t = lift consensus_state t
@@ -651,6 +657,7 @@ module Validated = struct
     , delta_transition_chain_proof
     , protocol_state_proof
     , blockchain_state
+    , blockchain_length
     , staged_ledger_diff
     , consensus_state
     , state_hash

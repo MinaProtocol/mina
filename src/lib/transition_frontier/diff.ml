@@ -384,9 +384,16 @@ end) :
       | New_breadcrumb _ ->
           None
       | New_frontier root ->
+          let blockchain_length =
+            Breadcrumb.blockchain_length root |> Unsigned.UInt32.to_int
+          in
           Some
-            {user_commands= Breadcrumb.user_commands root; root_length= Some 0}
-      | New_best_tip {old_root; new_root; old_root_length; _} ->
+            { user_commands= Breadcrumb.user_commands root
+            ; root_length= Some blockchain_length }
+      | New_best_tip {old_root; new_root; _} ->
+          let blockchain_length =
+            Breadcrumb.blockchain_length new_root |> Unsigned.UInt32.to_int
+          in
           if
             State_hash.equal
               (Breadcrumb.state_hash old_root)
@@ -395,7 +402,7 @@ end) :
           else
             Some
               { user_commands= Breadcrumb.user_commands new_root
-              ; root_length= Some (1 + old_root_length) }
+              ; root_length= Some blockchain_length }
   end
 
   (** A transition frontier extension that exposes the changes in the transactions

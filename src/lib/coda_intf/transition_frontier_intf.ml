@@ -294,6 +294,8 @@ module type Transition_frontier_breadcrumb_intf = sig
 
   val blockchain_state : t -> Coda_state.Blockchain_state.Value.t
 
+  val blockchain_length : t -> Unsigned.UInt32.t
+
   val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
   val state_hash : t -> State_hash.t
