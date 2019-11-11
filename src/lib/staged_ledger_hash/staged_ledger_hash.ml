@@ -3,57 +3,42 @@ open Coda_base
 open Fold_lib
 open Snark_params.Tick
 open Coda_digestif
-open Module_version
 
 module Aux_hash = struct
   let length_in_bits = 256
 
   let length_in_bytes = length_in_bits / 8
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
+      type t = string [@@deriving sexp, eq, compare, hash]
 
-        module Base58_check = Base58_check.Make (struct
-          let description = "Aux hash"
+      let to_latest = Fn.id
 
-          let version_byte =
-            Base58_check.Version_bytes.staged_ledger_hash_aux_hash
-        end)
+      module Base58_check = Base58_check.Make (struct
+        let description = "Aux hash"
 
-        let to_yojson s = `String (Base58_check.encode s)
+        let version_byte =
+          Base58_check.Version_bytes.staged_ledger_hash_aux_hash
+      end)
 
-        let of_yojson = function
-          | `String s -> (
-            match Base58_check.decode s with
-            | Error e ->
-                Error
-                  (sprintf "Aux_hash.of_yojson, bad Base58Check:%s"
-                     (Error.to_string_hum e))
-            | Ok x ->
-                Ok x )
-          | _ ->
-              Error "Aux_hash.of_yojson expected `String"
-      end
+      let to_yojson s = `String (Base58_check.encode s)
 
-      include T
-      include Registration.Make_latest_version (T)
+      let of_yojson = function
+        | `String s -> (
+          match Base58_check.decode s with
+          | Error e ->
+              Error
+                (sprintf "Aux_hash.of_yojson, bad Base58Check:%s"
+                   (Error.to_string_hum e))
+          | Ok x ->
+              Ok x )
+        | _ ->
+            Error "Aux_hash.of_yojson expected `String"
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "staged_ledger_hash_aux_hash"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   let of_bytes = Fn.id
@@ -68,83 +53,55 @@ module Pending_coinbase_aux = struct
 
   let length_in_bytes = length_in_bits / 8
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
+      type t = string [@@deriving sexp, eq, compare, hash]
 
-        module Base58_check = Base58_check.Make (struct
-          let description = "Pending coinbase aux"
+      let to_latest = Fn.id
 
-          let version_byte =
-            Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
-        end)
+      module Base58_check = Base58_check.Make (struct
+        let description = "Pending coinbase aux"
 
-        let to_yojson s = `String (Base58_check.encode s)
+        let version_byte =
+          Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
+      end)
 
-        let of_yojson = function
-          | `String s -> (
-            match Base58_check.decode s with
-            | Ok x ->
-                Ok x
-            | Error e ->
-                Error
-                  (sprintf "Pending_coinbase_aux.of_yojson, bad Base58Check:%s"
-                     (Error.to_string_hum e)) )
-          | _ ->
-              Error "Pending_coinbase_aux.of_yojson expected `String"
-      end
+      let to_yojson s = `String (Base58_check.encode s)
 
-      include T
-      include Registration.Make_latest_version (T)
+      let of_yojson = function
+        | `String s -> (
+          match Base58_check.decode s with
+          | Ok x ->
+              Ok x
+          | Error e ->
+              Error
+                (sprintf "Pending_coinbase_aux.of_yojson, bad Base58Check:%s"
+                   (Error.to_string_hum e)) )
+        | _ ->
+            Error "Pending_coinbase_aux.of_yojson expected `String"
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "staged_ledger_hash_pending_coinbase_state_hash"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 end
 
 module Non_snark = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { ledger_hash: Ledger_hash.Stable.V1.t
-          ; aux_hash: Aux_hash.Stable.V1.t
-          ; pending_coinbase_aux: Pending_coinbase_aux.Stable.V1.t }
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-      end
+      type t =
+        { ledger_hash: Ledger_hash.Stable.V1.t
+        ; aux_hash: Aux_hash.Stable.V1.t
+        ; pending_coinbase_aux: Pending_coinbase_aux.Stable.V1.t }
+      [@@deriving sexp, eq, compare, hash, yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "staged_ledger_hash_pending_coinbase_state_hash"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   type value = t [@@deriving sexp, compare, hash, yojson]
@@ -196,64 +153,43 @@ module Non_snark = struct
         Lazy.force dummy )
 end
 
-module Stable = struct
-  module Poly = struct
-    module Stable = struct
-      module V1 = struct
-        module T = struct
-          type ('non_snark, 'pending_coinbase_hash) t =
-            { non_snark: 'non_snark
-            ; pending_coinbase_hash: 'pending_coinbase_hash }
-          [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-        end
-
-        include T
-      end
-
-      module Latest = V1
+module Poly = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('non_snark, 'pending_coinbase_hash) t =
+        {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
+      [@@deriving sexp, eq, compare, hash, yojson]
     end
+  end]
 
-    type ('non_snark, 'pending_coinbase_hash) t =
-          ('non_snark, 'pending_coinbase_hash) Stable.Latest.t =
-      {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
-    [@@deriving sexp, compare, hash, yojson]
-  end
+  type ('non_snark, 'pending_coinbase_hash) t =
+        ('non_snark, 'pending_coinbase_hash) Stable.Latest.t =
+    {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
+  [@@deriving sexp, compare, hash, yojson]
+end
 
+[%%versioned
+module Stable = struct
   module V1 = struct
-    module T = struct
-      (** Staged ledger hash has two parts
+    (** Staged ledger hash has two parts
       1) merkle root of the pending coinbases
       2) ledger hash, aux hash, and the FIFO order of the coinbase stacks(Non snark).
       Only part 1 is required for blockchain snark computation and therefore the remaining fields of the staged ledger are grouped together as "Non_snark"
       *)
-      type t =
-        ( Non_snark.Stable.V1.t
-        , Pending_coinbase.Hash.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-    end
+    type t =
+      ( Non_snark.Stable.V1.t
+      , Pending_coinbase.Hash.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving sexp, eq, compare, hash, yojson]
 
-    include T
-    include Registration.Make_latest_version (T)
-    include Hashable.Make_binable (T)
+    let to_latest = Fn.id
   end
+end]
 
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "staged_ledger_hash"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
-
-(* bin_io, version omitted *)
 type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
-type ('a, 'b) t_ = ('a, 'b) Stable.Poly.t
+type ('a, 'b) t_ = ('a, 'b) Poly.t
 
 type value = t [@@deriving sexp, eq, compare, hash]
 
