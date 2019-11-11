@@ -7,7 +7,7 @@ O(1) Labs is seeking a Visual & Motion Designer who can navigate a variety of me
 
 In the nascent sector of crypto design, trustworthy and delightful designed experiences are largely absent. We aim to create engaging visuals and video content that are easily understood and enjoyed by an international audience.
 
-Visual Designers will work closely with Marketing to develop graphics, videos and campaigns in a variety of mediums.
+Visual Designers will work closely with marketing to develop graphics, videos and campaigns in a variety of mediums.
 Additionally, they will collaborate with product and engineering, to craft animations and interactions to elevate our User Experience.
 
 We seek to evolve our current brand identity, and bring our products and experiences to life through the use of motion!
@@ -17,7 +17,7 @@ This is a contract to hire position, with immediate availability.
 ## Requirements
 
 - Work on-site in a San Francisco based office
-- Deadline driven, organized and detail-obsessed
+- Deadline driven, organized, and detail-obsessed
 
 ## Responsibilities
 
