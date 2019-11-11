@@ -83,7 +83,8 @@ let run_test () : unit Deferred.t =
   setup_time_offsets () ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
-  File_system.with_temp_dir "full_test_config" ~f:(fun temp_conf_dir ->
+  File_system.with_temp_dir (Filename.temp_dir_name ^/ "full_test_config")
+    ~f:(fun temp_conf_dir ->
       let keypair = Genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
         match Unix.getenv "CODA_TRACING" with
