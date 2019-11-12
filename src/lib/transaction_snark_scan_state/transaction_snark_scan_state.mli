@@ -103,6 +103,8 @@ val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 
 val hash : t -> Staged_ledger_hash.Aux_hash.t
 
+val target_merkle_root : t -> Frozen_ledger_hash.t option
+
 (** All the transactions in the order in which they were applied*)
 val staged_transactions : t -> Transaction.t list Or_error.t
 
