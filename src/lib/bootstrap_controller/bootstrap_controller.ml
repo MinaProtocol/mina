@@ -278,7 +278,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     in
     let%bind staged_ledger_aux_result =
       let open Deferred.Or_error.Let_syntax in
-      let%bind scan_state, expected_merkle_root, pending_coinbases =
+      let%bind scan_state, pending_coinbases, expected_merkle_root =
         Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
           t.network sender hash
       in

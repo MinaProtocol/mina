@@ -15,8 +15,8 @@ module Rpcs : sig
 
     type response =
       ( Staged_ledger.Scan_state.Stable.V1.t
-      * Ledger_hash.Stable.V1.t
-      * Pending_coinbase.Stable.V1.t )
+      * Pending_coinbase.Stable.V1.t
+      * Ledger_hash.Stable.V1.t )
       option
   end
 
@@ -162,7 +162,7 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
   -> Unix.Inet_addr.t
   -> State_hash.t
-  -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
+  -> (Staged_ledger.Scan_state.t * Pending_coinbase.t * Ledger_hash.t)
      Deferred.Or_error.t
 
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
@@ -211,9 +211,9 @@ val create :
                                                           -> ( Staged_ledger
                                                                .Scan_state
                                                                .t
-                                                             * Ledger_hash.t
                                                              * Pending_coinbase
-                                                               .t )
+                                                               .t
+                                                             * Ledger_hash.t )
                                                              Deferred.Option.t)
   -> answer_sync_ledger_query:(   (Ledger_hash.t * Sync_ledger.Query.t)
                                   Envelope.Incoming.t

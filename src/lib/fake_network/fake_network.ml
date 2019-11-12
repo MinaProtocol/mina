@@ -73,7 +73,7 @@ let setup (type n) ?(logger = Logger.null ())
                   let input = Envelope.Incoming.data query_env in
                   Deferred.return
                     (let open Option.Let_syntax in
-                    let%map scan_state, expected_merkle_root, pending_coinbases
+                    let%map scan_state, pending_coinbases, expected_merkle_root
                         =
                       Sync_handler
                       .get_staged_ledger_aux_and_pending_coinbases_at_hash
@@ -82,7 +82,7 @@ let setup (type n) ?(logger = Logger.null ())
                     let staged_ledger_hash =
                       Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
                         (Staged_ledger.Scan_state.hash scan_state)
-                        expected_merkle_root pending_coinbases
+                        pending_coinbases expected_merkle_root
                     in
                     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                       ~metadata:

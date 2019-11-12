@@ -674,7 +674,7 @@ let create (config : Config.t) =
                     let%bind frontier =
                       Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                     in
-                    let%map scan_state, expected_merkle_root, pending_coinbases
+                    let%map scan_state, pending_coinbases, expected_merkle_root
                         =
                       Sync_handler
                       .get_staged_ledger_aux_and_pending_coinbases_at_hash
@@ -683,7 +683,7 @@ let create (config : Config.t) =
                     let staged_ledger_hash =
                       Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
                         (Staged_ledger.Scan_state.hash scan_state)
-                        expected_merkle_root pending_coinbases
+                        pending_coinbases expected_merkle_root
                     in
                     Logger.debug config.logger ~module_:__MODULE__
                       ~location:__LOC__
