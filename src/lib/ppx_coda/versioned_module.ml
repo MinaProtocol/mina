@@ -1,9 +1,6 @@
 open Core_kernel
 open Ppxlib
-
-let mk_loc ~loc txt = {Location.loc; txt}
-
-let map_loc ~f {Location.loc; txt} = {Location.loc; txt= f txt}
+open Versioned_util
 
 let parse_opt = Ast_pattern.parse ~on_error:(fun () -> None)
 
@@ -255,11 +252,8 @@ let convert_module_stri last_version stri =
           "Expected a statement of the form `module Vn = struct ... end`." )
       (fun name str -> (name, str))
   in
-  Versioned_type.validate_module_version name.txt name.loc ;
-  let version =
-    String.sub name.txt ~pos:1 ~len:(String.length name.txt - 1)
-    |> int_of_string
-  in
+  validate_module_version name.txt name.loc ;
+  let version = version_of_versioned_module_name name.txt in
   Option.iter last_version ~f:(fun last_version ->
       if version = last_version then
         (* Mimic wording of the equivalent OCaml error. *)
@@ -364,12 +358,6 @@ let convert_modbody ~loc body =
   in
   List.rev rev_str
 
-let check_modname ~loc name =
-  if name = "Stable" then name
-  else
-    Location.raise_errorf ~loc
-      "Expected a module named Stable, but got a module named %s." name
-
 let version_module ~loc ~path:_ modname modbody =
   Printexc.record_backtrace true ;
   try
@@ -383,17 +371,180 @@ let version_module ~loc ~path:_ modname modbody =
     Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
     raise exn
 
+(* code for module declarations in signatures 
+
+   - add deriving bin_io, version to list of deriving items for the type "t" in versioned modules
+   - add "module Latest = Vn" to Stable module
+ *)
+
+let convert_module_type_signature_item sigitem =
+  match sigitem.psig_desc with
+  | Psig_type
+      (recflag, [({ptype_name= {txt= "t"; loc}; ptype_attributes; _} as type_)])
+    ->
+      let module E = Ppxlib.Ast_builder.Make (struct
+        let loc = loc
+      end) in
+      let open E in
+      let derivings, other_attrs =
+        List.partition_tf ptype_attributes ~f:(fun ({txt; _}, _) ->
+            String.equal txt "deriving" )
+      in
+      let deriving =
+        match derivings with
+        | [] ->
+            ({txt= "deriving"; loc}, PStr [%str bin_io, version])
+        | [(s, PStr [item])] ->
+            let desired_derivers = ["bin_io"; "version"] in
+            let item' =
+              match item.pstr_desc with
+              | Pstr_eval (expr, _attrs) -> (
+                match expr.pexp_desc with
+                | Pexp_ident {txt= Lident s; _}
+                  when List.mem desired_derivers s ~equal:String.equal ->
+                    [%stri bin_io, version]
+                | Pexp_ident {txt= Lident _; _} ->
+                    [%stri [%e expr], bin_io, version]
+                | Pexp_tuple exprs ->
+                    let derivers =
+                      List.filter_map exprs ~f:(fun expr ->
+                          match expr.pexp_desc with
+                          | Pexp_ident {txt= Lident s; _}
+                            when List.mem desired_derivers s
+                                   ~equal:String.equal ->
+                              None
+                          | _ ->
+                              Some expr )
+                    in
+                    let pexp_desc =
+                      Pexp_tuple
+                        ( derivers
+                        @ List.map desired_derivers ~f:(fun s ->
+                              pexp_ident {txt= Lident s; loc} ) )
+                    in
+                    let all_derivers = {expr with pexp_desc} in
+                    [%stri [%e all_derivers]]
+                | _ ->
+                    Location.raise_errorf ~loc:item.pstr_loc
+                      "Unrecognized Pstr_eval argument in deriving attribute" )
+              | _ ->
+                  Location.raise_errorf ~loc:item.pstr_loc
+                    "Unrecognized PStr argument in deriving attribute"
+            in
+            (s, PStr [item'])
+        | [_] ->
+            (* should be unreachable *)
+            Location.raise_errorf ~loc
+              "Unrecognized pattern in deriving attribute"
+        | _ :: _ ->
+            (* should be unreachable *)
+            Location.raise_errorf ~loc "Duplicate deriving attribute"
+      in
+      let ptype_attributes' = deriving :: other_attrs in
+      let psig_desc =
+        Psig_type (recflag, [{type_ with ptype_attributes= ptype_attributes'}])
+      in
+      {sigitem with psig_desc}
+  | _ ->
+      sigitem
+
+let convert_module_type_signature signature =
+  List.map signature ~f:convert_module_type_signature_item
+
+let convert_module_type (mod_ty : module_type) =
+  match mod_ty.pmty_desc with
+  | Pmty_signature signature ->
+      let signature' = convert_module_type_signature signature in
+      {mod_ty with pmty_desc= Pmty_signature signature'}
+  | _ ->
+      Location.raise_errorf ~loc:mod_ty.pmty_loc
+        "Expected versioned module type to be a signature"
+
+type accum = {latest: string option; last: int option; sigitems: signature}
+
+let convert_module_decls ~loc:_ signature =
+  let init = {latest= None; last= None; sigitems= []} in
+  let f {latest; last; sigitems} sigitem =
+    match sigitem.psig_desc with
+    | Psig_module ({pmd_name; pmd_type; _} as pmd) ->
+        validate_module_version pmd_name.txt pmd_name.loc ;
+        let version = version_of_versioned_module_name pmd_name.txt in
+        Option.iter last ~f:(fun n ->
+            if Int.equal version n then
+              Location.raise_errorf ~loc:pmd_name.loc
+                "Duplicate versions in versioned modules" ;
+            if Int.( > ) version n then
+              Location.raise_errorf ~loc:pmd_name.loc
+                "Versioned modules must be listed in decreasing order" ) ;
+        let latest =
+          if Option.is_none latest then Some pmd_name.txt else latest
+        in
+        let psig_desc' =
+          Psig_module {pmd with pmd_type= convert_module_type pmd_type}
+        in
+        let sigitem' = {sigitem with psig_desc= psig_desc'} in
+        {latest; last= Some version; sigitems= sigitem' :: sigitems}
+    | _ ->
+        Location.raise_errorf ~loc:sigitem.psig_loc
+          "Expected versioned module declaration"
+  in
+  List.fold signature ~init ~f
+
+let version_module_decl ~loc ~path:_ modname signature =
+  Printexc.record_backtrace true ;
+  try
+    let open Ast_helper in
+    let modname = map_loc ~f:(check_modname ~loc:modname.loc) modname in
+    let {txt= {latest; sigitems; _}; _} =
+      map_loc ~f:(convert_module_decls ~loc:signature.loc) signature
+    in
+    let mk_module_decl name ty_desc =
+      Sig.mk ~loc (Psig_module (Md.mk ~loc name (Mty.mk ~loc ty_desc)))
+    in
+    let signature =
+      match latest with
+      | None ->
+          sigitems
+      | Some vn ->
+          let module E = Ppxlib.Ast_builder.Make (struct
+            let loc = loc
+          end) in
+          let open E in
+          let latest =
+            mk_module_decl {txt= "Latest"; loc}
+              (Pmty_alias {txt= Lident vn; loc})
+          in
+          List.rev sigitems @ [latest]
+    in
+    mk_module_decl modname (Pmty_signature signature)
+  with exn ->
+    Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
+    raise exn
+
 let () =
-  let ast_pattern =
+  let module_ast_pattern =
     Ast_pattern.(
       pstr
         ( pstr_module (module_binding ~name:__' ~expr:(pmod_structure __'))
         ^:: nil ))
   in
-  let extension =
+  let module_extension =
     Extension.(
-      declare "versioned" Context.structure_item ast_pattern version_module)
+      declare "versioned" Context.structure_item module_ast_pattern
+        version_module)
   in
-  let rule = Context_free.Rule.extension extension in
-  let rules = [rule] in
+  let module_decl_ast_pattern =
+    Ast_pattern.(
+      psig
+        ( psig_module (module_declaration ~name:__' ~type_:(pmty_signature __'))
+        ^:: nil ))
+  in
+  let module_decl_extension =
+    Extension.(
+      declare "versioned" Context.signature_item module_decl_ast_pattern
+        version_module_decl)
+  in
+  let module_rule = Context_free.Rule.extension module_extension in
+  let module_decl_rule = Context_free.Rule.extension module_decl_extension in
+  let rules = [module_rule; module_decl_rule] in
   Driver.register_transformation "ppx_coda/versioned_module" ~rules
