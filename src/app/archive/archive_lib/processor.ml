@@ -148,6 +148,8 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         , Option.value_map first_seen_in_db ~default:(Some default_block_time)
             ~f:Option.some ) )
 
+  
+
   let update_block_confirmations t (parent_state_hash : State_hash.t) =
     let open Deferred.Result.Let_syntax in
     let%bind blocks_to_update =
@@ -157,37 +159,19 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
           ~new_updated_confirmation_number:1 ()
       in
       let%map response = Client.query graphql t.port in
-      let alist =
-        Array.to_list response#state_hash_path
+      Array.to_list response#state_hash_path
         |> List.map ~f:(fun obj ->
-               ((obj#state_hash)#value, (obj#parent_state_hash)#value) )
-      in
-      Core.printf
-        !"Blocks to update: %{sexp:(State_hash.t * State_hash.t) list}\n"
-        alist ;
-      State_hash.Table.of_alist_exn alist
-    in
-    let ordered_blocks_to_update =
-      Sequence.unfold ~init:parent_state_hash ~f:(fun hash ->
-          let open Option.Let_syntax in
-          let%map parent_hash = Hashtbl.find blocks_to_update hash in
-          (hash, parent_hash) )
+               ((obj#state_hash)#value, obj#status + 1 ) )
     in
     let results =
-      Sequence.mapi ordered_blocks_to_update
-        ~f:(fun lagging_block_confirmation hash ->
-          let new_block_confirmation = lagging_block_confirmation + 1 in
-          Core.printf
-            !"Block will be updated with State_hash(%{sexp:State_hash.t}, %i)\n"
-            hash new_block_confirmation ;
-          (* Each update should be at least greater than 1. So, we offset the index value from `mapi` *)
+      List.map blocks_to_update
+        ~f:(fun (hash, new_block_confirmation) ->
           let hash = State_hash.to_base58_check hash in
           let graphql =
             Graphql_query.Blocks.Update_block_confirmations.make ~hash
               ~status:new_block_confirmation ()
           in
           Client.query graphql t.port )
-      |> Sequence.to_list
     in
     Deferred.Result.all results |> Deferred.Result.ignore
 

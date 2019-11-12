@@ -26,6 +26,21 @@ module Update_block_confirmations =
   }
 |}]
 
+module Update_batch_block_confirmations = 
+[%graphql
+{|
+  mutation update($objects: [blocks_insert_input!]!) {
+    insert_blocks(objects: $objects, on_conflict: {constraint: blocks_state_hash_key, update_columns: status}) {
+      returning {
+        state_hash: stateHashByStateHash {
+          value
+        }
+        status
+      }
+    }
+  }
+|}]
+
 module Get_all_pending_blocks =
 [%graphql
 {|
@@ -63,9 +78,7 @@ module Batch_query_updated_block_confirmations =
       state_hash : stateHashByStateHash {
         value @bsDecoder(fn: "State_hash.of_base58_check_exn")
       }
-      parent_state_hash: stateHashByParentHash {
-        value @bsDecoder(fn: "State_hash.of_base58_check_exn")
-      }
+      status
     }
   }
 |}]
