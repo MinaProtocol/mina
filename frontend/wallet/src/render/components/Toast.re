@@ -14,13 +14,13 @@ module Styles = {
 let make =
     (
       ~defaultText=?,
-      ~style as styleOverride=ToastProvider.Default,
+      ~defaultStyle=ToastProvider.Default,
       ~onClick: unit => unit=() => (),
     ) => {
   let (value, _) = React.useContext(ToastProvider.context);
   let value =
     Option.map(value, ~f=({ToastProvider.text, style}) => (text, style));
-  let default = Option.map(defaultText, ~f=text => (text, styleOverride));
+  let default = Option.map(defaultText, ~f=text => (text, defaultStyle));
 
   // The second arg to orElse has precedence
   switch (Option.orElse(default, value)) {
