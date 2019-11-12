@@ -469,7 +469,8 @@ let root_diff t =
   trace_recurring_task "root diff pipe reader" (fun () ->
       let open Root_diff.Stable.V1 in
       let length_of_breadcrumb =
-        Fn.compose Unsigned.UInt32.to_int Breadcrumb.blockchain_length
+        Fn.compose Unsigned.UInt32.to_int
+          Transition_frontier.Breadcrumb.blockchain_length
       in
       Broadcast_pipe.Reader.iter t.components.transition_frontier ~f:(function
         | None ->

@@ -105,7 +105,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let hook : type q r. (q, r) rpc -> q -> r Deferred.Or_error.t =
        fun rpc query ->
         let (module Impl) = implementation_of_rpc rpc in
-        let latest_version = Int.Set.max_elt (Impl.versions ()) in
+        let latest_version =
+          (* this is assumed safe since there should always be at least one version *)
+          Int.Set.max_elt (Impl.versions ()) |> Option.value_exn
+        in
         match
           List.find_map rpc_handlers ~f:(fun handler ->
               match_handler handler rpc ~do_:(fun f ->
