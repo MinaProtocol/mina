@@ -71,7 +71,6 @@
 
 open Core_kernel
 open Ppxlib
-open Versioned_util
 
 let deriver = "version"
 
@@ -164,6 +163,8 @@ let () =
       (create deriver ~type_decl_str:print_type () ~type_decl_sig:gen_empty_sig))
 
 [%%else]
+
+open Versioned_util
 
 type generation_kind = Plain | Wrapped | Rpc
 

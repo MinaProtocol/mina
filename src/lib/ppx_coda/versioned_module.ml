@@ -412,7 +412,7 @@ let convert_module_type mod_ty =
       let {sigitems; parameterless_t} =
         convert_module_type_signature signature
       in
-      { module_type= {mod_ty with pmty_desc= Pmty_signature sigitems}
+      { module_type= {mod_ty with pmty_desc= Pmty_signature (List.rev sigitems)}
       ; convertible= parameterless_t }
   | _ ->
       Location.raise_errorf ~loc:mod_ty.pmty_loc
@@ -479,7 +479,7 @@ let version_module_decl ~loc ~path:_ modname signature =
     let signature =
       match latest with
       | None ->
-          sigitems
+          List.rev sigitems
       | Some vn ->
           let module E = Ppxlib.Ast_builder.Make (struct
             let loc = loc
