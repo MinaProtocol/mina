@@ -535,14 +535,14 @@ module Scan_state_metrics = struct
 
   let purchased_snark_work_per_block : Gauge.t =
     let help = "# of snark work bundles purchased per block" in
-    Gauge.v "completed_snark_work_last_block" ~help ~namespace ~subsystem
+    Gauge.v "purchased_snark_work_per_block" ~help ~namespace ~subsystem
 
   let scan_state_snark_work_available : Gauge.t =
     let help =
       "# of snark work bundles in the scan state that are yet to be \
        done/purchased after every block"
     in
-    Gauge.v "scan_state_snark_work" ~help ~namespace ~subsystem
+    Gauge.v "scan_state_snark_work_available" ~help ~namespace ~subsystem
 end
 
 module Trust_system = struct
