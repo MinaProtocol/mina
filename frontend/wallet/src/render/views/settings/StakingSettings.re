@@ -96,10 +96,7 @@ let make = (~publicKey, ~stakingActive=false) => {
 
   // Mutation variables and handlers
   let variables =
-    EnableStaking.make(
-      ~publicKey=Apollo.Encoders.publicKey(publicKey),
-      ()
-    )##variables;
+    EnableStaking.make(~publicKey=Apollo.Encoders.publicKey(publicKey), ())##variables;
 
   let _changeVariables =
     ChangeDelegation.make(

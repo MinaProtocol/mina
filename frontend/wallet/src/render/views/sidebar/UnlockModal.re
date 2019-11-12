@@ -71,8 +71,10 @@ let make = (~account, ~onClose, ~onSuccess) => {
             <Button
               label="Cancel"
               style=Button.Gray
-              onClick={evt => {ReactEvent.Synthetic.stopPropagation(evt);
-onClose()}}
+              onClick={evt => {
+                ReactEvent.Synthetic.stopPropagation(evt);
+                onClose();
+              }}
             />
             <Spacer width=1. />
             <Button label="Unlock" style=Button.Green type_="submit" />

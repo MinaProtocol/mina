@@ -135,7 +135,7 @@ type ownedAccounts =
     publicKey: PublicKey.t,
     balance: {. "total": int64},
   };
-  
+
 module AccountSettingsItem = {
   [@react.component]
   let make = (~account) => {
@@ -145,26 +145,33 @@ module AccountSettingsItem = {
     let (showModal, setModalOpen) = React.useState(() => false);
     <div
       className=Styles.accountItem
-      onClick={_ => 
-        isLocked ? setModalOpen(_ => true) : ReasonReact.Router.push(route);
+      onClick={_ =>
+        isLocked ? setModalOpen(_ => true) : ReasonReact.Router.push(route)
       }>
       <div className=Styles.accountName>
         <AccountName pubkey=account##publicKey />
       </div>
       <span className=Styles.accountKey>
-        <Pill> {React.string(PublicKey.prettyPrint(account##publicKey))} </Pill>
+        <Pill>
+          {React.string(PublicKey.prettyPrint(account##publicKey))}
+        </Pill>
       </span>
       <Spacer width=5.0 />
       <span className=Styles.accountChevron>
         <Icon kind=Icon.EmptyChevronRight />
       </span>
-       {showModal
-       ? <UnlockModal
-           account={account##publicKey}
-           onClose={() =>  setModalOpen(_ => false)}
-           onSuccess={() => {setModalOpen(_ => false); ReasonReact.Router.push(route);}}
-         />
-       : React.null}
+      {showModal
+         ? <UnlockModal
+             account={
+               account##publicKey;
+             }
+             onClose={() => setModalOpen(_ => false)}
+             onSuccess={() => {
+               setModalOpen(_ => false);
+               ReasonReact.Router.push(route);
+             }}
+           />
+         : React.null}
     </div>;
   };
 };
@@ -205,11 +212,7 @@ let make = () => {
            | Error(_) => React.null
            | Data(data) =>
              data##ownedWallets
-             |> Array.map(~f=account=>
-                  <AccountSettingsItem
-                    account
-                  />
-                )
+             |> Array.map(~f=account => <AccountSettingsItem account />)
              |> React.array
            }}
       </AccountsQuery>

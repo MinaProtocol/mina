@@ -29,10 +29,14 @@ module Styles = {
 
   let deleteAlert = style([margin2(~v=`rem(0.5), ~h=`zero)]);
 
-  let textBox = style([width(`rem(21.)), selector("input",[maxWidth(`rem(12.0))])]);
-  
+  let textBox =
+    style([
+      width(`rem(21.)),
+      selector("input", [maxWidth(`rem(12.0))]),
+    ]);
+
   let fields = style([marginLeft(`rem(3.0))]);
-  
+
   let modalContainer =
     style([
       width(`rem(22.)),
@@ -54,20 +58,40 @@ module Styles = {
 
   let delegating = style([display(`flex), flexDirection(`column)]);
 
-  let delegatingLabel =
+  let delegationProgressLabel =
     merge([
-      Theme.Text.Body.regular,
+      Theme.Text.Body.regularLight,
       style([
         color(Theme.Colors.slate),
         display(`block),
         marginLeft(`rem(19.)),
+        minWidth(`rem(20.)),
       ]),
     ]);
-  
-  let breadcrumbText = merge([Theme.Text.Body.semiBold, style([color(Theme.Colors.hyperlink), marginBottom(`rem(0.5))])]);
-  
-  let keys = style([display(`flex), justifyContent(`spaceBetween), alignItems(`center)]);
-  };
+
+  let delegatingLabel =
+    merge([
+      Theme.Text.Body.regular,
+      style([
+        color(Theme.Colors.midnightBlue),
+        display(`block),
+        marginLeft(`rem(19.)),
+      ]),
+    ]);
+
+  let breadcrumbText =
+    merge([
+      Theme.Text.Body.semiBold,
+      style([color(Theme.Colors.hyperlink), marginBottom(`rem(0.5))]),
+    ]);
+
+  let keys =
+    style([
+      display(`flex),
+      justifyContent(`spaceBetween),
+      alignItems(`center),
+    ]);
+};
 
 module DeleteAccount = [%graphql
   {|
@@ -107,13 +131,13 @@ module DeleteButton = {
       </h3>
       <Spacer height=1. />
       <div className=Styles.fields>
-      <Button
-        style=Button.Red
-        onClick={_ =>
-          updateModal(x => Option.or_(Some({text: "", error: None}), x))
-        }
-        label="Delete account"
-      />
+        <Button
+          style=Button.Red
+          onClick={_ =>
+            updateModal(x => Option.or_(Some({text: "", error: None}), x))
+          }
+          label="Delete account"
+        />
       </div>
       {switch (modalState) {
        | None => React.null
@@ -222,9 +246,13 @@ module AccountInfo = [%graphql
            publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
         }
     }
+     pooledUserCommands(publicKey: $publicKey) {
+        isDelegation
+    }
   }
 |}
 ];
+
 module AccountInfoQuery = ReasonApollo.CreateQuery(AccountInfo);
 
 module DisableStaking = [%graphql
@@ -241,9 +269,8 @@ module DisableStakingMutation = ReasonApollo.CreateMutation(DisableStaking);
 module BlockRewards = {
   [@react.component]
   let make = (~publicKey) => {
-    let (label, setLabel) = React.useState(() => "Staking Enabled");
-    let (delegateLabel, setDelegateLabel) = React.useState(() => "Delegation Enabled");
-    let (buttonStyle, setStyle) = React.useState(() => Button.Green);
+    let (stakingHovered, setStakingHovered) = React.useState(() => false);
+    let (delegateHovered, setDelegateHovered) = React.useState(() => false);
 
     let accountInfoVariables =
       AccountInfo.make(~publicKey=Apollo.Encoders.publicKey(publicKey), ())##variables;
@@ -251,7 +278,7 @@ module BlockRewards = {
       <h3 className=Theme.Text.Header.h3>
         {React.string("Block Rewards")}
       </h3>
-      <Spacer height=1./>
+      <Spacer height=1. />
       <AccountInfoQuery variables=accountInfoVariables>
         {response =>
            switch (response.result) {
@@ -259,100 +286,125 @@ module BlockRewards = {
            | Error(err) => <span> {React.string(err##message)} </span>
            | Data(data) =>
              let account = Option.getExn(data##account);
+             let isDelegationInProgress =
+               Array.any(
+                 ~f=commands => commands##isDelegation,
+                 data##pooledUserCommands,
+               );
              switch (account.delegateAccount) {
              | None =>
                <Well>
                  <Alert kind=`Warning message="Wait until fully synced..." />
                </Well>
              | Some(delegate) =>
-             <div>
-               <Well>
-                 <div className=Styles.delegating>
-                   <div
-                     className=Css.(
-                       style([
-                         display(`flex),
-                         justifyContent(`flexStart),
-                       ])
-                     )>
-                     {account.stakingActive ? 
-                     <DisableStakingMutation>
-                      ((mutate, _) =>
-                      <Button
-                       width=12.
-                       height=2.5
-                       label=label
-                       style=buttonStyle
-                       onMouseEnter={_ => {setLabel(_ => "Disable Staking"); setStyle(_ => Button.Red);}}
-                       onMouseLeave={_ => {setLabel(_ => "Staking Enabled"); setStyle(_ => Button.Green);}}
-                       onClick={_ =>
-                         mutate(
-                        (),
-                      ) |> ignore
-                       }
-                     />)
-                     </DisableStakingMutation> :
-                     <Button
-                       width=12.
-                       height=2.5
-                       style=Button.HyperlinkBlue
-                       label="Stake"
-                       onClick={_ =>
-                         ReasonReact.Router.push(
-                           "/settings/"
-                           ++ PublicKey.uriEncode(publicKey)
-                           ++ "/stake",
-                         )
-                       }
-                     /> }
-                   <Spacer width=1./>
-                     <img
-                       src="or-divider.svg"
-                       height="40px"
-                     />
-                   <Spacer width=1./>
-                   {if (delegate##publicKey == publicKey) {
-                     <Button
-                     width=12.
-                     height=2.5
-                     style=Button.HyperlinkBlue
-                     label="Delegate"
-                     onClick={_ =>
-                       ReasonReact.Router.push(
-                         "/settings/"
-                         ++ PublicKey.uriEncode(publicKey)
-                         ++ "/delegate",
-                       )
-                     }
-                   />
-                   } else {
-                     <Button
-                       width=12.
-                       height=2.5
-                       style=Button.Green
-                       label=delegateLabel
-                       onMouseEnter={_ => {setDelegateLabel(_ => "Change Delegation");}}
-                       onMouseLeave={_ => {setDelegateLabel(_ => "Delegation Enabled");}}
-                       onClick={_ =>
-                         ReasonReact.Router.push(
-                           "/settings/"
-                           ++ PublicKey.uriEncode(publicKey)
-                           ++ "/delegate",
-                         )
-                       }
-                     />
-                      };}
+               let isDelegation =
+                 isDelegationInProgress || delegate##publicKey != publicKey;
+
+               <div>
+                 <Well>
+                   <div className=Styles.delegating>
+                     <div
+                       className=Css.(
+                         style([display(`flex), justifyContent(`flexStart)])
+                       )>
+                       {account.stakingActive
+                          ? <DisableStakingMutation>
+                              (
+                                (mutate, _) =>
+                                  <Button
+                                    width=12.
+                                    height=2.5
+                                    label={
+                                            if (stakingHovered) {
+                                              "Disable Staking"
+                                            } else {
+                                              "Staking Enabled"
+                                            }
+                                          }
+                                    style={
+                                            if (stakingHovered) {Button.Red} else {
+                                              Button.Green
+                                            }
+                                          }
+                                    onMouseEnter={_ =>
+                                      setStakingHovered(_ => true)
+                                    }
+                                    onMouseLeave={_ =>
+                                      setStakingHovered(_ => false)
+                                    }
+                                    onClick={_ => mutate() |> ignore}
+                                  />
+                              )
+                            </DisableStakingMutation>
+                          : <Button
+                              width=12.
+                              height=2.5
+                              style=Button.HyperlinkBlue
+                              label="Stake"
+                              onClick={_ =>
+                                ReasonReact.Router.push(
+                                  "/settings/"
+                                  ++ PublicKey.uriEncode(publicKey)
+                                  ++ "/stake",
+                                )
+                              }
+                            />}
+                       <Spacer width=1. />
+                       <img
+                         src="https://cdn.discordapp.com/attachments/638495089232183306/641796805314478092/OR.png"
+                         height="40px"
+                       />
+                       <Spacer width=1. />
+                       <Button
+                         width=12.
+                         height=2.5
+                         style={
+                           isDelegation ? Button.Green : Button.HyperlinkBlue
+                         }
+                         label={
+                                 if (delegateHovered && !isDelegation) {
+                                   "Delegate";
+                                 } else if (delegateHovered) {
+                                   "Change Delegation";
+                                 } else if (isDelegationInProgress) {
+                                   "Delegation In Progress";
+                                 } else if (isDelegation) {
+                                   "Delegation Enabled";
+                                 } else {
+                                   "Delegate";
+                                 }
+                               }
+                         onMouseEnter={_ => setDelegateHovered(_ => true)}
+                         onMouseLeave={_ => setDelegateHovered(_ => false)}
+                         onClick={_ =>
+                           ReasonReact.Router.push(
+                             "/settings/"
+                             ++ PublicKey.uriEncode(publicKey)
+                             ++ "/delegate",
+                           )
+                         }
+                       />
+                     </div>
                    </div>
-                 </div>
-               </Well>
-               <Spacer height=1. />
-               {if (delegate##publicKey == publicKey) {
-                 <span className=Styles.delegatingLabel>
-                   {React.string("Delegating to: ")}
-                   <AccountName pubkey=delegate##publicKey />
-                 </span>
-               } else {React.null}}
-              </div>
+                 </Well>
+                 <Spacer height=0.5 />
+                 {isDelegation
+                    ? <p className=Styles.delegationProgressLabel>
+                        {React.string(
+                           "Delegation takes 24-36 hours to process.",
+                         )}
+                      </p>
+                    : React.null}
+                 <Spacer height=0.5 />
+                 {if (delegate##publicKey == publicKey) {
+                    React.null;
+                  } else {
+                    <span className=Styles.delegatingLabel>
+                      {React.string("Delegating to: ")}
+                      <AccountName pubkey=delegate##publicKey />
+                    </span>;
+                  }}
+               </div>;
              };
            }}
       </AccountInfoQuery>
@@ -386,96 +438,100 @@ let make = (~publicKey) => {
 
   <div className=Styles.container>
     <div className=Styles.backHeader>
-     <a className=Styles.breadcrumbText onClick={_ => ReasonReact.Router.push("/settings")}>
-      {React.string("Global Settings >")}
-      </a> 
-      <Spacer width=0.2/>
-      <AccountName pubkey=publicKey className=Styles.breadcrumbText/>
+      <a
+        className=Styles.breadcrumbText
+        onClick={_ => ReasonReact.Router.push("/settings")}>
+        {React.string("Global Settings >")}
+      </a>
+      <Spacer width=0.2 />
+      <AccountName pubkey=publicKey className=Styles.breadcrumbText />
     </div>
     <Spacer height=1. />
-    <h3 className=Theme.Text.Header.h3>
-        {React.string("Account Basics")}
-      </h3>
-    <Spacer height=0.7 /> 
+    <h3 className=Theme.Text.Header.h3> {React.string("Account Basics")} </h3>
+    <Spacer height=0.7 />
     <div className=Styles.fields>
-    <div className=Styles.label> {React.string("Name")} </div>
-    <div className=Styles.textBox>
-      <TextField
-        label="Name"
-        value={Option.withDefault(
-          ~default="",
-          AddressBook.lookup(addressBook, publicKey),
-        )}
-        placeholder="My Coda Account"
-        onChange={value =>
-          updateAddressBook(ab =>
-            AddressBook.set(ab, ~key=publicKey, ~name=value)
-          )
-        }
-      />
-    </div>
-    <Spacer height=1. />
-    <div className=Styles.label> {React.string("Public key")} </div>
-    <div className=Styles.textBox>
-      <TextField
-        label="Key"
-        value={PublicKey.prettyPrint(publicKey)}
-        mono=true
-        onChange={_ => ()}
-        button={
-          <TextField.Button text="Copy" color=`Blue onClick=handleClipboard />
-        }
-      />
-    </div>
-    <Spacer height=1. />
-    <div className=Styles.label> {React.string("Private key")} </div>
-    <div className=Styles.textBox>
-      <KeypathQuery
-        variables=
-          {KeypathQueryString.make(
-             ~publicKey=Apollo.Encoders.publicKey(publicKey),
-             (),
-           )##variables}>
-        {({result}) => {
-           let path =
-             switch (result) {
-             | Loading
-             | Error(_) => None
-             | Data(data) =>
-               Option.map(~f=w => w##privateKeyPath, data##wallet)
+      <div className=Styles.label> {React.string("Name")} </div>
+      <div className=Styles.textBox>
+        <TextField
+          label="Name"
+          value={Option.withDefault(
+            ~default="",
+            AddressBook.lookup(addressBook, publicKey),
+          )}
+          placeholder="My Coda Account"
+          onChange={value =>
+            updateAddressBook(ab =>
+              AddressBook.set(ab, ~key=publicKey, ~name=value)
+            )
+          }
+        />
+      </div>
+      <Spacer height=1. />
+      <div className=Styles.label> {React.string("Public key")} </div>
+      <div className=Styles.textBox>
+        <TextField
+          label="Key"
+          value={PublicKey.prettyPrint(publicKey)}
+          mono=true
+          onChange={_ => ()}
+          button={
+            <TextField.Button
+              text="Copy"
+              color=`Blue
+              onClick=handleClipboard
+            />
+          }
+        />
+      </div>
+      <Spacer height=1. />
+      <div className=Styles.label> {React.string("Private key")} </div>
+      <div className=Styles.textBox>
+        <KeypathQuery
+          variables=
+            {KeypathQueryString.make(
+               ~publicKey=Apollo.Encoders.publicKey(publicKey),
+               (),
+             )##variables}>
+          {({result}) => {
+             let path =
+               switch (result) {
+               | Loading
+               | Error(_) => None
+               | Data(data) =>
+                 Option.map(~f=w => w##privateKeyPath, data##wallet)
+               };
+             switch (path) {
+             | Some(secretKeyPath) =>
+               <TextField
+                 label="Path"
+                 value=secretKeyPath
+                 onChange=ignore
+                 button={
+                   <TextField.Button
+                     text="Open"
+                     color=`Teal
+                     onClick={_ => showItemInFolder(secretKeyPath)}
+                   />
+                 }
+               />
+             | None =>
+               <TextField
+                 label="Path"
+                 value=""
+                 onChange=ignore
+                 button={
+                   <TextField.Button
+                     text="Open"
+                     disabled=true
+                     color=`Teal
+                     onClick=ignore
+                   />
+                 }
+               />
              };
-           switch (path) {
-           | Some(secretKeyPath) =>
-             <TextField
-               label="Path"
-               value=secretKeyPath
-               onChange=ignore
-               button={
-                 <TextField.Button
-                   text="Open"
-                   color=`Teal
-                   onClick={_ => showItemInFolder(secretKeyPath)}
-                 />
-               }
-             />
-           | None =>
-             <TextField
-               label="Path"
-               value=""
-               onChange=ignore
-               button={
-                 <TextField.Button
-                   text="Open"
-                   disabled=true
-                   color=`Teal
-                   onClick=ignore
-                 />
-               }
-             />
-           };
-         }}
-      </KeypathQuery>
-    </div>
+           }}
+        </KeypathQuery>
+      </div>
     </div>
     <Spacer height=1.5 />
     <BlockRewards publicKey />
