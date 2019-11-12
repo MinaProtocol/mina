@@ -1,3 +1,4 @@
+open Async_kernel
 open Core_kernel
 open Snark_params
 open Snark_bits
@@ -141,5 +142,14 @@ module Timeout :
     val cancel : Controller.t -> 'a t -> 'a -> unit
 
     val remaining_time : 'a t -> Span.t
+
+    val await :
+         timeout_duration:Span.t
+      -> Controller.t
+      -> 'a Deferred.t
+      -> [`Ok of 'a | `Timeout] Deferred.t
+
+    val await_exn :
+      timeout_duration:Span.t -> Controller.t -> 'a Deferred.t -> 'a Deferred.t
   end
   with type time := t
