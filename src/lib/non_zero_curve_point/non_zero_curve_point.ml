@@ -128,8 +128,7 @@ module Compressed = struct
     end
   end
 
-  (* bin_io, sexp omitted *)
-  type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving compare, hash]
+  type t = (Field.t, bool) Poly.t [@@deriving compare, hash]
 
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
