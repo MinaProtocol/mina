@@ -262,7 +262,6 @@ def get_required_status():
                                      for profile in build_artifact_profiles))),
                   extra_required_status_checks)))
 
-
 def required_status(args):
     print('\n'.join(get_required_status()))
 
