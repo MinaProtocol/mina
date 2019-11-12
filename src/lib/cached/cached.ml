@@ -226,6 +226,7 @@ let run
       (* Attempt load from s3 *)
       let open Deferred.Let_syntax in
       let%bind () = Async.Unix.mkdir ~p:() s3_install_path in
+      let%bind () = Async.Unix.mkdir ~p:() autogen_path in
       match%bind
         let open Deferred.Result.Let_syntax in
         let%bind () =
