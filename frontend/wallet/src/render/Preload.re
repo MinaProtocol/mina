@@ -28,3 +28,6 @@ let isFaker =
 [%bs.raw "window.downloadKey = downloadKey"];
 [%bs.raw "window.showItemInFolder = showItemInFolder"];
 [%bs.raw "window.openExternal = openExternal"];
+[%bs.raw
+  "window.fileRoot = require(\"path\").dirname(window.location.pathname)"
+];

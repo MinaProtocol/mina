@@ -7,9 +7,9 @@ open Signature_lib
 
 let%test_module "Processor" =
   ( module struct
-    module Stubs = Transition_frontier_controller_tests.Stubs.Make (struct
-      let max_length = 4
-    end)
+    let () =
+      Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true
 
     module Processor = Processor.Make (struct
       let address = "v1/graphql"
@@ -124,7 +124,6 @@ let%test_module "Processor" =
 
     let%test_unit "Process multiple user commands from Transaction_pool diff \
                    (including a duplicate)" =
-      Backtrace.elide := false ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
       try_with ~f:(fun () ->
@@ -230,12 +229,6 @@ let%test_module "Processor" =
               in
               Deferred.unit ) )
 
-    open Stubs
-
-    let pids = Pid.Table.create ()
-
-    let trust_system = Trust_system.null ()
-
     let create_added_breadcrumb_diff breadcrumb =
       let ((block, _) as validated_block) =
         Transition_frontier.Breadcrumb.validated_transition breadcrumb
@@ -268,36 +261,28 @@ let%test_module "Processor" =
 
     (* TODO: make other tests that queries components of a block by testing other queries, such prove_receipt_chain and block pagination *)
     let%test_unit "Write a external transition diff successfully" =
-      Backtrace.elide := false ;
-      Async.Scheduler.set_record_backtraces true ;
-      Thread_safe.block_on_async_exn
-      @@ fun () ->
-      let%bind frontier =
-        Stubs.create_root_frontier ~logger ~pids Genesis_ledger.accounts
-      in
-      let root_breadcrumb = Transition_frontier.root frontier in
-      let%bind () =
-        Stubs.add_linear_breadcrumbs ~logger ~pids ~trust_system ~size:1
-          ~accounts_with_secret_keys:Genesis_ledger.accounts ~frontier
-          ~parent:root_breadcrumb
-      in
-      let successors =
-        Transition_frontier.successors_rec frontier root_breadcrumb
-      in
-      try_with ~f:(fun () ->
-          let reader, writer =
-            Strict_pipe.create ~name:"archive"
-              (Buffered (`Capacity 10, `Overflow Crash))
+      Quickcheck.test
+        (Transition_frontier.For_tests.gen ~logger ~max_length:4 ~size:1 ())
+        ~f:(fun frontier ->
+          let root_breadcrumb = Transition_frontier.root frontier in
+          let successors =
+            Transition_frontier.successors_rec frontier root_breadcrumb
           in
-          let processing_deferred_job = Processor.run t reader in
-          let diffs =
-            List.map
-              ~f:(fun breadcrumb ->
-                Diff.Transition_frontier
-                  (create_added_breadcrumb_diff breadcrumb) )
-              (root_breadcrumb :: successors)
-          in
-          List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
-          Strict_pipe.Writer.close writer ;
-          processing_deferred_job )
+          Thread_safe.block_on_async_exn (fun () ->
+              try_with ~f:(fun () ->
+                  let reader, writer =
+                    Strict_pipe.create ~name:"archive"
+                      (Buffered (`Capacity 10, `Overflow Crash))
+                  in
+                  let processing_deferred_job = Processor.run t reader in
+                  let diffs =
+                    List.map
+                      ~f:(fun breadcrumb ->
+                        Diff.Transition_frontier
+                          (create_added_breadcrumb_diff breadcrumb) )
+                      (root_breadcrumb :: successors)
+                  in
+                  List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
+                  Strict_pipe.Writer.close writer ;
+                  processing_deferred_job ) ) )
   end )

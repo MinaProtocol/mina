@@ -152,7 +152,11 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
          (Option.value_map ~default:Deferred.unit
             ~f:(fun transition_frontier ->
               let best_tip_diff_pipe =
-                Transition_frontier.best_tip_diff_pipe transition_frontier
+                Transition_frontier.(
+                  Extensions.(
+                    get_view_pipe
+                      (extensions transition_frontier)
+                      Best_tip_diff))
               in
               Broadcast_pipe.Reader.iter best_tip_diff_pipe
                 ~f:(fun {reorg_best_tip; _} ->
@@ -181,7 +185,7 @@ let add_block_subscriber t public_key =
          match
            List.filter pipes ~f:(fun rw_pair' ->
                (* Intentionally using pointer equality *)
-               rw_pair <> rw_pair' )
+               not @@ phys_equal rw_pair rw_pair' )
          with
          | [] ->
              None
