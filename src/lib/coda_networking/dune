@@ -4,9 +4,8 @@
  (library_flags -linkall)
  (libraries core o1trace envelope async gossip_net coda_intf
   async_extra coda_base unix_timestamp perf_histograms proof_carrying_data
-  consensus network_pool coda_transition
-  staged_ledger)
+  consensus network_pool coda_transition transition_frontier staged_ledger)
  (inline_tests)
  (preprocess
-  (pps ppx_coda -lint-version-syntax-warnings ppx_inline_test ppx_deriving.eq ppx_deriving.make ppx_deriving_yojson bisect_ppx ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_fields_conv ppx_let ppx_custom_printf -- -conditional))
+  (pps ppx_coda ppx_inline_test ppx_deriving.eq ppx_deriving.make ppx_deriving_yojson bisect_ppx ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_fields_conv ppx_let ppx_custom_printf -- -conditional))
  (synopsis "Networking layer for coda"))

@@ -518,10 +518,15 @@ module type S = sig
     open Data
 
     module Rpcs : sig
-      val implementations :
-           logger:Logger.t
-        -> local_state:Local_state.t
-        -> Host_and_port.t Rpc.Implementation.t list
+      include Rpc_intf.Rpc_interface_intf
+
+      val rpc_handlers :
+        logger:Logger.t -> local_state:Local_state.t -> rpc_handler list
+
+      type query =
+        { query:
+            'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
+            -> 'r Deferred.Or_error.t }
     end
 
     (* Check whether we are in the genesis epoch *)
@@ -605,7 +610,7 @@ module type S = sig
       -> trust_system:Trust_system.t
       -> local_state:Local_state.t
       -> random_peers:(int -> Network_peer.Peer.t list)
-      -> query_peer:Network_peer.query_peer
+      -> query_peer:Rpcs.query
       -> local_state_sync Non_empty_list.t
       -> unit Deferred.Or_error.t
 
