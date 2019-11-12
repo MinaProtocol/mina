@@ -151,7 +151,7 @@ let print_type ~options:_ ~path type_decls =
   Pprintast.structure_item formatter stri ;
   Format.print_flush () ;
   printf "\n%!" ;
-  o []
+  []
 
 (* we're worried about changes to the serialization of types, which can occur via changes to implementations,
    so nothing to do for signatures

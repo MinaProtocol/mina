@@ -371,7 +371,7 @@ let version_module ~loc ~path:_ modname modbody =
     Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
     raise exn
 
-(* code for module declarations in signatures 
+(* code for module declarations in signatures
 
    - add deriving bin_io, version to list of deriving items for the type "t" in versioned modules
    - add "module Latest = Vn" to Stable module
