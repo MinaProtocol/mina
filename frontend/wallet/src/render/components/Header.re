@@ -127,6 +127,7 @@ module SyncStatus = {
 [@react.component]
 let make = () => {
   let url = ReasonReact.Router.useUrl();
+  let codaSvg = Hooks.useAsset("CodaLogo.svg");
   let onSettingsPage =
     switch (url.path) {
     | ["settings", ..._] => true
@@ -134,7 +135,7 @@ let make = () => {
     };
   <header className=Styles.header>
     <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
-      <img src="CodaLogo.svg" alt="Coda logo" />
+      <img src=codaSvg alt="Coda logo" />
     </div>
     <Toast />
     <div className=Styles.rightButtons>
