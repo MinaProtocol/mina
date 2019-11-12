@@ -200,7 +200,11 @@ let run
                 !"Loaded %s from the following paths %{sexp: string list}\n"
                 name (full_paths path) ;
               Some x
-          | Error _ ->
+          | Error e ->
+              Core.printf
+                !"Error loading from (name %s) (base_path %s) (full paths \
+                  %{sexp: string list}: %s\n"
+                name (base_path path) (full_paths path) (Error.to_string_hum e) ;
               None )
   with
   | Some x ->
@@ -226,17 +230,20 @@ let run
         let%bind () =
           Deferred.map ~f:Result.join
           @@ Monitor.try_with (fun () ->
-                 let each_uri uri_string =
+                 let each_uri (uri_string, file_path) =
                    let open Deferred.Let_syntax in
                    let%map result =
                      Process.run_exn ~prog:"curl"
-                       ~args:["-o"; s3_install_path; uri_string]
+                       ~args:["-o"; file_path; uri_string]
                        ()
                    in
-                   Core.printf !"Curl finished: %s" result ;
+                   Core.printf !"Curl finished: %s\n" result ;
                    Result.return ()
                  in
-                 Deferred.List.map ~f:each_uri (full_paths s3_bucket_prefix)
+                 Deferred.List.map ~f:each_uri
+                   (List.zip_exn
+                      (full_paths s3_bucket_prefix)
+                      (full_paths s3_install_path))
                  |> Deferred.map ~f:Result.all_unit )
           |> Deferred.Result.map_error ~f:Error.of_exn
         in
