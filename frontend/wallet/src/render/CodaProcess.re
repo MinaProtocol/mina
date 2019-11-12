@@ -48,6 +48,13 @@ let defaultPeers = [
   "/ip4/52.13.17.206/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7",
 ];
 
+let defaultArgs =
+  List.fold_right(
+    (peer, acc) => List.concat([["-peer", peer], acc]),
+    defaultPeers,
+    [],
+  );
+
 let useHook = () => {
   let (_state, dispatch) =
     Hooks.Reducer.useReducer(reduce, {State.args: [], mode: Stable});

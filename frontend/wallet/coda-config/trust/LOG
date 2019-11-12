@@ -1,0 +1,189 @@
+2019/11/12-15:35:27.622237 700005a6c000 RocksDB version: 5.17.2
+2019/11/12-15:35:27.622292 700005a6c000 Git sha rocksdb_build_git_sha:f438b98e552010613cff8684a7d84191ed785148
+2019/11/12-15:35:27.622294 700005a6c000 Compile date Nov 11 2019
+2019/11/12-15:35:27.622296 700005a6c000 DB SUMMARY
+2019/11/12-15:35:27.622325 700005a6c000 SST files in /Users/figitaki/src/coda/frontend/wallet/coda-config/trust dir, Total Num: 0, files: 
+2019/11/12-15:35:27.622328 700005a6c000 Write Ahead Log file in /Users/figitaki/src/coda/frontend/wallet/coda-config/trust: 
+2019/11/12-15:35:27.622329 700005a6c000                         Options.error_if_exists: 0
+2019/11/12-15:35:27.622331 700005a6c000                       Options.create_if_missing: 1
+2019/11/12-15:35:27.622332 700005a6c000                         Options.paranoid_checks: 1
+2019/11/12-15:35:27.622333 700005a6c000                                     Options.env: 0x116de8138
+2019/11/12-15:35:27.622334 700005a6c000                                Options.info_log: 0x11c82f000
+2019/11/12-15:35:27.622335 700005a6c000                Options.max_file_opening_threads: 16
+2019/11/12-15:35:27.622336 700005a6c000                              Options.statistics: 0x0
+2019/11/12-15:35:27.622337 700005a6c000                               Options.use_fsync: 0
+2019/11/12-15:35:27.622338 700005a6c000                       Options.max_log_file_size: 0
+2019/11/12-15:35:27.622339 700005a6c000                  Options.max_manifest_file_size: 1073741824
+2019/11/12-15:35:27.622339 700005a6c000                   Options.log_file_time_to_roll: 0
+2019/11/12-15:35:27.622340 700005a6c000                       Options.keep_log_file_num: 1000
+2019/11/12-15:35:27.622341 700005a6c000                    Options.recycle_log_file_num: 0
+2019/11/12-15:35:27.622342 700005a6c000                         Options.allow_fallocate: 1
+2019/11/12-15:35:27.622343 700005a6c000                        Options.allow_mmap_reads: 0
+2019/11/12-15:35:27.622344 700005a6c000                       Options.allow_mmap_writes: 0
+2019/11/12-15:35:27.622345 700005a6c000                        Options.use_direct_reads: 0
+2019/11/12-15:35:27.622345 700005a6c000                        Options.use_direct_io_for_flush_and_compaction: 0
+2019/11/12-15:35:27.622346 700005a6c000          Options.create_missing_column_families: 0
+2019/11/12-15:35:27.622347 700005a6c000                              Options.db_log_dir: 
+2019/11/12-15:35:27.622348 700005a6c000                                 Options.wal_dir: /Users/figitaki/src/coda/frontend/wallet/coda-config/trust
+2019/11/12-15:35:27.622349 700005a6c000                Options.table_cache_numshardbits: 6
+2019/11/12-15:35:27.622350 700005a6c000                      Options.max_subcompactions: 1
+2019/11/12-15:35:27.622351 700005a6c000                  Options.max_background_flushes: -1
+2019/11/12-15:35:27.622352 700005a6c000                         Options.WAL_ttl_seconds: 0
+2019/11/12-15:35:27.622353 700005a6c000                       Options.WAL_size_limit_MB: 0
+2019/11/12-15:35:27.622353 700005a6c000             Options.manifest_preallocation_size: 4194304
+2019/11/12-15:35:27.622354 700005a6c000                     Options.is_fd_close_on_exec: 1
+2019/11/12-15:35:27.622355 700005a6c000                   Options.advise_random_on_open: 1
+2019/11/12-15:35:27.622356 700005a6c000                    Options.db_write_buffer_size: 0
+2019/11/12-15:35:27.622357 700005a6c000                    Options.write_buffer_manager: 0x11c84e030
+2019/11/12-15:35:27.622358 700005a6c000         Options.access_hint_on_compaction_start: 1
+2019/11/12-15:35:27.622359 700005a6c000  Options.new_table_reader_for_compaction_inputs: 0
+2019/11/12-15:35:27.622359 700005a6c000           Options.random_access_max_buffer_size: 1048576
+2019/11/12-15:35:27.622360 700005a6c000                      Options.use_adaptive_mutex: 0
+2019/11/12-15:35:27.622361 700005a6c000                            Options.rate_limiter: 0x0
+2019/11/12-15:35:27.622362 700005a6c000     Options.sst_file_manager.rate_bytes_per_sec: 0
+2019/11/12-15:35:27.622363 700005a6c000                       Options.wal_recovery_mode: 2
+2019/11/12-15:35:27.622364 700005a6c000                  Options.enable_thread_tracking: 0
+2019/11/12-15:35:27.622382 700005a6c000                  Options.enable_pipelined_write: 0
+2019/11/12-15:35:27.622383 700005a6c000         Options.allow_concurrent_memtable_write: 1
+2019/11/12-15:35:27.622384 700005a6c000      Options.enable_write_thread_adaptive_yield: 1
+2019/11/12-15:35:27.622385 700005a6c000             Options.write_thread_max_yield_usec: 100
+2019/11/12-15:35:27.622386 700005a6c000            Options.write_thread_slow_yield_usec: 3
+2019/11/12-15:35:27.622387 700005a6c000                               Options.row_cache: None
+2019/11/12-15:35:27.622387 700005a6c000                              Options.wal_filter: None
+2019/11/12-15:35:27.622388 700005a6c000             Options.avoid_flush_during_recovery: 0
+2019/11/12-15:35:27.622389 700005a6c000             Options.allow_ingest_behind: 0
+2019/11/12-15:35:27.622390 700005a6c000             Options.preserve_deletes: 0
+2019/11/12-15:35:27.622391 700005a6c000             Options.two_write_queues: 0
+2019/11/12-15:35:27.622392 700005a6c000             Options.manual_wal_flush: 0
+2019/11/12-15:35:27.622393 700005a6c000             Options.max_background_jobs: 2
+2019/11/12-15:35:27.622394 700005a6c000             Options.max_background_compactions: -1
+2019/11/12-15:35:27.622394 700005a6c000             Options.avoid_flush_during_shutdown: 0
+2019/11/12-15:35:27.622395 700005a6c000           Options.writable_file_max_buffer_size: 1048576
+2019/11/12-15:35:27.622396 700005a6c000             Options.delayed_write_rate : 16777216
+2019/11/12-15:35:27.622397 700005a6c000             Options.max_total_wal_size: 0
+2019/11/12-15:35:27.622398 700005a6c000             Options.delete_obsolete_files_period_micros: 21600000000
+2019/11/12-15:35:27.622399 700005a6c000                   Options.stats_dump_period_sec: 600
+2019/11/12-15:35:27.622400 700005a6c000                          Options.max_open_files: -1
+2019/11/12-15:35:27.622402 700005a6c000                          Options.bytes_per_sync: 0
+2019/11/12-15:35:27.622403 700005a6c000                      Options.wal_bytes_per_sync: 0
+2019/11/12-15:35:27.622404 700005a6c000       Options.compaction_readahead_size: 0
+2019/11/12-15:35:27.622405 700005a6c000 Compression algorithms supported:
+2019/11/12-15:35:27.622408 700005a6c000 	kZSTD supported: 0
+2019/11/12-15:35:27.622409 700005a6c000 	kZlibCompression supported: 1
+2019/11/12-15:35:27.622410 700005a6c000 	kXpressCompression supported: 0
+2019/11/12-15:35:27.622411 700005a6c000 	kSnappyCompression supported: 0
+2019/11/12-15:35:27.622412 700005a6c000 	kZSTDNotFinalCompression supported: 0
+2019/11/12-15:35:27.622413 700005a6c000 	kLZ4HCCompression supported: 0
+2019/11/12-15:35:27.622414 700005a6c000 	kLZ4Compression supported: 0
+2019/11/12-15:35:27.622415 700005a6c000 	kBZip2Compression supported: 1
+2019/11/12-15:35:27.622416 700005a6c000 Fast CRC32 supported: Not supported on x86
+2019/11/12-15:35:27.622496 700005a6c000 [db/db_impl_open.cc:230] Creating manifest 1 
+2019/11/12-15:35:27.623636 700005a6c000 [db/version_set.cc:3406] Recovering from manifest file: MANIFEST-000001
+2019/11/12-15:35:27.623680 700005a6c000 [db/column_family.cc:475] --------------- Options for column family [default]:
+2019/11/12-15:35:27.623683 700005a6c000               Options.comparator: leveldb.BytewiseComparator
+2019/11/12-15:35:27.623684 700005a6c000           Options.merge_operator: None
+2019/11/12-15:35:27.623685 700005a6c000        Options.compaction_filter: None
+2019/11/12-15:35:27.623686 700005a6c000        Options.compaction_filter_factory: None
+2019/11/12-15:35:27.623687 700005a6c000         Options.memtable_factory: SkipListFactory
+2019/11/12-15:35:27.623688 700005a6c000            Options.table_factory: BlockBasedTable
+2019/11/12-15:35:27.623712 700005a6c000            table_factory options:   flush_block_policy_factory: FlushBlockBySizePolicyFactory (0x11c85d000)
+  cache_index_and_filter_blocks: 0
+  cache_index_and_filter_blocks_with_high_priority: 0
+  pin_l0_filter_and_index_blocks_in_cache: 0
+  pin_top_level_index_and_filter: 1
+  index_type: 0
+  hash_index_allow_collision: 1
+  checksum: 1
+  no_block_cache: 0
+  block_cache: 0x11c85e018
+  block_cache_name: LRUCache
+  block_cache_options:
+    capacity : 8388608
+    num_shard_bits : 4
+    strict_capacity_limit : 0
+    high_pri_pool_ratio: 0.000
+  block_cache_compressed: 0x0
+  persistent_cache: 0x0
+  block_size: 4096
+  block_size_deviation: 10
+  block_restart_interval: 16
+  index_block_restart_interval: 1
+  metadata_block_size: 4096
+  partition_filters: 0
+  use_delta_encoding: 1
+  filter_policy: nullptr
+  whole_key_filtering: 1
+  verify_compression: 0
+  read_amp_bytes_per_bit: 0
+  format_version: 2
+  enable_index_compression: 1
+  block_align: 0
+2019/11/12-15:35:27.623733 700005a6c000        Options.write_buffer_size: 67108864
+2019/11/12-15:35:27.623735 700005a6c000  Options.max_write_buffer_number: 2
+2019/11/12-15:35:27.623736 700005a6c000          Options.compression: NoCompression
+2019/11/12-15:35:27.623737 700005a6c000                  Options.bottommost_compression: Disabled
+2019/11/12-15:35:27.623738 700005a6c000       Options.prefix_extractor: nullptr
+2019/11/12-15:35:27.623739 700005a6c000   Options.memtable_insert_with_hint_prefix_extractor: nullptr
+2019/11/12-15:35:27.623740 700005a6c000             Options.num_levels: 7
+2019/11/12-15:35:27.623741 700005a6c000        Options.min_write_buffer_number_to_merge: 1
+2019/11/12-15:35:27.623741 700005a6c000     Options.max_write_buffer_number_to_maintain: 0
+2019/11/12-15:35:27.623742 700005a6c000            Options.bottommost_compression_opts.window_bits: -14
+2019/11/12-15:35:27.623743 700005a6c000                  Options.bottommost_compression_opts.level: 32767
+2019/11/12-15:35:27.623744 700005a6c000               Options.bottommost_compression_opts.strategy: 0
+2019/11/12-15:35:27.623745 700005a6c000         Options.bottommost_compression_opts.max_dict_bytes: 0
+2019/11/12-15:35:27.623746 700005a6c000         Options.bottommost_compression_opts.zstd_max_train_bytes: 0
+2019/11/12-15:35:27.623747 700005a6c000                  Options.bottommost_compression_opts.enabled: false
+2019/11/12-15:35:27.623748 700005a6c000            Options.compression_opts.window_bits: -14
+2019/11/12-15:35:27.623749 700005a6c000                  Options.compression_opts.level: 32767
+2019/11/12-15:35:27.623750 700005a6c000               Options.compression_opts.strategy: 0
+2019/11/12-15:35:27.623750 700005a6c000         Options.compression_opts.max_dict_bytes: 0
+2019/11/12-15:35:27.623751 700005a6c000         Options.compression_opts.zstd_max_train_bytes: 0
+2019/11/12-15:35:27.623752 700005a6c000                  Options.compression_opts.enabled: false
+2019/11/12-15:35:27.623753 700005a6c000      Options.level0_file_num_compaction_trigger: 4
+2019/11/12-15:35:27.623754 700005a6c000          Options.level0_slowdown_writes_trigger: 20
+2019/11/12-15:35:27.623755 700005a6c000              Options.level0_stop_writes_trigger: 36
+2019/11/12-15:35:27.623756 700005a6c000                   Options.target_file_size_base: 67108864
+2019/11/12-15:35:27.623757 700005a6c000             Options.target_file_size_multiplier: 1
+2019/11/12-15:35:27.623757 700005a6c000                Options.max_bytes_for_level_base: 268435456
+2019/11/12-15:35:27.623758 700005a6c000 Options.level_compaction_dynamic_level_bytes: 0
+2019/11/12-15:35:27.623759 700005a6c000          Options.max_bytes_for_level_multiplier: 10.000000
+2019/11/12-15:35:27.623761 700005a6c000 Options.max_bytes_for_level_multiplier_addtl[0]: 1
+2019/11/12-15:35:27.623762 700005a6c000 Options.max_bytes_for_level_multiplier_addtl[1]: 1
+2019/11/12-15:35:27.623763 700005a6c000 Options.max_bytes_for_level_multiplier_addtl[2]: 1
+2019/11/12-15:35:27.623763 700005a6c000 Options.max_bytes_for_level_multiplier_addtl[3]: 1
+2019/11/12-15:35:27.623764 700005a6c000 Options.max_bytes_for_level_multiplier_addtl[4]: 1
+2019/11/12-15:35:27.623765 700005a6c000 Options.max_bytes_for_level_multiplier_addtl[5]: 1
+2019/11/12-15:35:27.623766 700005a6c000 Options.max_bytes_for_level_multiplier_addtl[6]: 1
+2019/11/12-15:35:27.623767 700005a6c000       Options.max_sequential_skip_in_iterations: 8
+2019/11/12-15:35:27.623779 700005a6c000                    Options.max_compaction_bytes: 1677721600
+2019/11/12-15:35:27.623781 700005a6c000                        Options.arena_block_size: 8388608
+2019/11/12-15:35:27.623784 700005a6c000   Options.soft_pending_compaction_bytes_limit: 68719476736
+2019/11/12-15:35:27.623785 700005a6c000   Options.hard_pending_compaction_bytes_limit: 274877906944
+2019/11/12-15:35:27.623786 700005a6c000       Options.rate_limit_delay_max_milliseconds: 100
+2019/11/12-15:35:27.623786 700005a6c000                Options.disable_auto_compactions: 0
+2019/11/12-15:35:27.623788 700005a6c000                        Options.compaction_style: kCompactionStyleLevel
+2019/11/12-15:35:27.623789 700005a6c000                          Options.compaction_pri: kByCompensatedSize
+2019/11/12-15:35:27.623789 700005a6c000 Options.compaction_options_universal.size_ratio: 1
+2019/11/12-15:35:27.623790 700005a6c000 Options.compaction_options_universal.min_merge_width: 2
+2019/11/12-15:35:27.623791 700005a6c000 Options.compaction_options_universal.max_merge_width: 4294967295
+2019/11/12-15:35:27.623792 700005a6c000 Options.compaction_options_universal.max_size_amplification_percent: 200
+2019/11/12-15:35:27.623793 700005a6c000 Options.compaction_options_universal.compression_size_percent: -1
+2019/11/12-15:35:27.623794 700005a6c000 Options.compaction_options_universal.stop_style: kCompactionStopStyleTotalSize
+2019/11/12-15:35:27.623795 700005a6c000 Options.compaction_options_fifo.max_table_files_size: 1073741824
+2019/11/12-15:35:27.623796 700005a6c000 Options.compaction_options_fifo.allow_compaction: 0
+2019/11/12-15:35:27.623797 700005a6c000 Options.compaction_options_fifo.ttl: 0
+2019/11/12-15:35:27.623798 700005a6c000                   Options.table_properties_collectors: 
+2019/11/12-15:35:27.623799 700005a6c000                   Options.inplace_update_support: 0
+2019/11/12-15:35:27.623800 700005a6c000                 Options.inplace_update_num_locks: 10000
+2019/11/12-15:35:27.623800 700005a6c000               Options.memtable_prefix_bloom_size_ratio: 0.000000
+2019/11/12-15:35:27.623802 700005a6c000   Options.memtable_huge_page_size: 0
+2019/11/12-15:35:27.623802 700005a6c000                           Options.bloom_locality: 0
+2019/11/12-15:35:27.623803 700005a6c000                    Options.max_successive_merges: 0
+2019/11/12-15:35:27.623804 700005a6c000                Options.optimize_filters_for_hits: 0
+2019/11/12-15:35:27.623805 700005a6c000                Options.paranoid_file_checks: 0
+2019/11/12-15:35:27.623806 700005a6c000                Options.force_consistency_checks: 0
+2019/11/12-15:35:27.623807 700005a6c000                Options.report_bg_io_stats: 0
+2019/11/12-15:35:27.623808 700005a6c000                               Options.ttl: 0
+2019/11/12-15:35:27.624125 700005a6c000 [db/version_set.cc:3610] Recovered from manifest file:/Users/figitaki/src/coda/frontend/wallet/coda-config/trust/MANIFEST-000001 succeeded,manifest_file_number is 1, next_file_number is 3, last_sequence is 0, log_number is 0,prev_log_number is 0,max_column_family is 0,min_log_number_to_keep is 0
+2019/11/12-15:35:27.624130 700005a6c000 [db/version_set.cc:3618] Column family [default] (ID 0), log number is 0
+2019/11/12-15:35:27.625450 700005a6c000 [db/db_impl_open.cc:1287] DB pointer 0x11c864000
