@@ -1,10 +1,7 @@
 module Styles = {
   open Css;
 
-  let container =
-    style([
-      marginLeft(`rem(3.0)),
-    ]);
+  let container = style([marginLeft(`rem(3.0))]);
 
   let disabled = style([opacity(0.5), pointerEvents(`none)]);
 };

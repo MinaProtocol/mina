@@ -36,7 +36,7 @@ module Styles = {
         active([backgroundColor(Theme.Colors.marine), color(white)]),
       ]),
     ]);
-    
+
   let hyperlinkBlue =
     merge([
       base,

@@ -160,7 +160,6 @@ module AccountSettingsItem = {
       <span className=Styles.accountChevron>
         <Icon kind=Icon.EmptyChevronRight />
       </span>
-<<<<<<< HEAD
       {showModal
          ? <UnlockModal
              account={
@@ -173,15 +172,6 @@ module AccountSettingsItem = {
              }}
            />
          : React.null}
-=======
-       {showModal
-       ? <UnlockModal
-           account={publicKey}
-           onClose={() =>  setModalOpen(_ => false)}
-           onSuccess={() => {setModalOpen(_ => false); ReasonReact.Router.push(route);}}
-         />
-       : React.null}
->>>>>>> Fixed unlock modal
     </div>;
   };
 };
