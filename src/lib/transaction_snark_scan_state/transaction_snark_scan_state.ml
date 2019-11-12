@@ -581,6 +581,8 @@ let all_work_pairs_exn t =
       List.map (One_or_two.group_list jobs) ~f:(One_or_two.map ~f:single_spec)
   )
 
+let update_metrics = Parallel_scan.update_metrics
+
 let fill_work_and_enqueue_transactions t transactions work =
   let open Or_error.Let_syntax in
   let fill_in_transaction_snark_work t (works : Transaction_snark_work.t list)
