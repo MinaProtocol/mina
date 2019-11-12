@@ -137,7 +137,7 @@ Now that you’ve had a chance to really wrap your head around the basic idea of
 <a href="https://www.bitrates.com/news/p/zero-knowledge-proofs-part-one-the-cryptographic-protocols-and-their-variations" class="customLink">Zero Knowledge Proofs Part One: The Cryptographic Protocols and Their Variations</a>  
 This piece more or less reiterates a lot of the concepts discussed in the previous pieces. One valuable addition is an additional simplified definition of zk-SNARKs and a comparison to zk-STARKs. 
 
-<a href="https://www.youtube.com/watch?v=Rku9pABMLKI" class="customLink">[Video] What are ZK-Snarks?</a>
+<a href="https://www.youtube.com/watch?v=Rku9pABMLKI" class="customLink">[Video] What are ZK-Snarks?</a>  
 Now that we’ve bridged from zero knowledge proofs to SNARKs, let’s drop another quick intro video for the visually minded. This 4 minute overview is going to give you the basics so that we can dive back into some more substantive content. 
 
 <a href="https://www.binance.vision/blockchain/zk-snarks-and-zk-starks-explained" class="customLink">zk-SNARKS and zk-STARKS Explained</a>  
