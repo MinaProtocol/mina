@@ -117,7 +117,6 @@
 /src/lib/transaction_snark_work/ @deepthiskumar @cmr @imeckler
 /src/lib/transition_frontier/ @nholland94 @wu-s-john
 /src/lib/transition_frontier_controller/ @nholland94 @ghost-not-in-the-shell
-/src/lib/transition_frontier_persistence/ @nholland94
 /src/lib/transition_handler/ @wu-s-john @nholland94 @ghost-not-in-the-shell
 /src/lib/transition_router/ @wu-s-john @nholland94 @ghost-not-in-the-shell
 /src/lib/trust_system/ @enolan @nholland94
