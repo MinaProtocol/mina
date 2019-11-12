@@ -21,6 +21,9 @@ let useToast = () => {
   };
 };
 
+[@bs.scope "window"] [@bs.val] external fileRoot: string = "fileRoot";
+let useAsset = fileName => Filename.concat(fileRoot, fileName);
+
 // Vanilla React.useReducer aren't supposed to have any effects themselves.
 // The following supports the handling of the effects.
 //
