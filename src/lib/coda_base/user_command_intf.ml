@@ -77,6 +77,9 @@ module type S = sig
 
   val sender : t -> Public_key.Compressed.t
 
+  (* for filtering *)
+  val is_trivial : t -> bool
+
   include Gen_intf with type t := t
 
   module With_valid_signature : sig
