@@ -78,6 +78,7 @@ ci_blacklist = [
 required_blacklist = [
     'test_postake_five_even_snarkless:*',
     'test_postake_catchup:*',
+    'test_postake_holy_grail:*',
 ]
 
 # these extra jobs are not filters, they are full status check names
@@ -260,7 +261,6 @@ def get_required_status():
                                     ("build-artifacts--%s" % profile
                                      for profile in build_artifact_profiles))),
                   extra_required_status_checks)))
-
 
 def required_status(args):
     print('\n'.join(get_required_status()))

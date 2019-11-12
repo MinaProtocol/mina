@@ -38,6 +38,6 @@ let command =
      and waiting_time =
        flag "waiting-time"
          ~doc:"the waiting time after the nodes coming back alive"
-         (optional_with_default 30 int)
+         (optional_with_default 120 int)
      in
      main num_proposers waiting_time)
