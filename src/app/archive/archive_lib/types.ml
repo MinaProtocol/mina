@@ -360,7 +360,6 @@ module Blocks = struct
       (* TODO: Need to implement *)
       method ledger_proof_nonce = some 0
 
-      (* TODO: Need to implement *)
       method status = some 0
 
       method block_length =
@@ -383,3 +382,43 @@ module Blocks = struct
         @@ Blocks_user_commands.encode_as_arr_rel_insert_input user_commands
     end
 end
+
+let update_block_confirmations_obj (state_hash : State_hash.t)
+    (block_confirmation_number : int) =
+  let open Option in
+  object
+    method stateHashByStateHash =
+      some @@ State_hashes.encode_as_obj_rel_insert_input state_hash
+
+    method public_key = None
+
+    method stateHashByParentHash = None
+
+    method snarked_ledger_hash = None
+
+    method ledger_hash = None
+
+    method global_slot = None
+
+    method ledger_proof_nonce = None
+
+    method status = some block_confirmation_number
+
+    method block_length = None
+
+    method block_time = None
+
+    method blocks_fee_transfers = None
+
+    method blocks_snark_jobs = None
+
+    method blocks_user_commands = None
+  end
+
+let batch_update_block_confirmations_obj
+    (blocks_to_confirmation_numbers : (State_hash.t * int) list) =
+  encode_as_arr_rel_insert_input
+    (List.map blocks_to_confirmation_numbers
+       ~f:(fun (block, block_confirmation) ->
+         update_block_confirmations_obj block block_confirmation ))
+    Ast.On_conflict.blocks

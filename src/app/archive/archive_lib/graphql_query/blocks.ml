@@ -54,3 +54,18 @@ module Query_blocks_with_confirmations =
     }
   }
 |}]
+
+module Batch_query_updated_block_confirmations =
+[%graphql
+{|
+  query query($hash: String!, $new_updated_confirmation_number: Int!) {
+    state_hash_path(args: {state_hash_with_new_child: $hash, new_updated_confirmation_number: $new_updated_confirmation_number}) {
+      state_hash : stateHashByStateHash {
+        value @bsDecoder(fn: "State_hash.of_base58_check_exn")
+      }
+      parent_state_hash: stateHashByParentHash {
+        value @bsDecoder(fn: "State_hash.of_base58_check_exn")
+      }
+    }
+  }
+|}]

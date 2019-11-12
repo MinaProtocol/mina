@@ -41,7 +41,7 @@ module On_conflict = struct
 
   type state_hashes = ([`state_hashes_value_key], [`value]) t
 
-  type blocks = ([`blocks_state_hash_key], [`block_length]) t
+  type blocks = ([`blocks_state_hash_key], [`status]) t
 
   let public_keys : public_keys = create `public_keys_value_key [`value]
 
@@ -66,6 +66,8 @@ module On_conflict = struct
 
   let blocks_snark_jobs : block_snark_jobs =
     create `blocks_snark_jobs_block_id_snark_job_id_key []
+
+  let blocks : blocks = create `blocks_state_hash_key [`status]
 end
 
 type bit = Yojson.Basic.json

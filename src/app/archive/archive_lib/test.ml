@@ -305,7 +305,14 @@ let%test_module "Processor" =
           Strict_pipe.Writer.close writer ;
           processing_deferred_job )
 
-    let%test_unit "Can get the block height of all the blocks" =
+    let create_expected_num_confirmations_map frontier breadcrumb =
+      Transition_frontier.(Breadcrumb.state_hash @@ root frontier)
+      :: Transition_frontier.hash_path frontier breadcrumb
+      |> List.rev
+      |> List.mapi ~f:(fun i state_hash -> (state_hash, i))
+      |> State_hash.Map.of_alist_exn
+
+    let%test_unit "Can get the block confirmations for all the blocks" =
       Thread_safe.block_on_async_exn
       @@ fun () ->
       let%bind frontier =
@@ -313,17 +320,32 @@ let%test_module "Processor" =
       in
       let root_breadcrumb = Transition_frontier.root frontier in
       let%bind () =
+        Stubs.add_linear_breadcrumbs ~logger ~pids ~trust_system ~size:1
+          ~accounts_with_secret_keys:Genesis_ledger.accounts ~frontier
+          ~parent:root_breadcrumb
+      in
+      let expected_num_confirmation_from_fork =
+        create_expected_num_confirmations_map frontier
+          (Transition_frontier.best_tip frontier)
+      in
+      let%bind () =
         Stubs.add_linear_breadcrumbs ~logger ~pids ~trust_system ~size:3
           ~accounts_with_secret_keys:Genesis_ledger.accounts ~frontier
           ~parent:root_breadcrumb
       in
+      let expected_num_confirmation_from_best_tip =
+        create_expected_num_confirmations_map frontier
+          (Transition_frontier.best_tip frontier)
+      in
       let expected_num_confirmations =
-        Transition_frontier.(Breadcrumb.state_hash @@ root frontier)
-        :: Transition_frontier.hash_path frontier
-             (Transition_frontier.best_tip frontier)
-        |> List.rev
-        |> List.mapi ~f:(fun i state_hash -> (state_hash, i))
-        |> State_hash.Map.of_alist_exn
+        Map.merge expected_num_confirmation_from_fork
+          expected_num_confirmation_from_best_tip ~f:(fun ~key:_ -> function
+          | `Left num_confirmations ->
+              Some num_confirmations
+          | `Right num_confirmations ->
+              Some num_confirmations
+          | `Both (left_num_confirmations, right_num_confirmations) ->
+              Some (max left_num_confirmations right_num_confirmations) )
       in
       let successors =
         Transition_frontier.successors_rec frontier root_breadcrumb

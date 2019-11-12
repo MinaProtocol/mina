@@ -148,28 +148,51 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         , Option.value_map first_seen_in_db ~default:(Some default_block_time)
             ~f:Option.some ) )
 
-  let update_block_confirmations t (parent_state_hash, state_hash) block_height
-      =
-    let new_updates =
-      Block_confirmation_cache.update t.pending_block_confirmations_cache
-        (state_hash, `Parent parent_state_hash)
-        block_height
+  let update_block_confirmations t (parent_state_hash : State_hash.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind blocks_to_update =
+      let graphql =
+        Graphql_query.Blocks.Batch_query_updated_block_confirmations.make
+          ~hash:(State_hash.to_base58_check parent_state_hash)
+          ~new_updated_confirmation_number:1 ()
+      in
+      let%map response = Client.query graphql t.port in
+      let alist =
+        Array.to_list response#state_hash_path
+        |> List.map ~f:(fun obj ->
+               ((obj#state_hash)#value, (obj#parent_state_hash)#value) )
+      in
+      Core.printf
+        !"Blocks to update: %{sexp:(State_hash.t * State_hash.t) list}\n"
+        alist ;
+      State_hash.Table.of_alist_exn alist
+    in
+    let ordered_blocks_to_update =
+      Sequence.unfold ~init:parent_state_hash ~f:(fun hash ->
+          let open Option.Let_syntax in
+          let%map parent_hash = Hashtbl.find blocks_to_update hash in
+          (hash, parent_hash) )
     in
     let results =
-      List.map new_updates ~f:(fun (hash, {block_height; _}) ->
-          let consensus_status = Consensus_status.Pending block_height in
+      Sequence.mapi ordered_blocks_to_update
+        ~f:(fun lagging_block_confirmation hash ->
+          let new_block_confirmation = lagging_block_confirmation + 1 in
+          Core.printf
+            !"Block will be updated with State_hash(%{sexp:State_hash.t}, %i)\n"
+            hash new_block_confirmation ;
+          (* Each update should be at least greater than 1. So, we offset the index value from `mapi` *)
           let hash = State_hash.to_base58_check hash in
           let graphql =
             Graphql_query.Blocks.Update_block_confirmations.make ~hash
-              ~status:(Consensus_status.to_int consensus_status)
-              ()
+              ~status:new_block_confirmation ()
           in
           Client.query graphql t.port )
+      |> Sequence.to_list
     in
     Deferred.Result.all results |> Deferred.Result.ignore
 
   let added_transition t
-      ({With_hash.data= block; hash} as block_with_hash :
+      ({With_hash.data= block; hash= _} as block_with_hash :
         (External_transition.t, State_hash.t) With_hash.t)
       (sender_receipt_chains_from_parent_ledger :
         Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
@@ -227,9 +250,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         ()
     in
     let%bind _ = Client.query graphql t.port in
-    update_block_confirmations t
-      (External_transition.parent_hash block, hash)
-      0
+    update_block_confirmations t (External_transition.parent_hash block)
 
   let load_pending_blocks port =
     let open Deferred.Result.Let_syntax in

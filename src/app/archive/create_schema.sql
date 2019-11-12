@@ -143,3 +143,28 @@ CREATE TABLE blocks_snark_jobs (
 );
 
 alter table blocks_snark_jobs add constraint blocks_snark_jobs_block_id_snark_job_id_key unique (block_id, snark_job_id);
+
+-- TODO: This query queries too many unneccessary columns, mainly because Hasura only allows functions that return table types (i.e. the entire blocks table). 
+-- We can reduce the amount of columns that we have by having the child-parent relationship of blocks in another table. 
+
+-- TODO: better name than state_hash_path. Maybe hashes to update
+CREATE FUNCTION state_hash_path (state_hash_with_new_child text, new_updated_confirmation_number int)
+  RETURNS setof blocks AS $$
+  WITH RECURSIVE sub_result AS
+  (SELECT blocks.* FROM blocks 
+    INNER JOIN state_hashes ON
+      (blocks.state_hash =  state_hashes.id AND state_hashes.value = state_hash_with_new_child AND blocks.status <= new_updated_confirmation_number)
+  UNION ALL
+  (
+    -- In this statement, we are determining if we would like to update the state_hash or not
+    -- [sub_result] -parent-> [hash] 
+    (SELECT blocks.* FROM blocks 
+      INNER JOIN sub_result ON (sub_result.parent_hash = blocks.state_hash AND 
+        blocks.status >= 0 AND -- Make sure that we are getting parent blocks that have the pending status
+        (sub_result.status + 1 = blocks.status)
+      )
+    ) 
+   )
+  )
+  SELECT * FROM sub_result
+$$ LANGUAGE sql STABLE;;
