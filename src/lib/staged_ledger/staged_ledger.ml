@@ -682,7 +682,7 @@ module T = struct
           (Int.to_float @@ Fee.to_int total_txn_fee) ;
         Gauge.set Scan_state_metrics.purchased_snark_work_per_block
           (Float.of_int @@ List.length work) ;
-        Gauge.set Scan_state_metrics.scan_state_snark_work_available
+        Gauge.set Scan_state_metrics.snark_work_required
           (Float.of_int
              (List.length (Scan_state.all_work_pairs_exn t.scan_state))) )
 

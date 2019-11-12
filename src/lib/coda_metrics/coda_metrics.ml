@@ -323,10 +323,6 @@ end
 module Transaction_pool = struct
   let subsystem = "Transaction_pool"
 end
-
-module Snark_pool = struct
-  let subsystem = "Snark_pool"
-end
 *)
 
 module Metric_map (Metric : sig
@@ -537,12 +533,12 @@ module Scan_state_metrics = struct
     let help = "# of snark work bundles purchased per block" in
     Gauge.v "purchased_snark_work_per_block" ~help ~namespace ~subsystem
 
-  let scan_state_snark_work_available : Gauge.t =
+  let snark_work_required : Gauge.t =
     let help =
       "# of snark work bundles in the scan state that are yet to be \
-       done/purchased after every block"
+       done/purchased"
     in
-    Gauge.v "scan_state_snark_work_available" ~help ~namespace ~subsystem
+    Gauge.v "snark_work_required" ~help ~namespace ~subsystem
 end
 
 module Trust_system = struct
