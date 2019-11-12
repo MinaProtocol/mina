@@ -240,7 +240,7 @@ let run profiler num_transactions repeats preeval =
 
 let main num_transactions repeats preeval () =
   Snarky.Libsnark.set_no_profiling false ;
-  Snarky.Libsnark.set_printing_json () ;
+  Snarky.Libsnark.set_printing_off () ;
   Test_util.with_randomness 123456789 (fun () ->
       let keys = Transaction_snark.Keys.create () in
       let module T = Transaction_snark.Make (struct
