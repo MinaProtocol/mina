@@ -120,6 +120,8 @@ let consensus_state = lift External_transition.Validated.consensus_state
 
 let blockchain_state = lift External_transition.Validated.blockchain_state
 
+let blockchain_length = lift External_transition.Validated.blockchain_state
+
 let proposer = lift External_transition.Validated.proposer
 
 let user_commands = lift External_transition.Validated.user_commands

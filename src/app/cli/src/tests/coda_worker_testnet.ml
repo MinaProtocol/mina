@@ -266,7 +266,11 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
                 , `List
                     ( Hash_set.to_list hashes_in_common
                     |> List.map ~f:State_hash.Stable.Latest.to_yojson ) )
-              ; ("chains", chains_json ()) ]
+              ; ("chains", chains_json ())
+              ; ( "root_lengths"
+                , `List
+                    ( List.map ~f:(fun l -> `Int l)
+                    @@ Array.to_list testnet.root_lengths ) ) ]
     | None ->
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
           "Empty list of online chains, OK if we're still starting the network"
@@ -403,7 +407,8 @@ let events workers start_reader =
               (let ms_to_catchup =
                  (Consensus.Constants.c + Consensus.Constants.delta)
                  * Consensus.Constants.block_window_duration_ms
-                 + 16_000
+                 + 60_000
+                 (* time for peer discovery *)
                  |> Float.of_int
                in
                let%map () = after (Time.Span.of_ms ms_to_catchup) in

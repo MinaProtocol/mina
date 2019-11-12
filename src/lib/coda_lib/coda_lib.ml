@@ -467,10 +467,18 @@ let root_diff t =
       (Buffered (`Capacity 30, `Overflow Crash))
   in
   trace_recurring_task "root diff pipe reader" (fun () ->
+      let open Root_diff.Stable.V1 in
+      let length_of_breadcrumb =
+        Fn.compose Unsigned.UInt32.to_int Breadcrumb.blockchain_length
+      in
       Broadcast_pipe.Reader.iter t.components.transition_frontier ~f:(function
         | None ->
             Deferred.unit
         | Some frontier ->
+            let root = Transition_frontier.root frontier in
+            Strict_pipe.Writer.write root_diff_writer
+              { user_commands= Transition_frontier.Breadcrumb.user_commands root
+              ; root_length= length_of_breadcrumb root } ;
             Broadcast_pipe.Reader.iter
               Transition_frontier.(
                 Extensions.(get_view_pipe (extensions frontier) Identity))
@@ -482,14 +490,16 @@ let root_diff t =
                       Deferred.unit
                   | Transition_frontier.Diff.Full.E.E
                       (Root_transitioned {new_root; _}) ->
-                      let open Root_diff.Stable.V1 in
+                      let new_root_breadcrumb =
+                        Transition_frontier.find_exn frontier new_root.hash
+                      in
                       Strict_pipe.Writer.write root_diff_writer
                         { user_commands=
                             Transition_frontier.Breadcrumb.user_commands
                               (Transition_frontier.find_exn frontier
                                  new_root.hash)
-                        ; root_length=
-                            Transition_frontier.root_length frontier + 1 } ;
+                        ; root_length= length_of_breadcrumb new_root_breadcrumb
+                        } ;
                       Deferred.unit )) ) ) ;
   root_diff_reader
 

@@ -31,7 +31,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
     ~initialization_finish_signal frontier =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Starting Transition Frontier Controller phase" ;
-  Ivar.fill_if_empty initialization_finish_signal () ;
+  initialization_finish_signal := true ;
   let ( transition_frontier_controller_reader
       , transition_frontier_controller_writer ) =
     create_bufferred_pipe ~name:"transition frontier controller pipe" ()
@@ -59,6 +59,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     ~initial_root_transition ~persistent_root ~persistent_frontier =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Starting Bootstrap Controller phase" ;
+  initialization_finish_signal := false ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
     create_bufferred_pipe ~name:"bootstrap controller pipe" ()
   in
@@ -85,9 +86,13 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
                        , `Int (List.length @@ Coda_networking.peers network) )
                      ; ( "Max seconds to wait for high connectivity"
                        , `Float connectivity_time_uppperbound ) ]
-                   ~location:__LOC__ ~module_:__MODULE__ ) ]
+                   ~location:__LOC__ ~module_:__MODULE__
+               else
+                 Logger.info logger ~location:__LOC__ ~module_:__MODULE__
+                   "Already connected to enough peers, start bootstrapping" )
+             ]
          in
-         Ivar.fill_if_empty initialization_finish_signal () ;
+         initialization_finish_signal := true ;
          Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
            ~consensus_local_state ~transition_reader:!transition_reader_ref
            ~persistent_frontier ~persistent_root ~initial_root_transition)
@@ -105,7 +110,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~network_transition_reader ~proposer_transition_reader
     ~most_recent_valid_block:( most_recent_valid_block_reader
                              , most_recent_valid_block_writer ) =
-  let initialization_finish_signal = Ivar.create () in
+  let initialization_finish_signal = ref false in
   let clear_reader, clear_writer =
     Strict_pipe.create ~name:"clear" Synchronous
   in

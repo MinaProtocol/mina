@@ -231,12 +231,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
      fun t peer dispatch query ->
       match setup_track_connection t peer.host with
       | `Banned ->
-          (* The peer set should never include banned peers, so this should never
-             be called with a banned peer. *)
-          Logger.fatal t.config.logger ~module_:__MODULE__ ~location:__LOC__
-            "Tried to connect to a banned peer in try_call_rpc. This should \
-             never happen." ;
-          Core.exit 121
+          (* This can happen when a peer is banned after it's selected to be
+             called but before this function runs. It should be rare and benign.
+          *)
+          Deferred.Or_error.errorf
+            "Tried to connect to a banned peer %s in try_call_rpc, but it's \
+             banned"
+            (Peer.to_string peer)
       | `At_max_connections ->
           (* We could also block here until we're under the limit, but it's better
            if progress is quick and retries happen in the caller. *)

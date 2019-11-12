@@ -13,6 +13,8 @@ module type External_transition_common_intf = sig
 
   val blockchain_state : t -> Blockchain_state.Value.t
 
+  val blockchain_length : t -> Unsigned.UInt32.t
+
   val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
   val staged_ledger_diff : t -> Staged_ledger_diff.t
