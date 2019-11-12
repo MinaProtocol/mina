@@ -28,12 +28,7 @@ let%test_module "Processor" =
     let try_with ~f =
       Deferred.Or_error.ok_exn
       @@ let%bind result =
-           let open Deferred.Or_error.Let_syntax in
-           let%bind t =
-             Deferred.Result.map_error
-               ~f:Graphql_client_lib.Connection_error.to_error
-             @@ Processor.create port
-           in
+           let t = Processor.create port in
            Monitor.try_with_or_error ~name:"Write Processor" (fun () -> f t)
          in
          let%map clear_action =

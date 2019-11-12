@@ -26,7 +26,7 @@ module Update_block_confirmations =
   }
 |}]
 
-module Update_batch_block_confirmations = 
+module Update_batch_block_confirmations =
 [%graphql
 {|
   mutation update($objects: [blocks_insert_input!]!) {
