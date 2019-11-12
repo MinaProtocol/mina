@@ -1,0 +1,5 @@
+(library
+  (name tests)
+  (libraries transition_frontier)
+  (inline_tests)
+  (preprocess (pps ppx_jane ppx_coda)))
