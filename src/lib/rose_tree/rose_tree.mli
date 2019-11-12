@@ -10,6 +10,8 @@ open Async_kernel
 
 type 'a t = T of 'a * 'a t list [@@deriving yojson]
 
+val print : ?whitespace:int -> element_to_string:('a -> string) -> 'a t -> unit
+
 val of_list_exn : ?subtrees:'a t list -> 'a list -> 'a t
 
 val of_non_empty_list : ?subtrees:'a t list -> 'a Non_empty_list.t -> 'a t

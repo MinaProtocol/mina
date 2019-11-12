@@ -71,9 +71,9 @@ let of_transaction : Transaction.t -> t = function
         ; signature= Signature.dummy }
       in
       match tr with
-      | One (pk, fee) ->
+      | `One (pk, fee) ->
           two (pk, fee) (pk, Fee.zero)
-      | Two (t1, t2) ->
+      | `Two (t1, t2) ->
           two t1 t2 )
 
 let excess (t : t) = Transaction_union_payload.excess t.payload
