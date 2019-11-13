@@ -66,6 +66,11 @@ let fee = Fn.compose Payload.fee payload
 
 let nonce = Fn.compose Payload.nonce payload
 
+(* for filtering *)
+let minimum_fee = Fee.of_int 2
+
+let is_trivial t = Fee.(fee t < minimum_fee)
+
 let sender t = Public_key.compress Poly.(t.sender)
 
 let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
