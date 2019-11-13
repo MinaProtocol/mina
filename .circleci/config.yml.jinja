@@ -166,14 +166,14 @@ jobs:
                     sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
                     df -h
             # Attach workspace from prior linux build
-            - attach_workspace:
+            {# - attach_workspace:
                 at: /tmp/workspace
             - run:
                 name: Unpack Workspace PV Keys
                 command: |
                     sudo mkdir -p /var/lib/coda
                     sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
-                    sudo rm /tmp/workspace/coda*.bz2
+                    sudo rm /tmp/workspace/coda*.bz2 #}
             - checkout
             - run:
                   name: Update submodules
@@ -354,9 +354,9 @@ jobs:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             {%- if profile in medium_curve_profiles %}
-            - persist_to_workspace:
+            {# - persist_to_workspace:
                 root: /tmp/artifacts
-                paths: coda_pvkeys*
+                paths: coda_pvkeys* #}
             - store_artifacts:
                   path: /tmp/artifacts
             {%- endif %}
