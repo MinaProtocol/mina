@@ -280,11 +280,9 @@ module T = struct
                | Some res ->
                    res )) )
 
-  let working_stack pending_coinbase_collection ~is_new_stack
-      ~update_state_hash =
+  let working_stack pending_coinbase_collection ~is_new_stack =
     to_staged_ledger_or_error
-      (Pending_coinbase.latest_stack pending_coinbase_collection ~is_new_stack
-         ~update_state_hash)
+      (Pending_coinbase.latest_stack pending_coinbase_collection ~is_new_stack)
 
   let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
     match t with
@@ -450,80 +448,69 @@ module T = struct
     let {Scan_state.Space_partition.first= slots, _; second} =
       Scan_state.partition_if_overflowing scan_state
     in
-    match second with
-    | None ->
-        (*Single partition:
+    if List.length transactions > 0 then
+      match second with
+      | None ->
+          (*Single partition:
          1.Check if a new stack is required and get a working stack [working_stack]
          2.create data for enqueuing onto the scan state *)
-        let is_new_stack = Scan_state.next_on_new_tree scan_state in
-        let update_state_hash = coinbase_exists transactions in
-        let%bind working_stack =
-          working_stack pending_coinbase_collection ~is_new_stack
-            ~update_state_hash
-          |> Deferred.return
-        in
-        let%map data, updated_stack =
-          update_ledger_and_get_statements ledger working_stack transactions
-        in
-        Core.printf
-          !"Updated stack no partition: %{sexp: Pending_coinbase.Stack.t}\n%!"
-          updated_stack ;
-        (is_new_stack, data, `Update_one updated_stack)
-    | Some _ ->
-        (*Two partition:
+          let is_new_stack = Scan_state.next_on_new_tree scan_state in
+          let%bind working_stack =
+            working_stack pending_coinbase_collection ~is_new_stack
+            |> Deferred.return
+          in
+          let%map data, updated_stack =
+            update_ledger_and_get_statements ledger working_stack transactions
+          in
+          (is_new_stack, data, `Update_one updated_stack)
+      | Some _ ->
+          (*Two partition:
         Assumption: Only one of the partition will have coinbase transaction(s)in it.
         1. Get the latest stack for coinbase in the first set of transactions
         2. get the first set of scan_state data[data1]
         3. get a new stack for the second parition because the second set of transactions would start from the begining of the scan_state
         4. get the second set of scan_state data[data2]*)
-        let txns_for_partition1 = List.take transactions slots in
-        let coinbase_in_first_partition =
-          coinbase_exists txns_for_partition1
-        in
-        let%bind working_stack1 =
-          working_stack pending_coinbase_collection ~is_new_stack:false
-            ~update_state_hash:coinbase_in_first_partition
-          |> Deferred.return
-        in
-        Core.printf
-          !"working stack1 %{sexp:Pending_coinbase.Stack.t}\n%!"
-          working_stack1 ;
-        let%bind data1, updated_stack1 =
-          update_ledger_and_get_statements ledger working_stack1
-            txns_for_partition1
-        in
-        let txns_for_partition2 = List.drop transactions slots in
-        let coinbase_in_second_partition =
-          coinbase_exists txns_for_partition2
-        in
-        let%bind working_stack2 =
-          working_stack pending_coinbase_collection ~is_new_stack:true
-            ~update_state_hash:coinbase_in_second_partition
-          |> Deferred.return
-        in
-        let%map data2, updated_stack2 =
-          update_ledger_and_get_statements ledger working_stack2
-            txns_for_partition2
-        in
-        let second_has_data = List.length (List.drop transactions slots) > 0 in
-        let new_stack_in_snark, stack_update =
-          match (coinbase_in_first_partition, second_has_data) with
-          | true, true ->
-              Core.printf !"updating two\n%!" ;
-              (false, `Update_two (updated_stack1, updated_stack2))
-          (*updated_stack2 will not have any coinbase and therefore we don't want to create a new stack in snark. updated_stack2 is only used to update the pending_coinbase_aux because there's going to be data(second has data) on a "new tree" and we don't want to keep creating new stacks or override existing stack in the case when a tree has no coinbase at all*)
-          | true, false ->
-              (*updated_stack1 has some new coinbase*)
-              Core.printf !"updating first one\n%!" ;
-              (false, `Update_one updated_stack1)
-          | false, true ->
-              Core.printf !"adding the second one\n%!" ;
-              (true, `Update_one updated_stack2)
-          (*updated_stack1 would not have new coinbases. [updated stack2] might have and so add it*)
-          | false, false ->
-              (false, `Update_none)
-        in
-        (new_stack_in_snark, data1 @ data2, stack_update)
+          let txns_for_partition1 = List.take transactions slots in
+          let coinbase_in_first_partition =
+            coinbase_exists txns_for_partition1
+          in
+          let%bind working_stack1 =
+            working_stack pending_coinbase_collection ~is_new_stack:false
+            |> Deferred.return
+          in
+          let%bind data1, updated_stack1 =
+            update_ledger_and_get_statements ledger working_stack1
+              txns_for_partition1
+          in
+          let txns_for_partition2 = List.drop transactions slots in
+          let%bind working_stack2 =
+            working_stack pending_coinbase_collection ~is_new_stack:true
+            |> Deferred.return
+          in
+          let%map data2, updated_stack2 =
+            update_ledger_and_get_statements ledger working_stack2
+              txns_for_partition2
+          in
+          let second_has_data =
+            List.length (List.drop transactions slots) > 0
+          in
+          let new_stack_in_snark, stack_update =
+            match (coinbase_in_first_partition, second_has_data) with
+            | true, true ->
+                Core.printf !"updating two\n%!" ;
+                (false, `Update_two (updated_stack1, updated_stack2))
+            (*updated_stack2 will not have any coinbase and therefore we don't want to create a new stack in snark. updated_stack2 is only used to update the pending_coinbase_aux because there's going to be data on a "new tree" and we don't want to keep creating new stacks or override existing stacks in the case when a tree has no coinbase at all*)
+            | true, false ->
+                (*updated_stack1 has some new coinbase but parition 2 has no data and so we don't have to update pending_coinbase_aux just yet*)
+                (false, `Update_one updated_stack1)
+            | false, true ->
+                (*updated_stack1 does not have new coinbases and so don't update it. [updated stack2] might have (definitely has some data) and so add it*)
+                (true, `Update_one updated_stack2)
+            | false, false ->
+                (false, `Update_none)
+          in
+          (new_stack_in_snark, data1 @ data2, stack_update)
+    else Deferred.return (Ok (false, [], `Update_none))
 
   (*update the pending_coinbase tree with the updated/new stack and delete the oldest stack if a proof was emitted*)
   let update_pending_coinbase_collection pending_coinbase_collection

@@ -136,7 +136,7 @@ module type S = sig
 
     val equal_state_hash : t -> t -> bool
 
-    val push : ?init_state_hash:State_hash.t -> t -> Coinbase.t -> t
+    val push : t -> Coinbase.t -> t
 
     module Checked : sig
       type t = var
@@ -162,9 +162,8 @@ module type S = sig
   (** Update the current working stack or if [is_new_stack] add as the new working stack*)
   val update_coinbase_stack : t -> Stack.t -> is_new_stack:bool -> t Or_error.t
 
-  (** Stack that is currently being updated. if [is_new_stack] then a new stack is returned updated with previous protocol state hash if [update_state_hash] is true*)
-  val latest_stack :
-    t -> is_new_stack:bool -> update_state_hash:bool -> Stack.t Or_error.t
+  (** Stack that is currently being updated. if [is_new_stack] then a new stack is returned*)
+  val latest_stack : t -> is_new_stack:bool -> Stack.t Or_error.t
 
   (** The stack that corresponds to the next ledger proof that is to be generated*)
   val oldest_stack : t -> Stack.t Or_error.t
