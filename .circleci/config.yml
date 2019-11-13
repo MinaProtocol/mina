@@ -292,6 +292,14 @@ jobs:
         steps:
             - checkout
             - run:
+                  name: Install Docker client
+                  command: |
+                      set -x
+                      VER="19.03.4"
+                      curl -L -o /tmp/docker-$VER.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$VER.tgz
+                      tar -xz -C /tmp -f /tmp/docker-$VER.tgz
+                      mv /tmp/docker/* /usr/bin
+            - run:
                   name: Artifacts
                   command: |
                       mkdir -p /tmp/artifacts
@@ -329,6 +337,22 @@ jobs:
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+            - setup_remote_docker
+            - run: 
+                  name: Build and Upload Docker 
+                  command: |
+                    source /tmp/DOCKER_DEPLOY_ENV
+                    echo "Publishing Docker"
+                    echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
+                    set -x
+                    if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
+                        
+                        echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+                        ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
+                        -s coda-daemon \
+                        -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GITHASH \
+                        --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                    fi
             - persist_to_workspace:
                 root: /tmp/artifacts
                 paths: coda_pvkeys*
