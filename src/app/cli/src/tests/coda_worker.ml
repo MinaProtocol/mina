@@ -12,7 +12,7 @@ module Input = struct
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
     ; proposer: int option
-    ; work_selection_method: Cli_lib.Arg_type.work_selection_method
+    ; work_selection_method: Cli_lib.Arg_type.Work_selection_method.Stable.V1.t
     ; conf_dir: string
     ; trace_dir: string option
     ; program_dir: string

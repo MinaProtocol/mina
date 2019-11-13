@@ -74,26 +74,6 @@ open Ppxlib
 
 let deriver = "version"
 
-let validate_module_version module_version loc =
-  let len = String.length module_version in
-  if not (Char.equal module_version.[0] 'V' && len > 1) then
-    Location.raise_errorf ~loc
-      "Versioning module containing versioned type must be named Vn, for some \
-       number n"
-  else
-    let numeric_part = String.sub module_version ~pos:1 ~len:(len - 1) in
-    String.iter numeric_part ~f:(fun c ->
-        if not (Char.is_digit c) then
-          Location.raise_errorf ~loc
-            "Versioning module name must be Vn, for some number n, got: \"%s\""
-            module_version ) ;
-    (* invariant: 0th char is digit *)
-    if Int.equal (Char.get_digit_exn numeric_part.[0]) 0 then
-      Location.raise_errorf ~loc
-        "Versioning module name must be Vn, for a number n, which cannot \
-         begin with 0, got: \"%s\""
-        module_version
-
 [%%if
 print_versioned_types]
 
@@ -183,6 +163,8 @@ let () =
       (create deriver ~type_decl_str:print_type () ~type_decl_sig:gen_empty_sig))
 
 [%%else]
+
+open Versioned_util
 
 type generation_kind = Plain | Wrapped | Rpc
 
@@ -288,10 +270,7 @@ let generate_version_number_decl inner3_modules loc generation_kind =
     | Rpc ->
         module_name_from_rpc_path inner3_modules
   in
-  let version =
-    String.sub module_name ~pos:1 ~len:(String.length module_name - 1)
-    |> int_of_string
-  in
+  let version = version_of_versioned_module_name module_name in
   [%str
     let version = [%e eint version]
 
