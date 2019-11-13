@@ -477,10 +477,7 @@ workflows:
             - tracetool
             - build-wallet
             - build-archive
-            - build-macos:
-                # only run AFTER linux build
-                requires:
-                    - build-artifacts--testnet_postake_medium_curves
+            - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}

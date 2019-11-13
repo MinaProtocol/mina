@@ -712,10 +712,7 @@ workflows:
             - tracetool
             - build-wallet
             - build-archive
-            - build-macos:
-                # only run AFTER linux build
-                requires:
-                    - build-artifacts--testnet_postake_medium_curves
+            - build-macos
             - build-artifacts--testnet_postake_medium_curves
             - test-unit--test_postake_snarkless_unittest
             - test-unit--dev
