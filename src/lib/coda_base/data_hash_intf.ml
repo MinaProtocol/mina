@@ -5,8 +5,7 @@ open Tuple_lib
 open Fold_lib
 
 module type Basic = sig
-  type t = private Pedersen.Digest.t
-  [@@deriving sexp, eq, compare, hash, yojson]
+  type t = private Pedersen.Digest.t [@@deriving sexp, compare, hash, yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -15,8 +14,6 @@ module type Basic = sig
   val to_bytes : t -> string
 
   val length_in_triples : int
-
-  val ( = ) : t -> t -> bool
 
   module Stable : sig
     module V1 : sig
@@ -52,6 +49,8 @@ module type Basic = sig
   include Bits_intf.S with type t := t
 
   include Hashable with type t := t
+
+  include Comparable with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 end
