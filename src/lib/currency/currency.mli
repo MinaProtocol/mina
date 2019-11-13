@@ -95,14 +95,13 @@ module type Checked_arithmetic_intf = sig
 end
 
 module Signed : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type ('magnitude, 'sgn) t = {magnitude: 'magnitude; sgn: 'sgn}
-      [@@deriving sexp, hash, compare, eq, yojson, bin_io, version]
+      [@@deriving sexp, hash, compare, eq, yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('magnitude, 'sgn) t = ('magnitude, 'sgn) Stable.Latest.t =
     {magnitude: 'magnitude; sgn: 'sgn}
@@ -168,13 +167,12 @@ module type Signed_intf = sig
 end
 
 module Fee : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, compare, hash, yojson, eq, version]
+      type t [@@deriving sexp, compare, hash, yojson, eq]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include Basic with type t = Stable.Latest.t
 
@@ -198,13 +196,12 @@ module Fee : sig
 end
 
 module Amount : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, compare, hash, eq, yojson, version]
+      type t [@@deriving sexp, compare, hash, eq, yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include Basic with type t = Stable.Latest.t
 
@@ -241,13 +238,12 @@ module Amount : sig
 end
 
 module Balance : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, compare, hash, yojson, eq, version]
+      type t [@@deriving sexp, compare, hash, yojson, eq]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include Basic with type t = Stable.Latest.t
 

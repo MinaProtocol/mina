@@ -792,7 +792,22 @@ let create (config : Config.t)
                   ; ( "sender"
                     , Envelope.(Sender.to_yojson (Incoming.sender envelope)) )
                   ] ;
-            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff)) )
+            let diff' =
+              List.filter diff ~f:(fun cmd ->
+                  if User_command.is_trivial cmd then (
+                    Logger.debug config.logger ~module_:__MODULE__
+                      ~location:__LOC__
+                      "Filtering trivial user command in transaction-pool \
+                       diff $cmd from $sender"
+                      ~metadata:
+                        [ ("cmd", User_command.to_yojson cmd)
+                        ; ( "sender"
+                          , Envelope.(
+                              Sender.to_yojson (Incoming.sender envelope)) ) ] ;
+                    false )
+                  else true )
+            in
+            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff')) )
   in
   { gossip_net
   ; logger= config.logger

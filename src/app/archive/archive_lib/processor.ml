@@ -11,7 +11,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
 
   module Client = Graphql_client_lib.Make (Config)
 
-  let added_transactions {port} added =
+  let added_transactions {port; _} added =
     let open Deferred.Result.Let_syntax in
     let user_commands_with_times = Map.to_alist added in
     let user_commands_with_hashes_and_times =
@@ -137,8 +137,47 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         , Option.value_map first_seen_in_db ~default:(Some default_block_time)
             ~f:Option.some ) )
 
-  let added_transition {port}
-      ({With_hash.data= block; _} as block_with_hash :
+  let update_block_confirmations t (parent_state_hash : State_hash.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind corrected_block_confirmations =
+      let graphql =
+        Graphql_query.Blocks.Get_stale_block_confirmations.make
+          ~parent_hash:(State_hash.to_base58_check parent_state_hash)
+          ()
+      in
+      let%map state_block_confirmations =
+        Client.query graphql t.port
+        >>| fun response -> response#get_stale_block_confirmations
+      in
+      Array.to_list state_block_confirmations
+      |> List.map ~f:(fun stale_block ->
+             ((stale_block#state_hash)#value, stale_block#status + 1) )
+    in
+    let results =
+      (* TODO: This code writes Hasura functions in a sequential manner. Hasura
+         currently cannot express atomic batch row updates. We would need to
+         write a SQL query in order to do this. *)
+      List.map corrected_block_confirmations
+        ~f:(fun (hash, new_block_confirmation) ->
+          let hash = State_hash.to_base58_check hash in
+          let graphql =
+            Graphql_query.Blocks.Update_block_confirmations.make ~hash
+              ~status:new_block_confirmation ()
+          in
+          Client.query graphql t.port )
+    in
+    Deferred.Result.all results |> Deferred.Result.ignore
+
+  let update_new_block t encoded_block =
+    let graphql =
+      Graphql_query.Blocks.Insert.make
+        ~blocks:(Array.of_list [encoded_block])
+        ()
+    in
+    Client.query graphql t.port |> Deferred.Result.ignore
+
+  let added_transition t
+      ({With_hash.data= block; hash= _} as block_with_hash :
         (External_transition.t, State_hash.t) With_hash.t)
       (sender_receipt_chains_from_parent_ledger :
         Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
@@ -175,14 +214,14 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         ~get_first_seen:(fun hashes ->
           Graphql_query.User_commands.Query_first_seen.make ~hashes () )
         ~get_obj:(fun result -> result#user_commands)
-        user_commands block_time port
+        user_commands block_time t.port
     in
     let%bind fee_transfers_with_time =
       tag_with_first_seen
         ~get_first_seen:(fun hashes ->
           Graphql_query.Fee_transfers.Query_first_seen.make ~hashes () )
         ~get_obj:(fun result -> result#fee_transfers)
-        fee_transfers block_time port
+        fee_transfers block_time t.port
     in
     let encoded_block =
       Types.Blocks.serialize block_with_hash
@@ -190,13 +229,10 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
            sender_receipt_chains_from_parent_ledger)
         fee_transfers_with_time
     in
-    let graphql =
-      Graphql_query.Blocks.Insert.make
-        ~blocks:(Array.of_list [encoded_block])
-        ()
+    let%bind () =
+      update_block_confirmations t (External_transition.parent_hash block)
     in
-    let%bind _ = Client.query graphql port in
-    Deferred.Result.return ()
+    update_new_block t encoded_block
 
   let create port = {port}
 
