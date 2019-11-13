@@ -7,9 +7,9 @@ open Signature_lib
 
 let%test_module "Processor" =
   ( module struct
-    module Stubs = Transition_frontier_controller_tests.Stubs.Make (struct
-      let max_length = 4
-    end)
+    let () =
+      Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true
 
     module Processor = Processor.Make (struct
       let address = "v1/graphql"
@@ -70,13 +70,9 @@ let%test_module "Processor" =
         ~equal:Int.equal ~expect:index1 index2 ;
       index1
 
-    let validated_merge (map1 : int Public_key.Compressed.Map.t)
-        (map2 : int Public_key.Compressed.Map.t) =
-      Map.merge map1 map2 ~f:(fun ~key:_ -> function
-        | `Both (index1, index2) ->
-            Some (assert_same_index_reference index1 index2)
-        | `Left index | `Right index ->
-            Some index )
+    let validated_merge =
+      Map.merge_skewed ~combine:(fun ~key:_ index1 index2 ->
+          assert_same_index_reference index1 index2 )
 
     let query_participants (t : Processor.t) hashes =
       let%map response =
@@ -125,7 +121,6 @@ let%test_module "Processor" =
 
     let%test_unit "Process multiple user commands from Transaction_pool diff \
                    (including a duplicate)" =
-      Backtrace.elide := false ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
       try_with ~f:(fun t ->
@@ -231,12 +226,6 @@ let%test_module "Processor" =
               in
               Deferred.unit ) )
 
-    open Stubs
-
-    let pids = Pid.Table.create ()
-
-    let trust_system = Trust_system.null ()
-
     let create_added_breadcrumb_diff breadcrumb =
       let ((block, _) as validated_block) =
         Transition_frontier.Breadcrumb.validated_transition breadcrumb
@@ -267,110 +256,101 @@ let%test_module "Processor" =
       Diff.Transition_frontier.Breadcrumb_added
         {block; sender_receipt_chains_from_parent_ledger}
 
-    (* TODO: make other tests that queries components of a block by testing other queries, such prove_receipt_chain and block pagination *)
+    (* TODO: make other tests that queries components of a block by testing
+       other queries, such prove_receipt_chain and block pagination *)
     let%test_unit "Write a external transition diff successfully" =
-      Thread_safe.block_on_async_exn
-      @@ fun () ->
-      let%bind frontier =
-        Stubs.create_root_frontier ~logger ~pids Genesis_ledger.accounts
-      in
-      let root_breadcrumb = Transition_frontier.root frontier in
-      let%bind () =
-        Stubs.add_linear_breadcrumbs ~logger ~pids ~trust_system ~size:1
-          ~accounts_with_secret_keys:Genesis_ledger.accounts ~frontier
-          ~parent:root_breadcrumb
-      in
-      let successors =
-        Transition_frontier.successors_rec frontier root_breadcrumb
-      in
-      try_with ~f:(fun t ->
-          let reader, writer =
-            Strict_pipe.create ~name:"archive"
-              (Buffered (`Capacity 10, `Overflow Crash))
+      Quickcheck.test ~trials:2
+        (Transition_frontier.For_tests.gen ~logger ~max_length:4 ~size:1 ())
+        ~f:(fun frontier ->
+          let root_breadcrumb = Transition_frontier.root frontier in
+          let successors =
+            Transition_frontier.successors_rec frontier root_breadcrumb
           in
-          let processing_deferred_job = Processor.run t reader in
-          let diffs =
-            List.map
-              ~f:(fun breadcrumb ->
-                Diff.Transition_frontier
-                  (create_added_breadcrumb_diff breadcrumb) )
-              (root_breadcrumb :: successors)
-          in
-          List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
-          Strict_pipe.Writer.close writer ;
-          processing_deferred_job )
+          Thread_safe.block_on_async_exn (fun () ->
+              try_with ~f:(fun t ->
+                  let reader, writer =
+                    Strict_pipe.create ~name:"archive"
+                      (Buffered (`Capacity 10, `Overflow Crash))
+                  in
+                  let processing_deferred_job = Processor.run t reader in
+                  let diffs =
+                    List.map
+                      ~f:(fun breadcrumb ->
+                        Diff.Transition_frontier
+                          (create_added_breadcrumb_diff breadcrumb) )
+                      (root_breadcrumb :: successors)
+                  in
+                  List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
+                  Strict_pipe.Writer.close writer ;
+                  processing_deferred_job ) ) )
 
-    let create_expected_num_confirmations_map frontier breadcrumb =
-      Transition_frontier.(Breadcrumb.state_hash @@ root frontier)
-      :: Transition_frontier.hash_path frontier breadcrumb
-      |> List.rev
-      |> List.mapi ~f:(fun i state_hash -> (state_hash, i))
-      |> State_hash.Map.of_alist_exn
+    let create_expected_num_confirmations_map frontier =
+      let rec go breadcrumb : int * int State_hash.Map.t =
+        let successors = Transition_frontier.successors frontier breadcrumb in
+        let successors_block_confirmations, block_confirmation_maps =
+          List.map successors ~f:go |> List.unzip
+        in
+        let max_successor_block_confirmation =
+          List.max_elt successors_block_confirmations ~compare:Int.compare
+          |> Option.value ~default:(-1)
+        in
+        let successors_block_confirmations =
+          List.fold block_confirmation_maps ~init:State_hash.Map.empty
+            ~f:
+              (Map.merge_skewed ~combine:(fun ~key:_ ->
+                   failwith
+                     "Create_expected_num_confirmations_map: forks of \
+                      breadcrumbs should have disjoint state_hashes" ))
+        in
+        let block_confirmation = max_successor_block_confirmation + 1 in
+        ( block_confirmation
+        , Map.set successors_block_confirmations
+            ~key:(Transition_frontier.Breadcrumb.state_hash breadcrumb)
+            ~data:block_confirmation )
+      in
+      snd @@ go (Transition_frontier.root frontier)
 
     let%test_unit "Can get the block confirmations for all the blocks" =
-      Thread_safe.block_on_async_exn
-      @@ fun () ->
-      let%bind frontier =
-        Stubs.create_root_frontier ~logger ~pids Genesis_ledger.accounts
-      in
-      let root_breadcrumb = Transition_frontier.root frontier in
-      let%bind () =
-        Stubs.add_linear_breadcrumbs ~logger ~pids ~trust_system ~size:1
-          ~accounts_with_secret_keys:Genesis_ledger.accounts ~frontier
-          ~parent:root_breadcrumb
-      in
-      let expected_num_confirmation_from_fork =
-        create_expected_num_confirmations_map frontier
-          (Transition_frontier.best_tip frontier)
-      in
-      let%bind () =
-        Stubs.add_linear_breadcrumbs ~logger ~pids ~trust_system ~size:3
-          ~accounts_with_secret_keys:Genesis_ledger.accounts ~frontier
-          ~parent:root_breadcrumb
-      in
-      let expected_num_confirmation_from_best_tip =
-        create_expected_num_confirmations_map frontier
-          (Transition_frontier.best_tip frontier)
-      in
-      let expected_num_confirmations =
-        Map.merge expected_num_confirmation_from_fork
-          expected_num_confirmation_from_best_tip ~f:(fun ~key:_ -> function
-          | `Left num_confirmations ->
-              Some num_confirmations
-          | `Right num_confirmations ->
-              Some num_confirmations
-          | `Both (left_num_confirmations, right_num_confirmations) ->
-              Some (max left_num_confirmations right_num_confirmations) )
-      in
-      let successors =
-        Transition_frontier.successors_rec frontier root_breadcrumb
-      in
-      try_with ~f:(fun t ->
-          let reader, writer =
-            Strict_pipe.create ~name:"archive"
-              (Buffered (`Capacity 10, `Overflow Crash))
+      Quickcheck.test ~trials:2
+        (Transition_frontier.For_tests.gen ~logger ~max_length:4 ~size:3 ())
+        ~f:(fun frontier ->
+          let expected_num_confirmations =
+            create_expected_num_confirmations_map frontier
           in
-          let processing_deferred_job = Processor.run t reader in
-          let diffs =
-            List.map
-              ~f:(fun breadcrumb ->
-                Diff.Transition_frontier
-                  (create_added_breadcrumb_diff breadcrumb) )
-              (root_breadcrumb :: successors)
+          let root_breadcrumb = Transition_frontier.root frontier in
+          let successors =
+            Transition_frontier.successors_rec frontier root_breadcrumb
           in
-          List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
-          Strict_pipe.Writer.close writer ;
-          let%bind () = processing_deferred_job in
-          let graphql = Graphql_query.Blocks.Get_all_pending_blocks.make () in
-          let%map response =
-            Processor.Client.query_exn graphql t.port
-            >>| (fun obj -> obj#blocks)
-            >>| Array.map ~f:(fun block ->
-                    ((block#state_hash)#value, block#status) )
-            >>| Array.to_list >>| State_hash.Map.of_alist_exn
-          in
-          [%test_eq: int State_hash.Map.t]
-            ~equal:(State_hash.Map.equal Int.equal)
-            ~message:"Block confirmations are not equal"
-            expected_num_confirmations response )
+          Async.Thread_safe.block_on_async_exn
+          @@ fun () ->
+          try_with ~f:(fun t ->
+              let reader, writer =
+                Strict_pipe.create ~name:"archive"
+                  (Buffered (`Capacity 10, `Overflow Crash))
+              in
+              let processing_deferred_job = Processor.run t reader in
+              let diffs =
+                List.map
+                  ~f:(fun breadcrumb ->
+                    Diff.Transition_frontier
+                      (create_added_breadcrumb_diff breadcrumb) )
+                  (root_breadcrumb :: successors)
+              in
+              List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
+              Strict_pipe.Writer.close writer ;
+              let%bind () = processing_deferred_job in
+              let graphql =
+                Graphql_query.Blocks.Get_all_pending_blocks.make ()
+              in
+              let%map response =
+                Processor.Client.query_exn graphql t.port
+                >>| (fun obj -> obj#blocks)
+                >>| Array.map ~f:(fun block ->
+                        ((block#state_hash)#value, block#status) )
+                >>| Array.to_list >>| State_hash.Map.of_alist_exn
+              in
+              [%test_eq: int State_hash.Map.t]
+                ~equal:(State_hash.Map.equal Int.equal)
+                ~message:"Block confirmations are not equal"
+                expected_num_confirmations response ) )
   end )

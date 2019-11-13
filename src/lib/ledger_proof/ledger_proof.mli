@@ -20,6 +20,12 @@ include S with type t = Debug.t
 
 [%%endif]
 
+type _ type_witness =
+  | Debug : Debug.t type_witness
+  | Prod : Prod.t type_witness
+
+type with_witness = With_witness : 't * 't type_witness -> with_witness
+
 module For_tests : sig
   val mk_dummy_proof : Transaction_snark.Statement.t -> t
 end
