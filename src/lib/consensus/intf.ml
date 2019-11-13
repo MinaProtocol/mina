@@ -2,8 +2,6 @@ open Core_kernel
 open Coda_numbers
 open Async
 open Currency
-open Fold_lib
-open Tuple_lib
 open Signature_lib
 open Coda_base
 
@@ -181,6 +179,7 @@ module type Snark_transition_intf = sig
          , 'consensus_transition
          , 'sok_digest
          , 'amount
+         , 'state_body_hash
          , 'public_key )
          t
     [@@deriving sexp]
@@ -195,11 +194,12 @@ module type Snark_transition_intf = sig
     , consensus_transition_var
     , Sok_message.Digest.Checked.t
     , Amount.var
+    , State_body_hash.var
     , Public_key.Compressed.var )
     Poly.t
 
   val consensus_transition :
-    (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
+    (_, 'consensus_transition, _, _, _, _) Poly.t -> 'consensus_transition
 end
 
 module type State_hooks_intf = sig
@@ -261,6 +261,28 @@ module type State_hooks_intf = sig
   end
 end
 
+module type Epoch_data_intf = sig
+  type ledger
+
+  type seed
+
+  type lock_checkpoint
+
+  module Value : sig
+    type t
+  end
+
+  val ledger : Value.t -> ledger
+
+  val seed : Value.t -> seed
+
+  val start_checkpoint : Value.t -> State_hash.t
+
+  val lock_checkpoint : Value.t -> lock_checkpoint
+
+  val epoch_length : Value.t -> Length.t
+end
+
 module type S = sig
   val name : string
 
@@ -292,6 +314,12 @@ module type S = sig
   end
 
   module Data : sig
+    module Epoch_seed : sig
+      type t
+
+      val to_base58_check : t -> string
+    end
+
     module Local_state : sig
       type t [@@deriving sexp, to_yojson]
 
@@ -306,6 +334,57 @@ module type S = sig
         -> Signature_lib.Public_key.Compressed.Set.t
         -> Coda_base.Block_time.t
         -> unit
+    end
+
+    module Vrf : sig
+      module Output : sig
+        module Truncated : sig
+          module Stable : sig
+            module V1 : sig
+              type t
+            end
+
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t
+
+          val to_base58_check : t -> string
+        end
+      end
+    end
+
+    module Epoch_ledger : sig
+      module Value : sig
+        type t
+
+        module Stable :
+          sig
+            module V1 : sig
+              type t
+              [@@deriving hash, eq, compare, bin_io, sexp, to_yojson, version]
+            end
+          end
+          with type V1.t = t
+      end
+
+      val hash : Value.t -> Frozen_ledger_hash.t
+
+      val total_currency : Value.t -> Currency.Amount.t
+    end
+
+    module Epoch_data : sig
+      module Staking :
+        Epoch_data_intf
+        with type ledger := Epoch_ledger.Value.t
+         and type seed := Epoch_seed.t
+         and type lock_checkpoint := State_hash.t
+
+      module Next :
+        Epoch_data_intf
+        with type ledger := Epoch_ledger.Value.t
+         and type seed := Epoch_seed.t
+         and type lock_checkpoint := State_hash.t option
     end
 
     module Prover_state : sig
@@ -345,6 +424,18 @@ module type S = sig
       val genesis : Value.t
     end
 
+    module Checkpoints : sig
+      type t
+
+      module Hash : sig
+        type t
+
+        val to_base58_check : t -> string
+      end
+
+      val hash : t -> Hash.t
+    end
+
     module Consensus_state : sig
       module Value : sig
         (* bin_io omitted *)
@@ -376,15 +467,12 @@ module type S = sig
 
       val length_in_triples : int
 
-      val var_to_triples :
-           var
-        -> ( Snark_params.Tick.Boolean.var Triple.t list
-           , _ )
-           Snark_params.Tick.Checked.t
+      open Snark_params.Tick
 
-      val fold : Value.t -> bool Triple.t Fold.t
+      val var_to_input :
+        var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
 
-      val blockchain_length : Value.t -> Length.t
+      val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
       val time_hum : Value.t -> string
 
@@ -393,6 +481,26 @@ module type S = sig
       val display : Value.t -> display
 
       val network_delay : Configuration.t -> int
+
+      val global_slot : Value.t -> Unsigned.uint32
+
+      val blockchain_length : Value.t -> Length.t
+
+      val epoch_count : Value.t -> Length.t
+
+      val min_epoch_length : Value.t -> Length.t
+
+      val last_vrf_output : Value.t -> Vrf.Output.Truncated.t
+
+      val total_currency : Value.t -> Amount.t
+
+      val staking_epoch_data : Value.t -> Epoch_data.Staking.Value.t
+
+      val next_epoch_data : Value.t -> Epoch_data.Next.Value.t
+
+      val has_ancestor_in_same_checkpoint_window : Value.t -> bool
+
+      val checkpoints : Value.t -> Checkpoints.t
 
       val curr_epoch : Value.t -> Epoch.t
 
@@ -410,10 +518,15 @@ module type S = sig
     open Data
 
     module Rpcs : sig
-      val implementations :
-           logger:Logger.t
-        -> local_state:Local_state.t
-        -> Host_and_port.t Rpc.Implementation.t list
+      include Rpc_intf.Rpc_interface_intf
+
+      val rpc_handlers :
+        logger:Logger.t -> local_state:Local_state.t -> rpc_handler list
+
+      type query =
+        { query:
+            'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
+            -> 'r Deferred.Or_error.t }
     end
 
     (* Check whether we are in the genesis epoch *)
@@ -438,6 +551,12 @@ module type S = sig
       -> logger:Logger.t
       -> [`Keep | `Take]
 
+    type proposal =
+      [ `Check_again of Unix_timestamp.t
+      | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
+      | `Propose of
+        Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t ]
+
     (**
      * Determine if and when to perform the next transition proposal. Either
      * informs the callee to check again at some time in the future, or to
@@ -451,10 +570,7 @@ module type S = sig
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
-      -> [ `Check_again of Unix_timestamp.t
-         | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
-         | `Propose of
-           Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t ]
+      -> proposal
 
     (**
      * A hook for managing local state when the locked tip is updated.
@@ -494,7 +610,7 @@ module type S = sig
       -> trust_system:Trust_system.t
       -> local_state:Local_state.t
       -> random_peers:(int -> Network_peer.Peer.t list)
-      -> query_peer:Network_peer.query_peer
+      -> query_peer:Rpcs.query
       -> local_state_sync Non_empty_list.t
       -> unit Deferred.Or_error.t
 

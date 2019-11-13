@@ -11,15 +11,6 @@ module type S_unchecked = sig
 
   include Hashable.S with type t := t
 
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-    end
-
-    module Latest = V1
-  end
-
   val length_in_bits : int
 
   val length_in_triples : int
@@ -43,7 +34,11 @@ module type S_unchecked = sig
 
   val to_string : t -> string
 
-  module Bits : Bits_intf.S with type t := t
+  module Bits : Bits_intf.Convertible_bits with type t := t
+
+  val to_bits : t -> bool list
+
+  val of_bits : bool list -> t
 
   val fold : t -> bool Triple.t Fold.t
 end
@@ -108,7 +103,16 @@ module type S = sig
 end
 
 module type UInt32 = sig
-  include S with type t = Unsigned_extended.UInt32.t
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = Unsigned_extended.UInt32.t
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+    end
+
+    module Latest = V1
+  end
+
+  include S with type t = Stable.Latest.t
 
   val to_uint32 : t -> uint32
 
@@ -116,7 +120,16 @@ module type UInt32 = sig
 end
 
 module type UInt64 = sig
-  include S with type t = Unsigned_extended.UInt64.t
+  module Stable : sig
+    module V1 : sig
+      type t = Unsigned_extended.UInt64.t
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+    end
+
+    module Latest = V1
+  end
+
+  include S with type t = Stable.Latest.t
 
   val to_uint64 : t -> uint64
 
@@ -132,5 +145,5 @@ module type F = functor
 
       val random : unit -> t
     end)
-  (Bits : Bits_intf.S with type t := N.t)
+  (Bits : Bits_intf.Convertible_bits with type t := N.t)
   -> S with type t := N.t and module Bits := Bits

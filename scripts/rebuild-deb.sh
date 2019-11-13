@@ -32,7 +32,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1, miniupnpc, coda-kademlia
+Depends: coda-discovery, libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
@@ -64,15 +64,23 @@ compile_keys=$(./default/app/cli/src/coda.exe internal snark-hashes)
 for key in $compile_keys
 do
     echo -n "Looking for keys matching: ${key} -- "
-    if [ -f "/var/lib/coda/${key}_proving" ]; then
-        echo " [OK] found key in stable key set"
-        cp /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
-    elif [ -f "/tmp/coda_cache_dir/${key}_proving" ]; then
-        echo " [WARN] found key in compile-time set"
-        cp /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
-    else
-        echo "Key not found!"
-    fi
+
+    # Awkward, you can't do a filetest on a wildcard - use loops
+    for f in  /var/lib/coda/${key}*; do
+        if [ -e "$f" ]; then
+            echo " [OK] found key in stable key set"
+            cp /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
+            break
+        fi
+    done
+
+    for f in  /tmp/coda_cache_dir/${key}*; do
+        if [ -e "$f" ]; then
+            echo " [WARN] found key in compile-time set"
+            cp /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+            break
+        fi
+    done
 done
 
 # Bash autocompletion
@@ -116,7 +124,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1, miniupnpc, coda-kademlia
+Depends: coda-discovery, libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>

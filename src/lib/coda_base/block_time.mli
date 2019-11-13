@@ -1,3 +1,4 @@
+open Async_kernel
 open Core_kernel
 open Snark_params
 open Snark_bits
@@ -5,28 +6,32 @@ open Tuple_lib
 open Fold_lib
 
 module Time : sig
-  type t [@@deriving sexp, eq, yojson]
+  type t [@@deriving sexp, compare, yojson]
 
-  type t0 = t
+  include Comparable.S with type t := t
+
+  include Hashable.S with type t := t
 
   module Controller : sig
     type t
 
     val create : t -> t
 
-    val basic : t
+    val basic : logger:Logger.t -> t
   end
 
   module Stable : sig
     module V1 : sig
       type nonrec t = t
       [@@deriving sexp, bin_io, compare, eq, hash, yojson, version]
+
+      include Hashable.S with type t := t
     end
   end
 
   val length_in_triples : int
 
-  module Bits : Bits_intf.S with type t := t
+  module Bits : Bits_intf.Convertible_bits with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 
@@ -54,6 +59,8 @@ module Time : sig
 
     val to_time_ns_span : t -> Core.Time_ns.Span.t
 
+    val to_string_hum : t -> string
+
     val to_ms : t -> Int64.t
 
     val of_ms : Int64.t -> t
@@ -75,17 +82,9 @@ module Time : sig
     val ( >= ) : t -> t -> bool
 
     val min : t -> t -> t
+
+    val zero : t
   end
-
-  val ( < ) : t -> t -> bool
-
-  val ( > ) : t -> t -> bool
-
-  val ( = ) : t -> t -> bool
-
-  val ( <= ) : t -> t -> bool
-
-  val ( >= ) : t -> t -> bool
 
   val field_var_to_unpacked :
     Tick.Field.Var.t -> (Unpacked.var, _) Tick.Checked.t
@@ -113,23 +112,44 @@ module Time : sig
 
   val now : Controller.t -> t
 
+  val to_int64 : t -> Int64.t
+
+  val of_int64 : Int64.t -> t
+
   val to_string : t -> string
 
   val of_string_exn : string -> t
+
+  val gen_incl : t -> t -> t Quickcheck.Generator.t
+
+  val gen : t Quickcheck.Generator.t
 end
 
 include module type of Time
 
-module Timeout : sig
-  type 'a t
+module Timeout :
+  sig
+    type 'a t
 
-  val create : Controller.t -> Span.t -> f:(t0 -> 'a) -> 'a t
+    type time
 
-  val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
+    val create : Controller.t -> Span.t -> f:(time -> 'a) -> 'a t
 
-  val peek : 'a t -> 'a option
+    val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
 
-  val cancel : Controller.t -> 'a t -> 'a -> unit
+    val peek : 'a t -> 'a option
 
-  val remaining_time : 'a t -> Span.t
-end
+    val cancel : Controller.t -> 'a t -> 'a -> unit
+
+    val remaining_time : 'a t -> Span.t
+
+    val await :
+         timeout_duration:Span.t
+      -> Controller.t
+      -> 'a Deferred.t
+      -> [`Ok of 'a | `Timeout] Deferred.t
+
+    val await_exn :
+      timeout_duration:Span.t -> Controller.t -> 'a Deferred.t -> 'a Deferred.t
+  end
+  with type time := t

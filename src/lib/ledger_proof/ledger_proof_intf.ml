@@ -2,12 +2,12 @@ open Coda_base
 
 module type S = sig
   (* bin_io omitted intentionally *)
-  type t [@@deriving sexp, yojson]
+  type t [@@deriving sexp, to_yojson]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, yojson, version]
+        type t [@@deriving bin_io, compare, sexp, version, to_yojson]
       end
 
       module Latest = V1

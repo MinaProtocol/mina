@@ -27,9 +27,12 @@ module type S = sig
 
   val get_unchecked :
        Staged_ledger_diff.With_valid_signatures_and_proofs.t
-    -> Transaction.t list
-       * Transaction_snark_work.t list
-       * Currency.Amount.t list
+    -> ( Transaction.t list
+         * Transaction_snark_work.t list
+         * int
+         * Currency.Amount.t list
+       , Error.t )
+       result
 
   val get_transactions :
     Staged_ledger_diff.t -> (Transaction.t list, Error.t) result
@@ -65,11 +68,12 @@ type t =
   { transactions: Transaction.t list
   ; work: Transaction_snark_work.t list
   ; user_commands_count: int
-  ; coinbases: Coinbase.t list }
+  ; coinbases: Currency.Amount.t list }
 
 (*A Coinbase is a single transaction that accommodates the coinbase amount
-    and a fee transfer for the work required to add the coinbase. Unlike a
-    transaction, a coinbase (including the fee transfer) just requires one slot
+    and a fee transfer for the work required to add the coinbase. It also
+    contains the state body hash corresponding to a particular protocol state.
+    Unlike a transaction, a coinbase (including the fee transfer) just requires one slot
     in the jobs queue.
 
     The minimum number of slots required to add a single transaction is three (at
@@ -80,13 +84,14 @@ type t =
     adding transactions, the first prediff has two slots remaining which cannot
     not accommodate transactions, then those slots are filled by splitting the
     coinbase into two parts.
+
     If it has one slot, then we simply add one coinbase. It is also possible that
-    the first prediff may have no slots left after adding transactions (For
-    example, when there are three slots and
-    maximum number of provers), in which case, we simply add one coinbase as part
-    of the second prediff.
+    the first prediff may have no slots left after adding transactions (for
+    example, when there are three slots and maximum number of provers), in which case,
+    we simply add one coinbase as part of the second prediff.
   *)
-let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t) =
+let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
+    (state_body_hash : State_body_hash.t) =
   let open Result.Let_syntax in
   let coinbase = Coda_compile_config.coinbase in
   let coinbase_or_error = function
@@ -116,10 +121,12 @@ let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t) =
     in
     let%bind cb1 =
       coinbase_or_error
-        (Coinbase.create ~amount:amt ~proposer ~fee_transfer:ft1)
+        (Coinbase.create ~amount:amt ~proposer ~fee_transfer:ft1
+           ~state_body_hash)
     in
     let%map cb2 =
       Coinbase.create ~amount:rem_coinbase ~proposer ~fee_transfer:ft2
+        ~state_body_hash
       |> coinbase_or_error
     in
     [cb1; cb2]
@@ -130,6 +137,7 @@ let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t) =
   | `One x ->
       let%map cb =
         Coinbase.create ~amount:coinbase ~proposer ~fee_transfer:x
+          ~state_body_hash
         |> coinbase_or_error
       in
       [cb]
@@ -202,63 +210,47 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
               else Public_key.Compressed.Map.remove accum (fst single) )
       (* TODO: This creates a weird incentive to have a small public_key *)
       |> Map.to_alist ~key_order:`Increasing
-      |> Fee_transfer.of_single_list )
+      |> One_or_two.group_list )
   |> to_staged_ledger_or_error
 
-let get_individual_info coinbase_parts (proposer : Public_key.Compressed.t)
-    user_commands completed_works =
+let get_individual_info coinbase_parts proposer user_commands completed_works
+    state_body_hash =
   let open Result.Let_syntax in
-  let%map user_commands, coinbase, transactions =
-    let open Result.Let_syntax in
-    let%bind user_commands =
-      let%map user_commands' =
-        List.fold_until user_commands ~init:[]
-          ~f:(fun acc t ->
-            match User_command.check t with
-            | Some t ->
-                Continue (t :: acc)
-            | None ->
-                Stop (Error (Error.Bad_signature t)) )
-          ~finish:(fun acc -> Ok acc)
-      in
-      List.rev user_commands'
-    in
-    let%bind coinbase = create_coinbase coinbase_parts proposer in
-    let coinbase_fts =
-      List.concat_map coinbase ~f:(fun cb ->
-          Option.value_map cb.fee_transfer ~default:[] ~f:(fun ft -> [ft]) )
-    in
-    let%bind coinbase_work_fees =
-      sum_fees coinbase_fts ~f:snd |> to_staged_ledger_or_error
-    in
-    let completed_works_others =
-      List.filter completed_works ~f:(fun {Transaction_snark_work.prover; _} ->
-          not (Public_key.Compressed.equal proposer prover) )
-    in
-    let%bind delta =
-      fee_remainder user_commands completed_works_others coinbase_work_fees
-    in
-    let%map fee_transfers =
-      create_fee_transfers completed_works_others delta proposer
-        (coinbase_fts : Fee_transfer.Single.t list)
-    in
-    let transactions =
-      List.map user_commands ~f:(fun t -> Transaction.User_command t)
-      @ List.map coinbase ~f:(fun t -> Transaction.Coinbase t)
-      @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
-    in
-    (user_commands, coinbase, transactions)
+  let%bind coinbase_parts =
+    O1trace.measure "create_coinbase" (fun () ->
+        create_coinbase coinbase_parts proposer state_body_hash )
+  in
+  let coinbase_fts =
+    List.concat_map coinbase_parts ~f:(fun cb ->
+        Option.value_map cb.fee_transfer ~default:[] ~f:(fun ft -> [ft]) )
+  in
+  let coinbase_work_fees = sum_fees coinbase_fts ~f:snd |> Or_error.ok_exn in
+  let txn_works_others =
+    List.filter completed_works ~f:(fun {Transaction_snark_work.prover; _} ->
+        not (Public_key.Compressed.equal proposer prover) )
+  in
+  let%bind delta =
+    fee_remainder user_commands txn_works_others coinbase_work_fees
+  in
+  let%map fee_transfers =
+    create_fee_transfers txn_works_others delta proposer coinbase_fts
+  in
+  let transactions =
+    List.map user_commands ~f:(fun t -> Transaction.User_command t)
+    @ List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
+    @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
   in
   { transactions
   ; work= completed_works
   ; user_commands_count= List.length user_commands
-  ; coinbases= coinbase }
+  ; coinbases= List.map coinbase_parts ~f:(fun Coinbase.{amount; _} -> amount)
+  }
 
 open Staged_ledger_diff
 
-let get t =
+let get' (t : With_valid_signatures.t) =
   let apply_pre_diff_with_at_most_two
-      (t1 : Pre_diff_with_at_most_two_coinbase.t) =
+      (t1 : With_valid_signatures.pre_diff_with_at_most_two_coinbase) =
     let coinbase_parts =
       match t1.coinbase with
       | Zero ->
@@ -269,15 +261,15 @@ let get t =
           `Two x
     in
     get_individual_info coinbase_parts t.creator t1.user_commands
-      t1.completed_works
+      t1.completed_works t.state_body_hash
   in
   let apply_pre_diff_with_at_most_one
-      (t2 : Pre_diff_with_at_most_one_coinbase.t) =
+      (t2 : With_valid_signatures.pre_diff_with_at_most_one_coinbase) =
     let coinbase_added =
       match t2.coinbase with Zero -> `Zero | One x -> `One x
     in
     get_individual_info coinbase_added t.creator t2.user_commands
-      t2.completed_works
+      t2.completed_works t.state_body_hash
   in
   let open Result.Let_syntax in
   let%bind p1 = apply_pre_diff_with_at_most_two (fst t.diff) in
@@ -291,77 +283,18 @@ let get t =
   ( p1.transactions @ p2.transactions
   , p1.work @ p2.work
   , p1.user_commands_count + p2.user_commands_count
-  , List.map (p1.coinbases @ p2.coinbases) ~f:(fun Coinbase.{amount; _} ->
-        amount ) )
+  , p1.coinbases @ p2.coinbases )
 
-let ok_exn' (t : ('a, Error.t) Result.t) =
-  match t with Ok x -> x | Error e -> Core.Error.raise (Error.to_error e)
-
-let get_individual_diff_unchecked coinbase_parts proposer user_commands
-    completed_works =
-  let txn_works = List.map ~f:Transaction_snark_work.forget completed_works in
-  let coinbase_parts =
-    O1trace.measure "create_coinbase" (fun () ->
-        ok_exn' (create_coinbase coinbase_parts proposer) )
-  in
-  let coinbase_fts =
-    List.concat_map coinbase_parts ~f:(fun cb ->
-        Option.value_map cb.fee_transfer ~default:[] ~f:(fun ft -> [ft]) )
-  in
-  let coinbase_work_fees = sum_fees coinbase_fts ~f:snd |> Or_error.ok_exn in
-  let txn_works_others =
-    List.filter txn_works ~f:(fun {Transaction_snark_work.prover; _} ->
-        not (Public_key.Compressed.equal proposer prover) )
-  in
-  let delta =
-    ok_exn' (fee_remainder user_commands txn_works_others coinbase_work_fees)
-  in
-  let fee_transfers =
-    ok_exn' (create_fee_transfers txn_works_others delta proposer coinbase_fts)
-  in
-  let transactions =
-    List.map user_commands ~f:(fun t -> Transaction.User_command t)
-    @ List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
-    @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
-  in
-  ( transactions
-  , txn_works
-  , List.map coinbase_parts ~f:(fun Coinbase.{amount; _} -> amount) )
+let get t =
+  match validate_user_commands t ~check:User_command.check with
+  | Ok diff ->
+      get' diff
+  | Error uc ->
+      Error (Error.Bad_signature uc)
 
 let get_unchecked (t : With_valid_signatures_and_proofs.t) =
-  let apply_pre_diff_with_at_most_two
-      (pre_diff1 :
-        With_valid_signatures_and_proofs.pre_diff_with_at_most_two_coinbase) =
-    let coinbase_parts =
-      match pre_diff1.coinbase with
-      | Zero ->
-          `Zero
-      | One x ->
-          `One x
-      | Two x ->
-          `Two x
-    in
-    get_individual_diff_unchecked coinbase_parts t.creator
-      pre_diff1.user_commands pre_diff1.completed_works
-  in
-  let apply_pre_diff_with_at_most_one
-      (pre_diff2 :
-        With_valid_signatures_and_proofs.pre_diff_with_at_most_one_coinbase) =
-    let coinbase_added =
-      match pre_diff2.coinbase with Zero -> `Zero | One x -> `One x
-    in
-    get_individual_diff_unchecked coinbase_added t.creator
-      pre_diff2.user_commands pre_diff2.completed_works
-  in
-  let data1, work1, coinbases1 =
-    apply_pre_diff_with_at_most_two (fst t.diff)
-  in
-  let data2, work2, coinbases2 =
-    Option.value_map
-      ~f:(fun d -> apply_pre_diff_with_at_most_one d)
-      (snd t.diff) ~default:([], [], [])
-  in
-  (data1 @ data2, work1 @ work2, coinbases1 @ coinbases2)
+  let t = forget_proof_checks t in
+  get' t
 
 let get_transactions (sl_diff : t) =
   let open Result.Let_syntax in

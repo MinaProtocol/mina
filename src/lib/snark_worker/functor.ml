@@ -32,30 +32,27 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let perform (s : Worker_state.t) public_key
       ({instances; fee} as spec : Work.Spec.t) =
-    List.fold_until instances ~init:([], [])
-      ~f:(fun (acc1, acc2) w ->
-        match
+    One_or_two.Or_error.map instances ~f:(fun w ->
+        let open Or_error.Let_syntax in
+        let%map proof, time =
           perform_single s
             ~message:(Coda_base.Sok_message.create ~fee ~prover:public_key)
             w
-        with
-        | Ok (res, time) ->
-            let tag =
-              match w with
-              | Snark_work_lib.Work.Single.Spec.Transition _ ->
-                  `Transition
-              | Merge _ ->
-                  `Merge
-            in
-            Continue (res :: acc1, (time, tag) :: acc2)
-        | Error e ->
-            Stop (Error e) )
-      ~finish:(fun (res, metrics) ->
-        Ok
-          { Snark_work_lib.Work.Result.proofs= List.rev res
-          ; metrics= List.rev metrics
-          ; spec
-          ; prover= public_key } )
+        in
+        ( proof
+        , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
+        ) )
+    |> Or_error.map ~f:(function
+         | `One (proof1, metrics1) ->
+             { Snark_work_lib.Work.Result.proofs= `One proof1
+             ; metrics= `One metrics1
+             ; spec
+             ; prover= public_key }
+         | `Two ((proof1, metrics1), (proof2, metrics2)) ->
+             { Snark_work_lib.Work.Result.proofs= `Two (proof1, proof2)
+             ; metrics= `Two (metrics1, metrics2)
+             ; spec
+             ; prover= public_key } )
 
   let dispatch rpc shutdown_on_disconnect query address =
     let%map res =
@@ -79,13 +76,19 @@ module Make (Inputs : Intf.Inputs_intf) :
         res
 
   let emit_proof_metrics metrics logger =
-    List.iter metrics ~f:(fun (total, tag) ->
+    One_or_two.iter metrics ~f:(fun (total, tag) ->
         match tag with
         | `Merge ->
+            Coda_metrics.(
+              Cryptography.Snark_work_histogram.observe
+                Cryptography.snark_work_merge_time_sec (Time.Span.to_sec total)) ;
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               "Merge SNARK generated in $time"
               ~metadata:[("time", `String (Time.Span.to_string_hum total))]
         | `Transition ->
+            Coda_metrics.(
+              Cryptography.Snark_work_histogram.observe
+                Cryptography.snark_work_base_time_sec (Time.Span.to_sec total)) ;
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               "Base SNARK generated in $time"
               ~metadata:[("time", `String (Time.Span.to_string_hum total))] )
@@ -93,21 +96,34 @@ module Make (Inputs : Intf.Inputs_intf) :
   let main ~logger daemon_address shutdown_on_disconnect =
     let%bind state = Worker_state.create () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
-    let rec go () =
-      let log_and_retry label error =
+    (* retry interval with jitter *)
+    let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0) in
+    let log_and_retry label error sec k =
+      let error_str = Error.to_string_hum error in
+      (* HACK: the bind before the call to go () produces an evergrowing
+           backtrace history which takes forever to print and fills our disks.
+           If the string becomes too long, chop off the first 10 lines and include
+           only that *)
+      ( if String.length error_str < 4096 then
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__
           !"Error %s: %{sexp:Error.t}"
-          label error ;
-        let%bind () = wait ~sec:30.0 () in
-        (* FIXME: Use a backoff algo here *)
-        go ()
-      in
+          label error
+      else
+        let lines = String.split ~on:'\n' error_str in
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          !"Error %s: %s" label
+          (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
+      let%bind () = wait ~sec () in
+      (* FIXME: Use a backoff algo here *)
+      k ()
+    in
+    let rec go () =
       match%bind
         dispatch Rpcs.Get_work.Latest.rpc shutdown_on_disconnect ()
           daemon_address
       with
       | Error e ->
-          log_and_retry "getting work" e
+          log_and_retry "getting work" e (retry_pause 10.) go
       | Ok None ->
           let random_delay =
             Worker_state.worker_wait_time
@@ -125,22 +141,26 @@ module Make (Inputs : Intf.Inputs_intf) :
           (* Pause to wait for stdout to flush *)
           match perform state public_key work with
           | Error e ->
-              log_and_retry "performing work" e
-          | Ok result -> (
-              match%bind
-                emit_proof_metrics result.metrics logger ;
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Submitted completed SNARK work to $address"
-                  ~metadata:
-                    [ ( "address"
-                      , `String (Host_and_port.to_string daemon_address) ) ] ;
-                dispatch Rpcs.Submit_work.Latest.rpc shutdown_on_disconnect
-                  result daemon_address
-              with
-              | Error e ->
-                  log_and_retry "submitting work" e
-              | Ok () ->
-                  go () ) )
+              log_and_retry "performing work" e (retry_pause 10.) go
+          | Ok result ->
+              emit_proof_metrics result.metrics logger ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Submitted completed SNARK work to $address"
+                ~metadata:
+                  [ ( "address"
+                    , `String (Host_and_port.to_string daemon_address) ) ] ;
+              let rec submit_work () =
+                match%bind
+                  dispatch Rpcs.Submit_work.Latest.rpc shutdown_on_disconnect
+                    result daemon_address
+                with
+                | Error e ->
+                    log_and_retry "submitting work" e (retry_pause 10.)
+                      submit_work
+                | Ok () ->
+                    go ()
+              in
+              submit_work () )
     in
     go ()
 

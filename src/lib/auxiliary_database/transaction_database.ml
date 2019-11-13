@@ -15,6 +15,8 @@ module Make (Transaction : sig
   val accounts_accessed : t -> Public_key.Compressed.t list
 end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
+
+  include Hashable.S with type t := t
 end) =
 struct
   module Database = Rocksdb.Serializable.Make (Transaction) (Time)
@@ -28,7 +30,7 @@ struct
       transaction transaction date
 
   let create ~logger directory =
-    let database = Database.create ~directory in
+    let database = Database.create directory in
     let pagination = Pagination.create () in
     List.iter (Database.to_alist database) ~f:(add_user_transaction pagination) ;
     {database; pagination; logger}
@@ -36,7 +38,7 @@ struct
   let close {database; _} = Database.close database
 
   let add {database; pagination; logger} transaction date =
-    match Hashtbl.find pagination.all_values transaction with
+    match Hashtbl.find pagination.all_values.table transaction with
     | Some _retrieved_transaction ->
         Logger.trace logger
           !"Not adding transaction into transaction database since it already \
@@ -49,14 +51,9 @@ struct
 
   let get_total_values {pagination; _} = Pagination.get_total_values pagination
 
-  let get_values {pagination; _} = Pagination.get_values pagination
-
   let get_all_values {pagination; _} = Pagination.get_all_values pagination
 
-  let get_earlier_values {pagination; _} =
-    Pagination.get_earlier_values pagination
-
-  let get_later_values {pagination; _} = Pagination.get_later_values pagination
+  let query {pagination; _} = Pagination.query pagination
 end
 
 module Block_time = Coda_base.Block_time
@@ -68,6 +65,8 @@ module For_tests = struct
 
   let of_year years = Int64.of_int (years * 365 * 24 * 60 * 60 * 1000)
 
+  let password = lazy (Deferred.return (Bytes.of_string ""))
+
   let compress_key_pairs =
     List.map ~f:(fun {Keypair.public_key; _} -> Public_key.compress public_key)
 
@@ -77,8 +76,9 @@ module For_tests = struct
     let%bind wallets = Secrets.Wallets.load ~logger ~disk_location:directory in
     let%map local_wallet_keypairs =
       Deferred.List.init num_wallets ~f:(fun _ ->
-          let%map needle = Secrets.Wallets.generate_new wallets in
-          Option.value_exn (Secrets.Wallets.find wallets ~needle) )
+          let%map needle = Secrets.Wallets.generate_new wallets ~password in
+          let keypair = Secrets.Wallets.find_unlocked wallets ~needle in
+          Option.value_exn keypair )
     in
     let remote_user_keypairs =
       List.init num_foreign ~f:(fun _ -> Keypair.create ())
@@ -109,7 +109,7 @@ module For_tests = struct
     let time_gen =
       let time_now =
         Block_time.Time.to_span_since_epoch
-          (Block_time.Time.now Block_time.Time.Controller.basic)
+          (Block_time.Time.now @@ Block_time.Time.Controller.basic ~logger)
       in
       let time_max = Block_time.Time.Span.to_ms time_now in
       let time_min = Int64.(time_max - of_year 5) in

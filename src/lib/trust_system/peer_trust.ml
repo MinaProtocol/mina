@@ -20,16 +20,31 @@ let max_rate secs =
      ban threshold (-1) *)
   1. -. (Record.decay_rate ** interval)
 
-module Make0 (Peer_id : sig
-  type t [@@deriving sexp, to_yojson]
-end) (Now : sig
-  val now : unit -> Time.t
-end)
-(Db : Key_value_database.S
-      with type key := Peer_id.t
-       and type value := Record.t)
-(Action : Action_intf) =
-struct
+module type Input_intf = sig
+  module Peer_id : sig
+    type t [@@deriving sexp, to_yojson]
+  end
+
+  module Now : sig
+    val now : unit -> Time.t
+  end
+
+  module Config : sig
+    type t
+  end
+
+  module Db :
+    Key_value_database.Intf.Ident
+    with type key := Peer_id.t
+     and type value := Record.t
+     and type config := Config.t
+
+  module Action : Action_intf
+end
+
+module Make0 (Inputs : Input_intf) = struct
+  open Inputs
+
   type t =
     { db: Db.t option
           (* This is an option to allow using a fake trust system in tests. This is
@@ -45,11 +60,9 @@ struct
 
   module Record_inst = Record.Make (Now)
 
-  let disable_bans = Record_inst.disable_bans
-
-  let create ~db_dir =
+  let create db_dir =
     let reader, writer = Strict_pipe.create Strict_pipe.Synchronous in
-    { db= Some (Db.create ~directory:db_dir)
+    { db= Some (Db.create db_dir)
     ; bans_reader= reader
     ; bans_writer= writer
     ; actions_writers= [] }
@@ -118,17 +131,9 @@ struct
         else "Decreasing"
       in
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:([("peer", Peer_id.to_yojson peer)] @ action_metadata)
-        "%s trust for peer $peer due to action %s. New trust is %f." verb
-        action_fmt simple_new.trust ;
-      if
-        Record_inst.get_bans_disabled ()
-        && simple_old.trust >. -1. && simple_new.trust <=. -1.
-      then
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Bans are disabled; otherwise, peer $peer would be banned (maybe \
-           already banned)"
-          ~metadata:[("peer", Peer_id.to_yojson peer)]
+        ~metadata:([("peer_id", Peer_id.to_yojson peer)] @ action_metadata)
+        "%s trust for peer $peer_id due to %s. New trust is %f." verb
+        action_fmt simple_new.trust
     in
     let%map () =
       match (simple_old.banned, simple_new.banned) with
@@ -136,12 +141,12 @@ struct
           Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
             ~location:__LOC__
             ~metadata:
-              ( [ ("peer", Peer_id.to_yojson peer)
+              ( [ ("peer_id", Peer_id.to_yojson peer)
                 ; ( "expiration"
                   , `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
                   ) ]
               @ action_metadata )
-            "Banning peer $peer until $expiration because it %s" action_fmt ;
+            "Banning peer $peer_id until $expiration due to %s" action_fmt ;
           if Option.is_some db then (
             Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
             Strict_pipe.Writer.write bans_writer (peer, expiration) )
@@ -200,7 +205,13 @@ let%test_module "peer_trust" =
       let to_log t = (string_of_sexp @@ sexp_of_t t, [])
     end
 
-    module Peer_trust_test = Make0 (Peer_id) (Mock_now) (Db) (Action)
+    module Peer_trust_test = Make0 (struct
+      module Peer_id = Peer_id
+      module Now = Mock_now
+      module Config = Unit
+      module Db = Db
+      module Action = Action
+    end)
 
     (* We want to check the output of the pipe in these tests, but it's
        synchronous, so we need to read from it in a different "thread",
@@ -213,7 +224,7 @@ let%test_module "peer_trust" =
       ban_pipe_out := []
 
     let setup_mock_db () =
-      let res = Peer_trust_test.create ~db_dir:"fake" in
+      let res = Peer_trust_test.create () in
       don't_wait_for
       @@ Strict_pipe.Reader.iter_without_pushback res.bans_reader ~f:(fun v ->
              ban_pipe_out := v :: !ban_pipe_out ) ;
@@ -364,13 +375,19 @@ let%test_module "peer_trust" =
               failwith "wrong number of actions written to pipe" )
   end )
 
-module Make =
-  Make0 (struct
-      include Unix.Inet_addr.Blocking_sexp
+module Make (Action : Action_intf) = Make0 (struct
+  module Peer_id = struct
+    include Unix.Inet_addr.Blocking_sexp
 
-      let to_yojson x = `String (Unix.Inet_addr.to_string x)
-    end)
-    (struct
-      let now = Time.now
-    end)
-    (Rocksdb.Serializable.Make (Unix.Inet_addr.Blocking_sexp) (Record))
+    let to_yojson x = `String (Unix.Inet_addr.to_string x)
+  end
+
+  module Now = struct
+    let now = Time.now
+  end
+
+  module Config = String
+  module Db =
+    Rocksdb.Serializable.Make (Unix.Inet_addr.Blocking_sexp) (Record.Stable.V1)
+  module Action = Action
+end)

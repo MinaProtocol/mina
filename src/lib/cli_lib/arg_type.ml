@@ -70,11 +70,30 @@ let txn_nonce =
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
 
-type work_selection_method = Sequence | Random [@@deriving bin_io]
+let user_command =
+  Command.Arg_type.create (fun s ->
+      try Coda_base.User_command.of_base58_check_exn s
+      with e ->
+        failwithf "Couldn't decode transaction id: %s\n"
+          (Error.to_string_hum (Error.of_exn e))
+          () )
+
+module Work_selection_method = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Sequence | Random
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t = Sequence | Random
+end
 
 let work_selection_method_val = function
   | "seq" ->
-      Sequence
+      Work_selection_method.Sequence
   | "rand" ->
       Random
   | _ ->
@@ -84,7 +103,7 @@ let work_selection_method =
   Command.Arg_type.map Command.Param.string ~f:work_selection_method_val
 
 let work_selection_method_to_module :
-    work_selection_method -> (module Work_selector.Selection_method_intf) =
+    Work_selection_method.t -> (module Work_selector.Selection_method_intf) =
   function
   | Sequence ->
       (module Work_selector.Selection_methods.Sequence)

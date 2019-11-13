@@ -90,14 +90,65 @@ module TextFormat_0_0_4 = struct
           samples )
 end
 
+module Moving_average (Spec : sig
+  val tick_interval : Core.Time.Span.t
+
+  val rolling_interval : Core.Time.Span.t
+
+  val display : Float.t -> Float.t
+end) =
+struct
+  open Async
+
+  let total = ref 0.
+
+  let create () ~name ~subsystem ~namespace ~help =
+    let gauge = Gauge.v name ~subsystem ~namespace ~help in
+    let rec tick () =
+      upon (after Spec.tick_interval) (fun () ->
+          Gauge.set gauge (Spec.display !total) ;
+          tick () )
+    in
+    tick ()
+
+  let update datum =
+    total := !total +. datum ;
+    upon (after Spec.rolling_interval) (fun () -> total := !total -. datum)
+
+  let clear () = total := 0.
+end
+
 module Runtime = struct
+  let subsystem = "Runtime"
+
+  module Long_async_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 0.5 2. 7
+  end)
+
+  let long_async_cycle : Long_async_histogram.t =
+    let help = "A histogram for long async cycles" in
+    Long_async_histogram.v "long_async_cycle" ~help ~namespace ~subsystem
+
+  module Long_job_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 0.5 2. 7
+  end)
+
+  let long_async_job : Long_job_histogram.t =
+    let help = "A histogram for long async jobs" in
+    Long_job_histogram.v "long_async_job" ~help ~namespace ~subsystem
+
   let start_time = Core.Time.now ()
 
-  let current = ref (Gc.stat ())
+  let current_gc = ref (Gc.stat ())
 
-  let update () = current := Gc.stat ()
+  let current_jemalloc = ref (Jemalloc.get_memory_stats ())
+
+  let update () =
+    current_gc := Gc.stat () ;
+    current_jemalloc := Jemalloc.get_memory_stats ()
 
   let simple_metric ~metric_type ~help name fn =
+    let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
     let info =
       {MetricInfo.name= MetricName.v name; help; metric_type; label_names= []}
     in
@@ -111,59 +162,81 @@ module Runtime = struct
 
   let ocaml_gc_major_words =
     simple_metric ~metric_type:Counter "ocaml_gc_major_words"
-      (fun () -> !current.Gc.Stat.major_words)
+      (fun () -> !current_gc.Gc.Stat.major_words)
       ~help:
         "Number of words allocated in the major heap since the program was \
          started."
 
   let ocaml_gc_minor_collections =
     simple_metric ~metric_type:Counter "ocaml_gc_minor_collections"
-      (fun () -> float_of_int !current.Gc.Stat.minor_collections)
+      (fun () -> float_of_int !current_gc.Gc.Stat.minor_collections)
       ~help:
         "Number of minor collection cycles completed since the program was \
          started."
 
   let ocaml_gc_major_collections =
     simple_metric ~metric_type:Counter "ocaml_gc_major_collections"
-      (fun () -> float_of_int !current.Gc.Stat.major_collections)
+      (fun () -> float_of_int !current_gc.Gc.Stat.major_collections)
       ~help:
         "Number of major collection cycles completed since the program was \
          started."
 
   let ocaml_gc_heap_words =
     simple_metric ~metric_type:Gauge "ocaml_gc_heap_words"
-      (fun () -> float_of_int !current.Gc.Stat.heap_words)
+      (fun () -> float_of_int !current_gc.Gc.Stat.heap_words)
       ~help:"Total size of the major heap, in words."
 
   let ocaml_gc_compactions =
     simple_metric ~metric_type:Counter "ocaml_gc_compactions"
-      (fun () -> float_of_int !current.Gc.Stat.compactions)
+      (fun () -> float_of_int !current_gc.Gc.Stat.compactions)
       ~help:"Number of heap compactions since the program was started."
 
   let ocaml_gc_top_heap_words =
     simple_metric ~metric_type:Counter "ocaml_gc_top_heap_words"
-      (fun () -> float_of_int !current.Gc.Stat.top_heap_words)
+      (fun () -> float_of_int !current_gc.Gc.Stat.top_heap_words)
       ~help:"Maximum size reached by the major heap, in words."
 
   let ocaml_gc_live_words =
     simple_metric ~metric_type:Counter "ocaml_gc_live_words"
-      (fun () -> float_of_int !current.Gc.Stat.live_words)
+      (fun () -> float_of_int !current_gc.Gc.Stat.live_words)
       ~help:"Live words allocated by the GC."
 
   let ocaml_gc_free_words =
     simple_metric ~metric_type:Counter "ocaml_gc_free_words"
-      (fun () -> float_of_int !current.Gc.Stat.free_words)
+      (fun () -> float_of_int !current_gc.Gc.Stat.free_words)
       ~help:"Words freed by the GC."
 
   let ocaml_gc_largest_free =
     simple_metric ~metric_type:Counter "ocaml_gc_largest_free"
-      (fun () -> float_of_int !current.Gc.Stat.largest_free)
+      (fun () -> float_of_int !current_gc.Gc.Stat.largest_free)
       ~help:"Size of the largest block freed by the GC."
 
   let ocaml_gc_stack_size =
     simple_metric ~metric_type:Counter "ocaml_gc_stack_size"
-      (fun () -> float_of_int !current.Gc.Stat.stack_size)
+      (fun () -> float_of_int !current_gc.Gc.Stat.stack_size)
       ~help:"Current stack size."
+
+  let jemalloc_active_bytes =
+    simple_metric ~metric_type:Gauge "jemalloc_active_bytes"
+      (fun () -> float_of_int !current_jemalloc.active)
+      ~help:"active memory in bytes"
+
+  let jemalloc_resident_bytes =
+    simple_metric ~metric_type:Gauge "jemalloc_resident_bytes"
+      (fun () -> float_of_int !current_jemalloc.resident)
+      ~help:
+        "resident memory in bytes (may be zero depending on jemalloc compile \
+         options)"
+
+  let jemalloc_allocated_bytes =
+    simple_metric ~metric_type:Gauge "jemalloc_allocated_bytes"
+      (fun () -> float_of_int !current_jemalloc.allocated)
+      ~help:"memory allocated to heap objects in bytes"
+
+  let jemalloc_mapped_bytes =
+    simple_metric ~metric_type:Gauge "jemalloc_mapped_bytes"
+      (fun () -> float_of_int !current_jemalloc.mapped)
+      ~help:"memory mapped into process address space in bytes"
 
   let process_cpu_seconds_total =
     simple_metric ~metric_type:Counter "process_cpu_seconds_total" Sys.time
@@ -187,6 +260,10 @@ module Runtime = struct
     ; ocaml_gc_free_words
     ; ocaml_gc_largest_free
     ; ocaml_gc_stack_size
+    ; jemalloc_active_bytes
+    ; jemalloc_resident_bytes
+    ; jemalloc_allocated_bytes
+    ; jemalloc_mapped_bytes
     ; process_cpu_seconds_total
     ; process_uptime_ms_total ]
 
@@ -197,14 +274,32 @@ module Runtime = struct
         register default info collector )
 end
 
-module Proving_time = struct
-  let subsystem = "Proving_time"
+module Cryptography = struct
+  let subsystem = "Cryptography"
 
   let blockchain_proving_time_ms =
     let help =
       "time elapsed while proving most recently generated blockchain snark"
     in
     Gauge.v "blockchain_proving_time_ms" ~help ~namespace ~subsystem
+
+  let total_pedersen_hashes_computed =
+    let help = "# of pedersen hashes computed" in
+    Counter.v "total_pedersen_hash_computed" ~help ~namespace ~subsystem
+
+  module Snark_work_histogram = Histogram (struct
+    let spec = Histogram_spec.of_linear 60. 30. 8
+  end)
+
+  let snark_work_merge_time_sec =
+    let help = "time elapsed while doing merge proof" in
+    Snark_work_histogram.v "snark_work_merge_time_sec" ~help ~namespace
+      ~subsystem
+
+  let snark_work_base_time_sec =
+    let help = "time elapsed while doing base proof" in
+    Snark_work_histogram.v "snark_work_base_time_sec" ~help ~namespace
+      ~subsystem
 
   (* TODO:
   let transaction_proving_time_ms =
@@ -241,6 +336,48 @@ module Network = struct
   let gossip_messages_received : Counter.t =
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
+
+  module Rpc_latency_map = Hashtbl.Make (String)
+  module Rpc_size_map = Hashtbl.Make (String)
+
+  module Rpc_latency_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 1000. 10. 5
+  end)
+
+  module Rpc_size_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 500. 2. 7
+  end)
+
+  let rpc_latency_table = Rpc_latency_map.of_alist_exn []
+
+  let rpc_size_table = Rpc_size_map.of_alist_exn []
+
+  let rpc_latency_ms ~name : Gauge.t =
+    if Rpc_latency_map.mem rpc_latency_table name then
+      Rpc_latency_map.find_exn rpc_latency_table name
+    else
+      let help = "time elapsed while doing RPC calls in ms" in
+      let rpc_gauge =
+        Gauge.v (name ^ "_latency") ~help ~namespace ~subsystem
+      in
+      Rpc_latency_map.add_exn rpc_latency_table ~key:name ~data:rpc_gauge ;
+      rpc_gauge
+
+  let rpc_size_bytes ~name : Rpc_size_histogram.t =
+    if Rpc_size_map.mem rpc_size_table name then
+      Rpc_size_map.find_exn rpc_size_table name
+    else
+      let help = "size for RPC reponse in bytes" in
+      let rpc_histogram =
+        Rpc_size_histogram.v (name ^ "_size") ~help ~namespace ~subsystem
+      in
+      Rpc_size_map.add_exn rpc_size_table ~key:name ~data:rpc_histogram ;
+      rpc_histogram
+
+  let rpc_latency_ms_summary : Rpc_latency_histogram.t =
+    let help = "A histogram for all RPC call latencies" in
+    Rpc_latency_histogram.v "rpc_latency_ms_summary" ~help ~namespace
+      ~subsystem
 end
 
 module Snark_work = struct
@@ -280,6 +417,14 @@ module Snark_work = struct
        after every block"
     in
     Gauge.v "scan_state_snark_work" ~help ~namespace ~subsystem
+
+  module Snark_fee_histogram = Histogram (struct
+    let spec = Histogram_spec.of_linear 0. 1. 10
+  end)
+
+  let snark_fee =
+    let help = "A histogram for snark fees" in
+    Snark_fee_histogram.v "snark_fee" ~help ~namespace ~subsystem
 end
 
 module Trust_system = struct
@@ -333,6 +478,14 @@ end
 module Transition_frontier = struct
   let subsystem = "Transition_frontier"
 
+  let max_blocklength_observed : Gauge.t =
+    let help = "max blocklength observed by the system" in
+    Gauge.v "max_blocklength_observed" ~help ~namespace ~subsystem
+
+  let slot_fill_rate : Gauge.t =
+    let help = "number of blocks / total slots since genesis" in
+    Gauge.v "slot_fill_rate" ~help ~namespace ~subsystem
+
   let active_breadcrumbs : Gauge.t =
     let help = "current # of breadcrumbs in the transition frontier" in
     Gauge.v "active_breadcrumbs" ~help ~namespace ~subsystem
@@ -352,6 +505,23 @@ module Transition_frontier = struct
   let finalized_staged_txns : Counter.t =
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
+
+  module TPS_30min = Moving_average (struct
+    let tick_interval = Core.Time.Span.of_min 3.
+
+    let rolling_interval = Core.Time.Span.of_min 30.
+
+    let display total_txns =
+      total_txns /. Core.Time.Span.to_sec rolling_interval
+  end)
+
+  let tps_30min =
+    let name = "tps_30min" in
+    let help =
+      "moving average for transaction per second, the rolling interval is set \
+       to 30 min"
+    in
+    TPS_30min.create ~name ~help ~namespace ~subsystem ()
 
   let recently_finalized_staged_txns : Gauge.t =
     let help =
@@ -406,6 +576,10 @@ module Transition_frontier_controller = struct
   let catchup_time_ms =
     let help = "time elapsed while doing catchup" in
     Gauge.v "catchup_time_ms" ~help ~namespace ~subsystem
+
+  let transitions_downloaded_from_catchup =
+    let help = "# of transitions downloaded by ledger_catchup" in
+    Gauge.v "transitions_downloaded_from_catchup" ~help ~namespace ~subsystem
 
   let breadcrumbs_built_by_processor : Counter.t =
     let help = "breadcrumbs built by the processor" in

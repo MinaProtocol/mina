@@ -12,7 +12,9 @@ let main () =
     Time.Span.of_ms
       (proposal_interval * Consensus.Constants.delta |> Float.of_int)
   in
-  let work_selection_method = Cli_lib.Arg_type.Sequence in
+  let work_selection_method =
+    Cli_lib.Arg_type.Work_selection_method.Sequence
+  in
   Coda_processes.init () ;
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
@@ -41,7 +43,7 @@ let main () =
                   ))
                (S.of_list expected_peers) ) ))
   in
-  Deferred.List.iter workers ~f:Coda_process.disconnect
+  Deferred.List.iter workers ~f:(Coda_process.disconnect ~logger)
 
 let command =
   Command.async

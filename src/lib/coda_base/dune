@@ -4,55 +4,55 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-    lite_base
-    outside_pedersen_image
-    linked_tree
-    hash_prefixes
-    hash_prefix_states
-    syncable_ledger
-    base58_check
-    fold_lib
-    signature_lib
-    test_util
-    random_oracle
-    coda_digestif
-    snark_bits
-    currency
-    snark_params
-    unsigned_extended
-    sparse_ledger_lib
-    core
-    dummy_values
-    o1trace
-    merkle_ledger
-    module_version
-    snarky crypto_params
     async
     async_extra
+    base58_check
     bignum_bigint
-    coda_numbers
-    debug_assert
-    merkle_mask
-    trust_system
-    receipt_chain_database_lib
-    storage
-    yojson
-    codable
-    rocksdb
-    visualization
     coda_compile_config
+    coda_digestif
+    coda_numbers
+    codable
+    core
+    currency
+    debug_assert
+    dummy_values
+    fold_lib
+    hash_prefix_states
+    hash_prefixes
+    linked_tree
+    lite_base
+    merkle_ledger
+    merkle_mask
+    module_version
+    one_or_two
+    o1trace
+    outside_pedersen_image
     quickcheck_lib
+    random_oracle
+    rocksdb
     sexp_diff_kernel
+    signature_lib
+    snark_bits
+    snark_params
+    snarky crypto_params
+    sparse_ledger_lib
+    storage
+    syncable_ledger
+    test_util
+    trust_system
+    unsigned_extended
+    visualization
+    yojson
     )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_snarky ppx_coda ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
-    ppx_base ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test
+  (pps ppx_snarky ppx_coda -lint-version-syntax-warnings ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
+    ppx_base ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test
     bisect_ppx -- -conditional))
  (synopsis "Snarks and friends necessary for keypair generation"))
 
 (rule
- (targets sample_keypairs.ml)
+ (targets sample_keypairs.ml sample_keypairs.json)
  (deps
   (:< gen/gen.exe))
  (action

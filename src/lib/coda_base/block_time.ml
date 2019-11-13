@@ -8,32 +8,25 @@ open Tick
 open Unsigned_extended
 open Snark_bits
 open Fold_lib
-open Module_version
 
 module Time = struct
   (* Milliseconds since epoch *)
+  [%%versioned
   module Stable = struct
     module V1 = struct
+      type t = UInt64.Stable.V1.t [@@deriving sexp, compare, eq, hash, yojson]
+
+      let to_latest = Fn.id
+
       module T = struct
-        type t = UInt64.t
-        [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
+        type typ = t [@@deriving sexp, compare, hash]
+
+        type t = typ [@@deriving sexp, compare, hash]
       end
 
-      include T
-      include Registration.Make_latest_version (T)
+      include Hashable.Make (T)
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "block_time"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   module Controller = struct
     [%%if
@@ -43,10 +36,19 @@ module Time = struct
 
     let create offset = offset
 
-    let basic =
+    let basic ~logger =
       lazy
-        ( Core_kernel.Time.Span.of_int_sec @@ Int.of_string
-        @@ Unix.getenv "CODA_TIME_OFFSET" )
+        (let offset =
+           match Core.Sys.getenv "CODA_TIME_OFFSET" with
+           | Some tm ->
+               Int.of_string tm
+           | None ->
+               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                 "Environment variable CODA_TIME_OFFSET not found, using \
+                  default of 0" ;
+               0
+         in
+         Core_kernel.Time.Span.of_int_sec offset)
 
     [%%else]
 
@@ -54,15 +56,12 @@ module Time = struct
 
     let create () = ()
 
-    let basic = ()
+    let basic ~logger:_ = ()
 
     [%%endif]
   end
 
-  (* DO NOT add bin_io the deriving list *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash, yojson]
-
-  type t0 = t
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   module B = Bits
 
@@ -76,29 +75,17 @@ module Time = struct
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 
   module Span = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t = UInt64.t [@@deriving bin_io, sexp, compare, version]
-        end
+        type t = UInt64.Stable.V1.t [@@deriving sexp, compare]
 
-        include T
-        include Registration.Make_latest_version (T)
+        let to_latest = Fn.id
       end
+    end]
 
-      module Latest = V1
+    type t = Stable.Latest.t [@@deriving sexp, compare]
 
-      module Module_decl = struct
-        let name = "block_time_span"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
-
-    include Stable.Latest
     module Bits = B.UInt64
     include B.Snarkable.UInt64 (Tick)
 
@@ -106,6 +93,8 @@ module Time = struct
 
     let to_time_ns_span s =
       Time_ns.Span.of_ms (Int64.to_float (UInt64.to_int64 s))
+
+    let to_string_hum s = to_time_ns_span s |> Time_ns.Span.to_string_hum
 
     let to_ms = UInt64.to_int64
 
@@ -128,17 +117,12 @@ module Time = struct
     let ( >= ) = UInt64.( >= )
 
     let min = UInt64.min
+
+    let zero = UInt64.zero
   end
 
-  let ( < ) = UInt64.( < )
-
-  let ( > ) = UInt64.( > )
-
-  let ( = ) = UInt64.( = )
-
-  let ( <= ) = UInt64.( <= )
-
-  let ( >= ) = UInt64.( >= )
+  include Comparable.Make (Stable.Latest)
+  include Hashable.Make (Stable.Latest)
 
   let of_time t =
     UInt64.of_int64
@@ -184,11 +168,28 @@ module Time = struct
     let bits = Span.Unpacked.var_to_bits var in
     Number.of_bits (bits :> Boolean.var list)
 
-  let to_string time =
-    to_span_since_epoch time |> Span.to_ms |> Int64.to_string
+  let to_int64 = Fn.compose Span.to_ms to_span_since_epoch
+
+  let of_int64 = Fn.compose of_span_since_epoch Span.of_ms
+
+  let to_string = Fn.compose Int64.to_string to_int64
 
   let of_string_exn string =
     Int64.of_string string |> Span.of_ms |> of_span_since_epoch
+
+  let gen_incl time_beginning time_end =
+    let open Quickcheck.Let_syntax in
+    let time_beginning_int64 = to_int64 time_beginning in
+    let time_end_int64 = to_int64 time_end in
+    let%map int64_time_span =
+      Int64.(gen_incl time_beginning_int64 time_end_int64)
+    in
+    of_span_since_epoch @@ Span.of_ms int64_time_span
+
+  let gen =
+    let open Quickcheck.Let_syntax in
+    let%map int64_time_span = Int64.(gen_incl zero max_value) in
+    of_span_since_epoch @@ Span.of_ms int64_time_span
 end
 
 include Time

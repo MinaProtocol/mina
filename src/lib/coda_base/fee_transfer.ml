@@ -1,85 +1,52 @@
 open Core
 open Import
-open Module_version
 
 module Single = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Public_key.Compressed.Stable.V1.t * Currency.Fee.Stable.V1.t
-        [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
-      end
+      type t = Public_key.Compressed.Stable.V1.t * Currency.Fee.Stable.V1.t
+      [@@deriving sexp, compare, eq, yojson, hash]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
+
+      let description = "Fee transfer Single"
+
+      let version_byte = Base58_check.Version_bytes.fee_transfer_single
     end
+  end]
 
-    module Latest = V1
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
 
-    module Module_decl = struct
-      let name = "fee_transfer_single"
+  include Comparable.Make (Stable.Latest)
+  module Base58_check = Codable.Make_base58_check (Stable.Latest)
 
-      type latest = Latest.t
-    end
+  [%%define_locally
+  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson, hash]
+  [%%define_locally
+  Base58_check.String_ops.(to_string, of_string)]
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        | One of Single.Stable.V1.t
-        | Two of Single.Stable.V1.t * Single.Stable.V1.t
-      [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
-    end
+    type t = Single.Stable.V1.t One_or_two.Stable.V1.t
+    [@@deriving sexp, compare, eq, yojson, hash]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
   end
+end]
 
-  module Latest = V1
+type t = Single.Stable.Latest.t One_or_two.Stable.Latest.t
+[@@deriving sexp, compare, yojson, hash]
 
-  module Module_decl = struct
-    let name = "fee_transfer"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
-
-(* bin_io omitted *)
-type t = Stable.Latest.t =
-  | One of Single.Stable.V1.t
-  | Two of Single.Stable.V1.t * Single.Stable.V1.t
-[@@deriving sexp, compare, eq, yojson, hash]
-
-let to_list = function One x -> [x] | Two (x, y) -> [x; y]
-
-let of_single s = One s
-
-let of_single_list xs =
-  let rec go acc = function
-    | x1 :: x2 :: xs ->
-        go (Two (x1, x2) :: acc) xs
-    | [] ->
-        acc
-    | [x] ->
-        One x :: acc
-  in
-  go [] xs
+include Comparable.Make (Stable.Latest)
 
 let fee_excess = function
-  | One (_, fee) ->
+  | `One (_, fee) ->
       Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned fee)
-  | Two ((_, fee1), (_, fee2)) -> (
+  | `Two ((_, fee1), (_, fee2)) -> (
     match Currency.Fee.add fee1 fee2 with
     | None ->
         Or_error.error_string "Fee_transfer.fee_excess: overflow"
@@ -87,4 +54,4 @@ let fee_excess = function
         Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned res)
     )
 
-let receivers t = List.map (to_list t) ~f:(fun (pk, _) -> pk)
+let receivers t = One_or_two.map t ~f:(fun (pk, _) -> pk)

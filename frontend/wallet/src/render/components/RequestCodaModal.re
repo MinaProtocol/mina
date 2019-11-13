@@ -3,14 +3,6 @@ open Tc;
 module Styles = {
   open Css;
 
-  let modalBody =
-    style([
-      display(`flex),
-      flexDirection(`column),
-      alignItems(`center),
-      justifyContent(`center),
-    ]);
-
   let bodyMargin = style([margin(`rem(1.0)), width(`percent(100.))]);
 
   let publicKey =
@@ -23,44 +15,48 @@ module Styles = {
         backgroundColor(white),
         wordWrap(`breakWord),
         userSelect(`text),
+        color(Theme.Colors.midnightBlue),
       ]),
     ]);
 };
 
 [@react.component]
-let make = (~wallets, ~setModalState) => {
-  let activePublicKey = Hooks.useActiveWallet();
-  let (selectedWallet, setSelectedWallet) =
+let make = (~accounts, ~setModalState) => {
+  let activePublicKey = Hooks.useActiveAccount();
+  let (selectedAccount, setSelectedAccount) =
     React.useState(() => activePublicKey);
-  let handleClipboard = (~wallet, _) =>
-    Bindings.Navigator.Clipboard.writeTextTask(PublicKey.toString(wallet))
+  let toast = Hooks.useToast();
+  let handleClipboard = (~account, _) => {
+    Bindings.Navigator.Clipboard.writeTextTask(PublicKey.toString(account))
     |> Task.perform(~f=() => setModalState(_ => false));
+    toast("Copied public key to clipboard", ToastProvider.Default);
+  };
   <Modal title="Request Coda" onRequestClose={() => setModalState(_ => false)}>
-    <div className=Styles.modalBody>
+    <div className=Modal.Styles.default>
       <div className=Styles.bodyMargin>
         <Dropdown
           label="To"
-          value={Option.map(~f=PublicKey.toString, selectedWallet)}
+          value={Option.map(~f=PublicKey.toString, selectedAccount)}
           onChange={value =>
-            setSelectedWallet(_ => Some(PublicKey.ofStringExn(value)))
+            setSelectedAccount(_ => Some(PublicKey.ofStringExn(value)))
           }
           options={
-            wallets
-            |> Array.map(~f=wallet =>
+            accounts
+            |> Array.map(~f=account =>
                  (
-                   PublicKey.toString(wallet.Wallet.publicKey),
-                   <WalletDropdownItem wallet />,
+                   PublicKey.toString(account.Account.publicKey),
+                   <AccountDropdownItem account />,
                  )
                )
             |> Array.toList
           }
         />
         <Spacer height=1. />
-        {switch (selectedWallet) {
+        {switch (selectedAccount) {
          | None => React.null
-         | Some(selectedWallet) =>
+         | Some(selectedAccount) =>
            <div className=Styles.publicKey>
-             {React.string(PublicKey.toString(selectedWallet))}
+             {React.string(PublicKey.toString(selectedAccount))}
            </div>
          }}
       </div>
@@ -71,14 +67,14 @@ let make = (~wallets, ~setModalState) => {
           onClick={_ => setModalState(_ => false)}
         />
         <Spacer width=1. />
-        {switch (selectedWallet) {
+        {switch (selectedAccount) {
          | None =>
            <Button label="Copy public key" style=Button.Blue disabled=true />
-         | Some(selectedWallet) =>
+         | Some(selectedAccount) =>
            <Button
              label="Copy public key"
              style=Button.Blue
-             onClick={handleClipboard(~wallet=selectedWallet)}
+             onClick={handleClipboard(~account=selectedAccount)}
            />
          }}
       </div>

@@ -1,6 +1,14 @@
 open Core
 
-type t
+module Stable : sig
+  module V1 : sig
+    type t [@@deriving bin_io, version]
+  end
+
+  module Latest = V1
+end
+
+type t = Stable.V1.t
 
 module Level : sig
   type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
@@ -25,8 +33,20 @@ module Source : sig
 end
 
 module Metadata : sig
-  type t = Yojson.Safe.json String.Map.t [@@deriving yojson]
+  module Stable : sig
+    module V1 : sig
+      type t = Yojson.Safe.json String.Map.t
+      [@@deriving yojson, bin_io, version]
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.V1.t
 end
+
+(** Used only when dealing with the raw logging function *)
+val metadata : t -> Metadata.t
 
 module Message : sig
   type t =
@@ -65,7 +85,8 @@ module Transport : sig
      *  before writing to it. When the logs reach max
      *  size, the old log is deleted and a new log is
      *  started. *)
-    val dumb_logrotate : directory:string -> max_size:int -> t
+    val dumb_logrotate :
+      directory:string -> log_filename:string -> max_size:int -> t
   end
 end
 
@@ -78,10 +99,8 @@ end
  *  ensure the code does not accidentally attach the same
  *  consumer multiple times. *)
 module Consumer_registry : sig
-  type id = string
-
   val register :
-    id:id -> processor:Processor.t -> transport:Transport.t -> unit
+    id:string -> processor:Processor.t -> transport:Transport.t -> unit
 end
 
 type 'a log_function =
@@ -93,14 +112,15 @@ type 'a log_function =
   -> 'a
 
 val create :
-     ?metadata:(string, Yojson.Safe.json) List.Assoc.t
-  -> ?initialize_default_consumer:bool
-  -> unit
-  -> t
+  ?metadata:(string, Yojson.Safe.json) List.Assoc.t -> ?id:string -> unit -> t
 
 val null : unit -> t
 
 val extend : t -> (string, Yojson.Safe.json) List.Assoc.t -> t
+
+val change_id : t -> id:string -> t
+
+val raw : t -> Message.t -> unit
 
 val trace : _ log_function
 

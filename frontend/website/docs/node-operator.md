@@ -18,7 +18,12 @@ The Coda network is secured by [Proof-of-Stake consensus](/docs/glossary/#proof-
 
 Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can now start the daemon with the `-propose-key` flag to begin staking coda. Let's stop our current daemon process, and restart it with the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`):
 
-    coda daemon -peer something-snarky.o1test.net:8303 -propose-key keys/my-wallet
+    coda daemon \
+        -discovery-port 8303 \
+        -peer /ip4/52.39.56.50/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs \
+        -peer /ip4/18.212.230.102/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF \
+        -peer /ip4/52.13.17.206/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7 \
+        -propose-key keys/my-wallet
 
 !!! note
     You can provide a list of key files to turn on staking for multiple wallets at the same time
@@ -90,7 +95,10 @@ However, this isn't data encoding or compression in the traditional sense - rath
 When you [start the daemon](/docs/my-first-transaction/#start-up-a-node), set these extra arguments to also start a snark-worker:
 
     coda daemon \
-        -peer something-snarky.o1test.net:8303 \
+        -discovery-port 8303 \
+        -peer /ip4/52.39.56.50/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs \
+        -peer /ip4/18.212.230.102/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF \
+        -peer /ip4/52.13.17.206/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7 \
         -run-snark-worker $CODA_PK \
         -snark-worker-fee <fee>
 

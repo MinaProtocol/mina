@@ -43,7 +43,9 @@ module type Account = sig
 end
 
 module type Hash = sig
-  type t [@@deriving bin_io, sexp, eq, compare, yojson]
+  type t [@@deriving bin_io, compare, eq, sexp, yojson]
+
+  val to_string : t -> string
 
   include Hashable.S_binable with type t := t
 
@@ -63,11 +65,14 @@ end
 module type Key_value_database = sig
   type t [@@deriving sexp]
 
+  type config
+
   include
-    Key_value_database.S
+    Key_value_database.Intf.Ident
     with type t := t
      and type key := Bigstring.t
      and type value := Bigstring.t
+     and type config := config
 
   val get_uuid : t -> Uuid.t
 

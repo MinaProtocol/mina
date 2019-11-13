@@ -1,59 +1,47 @@
 open Core_kernel
 open Snark_params.Tick
 open Fold_lib
-open Module_version
 module Account_nonce = Coda_numbers.Account_nonce
 module Memo = User_command_memo
 
 module Common = struct
   module Poly = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type ('fee, 'nonce, 'memo) t = {fee: 'fee; nonce: 'nonce; memo: 'memo}
-          [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
-        end
-
-        include T
+        type ('fee, 'nonce, 'memo) t = {fee: 'fee; nonce: 'nonce; memo: 'memo}
+        [@@deriving compare, eq, sexp, hash, yojson]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type ('fee, 'nonce, 'memo) t = ('fee, 'nonce, 'memo) Stable.Latest.t =
       {fee: 'fee; nonce: 'nonce; memo: 'memo}
     [@@deriving eq, sexp, hash, yojson]
   end
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          ( Currency.Fee.Stable.V1.t
-          , Account_nonce.Stable.V1.t
-          , Memo.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
-      end
+      type t =
+        ( Currency.Fee.Stable.V1.t
+        , Account_nonce.Stable.V1.t
+        , Memo.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving compare, eq, sexp, hash, yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "user_command_payload_common"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
+  type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
+
+  let to_input ({fee; nonce; memo} : t) : _ Random_oracle.Input.t =
+    { field_elements= [||]
+    ; bitstrings=
+        [| Currency.Fee.to_bits fee
+         ; Account_nonce.Bits.to_bits nonce
+         ; Memo.to_bits memo |] }
 
   let fold ({fee; nonce; memo} : t) =
     Fold.(Currency.Fee.fold fee +> Account_nonce.fold nonce +> Memo.fold memo)
@@ -99,6 +87,15 @@ module Common = struct
       ; nonce= Account_nonce.Checked.constant nonce
       ; memo= Memo.Checked.constant memo }
 
+    let to_input ({fee; nonce; memo} : var) =
+      let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
+      let%map nonce = Account_nonce.Checked.to_bits nonce in
+      { Random_oracle.Input.field_elements= [||]
+      ; bitstrings=
+          [| s (Currency.Fee.var_to_bits fee)
+           ; s nonce
+           ; Array.to_list (memo :> Boolean.var array) |] }
+
     let to_triples ({fee; nonce; memo} : var) =
       let%map nonce = Account_nonce.Checked.to_triples nonce in
       Currency.Fee.var_to_triples fee @ nonce @ Memo.Checked.to_triples memo
@@ -106,32 +103,18 @@ module Common = struct
 end
 
 module Body = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          | Payment of Payment_payload.Stable.V1.t
-          | Stake_delegation of Stake_delegation.Stable.V1.t
-        [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
-      end
+      type t =
+        | Payment of Payment_payload.Stable.V1.t
+        | Stake_delegation of Stake_delegation.Stable.V1.t
+      [@@deriving compare, eq, sexp, hash, yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "user_command_payload_body"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t =
     | Payment of Payment_payload.Stable.V1.t
     | Stake_delegation of Stake_delegation.Stable.V1.t
@@ -162,49 +145,31 @@ module Body = struct
 end
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('common, 'body) t = {common: 'common; body: 'body}
-        [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
-      end
-
-      include T
+      type ('common, 'body) t = {common: 'common; body: 'body}
+      [@@deriving eq, sexp, hash, yojson, compare]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
     {common: 'common; body: 'body}
   [@@deriving eq, sexp, hash, yojson, compare]
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
-    end
+    type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
+    [@@deriving compare, eq, sexp, hash, yojson]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "user_command_payload"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 (* bin_io omitted *)
-type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
+type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
 let create ~fee ~nonce ~memo ~body : t = {common= {fee; nonce; memo}; body}
 

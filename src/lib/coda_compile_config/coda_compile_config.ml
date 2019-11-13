@@ -7,10 +7,7 @@
 [%%inject
 "coinbase_int", coinbase]
 
+[%%inject
+"pending_coinbase_hack", pending_coinbase_hack]
+
 let coinbase = Currency.Amount.of_int coinbase_int
-
-[%%inject
-"scan_state_transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
-
-[%%inject
-"scan_state_work_delay", scan_state_work_delay]

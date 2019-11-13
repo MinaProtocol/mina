@@ -5,12 +5,12 @@ open Snark_params
 open Tick
 open Coda_base
 open Coda_state
-open Let_syntax
 
 module type Update_intf = sig
   module Checked : sig
     val update :
-         State_hash.var * Protocol_state.var
+         logger:Logger.t
+      -> State_hash.var * Protocol_state.var
       -> Snark_transition.var
       -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
          , _ )
@@ -47,7 +47,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
       | _ ->
           fun _ _ _ _ _ _ _ -> Checked.return Boolean.true_
 
-    let%snarkydef update
+    let%snarkydef update ~(logger : Logger.t)
         ((previous_state_hash, previous_state) :
           State_hash.var * Protocol_state.var)
         (transition : Snark_transition.var) :
@@ -86,9 +86,12 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           let%map new_root =
             Pending_coinbase.Checked.add_coinbase root_after_delete
               ( Snark_transition.proposer transition
-              , Snark_transition.coinbase transition )
+              , Snark_transition.coinbase_amount transition
+              , Snark_transition.coinbase_state_body_hash transition )
           in
-          (new_root, deleted_stack)
+          if Coda_compile_config.pending_coinbase_hack then
+            (new_root, Pending_coinbase.Stack.Checked.empty)
+          else (new_root, deleted_stack)
         in
         let%bind correct_coinbase_status =
           let new_root =
@@ -96,7 +99,11 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
             |> Blockchain_state.staged_ledger_hash
             |> Staged_ledger_hash.pending_coinbase_hash_var
           in
-          Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
+          (*TODO: disabling the pending coinbase check until the prover crash is fixed*)
+          if Coda_compile_config.pending_coinbase_hack then
+            Checked.return Boolean.true_
+          else
+            Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
         in
         let%bind correct_transaction_snark =
           verify_complete_merge
@@ -113,28 +120,49 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         let%bind correct_snark =
           Boolean.(correct_transaction_snark || nothing_changed)
         in
-        Boolean.all
-          [correct_snark; updated_consensus_state; correct_coinbase_status]
+        let%bind result =
+          Boolean.all
+            [correct_snark; updated_consensus_state; correct_coinbase_status]
+        in
+        let%map () =
+          as_prover
+            As_prover.(
+              Let_syntax.(
+                let%map correct_transaction_snark =
+                  read Boolean.typ correct_transaction_snark
+                and nothing_changed = read Boolean.typ nothing_changed
+                and updated_consensus_state =
+                  read Boolean.typ updated_consensus_state
+                and correct_coinbase_status =
+                  read Boolean.typ correct_coinbase_status
+                and result = read Boolean.typ result in
+                Logger.trace logger
+                  "blockchain snark update success (check pending coinbase = \
+                   $check): $result = \
+                   (correct_transaction_snark=$correct_transaction_snark ∨ \
+                   nothing_changed=$nothing_changed) ∧ \
+                   updated_consensus_state=$updated_consensus_state ∧ \
+                   correct_coinbase_status=$correct_coinbase_status"
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ( "correct_transaction_snark"
+                      , `Bool correct_transaction_snark )
+                    ; ("nothing_changed", `Bool nothing_changed)
+                    ; ("updated_consensus_state", `Bool updated_consensus_state)
+                    ; ("correct_coinbase_status", `Bool correct_coinbase_status)
+                    ; ("result", `Bool result)
+                    ; ("check", `Bool Coda_compile_config.pending_coinbase_hack)
+                    ]))
+        in
+        result
       in
       let new_state =
         Protocol_state.create_var ~previous_state_hash
           ~blockchain_state:(Snark_transition.blockchain_state transition)
           ~consensus_state
       in
-      let%bind state_triples = Protocol_state.var_to_triples new_state in
-      let%bind state_partial =
-        Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty
-          ~start:Hash_prefix.length_in_triples state_triples
-      in
-      let%map state_hash =
-        Pedersen.Checked.Section.create
-          ~acc:(`Value Hash_prefix.protocol_state.acc)
-          ~support:
-            (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
-        |> Pedersen.Checked.Section.disjoint_union_exn state_partial
-        >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
-      in
-      (State_hash.var_of_hash_packed state_hash, new_state, `Success success)
+      let%map state_hash = Protocol_state.hash_checked new_state in
+      (state_hash, new_state, `Success success)
   end
 end
 
@@ -145,8 +173,5 @@ module Checked = struct
          ((Lazy.force Genesis_protocol_state.t).hash :> Field.t))
       (State_hash.var_to_hash_packed h)
 
-  let%snarkydef hash (t : Protocol_state.var) =
-    Protocol_state.var_to_triples t
-    >>= Pedersen.Checked.digest_triples ~init:Hash_prefix.protocol_state
-    >>| State_hash.var_of_hash_packed
+  let%snarkydef hash (t : Protocol_state.var) = Protocol_state.hash_checked t
 end

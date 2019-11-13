@@ -4,8 +4,6 @@ open Async_unix
 open Deferred.Let_syntax
 open Pipe_lib
 
-exception Child_died
-
 (* BTC alphabet *)
 let alphabet =
   B58.make_alphabet
@@ -40,9 +38,7 @@ type stream_state =
 
 module Helper = struct
   type t =
-    { subprocess: Process.t
-    ; mutable failure_response: [`Die | `Ignore]
-    ; lock_path: string
+    { subprocess: Child_processes.t
     ; conf_dir: string
     ; outstanding_requests: (int, Yojson.Safe.json Or_error.t Ivar.t) Hashtbl.t
           (**
@@ -63,7 +59,7 @@ module Helper = struct
     ; subscriptions: (int, subscription) Hashtbl.t
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
-    ; mutable new_peer_callback: (string -> unit) option
+    ; mutable new_peer_callback: (string -> string list -> unit) option
     ; mutable finished: bool }
 
   and subscription =
@@ -173,6 +169,7 @@ module Helper = struct
         { privk: string
         ; statedir: string
         ; ifaces: string list
+        ; external_maddr: string
         ; network_id: string }
       [@@deriving yojson]
 
@@ -276,7 +273,7 @@ module Helper = struct
       Logger.trace t.logger "sending line to libp2p_helper: $line"
         ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("line", `String rpc)] ;
-      Writer.write_line (Process.stdin t.subprocess) rpc ;
+      Writer.write_line (Child_processes.stdin t.subprocess) rpc ;
       let%map res_json = Ivar.read res in
       Or_error.bind res_json
         ~f:
@@ -329,14 +326,26 @@ module Helper = struct
     let us_them_eq a b =
       match (a, b) with `Us, `Us | `Them, `Them -> true | _, _ -> false
     in
+    let release () =
+      match Hashtbl.find_and_remove net.streams stream.idx with
+      | Some _ ->
+          ()
+      | None ->
+          Logger.error net.logger
+            "tried to release stream $idx but it was already gone"
+            ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("idx", `Int stream.idx)]
+    in
     stream.state
     <- ( match (stream.state, who_closed) with
        | FullyOpen, _ ->
            HalfClosed who_closed
        | HalfClosed other, _ ->
-           if us_them_eq other who_closed then double_close () else FullyClosed
+           if us_them_eq other who_closed then double_close () else release () ;
+           FullyClosed
        | FullyClosed, _ ->
            double_close () ) ;
+    (* TODO: maybe we can check some invariants on the Go side too? *)
     assert (stream_state_invariant stream)
 
   (** Track a new stream.
@@ -470,7 +479,8 @@ module Helper = struct
     end
 
     module Discovered_peer = struct
-      type t = {peer_id: string; multiaddrs: string list} [@@deriving yojson]
+      type t = {upcall: string; peer_id: string; multiaddrs: string list}
+      [@@deriving yojson]
     end
 
     let or_error (t : ('a, string) Result.t) =
@@ -595,7 +605,7 @@ module Helper = struct
         )
     | "discoveredPeer" ->
         let%map p = Discovered_peer.of_yojson v |> or_error in
-        Option.iter t.new_peer_callback ~f:(fun cb -> cb p.peer_id)
+        Option.iter t.new_peer_callback ~f:(fun cb -> cb p.peer_id p.multiaddrs)
     (* Received a message on some stream *)
     | "incomingStreamMsg" -> (
         let%bind m = Incoming_stream_msg.of_yojson v |> or_error in
@@ -610,17 +620,11 @@ module Helper = struct
     | "streamLost" ->
         let%bind m = Stream_lost.of_yojson v |> or_error in
         let stream_idx = m.stream_idx in
-        Logger.warn t.logger "Encountered error while reading stream: $error"
+        Logger.warn t.logger
+          "Encountered error while reading stream $idx: $error"
           ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("error", `String m.reason)] ;
-        let ret =
-          if Hashtbl.mem t.streams stream_idx then Ok ()
-          else
-            Or_error.errorf "lost a stream we don't know about: %d" stream_idx
-        in
-        Hashtbl.remove t.streams stream_idx ;
-        (* TODO: leaking pipes *)
-        ret
+          ~metadata:[("error", `String m.reason); ("idx", `Int stream_idx)] ;
+        Ok ()
     (* The remote peer closed its write end of one of our streams *)
     | "streamReadComplete" -> (
         let%bind m = Stream_read_complete.of_yojson v |> or_error in
@@ -636,53 +640,72 @@ module Helper = struct
     | s ->
         Or_error.errorf "unknown upcall %s" s
 
-  let create logger subprocess conf_dir lock_path =
-    let t =
-      { subprocess
-      ; failure_response= `Die
-      ; lock_path
-      ; conf_dir
-      ; logger
-      ; me_keypair= None
-      ; outstanding_requests= Hashtbl.create (module Int)
-      ; subscriptions= Hashtbl.create (module Int)
-      ; streams= Hashtbl.create (module Int)
-      ; new_peer_callback= None
-      ; protocol_handlers= Hashtbl.create (module String)
-      ; seqno= 1
-      ; finished= false }
-    in
-    let err = Process.stderr subprocess in
-    let errlines = Reader.lines err in
-    let lines = Process.stdout subprocess |> Reader.lines in
-    Pipe.iter errlines ~f:(fun line ->
-        (* TODO: the log messages are JSON, parse them and log at the appropriate level *)
-        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-          "log message from libp2p_helper: $line"
-          ~metadata:[("line", `String line)] ;
-        Deferred.unit )
-    |> don't_wait_for ;
-    Pipe.iter lines ~f:(fun line ->
-        let open Yojson.Safe.Util in
-        let v = Yojson.Safe.from_string line in
-        Logger.trace logger "handling line from helper: $line"
-          ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("line", `String line)] ;
-        ( match
-            if member "upcall" v = `Null then handle_response t v
-            else handle_upcall t v
-          with
-        | Ok () ->
-            ()
-        | Error e ->
-            Logger.error logger "handling line from helper failed! $err"
-              ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ("line", `String line)
-                ; ("err", `String (Error.to_string_hum e)) ] ) ;
-        Deferred.unit )
-    |> don't_wait_for ;
-    t
+  let create logger conf_dir =
+    let outstanding_requests = Hashtbl.create (module Int) in
+    match%bind
+      Child_processes.start_custom ~logger ~name:"libp2p_helper"
+        ~git_root_relative_path:
+          "src/app/libp2p_helper/result/bin/libp2p_helper" ~conf_dir ~args:[]
+        ~stdout:(`Log Logger.Level.Trace, `Pipe)
+        ~stderr:
+          (`Log Logger.Level.Debug, `No_pipe)
+          (* TODO the stderr log messages are JSON but not in our format. The
+             helper should either emit our format or we should convert in
+             OCaml *)
+        ~termination:
+          (`Handler
+            (fun ~killed e ->
+              if killed then (
+                Hashtbl.iter outstanding_requests ~f:(fun iv ->
+                    Ivar.fill iv
+                      (Or_error.error_string
+                         "libp2p_helper process died before answering") ) ;
+                Deferred.unit )
+              else (
+                Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                  !"libp2p_helper process died: %s"
+                  (Unix.Exit_or_signal.to_string_hum e) ;
+                raise Child_processes.Child_died ) ))
+    with
+    | Error e ->
+        Deferred.Or_error.error_string
+          ( "Could not start libp2p_helper. If you are a dev, did you forget \
+             to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
+             CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper "
+          ^ Error.to_string_hum e )
+    | Ok subprocess ->
+        let t =
+          { subprocess
+          ; conf_dir
+          ; logger
+          ; me_keypair= None
+          ; outstanding_requests
+          ; subscriptions= Hashtbl.create (module Int)
+          ; streams= Hashtbl.create (module Int)
+          ; new_peer_callback= None
+          ; protocol_handlers= Hashtbl.create (module String)
+          ; seqno= 1
+          ; finished= false }
+        in
+        Strict_pipe.Reader.iter (Child_processes.stdout_lines subprocess)
+          ~f:(fun line ->
+            let open Yojson.Safe.Util in
+            let v = Yojson.Safe.from_string line in
+            ( match
+                if member "upcall" v = `Null then handle_response t v
+                else handle_upcall t v
+              with
+            | Ok () ->
+                ()
+            | Error e ->
+                Logger.error logger "handling line from helper failed! $err"
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ("line", `String line)
+                    ; ("err", `String (Error.to_string_hum e)) ] ) ;
+            Deferred.unit )
+        |> don't_wait_for ;
+        Deferred.Or_error.return t
 end [@(* Warning 30 is about field labels being defined in multiple types.
      It means more disambiguation has to happen sometimes but it doesn't
      seem to be a big deal. *)
@@ -711,19 +734,30 @@ module Keypair = struct
   let secret_key_base58 {secret; _} = to_b58_data secret
 
   let to_string {secret; public; peer_id} =
-    String.concat ~sep:";"
-      [to_b58_data secret; to_b58_data public; to_b58_data peer_id]
+    String.concat ~sep:"," [to_b58_data secret; to_b58_data public; peer_id]
 
   let of_string s =
-    match String.split s ~on:';' with
-    | [secret_b58; public_b58; peer_id_b58] ->
-        let open Or_error.Let_syntax in
-        let%map secret = of_b58_data (`String secret_b58)
-        and public = of_b58_data (`String public_b58)
-        and peer_id = of_b58_data (`String peer_id_b58) in
-        {secret; public; peer_id}
-    | _ ->
-        Or_error.errorf "%s is not a valid Keypair.to_string output" s
+    let with_semicolon =
+      match String.split s ~on:';' with
+      | [secret_b58; public_b58; peer_id] ->
+          let open Or_error.Let_syntax in
+          let%map secret = of_b58_data (`String secret_b58)
+          and public = of_b58_data (`String public_b58) in
+          {secret; public; peer_id}
+      | _ ->
+          Or_error.errorf "%s is not a valid Keypair.to_string output" s
+    in
+    let with_comma =
+      match String.split s ~on:',' with
+      | [secret_b58; public_b58; peer_id] ->
+          let open Or_error.Let_syntax in
+          let%map secret = of_b58_data (`String secret_b58)
+          and public = of_b58_data (`String public_b58) in
+          {secret; public; peer_id}
+      | _ ->
+          Or_error.errorf "%s is not a valid Keypair.to_string output" s
+    in
+    if Or_error.is_error with_semicolon then with_comma else with_semicolon
 
   let to_peerid {peer_id; _} = peer_id
 end
@@ -743,6 +777,8 @@ module Multiaddr = struct
 
   let of_string t = t
 end
+
+type discovered_peer = {id: PeerID.t; maddrs: Multiaddr.t list}
 
 module Pubsub = struct
   let publish net ~topic ~data =
@@ -849,19 +885,24 @@ end
 
 let me (net : Helper.t) = net.me_keypair
 
-let configure net ~me ~maddrs ~network_id ~on_new_peer =
+let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
       { privk= Keypair.secret_key_base58 me
       ; statedir= net.conf_dir
       ; ifaces= List.map ~f:Multiaddr.to_string maddrs
+      ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id }
   with
   | Ok "configure success" ->
       net.me_keypair <- Some me ;
       net.new_peer_callback
-      <- Some (fun peer_id_string -> on_new_peer (peer_id_string :> PeerID.t)) ;
+      <- Some
+           (fun peer_id peer_addrs ->
+             on_new_peer
+               { id= (peer_id :> PeerID.t)
+               ; maddrs= List.map ~f:Multiaddr.of_string peer_addrs } ) ;
       Ok ()
   | Ok j ->
       failwithf "helper broke RPC protocol: configure got %s" j ()
@@ -889,16 +930,21 @@ let listening_addrs net =
       Error e
 
 (** TODO: graceful shutdown. Reset all our streams, sync the databases, then
-shutdown. Replace kill invocation with an RPC. *)
+    shutdown. Replace kill invocation with an RPC. *)
 let shutdown (net : net) =
-  net.failure_response <- `Ignore ;
-  let%bind _ =
-    Process.run_exn ~prog:"kill"
-      ~args:[Pid.to_string (Process.pid net.subprocess)]
-      ()
+  let fail exit =
+    failwithf
+      !"Libp2p helper died when shutting down with unexpected exit: %{sexp: \
+        Unix.Exit_or_signal.t}"
+      exit ()
   in
-  let%bind _ = Process.wait net.subprocess in
-  Sys.remove net.lock_path
+  Child_processes.kill net.subprocess
+  >>| Or_error.ok_exn
+  >>= function
+  | Error (`Signal s) as exit ->
+      if Signal.equal s Signal.term then Deferred.unit else fail exit
+  | exit ->
+      fail exit
 
 module Stream = struct
   type t = Helper.stream
@@ -1011,131 +1057,10 @@ let begin_advertising net =
   | Error e ->
       Error e
 
-(* Create and helpers for create *)
-
-(* Unfortunately, `dune runtest` runs in a pwd deep inside the build
- * directory. This hack finds the project root by recursively looking for the
-   dune-project file. *)
-let get_project_root () =
-  let open Filename in
-  let rec go dir =
-    if Core.Sys.file_exists_exn @@ dir ^/ "src/dune-project" then Some dir
-    else if String.equal dir "/" then None
-    else go @@ fst @@ split dir
-  in
-  go @@ realpath current_dir_name
-
-let lock_file = "libp2p_helper.lock"
-
-let write_lock_file lock_path pid =
-  Async.Writer.save lock_path ~contents:(Pid.to_string pid)
-
-let keep_trying :
-    f:('a -> 'b Deferred.Or_error.t) -> 'a list -> 'b Deferred.Or_error.t =
- fun ~f xs ->
-  let open Deferred.Let_syntax in
-  let rec go e xs : 'b Deferred.Or_error.t =
-    match xs with
-    | [] ->
-        return e
-    | x :: xs -> (
-        match%bind f x with
-        | Ok r ->
-            return (Ok r)
-        | Error e ->
-            go (Error e) xs )
-  in
-  go (Or_error.error_string "empty input") xs
-
 let create ~logger ~conf_dir =
-  let conf_dir = conf_dir ^/ "libp2p_helper" in
-  let%bind () = Unix.mkdir ~p:() conf_dir in
-  let lock_path = Filename.concat conf_dir lock_file in
-  let run_p2p () =
-    (* This is where nix dumps the go artifact *)
-    let libp2p_helper_binary =
-      "src/app/libp2p_helper/result/bin/libp2p_helper"
-    in
-    (* This is where you'd manually install kademlia *)
-    let coda_libp2p_helper = "coda-libp2p_helper" in
-    let open Deferred.Let_syntax in
-    match%map
-      keep_trying
-        ( ( Unix.getenv "CODA_LIBP2P_HELPER_PATH"
-          |> Option.value ~default:coda_libp2p_helper )
-        ::
-        ( match get_project_root () with
-        | Some path ->
-            [path ^/ libp2p_helper_binary]
-        | None ->
-            [] ) )
-        ~f:(fun prog -> Process.create ~prog ~args:[] ())
-      |> Deferred.Or_error.map ~f:(fun p ->
-             Helper.create logger p conf_dir lock_path )
-    with
-    | Ok p ->
-        (* If the libp2p_helper process dies, kill the parent daemon process. Fix
-       * for #550 *)
-        Deferred.upon (Process.wait p.subprocess) (fun code ->
-            p.finished <- true ;
-            match (p.failure_response, code) with
-            | `Ignore, _ | _, Ok () ->
-                Hashtbl.iter p.outstanding_requests ~f:(fun iv ->
-                    Ivar.fill iv
-                      (Or_error.error_string
-                         "libp2p_helper process died before answering") )
-            | `Die, (Error _ as e) ->
-                Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                  !"libp2p_helper process died: %s"
-                  (Unix.Exit_or_signal.to_string_hum e) ;
-                raise Child_died ) ;
-        Ok p
-    | Error e ->
-        Or_error.error_string
-          ( "Could not start libp2p_helper. If you are a dev, did you forget \
-             to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
-             CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper "
-          ^ Error.to_string_hum e )
-  in
-  let kill_locked_process ~logger =
-    (* TODO: is there something better than this PID file pattern to use? *)
-    match%bind Sys.file_exists lock_path with
-    | `Yes -> (
-        let%bind p = (* FIXME: TOCTOU *) Reader.file_contents lock_path in
-        match%bind Process.run ~prog:"kill" ~args:[p] () with
-        | Ok _ ->
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "Killed dead libp2p_helper process %s" p ;
-            let%bind () = Sys.remove lock_path in
-            (* Let the process die and be reaped. *)
-            let%map () = after (sec 5.) in
-            Ok ()
-        | Error _ ->
-            let%map () = Sys.remove lock_path in
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "Process %s does not exist and will not be killed (removing \
-               lock fle)"
-              p ;
-            Ok () )
-    | _ ->
-        return @@ Ok ()
-  in
-  let open Deferred.Or_error.Let_syntax in
-  let%bind () = kill_locked_process ~logger in
-  match%bind Sys.is_directory conf_dir |> Deferred.map ~f:Or_error.return with
-  | `Yes ->
-      let%bind t = run_p2p () in
-      let%map () =
-        write_lock_file lock_path (Process.pid t.subprocess)
-        |> Deferred.map ~f:Or_error.return
-      in
-      t
-  | _ ->
-      Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
+  let conf_dir' = conf_dir ^/ "libp2p_helper" in
+  Unix.mkdir ~p:() conf_dir' >>= fun () -> Helper.create logger conf_dir'
 
-(* Temporarily commenting out while we figure out how to build libp2p_helper on CI
-       *
-       *
 let%test_module "coda network tests" =
   ( module struct
     let () = Backtrace.elide := false
@@ -1167,10 +1092,20 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~me:kp_a ~maddrs ~network_id ~on_new_peer:None >>| Or_error.ok_exn
-      and () = configure b ~me:kp_b ~maddrs ~network_id ~on_new_peer:None >>| Or_error.ok_exn in
+        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
+          ~network_id ~on_new_peer:Fn.ignore
+        >>| Or_error.ok_exn
+      and () =
+        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
+          ~network_id ~on_new_peer:Fn.ignore
+        >>| Or_error.ok_exn
+      in
+      let%bind a_advert = begin_advertising a
+      and b_advert = begin_advertising b in
+      Or_error.ok_exn a_advert ;
+      Or_error.ok_exn b_advert ;
       (* Give the helpers time to announce and discover each other on localhost *)
-      let%map () = after (Time.Span.of_sec 0.5) in
+      let%map () = after (Time.Span.of_sec 1.5) in
       let shutdown () =
         let%bind () = shutdown a in
         let%bind () = shutdown b in
@@ -1252,5 +1187,3 @@ let%test_module "coda network tests" =
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
   end )
-  
-  *)

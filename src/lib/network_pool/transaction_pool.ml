@@ -2,13 +2,14 @@
     the Network_pool module, this handles storing and gossiping the correct
     transactions (user commands) and providing them to the proposer code. *)
 
-open Core_kernel
+open Core
 open Async
 open Coda_base
 open Module_version
 open Pipe_lib
 open Signature_lib
 
+(* TEMP HACK UNTIL DEFUNCTORING: transition frontier interface is simplified *)
 module type Transition_frontier_intf = sig
   type t
 
@@ -20,18 +21,14 @@ module type Transition_frontier_intf = sig
     val staged_ledger : t -> staged_ledger
   end
 
-  module Diff : sig
-    module Best_tip_diff : sig
-      type view =
-        { new_user_commands: User_command.t list
-        ; removed_user_commands: User_command.t list
-        ; reorg_best_tip: bool }
-    end
-  end
+  type best_tip_diff =
+    { new_user_commands: User_command.t list
+    ; removed_user_commands: User_command.t list
+    ; reorg_best_tip: bool }
 
   val best_tip : t -> Breadcrumb.t
 
-  val best_tip_diff_pipe : t -> Diff.Best_tip_diff.view Broadcast_pipe.Reader.t
+  val best_tip_diff_pipe : t -> best_tip_diff Broadcast_pipe.Reader.t
 end
 
 module type S = sig
@@ -55,11 +52,13 @@ module type S = sig
     with type resource_pool := Resource_pool.t
      and type transition_frontier := transition_frontier
      and type resource_pool_diff := Resource_pool.Diff.t
+     and type config := Resource_pool.Config.t
 
-  val add : t -> User_command.t -> unit Deferred.t
+  val add : t -> User_command.t list -> unit Deferred.t
 end
 
-(* Functor over user command, base ledger and transaction validator for mocking. *)
+(* Functor over user command, base ledger and transaction validator for
+   mocking. *)
 module Make0 (Base_ledger : sig
   type t
 
@@ -85,10 +84,24 @@ struct
   module Resource_pool = struct
     include Max_size
 
+    module Config = struct
+      type t = {trust_system: Trust_system.t sexp_opaque}
+      [@@deriving sexp_of, make]
+    end
+
+    let make_config = Config.make
+
     type t =
       { mutable pool: Indexed_pool.t
+      ; locally_generated_uncommitted:
+          (User_command.With_valid_signature.t, Time.t) Hashtbl.t
+            (** Commands generated on this machine, that are not included in the
+                current best tip, along with the time they were added. *)
+      ; locally_generated_committed:
+          (User_command.With_valid_signature.t, Time.t) Hashtbl.t
+            (** Ones that are included in the current best tip. *)
+      ; config: Config.t
       ; logger: Logger.t sexp_opaque
-      ; trust_system: Trust_system.t sexp_opaque
       ; mutable diff_reader: unit Deferred.t sexp_opaque Option.t
       ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
     [@@deriving sexp_of]
@@ -99,16 +112,14 @@ struct
       Sequence.unfold ~init:p ~f:(fun pool ->
           match Indexed_pool.get_highest_fee pool with
           | Some cmd ->
-              let unchecked = User_command.forget_check cmd in
               Some
                 ( cmd
-                , Indexed_pool.handle_committed_txn pool
-                    (User_command.sender unchecked)
-                    (User_command.nonce unchecked)
-                    (* we have the invariant that the transactions currently in
-                     the pool are always valid against the best tip, so no need
-                     to check balances here *)
-                    Currency.Amount.max_int )
+                , fst
+                  @@ Indexed_pool.handle_committed_txn pool cmd
+                       (* we have the invariant that the transactions currently
+                          in the pool are always valid against the best tip, so
+                          no need to check balances here *)
+                       Currency.Amount.max_int )
           | None ->
               None )
 
@@ -138,18 +149,32 @@ struct
       in
       go pool @@ Sequence.empty
 
+    let has_sufficient_fee pool cmd : bool =
+      match Indexed_pool.min_fee pool with
+      | None ->
+          true
+      | Some min_fee ->
+          if Indexed_pool.size pool >= pool_max_size then
+            Currency.Fee.(User_command.fee cmd > min_fee)
+          else true
+
     let handle_diff t frontier
         ({new_user_commands; removed_user_commands; reorg_best_tip= _} :
-          Transition_frontier.Diff.Best_tip_diff.view) =
-      (* This runs whenever the best tip changes. The simple case is when the new
-         best tip is an extension of the old one. There, we remove any user
-         commands that were included in it from the transaction pool. Dealing with
-         a fork is more intricate. In general we want to remove any commands from
-         the pool that are included in the new best tip; and add any commands to
-         the pool that were included in the old one but not the new one, provided
-         they are still valid against the ledger of the best tip. The goal is that
-         transactions are carried from losing forks to winning ones as much as
-         possible. *)
+          Transition_frontier.best_tip_diff) =
+      (* This runs whenever the best tip changes. The simple case is when the
+         new best tip is an extension of the old one. There, we just remove any
+         user commands that were included in it from the transaction pool.
+         Dealing with a fork is more intricate. In general we want to remove any
+         commands from the pool that are included in the new best tip; and add
+         any commands to the pool that were included in the old one but not the
+         new one, provided they are still valid against the ledger of the best
+         tip. The goal is that transactions are carried from losing forks to
+         winning ones as much as possible.
+
+         The locally generated commands need to move from
+         locally_generated_uncommitted to locally_generated_committed and vice
+         versa so those hashtables remain in sync with reality.
+      *)
       let validation_ledger = get_best_tip_ledger_and_update t frontier in
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
@@ -168,16 +193,41 @@ struct
                      "somehow user command from the frontier has an invalid \
                       signature!"
                    (User_command.check unchecked) ) )
-          ~init:(t.pool, 0)
+          ~init:(t.pool, Sequence.empty)
           ~f:(fun (pool, dropped_so_far) cmd ->
+            ( match
+                Hashtbl.find_and_remove t.locally_generated_committed cmd
+              with
+            | None ->
+                ()
+            | Some time_added ->
+                Hashtbl.add_exn t.locally_generated_uncommitted ~key:cmd
+                  ~data:time_added ) ;
             let pool', dropped_seq =
               drop_until_below_max_size
               @@ Indexed_pool.add_from_backtrack pool cmd
             in
-            (pool', Sequence.length dropped_seq + dropped_so_far) )
+            (pool', Sequence.append dropped_so_far dropped_seq) )
       in
-      let pool'' =
-        List.fold new_user_commands ~init:pool' ~f:(fun p cmd ->
+      (* Track what locally generated commands were removed from the pool
+         during backtracking due to the max size constraint. *)
+      let locally_generated_dropped =
+        Sequence.filter dropped_backtrack
+          ~f:(Hashtbl.mem t.locally_generated_uncommitted)
+        |> Sequence.to_list_rev
+      in
+      if not (List.is_empty locally_generated_dropped) then
+        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Dropped locally generated commands $cmds during backtracking to \
+           maintain max size. Will attempt to re-add after forwardtracking."
+          ~metadata:
+            [ ( "cmds"
+              , `List
+                  (List.map ~f:User_command.With_valid_signature.to_yojson
+                     locally_generated_dropped) ) ] ;
+      let pool'', dropped_commit_conflicts =
+        List.fold new_user_commands ~init:(pool', Sequence.empty)
+          ~f:(fun (p, dropped_so_far) cmd ->
             let sender = User_command.sender cmd in
             let balance =
               match Base_ledger.location_of_key validation_ledger sender with
@@ -191,21 +241,105 @@ struct
                   in
                   acc.balance
             in
-            Indexed_pool.handle_committed_txn p sender (User_command.nonce cmd)
-              (Currency.Balance.to_amount balance) )
+            let cmd' = User_command.check cmd |> Option.value_exn in
+            ( match
+                Hashtbl.find_and_remove t.locally_generated_uncommitted cmd'
+              with
+            | None ->
+                ()
+            | Some time_added ->
+                Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                  "Locally generated command $cmd committed in a block!"
+                  ~metadata:[("cmd", User_command.to_yojson cmd)] ;
+                Hashtbl.add_exn t.locally_generated_committed ~key:cmd'
+                  ~data:time_added ) ;
+            let p', dropped =
+              Indexed_pool.handle_committed_txn p cmd'
+                (Currency.Balance.to_amount balance)
+            in
+            (p', Sequence.append dropped_so_far dropped) )
       in
+      let commit_conflicts_locally_generated =
+        Sequence.filter dropped_commit_conflicts ~f:(fun cmd ->
+            Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+            |> Option.is_some )
+      in
+      if not @@ Sequence.is_empty commit_conflicts_locally_generated then
+        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Locally generated commands $cmds dropped because they conflicted \
+           with a committed command."
+          ~metadata:
+            [ ( "cmds"
+              , `List
+                  (Sequence.to_list
+                     (Sequence.map commit_conflicts_locally_generated
+                        ~f:User_command.With_valid_signature.to_yojson)) ) ] ;
       Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
         !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
           %i commands during backtracking to maintain max size."
-        (Indexed_pool.size t.pool) (Indexed_pool.size pool'') dropped_backtrack ;
+        (Indexed_pool.size t.pool) (Indexed_pool.size pool'')
+        (Sequence.length dropped_backtrack) ;
       t.pool <- pool'' ;
+      List.iter locally_generated_dropped ~f:(fun cmd ->
+          (* If the dropped transaction was included in the winning chain, it'll
+             be in locally_generated_committed. If it wasn't, try re-adding to
+             the pool. *)
+          let remove_cmd () =
+            assert (
+              Option.is_some
+              @@ Hashtbl.find_and_remove t.locally_generated_uncommitted cmd )
+          in
+          let log_invalid () =
+            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+              "Couldn't re-add locally generated command $cmd, not valid \
+               against new ledger."
+              ~metadata:
+                [("cmd", User_command.to_yojson (cmd :> User_command.t))] ;
+            remove_cmd ()
+          in
+          if not (Hashtbl.mem t.locally_generated_committed cmd) then
+            if not (has_sufficient_fee t.pool (cmd :> User_command.t)) then (
+              Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                "Not re-adding locally generated command $cmd to pool, \
+                 insufficient fee"
+                ~metadata:
+                  [("cmd", User_command.to_yojson (cmd :> User_command.t))] ;
+              remove_cmd () )
+            else
+              match
+                Option.bind
+                  (Base_ledger.location_of_key validation_ledger
+                     (User_command.sender (cmd :> User_command.t)))
+                  ~f:(Base_ledger.get validation_ledger)
+              with
+              | Some acct -> (
+                match
+                  Indexed_pool.add_from_gossip_exn t.pool cmd acct.nonce
+                    (Currency.Balance.to_amount acct.balance)
+                with
+                | Error _ ->
+                    log_invalid ()
+                | Ok (pool''', _) ->
+                    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                      "re-added locally generated command $cmd to transaction \
+                       pool after reorg"
+                      ~metadata:
+                        [ ( "cmd"
+                          , User_command.to_yojson (cmd :> User_command.t) ) ] ;
+                    t.pool <- pool''' )
+              | None ->
+                  log_invalid () ) ;
       Deferred.unit
 
-    let create ~logger ~trust_system ~frontier_broadcast_pipe =
+    let create ~frontier_broadcast_pipe ~config ~logger =
       let t =
         { pool= Indexed_pool.empty
+        ; locally_generated_uncommitted=
+            Hashtbl.create (module User_command.With_valid_signature)
+        ; locally_generated_committed=
+            Hashtbl.create (module User_command.With_valid_signature)
+        ; config
         ; logger
-        ; trust_system
         ; diff_reader= None
         ; best_tip_ledger= None }
       in
@@ -216,8 +350,8 @@ struct
              | None -> (
                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                    "no frontier" ;
-                 (* Sanity check: the view pipe should have been closed before the
-                          frontier was destroyed. *)
+                 (* Sanity check: the view pipe should have been closed before
+                    the frontier was destroyed. *)
                  match t.diff_reader with
                  | None ->
                      Deferred.unit
@@ -242,9 +376,8 @@ struct
                  let validation_ledger =
                    get_best_tip_ledger_and_update t frontier
                  in
-                 (* The frontier has changed, so transactions in the pool may not
-                    be valid against the current best tip.
-                 *)
+                 (* The frontier has changed, so transactions in the pool may
+                    not be valid against the current best tip. *)
                  let new_pool, dropped =
                    Indexed_pool.revalidate t.pool (fun sender ->
                        match
@@ -263,6 +396,36 @@ struct
                            (acc.nonce, Currency.Balance.to_amount acc.balance)
                    )
                  in
+                 let dropped_locally_generated =
+                   Sequence.filter dropped ~f:(fun cmd ->
+                       let find_remove_bool tbl =
+                         Hashtbl.find_and_remove tbl cmd |> Option.is_some
+                       in
+                       let dropped_committed =
+                         find_remove_bool t.locally_generated_committed
+                       in
+                       let dropped_uncommitted =
+                         find_remove_bool t.locally_generated_uncommitted
+                       in
+                       (* Nothing should be in both tables. *)
+                       assert (not (dropped_committed && dropped_uncommitted)) ;
+                       dropped_committed || dropped_uncommitted )
+                 in
+                 (* In this situation we don't know whether the commands aren't
+                    valid against the new ledger because they were already
+                    committed or because they conflict with others,
+                    unfortunately. *)
+                 if not (Sequence.is_empty dropped_locally_generated) then
+                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                     "Dropped locally generated commands $cmds from pool when \
+                      transition frontier was recreated."
+                     ~metadata:
+                       [ ( "cmds"
+                         , `List
+                             (List.map
+                                (Sequence.to_list dropped_locally_generated)
+                                ~f:User_command.With_valid_signature.to_yojson)
+                         ) ] ;
                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                    !"Re-validated transaction pool after restart: dropped %i \
                      of %i previously in pool"
@@ -316,8 +479,8 @@ struct
                unavailable, ignoring."
         | Some ledger ->
             let trust_record =
-              Trust_system.record_envelope_sender t.trust_system t.logger
-                sender
+              Trust_system.record_envelope_sender t.config.trust_system
+                t.logger sender
             in
             let rec go txs' pool accepted =
               match txs' with
@@ -363,16 +526,7 @@ struct
                           in
                           go txs'' pool accepted
                       | Some account ->
-                          let sufficient_fee =
-                            match Indexed_pool.min_fee pool with
-                            | None ->
-                                true
-                            | Some min_fee ->
-                                if Indexed_pool.size pool >= pool_max_size then
-                                  Currency.Fee.(User_command.fee tx > min_fee)
-                                else true
-                          in
-                          if sufficient_fee then
+                          if has_sufficient_fee pool tx then
                             let add_res =
                               Indexed_pool.add_from_gossip_exn pool tx'
                                 account.nonce
@@ -401,6 +555,13 @@ struct
                                         , [("cmd", User_command.to_yojson tx)]
                                         ) )
                                 in
+                                if
+                                  Envelope.Sender.equal sender
+                                    Envelope.Sender.Local
+                                then
+                                  Hashtbl.add_exn
+                                    t.locally_generated_uncommitted ~key:tx'
+                                    ~data:(Time.now ()) ;
                                 let pool'', dropped_for_size =
                                   drop_until_below_max_size pool'
                                 in
@@ -430,12 +591,40 @@ struct
                                       [ ( "cmds"
                                         , seq_cmd_to_yojson dropped_for_size )
                                       ] ;
+                                let locally_generated_dropped =
+                                  Sequence.filter
+                                    (Sequence.append dropped dropped_for_size)
+                                    ~f:(fun tx_dropped ->
+                                      Hashtbl.find_and_remove
+                                        t.locally_generated_uncommitted
+                                        tx_dropped
+                                      |> Option.is_some )
+                                  |> Sequence.to_list
+                                in
+                                if
+                                  not (List.is_empty locally_generated_dropped)
+                                then
+                                  Logger.info t.logger ~module_:__MODULE__
+                                    ~location:__LOC__
+                                    "Dropped locally generated commands $cmds \
+                                     from transaction pool due to replacement \
+                                     or max size"
+                                    ~metadata:
+                                      [ ( "cmds"
+                                        , `List
+                                            (List.map
+                                               ~f:
+                                                 User_command
+                                                 .With_valid_signature
+                                                 .to_yojson
+                                               locally_generated_dropped) ) ] ;
                                 go txs'' pool'' (tx :: accepted)
                             | Error `Insufficient_replace_fee ->
                                 (* We can't punish peers for this, since an
-                               attacker can simultaneously send different
-                               transactions at the same nonce to different
-                               nodes, which will then naturally gossip them. *)
+                                   attacker can simultaneously send different
+                                   transactions at the same nonce to different
+                                   nodes, which will then naturally gossip them.
+                                *)
                                 Logger.debug t.logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   "rejecting $cmd because of insufficient \
@@ -467,13 +656,53 @@ struct
             in
             go txs t.pool []
     end
+
+    let get_rebroadcastable (t : t) ~is_expired =
+      let metadata ~(key : User_command.With_valid_signature.t) ~data =
+        [ ("cmd", User_command.to_yojson (key :> User_command.t))
+        ; ("time", `String (Time.to_string_abs ~zone:Time.Zone.utc data)) ]
+      in
+      let added_str =
+        "it was added at $time and its rebroadcast period is now expired."
+      in
+      Hashtbl.filteri_inplace t.locally_generated_uncommitted
+        ~f:(fun ~key ~data ->
+          match is_expired data with
+          | `Expired ->
+              Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                "No longer rebroadcasting uncommitted command $cmd, %s"
+                added_str ~metadata:(metadata ~key ~data) ;
+              false
+          | `Ok ->
+              true ) ;
+      Hashtbl.filteri_inplace t.locally_generated_committed
+        ~f:(fun ~key ~data ->
+          match is_expired data with
+          | `Expired ->
+              Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                "Removing committed locally generated command $cmd from \
+                 possible rebroadcast pool, %s"
+                added_str ~metadata:(metadata ~key ~data) ;
+              false
+          | `Ok ->
+              true ) ;
+      (* Important to maintain ordering here *)
+      let rebroadcastable_txs =
+        (Hashtbl.keys t.locally_generated_uncommitted :> User_command.t list)
+      in
+      if List.is_empty rebroadcastable_txs then []
+      else
+        [ List.sort rebroadcastable_txs ~compare:(fun tx1 tx2 ->
+              User_command.(
+                Coda_numbers.Account_nonce.compare (nonce tx1) (nonce tx2)) )
+        ]
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
 
   (* TODO: This causes the signature to get checked twice as it is checked
      below before feeding it to add *)
-  let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
+  let add t txns = apply_and_broadcast t (Envelope.Incoming.local txns)
 end
 
 (* Use this one in downstream consumers *)
@@ -486,7 +715,7 @@ end)
                        with type staged_ledger := Staged_ledger.t) :
   S
   with type transition_frontier := Transition_frontier.t
-   and type best_tip_diff := Transition_frontier.Diff.Best_tip_diff.view =
+   and type best_tip_diff := Transition_frontier.best_tip_diff =
   Make0
     (Coda_base.Ledger)
     (struct
@@ -504,7 +733,20 @@ end)
     (Staged_ledger)
     (Transition_frontier)
 
-include Make (Staged_ledger) (Transition_frontier)
+(* TODO: defunctor or remove monkey patching (#3731) *)
+include Make
+          (Staged_ledger)
+          (struct
+            include Transition_frontier
+
+            type best_tip_diff = Extensions.Best_tip_diff.view =
+              { new_user_commands: User_command.t list
+              ; removed_user_commands: User_command.t list
+              ; reorg_best_tip: bool }
+
+            let best_tip_diff_pipe t =
+              Extensions.(get_view_pipe (extensions t) Best_tip_diff)
+          end)
 
 let%test_module _ =
   ( module struct
@@ -535,27 +777,20 @@ let%test_module _ =
         let staged_ledger = Fn.id
       end
 
-      module Diff = struct
-        module Best_tip_diff = struct
-          type view =
-            { new_user_commands: User_command.t list
-            ; removed_user_commands: User_command.t list
-            ; reorg_best_tip: bool }
-        end
-      end
+      type best_tip_diff =
+        { new_user_commands: User_command.t list
+        ; removed_user_commands: User_command.t list
+        ; reorg_best_tip: bool }
 
-      type t =
-        Diff.Best_tip_diff.view Broadcast_pipe.Reader.t * Breadcrumb.t ref
+      type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-      let create : unit -> t * Diff.Best_tip_diff.view Broadcast_pipe.Writer.t
-          =
+      let create : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
        fun () ->
         let pipe_r, pipe_w =
           Broadcast_pipe.create
-            Diff.Best_tip_diff.
-              { new_user_commands= []
-              ; removed_user_commands= []
-              ; reorg_best_tip= false }
+            { new_user_commands= []
+            ; removed_user_commands= []
+            ; reorg_best_tip= false }
         in
         let accounts =
           List.map (Array.to_list test_keys) ~f:(fun kp ->
@@ -584,17 +819,44 @@ let%test_module _ =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true
 
+    (** Assert the invariants of the locally generated command tracking system.
+    *)
+    let assert_locally_generated (pool : Test.Resource_pool.t) =
+      let _ =
+        Hashtbl.merge pool.locally_generated_committed
+          pool.locally_generated_uncommitted ~f:(fun ~key -> function
+          | `Both (committed, uncommitted) ->
+              failwithf
+                !"Command %{sexp:User_command.With_valid_signature.t} in both \
+                  locally generated committed and uncommitted with times %s \
+                  and %s"
+                key (Time.to_string committed)
+                (Time.to_string uncommitted)
+                ()
+          | `Left cmd ->
+              Some cmd
+          | `Right cmd ->
+              (* Locally generated uncommitted transactions should be in the
+                 pool, so long as we're not in the middle of updating it. *)
+              assert (Indexed_pool.member pool.pool key) ;
+              Some cmd )
+      in
+      ()
+
     let setup_test () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
       let trust_system = Trust_system.null () in
+      let logger = Logger.null () in
+      let config = Test.Resource_pool.make_config ~trust_system in
       let pool =
-        Test.Resource_pool.create ~logger:(Logger.null ()) ~trust_system
+        Test.Resource_pool.create ~config ~logger
           ~frontier_broadcast_pipe:tf_pipe_r
       in
       let%map () = Async.Scheduler.yield () in
       ( (fun txs ->
           Indexed_pool.For_tests.assert_invariants pool.pool ;
+          assert_locally_generated pool ;
           [%test_eq: User_command.t List.t]
             ( Test.Resource_pool.transactions pool
             |> Sequence.map ~f:User_command.forget_check
@@ -620,7 +882,7 @@ let%test_module _ =
           go (n + 1) (cmd :: cmds)
         else Quickcheck.Generator.return @@ List.rev cmds
       in
-      Quickcheck.random_value (go 0 [])
+      Quickcheck.random_value ~seed:(`Deterministic "constant") (go 0 [])
 
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -745,7 +1007,7 @@ let%test_module _ =
           best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 1_000 1] ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= List.take independent_cmds 1
+              { new_user_commands= List.take independent_cmds 2
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -780,9 +1042,11 @@ let%test_module _ =
       Thread_safe.block_on_async_exn (fun () ->
           (* Set up initial frontier *)
           let frontier_pipe_r, frontier_pipe_w = Broadcast_pipe.create None in
+          let logger = Logger.null () in
+          let trust_system = Trust_system.null () in
+          let config = Test.Resource_pool.make_config ~trust_system in
           let pool =
-            Test.Resource_pool.create ~logger:(Logger.null ())
-              ~trust_system:(Trust_system.null ())
+            Test.Resource_pool.create ~config ~logger
               ~frontier_broadcast_pipe:frontier_pipe_r
           in
           let assert_pool_txs txs =
@@ -953,4 +1217,107 @@ let%test_module _ =
               assert (
                 Indexed_pool.size pool.pool <= Test.Resource_pool.pool_max_size
               ) ) )
+
+    let assert_rebroadcastable pool cmds =
+      let normalize = List.sort ~compare:User_command.compare in
+      let expected =
+        match normalize cmds with [] -> [] | normalized -> [normalized]
+      in
+      [%test_eq: User_command.t list list]
+        ( List.map ~f:normalize
+        @@ Test.Resource_pool.get_rebroadcastable pool
+             ~is_expired:(Fn.const `Ok) )
+        expected
+
+    let mock_sender =
+      Envelope.Sender.Remote (Unix.Inet_addr.of_string "1.2.3.4")
+
+    let%test_unit "rebroadcastable transaction behavior" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
+            setup_test ()
+          in
+          assert_pool_txs [] ;
+          let local_cmds = List.take independent_cmds 5 in
+          let remote_cmds = List.drop independent_cmds 5 in
+          (* Locally generated transactions are rebroadcastable *)
+          let%bind apply_res_1 =
+            Test.Resource_pool.Diff.apply pool
+              (Envelope.Incoming.local local_cmds)
+          in
+          [%test_eq: User_command.t list Or_error.t] apply_res_1
+            (Ok local_cmds) ;
+          assert_pool_txs local_cmds ;
+          assert_rebroadcastable pool local_cmds ;
+          (* Adding non-locally-generated transactions doesn't affect
+             rebroadcastable pool *)
+          let%bind apply_res_2 =
+            Test.Resource_pool.Diff.apply pool
+              (Envelope.Incoming.wrap ~data:remote_cmds ~sender:mock_sender)
+          in
+          [%test_eq: User_command.t list Or_error.t] apply_res_2
+            (Ok remote_cmds) ;
+          assert_pool_txs (local_cmds @ remote_cmds) ;
+          assert_rebroadcastable pool local_cmds ;
+          (* When locally generated transactions are committed they are no
+             longer rebroadcastable *)
+          let%bind () =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              { new_user_commands=
+                  List.take local_cmds 2 @ List.take remote_cmds 3
+              ; removed_user_commands= []
+              ; reorg_best_tip= false }
+          in
+          assert_pool_txs (List.drop local_cmds 2 @ List.drop remote_cmds 3) ;
+          assert_rebroadcastable pool (List.drop local_cmds 2) ;
+          (* Reorgs put locally generated transactions back into the
+             rebroadcastable pool, if they were removed and not re-added *)
+          let%bind () =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              { new_user_commands= List.take local_cmds 1
+              ; removed_user_commands= List.take local_cmds 2
+              ; reorg_best_tip= true }
+          in
+          assert_pool_txs (List.tl_exn local_cmds @ List.drop remote_cmds 3) ;
+          assert_rebroadcastable pool (List.tl_exn local_cmds) ;
+          (* Committing them again removes them from the pool again. *)
+          let%bind () =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              { new_user_commands=
+                  List.tl_exn local_cmds @ List.drop remote_cmds 3
+              ; removed_user_commands= []
+              ; reorg_best_tip= false }
+          in
+          assert_pool_txs [] ;
+          assert_rebroadcastable pool [] ;
+          (* A reorg that doesn't re-add anything puts the right things back
+             into the rebroadcastable pool. *)
+          let%bind () =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              { new_user_commands= []
+              ; removed_user_commands= List.drop local_cmds 3 @ remote_cmds
+              ; reorg_best_tip= true }
+          in
+          assert_pool_txs (List.drop local_cmds 3 @ remote_cmds) ;
+          assert_rebroadcastable pool (List.drop local_cmds 3) ;
+          (* Committing again removes them. (Checking this works in both one and
+             two step reorg processes) *)
+          let%bind () =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              { new_user_commands= [List.nth_exn local_cmds 3]
+              ; removed_user_commands= []
+              ; reorg_best_tip= false }
+          in
+          assert_pool_txs (List.drop local_cmds 4 @ remote_cmds) ;
+          assert_rebroadcastable pool (List.drop local_cmds 4) ;
+          (* When transactions expire from rebroadcast pool they are gone. This
+             doesn't affect the main pool.
+          *)
+          let _ =
+            Test.Resource_pool.get_rebroadcastable pool
+              ~is_expired:(Fn.const `Expired)
+          in
+          assert_pool_txs (List.drop local_cmds 4 @ remote_cmds) ;
+          assert_rebroadcastable pool [] ;
+          Deferred.unit )
   end )

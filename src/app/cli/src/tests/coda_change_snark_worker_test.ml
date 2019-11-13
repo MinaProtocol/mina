@@ -22,7 +22,8 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Work_selection_method.Sequence
+      ~max_concurrent_connections:None
   in
   let%bind new_block_pipe1, new_block_pipe2 =
     let%map pipe =
@@ -94,7 +95,7 @@ let main () =
     Option.value_exn opt
   in
   let%bind () = after (Time.Span.of_sec 30.) in
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async

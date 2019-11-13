@@ -1,0 +1,7 @@
+(library
+  (name sponge_params)
+  (public_name sponge_params)
+  (preprocess (pps ppx_coda ppx_jane ppx_deriving.eq))
+  (inline_tests)
+  (libraries
+    curve_choice ))

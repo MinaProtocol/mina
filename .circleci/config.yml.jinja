@@ -7,7 +7,9 @@ jobs:
             - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Build trace-tool
                   command: cd src/app/trace-tool && cargo build --frozen
@@ -17,7 +19,9 @@ jobs:
             xcode: "10.2.0"
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run: cd frontend/wallet && yarn
             - run:
                   name: Lint wallet
@@ -55,14 +59,44 @@ jobs:
                   name: Build bot
                   command: cd frontend/bot && yarn run build-ci
 
-    lint:
+    build-archive:
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
+              environment: 
+                CODA_DOCKER: true
+                HASURA_PORT: 8080
+            - image: postgres:12
+              environment:
+                POSTGRES_PASSWORD: codarules
+                POSTGRES_USER: admin
+                POSTGRES_DB: archiver
+            - image: hasura/graphql-engine:v1.0.0-beta.6
+              environment:
+                HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
+                HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+                HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
         steps:
             - checkout
             - run:
-                  name: Update submodules
+                  name: Update Submodules
                   command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Build Archive Process
+                  command:  bash -c 'eval `opam config env` && make build_archive'
+            - run:
+                  name: Configure Hasura
+                  command: ls && ./scripts/archive/make_hasura_configurations.sh
+    lint:
+        docker:
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
+        steps:
+            - checkout
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
@@ -75,7 +109,17 @@ jobs:
             - run:
                   name: Check CODEOWNERS file format
                   command: ./scripts/lint_codeowners.sh
-
+            - run:
+                  name: Require ppx_coda preprocessing for linting
+                  command: ./scripts/require-ppx-coda.py
+    lint-opt:
+        docker:
+            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+        steps:
+            - checkout
+            - run:
+                  name: Compare versioned types in PR
+                  command: ./scripts/compare_pr_diff_types.sh
     update-branch-protection:
         docker:
             - image: python:3
@@ -87,6 +131,21 @@ jobs:
             - run:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
+
+    build-auxiliary:
+        docker:
+            - image: nixos/nix
+        steps:
+            - checkout
+            - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
 
     build-macos:
       # only run when there's a 'release' tag
@@ -117,8 +176,8 @@ jobs:
                     sudo rm /tmp/workspace/coda*.bz2
             - checkout
             - run:
-                name: Update git submodules
-                command: git submodule sync && git submodule update --init --recursive
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
@@ -151,8 +210,9 @@ jobs:
                 name: Ensure/Fix opam permisssions
                 command: |
                     set +e
-                    sudo chown -R distiller /Users/distiller/.opam
-                    sudo chmod -R u+w /Users/distiller/.opam
+                    sudo mkdir -p /Users/distiller/.opam
+                    sudo chown -R distiller /Users/distiller/.opam | true
+                    sudo chmod -R u+w /Users/distiller/.opam | true
             - run:
                 name: Install macos dependencies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
@@ -195,11 +255,14 @@ jobs:
                     mkdir -p package/keys
                     cp /var/lib/coda/* package/keys/.
             - run:
-                name: Collect and rewrite aux binaries (kademlia + logproc)
+                name: Collect and rewrite aux binaries (kademlia + libp2p_helper + logproc)
                 command: |
                     cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
                     chmod +w package/kademlia
                     ./scripts/librewrite-macos.sh package/kademlia
+                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
+                    chmod +w package/coda-libp2p_helper
+                    ./scripts/librewrite-macos.sh package/coda-libp2p_helper
                     cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
             - run:
@@ -231,9 +294,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
-        environment:
-            DUNE_PROFILE: {{profile}}
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
@@ -242,20 +303,29 @@ jobs:
                       mkdir -p /tmp/artifacts
                       touch /tmp/artifacts/coda_pvkeys_dummy
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
             - run:
                   name: Download candidate stable PV keys
+                  environment:
+                    DUNE_PROFILE: {{profile}}
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  environment:
+                    DUNE_PROFILE: {{profile}}
                   {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
+                  environment:
+                    DUNE_PROFILE: {{profile}}
                   {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
@@ -280,15 +350,15 @@ jobs:
 
     {%- for profile in unit_test_profiles %}
     test-unit--{{profile}}:
-        resource_class: large
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
           # Uncomment if you want to try debugging why this install breaks
           # some unit tests:
           # 1. The command_line_tests
@@ -313,7 +383,7 @@ jobs:
                     #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
@@ -321,18 +391,18 @@ jobs:
 
     {%- for profile in unit_test_profiles_medium_curves %}
     test-unit--{{profile}}:
-        resource_class: large
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 1h
             - store_artifacts:
                 path: core_dumps
@@ -342,12 +412,12 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
@@ -359,14 +429,14 @@ jobs:
 
     {%- for profile in medium_curves_tests.keys() | sort %}
     test--{{profile}}:
-        resource_class: large
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
         steps:
             - checkout
             - run:
-                  name: Update submodules
-                  command: git submodule sync && git submodule update --init --recursive
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             {%- for test in medium_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
@@ -384,12 +454,15 @@ workflows:
     coda_parallel:
         jobs:
             - lint
+            - lint-opt
+            - build-auxiliary
             - update-branch-protection:
                 filters:
                   branches:
                     only: develop
             - tracetool
             - build-wallet
+            - build-archive
             - build-macos:
                 # only run AFTER linux build
                 requires:
@@ -403,6 +476,7 @@ workflows:
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
+
     daily:
         triggers:
           - schedule:

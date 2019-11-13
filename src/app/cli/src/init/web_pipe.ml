@@ -1,24 +1,9 @@
 open Core
 open Async
-open Coda_base
-open Coda_transition
 open Signature_lib
 open Pipe_lib
 
 let request_service_name = "CODA_WEB_CLIENT_SERVICE"
-
-module type Intf = sig
-  type t
-
-  val get_lite_chain :
-    (t -> Signature_lib.Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
-    option
-
-  val validated_transitions :
-       t
-    -> (External_transition.Validated.t, State_hash.t) With_hash.t
-       Strict_pipe.Reader.t
-end
 
 module Base58_check = Base58_check.Make (struct
   let description = "CODA_WEB_CLIENT_SERVICE"
@@ -119,7 +104,7 @@ let copy ~src ~dst =
 let project_directory = "CODA_PROJECT_DIR"
 
 let run_service coda ~conf_dir ~logger =
-  O1trace.trace_task "web pipe" (fun () -> function
+  O1trace.trace "web pipe" (fun () -> function
     | `None ->
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "Not running a web client pipe" ;

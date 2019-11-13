@@ -3,7 +3,7 @@
 </a>
 <hr/>
 
-Coda is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Coda project. It contains code for the OCaml protocol implementation, [website](https://codaprotocol.com), and wallet.
+Coda is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Coda project. It contains code for the OCaml protocol implementation, [website](https://codaprotocol.com), and wallet. Enjoy!
 
 ## Notes
 
@@ -36,8 +36,8 @@ The [Developer docs](https://codaprotocol.com/docs/developers/) contain all the 
 #### Quick Links:
 * [Developer readme](README-dev.md)
 * [Compiling from source and and running a node](docs/demo.md)
-* [Directory structure](frontend/website/docs/directory-structure.md)
-* [Lifecycle of a payment](docs/architecture/lifecycle-payment.md)
+* [Directory structure](frontend/website/docs/developers/directory-structure.md)
+* [Lifecycle of a payment](frontend/website/docs/architecture/lifecycle-payment.md)
 
 
 ## Community
