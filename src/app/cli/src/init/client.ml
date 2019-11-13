@@ -566,7 +566,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            printf "Fee %d is less than the minimum, %d\n%!"
              (Currency.Fee.to_int fee)
              (Currency.Fee.to_int User_command.minimum_fee) ;
-           Deferred.unit )
+           exit 29 )
          else
            let memo =
              Option.value_map memo_opt ~default:User_command_memo.empty
@@ -744,7 +744,7 @@ let cancel_transaction =
                    (Error.to_string_hum e) )
                ~join_error:Or_error.join
          | Error _e ->
-             eprintf "could not deserialize user command\n" ;
+             eprintf "Could not deserialize user command\n" ;
              exit 16 ))
 
 let cancel_transaction_graphql =
