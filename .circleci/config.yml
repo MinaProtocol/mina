@@ -264,10 +264,6 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - store_artifacts:
                   path: package
-            - run:
-                name: Publish to Artifactory
-                command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
-                when: on_success
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
