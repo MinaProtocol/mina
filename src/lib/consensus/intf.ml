@@ -32,6 +32,12 @@ module type Constants_intf = sig
 
   val inactivity_ms : int
 
+  val shifts_per_window : Unsigned.UInt32.t
+
+  val slots_per_shift : Unsigned.UInt32.t
+
+  val slots_per_window : Unsigned.UInt32.t
+
   (** Number of slots in one epoch *)
   val slots_per_epoch : Unsigned.UInt32.t
 end
@@ -488,7 +494,9 @@ module type S = sig
 
       val epoch_count : Value.t -> Length.t
 
-      val min_epoch_length : Value.t -> Length.t
+      val min_window_length : Value.t -> Length.t
+
+      val curr_shift_lengths : Value.t -> Length.t list
 
       val last_vrf_output : Value.t -> Vrf.Output.Truncated.t
 
