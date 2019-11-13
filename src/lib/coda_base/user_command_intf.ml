@@ -78,6 +78,8 @@ module type S = sig
   val sender : t -> Public_key.Compressed.t
 
   (* for filtering *)
+  val minimum_fee : Currency.Fee.t
+
   val is_trivial : t -> bool
 
   include Gen_intf with type t := t
