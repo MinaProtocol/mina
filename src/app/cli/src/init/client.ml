@@ -518,8 +518,9 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
       ~doc:
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
-            (default: %d)"
-           (Currency.Fee.to_int Cli_lib.Default.transaction_fee))
+            (default: %d) (minimum: %d)"
+           (Currency.Fee.to_int Cli_lib.Default.transaction_fee)
+           (Currency.Fee.to_int User_command.minimum_fee))
       (optional txn_fee)
   in
   let nonce_flag =
@@ -561,21 +562,28 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          let fee =
            Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
          in
-         let memo =
-           Option.value_map memo_opt ~default:User_command_memo.empty
-             ~f:User_command_memo.create_from_string_exn
-         in
-         let command =
-           Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp body
-         in
-         dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
-           ~success:(fun receipt_chain_hash ->
-             sprintf "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
-               label
-               (User_command.to_base58_check command)
-               (Receipt.Chain_hash.to_string receipt_chain_hash) )
-           ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e))
-           ~join_error:Or_error.join ))
+         if Currency.Fee.( < ) fee User_command.minimum_fee then (
+           printf "Fee %d is less than the minimum, %d\n%!"
+             (Currency.Fee.to_int fee)
+             (Currency.Fee.to_int User_command.minimum_fee) ;
+           exit 29 )
+         else
+           let memo =
+             Option.value_map memo_opt ~default:User_command_memo.empty
+               ~f:User_command_memo.create_from_string_exn
+           in
+           let command =
+             Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp body
+           in
+           dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
+             ~success:(fun receipt_chain_hash ->
+               sprintf
+                 "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
+                 label
+                 (User_command.to_base58_check command)
+                 (Receipt.Chain_hash.to_string receipt_chain_hash) )
+             ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e))
+             ~join_error:Or_error.join ))
 
 let send_payment =
   let body =
@@ -736,7 +744,7 @@ let cancel_transaction =
                    (Error.to_string_hum e) )
                ~join_error:Or_error.join
          | Error _e ->
-             eprintf "could not deserialize user command\n" ;
+             eprintf "Could not deserialize user command\n" ;
              exit 16 ))
 
 let cancel_transaction_graphql =
