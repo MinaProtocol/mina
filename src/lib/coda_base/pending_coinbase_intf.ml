@@ -136,7 +136,7 @@ module type S = sig
 
     val equal_state_hash : t -> t -> bool
 
-    val push : t -> Coinbase.t -> t
+    val push : ?init_state_hash:State_hash.t -> t -> Coinbase.t -> t
 
     module Checked : sig
       type t = var
