@@ -149,9 +149,8 @@ let make = (~publicKey, ~stakingActive=false) => {
                    )}
                 </span>
                 <Spacer height=1. />
-                {Option.flatMap(accountInfo##account, account =>
-                   account.delegateAccount
-                 )
+                {accountInfo##account
+                 |> Option.andThen(~f=account => account.delegateAccount)
                  |> Option.map(~f=delegate => delegate.publicKey == publicKey)
                  |> Option.withDefault(~default=false)
                    ? React.null

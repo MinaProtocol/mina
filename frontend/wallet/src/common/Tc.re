@@ -106,8 +106,6 @@ module Option = {
 
   let getExn = x => Belt.Option.getExn(x);
 
-  let flatMap = Belt.Option.flatMap;
-
   let map2 = (t1, t2, ~f) => {
     switch (t1, t2) {
     | (Some(a), Some(b)) => Some(f(a, b))
