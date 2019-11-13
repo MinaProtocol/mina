@@ -5095,6 +5095,27 @@
           "fields": null
         },
         {
+          "inputFields": [
+            {
+              "name": "new_block_parent_hash",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "get_stale_block_confirmations_args",
+          "enumValues": null,
+          "description": null,
+          "fields": null
+        },
+        {
           "inputFields": null,
           "kind": "OBJECT",
           "possibleTypes": null,
@@ -7741,6 +7762,111 @@
                 "ofType": null
               },
               "description": "fetch data from the table: \"fee_transfers\" using primary key columns"
+            },
+            {
+              "args": [
+                {
+                  "name": "args",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "get_stale_block_confirmations_args",
+                      "ofType": null
+                    }
+                  },
+                  "description": "input parameters for function \"get_stale_block_confirmations\""
+                },
+                {
+                  "name": "distinct_on",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "ENUM",
+                        "name": "blocks_select_column",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "distinct select on columns"
+                },
+                {
+                  "name": "limit",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "limit the nuber of rows returned"
+                },
+                {
+                  "name": "offset",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "skip the first n rows. Use only with order_by"
+                },
+                {
+                  "name": "order_by",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "INPUT_OBJECT",
+                        "name": "blocks_order_by",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "sort the rows by one or more columns"
+                },
+                {
+                  "name": "where",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "blocks_bool_exp",
+                    "ofType": null
+                  },
+                  "description": "filter the rows returned"
+                }
+              ],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "get_stale_block_confirmations",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "blocks",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": "execute function \"get_stale_block_confirmations\" which returns \"blocks\""
             },
             {
               "args": [
@@ -10775,6 +10901,111 @@
                 "ofType": null
               },
               "description": "fetch data from the table: \"fee_transfers\" using primary key columns"
+            },
+            {
+              "args": [
+                {
+                  "name": "args",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "get_stale_block_confirmations_args",
+                      "ofType": null
+                    }
+                  },
+                  "description": "input parameters for function \"get_stale_block_confirmations\""
+                },
+                {
+                  "name": "distinct_on",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "ENUM",
+                        "name": "blocks_select_column",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "distinct select on columns"
+                },
+                {
+                  "name": "limit",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "limit the nuber of rows returned"
+                },
+                {
+                  "name": "offset",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "description": "skip the first n rows. Use only with order_by"
+                },
+                {
+                  "name": "order_by",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "INPUT_OBJECT",
+                        "name": "blocks_order_by",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "description": "sort the rows by one or more columns"
+                },
+                {
+                  "name": "where",
+                  "defaultValue": null,
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "blocks_bool_exp",
+                    "ofType": null
+                  },
+                  "description": "filter the rows returned"
+                }
+              ],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "get_stale_block_confirmations",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "blocks",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "description": "execute function \"get_stale_block_confirmations\" which returns \"blocks\""
             },
             {
               "args": [
