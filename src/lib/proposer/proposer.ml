@@ -106,13 +106,17 @@ let generate_next_state ~previous_protocol_state ~time_controller
     ~(keypair : Keypair.t) ~proposal_data ~scheduled_time =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
+  let previous_protocol_state_body_hash =
+    Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
+  in
   let%bind res =
     Interruptible.uninterruptible
       (let open Deferred.Let_syntax in
       let diff =
         measure "create_diff" (fun () ->
             Staged_ledger.create_diff staged_ledger ~self ~logger
-              ~transactions_by_fee:transactions ~get_completed_work )
+              ~transactions_by_fee:transactions ~get_completed_work
+              ~state_body_hash:previous_protocol_state_body_hash )
       in
       match%map Staged_ledger.apply_diff_unchecked staged_ledger diff with
       | Ok
@@ -218,7 +222,9 @@ let generate_next_state ~previous_protocol_state ~time_controller
                   ~blockchain_state:
                     (Protocol_state.blockchain_state protocol_state)
                   ~consensus_transition:consensus_transition_data
-                  ~proposer:self ~coinbase:coinbase_amount ()
+                  ~proposer:self ~coinbase_amount
+                  ~coinbase_state_body_hash:previous_protocol_state_body_hash
+                  ()
               in
               let internal_transition =
                 Internal_transition.create ~snark_transition
@@ -235,8 +241,9 @@ let generate_next_state ~previous_protocol_state ~time_controller
 
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs
-    ~consensus_local_state ~frontier_reader ~transition_writer =
-  trace_task "block_producer" (fun () ->
+    ~consensus_local_state ~frontier_reader ~transition_writer
+    ~set_next_proposal =
+  trace "block_producer" (fun () ->
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Pausing block production while bootstrapping"
@@ -248,6 +255,12 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
         | None ->
             log_bootstrap_mode () ; Interruptible.return ()
         | Some frontier -> (
+            let open Transition_frontier.Extensions in
+            let transition_registry =
+              get_extension
+                (Transition_frontier.extensions frontier)
+                Transition_registry
+            in
             let crumb = Transition_frontier.best_tip frontier in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
@@ -463,8 +476,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                  inserted into frontier" ;
                               Deferred.choose
                                 [ Deferred.choice
-                                    (Transition_frontier.wait_for_transition
-                                       frontier transition_hash)
+                                    (Transition_registry.register
+                                       transition_registry transition_hash)
                                     (Fn.const `Transition_accepted)
                                 ; Deferred.choice
                                     ( Time.Timeout.create time_controller
@@ -499,7 +512,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
       let proposal_supervisor = Singleton_supervisor.create ~task:propose in
       let scheduler = Singleton_scheduler.create time_controller in
       let rec check_for_proposal () =
-        trace_recurring_task "check for proposal" (fun () ->
+        trace_recurring "check for proposal" (fun () ->
             (* See if we want to change keypairs *)
             let keypairs =
               match Agent.get keypairs with
@@ -534,12 +547,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     ~local_state:consensus_local_state
                   = None ) ;
                 let now = Time.now time_controller in
-                match
+                let next_proposal =
                   measure "asking conensus what to do" (fun () ->
                       Consensus.Hooks.next_proposal (time_to_ms now)
                         consensus_state ~local_state:consensus_local_state
                         ~keypairs ~logger )
-                with
+                in
+                set_next_proposal next_proposal ;
+                match next_proposal with
                 | `Check_again time ->
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_for_proposal

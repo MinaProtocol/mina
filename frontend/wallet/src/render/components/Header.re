@@ -117,6 +117,7 @@ module SyncStatus = {
       | `SYNCED => <Alert kind=`Success message="Synced" />
       | `BOOTSTRAP => <Alert kind=`Warning message="Syncing" />
       | `CONNECTING => <Alert kind=`Warning message="Connecting" />
+      | `CATCHUP => <Alert kind=`Warning message="Catching up" />
       | `LISTENING => <Alert kind=`Warning message="Listening" />
       }
     };
@@ -126,6 +127,7 @@ module SyncStatus = {
 [@react.component]
 let make = () => {
   let url = ReasonReact.Router.useUrl();
+  let codaSvg = Hooks.useAsset("CodaLogo.svg");
   let onSettingsPage =
     switch (url.path) {
     | ["settings", ..._] => true
@@ -133,8 +135,9 @@ let make = () => {
     };
   <header className=Styles.header>
     <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
-      <img src="CodaLogo.svg" alt="Coda logo" />
+      <img src=codaSvg alt="Coda logo" />
     </div>
+    <Toast />
     <div className=Styles.rightButtons>
       <SyncStatusQuery fetchPolicy="no-cache" partialRefetch=true>
         {response =>

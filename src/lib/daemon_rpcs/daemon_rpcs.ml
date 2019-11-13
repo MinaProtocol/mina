@@ -5,7 +5,16 @@ open Signature_lib
 
 module Types = struct
   module Git_sha = struct
-    type t = string [@@deriving sexp, to_yojson, bin_io, eq]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = string [@@deriving sexp, to_yojson, eq]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t [@@deriving sexp, to_yojson, eq]
 
     let of_string s = s
   end
@@ -171,7 +180,7 @@ module Types = struct
 
       let option_entry ~(f : 'a -> string) (name : string)
           (field : 'a option FieldT.t) =
-        match FieldT.get field with None -> None | Some x -> Some (name, f x)
+        Option.map (FieldT.get field) ~f:(fun x -> (name, f x))
 
       let string_option_entry = option_entry ~f:Fn.id
 
@@ -199,7 +208,7 @@ module Types = struct
 
       let staged_ledger_hash = string_option_entry "Staged-ledger hash"
 
-      let state_hash = string_option_entry "Staged hash"
+      let state_hash = string_option_entry "Protocol state hash"
 
       let commit_id = string_entry "Git SHA-1"
 
@@ -223,6 +232,8 @@ module Types = struct
 
       let consensus_time_best_tip =
         string_option_entry "Best tip consensus time"
+
+      let next_proposal = string_option_entry "Next proposal"
 
       let consensus_time_now = string_entry "Consensus time now"
 
@@ -248,6 +259,23 @@ module Types = struct
           |> digest_entries ~title:""
         in
         map_entry "Consensus configuration" ~f:render
+
+      let addrs_and_ports =
+        let render conf =
+          let fmt_field name op field = (name, op (Field.get field conf)) in
+          Kademlia.Node_addrs_and_ports.Display.Stable.V1.Fields.to_list
+            ~external_ip:(fmt_field "External IP" Fn.id)
+            ~bind_ip:(fmt_field "Bind IP" Fn.id)
+            ~discovery_port:(fmt_field "Haskell Kademlia port" string_of_int)
+            ~client_port:(fmt_field "Client port" string_of_int)
+            ~libp2p_port:(fmt_field "Discovery (libp2p) port" string_of_int)
+            ~communication_port:(fmt_field "External port" string_of_int)
+          |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
+          |> digest_entries ~title:""
+        in
+        map_entry "Addresses and ports" ~f:render
+
+      let libp2p_peer_id = string_entry "Libp2p PeerID"
     end
 
     type t =
@@ -257,7 +285,7 @@ module Types = struct
       ; uptime_secs: int
       ; ledger_merkle_root: string option
       ; state_hash: string option
-      ; commit_id: Git_sha.t
+      ; commit_id: Git_sha.Stable.V1.t
       ; conf_dir: string
       ; peers: string list
       ; user_commands_sent: int
@@ -267,9 +295,12 @@ module Types = struct
       ; propose_pubkeys: string list
       ; histograms: Histograms.t option
       ; consensus_time_best_tip: string option
+      ; next_proposal: string option
       ; consensus_time_now: string
       ; consensus_mechanism: string
-      ; consensus_configuration: Consensus.Configuration.t }
+      ; consensus_configuration: Consensus.Configuration.t
+      ; addrs_and_ports: Kademlia.Node_addrs_and_ports.Display.Stable.V1.t
+      ; libp2p_peer_id: string }
     [@@deriving to_yojson, bin_io, fields]
 
     let entries (s : t) =
@@ -284,7 +315,7 @@ module Types = struct
         ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent
         ~snark_worker ~propose_pubkeys ~histograms ~consensus_time_best_tip
         ~consensus_time_now ~consensus_mechanism ~consensus_configuration
-        ~snark_work_fee
+        ~next_proposal ~snark_work_fee ~addrs_and_ports ~libp2p_peer_id
       |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =
@@ -296,163 +327,419 @@ module Types = struct
 end
 
 module Send_user_command = struct
-  type query = User_command.Stable.Latest.t [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = User_command.Stable.V1.t
 
-  type response = Receipt.Chain_hash.Stable.Latest.t Or_error.t
-  [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Send_user_command" ~version:0 ~bin_query
-      ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Receipt.Chain_hash.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Send_user_command" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Get_transaction_status = struct
-  type query = User_command.Stable.Latest.t [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = User_command.Stable.V1.t
 
-  type response = Transaction_status.State.Stable.Latest.t Or_error.t
-  [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_transaction_status" ~version:0 ~bin_query
-      ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Transaction_status.State.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_transaction_status" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Send_user_commands = struct
-  type query = User_command.Stable.Latest.t list [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = User_command.Stable.V1.t list
 
-  type response = unit Or_error.t [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Send_user_commands" ~version:0 ~bin_query
-      ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Send_user_commands" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Get_ledger = struct
-  type query = Staged_ledger_hash.Stable.Latest.t option [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Staged_ledger_hash.Stable.V1.t option
 
-  type response = Account.Stable.Latest.t list Or_error.t [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_ledger" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Account.Stable.V1.t list Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_ledger" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Get_balance = struct
-  type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Public_key.Compressed.Stable.V1.t
 
-  type error = string [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type response = Currency.Balance.Stable.Latest.t option Or_error.t
-  [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_balance" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Currency.Balance.Stable.V1.t option Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_balance" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Get_trust_status = struct
-  type query = Unix.Inet_addr.Blocking_sexp.t [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Core.Unix.Inet_addr.Stable.V1.t
 
-  type response = Trust_system.Peer_status.Stable.Latest.t [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_trust_status" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Trust_system.Peer_status.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_trust_status" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Get_trust_status_all = struct
-  type query = unit [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
 
-  type response =
-    (Unix.Inet_addr.Blocking_sexp.t * Trust_system.Peer_status.Stable.Latest.t)
-    list
-  [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_trust_status_all" ~version:0 ~bin_query
-      ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Core.Unix.Inet_addr.Stable.V1.t
+          * Trust_system.Peer_status.Stable.V1.t )
+          list
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_trust_status_all" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Reset_trust_status = struct
-  type query = Unix.Inet_addr.Blocking_sexp.t [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Core.Unix.Inet_addr.Stable.V1.t
 
-  type response = Trust_system.Peer_status.Stable.Latest.t [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Reset_trust_status" ~version:0 ~bin_query
-      ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Trust_system.Peer_status.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Reset_trust_status" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Verify_proof = struct
-  type query =
-    Public_key.Compressed.Stable.Latest.t
-    * User_command.Stable.V1.t
-    * Payment_proof.t
-  [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Public_key.Compressed.Stable.V1.t
+          * User_command.Stable.V1.t
+          * (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list)
 
-  type response = unit Or_error.t [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Verify_proof" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Verify_proof" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Prove_receipt = struct
-  type query =
-    Receipt.Chain_hash.Stable.Latest.t * Public_key.Compressed.Stable.Latest.t
-  [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Receipt.Chain_hash.Stable.V1.t * Public_key.Compressed.Stable.V1.t
 
-  type response = Payment_proof.t Or_error.t [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Prove_receipt" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list)
+          Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Prove_receipt" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Get_inferred_nonce = struct
-  type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Public_key.Compressed.Stable.V1.t
 
-  type response = Account.Nonce.Stable.Latest.t option Or_error.t
-  [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_inferred_nonce" ~version:0 ~bin_query
-      ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Account.Nonce.Stable.V1.t option Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_inferred_nonce" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Get_nonce = struct
-  type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Public_key.Compressed.Stable.V1.t
 
-  type response = Account.Nonce.Stable.Latest.t option Or_error.t
-  [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_nonce" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Account.Nonce.Stable.V1.t option Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_nonce" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Get_status = struct
   type query = [`Performance | `None] [@@deriving bin_io]
 
   type response = Types.Status.t [@@deriving bin_io]
-
-  type error = unit [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_status" ~version:0 ~bin_query ~bin_response
@@ -463,121 +750,339 @@ module Clear_hist_status = struct
 
   type response = Types.Status.t [@@deriving bin_io]
 
-  type error = unit [@@deriving bin_io]
-
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query
       ~bin_response
 end
 
 module Get_public_keys_with_details = struct
-  type query = unit [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
 
-  type response = (string * int * int) list Or_error.t
-  [@@deriving bin_io, sexp]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_public_keys_with_details" ~version:0 ~bin_query
-      ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = (string * int * int) list Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_public_keys_with_details" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Get_public_keys = struct
-  type query = unit [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
 
-  type response = string list Or_error.t [@@deriving bin_io, sexp]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_public_keys" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = string list Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_public_keys" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Stop_daemon = struct
-  type query = unit [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
 
-  type response = unit [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Stop_daemon" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_daemon" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Snark_job_list = struct
-  type query = unit [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
 
-  type response = string Or_error.t [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Snark_job_list" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = string Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Snark_job_list" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Snark_pool_list = struct
-  type query = unit [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
 
-  type response = string [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Snark_pool_list" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = string
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Snark_pool_list" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Start_tracing = struct
-  type query = unit [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
 
-  type response = unit [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Start_tracing" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Start_tracing" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Stop_tracing = struct
-  type query = unit [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
 
-  type response = unit [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit [@@deriving bin_io]
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_tracing" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Set_staking = struct
-  type query = Keypair.Stable.Latest.t list [@@deriving bin_io]
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Keypair.Stable.V1.t list
 
-  type response = unit [@@deriving bin_io]
+        let to_latest = Fn.id
+      end
+    end]
 
-  type error = unit
+    type t = Stable.Latest.t
+  end
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Set_staking" ~version:0 ~bin_query ~bin_response
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Set_staking" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
 end
 
 module Visualization = struct
   module Frontier = struct
-    type query = string [@@deriving bin_io]
+    module Query = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = string
 
-    type response = [`Active of unit | `Bootstrapping] [@@deriving bin_io]
+          let to_latest = Fn.id
+        end
+      end]
 
-    let rpc : (query, response) Rpc.Rpc.t =
-      Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query
-        ~bin_response
+      type t = Stable.Latest.t
+    end
+
+    module Response = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = [`Active of unit | `Bootstrapping]
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type t = Stable.Latest.t
+    end
+
+    let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0
+        ~bin_query:Query.Stable.Latest.bin_t
+        ~bin_response:Response.Stable.Latest.bin_t
   end
 
   module Registered_masks = struct
-    type query = string [@@deriving bin_io]
+    module Query = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = string
 
-    type response = unit [@@deriving bin_io]
+          let to_latest = Fn.id
+        end
+      end]
 
-    let rpc : (query, response) Rpc.Rpc.t =
-      Rpc.Rpc.create ~name:"Visualize_registered_masks" ~version:0 ~bin_query
-        ~bin_response
+      type t = Stable.Latest.t
+    end
+
+    module Response = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = unit
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type t = Stable.Latest.t
+    end
+
+    let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Visualize_registered_masks" ~version:0
+        ~bin_query:Query.Stable.Latest.bin_t
+        ~bin_response:Response.Stable.Latest.bin_t
   end
 end

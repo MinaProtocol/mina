@@ -20,13 +20,12 @@ let net_configs n =
         let discovery_port = base + 1 in
         let libp2p_port = base + 2 in
         let client_port = 20000 + i in
-        Kademlia.Node_addrs_and_ports.
-          { external_ip= ip
-          ; bind_ip= ip
-          ; discovery_port
-          ; communication_port
-          ; libp2p_port
-          ; client_port } )
+        { Kademlia.Node_addrs_and_ports.external_ip= ip
+        ; bind_ip= ip
+        ; discovery_port
+        ; communication_port
+        ; libp2p_port
+        ; client_port } )
   in
   let all_peers =
     List.map addrs_and_ports_list
@@ -66,7 +65,7 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None)
   in
   configs
 
-let stabalize_and_start_or_timeout ?(timeout_ms = 2000.) nodes =
+let stabalize_and_start_or_timeout ?(timeout_ms = 10000.) nodes =
   let ready () =
     let check_ready node =
       let%map peers = Coda_process.peers_exn node in

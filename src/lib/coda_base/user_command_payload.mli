@@ -49,7 +49,7 @@ module Common : sig
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving eq, sexp, hash]
+  type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 
   val gen : t Quickcheck.Generator.t
 
@@ -61,10 +61,15 @@ module Common : sig
 
   val typ : (var, t) Typ.t
 
+  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
   val fold : t -> bool Triple.t Fold.t
 
   module Checked : sig
     val to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+
+    val to_input :
+      var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
 
     val constant : t -> var
   end
@@ -95,7 +100,7 @@ module Stable : sig
   module Latest = V1
 end
 
-type t = Stable.Latest.t [@@deriving eq, sexp, hash]
+type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 
 val create :
      fee:Currency.Fee.t

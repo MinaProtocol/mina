@@ -36,6 +36,10 @@ module Scan_state : sig
 
   val partition_if_overflowing : t -> Space_partition.t
 
+  val target_merkle_root : t -> Frozen_ledger_hash.t option
+
+  val staged_transactions : t -> Transaction.t list Or_error.t
+
   val all_work_statements : t -> Transaction_snark_work.Statement.t list
 
   val work_statements_for_new_diff :
@@ -108,13 +112,6 @@ val apply_diff_unchecked :
      , Staged_ledger_error.t )
      Deferred.Result.t
 
-module For_tests : sig
-  val materialized_snarked_ledger_hash :
-       t
-    -> expected_target:Frozen_ledger_hash.t
-    -> Frozen_ledger_hash.t Or_error.t
-end
-
 val current_ledger_proof : t -> Ledger_proof.t option
 
 (* This should memoize the snark verifications *)
@@ -126,9 +123,11 @@ val create_diff :
   -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
+  -> state_body_hash:State_body_hash.t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
-val statement_exn : t -> [`Non_empty of Transaction_snark.Statement.t | `Empty]
+val statement_exn :
+  t -> [`Non_empty of Transaction_snark.Statement.t | `Empty] Deferred.t
 
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t
@@ -141,13 +140,9 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
 
 val all_work_pairs_exn :
      t
-  -> ( ( Transaction.t
-       , Transaction_witness.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Single.Spec.t
-     * ( Transaction.t
-       , Transaction_witness.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Single.Spec.t
-       option )
+  -> ( Transaction.t
+     , Transaction_witness.t
+     , Ledger_proof.t )
+     Snark_work_lib.Work.Single.Spec.t
+     One_or_two.t
      list

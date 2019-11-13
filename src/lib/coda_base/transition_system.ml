@@ -1,7 +1,6 @@
 open Core_kernel
 open Util
 open Snark_params
-open Tuple_lib
 
 module type S = sig
   open Tick
@@ -16,7 +15,7 @@ module type S = sig
 
       val typ : (var, t) Typ.t
 
-      val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+      val var_to_field : var -> Field.Var.t
     end
 
     type var
@@ -31,7 +30,8 @@ module type S = sig
       val is_base_hash : Hash.var -> (Boolean.var, _) Checked.t
 
       val update :
-           Hash.var * var
+           logger:Logger.t
+        -> Hash.var * var
         -> Update.var
         -> (Hash.var * var * [`Success of Boolean.var], _) Checked.t
     end
@@ -93,30 +93,26 @@ struct
       |> bit_length_to_triple_length
 
     let hash_vk vk =
-      let%bind bs =
-        Verifier.Verification_key.(summary (summary_input vk))
-        >>| Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
-      in
-      Pedersen.Checked.Section.extend
-        (Pedersen.Checked.hash_prefix Hash_prefix.transition_system_snark)
-        ~start:Hash_prefix.length_in_triples bs
+      make_checked (fun () ->
+          Random_oracle.Checked.update
+            ~state:
+              (Random_oracle.State.map
+                 Hash_prefix.Random_oracle.transition_system_snark
+                 ~f:Snark_params.Tick.Field.Var.constant)
+            (Verifier.Verification_key.to_field_elements vk) )
 
-    let compute_top_hash wrap_vk_section state_hash_trips =
-      Tick.Pedersen.Checked.Section.extend wrap_vk_section
-        ~start:(Hash_prefix.length_in_triples + wrap_vk_triple_length)
-        state_hash_trips
-      >>| Tick.Pedersen.Checked.Section.to_initial_segment_digest
-      >>| Or_error.ok_exn >>| fst
+    let compute_top_hash wrap_vk_state state_hash =
+      make_checked (fun () ->
+          Random_oracle.Checked.(
+            update ~state:wrap_vk_state [|State.Hash.var_to_field state_hash|]
+            |> digest) )
 
     let%snarkydef prev_state_valid wrap_vk_section wrap_vk prev_state_hash =
       match Coda_compile_config.proof_level with
       | "full" ->
           (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
-          let%bind prev_state_hash_trips =
-            State.Hash.var_to_triples prev_state_hash
-          in
           let%bind prev_top_hash =
-            compute_top_hash wrap_vk_section prev_state_hash_trips
+            compute_top_hash wrap_vk_section prev_state_hash
             >>= Wrap_input.Checked.tick_field_to_scalars
           in
           let%bind precomp =
@@ -147,7 +143,7 @@ struct
       let%bind prev_state_hash = State.Checked.hash prev_state in
       let%bind next_state_hash, _next_state, `Success success =
         with_label __LOC__
-          (State.Checked.update (prev_state_hash, prev_state) update)
+          (State.Checked.update ~logger (prev_state_hash, prev_state) update)
       in
       let%bind wrap_vk =
         exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
@@ -157,10 +153,9 @@ struct
       let%bind wrap_vk_section = hash_vk wrap_vk in
       let%bind next_top_hash =
         with_label __LOC__
-          (let%bind sh = State.Hash.var_to_triples next_state_hash in
-           (* We could be reusing the intermediate state of the hash on sh here instead of
+          ((* We could be reusing the intermediate state of the hash on sh here instead of
                hashing anew *)
-           compute_top_hash wrap_vk_section sh)
+           compute_top_hash wrap_vk_section next_state_hash)
       in
       let%bind () =
         as_prover
@@ -206,6 +201,25 @@ struct
         with_label __LOC__ Boolean.(prev_state_valid && success)
       in
       let%bind is_base_case = State.Checked.is_base_hash next_state_hash in
+      let%bind () =
+        as_prover
+          As_prover.(
+            Let_syntax.(
+              let%map prev_valid = read Boolean.typ prev_state_valid
+              and success = read Boolean.typ success
+              and is_base_case = read Boolean.typ is_base_case in
+              let result = (prev_valid && success) || is_base_case in
+              Logger.trace logger
+                "transition system debug state: (previous valid=$prev_valid \
+                 ∧ update success=$success) ∨ base case=$is_base_case = \
+                 $result"
+                ~location:__LOC__ ~module_:__MODULE__
+                ~metadata:
+                  [ ("prev_valid", `Bool prev_valid)
+                  ; ("success", `Bool success)
+                  ; ("is_base_case", `Bool is_base_case)
+                  ; ("result", `Bool result) ]))
+      in
       with_label __LOC__
         (Boolean.Assert.any [is_base_case; inductive_case_passed])
   end

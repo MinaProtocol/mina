@@ -70,10 +70,10 @@ module Keys = struct
 
     let dummy =
       { step=
-          Tick_backend.Verification_key.dummy
+          Tick_backend.Verification_key.get_dummy
             ~input_size:Coda_base.Transition_system.step_input_size
       ; wrap=
-          Tock_backend.Bowe_gabizon.Verification_key.dummy
+          Tock_backend.Bowe_gabizon.Verification_key.get_dummy
             ~input_size:Wrap_input.size }
 
     let load ({step; wrap} : Location.t) =
@@ -143,7 +143,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
 
       include (U : module type of U with module Checked := U.Checked)
 
-      module Hash = Coda_base.State_hash
+      module Hash = struct
+        include Coda_base.State_hash
+
+        let var_to_field = var_to_hash_packed
+      end
 
       module Checked = struct
         include Blockchain_snark_state.Checked
@@ -212,10 +216,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
         let open Tick in
         let open Cached.Let_syntax in
         let%map verification =
-          Cached.component ~label:"verification" ~f:Keypair.vk
+          Cached.component ~label:"step_verification" ~f:Keypair.vk
             (module Verification_key)
         and proving =
-          Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+          Cached.component ~label:"step_proving" ~f:Keypair.pk
+            (module Proving_key)
         in
         (verification, {proving with value= ()})
       in
@@ -241,10 +246,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
           let open Tock in
           let open Cached.Let_syntax in
           let%map verification =
-            Cached.component ~label:"verification" ~f:Keypair.vk
+            Cached.component ~label:"wrap_verification" ~f:Keypair.vk
               (module Verification_key)
           and proving =
-            Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+            Cached.component ~label:"wrap_proving" ~f:Keypair.pk
+              (module Proving_key)
           in
           (verification, {proving with value= ()})
         in
@@ -273,6 +279,25 @@ module Make (T : Transaction_snark.Verification.S) = struct
       (location, t, checksum)
   end
 end
+
+let instance_hash wrap_vk =
+  let open Coda_base in
+  let init =
+    Random_oracle.update
+      ~state:Hash_prefix.Random_oracle.transition_system_snark
+      Snark_params.Tick.Verifier.(
+        let vk = vk_of_backend_vk wrap_vk in
+        let g1 = Tick.Inner_curve.to_affine_exn in
+        let g2 = Tick.Pairing.G2.Unchecked.to_affine_exn in
+        Verification_key.to_field_elements
+          { vk with
+            query_base= g1 vk.query_base
+          ; query= List.map ~f:g1 vk.query
+          ; delta= g2 vk.delta })
+  in
+  stage (fun state ->
+      Random_oracle.hash ~init [|(Protocol_state.hash state :> Tick.Field.t)|]
+  )
 
 let constraint_system_digests () =
   let module M = Make (Transaction_snark.Verification.Make (struct

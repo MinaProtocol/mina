@@ -21,8 +21,8 @@ let main () =
   let is_archive_node i = i = 1 in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
-      ~is_archive_node
+      Cli_lib.Arg_type.Work_selection_method.Sequence
+      ~max_concurrent_connections:None ~is_archive_node
   in
   let%bind new_block_pipe =
     let%map pipe =
@@ -48,7 +48,7 @@ let main () =
          ~f:(fun {With_hash.hash; _} -> hash))
   in
   assert (Hash_set.equal observed_hashset stored_state_hashes) ;
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async

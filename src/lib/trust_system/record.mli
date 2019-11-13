@@ -1,15 +1,19 @@
 open Core
 
-type t [@@deriving bin_io]
+module Stable : sig
+  module V1 : sig
+    type t [@@deriving bin_io, version]
+  end
+
+  module Latest = V1
+end
+
+type t = Stable.Latest.t
 
 module type S = sig
   val init : unit -> t
 
   val ban : t -> t
-
-  val disable_bans : unit -> unit
-
-  val get_bans_disabled : unit -> bool
 
   val add_trust : t -> float -> t
 

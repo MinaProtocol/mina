@@ -84,10 +84,6 @@ module Staged_undos : sig
   val apply : t -> Ledger.t -> unit Or_error.t
 end
 
-module Bundle : sig
-  type 'a t = 'a list
-end
-
 val staged_undos : t -> Staged_undos.t
 
 val empty : unit -> t
@@ -107,6 +103,8 @@ val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 
 val hash : t -> Staged_ledger_hash.Aux_hash.t
 
+val target_merkle_root : t -> Frozen_ledger_hash.t option
+
 (** All the transactions in the order in which they were applied*)
 val staged_transactions : t -> Transaction.t list Or_error.t
 
@@ -118,17 +116,17 @@ val statement_of_job : Available_job.t -> Transaction_snark.Statement.t option
 val snark_job_list_json : t -> string
 
 (** All the proof bundles *)
-val all_work_statements : t -> Transaction_snark.Statement.t Bundle.t list
+val all_work_statements : t -> Transaction_snark.Statement.t One_or_two.t list
 
 (** Required proof bundles for a certain number of slots *)
-val required_work_pairs : t -> slots:int -> Available_job.t Bundle.t list
+val required_work_pairs : t -> slots:int -> Available_job.t One_or_two.t list
 
 (**K proof bundles*)
-val k_work_pairs_for_new_diff : t -> k:int -> Available_job.t Bundle.t list
+val k_work_pairs_for_new_diff : t -> k:int -> Available_job.t One_or_two.t list
 
 (** All the proof bundles for 2**transaction_capacity_log2 slots that can be used up in one diff *)
 val work_statements_for_new_diff :
-  t -> Transaction_snark.Statement.t Bundle.t list
+  t -> Transaction_snark.Statement.t One_or_two.t list
 
 (** True if the latest tree is full and transactions would be added on to a new tree *)
 val next_on_new_tree : t -> bool
@@ -136,15 +134,11 @@ val next_on_new_tree : t -> bool
 (** All the proof bundles for snark workers*)
 val all_work_pairs_exn :
      t
-  -> ( ( Transaction.t
-       , Transaction_witness.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Single.Spec.t
-     * ( Transaction.t
-       , Transaction_witness.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Single.Spec.t
-       option )
+  -> ( Transaction.t
+     , Transaction_witness.t
+     , Ledger_proof.t )
+     Snark_work_lib.Work.Single.Spec.t
+     One_or_two.t
      list
 
-module Constants : Constants_intf.S
+module Constants : Snark_params.Scan_state_constants.S

@@ -1,6 +1,7 @@
 open Core_kernel
 open Coda_base
 open Module_version
+module Constants = Snark_params.Scan_state_constants
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -30,32 +31,19 @@ module type Monad_with_Or_error_intf = sig
 end
 
 module Transaction_with_witness = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-        type t =
-          { transaction_with_info: Ledger.Undo.Stable.V1.t
-          ; statement: Transaction_snark.Statement.Stable.V1.t
-          ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
-        [@@deriving sexp, bin_io, version]
-      end
+      (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
+      type t =
+        { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
+        ; statement: Transaction_snark.Statement.Stable.V1.t
+        ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
+      [@@deriving sexp]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_snark_scan_state_transaction_with_witness"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t =
     { transaction_with_info: Ledger.Undo.t
@@ -65,28 +53,15 @@ module Transaction_with_witness = struct
 end
 
 module Ledger_proof_with_sok_message = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
-        [@@deriving sexp, bin_io, version]
-      end
+      type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
+      [@@deriving sexp, bin_io, version]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_snark_scan_state_ledger_proof_with_sok_message"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Ledger_proof.t * Sok_message.t [@@deriving sexp]
 end
@@ -106,12 +81,12 @@ module Job_view = struct
   [@@deriving sexp]
 
   let to_yojson ({value; position} : t) : Yojson.Safe.json =
-    let hash_string h = Sexp.to_string (Frozen_ledger_hash.sexp_of_t h) in
+    let hash_yojson h = Frozen_ledger_hash.to_yojson h in
     let statement_to_yojson (s : Transaction_snark.Statement.t) =
       `Assoc
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
-        ; ("Source", `String (hash_string s.source))
-        ; ("Target", `String (hash_string s.target))
+        ; ("Source", hash_yojson s.source)
+        ; ("Target", hash_yojson s.target)
         ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
         ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase) ]
     in
@@ -271,7 +246,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
       , Sok_message.create ~fee ~prover )
 
 let total_proofs (works : Transaction_snark_work.t list) =
-  List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
+  List.sum (module Int) works ~f:(fun w -> One_or_two.length w.proofs)
 
 (*************exposed functions*****************)
 
@@ -453,10 +428,6 @@ module Staged_undos = struct
           ~f:(fun u -> Ledger.undo ledger u) )
 end
 
-module Bundle = struct
-  type 'a t = 'a list
-end
-
 let statement_of_job : job -> Transaction_snark.Statement.t option = function
   | Base {statement; _} ->
       Some statement
@@ -510,6 +481,13 @@ let next_on_new_tree = Parallel_scan.next_on_new_tree
 
 let base_jobs_on_latest_tree = Parallel_scan.base_jobs_on_latest_tree
 
+(* TODO: make this operation O(1) -- gets used in Sync_handler RPC, which is performance sensitive (#3733) *)
+let target_merkle_root t =
+  let open Transaction_with_witness in
+  let open Option.Let_syntax in
+  let%map last_item = List.last (Parallel_scan.pending_data t) in
+  last_item.statement.target
+
 (*All the transactions in the order in which they were applied*)
 let staged_transactions t =
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
@@ -557,43 +535,36 @@ let snark_job_list_json t =
 let all_work_statements t : Transaction_snark_work.Statement.t list =
   let work_seqs = all_jobs t in
   List.concat_map work_seqs ~f:(fun work_seq ->
-      List.chunks_of
+      One_or_two.group_list
         (List.map work_seq ~f:(fun job ->
              match statement_of_job job with
              | None ->
                  assert false
              | Some stmt ->
-                 stmt ))
-        ~length:Transaction_snark_work.proofs_length )
+                 stmt )) )
 
 let required_work_pairs t ~slots =
   let work_list = Parallel_scan.jobs_for_slots t ~slots in
-  List.concat_map work_list ~f:(fun works ->
-      List.chunks_of works ~length:Transaction_snark_work.proofs_length )
+  List.concat_map work_list ~f:(fun works -> One_or_two.group_list works)
 
 let k_work_pairs_for_new_diff t ~k =
   let work_list = Parallel_scan.jobs_for_next_update t in
   List.(
-    take
-      (concat_map work_list ~f:(fun works ->
-           chunks_of works ~length:Transaction_snark_work.proofs_length ))
-      k)
+    take (concat_map work_list ~f:(fun works -> One_or_two.group_list works)) k)
 
 (*Always the same pairing of jobs*)
 let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
   let work_list = Parallel_scan.jobs_for_next_update t in
   List.concat_map work_list ~f:(fun work_seq ->
-      List.chunks_of
+      One_or_two.group_list
         (List.map work_seq ~f:(fun job ->
              match statement_of_job job with
              | None ->
                  assert false
              | Some stmt ->
-                 stmt ))
-        ~length:Transaction_snark_work.proofs_length )
+                 stmt )) )
 
 let all_work_pairs_exn t =
-  let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0) in
   let all_jobs = all_jobs t in
   let module A = Available_job in
   let single_spec (job : job) =
@@ -613,25 +584,9 @@ let all_work_pairs_exn t =
         in
         Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
   in
-  let all_jobs_paired jobs =
-    let pairs = chunks_of jobs ~n:2 in
-    List.map pairs ~f:(fun js ->
-        match js with
-        | [j] ->
-            (j, None)
-        | [j1; j2] ->
-            (j1, Some j2)
-        | _ ->
-            failwith "error pairing jobs" )
-  in
-  let job_pair_to_work_spec_pair = function
-    | j, Some j' ->
-        (single_spec j, Some (single_spec j'))
-    | j, None ->
-        (single_spec j, None)
-  in
   List.concat_map all_jobs ~f:(fun jobs ->
-      List.map (all_jobs_paired jobs) ~f:job_pair_to_work_spec_pair )
+      List.map (One_or_two.group_list jobs) ~f:(One_or_two.map ~f:single_spec)
+  )
 
 let fill_work_and_enqueue_transactions t transactions work =
   let open Or_error.Let_syntax in
@@ -646,7 +601,8 @@ let fill_work_and_enqueue_transactions t transactions work =
     map2_or_error next_jobs
       (List.concat_map works
          ~f:(fun {Transaction_snark_work.fee; proofs; prover} ->
-           List.map proofs ~f:(fun proof -> (fee, proof, prover)) ))
+           One_or_two.map proofs ~f:(fun proof -> (fee, proof, prover))
+           |> One_or_two.to_list ))
       ~f:completed_work_to_scanable_work
   in
   let old_proof = Parallel_scan.last_emitted_value t in
@@ -668,5 +624,3 @@ let fill_work_and_enqueue_transactions t transactions work =
         else Or_error.error_string "Unexpected ledger proof emitted" )
   in
   (result_opt, updated_scan_state)
-
-module Constants = Constants

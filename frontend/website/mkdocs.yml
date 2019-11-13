@@ -6,7 +6,6 @@ repo_url: https://github.com/codaprotocol/coda/
 edit_uri: edit/develop/frontend/website/docs/
 nav:
   - Overview: index.md
-  - Coda Testnet: coda-testnet.md
   - Getting Started: getting-started.md
   - My First Transaction: my-first-transaction.md
   - Become a Node Operator: node-operator.md
@@ -23,6 +22,13 @@ nav:
     - Lifecycle of a Payment: architecture/lifecycle-payment.md
     - Consensus: architecture/consensus.md
     - Proof of Stake: architecture/proof-of-stake.md
+  - SNARKs:
+    - SNARKs Overview: snarks/index.md
+    - Getting started using SNARKs: snarks/snarky.md
+    - Which SNARK is right for me?: snarks/constructions.md
+    - The snarkyjs-crypto library: snarks/snarkyjs-crypto.md
+    - The snarky-universe library: snarks/snarky-universe.md
+  - GUI Wallet: gui-wallet.md
   - CLI Reference: cli-reference.md
   - Troubleshooting: troubleshooting.md
   - FAQ: faq.md

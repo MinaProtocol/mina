@@ -7,14 +7,16 @@ module Stable = struct
       type t =
         { proposer: Public_key.Compressed.Stable.V1.t
         ; amount: Currency.Amount.Stable.V1.t
-        ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
+        ; fee_transfer: Fee_transfer.Single.Stable.V1.t option
+        ; state_body_hash: State_body_hash.Stable.V1.t }
       [@@deriving sexp, bin_io, compare, eq, version, hash, yojson]
     end
 
     include T
-    include Module_version.Registration.Make_latest_version (T)
+    module Registered = Module_version.Registration.Make_latest_version (T)
+    include Registered
 
-    let is_valid {proposer= _; amount; fee_transfer} =
+    let is_valid {proposer= _; amount; fee_transfer; state_body_hash= _} =
       match fee_transfer with
       | None ->
           true
@@ -22,8 +24,12 @@ module Stable = struct
           Currency.Amount.(of_fee fee <= amount)
 
     (* check validity when deserializing *)
-    include Binable.Of_binable
-              (T)
+    include Binable.Of_binable (struct
+                (* use shadowed bin_io functions *)
+                type nonrec t = t
+
+                include Registered
+              end)
               (struct
                 type nonrec t = t
 
@@ -55,13 +61,14 @@ end
 type t = Stable.Latest.t =
   { proposer: Public_key.Compressed.Stable.V1.t
   ; amount: Currency.Amount.Stable.V1.t
-  ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
+  ; fee_transfer: Fee_transfer.Single.Stable.V1.t option
+  ; state_body_hash: State_body_hash.Stable.V1.t }
 [@@deriving sexp, compare, eq, hash, yojson]
 
 let is_valid = Stable.Latest.is_valid
 
-let create ~amount ~proposer ~fee_transfer =
-  let t = {proposer; amount; fee_transfer} in
+let create ~amount ~proposer ~fee_transfer ~state_body_hash =
+  let t = {proposer; amount; fee_transfer; state_body_hash} in
   if is_valid t then
     let adjusted_fee_transfer =
       if
@@ -74,7 +81,7 @@ let create ~amount ~proposer ~fee_transfer =
     Ok {t with fee_transfer= adjusted_fee_transfer}
   else Or_error.error_string "Coinbase.create: fee transfer was too high"
 
-let supply_increase {proposer= _; amount; fee_transfer} =
+let supply_increase {proposer= _; amount; fee_transfer; state_body_hash= _} =
   match fee_transfer with
   | None ->
       Ok amount
@@ -98,7 +105,8 @@ let gen =
     Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)
   in
   let prover = Public_key.Compressed.gen in
-  let%map fee_transfer =
+  let%bind fee_transfer =
     Option.quickcheck_generator (Quickcheck.Generator.tuple2 prover fee)
   in
-  {proposer; amount; fee_transfer}
+  let%map state_body_hash = State_body_hash.gen in
+  {proposer; amount; fee_transfer; state_body_hash}

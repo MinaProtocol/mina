@@ -4,49 +4,72 @@ open Coda_base
 open Coda_state
 open Module_version
 
+[%%versioned
 module Stable = struct
   module V1 = struct
+    type t =
+      { protocol_state: Protocol_state.Value.Stable.V1.t
+      ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+      ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
+      ; delta_transition_chain_proof:
+          State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list }
+    [@@deriving sexp, fields]
+
+    let to_latest = Fn.id
+
+    let to_yojson
+        { protocol_state
+        ; protocol_state_proof= _
+        ; staged_ledger_diff= _
+        ; delta_transition_chain_proof= _ } =
+      `Assoc
+        [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
+        ; ("protocol_state_proof", `String "<opaque>")
+        ; ("staged_ledger_diff", `String "<opaque>")
+        ; ("delta_transition_chain_proof", `String "<opaque>") ]
+
+    let delta_transition_chain_proof {delta_transition_chain_proof; _} =
+      delta_transition_chain_proof
+
+    let consensus_state {protocol_state; _} =
+      Protocol_state.consensus_state protocol_state
+
+    let blockchain_state {protocol_state; _} =
+      Protocol_state.blockchain_state protocol_state
+
+    let blockchain_length t =
+      consensus_state t |> Consensus.Data.Consensus_state.blockchain_length
+
+    let state_hash {protocol_state; _} = Protocol_state.hash protocol_state
+
+    let parent_hash {protocol_state; _} =
+      Protocol_state.previous_state_hash protocol_state
+
+    let proposer {staged_ledger_diff; _} =
+      Staged_ledger_diff.creator staged_ledger_diff
+
+    let transactions {staged_ledger_diff; _} =
+      let open Staged_ledger.Pre_diff_info in
+      match get_transactions staged_ledger_diff with
+      | Ok transactions ->
+          transactions
+      | Error e ->
+          Core.Error.raise (Error.to_error e)
+
+    let user_commands {staged_ledger_diff; _} =
+      Staged_ledger_diff.user_commands staged_ledger_diff
+
+    let payments external_transition =
+      List.filter
+        (user_commands external_transition)
+        ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
+
     module T = struct
-      type t =
-        { protocol_state: Protocol_state.Value.Stable.V1.t
-        ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-        ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
-        ; delta_transition_chain_proof:
-            State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list }
-      [@@deriving sexp, fields, bin_io, version]
+      type nonrec t = t
 
-      let to_yojson
-          { protocol_state
-          ; protocol_state_proof= _
-          ; staged_ledger_diff= _
-          ; delta_transition_chain_proof= _ } =
-        `Assoc
-          [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
-          ; ("protocol_state_proof", `String "<opaque>")
-          ; ("staged_ledger_diff", `String "<opaque>")
-          ; ("delta_transition_chain_proof", `String "<opaque>") ]
+      let t_of_sexp = t_of_sexp
 
-      let consensus_state {protocol_state; _} =
-        Protocol_state.consensus_state protocol_state
-
-      let blockchain_state {protocol_state; _} =
-        Protocol_state.blockchain_state protocol_state
-
-      let state_hash {protocol_state; _} = Protocol_state.hash protocol_state
-
-      let parent_hash {protocol_state; _} =
-        Protocol_state.previous_state_hash protocol_state
-
-      let proposer {staged_ledger_diff; _} =
-        Staged_ledger_diff.creator staged_ledger_diff
-
-      let user_commands {staged_ledger_diff; _} =
-        Staged_ledger_diff.user_commands staged_ledger_diff
-
-      let payments external_transition =
-        List.filter
-          (user_commands external_transition)
-          ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
+      let sexp_of_t = sexp_of_t
 
       let compare =
         Comparable.lift
@@ -63,22 +86,9 @@ module Stable = struct
           ~f:consensus_state
     end
 
-    include T
     include Comparable.Make (T)
-    include Registration.Make_latest_version (T)
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "external_transition"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 (* bin_io omitted *)
 type t = Stable.Latest.t =
@@ -94,12 +104,15 @@ type external_transition = t
 Stable.Latest.
   ( protocol_state
   , protocol_state_proof
+  , delta_transition_chain_proof
   , blockchain_state
+  , blockchain_length
   , staged_ledger_diff
   , consensus_state
   , state_hash
   , parent_hash
   , proposer
+  , transactions
   , user_commands
   , payments
   , to_yojson )]
@@ -136,14 +149,14 @@ module Validation = struct
           constraint
             'delta_transition_chain =
             [`Delta_transition_chain]
-            * (State_hash.t Non_empty_list.t, _) Truth.t
+            * (State_hash.Stable.V1.t Non_empty_list.Stable.V1.t, _) Truth.t
           constraint
             'frontier_dependencies =
             [`Frontier_dependencies] * (unit, _) Truth.t
           constraint
             'staged_ledger_diff =
             [`Staged_ledger_diff] * (unit, _) Truth.t
-        [@@deriving version]
+        [@@deriving version {of_binable}]
       end
 
       include T
@@ -201,6 +214,22 @@ module Validation = struct
     , (`Delta_transition_chain, Truth.False)
     , (`Frontier_dependencies, Truth.False)
     , (`Staged_ledger_diff, Truth.False) )
+
+  type initial_valid =
+    ( [`Time_received] * unit Truth.true_t
+    , [`Proof] * unit Truth.true_t
+    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+    , [`Frontier_dependencies] * unit Truth.false_t
+    , [`Staged_ledger_diff] * unit Truth.false_t )
+    t
+
+  type almost_valid =
+    ( [`Time_received] * unit Truth.true_t
+    , [`Proof] * unit Truth.true_t
+    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+    , [`Frontier_dependencies] * unit Truth.true_t
+    , [`Staged_ledger_diff] * unit Truth.false_t )
+    t
 
   let wrap t = (t, fully_invalid)
 
@@ -387,14 +416,6 @@ module Validation = struct
   end
 end
 
-type with_initial_validation =
-  ( [`Time_received] * unit Truth.true_t
-  , [`Proof] * unit Truth.true_t
-  , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
-  , [`Frontier_dependencies] * unit Truth.false_t
-  , [`Staged_ledger_diff] * unit Truth.false_t )
-  Validation.with_transition
-
 let skip_time_received_validation `This_transition_was_not_received_via_gossip
     (t, validation) =
   (t, Validation.Unsafe.set_valid_time_received validation)
@@ -454,41 +475,103 @@ let validate_delta_transition_chain (t, validation) =
       Error `Invalid_delta_transition_chain_proof
 
 let skip_frontier_dependencies_validation
-    `This_transition_belongs_to_a_detached_subtree (t, validation) =
+    (_ :
+      [ `This_transition_belongs_to_a_detached_subtree
+      | `This_transition_was_loaded_from_persistence ]) (t, validation) =
   (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
 
-let skip_staged_ledger_diff_validation `This_is_unsafe (t, validation) =
+let validate_staged_ledger_hash
+    (`Staged_ledger_already_materialized staged_ledger_hash) (t, validation) =
+  if
+    Staged_ledger_hash.equal staged_ledger_hash
+      (Blockchain_state.staged_ledger_hash
+         (blockchain_state (With_hash.data t)))
+  then Ok (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
+  else Error `Staged_ledger_hash_mismatch
+
+let skip_staged_ledger_diff_validation
+    `This_transition_has_a_trusted_staged_ledger (t, validation) =
   (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
+
+module With_validation = struct
+  let state_hash (t, _) = With_hash.hash t
+
+  let lift f (t, _) = With_hash.data t |> f
+
+  let protocol_state t = lift protocol_state t
+
+  let protocol_state_proof t = lift protocol_state_proof t
+
+  let blockchain_state t = lift blockchain_state t
+
+  let blockchain_length t = lift blockchain_length t
+
+  let staged_ledger_diff t = lift staged_ledger_diff t
+
+  let consensus_state t = lift consensus_state t
+
+  let parent_hash t = lift parent_hash t
+
+  let proposer t = lift proposer t
+
+  let user_commands t = lift user_commands t
+
+  let transactions t = lift transactions t
+
+  let payments t = lift payments t
+
+  let delta_transition_chain_proof t = lift delta_transition_chain_proof t
+end
+
+module Initial_validated = struct
+  type t =
+    (external_transition, State_hash.t) With_hash.t * Validation.initial_valid
+
+  include With_validation
+end
+
+module Almost_validated = struct
+  type t =
+    (external_transition, State_hash.t) With_hash.t * Validation.almost_valid
+
+  include With_validation
+end
 
 module Validated = struct
   module Stable = struct
     module V1 = struct
       module T = struct
         type t =
-          ( Stable.Latest.t
-          , State_hash.Stable.Latest.t )
-          With_hash.Stable.Latest.t
-          * ( [`Time_received]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t
-            , [`Proof]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t
+          (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
+          * ( [`Time_received] * (unit, Truth.True.t) Truth.t
+            , [`Proof] * (unit, Truth.True.t) Truth.t
             , [`Delta_transition_chain]
-              * ( State_hash.Stable.Latest.t Non_empty_list.Stable.Latest.t
-                , Truth.True.Stable.Latest.t )
-                Truth.Stable.Latest.t
-            , [`Frontier_dependencies]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t
-            , [`Staged_ledger_diff]
-              * (unit, Truth.True.Stable.Latest.t) Truth.Stable.Latest.t )
-            Validation.Stable.Latest.t
-        [@@deriving version]
+              * ( State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
+                , Truth.True.t )
+                Truth.t
+            , [`Frontier_dependencies] * (unit, Truth.True.t) Truth.t
+            , [`Staged_ledger_diff] * (unit, Truth.True.t) Truth.t )
+            Validation.Stable.V1.t
+        [@@deriving version {of_binable}]
 
-        type erased =
-          ( Stable.Latest.t
-          , State_hash.Stable.Latest.t )
-          With_hash.Stable.Latest.t
-          * State_hash.Stable.Latest.t Non_empty_list.Stable.Latest.t
-        [@@deriving sexp, bin_io]
+        module Erased = struct
+          (* if this type receives a new version, that changes the serialization of
+             the type `t', so that type must also get a new version
+          *)
+          [%%versioned
+          module Stable = struct
+            module V1 = struct
+              type t =
+                (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
+                * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
+              [@@deriving sexp]
+
+              let to_latest = Fn.id
+            end
+          end]
+        end
+
+        type erased = Erased.Stable.Latest.t [@@deriving sexp]
 
         let erase (transition_with_hash, validation) =
           ( transition_with_hash
@@ -515,7 +598,7 @@ module Validated = struct
                   end)
 
         include Binable.Of_binable (struct
-                    type t = erased [@@deriving bin_io]
+                    type t = Erased.Stable.Latest.t [@@deriving bin_io]
                   end)
                   (struct
                     type nonrec t = t
@@ -532,21 +615,9 @@ module Validated = struct
           With_hash.to_yojson to_yojson State_hash.to_yojson
             transition_with_hash
 
-        let lift f (t, _) = With_hash.data t |> f
-
-        let protocol_state = lift protocol_state
-
-        let protocol_state_proof = lift protocol_state_proof
-
-        let blockchain_state = lift blockchain_state
-
-        let staged_ledger_diff = lift staged_ledger_diff
-
-        let consensus_state = lift consensus_state
-
-        let create_unsafe t =
+        let create_unsafe_pre_hashed t =
           `I_swear_this_is_safe_see_my_comment
-            ( Validation.wrap (With_hash.of_data t ~hash_data:state_hash)
+            ( Validation.wrap t
             |> skip_time_received_validation
                  `This_transition_was_not_received_via_gossip
             |> skip_proof_validation `This_transition_was_generated_internally
@@ -554,17 +625,13 @@ module Validated = struct
                  `This_transition_was_not_received_via_gossip
             |> skip_frontier_dependencies_validation
                  `This_transition_belongs_to_a_detached_subtree
-            |> skip_staged_ledger_diff_validation `This_is_unsafe )
+            |> skip_staged_ledger_diff_validation
+                 `This_transition_has_a_trusted_staged_ledger )
 
-        let state_hash (t, _) = With_hash.hash t
+        let create_unsafe t =
+          create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hash)
 
-        let parent_hash = lift parent_hash
-
-        let proposer = lift proposer
-
-        let user_commands = lift user_commands
-
-        let payments = lift payments
+        include With_validation
       end
 
       include T
@@ -590,21 +657,52 @@ module Validated = struct
   Stable.Latest.
     ( sexp_of_t
     , t_of_sexp
+    , create_unsafe_pre_hashed
     , create_unsafe
     , protocol_state
+    , delta_transition_chain_proof
     , protocol_state_proof
     , blockchain_state
+    , blockchain_length
     , staged_ledger_diff
     , consensus_state
     , state_hash
     , parent_hash
     , proposer
+    , transactions
     , user_commands
     , payments
+    , erase
     , to_yojson )]
 
   include Comparable.Make (Stable.Latest)
 end
+
+let genesis =
+  let open Lazy.Let_syntax in
+  let%map genesis_protocol_state = Genesis_protocol_state.t in
+  let empty_diff =
+    { Staged_ledger_diff.diff=
+        ( { completed_works= []
+          ; user_commands= []
+          ; coinbase= Staged_ledger_diff.At_most_two.Zero }
+        , None )
+    ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
+    ; state_body_hash=
+        Protocol_state.body (With_hash.data genesis_protocol_state)
+        |> Protocol_state.Body.hash }
+  in
+  (* the genesis transition is assumed to be valid *)
+  let (`I_swear_this_is_safe_see_my_comment transition) =
+    Validated.create_unsafe_pre_hashed
+      (With_hash.map genesis_protocol_state ~f:(fun protocol_state ->
+           create ~protocol_state
+             ~protocol_state_proof:Precomputed_values.base_proof
+             ~staged_ledger_diff:empty_diff
+             ~delta_transition_chain_proof:
+               (Protocol_state.previous_state_hash protocol_state, []) ))
+  in
+  transition
 
 module Transition_frontier_validation (Transition_frontier : sig
   type t
@@ -674,6 +772,7 @@ module Staged_ledger_validation = struct
       -> logger:Logger.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
+      -> parent_protocol_state:Protocol_state.value
       -> ( [`Just_emitted_a_proof of bool]
            * [ `External_transition_with_validation of
                ( 'time_received
@@ -685,18 +784,26 @@ module Staged_ledger_validation = struct
            * [`Staged_ledger of Staged_ledger.t]
          , [ `Invalid_staged_ledger_diff of
              [ `Incorrect_target_staged_ledger_hash
-             | `Incorrect_target_snarked_ledger_hash ]
+             | `Incorrect_target_snarked_ledger_hash
+             | `Incorrect_staged_ledger_diff_state_body_hash ]
              list
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~verifier ~parent_staged_ledger ->
+   fun (t, validation) ~logger ~verifier ~parent_staged_ledger
+       ~parent_protocol_state ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
     let blockchain_state =
       Protocol_state.blockchain_state (protocol_state transition)
     in
     let staged_ledger_diff = staged_ledger_diff transition in
+    let diff_state_body_hash =
+      Staged_ledger_diff.state_body_hash staged_ledger_diff
+    in
+    let parent_state_body_hash =
+      Protocol_state.(Body.hash @@ body parent_protocol_state)
+    in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
@@ -729,7 +836,10 @@ module Staged_ledger_validation = struct
             (not
                (Frozen_ledger_hash.equal target_ledger_hash
                   (Blockchain_state.snarked_ledger_hash blockchain_state)))
-            `Incorrect_target_snarked_ledger_hash ]
+            `Incorrect_target_snarked_ledger_hash
+        ; Option.some_if
+            (State_body_hash.equal diff_state_body_hash parent_state_body_hash)
+            `Incorrect_staged_ledger_diff_state_body_hash ]
     in
     Deferred.return
       ( match maybe_errors with

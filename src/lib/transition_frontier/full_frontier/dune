@@ -1,0 +1,5 @@
+(library
+  (name full_frontier)
+  (public_name transition_frontier_full_frontier)
+  (libraries transition_frontier_base consensus core_kernel coda_base coda_state coda_transition staged_ledger)
+  (preprocess (pps ppx_jane ppx_coda ppx_deriving.std ppx_deriving_yojson)))

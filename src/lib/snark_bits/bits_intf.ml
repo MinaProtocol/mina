@@ -15,6 +15,12 @@ module type S = sig
   val to_bits : t -> bool list
 end
 
+module type Convertible_bits = sig
+  include S
+
+  val of_bits : bool list -> t
+end
+
 module Snarkable = struct
   module type Basic = sig
     type (_, _) typ

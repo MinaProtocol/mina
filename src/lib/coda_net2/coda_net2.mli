@@ -14,6 +14,24 @@ this module/the helper, and not misuse.
 Some errors can arise from calling certain functions before [configure] has been
 called. In general, anything that returns an [Or_error] can fail in this manner.
 
+A [Coda_net2.t] has the following lifecycle:
+
+- Fresh: the result of [Coda_net2.create]. This spawns the helper process but
+  does not connect to any network. Few operations can be done on fresh nets,
+  only [Keypair.random] for now.
+
+- Configured: after calling [Coda_net2.configure]. Configure creates the libp2p
+  objects and can start listening on network sockets. This doesn't join any DHT
+  or attempt peer connections. Configured networks can do everything but any
+  pubsub messages may have very limited reach without being in the DHT.
+
+- Active: after calling [Coda_net2.begin_advertising]. This joins the DHT,
+  announcing our existence to our peers and initiating local mDNS discovery.
+
+- Closed: after calling [Coda_net2.shutdown]. This flushes all the pending RPC
+
+TODO: consider encoding the network state in the types.
+
 A note about connection limits:
 
 In the original coda_net, connection limits were enforced synchronously on
@@ -42,11 +60,11 @@ module Keypair : sig
   (** Securely generate a new keypair. *)
   val random : net -> t Deferred.t
 
-  (** Formats this keypair to a ;-separated list of public key, secret key, and peer_id. *)
+  (** Formats this keypair to a comma-separated list of public key, secret key, and peer_id. *)
   val to_string : t -> string
 
   (** Undo [to_string t].
-  
+
     Only fails if the string has the wrong format, not if the embedded
     keypair data is corrupt. *)
   val of_string : string -> t Core.Or_error.t
@@ -63,7 +81,7 @@ end
   Some example multiaddrs:
 
   - [/ipfs/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC]
-  - [/ip4/127.0.0.1/ipfs/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC/tcp/1234]
+  - [/ip4/127.0.0.1/tcp/1234/ipfs/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC]
   - [/ip6/2601:9:4f81:9700:803e:ca65:66e8:c21]
  *)
 module Multiaddr : sig
@@ -81,6 +99,8 @@ module PeerID : sig
 
   val of_keypair : Keypair.t -> t
 end
+
+type discovered_peer = {id: PeerID.t; maddrs: Multiaddr.t list}
 
 module Pubsub : sig
   (** A subscription to a pubsub topic. *)
@@ -152,9 +172,10 @@ val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
 val configure :
      net
   -> me:Keypair.t
+  -> external_maddr:Multiaddr.t
   -> maddrs:Multiaddr.t list
   -> network_id:string
-  -> on_new_peer:(PeerID.t -> unit)
+  -> on_new_peer:(discovered_peer -> unit)
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.
@@ -271,7 +292,7 @@ val listening_addrs : net -> Multiaddr.t list Deferred.Or_error.t
   This can fail if the connection fails. *)
 val add_peer : net -> Multiaddr.t -> unit Deferred.Or_error.t
 
-(** Announce our existence on the DHT.
+(** Join the DHT and announce our existence.
 
   Call this after using [add_peer] to add any bootstrap peers. *)
 val begin_advertising : net -> unit Deferred.Or_error.t

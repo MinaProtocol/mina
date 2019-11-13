@@ -53,7 +53,7 @@ let make = () => {
   <A
     name="announcementbar"
     id="announcementbar--anchor"
-    href="/docs/coda-testnet/"
+    href="/testnet"
     className=Css.(
       style(
         Style.paddingX(`rem(1.25))
@@ -100,7 +100,7 @@ let make = () => {
           ]),
         ])
       )>
-      {React.string({j|Read Here\u00A0→|j})}
+      {React.string({j|Join Now\u00A0→|j})}
     </p>
   </A>;
 };

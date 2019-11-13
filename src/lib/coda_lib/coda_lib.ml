@@ -8,12 +8,12 @@ open Coda_transition
 open Pipe_lib
 open Strict_pipe
 open Signature_lib
-open Coda_state
 open O1trace
 open Otp_lib
-module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
+open Module_version
 module Config = Config
 module Subscriptions = Coda_subscriptions
+module Snark_worker_lib = Snark_worker
 
 exception Snark_worker_error of int
 
@@ -24,7 +24,9 @@ exception Snark_worker_signal_interrupt of Signal.t
    assigned to a public key. This public key can change throughout the entire time
    the daemon is running *)
 type snark_worker =
-  {public_key: Public_key.Compressed.t; process: Process.t Ivar.t}
+  { public_key: Public_key.Compressed.t
+  ; process: Process.t Ivar.t
+  ; kill_ivar: unit Ivar.t }
 
 type processes =
   { prover: Prover.t
@@ -57,6 +59,7 @@ type t =
   ; propose_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
+  ; mutable next_proposal: Consensus.Hooks.proposal option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
 [@@deriving fields]
@@ -72,7 +75,7 @@ let peek_frontier frontier_broadcast_pipe =
 
 let client_port t =
   let {Kademlia.Node_addrs_and_ports.client_port; _} =
-    t.config.net_config.gossip_net_params.addrs_and_ports
+    t.config.gossip_net_params.addrs_and_ports
   in
   client_port
 
@@ -84,7 +87,7 @@ let propose_public_keys t : Public_key.Compressed.Set.t =
 let replace_propose_keypairs t kps = Agent.update t.propose_keypairs kps
 
 module Snark_worker = struct
-  let run_process ~logger client_port =
+  let run_process ~logger client_port kill_ivar =
     let%map snark_worker_process =
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
@@ -96,56 +99,33 @@ module Snark_worker = struct
                ~shutdown_on_disconnect:false )
     in
     don't_wait_for
-      ( match%bind Process.wait snark_worker_process with
-      | Ok () ->
-          Logger.info logger "Snark worker process died" ~module_:__MODULE__
-            ~location:__LOC__ ;
-          Deferred.unit
-      | Error (`Exit_non_zero non_zero_error) ->
-          Logger.fatal logger
-            !"Snark worker process died with a nonzero error %i"
-            non_zero_error ~module_:__MODULE__ ~location:__LOC__ ;
-          raise (Snark_worker_error non_zero_error)
-      | Error (`Signal signal) when Signal.equal signal Signal.term ->
+      ( match%bind
+          Monitor.try_with (fun () -> Process.wait snark_worker_process)
+        with
+      | Ok signal_or_error -> (
+        match signal_or_error with
+        | Ok () ->
+            Logger.info logger "Snark worker process died" ~module_:__MODULE__
+              ~location:__LOC__ ;
+            Ivar.fill kill_ivar () ;
+            Deferred.unit
+        | Error (`Exit_non_zero non_zero_error) ->
+            Logger.fatal logger
+              !"Snark worker process died with a nonzero error %i"
+              non_zero_error ~module_:__MODULE__ ~location:__LOC__ ;
+            raise (Snark_worker_error non_zero_error)
+        | Error (`Signal signal) ->
+            Logger.info logger
+              !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
+              signal ~module_:__MODULE__ ~location:__LOC__ ;
+            raise (Snark_worker_signal_interrupt signal) )
+      | Error exn ->
           Logger.info logger
-            !"Snark worker received term signal. Expecting it to fully \
-              terminate"
-            ~module_:__MODULE__ ~location:__LOC__ ;
-          let wait_graceful_exit =
-            match%bind Process.wait snark_worker_process with
-            | Ok () ->
-                Logger.info logger
-                  !"Snark worker process fully died after receiving term \
-                    signal."
-                  ~module_:__MODULE__ ~location:__LOC__ ;
-                Deferred.unit
-            | Error error -> (
-                Logger.info logger
-                  !"Snark worker process died unexpectedly after getting the \
-                    term signal. Aborting the daemon"
-                  ~module_:__MODULE__ ~location:__LOC__ ;
-                match error with
-                | `Exit_non_zero non_zero_error ->
-                    raise (Snark_worker_error non_zero_error)
-                | `Signal signal ->
-                    raise (Snark_worker_signal_interrupt signal) )
-          in
-          Deferred.any
-            [ wait_graceful_exit
-            ; (* If the snark worker process was not able to fully abort, then kill the daemon *)
-              ( after (Core.Time.Span.of_sec 20.0)
-              >>= fun () ->
-              if not @@ Deferred.is_determined wait_graceful_exit then
-                Logger.error logger
-                  !"Snark worker process didn't die gracefully in a short \
-                    amount of time"
-                  ~module_:__MODULE__ ~location:__LOC__ ;
-              Deferred.unit ) ]
-      | Error (`Signal signal) ->
-          Logger.info logger
-            !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
-            signal ~module_:__MODULE__ ~location:__LOC__ ;
-          raise (Snark_worker_signal_interrupt signal) ) ;
+            !"Exception when waiting for snark worker process to terminate: \
+              $exn"
+            ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("exn", `String (Exn.to_string exn))] ;
+          Deferred.unit ) ;
     Logger.trace logger
       !"Created snark worker with pid: %i"
       ~module_:__MODULE__ ~location:__LOC__
@@ -163,13 +143,13 @@ module Snark_worker = struct
 
   let start t =
     match t.processes.snark_worker with
-    | `On ({process= process_ivar; _}, _) ->
+    | `On ({process= process_ivar; kill_ivar; _}, _) ->
         Logger.debug t.config.logger
           !"Starting snark worker process"
           ~module_:__MODULE__ ~location:__LOC__ ;
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
-            t.config.net_config.gossip_net_params.addrs_and_ports.client_port
+            t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
         in
         Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
@@ -184,16 +164,17 @@ module Snark_worker = struct
           ~module_:__MODULE__ ~location:__LOC__ ;
         Deferred.unit
 
-  let stop t =
+  let stop ?(should_wait_kill = false) t =
     match t.processes.snark_worker with
-    | `On ({public_key= _; process}, _) ->
-        let%map process = Ivar.read process in
+    | `On ({public_key= _; process; kill_ivar}, _) ->
+        let%bind process = Ivar.read process in
         Logger.info t.config.logger
           "Killing snark worker process with pid: $snark_worker_pid"
           ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [("snark_worker_pid", `Int (Pid.to_int (Process.pid process)))] ;
-        Signal.send_exn Signal.term (`Pid (Process.pid process))
+        Signal.send_exn Signal.term (`Pid (Process.pid process)) ;
+        if should_wait_kill then Ivar.read kill_ivar else Deferred.unit
     | `Off _ ->
         Logger.warn t.config.logger
           "Attempted to turn off snark worker, but no snark worker was running"
@@ -218,13 +199,16 @@ module Snark_worker = struct
         Deferred.unit
     | `Off fee, Some new_key ->
         let process = Ivar.create () in
-        t.processes.snark_worker <- `On ({public_key= new_key; process}, fee) ;
+        let kill_ivar = Ivar.create () in
+        t.processes.snark_worker
+        <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
         start t
-    | `On ({public_key= _; process}, fee), Some new_key ->
+    | `On ({public_key= _; process; kill_ivar}, fee), Some new_key ->
         Logger.debug logger
           !"Changing snark worker key from $old to $new"
           ~module_:__MODULE__ ~location:__LOC__ ;
-        t.processes.snark_worker <- `On ({public_key= new_key; process}, fee) ;
+        t.processes.snark_worker
+        <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
         Deferred.unit
     | `On (_, fee), None ->
         let%map () = stop t in
@@ -334,13 +318,12 @@ let create_sync_status_observer ~logger
               Logger.info (Logger.create ()) ~module_:__MODULE__
                 ~location:__LOC__ "Coda daemon is now bootstrapping" ;
               `Bootstrap
-          | Some (_, catchup_signal) -> (
-            match catchup_signal with
-            | `Catchup ->
+          | Some (_, catchup_jobs) ->
+              if catchup_jobs > 0 then (
                 Logger.info (Logger.create ()) ~module_:__MODULE__
                   ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
-                `Catchup
-            | `Normal ->
+                `Catchup )
+              else (
                 Logger.info (Logger.create ()) ~module_:__MODULE__
                   ~location:__LOC__ "Coda daemon is now synced" ;
                 `Synced ) ) )
@@ -444,20 +427,81 @@ let staged_ledger_ledger_proof t =
 
 let validated_transitions t = t.pipes.validated_transitions_reader
 
+module Root_diff = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t =
+          {user_commands: User_command.Stable.V1.t list; root_length: int}
+        [@@deriving bin_io, version]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "transition_frontier_diff_node_list"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  type t = Stable.Latest.t =
+    {user_commands: User_command.Stable.V1.t list; root_length: int}
+end
+
+(* TODO: this is a bad pattern for two reasons:
+ *   - uses an abstraction leak to patch new functionality instead of making a new extension
+ *   - every call to this function will create a new, unique pipe with it's own thread for transfering
+ *     items from the identity extension with no route for termination
+ *)
 let root_diff t =
   let root_diff_reader, root_diff_writer =
     Strict_pipe.create ~name:"root diff"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
-  don't_wait_for
-    (Broadcast_pipe.Reader.iter t.components.transition_frontier ~f:(function
-      | None ->
-          Deferred.unit
-      | Some frontier ->
-          Broadcast_pipe.Reader.iter
-            (Transition_frontier.root_diff_pipe frontier) ~f:(fun root_diff ->
-              Strict_pipe.Writer.write root_diff_writer root_diff
-              |> Deferred.return ) )) ;
+  trace_recurring_task "root diff pipe reader" (fun () ->
+      let open Root_diff.Stable.V1 in
+      let length_of_breadcrumb =
+        Fn.compose Unsigned.UInt32.to_int
+          Transition_frontier.Breadcrumb.blockchain_length
+      in
+      Broadcast_pipe.Reader.iter t.components.transition_frontier ~f:(function
+        | None ->
+            Deferred.unit
+        | Some frontier ->
+            let root = Transition_frontier.root frontier in
+            Strict_pipe.Writer.write root_diff_writer
+              { user_commands= Transition_frontier.Breadcrumb.user_commands root
+              ; root_length= length_of_breadcrumb root } ;
+            Broadcast_pipe.Reader.iter
+              Transition_frontier.(
+                Extensions.(get_view_pipe (extensions frontier) Identity))
+              ~f:
+                (Deferred.List.iter ~f:(function
+                  | Transition_frontier.Diff.Full.E.E (New_node _) ->
+                      Deferred.unit
+                  | Transition_frontier.Diff.Full.E.E (Best_tip_changed _) ->
+                      Deferred.unit
+                  | Transition_frontier.Diff.Full.E.E
+                      (Root_transitioned {new_root; _}) ->
+                      let new_root_breadcrumb =
+                        Transition_frontier.find_exn frontier new_root.hash
+                      in
+                      Strict_pipe.Writer.write root_diff_writer
+                        { user_commands=
+                            Transition_frontier.Breadcrumb.user_commands
+                              (Transition_frontier.find_exn frontier
+                                 new_root.hash)
+                        ; root_length= length_of_breadcrumb new_root_breadcrumb
+                        } ;
+                      Deferred.unit )) ) ) ;
   root_diff_reader
 
 let dump_tf t =
@@ -487,16 +531,27 @@ let request_work t =
         None
   in
   let fee = snark_work_fee t in
-  let instances, seen_jobs =
+  let instances_opt, seen_jobs =
     Work_selection_method.work ~logger:t.config.logger ~fee
       ~snark_pool:(snark_pool t) sl (seen_jobs t)
   in
   set_seen_jobs t seen_jobs ;
-  if List.is_empty instances then None
-  else Some {Snark_work_lib.Work.Spec.instances; fee}
+  Option.map instances_opt ~f:(fun instances ->
+      {Snark_work_lib.Work.Spec.instances; fee} )
+
+let work_selection_method t = t.config.work_selection_method
+
+let add_work t (work : Snark_worker_lib.Work.Result.t) =
+  let (module Work_selection_method) = t.config.work_selection_method in
+  let spec = work.spec.instances in
+  set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
+  Network_pool.Snark_pool.add_completed_work (snark_pool t) work
+
+let next_proposal t = t.next_proposal
 
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
+    ~set_next_proposal:(fun p -> t.next_proposal <- Some p)
     ~prover:t.processes.prover ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
       (Network_pool.Transaction_pool.resource_pool
@@ -510,94 +565,50 @@ let start t =
     ~transition_writer:t.pipes.proposer_transition_writer ;
   Snark_worker.start t
 
-let create_genesis_frontier (config : Config.t) ~verifier =
-  let consensus_local_state = config.consensus_local_state in
-  let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
-  let empty_diff =
-    { Staged_ledger_diff.diff=
-        ( { completed_works= []
-          ; user_commands= []
-          ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-        , None )
-    ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
-    }
-  in
-  let genesis_protocol_state =
-    With_hash.data (Lazy.force Genesis_protocol_state.t)
-  in
-  (* the genesis transition is assumed to be valid *)
-  let (`I_swear_this_is_safe_see_my_comment first_transition) =
-    External_transition.Validated.create_unsafe
-      (External_transition.create ~protocol_state:genesis_protocol_state
-         ~protocol_state_proof:Precomputed_values.base_proof
-         ~staged_ledger_diff:empty_diff
-         ~delta_transition_chain_proof:
-           (Protocol_state.previous_state_hash genesis_protocol_state, []))
-  in
-  let genesis_ledger = Lazy.force Genesis_ledger.t in
-  let load () =
-    let ledger_db =
-      Ledger.Db.create ?directory_name:config.ledger_db_location ()
-    in
-    ( ledger_db
-    , Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db )
-  in
-  let%bind root_snarked_ledger =
-    match load () with
-    | _, Ok l ->
-        return l
-    | ledger_db, Error _ ->
-        (* Persisted state was bogus. Give up on the ledger contents, we'll bootstrap. *)
-        Ledger.Db.close ledger_db ;
-        let%map () =
-          match config.ledger_db_location with
-          | Some ledger_db_location ->
-              Logger.error config.logger
-                "Failed to load genesis ledger, deleting $dir and trying again."
-                ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:[("dir", `String ledger_db_location)] ;
-              File_system.remove_dir ledger_db_location
-          | None ->
-              Deferred.unit
-        in
-        snd (load ()) |> Or_error.ok_exn
-    (* If it fails again, something is very wrong. Die. *)
-  in
-  let snarked_ledger_hash =
-    Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root genesis_ledger
-  in
-  let%bind root_staged_ledger =
-    match%map
-      Staged_ledger.of_scan_state_and_ledger ~logger:config.logger ~verifier
-        ~snarked_ledger_hash ~ledger:genesis_ledger
-        ~scan_state:(Staged_ledger.Scan_state.empty ())
-        ~pending_coinbase_collection:pending_coinbases
-    with
-    | Ok staged_ledger ->
-        staged_ledger
-    | Error err ->
-        Error.raise err
-  in
-  let%map frontier =
-    Transition_frontier.create ~logger:config.logger
-      ~root_transition:first_transition ~root_staged_ledger
-      ~root_snarked_ledger ~consensus_local_state
-  in
-  (root_snarked_ledger, frontier)
-
 let create (config : Config.t) =
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
-      trace_task "coda" (fun () ->
-          let%bind prover = Prover.create () in
-          let%bind verifier = Verifier.create () in
+      trace "coda" (fun () ->
+          let%bind prover =
+            Monitor.try_with
+              ~rest:
+                (`Call
+                  (fun exn ->
+                    Logger.warn config.logger
+                      "unhandled exception from daemon-side prover server: $exn"
+                      ~module_:__MODULE__ ~location:__LOC__
+                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
+              (fun () ->
+                trace "prover" (fun () ->
+                    Prover.create ~logger:config.logger ~pids:config.pids
+                      ~conf_dir:config.conf_dir ) )
+            >>| Result.ok_exn
+          in
+          let%bind verifier =
+            Monitor.try_with
+              ~rest:
+                (`Call
+                  (fun exn ->
+                    Logger.warn config.logger
+                      "unhandled exception from daemon-side verifier server: \
+                       $exn"
+                      ~module_:__MODULE__ ~location:__LOC__
+                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
+              (fun () ->
+                trace "verifier" (fun () ->
+                    Verifier.create ~logger:config.logger ~pids:config.pids
+                      ~conf_dir:(Some config.conf_dir) ) )
+            >>| Result.ok_exn
+          in
           let snark_worker =
             Option.value_map
               config.snark_worker_config.initial_snark_worker_key
               ~default:(`Off config.snark_work_fee) ~f:(fun public_key ->
                 `On
-                  ({public_key; process= Ivar.create ()}, config.snark_work_fee)
-            )
+                  ( { public_key
+                    ; process= Ivar.create ()
+                    ; kill_ivar= Ivar.create () }
+                  , config.snark_work_fee ) )
           in
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
@@ -605,31 +616,41 @@ let create (config : Config.t) =
           let proposer_transition_reader, proposer_transition_writer =
             Strict_pipe.create Synchronous
           in
-          let%bind ledger_db, transition_frontier =
-            create_genesis_frontier config ~verifier
+          (* TODO: (#3053) push transition frontier ownership down into transition router
+             * (then persistent root can be owned by transition frontier only) *)
+          let persistent_frontier =
+            Transition_frontier.Persistent_frontier.create
+              ~logger:config.logger ~verifier
+              ~time_controller:config.time_controller
+              ~directory:config.persistent_frontier_location
           in
-          let genesis_transition =
-            Transition_frontier.(
-              root transition_frontier |> Breadcrumb.validated_transition
-              |> External_transition.Validation.forget_validation)
+          let persistent_root =
+            Transition_frontier.Persistent_root.create ~logger:config.logger
+              ~directory:config.persistent_root_location
+          in
+          let%bind transition_frontier_opt =
+            Transition_frontier.load ~logger:config.logger ~verifier
+              ~consensus_local_state:config.consensus_local_state
+              ~persistent_root ~persistent_frontier ()
+            >>| function
+            | Ok frontier ->
+                Some frontier
+            | Error `Persistent_frontier_malformed ->
+                failwith
+                  "persistent frontier unexpectedly malformed -- this should \
+                   not happen with retry enabled"
+            | Error `Bootstrap_required ->
+                Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
+                  "" ;
+                None
+            | Error (`Failure err) ->
+                failwith ("failed to initialize transition frontier: " ^ err)
           in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
-            Broadcast_pipe.create None
+            Broadcast_pipe.create transition_frontier_opt
           in
-          let handle_request ~f query_env =
-            let input = Envelope.Incoming.data query_env in
-            Deferred.return
-            @@
-            let open Option.Let_syntax in
-            let%bind frontier =
-              Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-            in
-            f ~frontier input
-          in
-          let%bind net =
-            Coda_networking.create config.net_config
-              ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
-                (fun query_env ->
+          let handle_request name ~f query_env =
+            trace_recurring name (fun () ->
                 let input = Envelope.Incoming.data query_env in
                 Deferred.return
                 @@
@@ -637,157 +658,189 @@ let create (config : Config.t) =
                 let%bind frontier =
                   Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                 in
-                let%map scan_state, expected_merkle_root, pending_coinbases =
-                  Sync_handler
-                  .get_staged_ledger_aux_and_pending_coinbases_at_hash
-                    ~frontier input
-                in
-                let staged_ledger_hash =
-                  Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                    (Staged_ledger.Scan_state.hash scan_state)
-                    expected_merkle_root pending_coinbases
-                in
-                Logger.debug config.logger ~module_:__MODULE__
-                  ~location:__LOC__
-                  ~metadata:
-                    [ ( "staged_ledger_hash"
-                      , Staged_ledger_hash.to_yojson staged_ledger_hash ) ]
-                  "sending scan state and pending coinbase" ;
-                (scan_state, expected_merkle_root, pending_coinbases) )
+                f ~frontier input )
+          in
+          let%bind net =
+            Coda_networking.create config.net_config
+              ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
+                (fun query_env ->
+                trace_recurring
+                  "get_staged_ledger_aux_and_pending_coinbases_at_hash"
+                  (fun () ->
+                    let input = Envelope.Incoming.data query_env in
+                    Deferred.return
+                    @@
+                    let open Option.Let_syntax in
+                    let%bind frontier =
+                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                    in
+                    let%map scan_state, expected_merkle_root, pending_coinbases
+                        =
+                      Sync_handler
+                      .get_staged_ledger_aux_and_pending_coinbases_at_hash
+                        ~frontier input
+                    in
+                    let staged_ledger_hash =
+                      Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+                        (Staged_ledger.Scan_state.hash scan_state)
+                        expected_merkle_root pending_coinbases
+                    in
+                    Logger.debug config.logger ~module_:__MODULE__
+                      ~location:__LOC__
+                      ~metadata:
+                        [ ( "staged_ledger_hash"
+                          , Staged_ledger_hash.to_yojson staged_ledger_hash )
+                        ]
+                      "sending scan state and pending coinbase" ;
+                    (scan_state, expected_merkle_root, pending_coinbases) ) )
               ~answer_sync_ledger_query:(fun query_env ->
                 let open Deferred.Or_error.Let_syntax in
-                let ledger_hash, _ = Envelope.Incoming.data query_env in
-                let%bind frontier =
-                  Deferred.return @@ peek_frontier frontier_broadcast_pipe_r
-                in
-                Sync_handler.answer_query ~frontier ledger_hash
-                  (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
-                  ~logger:config.logger ~trust_system:config.trust_system
-                |> Deferred.map
-                   (* begin error string prefix so we can pattern-match *)
-                     ~f:
-                       (Result.of_option
-                          ~error:
-                            (Error.createf
-                               !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
-                               Coda_networking.refused_answer_query_string
-                               ledger_hash)) )
+                trace_recurring "answer_sync_ledger_query" (fun () ->
+                    let ledger_hash, _ = Envelope.Incoming.data query_env in
+                    let%bind frontier =
+                      Deferred.return
+                      @@ peek_frontier frontier_broadcast_pipe_r
+                    in
+                    Sync_handler.answer_query ~frontier ledger_hash
+                      (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
+                      ~logger:config.logger ~trust_system:config.trust_system
+                    |> Deferred.map
+                       (* begin error string prefix so we can pattern-match *)
+                         ~f:
+                           (Result.of_option
+                              ~error:
+                                (Error.createf
+                                   !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
+                                   Coda_networking.refused_answer_query_string
+                                   ledger_hash)) ) )
               ~get_ancestry:
-                (handle_request
+                (handle_request "get_ancestry"
                    ~f:(Sync_handler.Root.prove ~logger:config.logger))
               ~get_bootstrappable_best_tip:
-                (handle_request
+                (handle_request "get_bootstrappable_best_tip"
                    ~f:
                      (Sync_handler.Bootstrappable_best_tip.prove
                         ~logger:config.logger))
               ~get_transition_chain_proof:
-                (handle_request ~f:(fun ~frontier hash ->
+                (handle_request "get_transition_chain_proof"
+                   ~f:(fun ~frontier hash ->
                      Transition_chain_prover.prove ~frontier hash ))
               ~get_transition_chain:
-                (handle_request ~f:Sync_handler.get_transition_chain)
+                (handle_request "get_transition_chain"
+                   ~f:Sync_handler.get_transition_chain)
+          in
+          let txn_pool_config =
+            Network_pool.Transaction_pool.Resource_pool.make_config
+              ~trust_system:config.trust_system
           in
           let transaction_pool =
-            Network_pool.Transaction_pool.create ~logger:config.logger
-              ~trust_system:config.trust_system
+            Network_pool.Transaction_pool.create ~config:txn_pool_config
+              ~logger:config.logger
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
-            Broadcast_pipe.create genesis_transition
+            Broadcast_pipe.create
+              ( Lazy.force External_transition.genesis
+              |> External_transition.Validation.forget_validation )
           in
           let valid_transitions =
-            Transition_router.run ~logger:config.logger
-              ~trust_system:config.trust_system ~verifier ~network:net
-              ~time_controller:config.time_controller
-              ~frontier_broadcast_pipe:
-                (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
-              ~ledger_db
-              ~network_transition_reader:
-                (Strict_pipe.Reader.map external_transitions_reader
-                   ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
-              ~proposer_transition_reader transition_frontier
-              ~most_recent_valid_block
+            trace "transition router" (fun () ->
+                Transition_router.run ~logger:config.logger
+                  ~trust_system:config.trust_system ~verifier ~network:net
+                  ~time_controller:config.time_controller
+                  ~consensus_local_state:config.consensus_local_state
+                  ~persistent_root ~persistent_frontier
+                  ~frontier_broadcast_pipe:
+                    (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+                  ~network_transition_reader:
+                    (Strict_pipe.Reader.map external_transitions_reader
+                       ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
+                  ~proposer_transition_reader ~most_recent_valid_block )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
               , new_blocks ) =
             Strict_pipe.Reader.Fork.three valid_transitions
           in
-          don't_wait_for
-            (Linear_pipe.iter
-               (Network_pool.Transaction_pool.broadcasts transaction_pool)
-               ~f:(fun x ->
-                 Coda_networking.broadcast_transaction_pool_diff net x ;
-                 Deferred.unit )) ;
-          don't_wait_for
-            (Strict_pipe.Reader.iter_without_pushback
-               valid_transitions_for_network ~f:(fun transition ->
-                 let hash =
-                   External_transition.Validated.state_hash transition
-                 in
-                 let consensus_state =
-                   transition |> External_transition.Validated.consensus_state
-                 in
-                 let now =
-                   let open Block_time in
-                   now config.time_controller |> to_span_since_epoch
-                   |> Span.to_ms
-                 in
-                 match
-                   Consensus.Hooks.received_at_valid_time ~time_received:now
-                     consensus_state
-                 with
-                 | Ok () ->
-                     Logger.trace config.logger ~module_:__MODULE__
-                       ~location:__LOC__
-                       ~metadata:
-                         [ ("state_hash", State_hash.to_yojson hash)
-                         ; ( "external_transition"
-                           , External_transition.Validated.to_yojson transition
-                           ) ]
-                       "Rebroadcasting $state_hash" ;
-                     (* remove verified status for network broadcast *)
-                     Coda_networking.broadcast_state net
-                       (External_transition.Validation.forget_validation
-                          transition)
-                 | Error reason ->
-                     let timing_error_json =
-                       match reason with
-                       | `Too_early ->
-                           `String "too early"
-                       | `Too_late slots ->
-                           `String (sprintf "%Lu slots too late" slots)
-                     in
-                     Logger.warn config.logger ~module_:__MODULE__
-                       ~location:__LOC__
-                       ~metadata:
-                         [ ("state_hash", State_hash.to_yojson hash)
-                         ; ( "external_transition"
-                           , External_transition.Validated.to_yojson transition
-                           )
-                         ; ("timing", timing_error_json) ]
-                       "Not rebroadcasting block $state_hash because it was \
-                        received $timing" )) ;
+          trace_task "transaction pool broadcast loop" (fun () ->
+              Linear_pipe.iter
+                (Network_pool.Transaction_pool.broadcasts transaction_pool)
+                ~f:(fun x ->
+                  Coda_networking.broadcast_transaction_pool_diff net x ;
+                  Deferred.unit ) ) ;
+          trace_task "valid_transitions_for_network broadcast loop" (fun () ->
+              Strict_pipe.Reader.iter_without_pushback
+                valid_transitions_for_network ~f:(fun transition ->
+                  let hash =
+                    External_transition.Validated.state_hash transition
+                  in
+                  let consensus_state =
+                    transition |> External_transition.Validated.consensus_state
+                  in
+                  let now =
+                    let open Block_time in
+                    now config.time_controller |> to_span_since_epoch
+                    |> Span.to_ms
+                  in
+                  match
+                    Consensus.Hooks.received_at_valid_time ~time_received:now
+                      consensus_state
+                  with
+                  | Ok () ->
+                      Logger.trace config.logger ~module_:__MODULE__
+                        ~location:__LOC__
+                        ~metadata:
+                          [ ("state_hash", State_hash.to_yojson hash)
+                          ; ( "external_transition"
+                            , External_transition.Validated.to_yojson
+                                transition ) ]
+                        "Rebroadcasting $state_hash" ;
+                      (* remove verified status for network broadcast *)
+                      Coda_networking.broadcast_state net
+                        (External_transition.Validation.forget_validation
+                           transition)
+                  | Error reason ->
+                      let timing_error_json =
+                        match reason with
+                        | `Too_early ->
+                            `String "too early"
+                        | `Too_late slots ->
+                            `String (sprintf "%Lu slots too late" slots)
+                      in
+                      Logger.warn config.logger ~module_:__MODULE__
+                        ~location:__LOC__
+                        ~metadata:
+                          [ ("state_hash", State_hash.to_yojson hash)
+                          ; ( "external_transition"
+                            , External_transition.Validated.to_yojson
+                                transition )
+                          ; ("timing", timing_error_json) ]
+                        "Not rebroadcasting block $state_hash because it was \
+                         received $timing" ) ) ;
           don't_wait_for
             (Strict_pipe.transfer
                (Coda_networking.states net)
                external_transitions_writer ~f:ident) ;
-          don't_wait_for
-            (Linear_pipe.iter (Coda_networking.ban_notification_reader net)
-               ~f:(fun notification ->
-                 let peer = Coda_networking.banned_peer notification in
-                 let banned_until =
-                   Coda_networking.banned_until notification
-                 in
-                 (* if RPC call fails, will be logged in gossip net code *)
-                 let%map _ =
-                   Coda_networking.ban_notify net peer banned_until
-                 in
-                 () )) ;
-          let%bind snark_pool =
-            Network_pool.Snark_pool.load ~logger:config.logger
+          trace_task "ban notification loop" (fun () ->
+              Linear_pipe.iter (Coda_networking.ban_notification_reader net)
+                ~f:(fun notification ->
+                  let open Gossip_net in
+                  let peer = notification.banned_peer in
+                  let banned_until = notification.banned_until in
+                  (* if RPC call fails, will be logged in gossip net code *)
+                  let%map _ =
+                    Coda_networking.ban_notify net peer banned_until
+                  in
+                  () ) ) ;
+          let snark_pool_config =
+            Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
+          in
+          let%bind snark_pool =
+            Network_pool.Snark_pool.load ~config:snark_pool_config
+              ~logger:config.logger
               ~disk_location:config.snark_pool_disk_location
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -796,11 +849,11 @@ let create (config : Config.t) =
             Secrets.Wallets.load ~logger:config.logger
               ~disk_location:config.wallets_disk_location
           in
-          don't_wait_for
-            (Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
-               ~f:(fun x ->
-                 Coda_networking.broadcast_snark_pool_diff net x ;
-                 Deferred.unit )) ;
+          trace_task "snark pool broadcast loop" (fun () ->
+              Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
+                ~f:(fun x ->
+                  Coda_networking.broadcast_snark_pool_diff net x ;
+                  Deferred.unit ) ) ;
           let propose_keypairs =
             Agent.create
               ~f:(fun kps ->
@@ -825,8 +878,8 @@ let create (config : Config.t) =
             transition_frontier_incr
             >>= function
             | Some transition_frontier ->
-                Transition_frontier.catchup_signal transition_frontier
-                |> of_broadcast_pipe |> Var.watch
+                of_broadcast_pipe Ledger_catchup.Catchup_jobs.reader
+                |> Var.watch
                 >>| fun catchup_signal ->
                 Some (transition_frontier, catchup_signal)
             | None ->
@@ -839,12 +892,15 @@ let create (config : Config.t) =
                 ( Var.watch @@ of_broadcast_pipe
                 @@ Coda_networking.online_status net )
               ~first_connection_incr:
-                (Var.watch @@ of_ivar @@ Coda_networking.first_connection net)
+                ( Var.watch @@ of_deferred
+                @@ Coda_networking.on_first_connect net ~f:Fn.id )
               ~first_message_incr:
-                (Var.watch @@ of_ivar @@ Coda_networking.first_message net)
+                ( Var.watch @@ of_deferred
+                @@ Coda_networking.on_first_received_message net ~f:Fn.id )
           in
           Deferred.return
             { config
+            ; next_proposal= None
             ; processes= {prover; verifier; snark_worker}
             ; components=
                 { net

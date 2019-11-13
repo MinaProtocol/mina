@@ -1,17 +1,13 @@
+open Core_kernel
 open Coda_base
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type 'proof t = {proof: 'proof; fee: Fee_with_prover.Stable.V1.t}
-      [@@deriving bin_io, sexp, fields, yojson, version]
-    end
-
-    include T
+    type 'proof t = {proof: 'proof; fee: Fee_with_prover.Stable.V1.t}
+    [@@deriving compare, fields, sexp, yojson]
   end
-
-  module Latest = V1
-end
+end]
 
 type 'proof t = 'proof Stable.Latest.t =
   {proof: 'proof; fee: Fee_with_prover.Stable.V1.t}

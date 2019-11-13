@@ -4,8 +4,37 @@ open Coda_base
 open Coda_state
 open Signature_lib
 
+module type External_transition_common_intf = sig
+  type t
+
+  val protocol_state : t -> Protocol_state.Value.t
+
+  val protocol_state_proof : t -> Proof.t
+
+  val blockchain_state : t -> Blockchain_state.Value.t
+
+  val blockchain_length : t -> Unsigned.UInt32.t
+
+  val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
+
+  val staged_ledger_diff : t -> Staged_ledger_diff.t
+
+  val state_hash : t -> State_hash.t
+
+  val parent_hash : t -> State_hash.t
+
+  val proposer : t -> Public_key.Compressed.t
+
+  val transactions : t -> Transaction.t list
+
+  val user_commands : t -> User_command.t list
+
+  val payments : t -> User_command.t list
+
+  val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
+end
+
 module type External_transition_base_intf = sig
-  (* TODO: delegate forget here *)
   type t [@@deriving sexp, compare, to_yojson]
 
   include Comparable.S with type t := t
@@ -18,25 +47,7 @@ module type External_transition_base_intf = sig
     module Latest = V1
   end
 
-  val protocol_state : t -> Protocol_state.Value.t
-
-  val protocol_state_proof : t -> Proof.t
-
-  val blockchain_state : t -> Blockchain_state.Value.t
-
-  val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
-
-  val staged_ledger_diff : t -> Staged_ledger_diff.t
-
-  val state_hash : t -> State_hash.t
-
-  val parent_hash : t -> State_hash.t
-
-  val proposer : t -> Public_key.Compressed.t
-
-  val user_commands : t -> User_command.t list
-
-  val payments : t -> User_command.t list
+  include External_transition_common_intf with type t := t
 end
 
 module type S = sig
@@ -103,6 +114,22 @@ module type S = sig
       , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
       , [`Frontier_dependencies] * unit Truth.true_t
       , [`Staged_ledger_diff] * unit Truth.true_t )
+      t
+
+    type initial_valid =
+      ( [`Time_received] * unit Truth.true_t
+      , [`Proof] * unit Truth.true_t
+      , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+      , [`Frontier_dependencies] * unit Truth.false_t
+      , [`Staged_ledger_diff] * unit Truth.false_t )
+      t
+
+    type almost_valid =
+      ( [`Time_received] * unit Truth.true_t
+      , [`Proof] * unit Truth.true_t
+      , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
+      , [`Frontier_dependencies] * unit Truth.true_t
+      , [`Staged_ledger_diff] * unit Truth.false_t )
       t
 
     type ( 'time_received
@@ -173,17 +200,31 @@ module type S = sig
       -> external_transition
   end
 
-  type with_initial_validation =
-    ( [`Time_received] * unit Truth.true_t
-    , [`Proof] * unit Truth.true_t
-    , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
-    , [`Frontier_dependencies] * unit Truth.false_t
-    , [`Staged_ledger_diff] * unit Truth.false_t )
-    Validation.with_transition
+  module Initial_validated : sig
+    type t =
+      (external_transition, State_hash.t) With_hash.t
+      * Validation.initial_valid
+
+    include External_transition_common_intf with type t := t
+  end
+
+  module Almost_validated : sig
+    type t =
+      (external_transition, State_hash.t) With_hash.t * Validation.almost_valid
+
+    include External_transition_common_intf with type t := t
+  end
 
   module Validated : sig
     type t =
       (external_transition, State_hash.t) With_hash.t * Validation.fully_valid
+
+    val erase :
+         t
+      -> ( Stable.Latest.t
+         , State_hash.Stable.Latest.t )
+         With_hash.Stable.Latest.t
+         * State_hash.Stable.Latest.t Non_empty_list.Stable.Latest.t
 
     val create_unsafe :
       external_transition -> [`I_swear_this_is_safe_see_my_comment of t]
@@ -197,6 +238,8 @@ module type S = sig
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
     -> t
+
+  val genesis : Validated.t Lazy.t
 
   val timestamp : t -> Block_time.t
 
@@ -334,7 +377,8 @@ module type S = sig
   end
 
   val skip_frontier_dependencies_validation :
-       [`This_transition_belongs_to_a_detached_subtree]
+       [ `This_transition_belongs_to_a_detached_subtree
+       | `This_transition_was_loaded_from_persistence ]
     -> ( 'time_received
        , 'proof
        , 'delta_transition_chain
@@ -348,8 +392,25 @@ module type S = sig
        , 'staged_ledger_diff )
        Validation.with_transition
 
+  val validate_staged_ledger_hash :
+       [`Staged_ledger_already_materialized of Staged_ledger_hash.t]
+    -> ( 'time_received
+       , 'proof
+       , 'delta_transition_chain
+       , 'frontier_dependencies
+       , [`Staged_ledger_diff] * unit Truth.false_t )
+       Validation.with_transition
+    -> ( ( 'time_received
+         , 'proof
+         , 'delta_transition_chain
+         , 'frontier_dependencies
+         , [`Staged_ledger_diff] * unit Truth.true_t )
+         Validation.with_transition
+       , [> `Staged_ledger_hash_mismatch] )
+       Result.t
+
   val skip_staged_ledger_diff_validation :
-       [`This_is_unsafe]
+       [`This_transition_has_a_trusted_staged_ledger]
     -> ( 'time_received
        , 'proof
        , 'delta_transition_chain
@@ -374,6 +435,7 @@ module type S = sig
       -> logger:Logger.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
+      -> parent_protocol_state:Protocol_state.value
       -> ( [`Just_emitted_a_proof of bool]
            * [ `External_transition_with_validation of
                ( 'time_received
@@ -385,7 +447,8 @@ module type S = sig
            * [`Staged_ledger of Staged_ledger.t]
          , [ `Invalid_staged_ledger_diff of
              [ `Incorrect_target_staged_ledger_hash
-             | `Incorrect_target_snarked_ledger_hash ]
+             | `Incorrect_target_snarked_ledger_hash
+             | `Incorrect_staged_ledger_diff_state_body_hash ]
              list
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )

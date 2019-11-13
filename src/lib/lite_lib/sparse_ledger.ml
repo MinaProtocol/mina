@@ -1,3 +1,5 @@
+open Core_kernel
+
 module Hash = struct
   module Stable = struct
     module V1 = struct
@@ -19,44 +21,35 @@ module Hash = struct
   let merge = Stable.Latest.merge
 end
 
-module V1_make =
-  Sparse_ledger_lib.Sparse_ledger.Make
-    (Hash.Stable.V1)
-    (Lite_base.Public_key.Compressed.Stable.V1)
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t =
+      ( Hash.Stable.V1.t
+      , Lite_base.Public_key.Compressed.Stable.V1.t
+      , Account.Stable.V1.t )
+      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+    [@@deriving sexp]
+
+    let to_latest = Fn.id
+  end
+end]
+
+module M =
+  Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Lite_base.Public_key.Compressed)
     (struct
-      include Account.Stable.V1
+      include Account
 
       let data_hash = Account.digest
     end)
 
-module Stable = struct
-  module V1 = struct
-    module T = struct
-      type t = V1_make.Stable.V1.t [@@deriving bin_io, sexp, version]
-    end
-
-    include T
-  end
-
-  module Latest = V1
-end
-
-module Latest_make = V1_make
-
-let ( of_hash
-    , get_exn
-    , path_exn
-    , set_exn
-    , find_index_exn
-    , add_path
-    , merkle_root
-    , iteri ) =
-  Latest_make.
-    ( of_hash
-    , get_exn
-    , path_exn
-    , set_exn
-    , find_index_exn
-    , add_path
-    , merkle_root
-    , iteri )
+[%%define_locally
+M.
+  ( of_hash
+  , get_exn
+  , path_exn
+  , set_exn
+  , find_index_exn
+  , add_path
+  , merkle_root
+  , iteri )]

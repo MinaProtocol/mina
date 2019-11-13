@@ -6,5 +6,5 @@ Architecture: amd64
 License: BSD 3-Clause
 Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
-Description: Coda Protocol Kadelima Tool
+Description: Coda Protocol Kademlia Tool
  Coda Protocol Kademlia Utility

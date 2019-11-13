@@ -5,18 +5,7 @@ open Signature_lib
 
 let name = "coda-delegation-test"
 
-let heartbeat_flag = ref true
-
-let print_heartbeat logger =
-  let rec loop () =
-    if !heartbeat_flag then (
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-        "Heartbeat for CI" ;
-      let%bind () = after (Time.Span.of_min 1.) in
-      loop () )
-    else return ()
-  in
-  loop ()
+include Heartbeat.Make ()
 
 let main () =
   let logger = Logger.create () in
@@ -27,7 +16,7 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger num_proposers Option.some
-      snark_work_public_keys Cli_lib.Arg_type.Sequence
+      snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Started test net" ;
@@ -137,7 +126,7 @@ let main () =
     "Saw $delegatee_proposal_count blocks proposed by delegatee"
     ~metadata:[("delegatee_proposal_count", `Int !delegatee_proposal_count)] ;
   heartbeat_flag := false ;
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async
