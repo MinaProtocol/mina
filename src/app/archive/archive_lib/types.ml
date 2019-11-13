@@ -360,7 +360,8 @@ module Blocks = struct
       (* TODO: Need to implement *)
       method ledger_proof_nonce = some 0
 
-      (* TODO: Need to implement *)
+      (* When a new block is added, their status would be pending and its block
+         confirmation number is 0 *)
       method status = some 0
 
       method block_length =
