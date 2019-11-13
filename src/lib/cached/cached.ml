@@ -211,13 +211,14 @@ let run
       return (x, `Cache_hit)
   | None -> (
       Core.printf
-        !"Could not load %s from the following path:\n\
+        !"Could not load %s from the following paths:\n\
          \ \n\
           %{sexp: string list}\n\
           %{sexp: string list}\n\
           %{sexp: string list}\n\
          \ \n\
-         \ Trying to hit the s3 bucket @ %{sexp: string list}...\n"
+         \ Trying s3 http:\n\
+         \ %{sexp: string list}...\n"
         name
         (full_paths manual_install_path)
         (full_paths brew_install_path)
