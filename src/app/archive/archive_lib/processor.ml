@@ -6,19 +6,8 @@ open Coda_state
 open Coda_base
 open Signature_lib
 
-module type Transition_cache_intf = sig
-  type t
-
-  val create : unit -> t
-
-  val add : t -> key:State_hash.t -> data:int -> unit
-
-  val get : t -> State_hash.t -> int
-end
-
 module Make (Config : Graphql_client_lib.Config_intf) = struct
-  type t =
-    {port: int; pending_block_confirmations_cache: Block_confirmation_cache.t}
+  type t = {port: int}
 
   module Client = Graphql_client_lib.Make (Config)
 
@@ -148,28 +137,47 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
         , Option.value_map first_seen_in_db ~default:(Some default_block_time)
             ~f:Option.some ) )
 
-  let update_block_confirmations t (parent_state_hash, state_hash) block_height
-      =
-    let new_updates =
-      Block_confirmation_cache.update t.pending_block_confirmations_cache
-        (state_hash, `Parent parent_state_hash)
-        block_height
+  let update_block_confirmations t (parent_state_hash : State_hash.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind corrected_block_confirmations =
+      let graphql =
+        Graphql_query.Blocks.Get_stale_block_confirmations.make
+          ~parent_hash:(State_hash.to_base58_check parent_state_hash)
+          ()
+      in
+      let%map state_block_confirmations =
+        Client.query graphql t.port
+        >>| fun response -> response#get_stale_block_confirmations
+      in
+      Array.to_list state_block_confirmations
+      |> List.map ~f:(fun stale_block ->
+             ((stale_block#state_hash)#value, stale_block#status + 1) )
     in
     let results =
-      List.map new_updates ~f:(fun (hash, {block_height; _}) ->
-          let consensus_status = Consensus_status.Pending block_height in
+      (* TODO: This code writes Hasura functions in a sequential manner. Hasura
+         currently cannot express atomic batch row updates. We would need to
+         write a SQL query in order to do this. *)
+      List.map corrected_block_confirmations
+        ~f:(fun (hash, new_block_confirmation) ->
           let hash = State_hash.to_base58_check hash in
           let graphql =
             Graphql_query.Blocks.Update_block_confirmations.make ~hash
-              ~status:(Consensus_status.to_int consensus_status)
-              ()
+              ~status:new_block_confirmation ()
           in
           Client.query graphql t.port )
     in
     Deferred.Result.all results |> Deferred.Result.ignore
 
+  let update_new_block t encoded_block =
+    let graphql =
+      Graphql_query.Blocks.Insert.make
+        ~blocks:(Array.of_list [encoded_block])
+        ()
+    in
+    Client.query graphql t.port |> Deferred.Result.ignore
+
   let added_transition t
-      ({With_hash.data= block; hash} as block_with_hash :
+      ({With_hash.data= block; hash= _} as block_with_hash :
         (External_transition.t, State_hash.t) With_hash.t)
       (sender_receipt_chains_from_parent_ledger :
         Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
@@ -221,33 +229,12 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
            sender_receipt_chains_from_parent_ledger)
         fee_transfers_with_time
     in
-    let graphql =
-      Graphql_query.Blocks.Insert.make
-        ~blocks:(Array.of_list [encoded_block])
-        ()
+    let%bind () =
+      update_block_confirmations t (External_transition.parent_hash block)
     in
-    let%bind _ = Client.query graphql t.port in
-    update_block_confirmations t
-      (External_transition.parent_hash block, hash)
-      0
+    update_new_block t encoded_block
 
-  let load_pending_blocks port =
-    let open Deferred.Result.Let_syntax in
-    let graphql = Graphql_query.Blocks.Get_all_pending_blocks.make () in
-    let%map pending_blocks_response =
-      Client.query graphql port >>| fun result -> result#blocks
-    in
-    Array.map pending_blocks_response ~f:(fun obj ->
-        let state_hash = (obj#state_hash)#value in
-        let block_height = obj#status in
-        let parent = Some (obj#parent_state_hash)#value in
-        (state_hash, {Block_confirmation_cache.block_height; parent}) )
-    |> Array.to_list |> Block_confirmation_cache.create
-
-  let create port =
-    let open Deferred.Result.Let_syntax in
-    let%map pending_block_confirmations_cache = load_pending_blocks port in
-    {port; pending_block_confirmations_cache}
+  let create port = {port}
 
   let run t reader =
     Strict_pipe.Reader.iter reader ~f:(function

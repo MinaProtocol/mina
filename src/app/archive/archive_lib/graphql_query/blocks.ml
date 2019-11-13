@@ -42,12 +42,12 @@ module Get_all_pending_blocks =
   }
 |}]
 
-module Query_blocks_with_confirmations =
+module Get_stale_block_confirmations =
 [%graphql
 {|
-  query query {
-    blocks {
-      state_hash: stateHashByStateHash  {
+  query query($parent_hash: String!) {
+    get_stale_block_confirmations(args: {new_block_parent_hash: $parent_hash}) {
+      state_hash : stateHashByStateHash {
         value @bsDecoder(fn: "State_hash.of_base58_check_exn")
       }
       status
