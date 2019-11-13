@@ -133,6 +133,8 @@ let run = () =>
       createTray(dispatch);
       createApplicationMenu();
 
+      DaemonProcess.CodaProcess.(start(defaultArgs)) |> ignore;
+
       AppWindow.deepLink({AppWindow.Input.path: Route.Home, dispatch});
     },
   );
