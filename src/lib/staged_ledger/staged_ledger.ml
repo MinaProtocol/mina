@@ -255,8 +255,7 @@ module T = struct
     { scan_state= Scan_state.empty ()
     ; ledger
     ; pending_coinbase_collection=
-        Pending_coinbase.create ~init_state_hash:State_hash.dummy
-        |> Or_error.ok_exn }
+        Pending_coinbase.create () |> Or_error.ok_exn }
 
   let current_ledger_proof t =
     Option.map
@@ -491,15 +490,13 @@ module T = struct
             update_ledger_and_get_statements ledger working_stack2
               txns_for_partition2
           in
-          let second_has_data =
-            List.length (List.drop transactions slots) > 0
-          in
+          let second_has_data = List.length txns_for_partition2 > 0 in
           let new_stack_in_snark, stack_update =
             match (coinbase_in_first_partition, second_has_data) with
             | true, true ->
                 Core.printf !"updating two\n%!" ;
                 (false, `Update_two (updated_stack1, updated_stack2))
-            (*updated_stack2 will not have any coinbase and therefore we don't want to create a new stack in snark. updated_stack2 is only used to update the pending_coinbase_aux because there's going to be data on a "new tree" and we don't want to keep creating new stacks or override existing stacks in the case when a tree has no coinbase at all*)
+            (*updated_stack2 will not have any coinbase and therefore we don't want to create a new stack in snark. updated_stack2 is only used to update the pending_coinbase_aux because there's going to be data on a "new tree" and we don't want to keep creating new stacks or override existing stacks in the case when a tree has no coinbase at all.*)
             | true, false ->
                 (*updated_stack1 has some new coinbase but parition 2 has no data and so we don't have to update pending_coinbase_aux just yet*)
                 (false, `Update_one updated_stack1)
@@ -1957,15 +1954,6 @@ let%test_module "test" =
             ~fee_transfer ~state_body_hash
           |> Or_error.ok_exn
         in
-        (*let coinbase : Coinbase.t= 
-                match p1.coinbase, Option.value_map ~default:Staged_ledger_diff.At_most_one.Zero p2_opt ~f:(fun p2 -> p2.coinbase) with
-                | Staged_ledger_diff.At_most_two.Zero, Staged_ledger_diff.At_most_one.Zero -> create Amount.zero None
-                | One ft, Zero  (*new stack false*)
-                  | Zero, One ft (*new stack true*) -> create Coda_compile_config.coinbase ft
-                | Two None, Zero -> create (Amount.of_int 1) None
-                | Two Some (ft, _), Zero -> create (Amount.of_fee (snd ft)) (Some ft)
-                | _ -> failwith "Invalid coinbase"
-              in*)
         Pending_coinbase.Coinbase_data.of_coinbase
           (create coinbase_amount None)
       in
@@ -1981,7 +1969,6 @@ let%test_module "test" =
         in
         let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
         Pending_coinbase.Checked.add_coinbase root_after_popping coinbase_var
-          (State_hash.var_of_t (previous_state_hash pending_coinbase_before))
       in
       let checked_root_after_update =
         let open Snark_params.Tick in

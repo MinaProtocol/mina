@@ -149,7 +149,7 @@ module type S = sig
     end
   end
 
-  val create : init_state_hash:State_hash.t -> t Or_error.t
+  val create : unit -> t Or_error.t
 
   (** Delete the oldest stack*)
   val remove_coinbase_stack : t -> (Stack.t * t) Or_error.t
@@ -170,9 +170,6 @@ module type S = sig
 
   (** Hash of the auxilliary data (everything except the merkle tree)*)
   val hash_extra : t -> string
-
-  (** hash of the previous protocol state that is currently being tracked*)
-  val previous_state_hash : t -> State_hash.t
 
   module Checked : sig
     type var = Hash.var
@@ -202,8 +199,7 @@ module type S = sig
        - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
        - returns a root [t'] of the tree
     *)
-    val add_coinbase :
-      var -> Coinbase_data.var -> State_hash.var -> (var, 's) Tick.Checked.t
+    val add_coinbase : var -> Coinbase_data.var -> (var, 's) Tick.Checked.t
 
     (**
        [pop_coinbases t pk updated_stack] implements the following spec:

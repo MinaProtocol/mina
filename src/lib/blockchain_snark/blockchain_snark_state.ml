@@ -85,9 +85,6 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           let%bind prev_state_body_hash =
             Protocol_state.(Body.hash_checked (body previous_state))
           in
-          let prev_of_prev_state_hash =
-            Protocol_state.previous_state_hash previous_state
-          in
           let%bind same =
             State_body_hash.equal_var prev_state_body_hash
               (Snark_transition.coinbase_state_body_hash transition)
@@ -126,9 +123,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
               (Pending_coinbase.Checked.add_coinbase root_after_delete
                  ( Snark_transition.proposer transition
                  , Snark_transition.coinbase_amount transition
-                 , prev_state_body_hash )
-                 prev_of_prev_state_hash)
-            (*Not using state_body previous_state to get the hash becuase it's cheaper outside snark?*)
+                 , prev_state_body_hash ))
           in
           (new_root, deleted_stack)
         in

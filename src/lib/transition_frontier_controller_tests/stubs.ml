@@ -251,9 +251,7 @@ struct
       With_hash.data genesis_protocol_state_with_hash
     in
     let root_pending_coinbases =
-      Pending_coinbase.create
-        ~init_state_hash:(With_hash.hash genesis_protocol_state_with_hash)
-      |> Or_error.ok_exn
+      Pending_coinbase.create () |> Or_error.ok_exn
     in
     let root_ledger_hash =
       genesis_protocol_state |> Protocol_state.blockchain_state

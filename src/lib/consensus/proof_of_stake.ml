@@ -957,9 +957,7 @@ module Data = struct
                [pk]
            in
            let empty_pending_coinbase =
-             Coda_base.Pending_coinbase.create
-               ~init_state_hash:Coda_base.State_hash.dummy
-             |> Or_error.ok_exn
+             Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
            in
            let ledger_handler =
              unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
@@ -2952,10 +2950,7 @@ let%test_module "Proof of stake tests" =
       (* choose largest account as most likely to propose *)
       let ledger_data = Lazy.force Genesis_ledger.t in
       let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
-      let pending_coinbases =
-        Pending_coinbase.create ~init_state_hash:State_hash.dummy
-        |> Or_error.ok_exn
-      in
+      let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
       let maybe_sk, account = Genesis_ledger.largest_account_exn () in
       let private_key = Option.value_exn maybe_sk in
       let public_key_compressed = Account.public_key account in

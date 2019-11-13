@@ -607,35 +607,7 @@ struct
         (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
-    let _print equal_prev valid_stack_hash rem_amount amount1_equal_to_zero
-        amount2_equal_to_zero stack0 stack stack_with_amount1
-        stack_with_amount2 res : unit =
-      Core.print_string
-        ( "add coinbase values: equal_prev_hash " ^ Bool.to_string equal_prev
-        ^ " valid stack hash "
-        ^ Bool.to_string valid_stack_hash
-        ^ " rem_amount "
-        ^ Amount.to_string rem_amount
-        ^ " amt1 is zero "
-        ^ Bool.to_string amount1_equal_to_zero
-        ^ " amt2 is zero "
-        ^ Bool.to_string amount2_equal_to_zero
-        ^ " stack0 "
-        ^ Sexp.to_string (Stack.sexp_of_t stack0)
-        ^ " stack "
-        ^ Sexp.to_string (Stack.sexp_of_t stack)
-        ^ " stack with amount 1 "
-        ^ Sexp.to_string (Stack.sexp_of_t stack_with_amount1)
-        ^ " stack with amount 2 "
-        ^ Sexp.to_string (Stack.sexp_of_t stack_with_amount2)
-        ^ " res stack "
-        ^ Sexp.to_string (Stack.sexp_of_t res)
-        ^ " \n%!" )
-
-    (*equal_prev, valid_stack_hash, Amount.to_string rem_amount, amount1_equal_to_zero, amount2_equal_to_zero, Stack.to_bytes stack0, Sexp.to_string (Stack.sexp_of_t stack), Sexp.to_string (Stack.sexp_of_t stack_with_amount1), Sexp.to_string (Stack.sexp_of_t stack_with_amount2))*)
-
-    let%snarkydef add_coinbase t (pk, amount, state_body_hash)
-        _previous_state_hash (*This is previous_previous_state_hash*) =
+    let%snarkydef add_coinbase t (pk, amount, state_body_hash) =
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
@@ -710,31 +682,20 @@ struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('tree, 'stack_id, 'state_hash) t =
-          { tree: 'tree
-          ; pos_list: 'stack_id list
-          ; new_pos: 'stack_id
-          ; previous_state_hash: 'state_hash }
+        type ('tree, 'stack_id) t =
+          {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
         [@@deriving sexp, to_yojson]
       end
     end]
 
-    type ('tree, 'stack_id, 'state_hash) t =
-          ('tree, 'stack_id, 'state_hash) Stable.Latest.t =
-      { tree: 'tree
-      ; pos_list: 'stack_id list
-      ; new_pos: 'stack_id
-      ; previous_state_hash: 'state_hash }
+    type ('tree, 'stack_id) t = ('tree, 'stack_id) Stable.Latest.t =
+      {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
   end
 
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        ( Merkle_tree.Stable.V1.t
-        , Stack_id.Stable.V1.t
-        , State_hash.Stable.V1.t )
-        Poly.Stable.V1.t
+      type t = (Merkle_tree.Stable.V1.t, Stack_id.Stable.V1.t) Poly.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -756,7 +717,7 @@ struct
         in
         ((height, merged) :: hashes, merged) )
 
-  let create_exn' ~init_state_hash =
+  let create_exn' () =
     let rec create_path height path key =
       if height < 0 then path
       else
@@ -778,16 +739,12 @@ struct
     in
     { Poly.tree= make_tree (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
     ; pos_list= []
-    ; new_pos= Stack_id.zero
-    ; previous_state_hash= init_state_hash }
+    ; new_pos= Stack_id.zero }
 
   [%%define_locally
   Or_error.(try_with)]
 
-  let create ~init_state_hash =
-    try_with (fun () -> create_exn' ~init_state_hash)
-
-  let previous_state_hash ({previous_state_hash; _} : t) = previous_state_hash
+  let create () = try_with (fun () -> create_exn' ())
 
   let merkle_root (t : t) = Merkle_tree.merkle_root t.tree
 
@@ -855,18 +812,14 @@ struct
     let stack_after = Stack.push stack_before coinbase in
     let%bind t' = incr_index t ~is_new_stack in
     (* state hash in "after" stack becomes previous state hash at top level *)
-    set_stack
-      {t' with previous_state_hash= stack_after.state_hash}
-      stack_index stack_after
+    set_stack t' stack_index stack_after
 
   let update_coinbase_stack (t : t) stack ~is_new_stack =
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in
     let%bind stack_index = find_index t key in
     let%bind t' = incr_index t ~is_new_stack in
-    set_stack
-      {t' with previous_state_hash= stack.Stack.Poly.state_hash}
-      stack_index stack
+    set_stack t' stack_index stack
 
   let remove_coinbase_stack (t : t) =
     let open Or_error.Let_syntax in
@@ -941,9 +894,7 @@ end)
 include T
 
 let%test_unit "add stack + remove stack = initial tree " =
-  let pending_coinbases =
-    ref (create ~init_state_hash:State_hash.dummy |> Or_error.ok_exn)
-  in
+  let pending_coinbases = ref (create () |> Or_error.ok_exn) in
   let coinbases_gen = Quickcheck.Generator.list_non_empty Coinbase.gen in
   Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -1015,9 +966,7 @@ let%test_unit "Checked_stack = Unchecked_stack" =
 
 let%test_unit "Checked_tree = Unchecked_tree" =
   let open Quickcheck in
-  let pending_coinbases =
-    create ~init_state_hash:State_hash.dummy |> Or_error.ok_exn
-  in
+  let pending_coinbases = create () |> Or_error.ok_exn in
   test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let unchecked =
@@ -1025,7 +974,6 @@ let%test_unit "Checked_tree = Unchecked_tree" =
           (module T)
           pending_coinbases ~coinbase ~is_new_stack:true
       in
-      let prev_state_hash = pending_coinbases.previous_state_hash in
       (* inside the `open' below, Checked means something else, so define this function *)
       let f_add_coinbase = Checked.add_coinbase in
       let checked_merkle_root =
@@ -1036,8 +984,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 coinbase_var
-                 (State_hash.var_of_t prev_state_hash))
+                 coinbase_var)
               (unstage (handler pending_coinbases ~is_new_stack:true))
           in
           As_prover.read Hash.typ result
@@ -1050,16 +997,13 @@ let%test_unit "Checked_tree = Unchecked_tree" =
 let%test_unit "Checked_tree = Unchecked_tree after pop" =
   let open Quickcheck in
   test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
-      let pending_coinbases =
-        create ~init_state_hash:State_hash.dummy |> Or_error.ok_exn
-      in
+      let pending_coinbases = create () |> Or_error.ok_exn in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let unchecked =
         add_coinbase_with_zero_checks
           (module T)
           pending_coinbases ~coinbase ~is_new_stack:true
       in
-      let prev_state_hash = pending_coinbases.previous_state_hash in
       (* inside the `open' below, Checked means something else, so define these functions *)
       let f_add_coinbase = Checked.add_coinbase in
       let f_pop_coinbase = Checked.pop_coinbases in
@@ -1071,8 +1015,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 coinbase_var
-                 (State_hash.var_of_t prev_state_hash))
+                 coinbase_var)
               (unstage (handler pending_coinbases ~is_new_stack:true))
           in
           As_prover.read Hash.typ result
@@ -1149,9 +1092,7 @@ let%test_unit "push and pop multiple stacks" =
     updated_pending_coinbases
   in
   let add_remove_check coinbase_lists =
-    let pending_coinbases =
-      Pending_coinbase.create_exn' ~init_state_hash:State_hash.dummy
-    in
+    let pending_coinbases = Pending_coinbase.create_exn' () in
     let rec go coinbase_lists pc =
       if List.is_empty coinbase_lists then ()
       else
