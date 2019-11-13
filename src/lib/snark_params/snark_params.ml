@@ -325,7 +325,7 @@ module Tock = struct
       {Proof.a= a p; b= conv_g2 (b p); c= c p}
 
     let vk_of_backend_vk vk =
-      let open Tick_backend.Full.Groth16_verification_key_accessors in
+      let open Tick_backend.Full.Groth16.Verification_key in
       let open Inner_curve.Vector in
       let q = query vk in
       { Verification_key.query_base= get q 0

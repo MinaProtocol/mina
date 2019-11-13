@@ -494,7 +494,8 @@ let daemon logger =
            or_from_config
              (Fn.compose Option.return
                 (Fn.compose work_selection_method_val YJ.Util.to_string))
-             "work-selection" ~default:Cli_lib.Arg_type.Random
+             "work-selection"
+             ~default:Cli_lib.Arg_type.Work_selection_method.Random
              work_selection_method_flag
          in
          let work_reassignment_wait =

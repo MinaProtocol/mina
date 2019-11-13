@@ -16,7 +16,8 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n Option.some snark_work_public_keys
-      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Work_selection_method.Sequence
+      ~max_concurrent_connections:None
   in
   let%bind () =
     Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
