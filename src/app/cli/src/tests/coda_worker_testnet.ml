@@ -467,7 +467,7 @@ module Delegation : sig
 end = struct
   let delegate_stake ?acceptable_delay:(delay = 7) (testnet : Api.t) ~node
       ~delegator ~delegatee =
-    let fee = Currency.Fee.of_int 1 in
+    let fee = Currency.Fee.of_int 2 in
     let worker = testnet.workers.(node) in
     let%bind _ =
       let open Deferred.Option.Let_syntax in
@@ -518,7 +518,7 @@ end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
-    let fee = Currency.Fee.of_int 1 in
+    let fee = Currency.Fee.of_int 2 in
     let%bind (_ : unit option list) =
       Deferred.List.init n ~f:(fun _ ->
           let open Deferred.Option.Let_syntax in
@@ -570,7 +570,7 @@ end = struct
   let send_batch_consecutive_payments (testnet : Api.t) ~node ~sender
       ~(keypairs : Keypair.t list) ~n =
     let amount = Currency.Amount.of_int 10 in
-    let fee = Currency.Fee.of_int 1 in
+    let fee = Currency.Fee.of_int 2 in
     let%bind new_payment_readers =
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
           let pk = Public_key.(compress @@ of_private_key_exn sender) in
