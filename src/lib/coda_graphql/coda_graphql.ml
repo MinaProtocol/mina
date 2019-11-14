@@ -712,17 +712,19 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let open Option.Let_syntax in
-                   let%bind delegate_key = account.Account.Poly.delegate in
+                   let%bind public_key = account.public_key in
                    let%bind staking_ledger = Coda_lib.staking_ledger coda in
                    try
                      let index =
-                       Sparse_ledger.find_index_exn staking_ledger delegate_key
+                       Sparse_ledger.find_index_exn staking_ledger public_key
                      in
                      let delegate_account =
-                       Partial_account.of_full_account
-                       @@ Sparse_ledger.get_exn staking_ledger index
+                       Sparse_ledger.get_exn staking_ledger index
                      in
-                     Some (lift coda delegate_key delegate_account)
+                     let delegate_key = delegate_account.public_key in
+                     Some
+                       ( lift coda delegate_key
+                       @@ Partial_account.of_full_account delegate_account )
                    with e ->
                      Logger.warn
                        (Coda_lib.top_level_logger coda)
