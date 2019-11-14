@@ -991,6 +991,7 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
+  Snarky.Libsnark.set_printing_off () ;
   (* intercept command-line processing for "version", because we don't
      use the Jane Street scripts that generate their version information
    *)
