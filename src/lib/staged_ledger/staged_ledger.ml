@@ -92,7 +92,13 @@ module T = struct
             "Verification in apply_diff for work $work_id took $time ms" ;
           Deferred.return b
       | Error e ->
-          log_error (Error.to_string_hum e) ~metadata:[]
+          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("statement", Transaction_snark.Statement.to_yojson statement)
+              ; ("error", `String (Error.to_string_hum e)) ]
+            "Verifier error when checking transaction snark for statement \
+             $statement: $error" ;
+          exit 21
 
   let verify ~logger ~verifier ~message job proof prover =
     let open Deferred.Let_syntax in
