@@ -320,6 +320,57 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - store_artifacts:
                   path: /tmp/artifacts
+    build-artifacts--testnet_postake_medium_curves_10k_ledger:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
+        steps:
+            - checkout
+            - run:
+                  name: Artifacts
+                  command: |
+                      mkdir -p /tmp/artifacts
+                      touch /tmp/artifacts/coda_pvkeys_dummy
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
+            - run:
+                  name: Install awscli
+                  command: sudo pip install awscli
+            - run:
+                  name: Build OCaml
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves_10k_ledger
+            - run:
+                  name: Upload generated keys
+                  command: |
+                      ls -l /tmp/coda_cache_dir/
+                      aws s3 sync --acl public-read /tmp/coda_cache_dir/ s3://snark-keys.o1test.net/
+                      sleep 10
+            - run:
+                  name: Rebuild for pvkey changes
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves_10k_ledger
+            - run:
+                  name: Build deb package with PV keys and PV key tar
+                  command: ./scripts/skip_if_only_frontend.sh make deb
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves_10k_ledger
+            - run:
+                  name: Store genesis public/private keypairs
+                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
+                  no_output_timeout: 20m
+            - run:
+                  name: Copy artifacts to cloud
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     test-unit--test_postake_snarkless_unittest:
         resource_class: xlarge
         docker:
@@ -697,6 +748,7 @@ workflows:
             - build-archive
             - build-macos
             - build-artifacts--testnet_postake_medium_curves
+            - build-artifacts--testnet_postake_medium_curves_10k_ledger
             - test-unit--test_postake_snarkless_unittest
             - test-unit--dev
             - test--fake_hash
