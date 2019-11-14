@@ -66,6 +66,14 @@ do
     echo -n "Looking for keys matching: ${key} -- "
 
     # Awkward, you can't do a filetest on a wildcard - use loops
+    for f in  /tmp/s3_cache_dir/${key}*; do
+        if [ -e "$f" ]; then
+            echo " [OK] found key in s3 key set"
+            cp /tmp/s3_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+            break
+        fi
+    done
+
     for f in  /var/lib/coda/${key}*; do
         if [ -e "$f" ]; then
             echo " [OK] found key in stable key set"
