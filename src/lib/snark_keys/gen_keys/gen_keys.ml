@@ -201,7 +201,7 @@ let gen_keys () =
     , Transaction_snark_keys.Verification.key_location ~loc
         tx_keys_location.verification )
   in
-  match Cached.Track_generated.(dirty1 + dirty2) with
+  match dirty with
   | `Generated_something -> (
     (* TODO: Check if circleci and die *)
     match (Sys.getenv "CI", Sys.getenv "DUNE_PROFILE") with
