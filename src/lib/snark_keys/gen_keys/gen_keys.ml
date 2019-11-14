@@ -173,7 +173,7 @@ let location_expr key_location =
 
 let gen_keys () =
   let open Async_kernel in
-  let%bind {With_track_generated.data= acc; dirty} =
+  let%bind {Cached.With_track_generated.data= acc; dirty} =
     let open Cached.Deferred_with_track_generated.Let_syntax in
     let%bind tx_keys_location, tx_keys, tx_keys_checksum =
       Transaction_snark.Keys.cached ()
