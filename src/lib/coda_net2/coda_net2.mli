@@ -45,14 +45,13 @@ vulnerable to resource exhaustion by opening many new connections.
 
 *)
 
+open Base
 open Async
 open Pipe_lib
+module Peer = Network_peer.Peer
 
 (** Handle to all network functionality. *)
 type net
-
-(** Essentially a hash of a public key. *)
-type peer_id
 
 module Keypair : sig
   type t
@@ -69,7 +68,7 @@ module Keypair : sig
     keypair data is corrupt. *)
   val of_string : string -> t Core.Or_error.t
 
-  val to_peerid : t -> peer_id
+  val to_peerid : t -> Peer.Id.t
 end
 
 (** A "multiaddr" is libp2p's extensible encoding for network addresses.
@@ -92,15 +91,7 @@ module Multiaddr : sig
   val of_string : string -> t
 end
 
-module PeerID : sig
-  type t = peer_id
-
-  val to_string : t -> string
-
-  val of_keypair : Keypair.t -> t
-end
-
-type discovered_peer = {id: PeerID.t; maddrs: Multiaddr.t list}
+type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
 
 module Pubsub : sig
   (** A subscription to a pubsub topic. *)
@@ -186,7 +177,7 @@ val configure :
 val me : net -> Keypair.t option
 
 (** List of all peers we know about. *)
-val peers : net -> PeerID.t list Deferred.t
+val peers : net -> Peer.Id.t list Deferred.t
 
 (** An open stream.
 
@@ -217,7 +208,7 @@ module Stream : sig
 
   val remote_addr : t -> Multiaddr.t
 
-  val remote_peerid : t -> PeerID.t
+  val remote_peerid : t -> Peer.Id.t
 end
 
 (** [Protocol_handler.t] is the rough equivalent to [Tcp.Server.t].
@@ -251,7 +242,7 @@ end
   protocol, and probably for other reasons.
  *)
 val open_stream :
-  net -> protocol:string -> PeerID.t -> Stream.t Deferred.Or_error.t
+  net -> protocol:string -> Peer.Id.t -> Stream.t Deferred.Or_error.t
 
 (** Handle incoming streams for a protocol.
 

@@ -1,10 +1,12 @@
-open Core_kernel
+open Core
+open O1trace
 open Async
 open Coda_base
 open Coda_state
 open Pipe_lib
 open Network_peer
 open Coda_transition
+module Peer = Network_pool.Peer
 
 let refused_answer_query_string = "Refused to answer_query"
 

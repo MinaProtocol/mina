@@ -3,6 +3,7 @@ open Async
 open Async_unix
 open Deferred.Let_syntax
 open Pipe_lib
+module Peer = Network_peer.Peer
 
 exception Child_died
 
@@ -29,7 +30,7 @@ let to_int_res x =
   | None ->
       Or_error.error_string "needed an int"
 
-type keypair = {secret: string; public: string; peer_id: string}
+type keypair = {secret: string; public: string; peer_id: Peer.Id.t}
 
 type stream_state =
   | FullyOpen  (** Streams start in this state. Both sides can still write *)
@@ -699,8 +700,6 @@ end [@(* Warning 30 is about field labels being defined in multiple types.
 
 type net = Helper.t
 
-type peer_id = string
-
 module Keypair = struct
   type t = keypair
 
@@ -710,7 +709,7 @@ module Keypair = struct
         (let open Or_error.Let_syntax in
         let%bind secret = of_b58_data (`String sk) in
         let%map public = of_b58_data (`String pk) in
-        {secret; public; peer_id})
+        {secret; public; peer_id= Peer.Id.unsafe_of_string peer_id})
         |> Or_error.ok_exn
     | Error e ->
         failwithf "other RPC error generateKeypair: %s" (Error.to_string_hum e)
@@ -719,40 +718,25 @@ module Keypair = struct
   let secret_key_base58 {secret; _} = to_b58_data secret
 
   let to_string {secret; public; peer_id} =
-    String.concat ~sep:"," [to_b58_data secret; to_b58_data public; peer_id]
+    String.concat ~sep:","
+      [to_b58_data secret; to_b58_data public; Peer.Id.to_string peer_id]
 
   let of_string s =
-    let with_semicolon =
-      match String.split s ~on:';' with
+    let parse_with_sep sep =
+      match String.split s ~on:sep with
       | [secret_b58; public_b58; peer_id] ->
           let open Or_error.Let_syntax in
           let%map secret = of_b58_data (`String secret_b58)
           and public = of_b58_data (`String public_b58) in
-          {secret; public; peer_id}
+          {secret; public; peer_id= Peer.Id.unsafe_of_string peer_id}
       | _ ->
           Or_error.errorf "%s is not a valid Keypair.to_string output" s
     in
-    let with_comma =
-      match String.split s ~on:',' with
-      | [secret_b58; public_b58; peer_id] ->
-          let open Or_error.Let_syntax in
-          let%map secret = of_b58_data (`String secret_b58)
-          and public = of_b58_data (`String public_b58) in
-          {secret; public; peer_id}
-      | _ ->
-          Or_error.errorf "%s is not a valid Keypair.to_string output" s
-    in
+    let with_semicolon = parse_with_sep ';' in
+    let with_comma = parse_with_sep ',' in
     if Or_error.is_error with_semicolon then with_comma else with_semicolon
 
   let to_peerid {peer_id; _} = peer_id
-end
-
-module PeerID = struct
-  type t = peer_id
-
-  let to_string t = t
-
-  let of_keypair = Keypair.to_peerid
 end
 
 module Multiaddr = struct
@@ -763,7 +747,7 @@ module Multiaddr = struct
   let of_string t = t
 end
 
-type discovered_peer = {id: PeerID.t; maddrs: Multiaddr.t list}
+type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
 
 module Pubsub = struct
   let publish net ~topic ~data =
@@ -886,7 +870,7 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer =
       <- Some
            (fun peer_id peer_addrs ->
              on_new_peer
-               { id= (peer_id :> PeerID.t)
+               { id= Peer.Id.unsafe_of_string peer_id
                ; maddrs= List.map ~f:Multiaddr.of_string peer_addrs } ) ;
       Ok ()
   | Ok j ->
@@ -1005,7 +989,7 @@ let open_stream net ~protocol peer =
     Helper.(
       do_rpc net
         (module Rpcs.Open_stream)
-        {peer= PeerID.to_string peer; protocol})
+        {peer= Peer.Id.to_string peer; protocol})
   with
   | Ok {stream_idx; remote_addr; remote_peerid} ->
       let stream =
