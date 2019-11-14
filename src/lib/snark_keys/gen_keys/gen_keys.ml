@@ -185,7 +185,7 @@ let gen_keys () =
                                                    (struct
       let keys = tx_keys
     end)) in
-    let%bind bc_keys_location, _bc_keys, bc_keys_checksum = M.Keys.cached () in
+    let%map bc_keys_location, _bc_keys, bc_keys_checksum = M.Keys.cached () in
     ( Blockchain_snark_keys.Proving.load_expr ~loc bc_keys_location.proving
         bc_keys_checksum.proving
     , Blockchain_snark_keys.Proving.key_location ~loc bc_keys_location.proving
