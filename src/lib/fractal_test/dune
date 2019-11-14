@@ -1,0 +1,6 @@
+(executable
+  (package fractal)
+  (name marlin)
+  (public_name marlin)
+  (libraries fractal)
+  (preprocess (pps ppx_jane ppx_deriving.std)))
