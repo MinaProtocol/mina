@@ -1896,7 +1896,7 @@ module Data = struct
         ({ Poly.blockchain_length
          ; epoch_count
          ; min_window_length
-         ; curr_shift_lengths= _
+         ; curr_shift_lengths
          ; last_vrf_output
          ; total_currency
          ; curr_global_slot
@@ -1913,13 +1913,17 @@ module Data = struct
         let%map blockchain_length = length blockchain_length
         and epoch_count = length epoch_count
         and min_window_length = length min_window_length
-        and curr_global_slot =
-          up Global_slot.Checked.to_bits curr_global_slot
+        and curr_global_slot = up Global_slot.Checked.to_bits curr_global_slot
+        and curr_shift_lengths =
+          Checked.List.fold curr_shift_lengths ~init:[] ~f:(fun acc l ->
+              let%map res = length l in
+              List.append acc res )
         in
         { Random_oracle.Input.bitstrings=
             [| blockchain_length
              ; epoch_count
              ; min_window_length
+             ; curr_shift_lengths
              ; Array.to_list last_vrf_output
              ; bs (Amount.var_to_bits total_currency)
              ; curr_global_slot
@@ -1935,6 +1939,7 @@ module Data = struct
     (* TODO: How to calculate the length of an array for curr_shift_lengths *)
     let length_in_triples =
       Length.length_in_triples + Length.length_in_triples
+      + (Length.length_in_triples * UInt32.to_int Constants.shifts_per_window)
       + Vrf.Output.Truncated.length_in_triples + Epoch.length_in_triples
       + Epoch.Slot.length_in_triples + Amount.length_in_triples
       + Epoch_data.length_in_triples + Epoch_data.length_in_triples
