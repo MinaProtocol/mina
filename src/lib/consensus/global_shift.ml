@@ -12,7 +12,7 @@ let of_global_slot (s : Global_slot.t) : t =
 
 let shift t = UInt32.rem t Constants.shifts_per_window
 
-let ( <= ) a b = UInt32.compare a b <= 0
+let ( >= ) a b = UInt32.compare a b >= 0
 
 let add a b = UInt32.add a b
 
@@ -52,5 +52,5 @@ module Checked = struct
 
   let add a b = Integer.add ~m a b
 
-  let ( <= ) a b = make_checked (fun () -> Integer.lte ~m a b)
+  let ( >= ) a b = make_checked (fun () -> Integer.gte ~m a b)
 end

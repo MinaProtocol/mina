@@ -1521,7 +1521,7 @@ module Data = struct
       let same_window =
         Global_shift.(
           add prev_global_shift (constant Constants.shifts_per_window)
-          <= next_global_shift)
+          >= next_global_shift)
       in
       let new_shift_lengths =
         List.mapi prev_shift_lengths ~f:(fun i length ->
@@ -1575,7 +1575,7 @@ module Data = struct
         let%bind same_window =
           Global_shift.Checked.(
             add prev_global_shift (constant Constants.shifts_per_window)
-            <= next_global_shift)
+            >= next_global_shift)
         in
         let if_ cond ~then_ ~else_ =
           let%bind cond = cond and then_ = then_ and else_ = else_ in
