@@ -495,12 +495,21 @@ module T = struct
             match (coinbase_in_first_partition, second_has_data) with
             | true, true ->
                 (false, `Update_two (updated_stack1, updated_stack2))
-            (*updated_stack2 will not have any coinbase and therefore we don't want to create a new stack in snark. updated_stack2 is only used to update the pending_coinbase_aux because there's going to be data on a "new tree" and we don't want to keep creating new stacks or override existing stacks in the case when a tree has no coinbase at all.*)
+            (*updated_stack2 will not have any coinbase and therefore we don't
+            want to create a new stack in snark. updated_stack2 is only used to
+            update the pending_coinbase_aux because there's going to be data on
+            a "new tree" and we don't want to keep creating new stacks or
+            override existing stacks in the case when a tree has no coinbase at
+            all.*)
             | true, false ->
-                (*updated_stack1 has some new coinbase but parition 2 has no data and so we don't have to update pending_coinbase_aux just yet*)
+                (*updated_stack1 has some new coinbase but parition 2 has no
+                data and so we don't have to update pending_coinbase_aux just
+                yet*)
                 (false, `Update_one updated_stack1)
             | false, true ->
-                (*updated_stack1 does not have new coinbases and so don't update it. [updated stack2] might have (definitely has some data) and so add it*)
+                (*updated_stack1 does not have new coinbases and so don't
+                update it. [updated stack2] might have (definitely has some
+                data)*)
                 (true, `Update_one updated_stack2)
             | false, false ->
                 (false, `Update_none)
