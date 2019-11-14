@@ -543,8 +543,24 @@ let work_selection_method t = t.config.work_selection_method
 
 let add_work t (work : Snark_worker_lib.Work.Result.t) =
   let (module Work_selection_method) = t.config.work_selection_method in
+  let update_metrics () =
+    match best_staged_ledger t |> Participating_state.active with
+    | Some staged_ledger ->
+        let snark_pool = snark_pool t in
+        let fee = snark_work_fee t in
+        let pending_work =
+          Work_selection_method.pending_work_statements ~snark_pool ~fee
+            ~staged_ledger
+          |> List.length
+        in
+        Coda_metrics.(
+          Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
+    | None ->
+        ()
+  in
   let spec = work.spec.instances in
   set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
+  let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Network_pool.Snark_pool.add_completed_work (snark_pool t) work
 
 let next_proposal t = t.next_proposal
