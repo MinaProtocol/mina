@@ -147,7 +147,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                   read Boolean.typ correct_coinbase_status
                 and result = read Boolean.typ result in
                 Logger.trace logger
-                  "blockchain snark update success: $result = \
+                  "blockchain snark update success (check pending coinbase = \
+                   $check): $result = \
                    (correct_transaction_snark=$correct_transaction_snark ∨ \
                    nothing_changed=$nothing_changed) ∧ \
                    updated_consensus_state=$updated_consensus_state ∧ \

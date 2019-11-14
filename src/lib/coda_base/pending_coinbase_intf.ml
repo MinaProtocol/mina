@@ -31,10 +31,21 @@ module type S = sig
   end
 
   module Coinbase_data : sig
-    type t = Public_key.Compressed.t * Amount.t * State_body_hash.t
-    [@@deriving bin_io, sexp]
+    module Stable : sig
+      module V1 : sig
+        type t =
+          Public_key.Compressed.Stable.V1.t
+          * Amount.Stable.V1.t
+          * State_body_hash.Stable.V1.t
+        [@@deriving sexp, bin_io]
+      end
 
-    type value [@@deriving bin_io, sexp]
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t
+
+    type value [@@deriving sexp]
 
     type var = Public_key.Compressed.var * Amount.var * State_body_hash.var
 
