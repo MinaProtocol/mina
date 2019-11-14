@@ -1546,8 +1546,9 @@ module Data = struct
       let curr_shift_lengths =
         List.mapi new_shift_lengths ~f:(fun i length ->
             let is_next_shift = Shift.(of_int i = next_relative_shift) in
-            if is_next_shift && same_shift then Length.succ length
-            else Length.(succ zero) )
+            if is_next_shift then
+              if same_shift then Length.(succ length) else Length.(succ zero)
+            else length )
       in
       (min_window_length, curr_shift_lengths)
 
@@ -1628,9 +1629,13 @@ module Data = struct
                   constant (UInt32.of_int i) = next_relative_shift)
               in
               if_
-                Boolean.(is_next_shift && same_shift)
-                ~then_:(Length.Checked.succ length)
-                ~else_:Length.Checked.(succ zero) )
+                (Checked.return is_next_shift)
+                ~then_:
+                  (if_
+                     (Checked.return same_shift)
+                     ~then_:Length.Checked.(succ length)
+                     ~else_:Length.Checked.(succ zero))
+                ~else_:(Checked.return length) )
         in
         return (min_window_length, curr_shift_lengths)
     end
