@@ -74,10 +74,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         and supply_increase_is_zero =
           Currency.Amount.(equal_var supply_increase (var_of_t zero))
         in
-        let%bind nothing_changed =
-          Boolean.(ledger_hash_didn't_change && supply_increase_is_zero)
-        in
-        let%bind new_pending_coinbase_hash, deleted_stack =
+        let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped
+            =
           let%bind root_after_delete, deleted_stack =
             Pending_coinbase.Checked.pop_coinbases prev_pending_coinbase_root
               ~proof_emitted:(Boolean.not ledger_hash_didn't_change)
@@ -85,38 +83,14 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           let%bind prev_state_body_hash =
             Protocol_state.(Body.hash_checked (body previous_state))
           in
-          let%bind same =
-            State_body_hash.equal_var prev_state_body_hash
-              (Snark_transition.coinbase_state_body_hash transition)
+          let%bind no_coinbases_popped =
+            let%bind check =
+              Pending_coinbase.Hash.equal_var root_after_delete
+                prev_pending_coinbase_root
+            in
+            Boolean.if_ ledger_hash_didn't_change ~then_:check
+              ~else_:Boolean.true_
           in
-          let%bind empty_hash =
-            State_body_hash.equal_var
-              (Snark_transition.coinbase_state_body_hash transition)
-              (State_body_hash.var_of_t State_body_hash.dummy)
-          in
-          let%bind () =
-            with_label __LOC__ (Boolean.Assert.any [same; empty_hash])
-          in
-          let%bind correct_after_pop =
-            with_label __LOC__
-              (let%bind check =
-                 Pending_coinbase.Hash.equal_var root_after_delete
-                   prev_pending_coinbase_root
-               in
-               Boolean.if_
-                 (Boolean.not ledger_hash_didn't_change)
-                 ~then_:Boolean.true_ ~else_:check)
-          in
-          let%bind () =
-            as_prover
-              As_prover.(
-                Let_syntax.(
-                  let%map correct_after_pop =
-                    read Boolean.typ correct_after_pop
-                  in
-                  Core.printf !"Correct after pop %b\n%!" correct_after_pop))
-          in
-          let%bind () = Boolean.Assert.is_true correct_after_pop in
           (*new stack or update one*)
           let%map new_root =
             with_label __LOC__
@@ -125,28 +99,19 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                  , Snark_transition.coinbase_amount transition
                  , prev_state_body_hash ))
           in
-          (new_root, deleted_stack)
+          (new_root, deleted_stack, no_coinbases_popped)
+        in
+        let%bind nothing_changed =
+          Boolean.all
+            [ ledger_hash_didn't_change
+            ; supply_increase_is_zero
+            ; no_coinbases_popped ]
         in
         let%bind correct_coinbase_status =
           let new_root =
             transition |> Snark_transition.blockchain_state
             |> Blockchain_state.staged_ledger_hash
             |> Staged_ledger_hash.pending_coinbase_hash_var
-          in
-          let%bind () =
-            as_prover
-              As_prover.(
-                Let_syntax.(
-                  let%map new_root =
-                    read Pending_coinbase.Hash.typ new_pending_coinbase_hash
-                  and new_root_expected =
-                    read Pending_coinbase.Hash.typ new_root
-                  in
-                  Core.printf
-                    !"expected PC hash %{sexp: Pending_coinbase.Hash.t} got \
-                      %{sexp: Pending_coinbase.Hash.t}\n\
-                     \ %!"
-                    new_root_expected new_root))
           in
           Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
         in

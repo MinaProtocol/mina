@@ -248,6 +248,23 @@ let get_individual_info coinbase_parts proposer user_commands completed_works
 
 open Staged_ledger_diff
 
+let check_coinbase (diff : With_valid_signatures.diff) =
+  match
+    ( (fst diff).coinbase
+    , Option.value_map ~default:At_most_one.Zero (snd diff) ~f:(fun d ->
+          d.coinbase ) )
+  with
+  | Zero, Zero | Zero, One _ | One _, Zero | Two _, Zero ->
+      Ok ()
+  | x, y ->
+      Error
+        (Error.Coinbase_error
+           (sprintf
+              !"Invalid coinbase value in staged ledger prediffs \
+                %{sexp:Fee_transfer.Single.t At_most_two.t} and \
+                %{sexp:Fee_transfer.Single.t At_most_one.t}"
+              x y))
+
 let get' (t : With_valid_signatures.t) =
   let apply_pre_diff_with_at_most_two
       (t1 : With_valid_signatures.pre_diff_with_at_most_two_coinbase) =
@@ -272,6 +289,7 @@ let get' (t : With_valid_signatures.t) =
       t2.completed_works t.state_body_hash
   in
   let open Result.Let_syntax in
+  let%bind () = check_coinbase t.diff in
   let%bind p1 = apply_pre_diff_with_at_most_two (fst t.diff) in
   let%map p2 =
     Option.value_map

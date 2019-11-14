@@ -1287,11 +1287,13 @@ let%test_module "test" =
       sl := sl' ;
       (ledger_proof, diff', coinbase_amount, is_new_stack)
 
-    (*let create_and_apply sl logger pids txns stmt_to_work =
-      let open Deferred.Let_syntax in 
-      let%map (ledger_proof, diff, _, _) = create_and_apply_with_state_body_hash State_body_hash.dummy sl logger pids txns stmt_to_work
+    let create_and_apply sl logger pids txns stmt_to_work =
+      let open Deferred.Let_syntax in
+      let%map ledger_proof, diff, _, _ =
+        create_and_apply_with_state_body_hash State_body_hash.dummy sl logger
+          pids txns stmt_to_work
       in
-      (ledger_proof, diff)*)
+      (ledger_proof, diff)
 
     (* Run the given function inside of the Deferred monad, with a staged
          ledger and a separate test ledger, after applying the given
@@ -1375,9 +1377,8 @@ let%test_module "test" =
       One_or_two.map stmts ~f:(fun statement ->
           Ledger_proof.create ~statement ~sok_digest ~proof:Proof.dummy )
 
-    let _stmt_to_work_random_prover
-        (stmts : Transaction_snark_work.Statement.t) :
-        Transaction_snark_work.Checked.t option =
+    let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
+        : Transaction_snark_work.Checked.t option =
       let prover = stmt_to_prover stmts in
       let fee = Fee.of_int 1 in
       Some {Transaction_snark_work.Checked.fee; proofs= proofs stmts; prover}
@@ -1387,7 +1388,7 @@ let%test_module "test" =
       Quickcheck.random_value ~seed:(`Deterministic "snark worker")
         Public_key.Compressed.gen
 
-    let _stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
+    let stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
       let fee = Fee.of_int 1 in
       Some {fee; proofs= proofs stmts; prover= snark_worker_pk}
@@ -1489,7 +1490,7 @@ let%test_module "test" =
 
     (** Generic test framework. *)
 
-    (*let test_simple :
+    let test_simple :
            Ledger.init_state
         -> User_command.With_valid_signature.t list
         -> int option list
@@ -1544,7 +1545,7 @@ let%test_module "test" =
       (*Should have enough blocks to generate at least expected_proof_count
       proofs*)
       if Option.is_some expected_proof_count then
-        assert (total_ledger_proofs = Option.value_exn expected_proof_count) *)
+        assert (total_ledger_proofs = Option.value_exn expected_proof_count)
 
     (* We use first class modules to compute some derived constants that depend
        on the scan state constants. *)
@@ -1570,7 +1571,7 @@ let%test_module "test" =
 
     (** Generator for when we always have enough commands to fill all slots. *)
 
-    (*let gen_at_capacity :
+    let gen_at_capacity :
         ( Ledger.init_state
         * User_command.With_valid_signature.t list
         * int option list )
@@ -1602,7 +1603,7 @@ let%test_module "test" =
           ~sign_type:`Real ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
-      return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None)) *)
+      return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
     (* Generator for when we have less commands than needed to fill all slots. *)
     let gen_below_capacity ?(extra_blocks = false) () =
@@ -1629,7 +1630,7 @@ let%test_module "test" =
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.map ~f:Option.some cmds_per_iter)
 
-    (*let%test_unit "Max throughput-ledger proof count-fixed blocks" =
+    let%test_unit "Max throughput-ledger proof count-fixed blocks" =
       let expected_proof_count = 3 in
       Quickcheck.test (gen_at_capacity_fixed_blocks expected_proof_count)
         ~sexp_of:
@@ -1775,7 +1776,7 @@ let%test_module "test" =
                     return (diff', checked || checked') )
               in
               (*Note: if this fails, try increasing the number of trials*)
-              assert checked ) ) *)
+              assert checked ) )
 
     let stmt_to_work_restricted work_list provers
         (stmts : Transaction_snark_work.Statement.t) :
@@ -1799,7 +1800,7 @@ let%test_module "test" =
     (** Like test_simple but with a random number of completed jobs available.
     *)
 
-    (*let test_random_number_of_proofs :
+    let test_random_number_of_proofs :
            Ledger.init_state
         -> User_command.With_valid_signature.t list
         -> int option list
@@ -1937,7 +1938,7 @@ let%test_module "test" =
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_random_number_of_proofs ledger_init_state cmds iters
-                proofs_available sl test_mask `One_prover ) )*)
+                proofs_available sl test_mask `One_prover ) )
 
     let check_pending_coinbase proof diff ~sl_before ~sl_after state_body_hash
         ~coinbase_amount ~is_new_stack =
