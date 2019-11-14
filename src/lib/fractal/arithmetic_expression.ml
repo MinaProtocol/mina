@@ -21,6 +21,21 @@
 
     let ( ! ) = constant
 
+    let to_expr' ~constant ~int ~negate ~op ~pow t =
+      let rec go = function
+        | Op (o, x, y) ->
+          op o (go x) (go y)
+        | Constant x ->
+            constant x
+        | Int n ->
+            int n
+        | Negate x ->
+          negate (go x)
+        | Pow (x,n) ->
+          pow (go x) n
+      in
+      go t
+
     let to_expr ~constant ~int ~negate ~op ~pow t =
       let rec go = function
         | Op (o, x, y) ->
@@ -30,7 +45,7 @@
         | Int n ->
             int n
         | Negate x ->
-          negate x
+          negate (go x)
         | Pow (x,n) ->
           pow (go x) n
       in

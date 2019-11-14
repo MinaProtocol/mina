@@ -19,6 +19,14 @@ let rec length : type a n. (a, n) t -> n nat = function
   | _ :: xs ->
       S (length xs)
 
+let rec init : type a n. int -> n nat -> f:(int -> a) -> (a, n) t =
+  fun i n ~f ->
+  match n with
+  | Z -> []
+  | S n -> f i :: init (i + 1) n ~f
+
+let init n ~f = init 0 n ~f
+
 let rec fold_map : type acc a b n.
     (a, n) t -> f:(acc -> a -> acc * b) -> init:acc -> acc * (b, n) t =
  fun t ~f ~init ->

@@ -1,3 +1,4 @@
+(*
 open Core_kernel
 let ( ! ) = `no_refs
 open Hlist
@@ -501,6 +502,54 @@ module AHIOP = struct
     module Basic_IP = struct
       module F = Ip.F(Randomness)(Messaging.F(Prover_message)) (Computation)
       include Messaging_IP(Randomness)(Computation)(Prover_message)
+    end
+
+    module Junk = struct
+      module Randomness = struct
+        type (_, _) t =
+          | Field
+
+            : ('field, < field : 'field; ..>) t
+      end
+
+      module Computation = struct
+        type (_, _) t =
+          | Check_equal
+            : 'field Arithmetic_expression.t * 'field Arithmetic_expression.t
+              * 'k
+              -> ('k, < field: 'field; ..>) t
+
+        let map : type a b e. (a, e) t -> f:(a -> b) -> (b, e) t =
+          fun t ~f ->
+            match t with
+            | Check_equal (x, y, k) -> Check_equal (x, y, f k)
+      end
+
+      module Interaction = struct
+        module Prover_message = struct
+          type (_, _) t =
+            | Square_root : 'field Arithmetic_expression.t -> ('field, < field: 'field; ..>) t
+        end
+        include Messaging.F(Prover_message)
+      end
+
+      include Ip.T(Randomness)(Interaction)(Computation)
+
+      let protocol x =
+        let open Arithmetic_expression in
+        let%bind a = sample Field in
+        let%bind r =
+          interact
+            (Send_and_receive
+               (Field
+               , a
+               , Square_root (!a * !x)
+                , return))
+        in
+        compute (
+          Check_equal
+            (!r * !r, !a * !x, return ()))
+
     end
 
     type ('field, 'poly) virtual_oracle =
@@ -1027,17 +1076,15 @@ module AHIOP = struct
 )
       in
       (* TODO: Random linear combination and "levelling off" *)
-      let%bind combined =
-        combine
-          [ (Virtual s, Int.(Domain.size domain_H + 2 * b - 2))
-          ; (Virtual h, Int.(Domain.size domain_H + b - 2))
-          ; (Virtual e, 
-            let k = Domain.size domain_K in
-            Int.(max (5*k - 5 - k) (6*k - 6 - 1)
-                ) )
-          ]
-      in
-      FRI.fri
+      (* Not sure about the use of fri_rounds. Wrote this after not touching the code for a long time. *)
+      combine
+        [ (Virtual s, Int.(Domain.size domain_H + 2 * b - 2))
+        ; (Virtual h, Int.(Domain.size domain_H + b - 2))
+        ; (Virtual e, 
+          let k = Domain.size domain_K in
+          Int.(max (5*k - 5 - k) (6*k - 6 - 1)
+              ) )
+        ]
 
     let _ = protocol
 
@@ -1782,4 +1829,4 @@ type domain = I | L | H | K
 
 module Oracle = struct
   type t = F_input | F_A
-end
+end*)

@@ -98,3 +98,27 @@ end = struct
   include T
   include Monad_let.Make3 (T)
 end
+
+module Bind2 
+    (F1 : Functor.S2)
+    (F2 : Functor.S2)
+    (Eta : sig
+       val f : ('a, 'e) F1.t -> ('a, 'e) Make2(F2).t
+     end)
+  : sig
+    val f : ('a, 'e) Make2(F1).t -> ('a, 'e) Make2(F2).t
+  end 
+= struct
+  module M2 = Make2(F2)
+
+  let rec f : type a e. (a, e) Make2(F1).t -> (a, e) Make2(F2).t =
+    fun t ->
+      match t with
+      | Pure x -> Pure x
+      | Free xf ->
+        let ef = Eta.f xf in
+        M2.bind ef ~f
+end
+
+
+

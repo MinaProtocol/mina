@@ -1,6 +1,20 @@
-module type T2 = sig type (_, _) t end
-module type F2 = Free_monad.Functor.S2
+open Types
 
+(* Free monads: technique for implementing DSLs *)
+
+(* Goal *)
+(*
+let protocol x =
+  let a = sample () in
+  send_to_prover a;
+  let r =
+    receive_from_prover (
+      sqrt (a * x)
+    )
+  in
+  assert (r * r = a * x)
+
+*)
 module F 
     (Randomness : T2)
     (Interaction : F2) (Computation : F2) = struct
@@ -72,6 +86,21 @@ module T
       | Free c ->
         Free (Compute (Computation.map c ~f:lift_compute))
 end
+
+(*
+type message =
+  | Quit
+  | Move of { x : int; y : int; }
+  | Write of string
+  | Change_color of int * int * int
+
+let message_to_string message =
+  match message with
+  | Quit -> "quit"
+  | Move {x; y} -> sprintf "move (%d, %d)" x y
+  | Write s -> sprintf "write %s" s
+  | Change_color (r, g, b) -> sprintf "change_color (%d %d %d)" r g b
+*)
 
 module Computation = struct
   module Bind
