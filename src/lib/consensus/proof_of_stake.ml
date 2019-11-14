@@ -2059,9 +2059,10 @@ module Data = struct
          ; epoch_count= Length.zero
          ; min_window_length= max_window_length
          ; curr_shift_lengths=
-             List.init
-               (UInt32.to_int Constants.shifts_per_window)
-               ~f:(Fn.const max_shift_length)
+             Length.zero
+             :: List.init
+                  (UInt32.to_int Constants.shifts_per_window - 1)
+                  ~f:(Fn.const max_shift_length)
          ; last_vrf_output= Vrf.Output.Truncated.dummy
          ; total_currency= Lazy.force genesis_ledger_total_currency
          ; curr_global_slot= Global_slot.zero
