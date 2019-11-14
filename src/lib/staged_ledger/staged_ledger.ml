@@ -673,32 +673,44 @@ module T = struct
     , `Staged_ledger new_staged_ledger
     , `Pending_coinbase_data (is_new_stack, coinbase_amount) )
 
+  let update_metrics (t : t) (witness : Staged_ledger_diff.t) =
+    let open Or_error.Let_syntax in
+    let user_commands = Staged_ledger_diff.user_commands witness in
+    let work = Staged_ledger_diff.completed_works witness in
+    let%bind total_txn_fee = sum_fees user_commands ~f:User_command.fee in
+    let%bind total_snark_fee = sum_fees work ~f:Transaction_snark_work.fee in
+    let%bind () = Scan_state.update_metrics t.scan_state in
+    Or_error.try_with (fun () ->
+        let open Coda_metrics in
+        Gauge.set Scan_state_metrics.snark_fee_per_block
+          (Int.to_float @@ Fee.to_int total_snark_fee) ;
+        Gauge.set Scan_state_metrics.transaction_fees_per_block
+          (Int.to_float @@ Fee.to_int total_txn_fee) ;
+        Gauge.set Scan_state_metrics.purchased_snark_work_per_block
+          (Float.of_int @@ List.length work) ;
+        Gauge.set Scan_state_metrics.snark_work_required
+          (Float.of_int
+             (List.length (Scan_state.all_work_pairs_exn t.scan_state))) )
+
   let apply t witness ~logger ~verifier =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
-    Coda_metrics.(
-      Gauge.set Snark_work.completed_snark_work_last_block
-        (Float.of_int @@ List.length work)) ;
     let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
       @@ Pre_diff_info.get witness
       |> Deferred.return
     in
-    let%map res = apply_diff t prediff ~logger in
-    let _, _, `Staged_ledger new_staged_ledger, _ = res in
+    let%map ((_, _, `Staged_ledger new_staged_ledger, __) as res) =
+      apply_diff t prediff ~logger
+    in
     let () =
-      try
-        Coda_metrics.(
-          Gauge.set Snark_work.scan_state_snark_work
-            (Float.of_int
-               (List.length
-                  (Scan_state.all_work_pairs_exn new_staged_ledger.scan_state))))
-      with exn ->
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("error", `String (Exn.to_string exn))]
-          !"Error when getting all work pairs from scan state: $error" ;
-        Exn.reraise exn "Error when getting all work pairs from scan state"
+      Or_error.iter_error (update_metrics new_staged_ledger witness)
+        ~f:(fun e ->
+          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("error", `String (Error.to_string_hum e))]
+            !"Error updating metrics after applying staged_ledger diff: $error"
+      )
     in
     res
 
