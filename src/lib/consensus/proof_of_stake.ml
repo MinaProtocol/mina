@@ -370,6 +370,8 @@ module Data = struct
                                   ( Int.to_string account
                                   , `Int (Currency.Balance.to_int balance) ) )
                            ) ) ) ) ) ]
+
+      let ledger t = t.ledger
     end
 
     module Data = struct
@@ -427,7 +429,7 @@ module Data = struct
       let delegatee_table =
         compute_delegatee_table_sparse_ledger proposer_public_keys ledger
       in
-      let genesis_epoch_snapshot = Snapshot.{delegatee_table; ledger} in
+      let genesis_epoch_snapshot = {Snapshot.delegatee_table; ledger} in
       ref
         { Data.staking_epoch_snapshot= genesis_epoch_snapshot
         ; next_epoch_snapshot= genesis_epoch_snapshot

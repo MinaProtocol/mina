@@ -600,7 +600,7 @@ module Types = struct
           ; voting_for } =
         { Account.Poly.public_key= Some public_key
         ; nonce= Some nonce
-        ; balance
+        ; balance= {AnnotatedBalance.total= balance; unknown= balance}
         ; receipt_chain_hash= Some receipt_chain_hash
         ; delegate= Some delegate
         ; voting_for= Some voting_for }
@@ -653,16 +653,19 @@ module Types = struct
       ; is_actively_staking: bool
       ; path: string }
 
-    let rec get_account coda pk =
+    let lift coda pk account =
       let propose_public_keys = Coda_lib.propose_public_keys coda in
       let accounts = Coda_lib.wallets coda in
-      { account= Partial_account.of_pk coda pk
+      { account
       ; locked= Secrets.Wallets.check_locked accounts ~needle:pk
       ; is_actively_staking=
           Public_key.Compressed.Set.mem propose_public_keys pk
       ; path= Secrets.Wallets.get_path accounts pk }
 
-    and account =
+    let get_best_ledger_account coda pk =
+      lift coda pk (Partial_account.of_pk coda pk)
+
+    let rec account =
       lazy
         (obj "Account" ~doc:"An account record according to the daemon"
            ~fields:(fun _ ->
@@ -702,6 +705,32 @@ module Types = struct
                        Some (Account.Nonce.to_string nonce)
                    | `Active None | `Bootstrapping ->
                        None )
+             ; field "epochDelegateAccount" ~typ:(Lazy.force account)
+                 ~doc:
+                   "The account that you delegated on the staking ledger of \
+                    the current block"
+                 ~args:Arg.[]
+                 ~resolve:(fun {ctx= coda; _} {account; _} ->
+                   let open Option.Let_syntax in
+                   let%bind delegate_key = account.Account.Poly.delegate in
+                   let%bind staking_ledger = Coda_lib.staking_ledger coda in
+                   try
+                     let index =
+                       Sparse_ledger.find_index_exn staking_ledger delegate_key
+                     in
+                     let delegate_account =
+                       Partial_account.of_full_account
+                       @@ Sparse_ledger.get_exn staking_ledger index
+                     in
+                     Some (lift coda delegate_key delegate_account)
+                   with e ->
+                     Logger.warn
+                       (Coda_lib.top_level_logger coda)
+                       !"Could not retrieve delegate account from sparse \
+                         ledger. The account may not be in the ledger: \
+                         %{sexp:exn}"
+                       e ~module_:__MODULE__ ~location:__LOC__ ;
+                     None )
              ; field "receiptChainHash" ~typ:string
                  ~doc:"Top hash of the receipt chain merkle-list"
                  ~args:Arg.[]
@@ -722,7 +751,8 @@ module Types = struct
                     delegating to anybody, this would return your public key"
                  ~args:Arg.[]
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
-                   Option.map ~f:(get_account coda)
+                   Option.map
+                     ~f:(get_best_ledger_account coda)
                      account.Account.Poly.delegate )
              ; field "votingFor" ~typ:string
                  ~doc:
@@ -788,7 +818,8 @@ module Types = struct
             ~doc:"Account of the sender"
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} payment ->
-              AccountObj.get_account coda (User_command.sender payment) )
+              AccountObj.get_best_ledger_account coda
+                (User_command.sender payment) )
         ; field "to" ~typ:(non_null public_key)
             ~doc:"Public key of the receiver"
             ~deprecated:(Deprecated (Some "use toAccount field instead"))
@@ -815,7 +846,7 @@ module Types = struct
                 | Stake_delegation (Set_delegate {new_delegate}) ->
                     new_delegate
               in
-              AccountObj.get_account coda pk )
+              AccountObj.get_best_ledger_account coda pk )
         ; result_field_no_inputs "amount" ~typ:(non_null uint64)
             ~doc:
               "Amount that sender is sending to receiver - this is 0 for \
@@ -917,7 +948,7 @@ module Types = struct
             ~doc:"Account that produced this block"
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} {With_hash.data; _} ->
-              AccountObj.get_account coda data.creator )
+              AccountObj.get_best_ledger_account coda data.creator )
         ; field "stateHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the state after this block"
             ~args:Arg.[]
@@ -956,7 +987,7 @@ module Types = struct
             ~doc:"Account of the current snark worker"
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} (key, _) ->
-              AccountObj.get_account coda key )
+              AccountObj.get_best_ledger_account coda key )
         ; field "fee" ~typ:(non_null uint64)
             ~doc:"Fee that snark worker is charging to generate a snark proof"
             ~args:Arg.[]
@@ -976,7 +1007,7 @@ module Types = struct
               ~doc:"Details of created account"
               ~args:Arg.[]
               ~resolve:(fun {ctx= coda; _} key ->
-                AccountObj.get_account coda key ) ] )
+                AccountObj.get_best_ledger_account coda key ) ] )
 
     let unlock_account : (Coda_lib.t, Account.key option) typ =
       obj "UnlockPayload" ~fields:(fun _ ->
@@ -990,7 +1021,7 @@ module Types = struct
               ~doc:"Details of unlocked account"
               ~args:Arg.[]
               ~resolve:(fun {ctx= coda; _} key ->
-                AccountObj.get_account coda key ) ] )
+                AccountObj.get_best_ledger_account coda key ) ] )
 
     let lock_account : (Coda_lib.t, Account.key option) typ =
       obj "LockPayload" ~fields:(fun _ ->
@@ -1003,7 +1034,7 @@ module Types = struct
               ~doc:"Details of locked account"
               ~args:Arg.[]
               ~resolve:(fun {ctx= coda; _} key ->
-                AccountObj.get_account coda key ) ] )
+                AccountObj.get_best_ledger_account coda key ) ] )
 
     let delete_account =
       obj "DeleteAccountPayload" ~fields:(fun _ ->

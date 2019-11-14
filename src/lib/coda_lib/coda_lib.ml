@@ -492,6 +492,22 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
 
 let next_proposal t = t.next_proposal
 
+let staking_ledger t =
+  let open Option.Let_syntax in
+  let%map transition_frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let consensus_state =
+    Transition_frontier.Breadcrumb.consensus_state
+      (Transition_frontier.best_tip transition_frontier)
+  in
+  let epoch = Consensus.Data.Consensus_state.curr_epoch consensus_state in
+  let local_state = t.config.consensus_local_state in
+  let _, snapshot =
+    Consensus.Hooks.select_epoch_snapshot ~consensus_state ~epoch ~local_state
+  in
+  Consensus.Data.Local_state.Snapshot.ledger snapshot
+
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
     ~set_next_proposal:(fun p -> t.next_proposal <- Some p)

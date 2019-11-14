@@ -334,6 +334,12 @@ module type S = sig
         -> Signature_lib.Public_key.Compressed.Set.t
         -> Coda_base.Block_time.t
         -> unit
+
+      module Snapshot : sig
+        type t
+
+        val ledger : t -> Coda_base.Sparse_ledger.t
+      end
     end
 
     module Vrf : sig
@@ -585,6 +591,12 @@ module type S = sig
       -> candidate:Consensus_state.Value.t
       -> logger:Logger.t
       -> bool
+
+    val select_epoch_snapshot :
+         consensus_state:Consensus_state.Value.t
+      -> local_state:Local_state.t
+      -> epoch:Unsigned.UInt32.t
+      -> [> `Curr | `Last] * Local_state.Snapshot.t
 
     (** Data needed to synchronize the local state. *)
     type local_state_sync [@@deriving to_yojson]
