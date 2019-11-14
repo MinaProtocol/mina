@@ -41,6 +41,8 @@ val close : t -> unit Deferred.t
 
 val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
+val ledger_table : t -> (Ledger_hash.t, Ledger.t) Core_kernel.Hashtbl.t
+
 val persistent_root : t -> Persistent_root.t
 
 val persistent_frontier : t -> Persistent_frontier.t
