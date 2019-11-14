@@ -172,20 +172,20 @@ let location_expr key_location =
                 key_location)])]
 
 let gen_keys () =
-  let%bind (tx_keys_location, tx_keys, tx_keys_checksum), dirty1 =
-    Transaction_snark.Keys.cached ()
-  in
-  let module M =
-  (* TODO make toplevel library to encapsulate consensus params *)
-  Blockchain_snark.Blockchain_transition.Make (Transaction_snark.Verification
-                                               .Make
-                                                 (struct
-    let keys = tx_keys
-  end)) in
-  let%bind (bc_keys_location, _bc_keys, bc_keys_checksum), dirty2 =
-    M.Keys.cached ()
-  in
-  let acc =
+  let open Async_kernel in
+  let%bind {With_track_generated.data= acc; dirty} =
+    let open Cached.Deferred_with_track_generated.Let_syntax in
+    let%bind tx_keys_location, tx_keys, tx_keys_checksum =
+      Transaction_snark.Keys.cached ()
+    in
+    let module M =
+    (* TODO make toplevel library to encapsulate consensus params *)
+    Blockchain_snark.Blockchain_transition.Make (Transaction_snark.Verification
+                                                 .Make
+                                                   (struct
+      let keys = tx_keys
+    end)) in
+    let%bind bc_keys_location, _bc_keys, bc_keys_checksum = M.Keys.cached () in
     ( Blockchain_snark_keys.Proving.load_expr ~loc bc_keys_location.proving
         bc_keys_checksum.proving
     , Blockchain_snark_keys.Proving.key_location ~loc bc_keys_location.proving
