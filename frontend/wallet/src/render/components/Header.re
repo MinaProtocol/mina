@@ -1,5 +1,3 @@
-let component = ReasonReact.statelessComponent("Header");
-
 module Styles = {
   open Css;
   open Theme;
@@ -11,6 +9,9 @@ module Styles = {
         top(`px(0)),
         left(`px(0)),
         right(`px(0)),
+        zIndex(100),
+        background(`url("bg-texture.png")),
+        backgroundColor(`hex("f2f2f2")),
         height(Spacing.headerHeight),
         maxHeight(Spacing.headerHeight),
         minHeight(Spacing.headerHeight),
@@ -124,6 +125,64 @@ module SyncStatus = {
   };
 };
 
+module DefaultToast = {
+  type accountBsRecord = {
+    delegateAccount: option({. "publicKey": PublicKey.t}),
+    stakingActive: bool,
+  };
+
+  module DelegationQ = [%graphql
+    {|
+      query queryDelegation($publicKey: PublicKey!) {
+        account(publicKey: $publicKey) @bsRecord {
+          delegateAccount {
+            publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+          }
+          stakingActive
+        }
+      }
+    |}
+  ];
+
+  module DelegationQuery = ReasonApollo.CreateQuery(DelegationQ);
+
+  [@react.component]
+  let make = () => {
+    let pk = Hooks.useActiveAccount();
+    switch (pk) {
+    | Some(pk) =>
+      <DelegationQuery
+        variables={
+          DelegationQ.make(~publicKey=Apollo.Encoders.publicKey(pk), ())##variables;
+        }>
+        (
+          response =>
+            switch (response.result) {
+            | Data(d) =>
+              switch (d##account) {
+              | Some({delegateAccount: Some(delegate), stakingActive: false})
+                  when delegate##publicKey == pk =>
+                <Toast
+                  onClick={() =>
+                    ReasonReactRouter.push(
+                      "/settings/" ++ PublicKey.uriEncode(pk),
+                    )
+                  }
+                  defaultStyle=ToastProvider.Success
+                  defaultText={js|Participate in consensus to earn coda →|js}
+                />
+              | _ => <Toast />
+              }
+            | Loading
+            | Error(_) => <Toast />
+            }
+        )
+      </DelegationQuery>
+    | None => <Toast />
+    };
+  };
+};
+
 [@react.component]
 let make = () => {
   let url = ReasonReact.Router.useUrl();
@@ -137,7 +196,7 @@ let make = () => {
     <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
       <img src=codaSvg alt="Coda logo" />
     </div>
-    <Toast />
+    <DefaultToast />
     <div className=Styles.rightButtons>
       <SyncStatusQuery fetchPolicy="no-cache" partialRefetch=true>
         {response =>
@@ -155,9 +214,16 @@ let make = () => {
         onClick={_e =>
           ReasonReact.Router.push(onSettingsPage ? "/" : "/settings")
         }>
-        <Icon kind=Icon.Settings />
+        {onSettingsPage
+           ? <Icon kind=Icon.Cross /> : <Icon kind=Icon.Settings />}
         <Spacer width=0.25 />
-        {React.string("Settings")}
+        {onSettingsPage
+           ? {
+             React.string("Close");
+           }
+           : {
+             React.string("Settings");
+           }}
       </a>
     </div>
   </header>;
