@@ -22,17 +22,9 @@ end
 let hash_abstract ~hash_body
     ({previous_state_hash; body} : (State_hash.t, _) Poly.t) =
   let body : State_body_hash.t = hash_body body in
-  let state_hash =
-    Random_oracle.hash ~init:Hash_prefix.Random_oracle.protocol_state
-      [|(previous_state_hash :> Field.t); (body :> Field.t)|]
-    |> State_hash.of_hash
-  in
-  Core.printf
-    !"In protocol state: Body hash: %{sexp: State_body_hash.t} previous state \
-      hash: %{sexp: State_hash.t} new hash: %{sexp: State_hash.t}\n\
-      %!"
-    body previous_state_hash state_hash ;
-  state_hash
+  Random_oracle.hash ~init:Hash_prefix.Random_oracle.protocol_state
+    [|(previous_state_hash :> Field.t); (body :> Field.t)|]
+  |> State_hash.of_hash
 
 module Body = struct
   module Poly = struct

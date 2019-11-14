@@ -286,13 +286,7 @@ module T = struct
   let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
     match t with
     | Coinbase c ->
-        let res = Pending_coinbase.Stack.push current_stack c in
-        Core.printf
-          !"pushing coinbase: Stack before %{sexp: Pending_coinbase.Stack.t} \
-            Stack after: %{sexp: Pending_coinbase.Stack.t}\n\
-            %!"
-          current_stack res ;
-        res
+        Pending_coinbase.Stack.push current_stack c
     | _ ->
         current_stack
 
@@ -494,7 +488,6 @@ module T = struct
           let new_stack_in_snark, stack_update =
             match (coinbase_in_first_partition, second_has_data) with
             | true, true ->
-                Core.printf !"updating two\n%!" ;
                 (false, `Update_two (updated_stack1, updated_stack2))
             (*updated_stack2 will not have any coinbase and therefore we don't want to create a new stack in snark. updated_stack2 is only used to update the pending_coinbase_aux because there's going to be data on a "new tree" and we don't want to keep creating new stacks or override existing stacks in the case when a tree has no coinbase at all.*)
             | true, false ->
@@ -517,7 +510,6 @@ module T = struct
     let%bind pending_coinbase_collection_updated1 =
       match ledger_proof with
       | Some (proof, _) ->
-          Core.printf !"removing coinbase stack\n%!" ;
           let%bind oldest_stack, pending_coinbase_collection_updated1 =
             Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
             |> to_staged_ledger_or_error
@@ -539,45 +531,24 @@ module T = struct
       | None ->
           Ok pending_coinbase_collection
     in
-    Core.printf
-      !"outside snark: Pending_coinbase hash after pop %{sexp: \
-        Pending_coinbase.Hash.t}\n\
-        %!"
-      (Pending_coinbase.merkle_root pending_coinbase_collection_updated1) ;
     (*updating the latest stack and/or adding a new one*)
-    let%map pending_coinbase_collection_updated2 =
-      match stack_update with
-      | `Update_none ->
-          Core.printf !"outside snark: stacks updated: 0 \n%!" ;
-          Ok pending_coinbase_collection_updated1
-      | `Update_one stack1 ->
-          Core.printf !"outside snark: stacks updated: 1 \n%!" ;
+    match stack_update with
+    | `Update_none ->
+        Ok pending_coinbase_collection_updated1
+    | `Update_one stack1 ->
+        Pending_coinbase.update_coinbase_stack
+          pending_coinbase_collection_updated1 stack1 ~is_new_stack
+        |> to_staged_ledger_or_error
+    | `Update_two (stack1, stack2) ->
+        (*The case when part of the transactions go in to the old tree and remaining on to the new tree*)
+        let%bind update1 =
           Pending_coinbase.update_coinbase_stack
-            pending_coinbase_collection_updated1 stack1 ~is_new_stack
+            pending_coinbase_collection_updated1 stack1 ~is_new_stack:false
           |> to_staged_ledger_or_error
-      | `Update_two (stack1, stack2) ->
-          (*The case when part of the transactions go in to the old tree and remaining on to the new tree*)
-          let%bind update1 =
-            Pending_coinbase.update_coinbase_stack
-              pending_coinbase_collection_updated1 stack1 ~is_new_stack:false
-            |> to_staged_ledger_or_error
-          in
-          Core.printf
-            !"outside snark: stacks updated: 2 \n\
-             \ Stack1:%{sexp: Pending_coinbase.Stack.t}\n\
-             \ Stack2: %{sexp: Pending_coinbase.Stack.t}\n\
-              %!"
-            stack1 stack2 ;
-          Pending_coinbase.update_coinbase_stack update1 stack2
-            ~is_new_stack:true
-          |> to_staged_ledger_or_error
-    in
-    Core.printf
-      !"outside snark: Pending_coinbase hash after adding %{sexp: \
-        Pending_coinbase.Hash.t}\n\
-        %!"
-      (Pending_coinbase.merkle_root pending_coinbase_collection_updated2) ;
-    pending_coinbase_collection_updated2
+        in
+        Pending_coinbase.update_coinbase_stack update1 stack2
+          ~is_new_stack:true
+        |> to_staged_ledger_or_error
 
   let coinbase_for_blockchain_snark = function
     | [] ->
@@ -1984,9 +1955,6 @@ let%test_module "test" =
         let (), x = Or_error.ok_exn (run_and_check comp ()) in
         x
       in
-      Core.printf
-        !"asserting the root Proof_emitted %b\n%!"
-        (Option.is_some proof) ;
       assert (
         Pending_coinbase.(
           Hash.equal unchecked_root_after checked_root_after_update) )
