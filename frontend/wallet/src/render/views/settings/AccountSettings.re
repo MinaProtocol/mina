@@ -249,6 +249,7 @@ module AccountInfo = [%graphql
      pooledUserCommands(publicKey: $publicKey) {
         isDelegation
     }
+     syncStatus
   }
 |}
 ];
@@ -291,12 +292,16 @@ module BlockRewards = {
                  ~f=commands => commands##isDelegation,
                  data##pooledUserCommands,
                );
-             switch (account.delegateAccount) {
-             | None =>
+             switch (account.delegateAccount, data##syncStatus) {
+             | (None, `SYNCED) =>
                <Well>
+                 <Alert kind=`Warning message="Your node is synced, but the account has not entered the ledger yet because there are no funds in this account. Have you requested from the faucet yet?" />
+               </Well>
+             | (None, _) => 
+                <Well>
                  <Alert kind=`Warning message="Wait until fully synced..." />
                </Well>
-             | Some(delegate) =>
+             | (Some(delegate), _) =>
                let isDelegation =
                  isDelegationInProgress || delegate##publicKey != publicKey;
 
@@ -332,7 +337,7 @@ module BlockRewards = {
                                     onMouseLeave={_ =>
                                       setStakingHovered(_ => false)
                                     }
-                                    onClick={_ => mutate() |> ignore}
+                                    onClick={_ => Task.liftPromise(mutate) |> Task.perform(~f=_ => {Bindings.setTimeout(1000) |> ignore response.refetch(Some(accountInfoVariables))} |> ignore) }
                                   />
                               )
                             </DisableStakingMutation>
