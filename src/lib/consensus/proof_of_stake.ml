@@ -1860,7 +1860,6 @@ module Data = struct
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    (* TODO: how to convert an list for curr_shift_lengths *)
     let to_input
         ({ Poly.blockchain_length
          ; epoch_count
@@ -1891,7 +1890,6 @@ module Data = struct
         ; Epoch_data.Staking.to_input staking_epoch_data
         ; Epoch_data.Next.to_input next_epoch_data ]
 
-    (* TODO: how to convert an list for curr_shift_lengths *)
     let var_to_input
         ({ Poly.blockchain_length
          ; epoch_count
@@ -1936,7 +1934,6 @@ module Data = struct
       List.reduce_exn ~f:Random_oracle.Input.append
         [input; staking_epoch_data; next_epoch_data]
 
-    (* TODO: How to calculate the length of an array for curr_shift_lengths *)
     let length_in_triples =
       Length.length_in_triples + Length.length_in_triples
       + (Length.length_in_triples * UInt32.to_int Constants.shifts_per_window)
