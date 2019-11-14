@@ -158,14 +158,40 @@ end
 module Track_generated = struct
   type t = [`Generated_something | `Cache_hit]
 
+  let empty = `Cache_hit
+
   let ( + ) x y =
     match (x, y) with
-    | `Generated_something, _ ->
-        `Generated_something
-    | _, `Generated_something ->
+    | `Generated_something, _ | _, `Generated_something ->
         `Generated_something
     | `Cache_hit, `Cache_hit ->
         `Cache_hit
+end
+
+module With_track_generated = struct
+  type 'a t = {data: 'a; dirty: Track_generated.t}
+end
+
+(* This is just the writer monad in a deferred *)
+module Deferred_with_track_generated = struct
+  type 'a t = 'a With_track_generated.t Deferred.t
+
+  include Monad.Make2 (struct
+    type nonrec ('a, 'm) t = 'a t
+
+    let return x =
+      Deferred.return
+        {With_track_generated.data= x; dirty= Track_generated.empty}
+
+    let map = `Define_using_bind
+
+    let bind t ~f =
+      let open Deferred.Let_syntax in
+      let%bind {With_track_generated.data; dirty= dirty1} = t in
+      let%map {With_track_generated.data= output; dirty= dirty2} = f data in
+      { With_track_generated.data= output
+      ; dirty= Track_generated.(dirty1 + dirty2) }
+  end)
 end
 
 let run
@@ -196,21 +222,21 @@ let run
         else
           match%map With_components.load load ~base_path:(base_path path) with
           | Ok x ->
-              Core.printf
+              Core_kernel.printf
                 !"Loaded %s from the following paths %{sexp: string list}\n"
                 name (full_paths path) ;
               Some x
           | Error e ->
-              Core.printf
+              Core_kernel.printf
                 !"Error loading from (name %s) (base_path %s) (full paths \
                   %{sexp: string list}: %s\n"
                 name (base_path path) (full_paths path) (Error.to_string_hum e) ;
               None )
   with
-  | Some x ->
-      return (x, `Cache_hit)
+  | Some data ->
+      return {With_track_generated.data; dirty= `Cache_hit}
   | None -> (
-      Core.printf
+      Core_kernel.printf
         !"Could not load %s from the following paths:\n\
          \ \n\
           %{sexp: string list}\n\
@@ -240,7 +266,7 @@ let run
                        ~args:["-o"; file_path; uri_string]
                        ()
                    in
-                   Core.printf !"Curl finished: %s\n" result ;
+                   Core_kernel.printf !"Curl finished: %s\n" result ;
                    Result.return ()
                  in
                  Deferred.List.map ~f:each_uri
@@ -252,33 +278,33 @@ let run
         in
         With_components.load load ~base_path:(base_path s3_install_path)
       with
-      | Ok x ->
-          Core.printf
+      | Ok data ->
+          Core_kernel.printf
             !"Successfully loaded keys from s3 and placed them in %{sexp: \
               string list}\n"
             (full_paths s3_install_path) ;
-          return (x, `Cache_hit)
+          return {With_track_generated.data; dirty= `Cache_hit}
       | Error e -> (
-          Core.printf "Failed to load keys from s3: %s, looking at %s\n"
+          Core_kernel.printf "Failed to load keys from s3: %s, looking at %s\n"
             (Error.to_string_hum e) autogen_path ;
           match%bind
             With_components.load load ~base_path:(base_path autogen_path)
           with
-          | Ok x ->
-              Core.printf
+          | Ok data ->
+              Core_kernel.printf
                 !"Loaded %s from autogen path %{sexp: string list}\n"
                 name (full_paths autogen_path) ;
               (* We consider this a "cache miss" for the purposes of tracking
              * that we need to push to s3 *)
-              return (x, `Generated_something)
+              return {With_track_generated.data; dirty= `Generated_something}
           | Error _e ->
-              Core.printf
+              Core_kernel.printf
                 !"Could not load %s from autogen path %{sexp: string list}. \
                   Autogenerating...\n"
                 name (full_paths autogen_path) ;
               let%bind () = Unix.mkdir ~p:() autogen_path in
-              let%map x =
+              let%map data =
                 With_components.store load ~base_path:(base_path autogen_path)
                   ~env:(create_env input)
               in
-              (x, `Generated_something) ) )
+              {With_track_generated.data; dirty= `Generated_something} ) )

@@ -1470,10 +1470,10 @@ module Keys = struct
 
   let cached () =
     let paths path = Cache_dir.possible_paths (Filename.basename path) in
-    let open Async in
-    let%bind (base_vk, base_pk), dirty1 = Cached.run Base.cached in
-    let%bind (merge_vk, merge_pk), dirty2 = Cached.run Merge.cached in
-    let%map (wrap_vk, wrap_pk), dirty3 =
+    let open Cached.Deferred_with_track_generated.Let_syntax in
+    let%bind base_vk, base_pk = Cached.run Base.cached in
+    let%bind merge_vk, merge_pk = Cached.run Merge.cached in
+    let%map wrap_vk, wrap_pk =
       let module Wrap = Wrap (struct
         let base = base_vk.value
 
@@ -1502,7 +1502,7 @@ module Keys = struct
           Verification.checksum ~base:base_vk.checksum ~merge:merge_vk.checksum
             ~wrap:wrap_vk.checksum }
     in
-    ((location, t, checksum), Cached.Track_generated.(dirty1 + dirty2 + dirty3))
+    (location, t, checksum)
 end
 
 let%test_module "transaction_snark" =
