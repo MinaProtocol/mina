@@ -29,12 +29,13 @@ module Component = struct
         ; bin: 'a Binable.m }
         -> ('a value, 'env) t
 
-  let load (Load {label; f= _; bin}) ~base_path =
-    let path = base_path ^ "_" ^ label in
-    try_load bin path
+  let path (Load {label; f= _; bin= _}) ~base_path = base_path ^ "_" ^ label
 
-  let store (Load {label; f; bin}) ~base_path ~env =
-    let path = base_path ^ "_" ^ label in
+  let load (Load {label= _; f= _; bin} as l) ~base_path =
+    try_load bin (path ~base_path l)
+
+  let store (Load {label= _; f; bin} as l) ~base_path ~env =
+    let path = path ~base_path l in
     let logger = Logger.create () in
     let controller = Storage.Disk.Controller.create ~logger bin in
     let value = f env in
@@ -85,6 +86,14 @@ module With_components = struct
           let%map x = Component.load c ~base_path and f = load tf ~base_path in
           f x
 
+  let rec path : type a e. (a, e) t -> base_path:string -> string list =
+   fun t ~base_path ->
+    match t with
+    | Pure _ ->
+        []
+    | Ap ((Load _ as c), tf) ->
+        Component.path c ~base_path :: path tf ~base_path
+
   let rec store : type a e.
       (a, e) t -> base_path:string -> env:e -> a Deferred.t =
     let open Deferred.Let_syntax in
@@ -126,22 +135,37 @@ module Spec = struct
         ; autogen_path: string
         ; manual_install_path: string
         ; brew_install_path: string
+        ; s3_install_path: string
         ; digest_input: 'input -> string
         ; create_env: 'input -> 'env
         ; input: 'input }
         -> 'a t
 
   let create ~load ~name ~autogen_path ~manual_install_path ~brew_install_path
-      ~digest_input ~create_env ~input =
+      ~s3_install_path ~digest_input ~create_env ~input =
     T
       { load
       ; name
       ; autogen_path
       ; manual_install_path
       ; brew_install_path
+      ; s3_install_path
       ; digest_input
       ; create_env
       ; input }
+end
+
+module Track_generated = struct
+  type t = [`Generated_something | `Cache_hit]
+
+  let ( + ) x y =
+    match (x, y) with
+    | `Generated_something, _ ->
+        `Generated_something
+    | _, `Generated_something ->
+        `Generated_something
+    | `Cache_hit, `Cache_hit ->
+        `Cache_hit
 end
 
 let run
@@ -151,43 +175,110 @@ let run
       ; autogen_path
       ; manual_install_path
       ; brew_install_path
+      ; s3_install_path
       ; digest_input
       ; create_env
       ; input }) =
   let open Deferred.Let_syntax in
   let hash = digest_input input in
+  let s3_bucket_prefix =
+    "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
+  in
   let base_path directory = directory ^/ hash in
+  let full_paths directory =
+    With_components.path load ~base_path:(base_path directory)
+  in
   match%bind
-    Deferred.List.fold [manual_install_path; brew_install_path] ~init:None
+    Deferred.List.fold
+      [manual_install_path; brew_install_path; s3_install_path] ~init:None
       ~f:(fun acc path ->
         if is_some acc then return acc
         else
           match%map With_components.load load ~base_path:(base_path path) with
           | Ok x ->
-              Core.printf "Loaded %s from the following path %s\n" name path ;
+              Core.printf
+                !"Loaded %s from the following paths %{sexp: string list}\n"
+                name (full_paths path) ;
               Some x
-          | Error _ ->
+          | Error e ->
+              Core.printf
+                !"Error loading from (name %s) (base_path %s) (full paths \
+                  %{sexp: string list}: %s\n"
+                name (base_path path) (full_paths path) (Error.to_string_hum e) ;
               None )
   with
   | Some x ->
-      return x
+      return (x, `Cache_hit)
   | None -> (
       Core.printf
-        "Could not load %s from the following path:\n\
-        \ \n\
-         %s\n\
-         %s\n\
-        \ \n\
-        \ Trying the autogen path %s...\n"
-        name manual_install_path brew_install_path autogen_path ;
-      let base_path = base_path autogen_path in
-      match%bind With_components.load load ~base_path with
+        !"Could not load %s from the following paths:\n\
+         \ \n\
+          %{sexp: string list}\n\
+          %{sexp: string list}\n\
+          %{sexp: string list}\n\
+         \ \n\
+         \ Trying s3 http:\n\
+         \ %{sexp: string list}...\n"
+        name
+        (full_paths manual_install_path)
+        (full_paths brew_install_path)
+        (full_paths s3_install_path)
+        (full_paths s3_bucket_prefix) ;
+      (* Attempt load from s3 *)
+      let open Deferred.Let_syntax in
+      let%bind () = Async.Unix.mkdir ~p:() s3_install_path in
+      let%bind () = Async.Unix.mkdir ~p:() autogen_path in
+      match%bind
+        let open Deferred.Result.Let_syntax in
+        let%bind () =
+          Deferred.map ~f:Result.join
+          @@ Monitor.try_with (fun () ->
+                 let each_uri (uri_string, file_path) =
+                   let open Deferred.Let_syntax in
+                   let%map result =
+                     Process.run_exn ~prog:"curl"
+                       ~args:["-o"; file_path; uri_string]
+                       ()
+                   in
+                   Core.printf !"Curl finished: %s\n" result ;
+                   Result.return ()
+                 in
+                 Deferred.List.map ~f:each_uri
+                   (List.zip_exn
+                      (full_paths s3_bucket_prefix)
+                      (full_paths s3_install_path))
+                 |> Deferred.map ~f:Result.all_unit )
+          |> Deferred.Result.map_error ~f:Error.of_exn
+        in
+        With_components.load load ~base_path:(base_path s3_install_path)
+      with
       | Ok x ->
-          Core.printf "Loaded %s from autogen path %s\n" name autogen_path ;
-          return x
-      | Error _e ->
           Core.printf
-            "Could not load %s from autogen path %s. Autogenerating...\n" name
-            autogen_path ;
-          let%bind () = Unix.mkdir ~p:() autogen_path in
-          With_components.store load ~base_path ~env:(create_env input) )
+            !"Successfully loaded keys from s3 and placed them in %{sexp: \
+              string list}\n"
+            (full_paths s3_install_path) ;
+          return (x, `Cache_hit)
+      | Error e -> (
+          Core.printf "Failed to load keys from s3: %s, looking at %s\n"
+            (Error.to_string_hum e) autogen_path ;
+          match%bind
+            With_components.load load ~base_path:(base_path autogen_path)
+          with
+          | Ok x ->
+              Core.printf
+                !"Loaded %s from autogen path %{sexp: string list}\n"
+                name (full_paths autogen_path) ;
+              (* We consider this a "cache miss" for the purposes of tracking
+             * that we need to push to s3 *)
+              return (x, `Generated_something)
+          | Error _e ->
+              Core.printf
+                !"Could not load %s from autogen path %{sexp: string list}. \
+                  Autogenerating...\n"
+                name (full_paths autogen_path) ;
+              let%bind () = Unix.mkdir ~p:() autogen_path in
+              let%map x =
+                With_components.store load ~base_path:(base_path autogen_path)
+                  ~env:(create_env input)
+              in
+              (x, `Generated_something) ) )
