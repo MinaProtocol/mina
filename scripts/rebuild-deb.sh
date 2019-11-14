@@ -20,7 +20,7 @@ PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 if [ "$GITBRANCH" == "master" ]; then
     VERSION="$GITTAG-${GITHASH}"
 else
-    VERSION="${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+    VERSION="$GITTAG-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
 fi
 
 # Export variables for use with downstream steps
