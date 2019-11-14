@@ -47,8 +47,8 @@ module Track_generated : sig
 
   val empty : t
 
-  val ( + ) : t -> t -> t
   (** Generated_something overrides caches hits *)
+  val ( + ) : t -> t -> t
 end
 
 module With_track_generated : sig
