@@ -1,17 +1,14 @@
 [%%import
 "../../config.mlh"]
 
-open Core
-
-let offset = 20.
+[%%inject
+"genesis_state_timestamp_string", genesis_state_timestamp]
 
 let genesis_state_timestamp =
-  let zone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
-  let fmt = "%Y-%m-%d" in
-  let midnight =
-    Core.Time.parse (Core.Time.format (Core.Time.now ()) fmt ~zone) ~zone ~fmt
-  in
-  Coda_base.Block_time.of_time (Time.add midnight (Time.Span.of_hr offset))
+  let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
+  Core.Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone)
+    genesis_state_timestamp_string
+  |> Coda_base.Block_time.of_time
 
 [%%inject
 "k", k]

@@ -292,9 +292,7 @@ module T = struct
   let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
     match t with
     | Coinbase c ->
-        if Coda_compile_config.pending_coinbase_hack then
-          Pending_coinbase.Stack.empty
-        else Pending_coinbase.Stack.push current_stack c
+        Pending_coinbase.Stack.push current_stack c
     | _ ->
         current_stack
 
