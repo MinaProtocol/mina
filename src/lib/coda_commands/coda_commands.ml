@@ -246,7 +246,7 @@ type active_state_fields =
   ; blockchain_length: int option
   ; ledger_merkle_root: string option
   ; state_hash: string option
-  ; consensus_time_best_tip: string option }
+  ; consensus_time_best_tip: Consensus.Global_slot.t option }
 
 let get_status ~flag t =
   let open Coda_lib.Config in
@@ -272,7 +272,7 @@ let get_status ~flag t =
   let consensus_mechanism = Consensus.name in
   let time_controller = (Coda_lib.config t).time_controller in
   let consensus_time_now =
-    Consensus.time_hum (Block_time.now time_controller)
+    Consensus.Global_slot.of_time_exn @@ Block_time.now time_controller
   in
   let consensus_configuration = Consensus.Configuration.t in
   let r = Perf_histograms.report in
@@ -351,7 +351,7 @@ let get_status ~flag t =
           `Active `Catchup
     in
     let consensus_time_best_tip =
-      Consensus.Data.Consensus_state.time_hum consensus_state
+      Consensus.Data.Consensus_state.global_slot consensus_state
     in
     ( sync_status
     , { num_accounts= Some num_accounts
@@ -378,20 +378,14 @@ let get_status ~flag t =
           ; consensus_time_best_tip= None } )
   in
   let next_proposal =
-    let str time =
-      let open Block_time in
-      let since_epoch_time = time |> Span.of_ms |> of_span_since_epoch in
-      let diff = diff since_epoch_time (now time_controller) in
-      if Span.(zero < diff) then sprintf "in %s" (Span.to_string_hum diff)
-      else "Computing next proposal state..."
-    in
+    let open Block_time in
     Option.map (Coda_lib.next_proposal t) ~f:(function
       | `Propose_now _ ->
-          "Now"
+          `Propose_now
       | `Propose (time, _, _) ->
-          str time
+          `Propose (time |> Span.of_ms |> of_span_since_epoch)
       | `Check_again time ->
-          sprintf "None this epoch… checking at %s" (str time) )
+          `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
   in
   let libp2p_peer_id =
     Option.value ~default:"<not connected to libp2p>"

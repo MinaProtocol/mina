@@ -4,39 +4,9 @@ open Async
 open Currency
 open Signature_lib
 open Coda_base
+include Intf0
 
-(** Constants are defined with a single letter (latin or greek) based on
- * their usage in the Ouroboros suite of papers *)
-module type Constants_intf = sig
-  (** The timestamp for the genesis block *)
-  val genesis_state_timestamp : Coda_base.Block_time.t
-
-  (** [k] is the number of blocks required to reach finality *)
-  val k : int
-
-  (** The amount of money minted and given to the proposer whenever a block
-   * is created *)
-  val coinbase : Currency.Amount.t
-
-  val block_window_duration_ms : int
-
-  (** The window duration in which blocks are created *)
-  val block_window_duration : Coda_base.Block_time.Span.t
-
-  (** [delta] is the number of slots in the valid window for receiving blocks over the network *)
-  val delta : int
-
-  (** [c] is the number of slots in which we can probalistically expect at least 1
-   * block. In sig, it's exactly 1 as blocks should be produced every slot. *)
-  val c : int
-
-  val inactivity_ms : int
-
-  (** Number of slots in one epoch *)
-  val slots_per_epoch : Unsigned.UInt32.t
-end
-
-module type Blockchain_state_intf = sig
+module type Blockchain_state = sig
   module Poly : sig
     module Stable : sig
       module V1 : sig
@@ -83,7 +53,7 @@ module type Blockchain_state_intf = sig
   val timestamp : (_, _, 'time) Poly.t -> 'time
 end
 
-module type Protocol_state_intf = sig
+module type Protocol_state = sig
   type blockchain_state
 
   type blockchain_state_var
@@ -169,7 +139,7 @@ module type Protocol_state_intf = sig
   val hash : Value.t -> State_hash.t
 end
 
-module type Snark_transition_intf = sig
+module type Snark_transition = sig
   type blockchain_state_var
 
   type consensus_transition_var
@@ -202,7 +172,7 @@ module type Snark_transition_intf = sig
     (_, 'consensus_transition, _, _, _, _) Poly.t -> 'consensus_transition
 end
 
-module type State_hooks_intf = sig
+module type State_hooks = sig
   type consensus_state
 
   type consensus_state_var
@@ -261,7 +231,7 @@ module type State_hooks_intf = sig
   end
 end
 
-module type Epoch_data_intf = sig
+module type Epoch_data = sig
   type ledger
 
   type seed
@@ -293,7 +263,7 @@ module type S = sig
   *)
   val time_hum : Coda_base.Block_time.t -> string
 
-  module Constants : Constants_intf
+  module Constants : Constants
 
   (** from postake *)
   val epoch_size : int
@@ -375,13 +345,13 @@ module type S = sig
 
     module Epoch_data : sig
       module Staking :
-        Epoch_data_intf
+        Epoch_data
         with type ledger := Epoch_ledger.Value.t
          and type seed := Epoch_seed.t
          and type lock_checkpoint := State_hash.t
 
       module Next :
-        Epoch_data_intf
+        Epoch_data
         with type ledger := Epoch_ledger.Value.t
          and type seed := Epoch_seed.t
          and type lock_checkpoint := State_hash.t option
@@ -482,7 +452,7 @@ module type S = sig
 
       val network_delay : Configuration.t -> int
 
-      val global_slot : Value.t -> Unsigned.uint32
+      val global_slot : Value.t -> Global_slot.t
 
       val blockchain_length : Value.t -> Length.t
 
@@ -609,31 +579,28 @@ module type S = sig
       -> local_state_sync Non_empty_list.t
       -> unit Deferred.Or_error.t
 
-    module type State_hooks_intf =
-      State_hooks_intf
-      with type consensus_state := Consensus_state.Value.t
-       and type consensus_state_var := Consensus_state.var
-       and type consensus_transition := Consensus_transition.Value.t
-       and type proposal_data := Proposal_data.t
-
     module Make_state_hooks
-        (Blockchain_state : Blockchain_state_intf)
-        (Protocol_state : Protocol_state_intf
+        (Blockchain_state : Blockchain_state)
+        (Protocol_state : Protocol_state
                           with type blockchain_state :=
                                       Blockchain_state.Value.t
                            and type blockchain_state_var :=
                                       Blockchain_state.var
                            and type consensus_state := Consensus_state.Value.t
                            and type consensus_state_var := Consensus_state.var)
-        (Snark_transition : Snark_transition_intf
+        (Snark_transition : Snark_transition
                             with type blockchain_state_var :=
                                         Blockchain_state.var
                              and type consensus_transition_var :=
                                         Consensus_transition.var) :
-      State_hooks_intf
+      State_hooks
       with type blockchain_state := Blockchain_state.Value.t
        and type protocol_state := Protocol_state.Value.t
        and type protocol_state_var := Protocol_state.var
        and type snark_transition_var := Snark_transition.var
+       and type consensus_state := Consensus_state.Value.t
+       and type consensus_state_var := Consensus_state.var
+       and type consensus_transition := Consensus_transition.Value.t
+       and type proposal_data := Proposal_data.t
   end
 end

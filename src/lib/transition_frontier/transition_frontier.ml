@@ -620,7 +620,8 @@ struct
     in
     let global_slot =
       consensus_state |> Consensus.Data.Consensus_state.global_slot
-      |> Unsigned.UInt32.to_int |> Float.of_int
+      |> Consensus.Global_slot.to_uint32 |> Unsigned.UInt32.to_int
+      |> Float.of_int
     in
     Coda_metrics.(
       Gauge.set Transition_frontier.slot_fill_rate

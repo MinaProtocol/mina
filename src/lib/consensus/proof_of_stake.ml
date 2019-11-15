@@ -9,6 +9,7 @@ open Signature_lib
 open Module_version
 open Snark_params
 open Bitstring_lib
+open Num_util
 module Time = Coda_base.Block_time
 module Run = Snark_params.Tick.Run
 
@@ -19,10 +20,6 @@ let make_checked t =
   with_state (As_prover.return ()) (Run.make_checked t)
 
 let name = "proof_of_stake"
-
-let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
-
-let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
 let genesis_ledger_total_currency =
   lazy
@@ -74,46 +71,7 @@ let compute_delegatee_table_sparse_ledger keys ledger =
 module Segment_id = Nat.Make32 ()
 
 module Typ = Crypto_params.Tick0.Typ
-
-module Constants = struct
-  include Constants
-
-  module Slot = struct
-    (* let duration = Constants.block_window_duration *)
-
-    let duration_ms = Int64.of_int block_window_duration_ms
-  end
-
-  module Epoch = struct
-    let size = slots_per_epoch
-
-    (** Amount of time in total for an epoch *)
-    let duration =
-      Time.Span.of_ms Int64.Infix.(Slot.duration_ms * int64_of_uint32 size)
-  end
-
-  module Checkpoint_window = struct
-    let per_year = 12
-
-    let slots_per_year =
-      let one_year_ms =
-        Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int |> Int.to_int64
-      in
-      Int64.Infix.(one_year_ms / Slot.duration_ms) |> Int64.to_int
-
-    let size_in_slots =
-      assert (slots_per_year mod per_year = 0) ;
-      slots_per_year / per_year
-
-    (* Number of bits required to represent a number
-       < size_in_slots *)
-    (* let per_window_index_size_in_bits = Core.Int.ceil_log2 size_in_slots *)
-  end
-
-  (** The duration of delta *)
-  let delta_duration =
-    Time.Span.of_ms (Int64.of_int (Int64.to_int Slot.duration_ms * delta))
-end
+module Constants = Constants
 
 let epoch_size = UInt32.to_int Constants.Epoch.size
 
@@ -171,156 +129,8 @@ module Data = struct
     Base58_check.(to_base58_check)]
   end
 
-  module Epoch = struct
-    include Epoch
-
-    let of_time_exn t : t =
-      if Time.(t < Constants.genesis_state_timestamp) then
-        raise
-          (Invalid_argument
-             "Epoch.of_time: time is earlier than genesis block timestamp") ;
-      let time_since_genesis = Time.diff t Constants.genesis_state_timestamp in
-      uint32_of_int64
-        Int64.Infix.(
-          Time.Span.to_ms time_since_genesis
-          / Time.Span.to_ms Constants.Epoch.duration)
-
-    let start_time (epoch : t) =
-      let ms =
-        let open Int64.Infix in
-        Time.Span.to_ms
-          (Time.to_span_since_epoch Constants.genesis_state_timestamp)
-        + (int64_of_uint32 epoch * Time.Span.to_ms Constants.Epoch.duration)
-      in
-      Time.of_span_since_epoch (Time.Span.of_ms ms)
-
-    let end_time (epoch : t) =
-      Time.add (start_time epoch) Constants.Epoch.duration
-
-    module Slot = struct
-      include (Slot : module type of Slot with module Checked := Slot.Checked)
-
-      (*
-      let after_lock_checkpoint (slot : t) =
-        let ck = Constants.(c * k |> UInt32.of_int) in
-        let open UInt32.Infix in
-        ck * UInt32.of_int 2 < slot
-      *)
-
-      let in_seed_update_range (slot : t) =
-        let ck = Constants.(c * k |> UInt32.of_int) in
-        let open UInt32.Infix in
-        ck <= slot && slot < ck * UInt32.of_int 2
-
-      module Checked = struct
-        include Slot.Checked
-
-        let in_seed_update_range (slot : var) =
-          let uint32_msb (x : UInt32.t) =
-            List.init 32 ~f:(fun i ->
-                let open UInt32 in
-                let open Infix in
-                let ( = ) x y = Core.Int.equal (compare x y) 0 in
-                (x lsr Int.sub 31 i) land UInt32.one = UInt32.one )
-            |> Bitstring_lib.Bitstring.Msb_first.of_list
-          in
-          let open Tick in
-          let open Tick.Let_syntax in
-          let ( < ) = Bitstring_checked.lt_value in
-          let ck = Constants.(c * k) |> UInt32.of_int in
-          let ck_bitstring = uint32_msb ck
-          and ck_times_2 = uint32_msb UInt32.(Infix.(of_int 2 * ck)) in
-          let%bind slot_msb =
-            to_bits slot >>| Bitstring_lib.Bitstring.Msb_first.of_lsb_first
-          in
-          let%bind slot_gte_ck = slot_msb < ck_bitstring >>| Boolean.not
-          and slot_lt_ck_times_2 = slot_msb < ck_times_2 in
-          Boolean.(slot_gte_ck && slot_lt_ck_times_2)
-      end
-
-      let gen =
-        let open Quickcheck.Let_syntax in
-        Core.Int.gen_incl 0 (Constants.(c * k) * 3) >>| UInt32.of_int
-
-      let%test_unit "in_seed_update_range unchecked vs. checked equality" =
-        let test =
-          Test_util.test_equal typ Tick.Boolean.typ
-            Checked.in_seed_update_range in_seed_update_range
-        in
-        let x = Constants.(c * k) in
-        let examples =
-          List.map ~f:UInt32.of_int
-            [x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1]
-        in
-        Quickcheck.test ~trials:100 ~examples gen ~f:test
-    end
-
-    let slot_start_time (epoch : t) (slot : Slot.t) =
-      Coda_base.Block_time.add (start_time epoch)
-        (Coda_base.Block_time.Span.of_ms
-           Int64.Infix.(int64_of_uint32 slot * Constants.Slot.duration_ms))
-
-    (*
-    let slot_end_time (epoch : t) (slot : Slot.t) =
-      Time.add (slot_start_time epoch slot) Constants.Slot.duration
-    *)
-
-    let epoch_and_slot_of_time_exn tm : t * Slot.t =
-      let epoch = of_time_exn tm in
-      let time_since_epoch = Coda_base.Block_time.diff tm (start_time epoch) in
-      let slot =
-        uint32_of_int64
-        @@ Int64.Infix.(
-             Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
-      in
-      (epoch, slot)
-
-    let diff_in_slots ((epoch, slot) : t * Slot.t)
-        ((epoch', slot') : t * Slot.t) : int64 =
-      let ( < ) x y = Pervasives.(Int64.compare x y < 0) in
-      let ( > ) x y = Pervasives.(Int64.compare x y > 0) in
-      let open Int64.Infix in
-      let of_uint32 = UInt32.to_int64 in
-      let epoch, slot = (of_uint32 epoch, of_uint32 slot) in
-      let epoch', slot' = (of_uint32 epoch', of_uint32 slot') in
-      let epoch_size = of_uint32 Constants.Epoch.size in
-      let epoch_diff = epoch - epoch' in
-      if epoch_diff > 0L then
-        ((epoch_diff - 1L) * epoch_size) + slot + (epoch_size - slot')
-      else if epoch_diff < 0L then
-        ((epoch_diff + 1L) * epoch_size) - (epoch_size - slot) - slot'
-      else slot - slot'
-
-    let%test_unit "test diff_in_slots" =
-      let open Int64.Infix in
-      let ( !^ ) = UInt32.of_int in
-      let ( !@ ) = Fn.compose ( !^ ) Int64.to_int in
-      let epoch_size = UInt32.to_int64 Constants.Epoch.size in
-      [%test_eq: int64] (diff_in_slots (!^0, !^5) (!^0, !^0)) 5L ;
-      [%test_eq: int64] (diff_in_slots (!^3, !^23) (!^3, !^20)) 3L ;
-      [%test_eq: int64] (diff_in_slots (!^4, !^4) (!^3, !^0)) (epoch_size + 4L) ;
-      [%test_eq: int64]
-        (diff_in_slots (!^5, !^2) (!^4, !@(epoch_size - 3L)))
-        5L ;
-      [%test_eq: int64]
-        (diff_in_slots (!^6, !^42) (!^2, !^16))
-        ((epoch_size * 3L) + 42L + (epoch_size - 16L)) ;
-      [%test_eq: int64]
-        (diff_in_slots (!^2, !@(epoch_size - 1L)) (!^3, !^4))
-        (0L - 5L) ;
-      [%test_eq: int64]
-        (diff_in_slots (!^1, !^3) (!^7, !^27))
-        (0L - ((epoch_size * 5L) + (epoch_size - 3L) + 27L))
-
-    let incr ((epoch, slot) : t * Slot.t) =
-      let open UInt32 in
-      if Slot.equal slot (sub Constants.Epoch.size one) then
-        (add epoch one, zero)
-      else (epoch, add slot one)
-  end
-
   module Epoch_and_slot = struct
-    type t = Epoch.t * Epoch.Slot.t [@@deriving eq, sexp]
+    type t = Epoch.t * Slot.t [@@deriving eq, sexp]
 
     let of_time_exn tm : t =
       let epoch = Epoch.of_time_exn tm in
@@ -378,7 +188,7 @@ module Data = struct
         { mutable staking_epoch_snapshot: Snapshot.t
         ; mutable next_epoch_snapshot: Snapshot.t
         ; last_checked_slot_and_epoch:
-            (Epoch.t * Epoch.Slot.t) Public_key.Compressed.Table.t
+            (Epoch.t * Slot.t) Public_key.Compressed.Table.t
         ; genesis_epoch_snapshot: Snapshot.t }
       [@@deriving sexp]
 
@@ -394,8 +204,7 @@ module Data = struct
                     t.last_checked_slot_and_epoch
                 |> List.map ~f:(fun (key, epoch_and_slot) ->
                        ( Public_key.Compressed.to_string key
-                       , [%to_yojson: Epoch.t * Epoch.Slot.t] epoch_and_slot )
-                   ) ) )
+                       , [%to_yojson: Epoch.t * Slot.t] epoch_and_slot ) ) ) )
           ; ( "genesis_epoch_snapshot"
             , [%to_yojson: Snapshot.t] t.genesis_epoch_snapshot ) ]
     end
@@ -435,8 +244,7 @@ module Data = struct
         ; last_checked_slot_and_epoch=
             make_last_checked_slot_and_epoch_table
               (Public_key.Compressed.Table.create ())
-              proposer_public_keys
-              ~default:(Epoch.zero, Epoch.Slot.zero) }
+              proposer_public_keys ~default:(Epoch.zero, Slot.zero) }
 
     let proposer_swap t proposer_public_keys now =
       let old : Data.t = !t in
@@ -485,7 +293,7 @@ module Data = struct
         Table.to_alist !t.last_checked_slot_and_epoch
         |> List.filter_map ~f:(fun (pk, last_checked_epoch_and_slot) ->
                let i =
-                 Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Epoch.Slot.compare
+                 Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Slot.compare
                    last_checked_epoch_and_slot (epoch, slot)
                in
                if i >= 0 then None
@@ -621,12 +429,11 @@ module Data = struct
       type ('epoch, 'slot, 'epoch_seed, 'delegator) t =
         {epoch: 'epoch; slot: 'slot; seed: 'epoch_seed; delegator: 'delegator}
 
-      type value =
-        (Epoch.t, Epoch.Slot.t, Epoch_seed.t, Coda_base.Account.Index.t) t
+      type value = (Epoch.t, Slot.t, Epoch_seed.t, Coda_base.Account.Index.t) t
 
       type var =
         ( Epoch.Checked.t
-        , Epoch.Slot.Checked.t
+        , Slot.Checked.t
         , Epoch_seed.var
         , Coda_base.Account.Index.Unpacked.var )
         t
@@ -652,7 +459,7 @@ module Data = struct
       let data_spec =
         let open Tick.Data_spec in
         [ Epoch.typ
-        ; Epoch.Slot.typ
+        ; Slot.typ
         ; Epoch_seed.typ
         ; Coda_base.Account.Index.Unpacked.typ ]
 
@@ -692,7 +499,7 @@ module Data = struct
       let gen =
         let open Quickcheck.Let_syntax in
         let%map epoch = Epoch.gen
-        and slot = Epoch.Slot.gen
+        and slot = Slot.gen
         and seed = Epoch_seed.gen
         and delegator = Coda_base.Account.Index.gen in
         {epoch; slot; seed; delegator}
@@ -992,7 +799,7 @@ module Data = struct
         let _, sk = keypairs.(0) in
         eval ~private_key:sk
           { Message.epoch= Epoch.zero
-          ; slot= Epoch.Slot.zero
+          ; slot= Slot.zero
           ; seed= Epoch_seed.initial
           ; delegator= 0 }
     end
@@ -1006,7 +813,7 @@ module Data = struct
         "Checking VRF evaluations at epoch: $epoch, slot: $slot"
         ~metadata:
           [ ("epoch", `Int (Epoch.to_int epoch))
-          ; ("slot", `Int (Epoch.Slot.to_int slot)) ] ;
+          ; ("slot", `Int (Slot.to_int slot)) ] ;
       with_return (fun {return} ->
           Hashtbl.iteri
             ( Snapshot.delegators epoch_snapshot public_key_compressed
@@ -1330,7 +1137,7 @@ module Data = struct
           , epoch_count ) )
       in
       let curr_seed, curr_lock_checkpoint =
-        if Epoch.Slot.in_seed_update_range prev_slot then
+        if Slot.in_seed_update_range prev_slot then
           ( Epoch_seed.update next_data'.seed proposer_vrf_result
           , Some prev_protocol_state_hash )
         else (next_data'.seed, next_data'.lock_checkpoint)
@@ -1786,7 +1593,7 @@ module Data = struct
     let length_in_triples =
       Length.length_in_triples + Length.length_in_triples
       + Vrf.Output.Truncated.length_in_triples + Epoch.length_in_triples
-      + Epoch.Slot.length_in_triples + Amount.length_in_triples
+      + Slot.length_in_triples + Amount.length_in_triples
       + Epoch_data.length_in_triples + Epoch_data.length_in_triples
 
     let checkpoint_window slot =
@@ -1797,7 +1604,7 @@ module Data = struct
 
     let time_hum (t : Value.t) =
       let epoch, slot = Global_slot.to_epoch_and_slot t.curr_global_slot in
-      sprintf "epoch=%d, slot=%d" (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
+      sprintf "epoch=%d, slot=%d" (Epoch.to_int epoch) (Slot.to_int slot)
 
     let update ~(previous_consensus_state : Value.t)
         ~(consensus_transition : Consensus_transition.t)
@@ -1825,8 +1632,8 @@ module Data = struct
         then Ok ()
         else
           Or_error.errorf
-            !"(epoch, slot) did not increase. prev=%{sexp:Epoch.t * \
-              Epoch.Slot.t}, next=%{sexp:Epoch.t * Epoch.Slot.t}"
+            !"(epoch, slot) did not increase. prev=%{sexp:Epoch.t * Slot.t}, \
+              next=%{sexp:Epoch.t * Slot.t}"
             (prev_epoch, prev_slot) (next_epoch, next_slot)
       in
       let staking_epoch_data, next_epoch_data, epoch_count =
@@ -1972,7 +1779,7 @@ module Data = struct
       let%bind next_epoch_data =
         let%map seed =
           let%bind in_seed_update_range =
-            Epoch.Slot.Checked.in_seed_update_range prev_slot
+            Slot.Checked.in_seed_update_range prev_slot
           in
           let%bind base =
             Epoch_seed.if_ epoch_increased
@@ -2008,7 +1815,7 @@ module Data = struct
               ~else_:previous_state.next_epoch_data.lock_checkpoint
           in
           let%bind in_seed_update_range =
-            Epoch.Slot.Checked.in_seed_update_range prev_slot
+            Slot.Checked.in_seed_update_range prev_slot
           in
           Coda_base.State_hash.if_ in_seed_update_range
             ~then_:previous_protocol_state_hash ~else_:base
@@ -2088,7 +1895,7 @@ module Data = struct
 
     let curr_slot = curr_ Global_slot.slot
 
-    let global_slot (t : Value.t) = Global_slot.to_uint32 t.curr_global_slot
+    let global_slot (t : Value.t) = t.curr_global_slot
 
     [%%define_locally
     Poly.
@@ -2584,13 +2391,13 @@ module Hooks = struct
     let epoch, slot =
       if
         Epoch.equal curr_epoch (Consensus_state.curr_epoch state)
-        && Epoch.Slot.equal curr_slot (Consensus_state.curr_slot state)
+        && Slot.equal curr_slot (Consensus_state.curr_slot state)
       then Epoch.incr (curr_epoch, curr_slot)
       else (curr_epoch, curr_slot)
     in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       "Systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
-      (Int64.to_int now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
+      (Int64.to_int now) (Epoch.to_int epoch) (Slot.to_int slot)
       ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
       @@ Epoch.start_time epoch ) ;
     let next_slot =
@@ -2650,17 +2457,16 @@ module Hooks = struct
                   Continue_or_stop.Stop (Some (keypair, data)) )
           ~finish:(fun () -> None)
       in
-      let rec find_winning_slot (slot : Epoch.Slot.t) =
-        if UInt32.of_int (Epoch.Slot.to_int slot) >= Constants.Epoch.size then
-          None
+      let rec find_winning_slot (slot : Slot.t) =
+        if UInt32.of_int (Slot.to_int slot) >= Constants.Epoch.size then None
         else
           match Local_state.seen_slot local_state epoch slot with
           | `All_seen ->
-              find_winning_slot (Epoch.Slot.succ slot)
+              find_winning_slot (Slot.succ slot)
           | `Unseen pks -> (
             match proposal_data pks slot with
             | None ->
-                find_winning_slot (Epoch.Slot.succ slot)
+                find_winning_slot (Slot.succ slot)
             | Some (keypair, data) ->
                 Some (slot, keypair, data) )
       in
@@ -2671,9 +2477,8 @@ module Hooks = struct
     | Some (next_slot, keypair, data) ->
         info_if_proposing logger ~module_:__MODULE__ ~location:__LOC__
           "Producing block in %d slots"
-          (Epoch.Slot.to_int next_slot - Epoch.Slot.to_int slot) ;
-        if Epoch.Slot.equal curr_slot next_slot then
-          `Propose_now (keypair, data)
+          (Slot.to_int next_slot - Slot.to_int slot) ;
+        if Slot.equal curr_slot next_slot then `Propose_now (keypair, data)
         else
           `Propose
             ( Epoch.slot_start_time epoch next_slot
@@ -2769,20 +2574,20 @@ module Hooks = struct
           |> Result.is_ok ) )
 
   module type State_hooks_intf =
-    Intf.State_hooks_intf
+    Intf.State_hooks
     with type consensus_state := Consensus_state.Value.t
      and type consensus_state_var := Consensus_state.var
      and type consensus_transition := Consensus_transition.t
      and type proposal_data := Proposal_data.t
 
   module Make_state_hooks
-      (Blockchain_state : Intf.Blockchain_state_intf)
-      (Protocol_state : Intf.Protocol_state_intf
+      (Blockchain_state : Intf.Blockchain_state)
+      (Protocol_state : Intf.Protocol_state
                         with type blockchain_state := Blockchain_state.Value.t
                          and type blockchain_state_var := Blockchain_state.var
                          and type consensus_state := Consensus_state.Value.t
                          and type consensus_state_var := Consensus_state.var)
-      (Snark_transition : Intf.Snark_transition_intf
+      (Snark_transition : Intf.Snark_transition
                           with type blockchain_state_var :=
                                       Blockchain_state.var
                            and type consensus_transition_var :=
@@ -2918,9 +2723,8 @@ module Hooks = struct
 end
 
 let time_hum (now : Coda_base.Block_time.t) =
-  let epoch, slot = Data.Epoch.epoch_and_slot_of_time_exn now in
-  Printf.sprintf "epoch=%d, slot=%d" (Data.Epoch.to_int epoch)
-    (Data.Epoch.Slot.to_int slot)
+  let epoch, slot = Epoch.epoch_and_slot_of_time_exn now in
+  Printf.sprintf "epoch=%d, slot=%d" (Epoch.to_int epoch) (Slot.to_int slot)
 
 let%test_module "Proof of stake tests" =
   ( module struct
