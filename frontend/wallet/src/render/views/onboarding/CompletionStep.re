@@ -57,7 +57,7 @@ let make = (~closeOnboarding, ~prevStep) => {
         <FadeIn duration=500 delay=250>
           <Link
             kind=Link.Blue
-            onClick={_ => openExternal("https://discord.gg/JN75xk")}>
+            onClick={_ => openExternal("https://discordapp.com/invite/Vexf4ED")}>
             {React.string("Open Discord")}
           </Link>
         </FadeIn>
