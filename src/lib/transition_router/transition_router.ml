@@ -69,7 +69,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   trace_recurring "bootstrap controller" (fun () ->
       upon
         (let%bind () =
-           let connectivity_time_uppperbound = 15.0 in
+           let connectivity_time_uppperbound = 60.0 in
            let high_connectivity_deferred =
              Coda_networking.on_first_high_connectivity network ~f:Fn.id
            in
