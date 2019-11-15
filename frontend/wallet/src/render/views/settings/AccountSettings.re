@@ -337,7 +337,7 @@ module BlockRewards = {
                                     onMouseLeave={_ =>
                                       setStakingHovered(_ => false)
                                     }
-                                    onClick={_ => Task.liftPromise(mutate) |> Task.perform(~f=_ => {Bindings.setTimeout(1000) |> ignore response.refetch(Some(accountInfoVariables))} |> ignore) }
+                                    onClick={_ => Task.liftPromise(mutate) |> Task.perform(~f=_ => {Bindings.setTimeout(100) |> ignore response.refetch(Some(accountInfoVariables))} |> ignore) }
                                   />
                               )
                             </DisableStakingMutation>
