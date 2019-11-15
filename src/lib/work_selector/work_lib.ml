@@ -95,9 +95,12 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   (*Seen/Unseen jobs that are not in the snark pool yet*)
   let pending_work_statements ~snark_pool ~fee_opt ~staged_ledger =
     let all_jobs = Inputs.Staged_ledger.all_work_pairs_exn staged_ledger in
-    List.map
-      (Option.value_map fee_opt
-         ~default:(all_pending_work ~snark_pool all_jobs) ~f:(fun fee ->
-           get_expensive_work ~snark_pool ~fee all_jobs ))
-      ~f:(One_or_two.map ~f:Work_spec.statement)
+    let filtered_jobs =
+      match fee_opt with
+      | None ->
+          all_pending_work ~snark_pool all_jobs
+      | Some fee ->
+          get_expensive_work ~snark_pool ~fee all_jobs
+    in
+    List.map filtered_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
 end
