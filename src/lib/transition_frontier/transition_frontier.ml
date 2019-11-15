@@ -21,7 +21,6 @@ type t =
   ; verifier: Verifier.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; full_frontier: Full_frontier.t
-  ; ledger_table: (Ledger_hash.t, Ledger.t) Hashtbl.t
   ; persistent_root: Persistent_root.t
   ; persistent_root_instance: Persistent_root.Instance.t
   ; persistent_frontier: Persistent_frontier.t
@@ -94,16 +93,6 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
           | `Failure _ as err ->
               err ))
   in
-  (* reconstruct ledger table from breadcrumbs *)
-  let ledger_table =
-    let tbl = Hashtbl.create (module Ledger_hash) in
-    let breadcrumbs = Full_frontier.all_breadcrumbs full_frontier in
-    List.iter breadcrumbs ~f:(fun bc ->
-        let ledger = Staged_ledger.ledger @@ Breadcrumb.staged_ledger bc in
-        let ledger_hash = Ledger.merkle_root ledger in
-        ignore (Hashtbl.add tbl ~key:ledger_hash ~data:ledger) ) ;
-    tbl
-  in
   let%map () =
     Deferred.return
       ( Persistent_frontier.Instance.start_sync persistent_frontier_instance
@@ -119,7 +108,6 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
   ; verifier
   ; consensus_local_state
   ; full_frontier
-  ; ledger_table
   ; persistent_root
   ; persistent_root_instance
   ; persistent_frontier
@@ -227,7 +215,6 @@ let close
     ; verifier= _
     ; consensus_local_state= _
     ; full_frontier
-    ; ledger_table= _
     ; persistent_root= _safe_to_ignore_1
     ; persistent_root_instance
     ; persistent_frontier= _safe_to_ignore_2
@@ -241,8 +228,6 @@ let close
     Persistent_frontier.Instance.destroy persistent_frontier_instance
   in
   Persistent_root.Instance.destroy persistent_root_instance
-
-let ledger_table t = t.ledger_table
 
 let persistent_root {persistent_root; _} = persistent_root
 
@@ -305,13 +290,6 @@ let add_breadcrumb_exn t breadcrumb =
            "Cannot add breadcrumb because persistent frontier sync job is not \
             running, which indicates that transition frontier initialization \
             has not been performed correctly" )
-  |> Result.map ~f:(fun () ->
-         (* succesfully added breadcrumb, update ledger table *)
-         let ledger =
-           Staged_ledger.ledger @@ Breadcrumb.staged_ledger breadcrumb
-         in
-         let ledger_hash = Ledger.merkle_root ledger in
-         ignore (Hashtbl.add t.ledger_table ~key:ledger_hash ~data:ledger) )
   |> Result.ok_exn ;
   Extensions.notify t.extensions ~frontier:t.full_frontier ~diffs
 
