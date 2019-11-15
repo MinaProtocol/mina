@@ -1213,7 +1213,7 @@ module T = struct
                   [ ( "user_command"
                     , User_command.With_valid_signature.to_yojson t ) ]
                 !"%s" error_message ;
-              failwith error_message
+              seq
           | Ok _ ->
               Sequence.append (Sequence.singleton t) seq )
     in
