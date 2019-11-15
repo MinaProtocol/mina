@@ -153,7 +153,13 @@ let make = (~nextStep) => {
              )}
           </p>
         </FadeIn>
-        <div> <Button label="Continue" onClick={_ => nextStep()} /> </div>
+        <div>
+          <Button
+            label="Continue"
+            style=Button.HyperlinkBlue
+            onClick={_ => nextStep()}
+          />
+        </div>
       </div>
       <div />
       <div className=Styles.image>
