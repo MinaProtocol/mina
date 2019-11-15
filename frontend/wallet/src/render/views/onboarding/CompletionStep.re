@@ -153,7 +153,7 @@ let make = (~closeOnboarding, ~prevStep) => {
           <Link
             kind=Link.Blue
             onClick={_ => openExternal("https://discordapp.com/invite/Vexf4ED")}>
-            {React.string("Open Discord")}
+            {React.string({js| Open Discord → |js})}
           </Link>
         </FadeIn>
         <Spacer height=2. />
@@ -164,7 +164,11 @@ let make = (~closeOnboarding, ~prevStep) => {
             onClick={_ => prevStep()}
           />
           <Spacer width=0.5 />
-          <Button label="Continue" onClick={_ => closeOnboarding()} />
+          <Button
+            label="Continue"
+            style=Button.HyperlinkBlue
+            onClick={_ => closeOnboarding()}
+          />
         </div>
       </div>
       <div className=Styles.line />
