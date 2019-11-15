@@ -144,7 +144,7 @@ let make = (~closeOnboarding, ~prevStep) => {
         <FadeIn duration=500 delay=150>
           <p className=Styles.heroBody>
             {React.string(
-               "You've successfully set up Coda Wallet. Head over to the Faucet to request funds to start sending transactions on the Coda network.",
+               "You’ve completed your intial account set up. You may now request funds and make transactions. Please use our Discord faucet channel to request funds. You may skip this step for now.",
              )}
           </p>
         </FadeIn>
