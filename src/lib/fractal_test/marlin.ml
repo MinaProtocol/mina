@@ -474,24 +474,46 @@ module Rust_compilation_target = struct
 
   let gen = unstage (Name.gen () )
 
+  module Prover_params = struct
+    type t =
+      { committer_key : Expr.t
+      ; sponge_params : Expr.t
+      }
+  end
+
   let fundef n name body =
     let indent s =
       List.map (String.split_lines s) ~f:(sprintf "  %s")
       |> String.concat ~sep:"\n"
     in
+    let committer_key = gen ~name:"commiter_key" () in
+    let sponge_params = gen ~name:"sponge_params" () in
     let v = Vector.init n ~f:(fun _ -> gen ()) in
-    sprintf "fn %s(%s) {\n%s\n}"
+    let (%:) = sprintf "%s : %s" in
+    let traits = [
+      "F", "Field";
+      "SinglePC", "SinglePolynomialCommitment<F>";
+      "Sponge", "sponge::Sponge<Message<F, SinglePC::Commitment>, F>"
+    ]
+    in
+    sprintf "fn %s<%s>(%s) {\n%s\n}"
       name
-      (String.concat ~sep:" " (List.map (Vector.to_list v) ~f:(sprintf "P::ScalarField %s")))
+      (String.concat ~sep:", " (List.map ~f:(Tuple2.uncurry (%:)) traits))
+      (String.concat ~sep:", "
+         ( [ committer_key %: "&SinglePC::CommitterKey"
+           ; sponge_params %: "&Sponge::Params" ]
+         @  List.map (Vector.to_list v) ~f:(sprintf "%s : F"))
+      )
       (indent 
-         (body (Vector.map v ~f:(fun s -> Expr.Var s))))
+         (body { Prover_params.committer_key=Var committer_key; sponge_params= Var sponge_params }
+            (Vector.map v ~f:(fun s -> Expr.Var s))))
 
     open Fiat_shamir
 
     let arithmetic_expression =
       Arithmetic_expression.to_expr'
         ~constant:Fn.id
-        ~int:(fun n -> Expr.Var (sprintf "P::ScalarField(%d)" n))
+        ~int:(fun n -> Expr.Var (sprintf "F(%d)" n))
         ~negate:(fun x -> Expr.Method_call (x, "neg", []))
         ~op:(fun op x y ->
             let meth =
@@ -505,8 +527,8 @@ module Rust_compilation_target = struct
         ~pow:(fun x n -> 
             Method_call (x, "pow", [ Int n ]))
 
-    let bind_value' (eq : (field, 'a) Type_equal.t) e : Program.t * 'a =
-      let res = gen () in
+    let bind_value' ?name (eq : (field, 'a) Type_equal.t) e : Program.t * 'a =
+      let res = gen ?name () in
       ( [ Statement.Assign (res, e) ]
         , Type_equal.conv eq (Expr.Var res ) )
 
@@ -559,14 +581,15 @@ module Rust_compilation_target = struct
     let add_field x y = arithmetic_expression Arithmetic_expression.(!x + !y)
     let mul_field x y = arithmetic_expression Arithmetic_expression.(!x * !y)
 
-    let create_poly ~append_lines e =
+    let create_poly { Prover_params.committer_key; _ } ~append_lines e =
+      let borrow e = Expr.Prefix_op ("&", e) in
       { Poly.expr = e
       ; commitment =
           lazy (
             let name = gen () in
             append_lines
               [ Statement.Assign
-                  (name, Method_call (e, "commitment", []))
+                  (name, Fun_call ("commit::<F, SinglePC>", [committer_key; borrow e]))
               ];
             Var name
           )
@@ -575,12 +598,13 @@ module Rust_compilation_target = struct
 
 (* TODO: Needs access to some auxiliary information passed in
    (e.g., the variable for the witness) *)
-    let prove : env Compiler(Prover_message).t =
+    let prove params : env Compiler(Prover_message).t =
       let f : type a. (a, env) Compiler(Prover_message).f =
         fun  ~append_lines (m : (a, env) Prover_message.t) ->
+          let create_poly = create_poly params ~append_lines in
           match m with
           | PCS_proof (Proof (p, x, y)) ->
-            bind_value' T
+            bind_value' ~name:"pi" T
               (Method_call (p.Poly.expr, "evalution_proof", [x; y]))
           | PCS_proof (Evals (polys, x)) ->
             let ys =
@@ -597,7 +621,7 @@ module Rust_compilation_target = struct
                   bind_value' T
                     (Fun_call ("w_hat", []))
                 in
-                (lines, create_poly ~append_lines e)
+                (lines, create_poly e)
               | Sigma_1 -> 
                   bind_value' T
                     (Fun_call ("sigma1", []))
@@ -608,60 +632,63 @@ module Rust_compilation_target = struct
                   bind_value' T
                     (Fun_call ("sigma1", []))
               | H0  { z_hat_=_ ; domain_h=_ } -> 
-                ( [], create_poly ~append_lines (Var "junk_h0"))
+                ( [], create_poly (Var "junk_h0"))
               | GH1 _ -> 
                 ( [],
-                  ( create_poly ~append_lines (Var "junk_g1")
-                  ,create_poly ~append_lines (Var "junk_h1")
+                  ( create_poly (Var "junk_g1")
+                  ,create_poly (Var "junk_h1")
                   ) )
               | GH2 _ -> 
                 ( [],
-                  ( create_poly ~append_lines (Var "junk_g2")
-                  ,create_poly ~append_lines (Var "junk_h2")
+                  ( create_poly (Var "junk_g2")
+                  ,create_poly (Var "junk_h2")
                   ) )
               | GH3 _ -> 
                 ( [],
-                  ( create_poly ~append_lines (Var "junk_g3")
-                  ,create_poly ~append_lines (Var "junk_h3")
+                  ( create_poly (Var "junk_g3")
+                  ,create_poly (Var "junk_h3")
                   ) )
               | Z_hat_  _ ->
-                ( [], create_poly ~append_lines (Var "junk_z_hat"))
+                ( [], create_poly (Var "junk_z_hat"))
               | Random_poly  _ ->
-                ( [], create_poly ~append_lines (Var "junk_random_poly"))
+                ( [], create_poly (Var "junk_random_poly"))
             end
       in
       { f
       }
 
     let initialize () = 
-      bind_value' T
-        (Raw "Hash::new()")
+      bind_value' ~name:"sponge" T
+        (Raw "Sponge::new()")
 
-    let squeeze hash_state : env Compiler(Randomness).t =
+    let squeeze { Prover_params.sponge_params; _ } hash_state : env Compiler(Randomness).t =
       let f : type a. (a, env) Compiler(Randomness).f =
         fun ~append_lines:_ (r : (a, env) Randomness.t) ->
           match r with
           | () ->
-            bind_value' T
-              (Method_call (hash_state, "squeeze", []))
+            bind_value' ~name:"challenge" T
+              (Method_call (hash_state, "squeeze", [ sponge_params ]))
       in
       { f
       }
 
-    let absorb hash_state (input : env Snark.Hash_input.t) =
-      match input with
-      | Field x ->
+    let absorb { Prover_params.sponge_params; _ } hash_state (input : env Snark.Hash_input.t) =
+      let absorb tag value =
         [ Statement.Method_call
             ( hash_state
             , "absorb"
-            , [ x ])
+            , [ sponge_params
+              ; Prefix_op
+                  ("&", 
+                   Fun_call(
+                     (sprintf "Message::%s" tag),
+                     [ Method_call (value, "clone", [])]
+                   ))  ])
         ]
-      | Polynomial p ->
-        [ Statement.Method_call
-            ( hash_state
-            , "absorb_commitment"
-            , [ Lazy.force p.commitment ])
-        ]
+      in
+      match input with
+      | Field x -> absorb "Field" x
+      | Polynomial p -> absorb "Commitment" (Lazy.force p.commitment)
       |  PCS_proof _ -> []
 
   end
@@ -785,8 +812,12 @@ module Rust_compilation_target = struct
       (protocol index input)
 
   let f =
+    Compiler.fundef (S Z)
+      "prover"
+      (fun prover_params input ->
     let index =
       let junk name = Compiler.create_poly
+                        prover_params
           ~append_lines:(fun _ -> ())
           (Var name )
       in
@@ -807,15 +838,12 @@ module Rust_compilation_target = struct
             (junk "value_c")
       }
     in
-    Compiler.fundef (S Z)
-      "prover"
-      (fun input ->
       Snark.prover
         (snark index input)
         ~compute:Compiler.compute
-        ~prove:Compiler.prove
-        ~squeeze:Compiler.squeeze
-        ~absorb:Compiler.absorb
+        ~prove:(Compiler.prove prover_params)
+        ~squeeze:(Compiler.squeeze prover_params)
+        ~absorb:(Compiler.absorb prover_params)
         ~initialize:Compiler.initialize
       |> Program.to_rust 
       )
