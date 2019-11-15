@@ -89,6 +89,28 @@ end
 module AHIOP = struct
   module Computation = Trivial_computation
 
+  module Prover = struct
+    module A = struct
+      type ('a, 'e) t = 
+        | Divide_by_vanishing_poly
+          : 'poly * Domain.t
+          -> ('poly * 'poly, < poly: 'poly; ..>) t
+        | Add : 'poly * 'poly -> ('poly, < poly: 'poly; ..>) t
+    end
+
+    module F = struct
+      type ('k, 'e) t =
+        | Perform : ('a, 'e) t * ('a -> 'k) -> ('k, 'e) t
+
+      let map : type a b e. (a, e) t -> f:(a -> b) -> (b, e) t =
+        fun t ~f ->
+        match t with
+        | Perform (eff, k) -> Perform (eff, fun x -> f (k x))
+    end
+
+    include Free_monad.Make2(F)
+  end
+
   module Prover_message = struct
     type (_, _) t =
       | W_hat : { witness_size: int; b : int } -> ('poly, < poly: 'poly; ..>) t
@@ -102,13 +124,11 @@ module AHIOP = struct
           -> ('poly * 'poly, < poly: 'poly; ..>) t
       | Sigma_1
         : ('field, < field: 'field; ..>) t
-      | Sigma_2
-        : ('field, < field: 'field; ..>) t
       | Sigma_3
         : ('field, < field: 'field; ..>) t
-      | GH2
-        : { domain_h : Domain.t }
-          -> ('poly * 'poly, < poly: 'poly; ..>) t
+      | Sigma_GH2
+        : { domain_h : Domain.t; beta_1 : 'field; eta : m -> 'field; index : 'poly Index.t }
+          -> ('field * 'poly * 'poly, < field: 'field; poly: 'poly; ..>) t
       | GH3
         : { domain_k : Domain.t }
           -> ('poly * 'poly, < poly: 'poly; ..>) t
@@ -129,10 +149,9 @@ module AHIOP = struct
             (Polynomial (Domain.size domain_h - 1)
                , Polynomial (Domain.size domain_h + b - 1))
       | Sigma_1 -> Field
-      | Sigma_2 -> Field
       | Sigma_3 -> Field
-      | GH2 { domain_h } ->
-        Pair (Polynomial (Domain.size domain_h - 1)
+      | Sigma_GH2 { domain_h ; beta_1=_; index=_ ; eta=_ } ->
+        Triple (Field, Polynomial (Domain.size domain_h - 1)
                 ,Polynomial (Domain.size domain_h - 1))
       | GH3 { domain_k } ->
         Pair
@@ -206,7 +225,7 @@ module AHIOP = struct
     fun t -> (w_hat * vanishing_poly domain input_length t) + x_hat t
 
   let protocol (type field poly)
-      ({ Index. row; col; value } : poly Index.t)
+      ({ Index. row; col; value } as index : poly Index.t )
       input
     : ((( (field Arithmetic_expression.t * field Arithmetic_expression.t) list, < field: field; ..> ) Arithmetic_circuit.E.t
        , < field: field; poly: poly > ) Query_program.t,
@@ -225,11 +244,7 @@ module AHIOP = struct
         ~receive:(GH1 {b; domain_h })
     in
     let%bind (beta_1 : field) = sample () in
-    let%bind sigma_2 =
-      interact ~send:[ beta_1 ]
-        ~receive:Sigma_2
-    in
-    let%bind (g_2, h_2) = receive (GH2 { domain_h }) in
+    let%bind (sigma_2, g_2, h_2) = interact ~send:[beta_1] ~receive:(Sigma_GH2 { domain_h; eta; index; beta_1 }) in
     let%bind (beta_2 : field) = sample () in
     let%bind (sigma_3 : field) =
       interact ~send:[ beta_2 ]
@@ -625,9 +640,6 @@ module Rust_compilation_target = struct
               | Sigma_1 -> 
                   bind_value' T
                     (Fun_call ("sigma1", []))
-              | Sigma_2 ->
-                  bind_value' T
-                    (Fun_call ("sigma1", []))
               | Sigma_3 ->
                   bind_value' T
                     (Fun_call ("sigma1", []))
@@ -638,9 +650,10 @@ module Rust_compilation_target = struct
                   ( create_poly (Var "junk_g1")
                   ,create_poly (Var "junk_h1")
                   ) )
-              | GH2 _ -> 
+              | Sigma_GH2 _ -> 
                 ( [],
-                  ( create_poly (Var "junk_g2")
+                  ( Var "sigma_2_junk"
+                  , create_poly (Var "junk_g2")
                   ,create_poly (Var "junk_h2")
                   ) )
               | GH3 _ -> 
