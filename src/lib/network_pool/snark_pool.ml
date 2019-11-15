@@ -69,28 +69,46 @@ module type Transition_frontier_intf = sig
        Pipe_lib.Broadcast_pipe.Reader.t
 end
 
+module Serializable = struct
+  module Statement_table = Transaction_snark_work.Statement.Stable.V1.Table
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { all:
+            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+            Priced_proof.Stable.V1.t
+            Statement_table.Stable.V1.t
+              (** Every SNARK in the pool *)
+        ; rebroadcastable:
+            ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+              Priced_proof.Stable.V1.t
+            * Time.Stable.With_utc_sexp.V2.t )
+            Statement_table.Stable.V1.t }
+      [@@deriving sexp]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
+    { all: Ledger_proof.t One_or_two.t Priced_proof.t Statement_table.t
+          (** Every SNARK in the pool *)
+    ; rebroadcastable:
+        ( Ledger_proof.t One_or_two.t Priced_proof.t
+        * Time.Stable.With_utc_sexp.V2.t )
+        Statement_table.t }
+  [@@deriving sexp]
+end
+
 module Make (Transition_frontier : Transition_frontier_intf) :
   S with type transition_frontier := Transition_frontier.t = struct
   module Statement_table = Transaction_snark_work.Statement.Stable.V1.Table
 
   module Resource_pool = struct
     module T = struct
-      (* TODO : Version this type *)
-      type serializable =
-        { all:
-            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-            Priced_proof.Stable.V1.t
-            Statement_table.t
-              (** Every SNARK in the pool *)
-        ; rebroadcastable:
-            ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-              Priced_proof.Stable.V1.t
-            * Time.Stable.With_utc_sexp.V2.t )
-            Statement_table.t
-              (** Rebroadcastable SNARKs generated on this machine, along with
-                  when they were first added. *)
-        }
-      [@@deriving sexp, bin_io]
+      type serializable = Serializable.t [@@deriving sexp]
 
       module Config = struct
         type t =
