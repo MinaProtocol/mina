@@ -8,6 +8,8 @@ module Styles = {
       Theme.Text.Body.semiBold,
       style([color(Theme.Colors.midnight), marginBottom(`rem(0.5))]),
     ]);
+    
+  let fields = style([maxWidth(`rem(40.))]);
 };
 
 type feeSelection =
@@ -158,39 +160,42 @@ let make = (~publicKey, ~stakingActive=false) => {
                        <div className=Styles.label>
                          {React.string("Transaction fee")}
                        </div>
-                       <ToggleButton
-                         options=[|"Standard: 5 Coda", "Custom Amount"|]
-                         selected=feeSelectedValue
-                         onChange=onChangeFee
-                       />
-                       {switch (state.fee) {
-                        | DefaultAmount => React.null
-                        | Custom(feeAmount) =>
-                          <>
-                            <Spacer height=1. />
-                            <TextField.Currency
-                              label="Fee"
-                              value={
-                                feeAmount == Int64.zero
-                                  ? "" : Int64.to_string(feeAmount)
-                              }
-                              placeholder="0"
-                              onChange={value => {
-                                let serializedValue =
-                                  switch (value) {
-                                  | "" => Int64.zero
-                                  | nonEmpty => Int64.of_string(nonEmpty)
-                                  };
-                                changeState(_ =>
-                                  {
-                                    delegate: state.delegate,
-                                    fee: Custom(serializedValue),
-                                  }
-                                );
-                              }}
-                            />
-                          </>
-                        }}
+                       <div
+                         className=Styles.fields>
+                         <ToggleButton
+                           options=[|"Standard: 5 Coda", "Custom Amount"|]
+                           selected=feeSelectedValue
+                           onChange=onChangeFee
+                         />
+                         {switch (state.fee) {
+                          | DefaultAmount => React.null
+                          | Custom(feeAmount) =>
+                            <>
+                              <Spacer height=1. />
+                              <TextField.Currency
+                                label="Fee"
+                                value={
+                                  feeAmount == Int64.zero
+                                    ? "" : Int64.to_string(feeAmount)
+                                }
+                                placeholder="0"
+                                onChange={value => {
+                                  let serializedValue =
+                                    switch (value) {
+                                    | "" => Int64.zero
+                                    | nonEmpty => Int64.of_string(nonEmpty)
+                                    };
+                                  changeState(_ =>
+                                    {
+                                      delegate: state.delegate,
+                                      fee: Custom(serializedValue),
+                                    }
+                                  );
+                                }}
+                              />
+                            </>
+                          }}
+                       </div>
                        <Spacer height=1. />
                        <span
                          className=Css.(
