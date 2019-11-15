@@ -8,6 +8,8 @@ module Styles = {
       Theme.Text.Body.semiBold,
       style([color(Theme.Colors.midnight), marginBottom(`rem(0.5))]),
     ]);
+    
+  let fields = style([maxWidth(`rem(40.))]);
 };
 
 type feeSelection =
@@ -159,7 +161,7 @@ let make = (~publicKey, ~stakingActive=false) => {
                          {React.string("Transaction fee")}
                        </div>
                        <div
-                         className={Css.style([Css.maxWidth(`rem(40.))])}>
+                         className=Styles.fields>
                          <ToggleButton
                            options=[|"Standard: 5 Coda", "Custom Amount"|]
                            selected=feeSelectedValue

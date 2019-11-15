@@ -15,6 +15,7 @@ module Styles = {
       Theme.Text.Body.semiBold,
       style([color(Theme.Colors.hyperlink), marginBottom(`rem(2.3))]),
     ]);
+  let fields = style([maxWidth(`rem(40.))]);
 };
 
 type feeSelection =
@@ -113,7 +114,7 @@ let make = (~publicKey) => {
            {React.string("Delegate Participation To")}
          </div>
          <Spacer height=1. />
-         <div className={Css.style([Css.maxWidth(`rem(40.))])}>
+         <div className=Styles.fields>
            <TextField
              label="Key"
              value={
@@ -136,7 +137,7 @@ let make = (~publicKey) => {
            <div className=Styles.label>
              {React.string("Transaction fee")}
            </div>
-           <div className={Css.style([Css.maxWidth(`rem(40.))])}>
+           <div className=Styles.fields>
              <ToggleButton
                options=[|"Standard: 5 Coda", "Custom Amount"|]
                selected=feeSelectedValue
