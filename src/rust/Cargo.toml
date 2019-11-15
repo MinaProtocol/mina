@@ -1,0 +1,24 @@
+[package]
+name = "rust"
+version = "0.1.0"
+authors = ["Izaak Meckler <ihmeckler@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+algebra = { git = "https://github.com/scipr-lab/zexe/", features = [ "parallel" ] }
+ff-fft = { git = "https://github.com/scipr-lab/zexe/" }
+bench-utils = { git = "https://github.com/scipr-lab/zexe/" }
+r1cs-core = { git = "https://github.com/scipr-lab/zexe/" }
+
+poly-commit = { git = "https://github.com/scipr-lab/poly-commit" }
+
+rand_core = { version = "0.5" }
+rand_chacha = { version = "0.2.1" }
+rayon = { version = "1" }
+digest = { version = "0.8" }
+generic-array = { version = "0.12" }
+derivative = { version = "1" }
+
+rand = { version = "0.7" }
+
+either = { version = "1.5.3" }
