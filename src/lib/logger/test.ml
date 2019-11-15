@@ -29,7 +29,7 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
   in
   try
     Logger.Consumer_registry.register ~id:"test"
-      ~processor:(Logger.Processor.raw ())
+      ~processor:(Logger.Processor.raw ~log_level:Logger.Level.Trace)
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory ~log_filename
            ~max_size) ;

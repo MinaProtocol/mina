@@ -119,11 +119,13 @@ module Processor = struct
   type t = T : (module S with type t = 't) * 't -> t
 
   module Raw = struct
-    type t = unit
+    type t = {log_level: Level.t}
 
-    let create () = ()
+    let create ~log_level = {log_level}
 
-    let process () msg = Some (Yojson.Safe.to_string (Message.to_yojson msg))
+    let process {log_level} (msg : Message.t) =
+      if msg.level < log_level then None
+      else Some (Yojson.Safe.to_string (Message.to_yojson msg))
   end
 
   module Pretty = struct
@@ -156,7 +158,7 @@ module Processor = struct
               ^ formatted_extra )
   end
 
-  let raw () = T ((module Raw), Raw.create ())
+  let raw ~log_level = T ((module Raw), Raw.create ~log_level)
 
   let pretty ~log_level ~config =
     T ((module Pretty), Pretty.create ~log_level ~config)
@@ -265,7 +267,9 @@ module Consumer_registry = struct
             | None ->
                 () ) )
       ~if_not_found:(fun _ ->
-        let (Processor.T ((module Processor), processor)) = Processor.raw () in
+        let (Processor.T ((module Processor), processor)) =
+          Processor.raw ~log_level:Level.Trace
+        in
         let (Transport.T ((module Transport), transport)) =
           Transport.stdout ()
         in

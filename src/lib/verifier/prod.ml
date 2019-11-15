@@ -124,7 +124,7 @@ module Worker = struct
         ( if Option.is_some conf_dir then
           let max_size = 256 * 1024 * 512 in
           Logger.Consumer_registry.register ~id:"default"
-            ~processor:(Logger.Processor.raw ())
+            ~processor:(Logger.Processor.raw ~log_level:Level.Trace)
             ~transport:
               (Logger.Transport.File_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)

@@ -248,7 +248,7 @@ module Worker = struct
       let init_worker_state Worker_state.{conf_dir; logger} =
         let max_size = 256 * 1024 * 512 in
         Logger.Consumer_registry.register ~id:"default"
-          ~processor:(Logger.Processor.raw ())
+          ~processor:(Logger.Processor.raw ~log_level:Level.Trace)
           ~transport:
             (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"coda-prover.log" ~max_size) ;
