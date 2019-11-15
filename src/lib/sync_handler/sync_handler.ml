@@ -23,7 +23,7 @@ module Make (Inputs : Inputs_intf) :
     in
     Root_history.lookup root_history state_hash
 
-  let get_ledger_by_hash ~frontier ~logger ledger_hash =
+  let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
       Ledger.Any_ledger.cast (module Ledger.Db)
       @@ Transition_frontier.root_snarked_ledger frontier
@@ -38,7 +38,7 @@ module Make (Inputs : Inputs_intf) :
         get_extension (Transition_frontier.extensions frontier) Ledger_table
       in
       Option.map
-        (Ledger_table.lookup ledger_table ~logger ledger_hash)
+        (Ledger_table.lookup ledger_table ledger_hash)
         ~f:(Ledger.Any_ledger.cast (module Ledger))
 
   let answer_query :
@@ -49,7 +49,7 @@ module Make (Inputs : Inputs_intf) :
       -> trust_system:Trust_system.t
       -> Sync_ledger.Answer.t Option.t Deferred.t =
    fun ~frontier hash query ~logger ~trust_system ->
-    match get_ledger_by_hash ~frontier ~logger hash with
+    match get_ledger_by_hash ~frontier hash with
     | None ->
         return None
     | Some ledger ->

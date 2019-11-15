@@ -7,7 +7,7 @@ module T = struct
 
   type view = unit
 
-  let create ~logger frontier =
+  let create ~logger:_ frontier =
     (* populate ledger table from breadcrumbs *)
     let ledger_table = Ledger_hash.Table.create () in
     let breadcrumbs = Full_frontier.all_breadcrumbs frontier in
@@ -15,29 +15,9 @@ module T = struct
         let ledger = Staged_ledger.ledger @@ Breadcrumb.staged_ledger bc in
         let ledger_hash = Ledger.merkle_root ledger in
         ignore (Hashtbl.add ledger_table ~key:ledger_hash ~data:ledger) ) ;
-    Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-      "Populated ledger table of size $sz"
-      ~metadata:[("sz", `Int (Ledger_hash.Table.length ledger_table))] ;
     (ledger_table, ())
 
-  let lookup t ~logger ledger_hash =
-    let result = Ledger_hash.Table.find t ledger_hash in
-    ( match result with
-    | Some _ ->
-        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-          "Found entry in ledger table for hash $hash"
-          ~metadata:
-            [ ( "hash"
-              , `String (Sexp.to_string @@ Ledger_hash.sexp_of_t ledger_hash)
-              ) ]
-    | None ->
-        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-          "** No entry ** in ledger table for hash $hash"
-          ~metadata:
-            [ ( "hash"
-              , `String (Sexp.to_string @@ Ledger_hash.sexp_of_t ledger_hash)
-              ) ] ) ;
-    result
+  let lookup t ledger_hash = Ledger_hash.Table.find t ledger_hash
 
   let handle_diffs ledger_table _frontier diffs =
     List.iter diffs ~f:(function
