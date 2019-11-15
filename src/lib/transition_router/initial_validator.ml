@@ -33,11 +33,11 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash
   match error with
   | `Verifier_error err ->
       let error_metadata = [("error", `String (Error.to_string_hum err))] in
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
           (error_metadata @ [("state_hash", State_hash.to_yojson state_hash)])
-        "Error while verifying blockchain proof for $state_hash: $error" ;
-      punish Sent_invalid_proof (Some ("verifier error", error_metadata))
+        "Error in verifier verifying blockchain proof for $state_hash: $error" ;
+      exit 21
   | `Invalid_proof ->
       punish Sent_invalid_proof None
   | `Invalid_delta_transition_chain_proof ->

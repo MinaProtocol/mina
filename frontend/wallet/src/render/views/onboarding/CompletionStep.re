@@ -23,18 +23,13 @@ module Styles = {
   };
 
   let header = {
-    merge([
-      Theme.Text.Header.h1,
-    ]);
+    merge([Theme.Text.Header.h1]);
   };
 
   let heroBody = {
     merge([
       Theme.Text.Body.regularLight,
-      style([
-        maxWidth(`rem(21.5)),
-        color(Theme.Colors.midnightBlue),     
-      ]),
+      style([maxWidth(`rem(21.5)), color(Theme.Colors.midnightBlue)]),
     ]);
   };
   let buttonRow = {
@@ -54,8 +49,8 @@ let make = (~closeOnboarding, ~prevStep) => {
         <FadeIn duration=500 delay=150>
           <p className=Styles.heroBody>
             {React.string(
-              "You've successfully set up Coda Wallet. Head over to the Faucet to request funds to start sending transactions on the Coda network.",
-            )}
+               "You've successfully set up Coda Wallet. Head over to the Faucet to request funds to start sending transactions on the Coda network.",
+             )}
           </p>
         </FadeIn>
         <Spacer height=0.5 />
@@ -65,7 +60,7 @@ let make = (~closeOnboarding, ~prevStep) => {
             onClick={_ => openExternal("https://discord.gg/JN75xk")}>
             {React.string("Open Discord")}
           </Link>
-        </FadeIn> 
+        </FadeIn>
         <Spacer height=2. />
         <div className=Styles.buttonRow>
           <Button

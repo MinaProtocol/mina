@@ -100,7 +100,10 @@ let make = () => {
                {switch (modalState) {
                 | false => React.null
                 | true =>
-                  <RequestCodaModal accounts=data##ownedWallets setModalState />
+                  <RequestCodaModal
+                    accounts=data##ownedWallets
+                    setModalState
+                  />
                 }}
                <Spacer width=1. />
                <SendButton />
