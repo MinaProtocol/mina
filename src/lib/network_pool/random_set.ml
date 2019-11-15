@@ -1,7 +1,7 @@
 open Core
 
 module type S = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
 
   type key
 
@@ -20,15 +20,33 @@ module type S = sig
   val gen : t Quickcheck.Generator.t
 end
 
+module T = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('keys, 'key_to_loc) t = {keys: 'keys; key_to_loc: 'key_to_loc}
+      [@@deriving sexp]
+    end
+  end]
+
+  type ('keys, 'key_to_loc) t = ('keys, 'key_to_loc) Stable.Latest.t =
+    {keys: 'keys; key_to_loc: 'key_to_loc}
+  [@@deriving sexp]
+end
+
 module Make (Key : sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
 
   val quickcheck_generator : t Quickcheck.Generator.t
 
   include Hashable.S_binable with type t := t
 end) : S with type key := Key.t = struct
-  type t = {keys: Key.t Dyn_array.t; key_to_loc: Int.t Key.Table.t}
-  [@@deriving sexp, bin_io]
+  (* type to get record labels in scope *)
+  type ('keys, 'key_to_loc) tt = ('keys, 'key_to_loc) T.t =
+    {keys: 'keys; key_to_loc: 'key_to_loc}
+  [@@deriving sexp]
+
+  type t = (Key.t Dyn_array.t, Int.t Key.Table.t) T.t [@@deriving sexp]
 
   let create () = {keys= Dyn_array.create (); key_to_loc= Key.Table.create ()}
 
