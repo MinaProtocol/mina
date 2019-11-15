@@ -46,6 +46,8 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
       stop-tracing               Stop async tracing
       visualization              Visualize data structures special to Coda
       wrap-key                   Wrap a private key into a private key file
+      import                     Set an pre-owned private key (-privkey-path) as the active 
+                                    key in a coda daemon
       help                       explain a given subcommand (perhaps recursively)
 
 `daemon` - Daemon commands to configure settings related to how node interacts with network
