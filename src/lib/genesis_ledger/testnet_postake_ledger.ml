@@ -375,11 +375,19 @@ include Make (struct
       } ]
 
   let fake_accounts =
+    (* hack to workaround duplicate generated keys *)
+    let enough = fake_accounts_target - List.length real_accounts in
+    let too_many = enough * 2 in
     let open Quickcheck in
-    random_value ~seed:(`Deterministic "fake accounts for testnet postake")
-      (Generator.list_with_length
-         (fake_accounts_target - List.length real_accounts)
-         Fake_accounts.gen)
+    let too_many_accounts =
+      random_value ~seed:(`Deterministic "fake accounts for testnet postake")
+        (Generator.list_with_length too_many Fake_accounts.gen)
+    in
+    let accounts_dups_removed =
+      List.dedup_and_sort too_many_accounts ~compare:(fun acct1 acct2 ->
+          Public_key.Compressed.compare acct1.pk acct2.pk )
+    in
+    List.take accounts_dups_removed enough
 
   let accounts = real_accounts @ fake_accounts
 end)
