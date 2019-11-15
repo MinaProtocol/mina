@@ -112,3 +112,5 @@ val decompress_exn : Compressed.t -> t
 val compress_var : var -> (Compressed.var, _) Checked.t
 
 val decompress_var : Compressed.var -> (var, _) Checked.t
+
+val to_base58_check_compressed : t -> string
