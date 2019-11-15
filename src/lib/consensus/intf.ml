@@ -384,7 +384,7 @@ module type S = sig
         Epoch_data_intf
         with type ledger := Epoch_ledger.Value.t
          and type seed := Epoch_seed.t
-         and type lock_checkpoint := State_hash.t option
+         and type lock_checkpoint := State_hash.t
     end
 
     module Prover_state : sig
