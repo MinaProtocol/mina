@@ -381,5 +381,16 @@ include Make (struct
          (fake_accounts_target - List.length real_accounts)
          Fake_accounts.gen)
 
-  let accounts = real_accounts @ fake_accounts
+  let accounts =
+    let all_accounts = real_accounts @ fake_accounts in
+    let compare acct1 acct2 =
+      Public_key.Compressed.compare acct1.pk acct2.pk
+    in
+    eprintf "REAL ACCOUNTS HAS DUP: %B\n%!"
+      (List.contains_dup real_accounts ~compare) ;
+    eprintf "FAKE ACCOUNTS HAS DUP: %B\n%!"
+      (List.contains_dup fake_accounts ~compare) ;
+    eprintf "ALL ACCOUNTS HAS DUP: %B\n%!"
+      (List.contains_dup all_accounts ~compare) ;
+    all_accounts
 end)
