@@ -1,5 +1,7 @@
 open Tc;
 
+[@bs.module "graphql-tag"] external gql: ReasonApolloTypes.gql = "default";
+
 module Styles = {
   open Css;
 
@@ -81,6 +83,19 @@ module TransactionsQueryString = [%graphql
   |}
 ];
 module TransactionsQuery = ReasonApollo.CreateQuery(TransactionsQueryString);
+
+module NewBlock = [%graphql
+  {|
+      subscription newBlock {
+        newBlock {
+          stateHash
+        }
+      }
+    |}
+];
+
+let newBlock = NewBlock.make();
+let newBlockAst = gql(. newBlock##query);
 
 /**
   This function is getting pretty gnarly so here's an explaination.
@@ -210,6 +225,20 @@ let make = () => {
                    pending
                    transactions
                    hasNextPage=data##blocks##pageInfo##hasNextPage
+                   subscribeToMore={() =>
+                     response.subscribeToMore(
+                       ~document=newBlockAst,
+                       ~updateQuery=
+                         (prev, _) => {
+                           response.refetch(
+                             Some(transactionQuery##variables),
+                           )
+                           |> ignore;
+                           prev;
+                         },
+                       (),
+                     )
+                   }
                    onLoadMore={() => {
                      let moreTransactions =
                        TransactionsQueryString.make(

@@ -31,16 +31,16 @@ module Accounts = [%graphql
       }
     }} |}
 ];
-module AccountQuery = ReasonApollo.CreateQuery(Accounts);
-
+module AccountQuery = ReasonApollo.CreateQuery(Accounts);   
 [@react.component]
-let make = () =>
+let make = () => {
   <AccountQuery partialRefetch=true>
     {response =>
        switch (response.result) {
        | Loading => <Loader.Page> <Loader /> </Loader.Page>
        | Error(err) => React.string(err##message)
        | Data(accounts) =>
+       <BlockListener response>
          <div className=Styles.container>
            {React.array(
               Array.map(
@@ -54,5 +54,6 @@ let make = () =>
               ),
             )}
          </div>
+         </BlockListener>
        }}
-  </AccountQuery>;
+  </AccountQuery>; };
