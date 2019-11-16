@@ -374,23 +374,33 @@ include Make (struct
                "tdNDjjAwyjgvNgU1x8uWs1n44H8vK7UGrRLvXzkcv8iC3Jw9A1B1UDUZndgBZh6zTb23pNatt7ujfTbCVjiihTZRMJcErZSkz93qE5Ue5VpAJsvaQvpHQGj3XexP2fK6i6xMfQArSvcXWV")
       } ]
 
+  let compare acct1 acct2 = Public_key.Compressed.compare acct1.pk acct2.pk
+
   let fake_accounts =
+    (* hack to workaround duplicate generated keys *)
+    let enough = fake_accounts_target - List.length real_accounts in
+    let too_many = enough * 2 in
     let open Quickcheck in
-    random_value ~seed:(`Deterministic "fake accounts for testnet postake")
-      (Generator.list_with_length
-         (fake_accounts_target - List.length real_accounts)
-         Fake_accounts.gen)
+    let too_many_accounts =
+      random_value ~seed:(`Deterministic "fake accounts for testnet postake")
+        (Generator.list_with_length too_many Fake_accounts.gen)
+    in
+    eprintf "TOO MANY ACCOUNTS HAS DUP: %B\n%!"
+      (List.contains_dup too_many_accounts ~compare) ;
+    let accounts_dups_removed =
+      List.dedup_and_sort too_many_accounts ~compare
+    in
+    eprintf "ACCOUNTS DUPS REMOVED HAS DUP: %B\n%!"
+      (List.contains_dup accounts_dups_removed ~compare) ;
+    List.take accounts_dups_removed enough
 
   let accounts =
     let all_accounts = real_accounts @ fake_accounts in
-    let compare acct1 acct2 =
-      Public_key.Compressed.compare acct1.pk acct2.pk
-    in
     eprintf "REAL ACCOUNTS HAS DUP: %B\n%!"
       (List.contains_dup real_accounts ~compare) ;
     eprintf "FAKE ACCOUNTS HAS DUP: %B\n%!"
       (List.contains_dup fake_accounts ~compare) ;
     eprintf "ALL ACCOUNTS HAS DUP: %B\n%!"
       (List.contains_dup all_accounts ~compare) ;
-    all_accounts
+    List.dedup_and_sort all_accounts ~compare
 end)
