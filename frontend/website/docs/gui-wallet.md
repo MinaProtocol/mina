@@ -8,6 +8,10 @@ The GUI Wallet is the easiest way to connect to the Coda network and run a node.
 
 You'll need to make sure TCP ports 8302 and 8303 are open on your router. You can check out our [Getting Started](/docs/getting-started/) guide for more details.
 
+If you have your ports open, the GUI wallet will be able to start Coda for you in the background.
+
+Alternatively, if you already have a node running, the wallet will notice and connect to that running Coda node.
+
 ### MacOS
 
 [Download the latest build here](https://github.com/CodaProtocol/coda/releases/download/0.1.1-wallet-compat-0.0.11-beta/Coda.Wallet.0.1.1.dmg)
