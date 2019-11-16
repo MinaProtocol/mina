@@ -144,7 +144,9 @@ module Keys : sig
   val create : unit -> t
 
   val cached :
-    unit -> (Location.t * Verification.t * Checksum.t) Async.Deferred.t
+       unit
+    -> (Location.t * Verification.t * Checksum.t)
+       Cached.Deferred_with_track_generated.t
 end
 
 module Verification : sig

@@ -528,6 +528,7 @@ module Base = struct
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
       ~brew_install_path:Cache_dir.brew_install_path
+      ~s3_install_path:Cache_dir.s3_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(tick_input ()) main))
@@ -819,6 +820,7 @@ module Merge = struct
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
       ~brew_install_path:Cache_dir.brew_install_path
+      ~s3_install_path:Cache_dir.s3_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(input ()) main))
@@ -1069,6 +1071,7 @@ struct
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
       ~brew_install_path:Cache_dir.brew_install_path
+      ~s3_install_path:Cache_dir.s3_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:wrap_input main))
@@ -1467,7 +1470,7 @@ module Keys = struct
 
   let cached () =
     let paths path = Cache_dir.possible_paths (Filename.basename path) in
-    let open Async in
+    let open Cached.Deferred_with_track_generated.Let_syntax in
     let%bind base_vk, base_pk = Cached.run Base.cached in
     let%bind merge_vk, merge_pk = Cached.run Merge.cached in
     let%map wrap_vk, wrap_pk =
