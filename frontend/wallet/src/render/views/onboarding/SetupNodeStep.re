@@ -100,6 +100,7 @@ let make = (~nextStep, ~prevStep) => {
           <Spacer width=0.5 />
           <Button
             label="Continue"
+            style=Button.HyperlinkBlue
             disabled={state == Loading}
             onClick={_ => {
               dispatchToMain(
