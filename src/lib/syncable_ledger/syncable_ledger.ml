@@ -1,6 +1,7 @@
 open Core
 open Async_kernel
 open Pipe_lib
+open Network_peer
 
 (** Run f recursively n times, starting with value r.
     e.g. funpow 3 f r = f (f (f r)) *)

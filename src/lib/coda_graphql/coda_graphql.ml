@@ -221,15 +221,24 @@ module Types = struct
                ~slot_duration:nn_int ~epoch_duration:nn_int
                ~acceptable_network_delay:nn_int )
 
+    let peer : (_, Network_peer.Peer.Display.Stable.V1.t option) typ
+      =
+      obj "Peer" ~fields:(fun _ ->
+        let open Reflection.Shorthand in
+        List.rev @@
+        Network_peer.Peer.Display.Stable.V1.Fields.fold ~init:[]
+         ~host:nn_string ~libp2p_port:nn_int ~peer_id:nn_string
+      )
+
     let addrs_and_ports :
         (_, Node_addrs_and_ports.Display.Stable.V1.t option) typ =
       obj "AddrsAndPorts" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
           @@ Node_addrs_and_ports.Display.Stable.V1.Fields.fold ~init:[]
-               ~external_ip:nn_string ~bind_ip:nn_string ~discovery_port:nn_int
+               ~external_ip:nn_string ~bind_ip:nn_string
                ~client_port:nn_int ~libp2p_port:nn_int
-               ~communication_port:nn_int )
+               ~peer:(id ~typ:(peer)))
 
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
@@ -1678,9 +1687,9 @@ module Queries = struct
           ~f:Error.to_string_hum )
 
   let daemon_status =
-    field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
+    io_field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun {ctx= coda; _} () ->
-        Coda_commands.get_status ~flag:`Performance coda )
+        let%map status = Coda_commands.get_status ~flag:`Performance coda in Ok status)
 
   let trust_status =
     field "trustStatus" ~typ:Types.Payload.trust_status
@@ -1798,7 +1807,7 @@ module Queries = struct
       ~typ:(non_null @@ list @@ non_null string)
       ~resolve:(fun {ctx= coda; _} () ->
         List.map (Coda_lib.initial_peers coda)
-          ~f:(fun {Host_and_port.host; port} -> sprintf !"%s:%i" host port) )
+          ~f:Coda_net2.Multiaddr.to_string)
 
   let snark_pool =
     field "snarkPool"

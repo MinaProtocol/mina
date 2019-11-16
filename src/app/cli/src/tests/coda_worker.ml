@@ -9,6 +9,7 @@ open Init
 module Input = struct
   type t =
     { addrs_and_ports: Node_addrs_and_ports.Display.Stable.V1.t
+    ; chain_id: string
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
     ; proposer: int option
@@ -17,8 +18,6 @@ module Input = struct
     ; trace_dir: string option
     ; program_dir: string
     ; acceptable_delay: Time.Span.t
-    ; peers: Host_and_port.t list
-    ; max_concurrent_connections: int option
     ; is_archive_node: bool }
   [@@deriving bin_io]
 end
@@ -41,6 +40,8 @@ module T = struct
 
   type 'worker functions =
     { peers: ('worker, unit, Network_peer.Peer.t list) Rpc_parallel.Function.t
+    ; get_peer_id:
+        ('worker, unit, Network_peer.Peer.Id.t) Rpc_parallel.Function.t
     ; start: ('worker, unit, unit) Rpc_parallel.Function.t
     ; get_balance:
         ( 'worker
@@ -120,6 +121,7 @@ module T = struct
 
   type coda_functions =
     { coda_peers: unit -> Network_peer.Peer.t list Deferred.t
+    ; coda_get_peer_id: unit -> Network_peer.Peer.Id.t Deferred.t
     ; coda_start: unit -> unit Deferred.t
     ; coda_get_balance:
            Public_key.Compressed.t
@@ -188,6 +190,9 @@ module T = struct
             and type connection_state := Connection_state.t) =
   struct
     let peers_impl ~worker_state ~conn_state:() () = worker_state.coda_peers ()
+
+    let get_peer_id_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_get_peer_id ()
 
     let verified_transitions_impl ~worker_state ~conn_state:() () =
       worker_state.coda_verified_transitions ()
@@ -258,6 +263,11 @@ module T = struct
     let peers =
       C.create_rpc ~f:peers_impl ~name:"peers" ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: Network_peer.Peer.Stable.V1.t list] ()
+
+    let get_peer_id =
+      C.create_rpc ~f:get_peer_id_impl ~name:"get_peer_id"
+        ~bin_input:Unit.bin_t
+        ~bin_output:[%bin_type_class: Network_peer.Peer.Id.Stable.V1.t] ()
 
     let start =
       C.create_rpc ~name:"start" ~f:start_impl ~bin_input:Unit.bin_t
@@ -359,6 +369,7 @@ module T = struct
 
     let functions =
       { peers
+      ; get_peer_id
       ; start
       ; verified_transitions
       ; root_diff
@@ -381,20 +392,19 @@ module T = struct
 
     let init_worker_state
         { addrs_and_ports
+        ; chain_id
         ; proposer
         ; snark_worker_key
         ; work_selection_method
         ; conf_dir
         ; trace_dir
-        ; peers
-        ; max_concurrent_connections
         ; is_archive_node
         ; _ } =
       let logger =
         Logger.create
           ~metadata:
             [ ("host", `String addrs_and_ports.external_ip)
-            ; ("port", `Int addrs_and_ports.communication_port) ]
+            ; ("port", `Int addrs_and_ports.libp2p_port) ]
           ()
       in
       let pids = Child_processes.Termination.create_pid_table () in
@@ -417,6 +427,7 @@ module T = struct
           let%bind external_transition_database_dir =
             Unix.mkdtemp @@ conf_dir ^/ "external_transition"
           in
+          let%bind libp2p_dir = Unix.mkdtemp @@ conf_dir ^/ "libp2p" in
           let trace_database_initialization typ location =
             Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
               ~location typ
@@ -462,28 +473,21 @@ module T = struct
             Consensus.Data.Local_state.create initial_propose_keys
           in
           let net_config =
-            { Coda_networking.Config.logger
-            ; trust_system
-            ; time_controller
-            ; consensus_local_state
-            ; gossip_net_params=
-                { Coda_networking.Gossip_net.Config.timeout= Time.Span.of_sec 3.
-                ; target_peer_count= 8
-                ; conf_dir
-                ; initial_peers= peers
-                ; chain_id= "bogus chain id for testing"
-                ; addrs_and_ports=
-                    Node_addrs_and_ports.of_display addrs_and_ports
-                ; logger
-                ; trust_system
-                ; enable_libp2p= false
-                ; libp2p_keypair= None
-                ; libp2p_peers= []
-                ; max_concurrent_connections
-                ; log_gossip_heard=
-                    { snark_pool_diff= false
-                    ; transaction_pool_diff= false
-                    ; new_state= false } } }
+            Coda_networking.Config.
+              { logger
+              ; trust_system
+              ; time_controller
+              ; consensus_local_state
+              ; peers= []
+              ; conf_dir= libp2p_dir
+              ; chain_id
+              ; addrs_and_ports=
+                  Node_addrs_and_ports.of_display addrs_and_ports
+              ; keypair= None
+              ; log_gossip_heard=
+                  { snark_pool_diff= false
+                  ; transaction_pool_diff= false
+                  ; new_state= false } }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
@@ -524,7 +528,8 @@ module T = struct
           in
           Logger.info logger "Worker finish setting up coda"
             ~module_:__MODULE__ ~location:__LOC__ ;
-          let coda_peers () = return (Coda_lib.peers coda) in
+          let coda_peers () = Coda_lib.peers coda in
+          let coda_get_peer_id () = Coda_lib.get_peer_id coda in
           let coda_start () = Coda_lib.start coda in
           let coda_get_all_transitions pk =
             let external_transition_database =
@@ -690,6 +695,7 @@ module T = struct
             @@ Coda_commands.For_tests.get_all_user_commands coda
           in
           { coda_peers= with_monitor coda_peers
+          ; coda_get_peer_id= with_monitor coda_get_peer_id
           ; coda_verified_transitions= with_monitor coda_verified_transitions
           ; coda_root_diff= with_monitor coda_root_diff
           ; coda_get_balance= with_monitor coda_get_balance

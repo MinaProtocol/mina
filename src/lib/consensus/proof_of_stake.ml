@@ -2230,7 +2230,7 @@ module Hooks = struct
         Deferred.create (fun ivar ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
-                [ ("peer", `String (Host_and_port.to_string conn))
+                [ ("peer", Network_peer.Peer.to_yojson conn)
                 ; ("ledger_hash", Coda_base.Ledger_hash.to_yojson ledger_hash)
                 ]
               "Serving epoch ledger query with hash $ledger_hash from $peer" ;
@@ -2256,7 +2256,7 @@ module Hooks = struct
             Result.iter_error response ~f:(fun err ->
                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
-                    [ ("peer", `String (Host_and_port.to_string conn))
+                    [ ("peer", Network_peer.Peer.to_yojson conn)
                     ; ("error", `String err)
                     ; ( "ledger_hash"
                       , Coda_base.Ledger_hash.to_yojson ledger_hash ) ]
@@ -2399,12 +2399,15 @@ module Hooks = struct
           } ;
         return true )
       else
-        Deferred.List.exists (random_peers 3) ~f:(fun peer ->
+        let%bind peers = random_peers 3 in
+        Deferred.List.exists peers ~f:(fun peer ->
             match%bind
               query_peer.query peer Rpcs.Get_epoch_ledger.dispatch_multi
                 (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
             with
-            | Ok (Ok snapshot_ledger) ->
+            | Ok envelope ->
+            (match envelope.data with
+            | Ok snapshot_ledger ->
                 let%bind () =
                   Trust_system.(
                     record trust_system logger peer.host
@@ -2418,14 +2421,14 @@ module Hooks = struct
                 set_snapshot local_state snapshot_id
                   {ledger= snapshot_ledger; delegatee_table} ;
                 return true
-            | Ok (Error err) ->
+            | Error err ->
                 Logger.faulty_peer_without_punishment logger
                   ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("error", `String err) ]
                   "Peer $peer failed to serve requested epoch ledger: $error" ;
-                return false
+                return false)
             | Error err ->
                 Logger.faulty_peer_without_punishment logger
                   ~module_:__MODULE__ ~location:__LOC__

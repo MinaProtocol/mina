@@ -4,6 +4,7 @@ open Coda_state
 open Pipe_lib
 open Coda_transition
 open O1trace
+open Network_peer
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -13,7 +14,7 @@ module type Inputs_intf = sig
 
     val high_connectivity : t -> unit Ivar.t
 
-    val peers : t -> Network_peer.Peer.t list
+    val peers : t -> Network_peer.Peer.t list Deferred.t
   end
 
   module Transition_frontier : Coda_intf.Transition_frontier_intf
@@ -104,7 +105,8 @@ module Make (Inputs : Inputs_intf) = struct
              Deferred.any
                [ high_connectivity_deferred
                ; ( after (Time_ns.Span.of_sec connectivity_time_uppperbound)
-                 >>| fun () ->
+                 >>= fun () ->
+                 let%map peers = Network.peers network in 
                  if not @@ Deferred.is_determined high_connectivity_deferred
                  then
                    Logger.info logger
@@ -112,7 +114,7 @@ module Make (Inputs : Inputs_intf) = struct
                        many peers ($num_peers connected)"
                      ~metadata:
                        [ ( "num peers"
-                         , `Int (List.length @@ Network.peers network) )
+                         , `Int (List.length peers) )
                        ; ( "Max seconds to wait for high connectivity"
                          , `Float connectivity_time_uppperbound ) ]
                      ~location:__LOC__ ~module_:__MODULE__ ) ]

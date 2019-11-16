@@ -4,6 +4,7 @@ open Async_rpc_kernel
 open Pipe_lib
 open Coda_base
 open Coda_transition
+open Network_peer
 
 module type Network_intf = sig
   type t
@@ -19,7 +20,9 @@ module type Network_intf = sig
     -> (External_transition.t Envelope.Incoming.t * Block_time.t)
        Strict_pipe.Reader.t
 
-  val peers : t -> Network_peer.Peer.t list
+  val peers : t -> Network_peer.Peer.t list Deferred.t
+
+  val random_peers : t -> int -> Network_peer.Peer.t list Deferred.t
 
   val first_connection : t -> unit Ivar.t
 
@@ -29,53 +32,58 @@ module type Network_intf = sig
 
   val online_status : t -> [`Online | `Offline] Broadcast_pipe.Reader.t
 
-  val random_peers : t -> int -> Network_peer.Peer.t list
-
   val get_ancestry :
        t
-    -> Unix.Inet_addr.t
+    -> Network_peer.Peer.Id.t
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
+       Envelope.Incoming.t
        Deferred.Or_error.t
 
   val get_bootstrappable_best_tip :
        t
-    -> Network_peer.Peer.t
+    -> Network_peer.Peer.Id.t
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
+       Envelope.Incoming.t
        Deferred.Or_error.t
 
   val get_transition_chain_proof :
        t
-    -> Network_peer.Peer.t
+    -> Network_peer.Peer.Id.t
     -> State_hash.t
-    -> (State_hash.t * State_body_hash.t List.t) Deferred.Or_error.t
+    -> (State_hash.t * State_body_hash.t List.t) Envelope.Incoming.t
+       Deferred.Or_error.t
 
   val get_transition_chain :
        t
-    -> Network_peer.Peer.t
+    -> Network_peer.Peer.Id.t
     -> State_hash.t list
-    -> External_transition.t list Deferred.Or_error.t
+    -> External_transition.t list Envelope.Incoming.t Deferred.Or_error.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t
-    -> Unix.Inet_addr.t
+    -> Network_peer.Peer.Id.t
     -> State_hash.t
     -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
+       Envelope.Incoming.t
        Deferred.Or_error.t
 
   val ban_notify :
-    t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
+       t
+    -> Network_peer.Peer.t
+    -> Time.t
+    -> unit Envelope.Incoming.t Deferred.Or_error.t
 
   val snark_pool_diffs :
-    t -> snark_pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
+    t -> snark_pool_diff Envelope.Incoming.t Strict_pipe.Reader.t
 
   val transaction_pool_diffs :
-    t -> transaction_pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
+    t -> transaction_pool_diff Envelope.Incoming.t Strict_pipe.Reader.t
 
   val broadcast_state : t -> External_transition.t -> unit
 
@@ -94,14 +102,12 @@ module type Network_intf = sig
 
   val query_peer :
        t
-    -> Network_peer.Peer.t
+    -> Network_peer.Peer.Id.t
     -> (Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t)
     -> 'q
-    -> 'r Deferred.Or_error.t
+    -> 'r Envelope.Incoming.t Deferred.Or_error.t
 
-  val initial_peers : t -> Host_and_port.t list
-
-  val peers_by_ip : t -> Unix.Inet_addr.t -> Network_peer.Peer.t list
+  val initial_peers : t -> Coda_net2.Multiaddr.t list
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
 
@@ -109,18 +115,23 @@ module type Network_intf = sig
 
   val banned_until : ban_notification -> Time.t
 
-  val net2 : t -> Coda_net2.net option
-
-  module Gossip_net : sig
-    module Config : Gossip_net.Config_intf
-  end
+  val net2 : t -> Coda_net2.net
 
   module Config : sig
+    type log_gossip_heard =
+      {snark_pool_diff: bool; transaction_pool_diff: bool; new_state: bool}
+    [@@deriving make, fields]
+
     type t =
       { logger: Logger.t
       ; trust_system: Trust_system.t
-      ; gossip_net_params: Gossip_net.Config.t
       ; time_controller: Block_time.Controller.t
+      ; addrs_and_ports: Node_addrs_and_ports.t
+      ; conf_dir: string
+      ; chain_id: string
+      ; log_gossip_heard: log_gossip_heard
+      ; keypair: Coda_net2.Keypair.t option
+      ; peers: Coda_net2.Multiaddr.t list
       ; consensus_local_state: Consensus.Data.Local_state.t }
   end
 

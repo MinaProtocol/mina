@@ -132,8 +132,6 @@ let run_test () : unit Deferred.t =
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
-      let discovery_port = 8001 in
-      let communication_port = 8000 in
       let client_port = 8123 in
       let libp2p_port = 8002 in
       let net_config =
@@ -142,29 +140,20 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; time_controller
           ; consensus_local_state
-          ; gossip_net_params=
-              { timeout= Time.Span.of_sec 3.
-              ; logger
-              ; target_peer_count= 8
-              ; initial_peers= []
-              ; conf_dir= temp_conf_dir
-              ; chain_id= "bogus chain id for testing"
-              ; addrs_and_ports=
-                  { external_ip= Unix.Inet_addr.localhost
-                  ; bind_ip= Unix.Inet_addr.localhost
-                  ; discovery_port
-                  ; communication_port
-                  ; libp2p_port
-                  ; client_port }
-              ; trust_system
-              ; enable_libp2p= false
-              ; libp2p_keypair= None
-              ; libp2p_peers= []
-              ; max_concurrent_connections= Some 10
-              ; log_gossip_heard=
-                  { snark_pool_diff= false
-                  ; transaction_pool_diff= false
-                  ; new_state= false } } }
+          ; peers= []
+          ; conf_dir= temp_conf_dir
+          ; chain_id= "full test chain id"
+          ; addrs_and_ports=
+              { external_ip= Unix.Inet_addr.localhost
+              ; bind_ip= Unix.Inet_addr.localhost
+              ; peer= None
+              ; libp2p_port
+              ; client_port }
+          ; keypair= None
+          ; log_gossip_heard=
+              { snark_pool_diff= false
+              ; transaction_pool_diff= false
+              ; new_state= false } }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;

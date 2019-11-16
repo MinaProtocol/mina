@@ -2,6 +2,7 @@ open Core
 open Async_kernel
 open Pipe_lib
 open Cache_lib
+open Network_peer
 open Coda_base
 open Coda_transition
 

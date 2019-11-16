@@ -72,14 +72,6 @@ let daemon logger =
            "seq|rand Choose work sequentially (seq) or randomly (rand) \
             (default: rand)"
          (optional work_selection_method)
-     and external_port =
-       flag "external-port"
-         ~doc:
-           (sprintf
-              "PORT Base server port for daemon TCP (discovery UDP on port+1) \
-               (default: %d)"
-              Port.default_external)
-         (optional int16)
      and client_port =
        flag "client-port"
          ~doc:
@@ -141,12 +133,6 @@ let daemon logger =
            "Have REST server listen on all addresses, not just localhost \
             (this is INSECURE, make sure your firewall is configured \
             correctly!)"
-     and limit_connections =
-       flag "limit-concurrent-connections"
-         ~doc:
-           "true|false Limit the number of concurrent connections per IP \
-            address (default: true)"
-         (optional bool)
      (*TODO: This is being added to log all the snark works received for the
      beta-testnet challenge. We might want to remove this later?*)
      and log_received_snark_pool_diff =
@@ -164,8 +150,6 @@ let daemon logger =
            "true|false Log transaction-pool diff received from peers \
             (default: false)"
          (optional bool)
-     and disable_libp2p =
-       flag "disable-libp2p-discovery" no_arg ~doc:"Disable libp2p discovery"
      and discovery_port =
        flag "discovery-port" (optional int)
          ~doc:"PORT Port to use for peer-to-peer discovery (default: 28675)"
@@ -457,10 +441,6 @@ let daemon logger =
                  ~metadata:[("key", `String keyname)] ;
                default
          in
-         let external_port : int =
-           or_from_config YJ.Util.to_int_option "external-port"
-             ~default:Port.default_external external_port
-         in
          let client_port =
            or_from_config YJ.Util.to_int_option "client-port"
              ~default:Port.default_client client_port
@@ -479,13 +459,6 @@ let daemon logger =
            in
            or_from_config json_to_currency_fee_option "snark-worker-fee"
              ~default:Cli_lib.Default.snark_worker_fee snark_work_fee
-         in
-         let max_concurrent_connections =
-           if
-             or_from_config YJ.Util.to_bool_option "max-concurrent-connections"
-               ~default:true limit_connections
-           then Some 10
-           else None
          in
          let work_selection_method =
            or_from_config
@@ -512,7 +485,7 @@ let daemon logger =
              ~default:false log_transaction_pool_diff
          in
          let log_gossip_heard =
-           { Coda_networking.Gossip_net.Config.snark_pool_diff=
+           { Coda_networking.Config.snark_pool_diff=
                log_received_snark_pool_diff
            ; transaction_pool_diff= log_transaction_pool_diff
            ; new_state= log_received_blocks }
@@ -526,7 +499,6 @@ let daemon logger =
                        (YJ.Util.convert_each YJ.Util.to_string))
                     "peers" None ~default:[] ]
          in
-         let old_discovery_port = external_port + 1 in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
          let%bind initial_peers_cleaned_lists =
            (* for each provided peer, lookup all its addresses *)
@@ -580,8 +552,7 @@ let daemon logger =
          let addrs_and_ports : Node_addrs_and_ports.t =
            { external_ip
            ; bind_ip
-           ; discovery_port= old_discovery_port
-           ; communication_port= external_port
+           ; peer= Option.map ~f:(fun kp -> let peer_id = Coda_net2.Keypair.to_peer_id kp in Network_peer.Peer.create external_ip ~libp2p_port:discovery_port ~peer_id) libp2p_keypair
            ; client_port
            ; libp2p_port= discovery_port }
          in
@@ -655,25 +626,18 @@ let daemon logger =
          trace_database_initialization "consensus local state" __LOC__
            trust_dir ;
          let net_config =
-           { Coda_networking.Config.logger
-           ; trust_system
-           ; time_controller
-           ; consensus_local_state
-           ; gossip_net_params=
-               { timeout= Time.Span.of_sec 3.
-               ; logger
-               ; target_peer_count= 8
-               ; conf_dir
-               ; chain_id= Lazy.force chain_id
-               ; initial_peers= initial_peers_cleaned
-               ; addrs_and_ports
-               ; trust_system
-               ; log_gossip_heard
-               ; enable_libp2p= not disable_libp2p
-               ; libp2p_keypair
-               ; libp2p_peers=
-                   List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
-               ; max_concurrent_connections } }
+           Coda_networking.Config.
+             { logger
+             ; trust_system
+             ; time_controller
+             ; consensus_local_state
+             ; peers=
+                 List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+             ; conf_dir
+             ; chain_id= Lazy.force chain_id
+             ; addrs_and_ports
+             ; keypair= libp2p_keypair
+             ; log_gossip_heard }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in

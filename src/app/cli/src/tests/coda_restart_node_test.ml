@@ -19,8 +19,8 @@ let main () =
     else None
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
+    Coda_worker_testnet.test ~name logger n proposers snark_work_public_keys
+      Cli_lib.Arg_type.Sequence
   in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:1

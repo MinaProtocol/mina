@@ -11,7 +11,8 @@ import (
 	"log"
 	"os"
 	"sync"
-	"time"
+    "time"
+    "strconv"
 
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 
@@ -45,7 +46,7 @@ type app struct {
 	Streams    map[int]net.Stream
 	OutLock    sync.Mutex
 	Out        *bufio.Writer
-	RpcLock    sync.Mutex
+	RPCLock    sync.Mutex
 }
 
 var seqs = make(chan int)
@@ -69,7 +70,8 @@ const (
 	addStreamHandler
 	listeningAddrs
 	addPeer
-	beginAdvertising
+    beginAdvertising
+    listPeers
 )
 
 type envelope struct {
@@ -707,6 +709,52 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	return "beginAdvertising success", nil
 }
 
+type listPeersMsg struct {
+}
+
+type codaPeerInfo struct {
+	Libp2pPort int    `json:"libp2p_port"`
+	Host       string `json:"host"`
+	PeerID     string `json:"peer_id"`
+}
+
+func (lp *listPeersMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+
+	connsHere := app.P2p.Host.Network().Conns()
+
+	peerInfos := make([]codaPeerInfo, len(connsHere))
+
+	for _, conn := range connsHere {
+		connAddr := conn.RemoteMultiaddr()
+        id := conn.RemotePeer()
+
+		ipComponent, tcpMaddr := multiaddr.SplitFirst(connAddr)
+		if !(ipComponent.Protocol().Code == multiaddr.P_IP4 || ipComponent.Protocol().Code == multiaddr.P_IP6) {
+            app.P2p.Logger.Warning("skipping maddr, exotic non-ip network: ", connAddr.String())
+            continue
+		}
+
+		tcpComponent, _ := multiaddr.SplitFirst(tcpMaddr)
+		if tcpComponent.Protocol().Code != multiaddr.P_TCP {
+            app.P2p.Logger.Warning("skipping maddr, exotic non-tcp connection: ", connAddr.String())
+            continue
+		}
+
+        port, e := strconv.Atoi(tcpComponent.Value())
+        if e != nil {
+            app.P2p.Logger.Error("somehow failed to parse port string from maddr into int: ", connAddr.String())
+            continue
+        }
+
+		peerInfos = append(peerInfos, codaPeerInfo{Libp2pPort: port, Host: ipComponent.Value(), PeerID: peer.IDB58Encode(id)})
+	}
+
+	return peerInfos, nil
+}
+
 var msgHandlers = map[methodIdx]func() action{
 	configure:           func() action { return &configureMsg{} },
 	listen:              func() action { return &listenMsg{} },
@@ -724,6 +772,7 @@ var msgHandlers = map[methodIdx]func() action{
 	listeningAddrs:      func() action { return &listeningAddrsMsg{} },
 	addPeer:             func() action { return &addPeerMsg{} },
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
+	listPeers:           func() action { return &listPeersMsg{} },
 }
 
 type errorResult struct {
@@ -761,7 +810,7 @@ func main() {
 		Streams:    make(map[int]net.Stream),
 		// OutLock doesn't need to be initialized
 		Out: out,
-		// RpcLock doesn't need to be initialized
+		// RPCLock doesn't need to be initialized
 	}
 
 	for lines.Scan() {

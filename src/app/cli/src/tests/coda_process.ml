@@ -18,15 +18,16 @@ let spawn_exn (config : Coda_worker.Input.t) =
   File_system.dup_stderr process ;
   return (conn, process, config)
 
-let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
-    ~program_dir ~proposer ~snark_worker_key ~work_selection_method ~offset
-    ~trace_dir ~max_concurrent_connections ~is_archive_node () =
+let local_config ?proposal_interval:_ ~chain_id ~addrs_and_ports
+    ~acceptable_delay ~program_dir ~proposer ~snark_worker_key
+    ~work_selection_method ~offset ~trace_dir ~is_archive_node () =
   let conf_dir =
     Filename.temp_dir_name
     ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
   in
   let config =
     { Coda_worker.Input.addrs_and_ports
+    ; chain_id
     ; env=
         ( "CODA_TIME_OFFSET"
         , Time.Span.to_int63_seconds_round_down_exn offset
@@ -42,18 +43,20 @@ let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
     ; proposer
     ; snark_worker_key
     ; work_selection_method
-    ; peers
     ; conf_dir
     ; trace_dir
     ; program_dir
     ; acceptable_delay
-    ; is_archive_node
-    ; max_concurrent_connections }
+    ; is_archive_node }
   in
   config
 
 let peers_exn (conn, _proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()
+
+let get_peer_id (conn, _proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_peer_id
+    ~arg:()
 
 let get_balance_exn (conn, _proc, _) pk =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_balance

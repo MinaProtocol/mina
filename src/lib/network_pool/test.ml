@@ -1,6 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib
+open Network_peer
 
 let%test_module "network pool test" =
   ( module struct

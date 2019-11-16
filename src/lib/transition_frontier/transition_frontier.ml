@@ -5,6 +5,7 @@ open Coda_state
 open Coda_transition
 open Coda_incremental
 open Pipe_lib
+open Network_peer
 
 module type Inputs_intf = Inputs.Inputs_intf
 
@@ -79,7 +80,7 @@ struct
                 match sender with
                 | None | Some Envelope.Sender.Local ->
                     return ()
-                | Some (Envelope.Sender.Remote inet_addr) ->
+                | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
                     Trust_system.(
                       record trust_system logger inet_addr
                         Actions.
@@ -95,7 +96,7 @@ struct
                 match sender with
                 | None | Some Envelope.Sender.Local ->
                     return ()
-                | Some (Envelope.Sender.Remote inet_addr) ->
+                | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
                     let error_string =
                       Staged_ledger.Staged_ledger_error.to_string
                         staged_ledger_error

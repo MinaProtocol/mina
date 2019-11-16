@@ -5,6 +5,7 @@ open Coda_base
 open Coda_state
 open Signature_lib
 open Coda_transition
+open Network_peer
 
 module Make (Inputs : Transition_frontier.Inputs_intf) = struct
   let max_blocklength_observed = ref 0

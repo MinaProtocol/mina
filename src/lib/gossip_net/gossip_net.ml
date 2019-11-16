@@ -116,7 +116,7 @@ module type S = sig
 
   val peers : t -> Peer.t list
 
-  val initial_peers : t -> Host_and_port.t list
+  val initial_peers : t -> Coda_net2.Multiaddr.t list
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
 
@@ -132,7 +132,7 @@ module type S = sig
 
   val peers_by_ip : t -> Unix.Inet_addr.t -> Peer.t list
 
-  val net2 : t -> Coda_net2.net option
+  val net2 : t -> Coda_net2.net
 end
 
 module Make (Message : Message_intf) : S with type msg := Message.msg = struct
@@ -213,9 +213,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         Hashtbl.t
     ; first_connect: unit Ivar.t }
 
-  (* OPTIMIZATION: use fast n choose k implementation - see python or old flow code *)
-  let random_sublist xs n = List.take (List.permute xs) n
-
   (* clear disconnect set if peer set is at least this large *)
   let disconnect_clear_threshold = 3
 
@@ -223,7 +220,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     Tcp.Where_to_connect.of_host_and_port
       ~bind_to_address:t.config.addrs_and_ports.bind_ip
     @@ { Host_and_port.host= Unix.Inet_addr.to_string peer.host
-       ; port= peer.communication_port }
+       ; port= failwith "rip" }
 
   (* remove peer from set of peers and peers_by_ip
 
@@ -372,9 +369,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       !"Clearing disconnected peer set : %{sexp: Peer.t list}"
       (Hash_set.to_list t.disconnected_peers) ;
     let disconnected_peers =
-      List.map
-        (Hash_set.to_list t.disconnected_peers)
-        ~f:Peer.to_communications_host_and_port
+      List.map (Hash_set.to_list t.disconnected_peers) ~f:(failwith "rip")
     in
     Hash_set.clear t.disconnected_peers ;
     restart_kademlia t disconnected_peers
@@ -459,14 +454,14 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
        repeatedly in the broadcast loop, that will quickly lead to a ban,
        so we don't be able to re-connect to that peer
      *)
-    let selected_peers = random_sublist (Peer_set.to_list t.peers) n in
+    let selected_peers = (failwith "jeez") (Peer_set.to_list t.peers) n in
     broadcast_selected t selected_peers msg
 
   let send_ban_notification t banned_peer banned_until =
     Linear_pipe.write_without_pushback t.ban_notification_writer
       {banned_peer; banned_until}
 
-  let net2 t = t.libp2p_membership
+  let net2 t = failwith "stub"
 
   let create (config : Config.t)
       (implementation_list : Host_and_port.t Rpc.Implementation.t list) =
@@ -527,7 +522,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   | None ->
                       Keypair.random net2
                 in
-                let peerid = Keypair.to_peerid me |> PeerID.to_string in
+                let peerid = Keypair.to_peerid me |> failwith "rip" in
                 Logger.info config.logger
                   "libp2p peer ID this session is $peer_id" ~location:__LOC__
                   ~module_:__MODULE__
@@ -561,7 +556,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                            (sprintf "/ip4/%s/tcp/%d"
                               (Unix.Inet_addr.to_string
                                  config.addrs_and_ports.external_ip)
-                              config.addrs_and_ports.libp2p_port))
+                              (failwith "f")))
                       ~network_id:"libp2p phase2 test network" ~on_new_peer
                   in
                   let%bind _disc_handler =
@@ -577,14 +572,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                         Pipe.close w ; pushback )
                   in
                   (* TODO: chain ID as network ID. *)
-                  let%map _ =
-                    listen_on net2
-                      (Multiaddr.of_string
-                         (sprintf "/ip4/%s/tcp/%d"
-                            ( config.addrs_and_ports.bind_ip
-                            |> Unix.Inet_addr.to_string )
-                            config.addrs_and_ports.libp2p_port))
-                  in
+                  let%map _ = failwith "f" in
                   Deferred.ignore
                     (Deferred.bind
                        ~f:(fun _ -> Coda_net2.begin_advertising net2)
@@ -683,7 +671,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                     let sender =
                       Envelope.Sender.Remote
                         (Unix.Inet_addr.of_string
-                           client_host_and_port.Host_and_port.host)
+                           client_host_and_port.Host_and_port.host, Network_peer.Peer.Id.unsafe_of_string "lol")
                     in
                     Strict_pipe.Writer.write received_writer
                       (Envelope.Incoming.wrap ~data:msg ~sender) )
@@ -724,8 +712,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             Tcp.(
               Where_to_listen.bind_to
                 (Bind_to_address.Address t.config.addrs_and_ports.bind_ip)
-                (Bind_to_port.On_port
-                   t.config.addrs_and_ports.communication_port))
+                (Bind_to_port.On_port (failwith "jeez")))
             (fun client reader writer ->
               let client_inet_addr = Socket.Address.Inet.addr client in
               let%bind () =

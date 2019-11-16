@@ -1,6 +1,7 @@
 open Async
 open Core_kernel
 open Currency
+open Network_peer
 open Coda_base
 open Coda_state
 open Coda_transition
@@ -501,29 +502,6 @@ struct
       { logger: Logger.t
       ; ip_table: (Unix.Inet_addr.t, Transition_frontier.t) Hashtbl.t
       ; peers: Network_peer.Peer.t Hash_set.t }
-
-    module Gossip_net = struct
-      module Config = struct
-        type log_gossip_heard =
-          {snark_pool_diff: bool; transaction_pool_diff: bool; new_state: bool}
-        [@@deriving make]
-
-        type t =
-          { timeout: Time.Span.t
-          ; target_peer_count: int
-          ; initial_peers: Host_and_port.t list
-          ; addrs_and_ports: Node_addrs_and_ports.t
-          ; conf_dir: string
-          ; chain_id: string
-          ; logger: Logger.t
-          ; trust_system: Trust_system.t
-          ; max_concurrent_connections: int option
-          ; enable_libp2p: bool
-          ; libp2p_keypair: Coda_net2.Keypair.t option
-          ; libp2p_peers: Coda_net2.Multiaddr.t list
-          ; log_gossip_heard: log_gossip_heard }
-        [@@deriving make]
-      end
     end
 
     (* ban notification not implemented for these tests; satisfy interface *)
@@ -546,7 +524,6 @@ struct
       type t =
         { logger: Logger.t
         ; trust_system: Trust_system.t
-        ; gossip_net_params: Gossip_net.Config.t
         ; time_controller: Block_time.Controller.t
         ; consensus_local_state: Consensus.Data.Local_state.t }
     end
@@ -554,11 +531,6 @@ struct
     let create _ = failwith "stub"
 
     let create_stub ~logger ~ip_table ~peers = {logger; ip_table; peers}
-
-    let peers_by_ip _ ip =
-      [Network_peer.Peer.{host= ip; discovery_port= 0; communication_port= 0}]
-
-    let first_message _ = Ivar.create ()
 
     let first_connection _ = Ivar.create ()
 
@@ -666,7 +638,7 @@ struct
 
     let snark_pool_diffs _ = failwith "stub"
 
-    let net2 _ = None
+    let net2 _ = failwith "stub"
   end
 
   module Network_builder = struct

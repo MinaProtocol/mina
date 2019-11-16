@@ -4,6 +4,7 @@ open Cache_lib
 open Pipe_lib
 open Coda_base
 open Coda_transition
+open Network_peer
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
@@ -142,14 +143,15 @@ module Make (Inputs : Inputs.S) :
   (* returns a list of state-hashes with the older ones at the front *)
   let download_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
       ~target_hash =
-    let peers = Network.random_peers network num_peers in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
       "Doing a catchup job with target $target_hash" ;
+    let%bind peers = Network.random_peers network num_peers in
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
         let open Deferred.Or_error.Let_syntax in
         let%bind transition_chain_proof =
-          Network.get_transition_chain_proof network peer target_hash
+          Network.get_transition_chain_proof network peer.peer_id target_hash
+          >>| Envelope.Incoming.data
         in
         (* a list of state_hashes from new to old *)
         let%bind hashes =
@@ -201,7 +203,7 @@ module Make (Inputs : Inputs.S) :
   (* returns a list of transitions with old ones comes first *)
   let download_transitions ~logger ~trust_system ~network ~num_peers
       ~preferred_peer ~maximum_download_size ~hashes_of_missing_transitions =
-    let random_peers = Network.random_peers network num_peers in
+    let%bind random_peers = Network.random_peers network num_peers in
     Deferred.Or_error.List.concat_map
       (partition maximum_download_size hashes_of_missing_transitions)
       ~how:`Parallel ~f:(fun hashes ->
@@ -209,7 +211,7 @@ module Make (Inputs : Inputs.S) :
           ~f:(fun peer ->
             let open Deferred.Or_error.Let_syntax in
             let%bind transitions =
-              Network.get_transition_chain network peer hashes
+              Network.get_transition_chain network peer.peer_id hashes >>|? Envelope.Incoming.data
             in
             Coda_metrics.(
               Gauge.set
@@ -235,7 +237,9 @@ module Make (Inputs : Inputs.S) :
                        With_hash.of_data transition ~hash_data:(Fn.const hash)
                      in
                      Envelope.Incoming.wrap ~data:transition_with_hash
-                       ~sender:(Envelope.Sender.Remote peer.host) ) ) )
+                       ~sender:
+                         (Envelope.Sender.Remote (peer.host, peer.peer_id)) )
+        ) )
 
   let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
       ~frontier ~unprocessed_transition_cache ~transitions ~target_hash

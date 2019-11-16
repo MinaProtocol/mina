@@ -1,6 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib
+open Network_peer
 
 module type S = sig
   type ledger_proof

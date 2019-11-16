@@ -18,7 +18,7 @@ let level_color =
   let open Bash_colors in
   let open Logger.Level in
   function
-  | Trace ->
+  | Trace | Spam ->
       cyan
   | Debug ->
       green

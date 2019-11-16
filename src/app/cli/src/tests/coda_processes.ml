@@ -13,29 +13,15 @@ let net_configs n =
     List.init n ~f:(fun i ->
         Unix.Inet_addr.of_string @@ sprintf "127.0.0.1%i" i )
   in
-  let addrs_and_ports_list =
-    List.mapi ips ~f:(fun i ip ->
-        let base = 23000 + (i * 3) in
-        let communication_port = base in
-        let discovery_port = base + 1 in
-        let libp2p_port = base + 2 in
-        let client_port = 20000 + i in
-        { Node_addrs_and_ports.external_ip= ip
-        ; bind_ip= ip
-        ; discovery_port
-        ; communication_port
-        ; libp2p_port
-        ; client_port } )
-  in
-  let all_peers =
-    List.map addrs_and_ports_list
-      ~f:Node_addrs_and_ports.to_discovery_host_and_port
-  in
-  let peers =
-    List.init n ~f:(fun i -> List.take all_peers i @ List.drop all_peers (i + 1)
-    )
-  in
-  (addrs_and_ports_list, peers)
+  List.mapi ips ~f:(fun i ip ->
+      let base = 23000 + (i * 2) in
+      let libp2p_port = base in
+      let client_port = base + 1 in
+      { Node_addrs_and_ports.external_ip= ip
+      ; bind_ip= ip
+      ; peer= None
+      ; libp2p_port
+      ; client_port } )
 
 let offset =
   lazy
@@ -44,15 +30,11 @@ let offset =
         ( Consensus.Constants.genesis_state_timestamp
         |> Coda_base.Block_time.to_time ))
 
-let local_configs ?proposal_interval ?(proposers = Fn.const None)
+let local_configs ?proposal_interval ?(proposers = Fn.const None) ~chain_id
     ?(is_archive_node = Fn.const false) n ~acceptable_delay ~program_dir
-    ~snark_worker_public_keys ~work_selection_method ~trace_dir
-    ~max_concurrent_connections =
-  let addrs_and_ports_list, peers = net_configs n in
-  let peers = [] :: List.drop peers 1 in
-  let args = List.zip_exn addrs_and_ports_list peers in
+    ~snark_worker_public_keys ~work_selection_method ~trace_dir =
   let configs =
-    List.mapi args ~f:(fun i (addrs_and_ports, peers) ->
+    List.mapi (net_configs n) ~f:(fun i addrs_and_ports ->
         let public_key =
           Option.bind snark_worker_public_keys ~f:(fun keys ->
               List.nth_exn keys i )
@@ -60,11 +42,11 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None)
         let addrs_and_ports =
           Node_addrs_and_ports.to_display addrs_and_ports
         in
-        Coda_process.local_config ?proposal_interval ~addrs_and_ports ~peers
-          ~snark_worker_key:public_key ~program_dir ~acceptable_delay
+        Coda_process.local_config ?proposal_interval ~addrs_and_ports
+          ~snark_worker_key:public_key ~program_dir ~acceptable_delay ~chain_id
           ~proposer:(proposers i) ~work_selection_method ~trace_dir
-          ~is_archive_node:(is_archive_node i) ~offset:(Lazy.force offset)
-          ~max_concurrent_connections () )
+          ~is_archive_node:(is_archive_node i) ~offset:(Lazy.force offset) ()
+    )
   in
   configs
 

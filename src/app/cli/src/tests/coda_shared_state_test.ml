@@ -15,8 +15,8 @@ let main () =
     Some ((List.nth_exn keypairs i).public_key |> Public_key.compress)
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger n Option.some snark_work_public_keys
-      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
+    Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
+      Cli_lib.Arg_type.Sequence
   in
   let%bind () =
     Coda_worker_testnet.Payments.send_several_payments testnet ~node:0

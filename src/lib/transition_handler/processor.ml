@@ -14,6 +14,7 @@ open Coda_state
 open Cache_lib
 open O1trace
 open Coda_transition
+open Network_peer
 
 module Make (Inputs : Inputs.S) :
   Coda_intf.Transition_handler_processor_intf

@@ -416,7 +416,7 @@ module type S = sig
       val implementations :
            logger:Logger.t
         -> local_state:Local_state.t
-        -> Host_and_port.t Rpc.Implementation.t list
+        -> Network_peer.Peer.t Rpc.Implementation.t list
     end
 
     (* Check whether we are in the genesis epoch *)
@@ -499,7 +499,7 @@ module type S = sig
          logger:Logger.t
       -> trust_system:Trust_system.t
       -> local_state:Local_state.t
-      -> random_peers:(int -> Network_peer.Peer.t list)
+      -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
       -> query_peer:Network_peer.query_peer
       -> local_state_sync Non_empty_list.t
       -> unit Deferred.Or_error.t

@@ -4,6 +4,7 @@ open Pipe_lib
 open Coda_base
 open Coda_incremental
 open Coda_transition
+open Network_peer
 
 (** An extension to the transition frontier that provides a view onto the data
     other components can use. These are exposed through the broadcast pipes
@@ -33,7 +34,7 @@ end
 module type Transition_frontier_diff_intf = sig
   type breadcrumb
 
-  (* TODO: Remove New_frontier. 
+  (* TODO: Remove New_frontier.
     Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type t =
     | New_breadcrumb of {previous: breadcrumb; added: breadcrumb}

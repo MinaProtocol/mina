@@ -2,6 +2,7 @@ open Async_kernel
 open Coda_base
 open Pipe_lib
 open Coda_transition
+open Network_peer
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -11,7 +12,7 @@ module type Inputs_intf = sig
 
     val high_connectivity : t -> unit Ivar.t
 
-    val peers : t -> Network_peer.Peer.t list
+    val peers : t -> Network_peer.Peer.t list Deferred.t
   end
 
   module Transition_frontier : Coda_intf.Transition_frontier_intf

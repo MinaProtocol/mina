@@ -1,4 +1,5 @@
 module Peer = Peer
+module Envelope = Envelope
 
 type query_peer =
   { query:
@@ -6,4 +7,4 @@ type query_peer =
       -> (   Async_rpc_kernel.Versioned_rpc.Connection_with_menu.t
           -> 'q
           -> 'r Async.Deferred.Or_error.t) -> 'q
-      -> 'r Async.Deferred.Or_error.t }
+      -> 'r Envelope.Incoming.t Async.Deferred.Or_error.t }

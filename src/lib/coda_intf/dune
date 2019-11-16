@@ -2,6 +2,6 @@
   (public_name coda_intf)
   (name coda_intf)
   (libraries core async_kernel currency truth signature_lib
-    cache_lib coda_base coda_state snark_work_lib
+    cache_lib coda_base coda_state snark_work_lib coda_net2 node_addrs_and_ports
     proof_carrying_data coda_incremental blockchain_snark transaction_snark coda_transition)
   (preprocess (pps ppx_jane ppx_coda ppx_deriving.std ppx_deriving_yojson)))

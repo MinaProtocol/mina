@@ -5,6 +5,7 @@ open Coda_base
 open Coda_state
 open Cache_lib
 open Coda_transition
+open Network_peer
 
 module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   Coda_intf.Transition_handler_validator_intf

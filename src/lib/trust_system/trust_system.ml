@@ -6,6 +6,8 @@ open Core
 
 open Async
 
+open Network_peer
+
 [%%if
 consensus_mechanism = "proof_of_stake"]
 
@@ -166,5 +168,5 @@ let record_envelope_sender :
         ~metadata:action_metadata
         "Attempted to record trust action of ourselves: %s" action_fmt ;
       Deferred.unit
-  | Remote inet_addr ->
+  | Remote (inet_addr, _peer_id) ->
       record t logger inet_addr action

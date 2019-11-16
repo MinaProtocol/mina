@@ -20,9 +20,8 @@ let main () =
   in
   let is_archive_node i = i = 1 in
   let%bind testnet =
-    Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
-      ~is_archive_node
+    Coda_worker_testnet.test ~name logger n proposers snark_work_public_keys
+      Cli_lib.Arg_type.Sequence ~is_archive_node
   in
   let%bind new_block_pipe =
     let%map pipe =

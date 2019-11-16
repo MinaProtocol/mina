@@ -3,8 +3,25 @@
 open Core
 open Module_version
 
+(* Hide the nasty string details *)
+module type Id_intf = sig
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving bin_io, sexp, compare, version]
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving compare, sexp]
+
+  val to_string : t -> string
+
+  val unsafe_of_string : string -> t
+end
+
 (** A libp2p PeerID is more or less a hash of a public key. *)
-module Id = struct
+module Id : Id_intf = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -14,10 +31,10 @@ module Id = struct
     end
   end]
 
-  type t = Stable.Latest.t
+  type t = Stable.Latest.t [@@deriving compare, sexp]
 
   (** Convert to the libp2p-defined base58 string *)
-  let to_string (x : t) = x
+  let to_string (x : t) = (x :> string)
 
   (** Create a Peer ID from a string, without checking if it is well-formed. *)
   let unsafe_of_string (s : string) : t = s
@@ -43,7 +60,7 @@ module Stable = struct
       let to_yojson {host; peer_id; libp2p_port} =
         `Assoc
           [ ("host", `String (Unix.Inet_addr.to_string host))
-          ; ("peer_id", `String peer_id)
+          ; ("peer_id", `String (Id.to_string peer_id))
           ; ("libp2p_port", `Int libp2p_port) ]
 
       let of_yojson =
@@ -65,7 +82,7 @@ module Stable = struct
                  >>= lift_int
                in
                let host = Unix.Inet_addr.of_string host_str in
-               {host; peer_id; libp2p_port})
+               {host; peer_id= Id.unsafe_of_string peer_id; libp2p_port})
         | _ ->
             Error "expected object"
     end
@@ -88,7 +105,7 @@ end
 
 (* bin_io omitted *)
 type t = Stable.Latest.t =
-  {host: Core.Unix.Inet_addr.Stable.V1.t; libp2p_port: int; peer_id: string}
+  {host: Core.Unix.Inet_addr.Stable.V1.t; libp2p_port: int; peer_id: Id.t}
 [@@deriving compare, sexp]
 
 [%%define_locally
@@ -109,7 +126,7 @@ let to_string {host; libp2p_port; peer_id} =
     !"[host : %s, libp2p_port : %s, peer_id : %s]"
     (Unix.Inet_addr.to_string host)
     (Int.to_string libp2p_port)
-    peer_id
+    (Id.to_string peer_id)
 
 let pretty_list peers = String.concat ~sep:"," @@ List.map peers ~f:to_string
 
@@ -125,7 +142,7 @@ module Display = struct
   module Stable = struct
     module V1 = struct
       type t = {host: string; libp2p_port: int; peer_id: string}
-      [@@deriving yojson, version]
+      [@@deriving yojson, version, fields, sexp]
 
       let to_latest = Fn.id
     end

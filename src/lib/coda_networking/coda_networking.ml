@@ -6,7 +6,6 @@ open Coda_state
 open Pipe_lib
 open Network_peer
 open Coda_transition
-module Peer = Network_pool.Peer
 
 let refused_answer_query_string = "Refused to answer_query"
 
@@ -436,18 +435,7 @@ struct
     end
 
     include Register (T)
-
-    let summary = function
-      | T.New_state _ ->
-          "new state"
-      | Snark_pool_diff _ ->
-          "snark pool diff"
-      | Transaction_pool_diff _ ->
-          "transaction pool diff"
   end
-
-  [%%define_locally
-  V1.(summary)]
 end
 
 module type Inputs_intf = sig
@@ -478,55 +466,86 @@ module type Inputs_intf = sig
   end
 end
 
+module Subscription = Coda_net2.Pubsub.Subscription
+
 module type Config_intf = sig
-  type gossip_config
+  type log_gossip_heard =
+    {snark_pool_diff: bool; transaction_pool_diff: bool; new_state: bool}
+  [@@deriving make, fields]
 
   type t =
     { logger: Logger.t
     ; trust_system: Trust_system.t
-    ; gossip_net_params: gossip_config
     ; time_controller: Block_time.Controller.t
+    ; addrs_and_ports: Node_addrs_and_ports.t
+    ; conf_dir: string
+    ; chain_id: string
+    ; log_gossip_heard: log_gossip_heard
+    ; keypair: Coda_net2.Keypair.t option
+    ; peers: Coda_net2.Multiaddr.t list
     ; consensus_local_state: Consensus.Data.Local_state.t }
 end
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
-  module Message = Make_message (Inputs)
-  module Gossip_net = Gossip_net.Make (Message)
   module Peer = Peer
 
   type snark_pool_diff = Inputs.Snark_pool_diff.t
 
   type transaction_pool_diff = Inputs.Transaction_pool_diff.t
 
-  type ban_notification = Gossip_net.ban_notification =
-    {banned_peer: Peer.t; banned_until: Time.t}
+  type ban_notification = {banned_peer: Peer.t; banned_until: Time.t}
   [@@deriving fields]
 
-  module Config : Config_intf with type gossip_config := Gossip_net.Config.t =
-  struct
+  module Config = struct
+    type log_gossip_heard =
+      {snark_pool_diff: bool; transaction_pool_diff: bool; new_state: bool}
+    [@@deriving make, fields]
+
     type t =
       { logger: Logger.t
       ; trust_system: Trust_system.t
-      ; gossip_net_params: Gossip_net.Config.t
       ; time_controller: Block_time.Controller.t
+      ; addrs_and_ports: Node_addrs_and_ports.t
+      ; conf_dir: string
+      ; chain_id: string
+      ; log_gossip_heard: log_gossip_heard
+      ; keypair: Coda_net2.Keypair.t option
+      ; peers: Coda_net2.Multiaddr.t list
       ; consensus_local_state: Consensus.Data.Local_state.t }
   end
 
-  type t =
-    { gossip_net: Gossip_net.t
-    ; logger: Logger.t
-    ; trust_system: Trust_system.t
-    ; states:
-        (External_transition.t Envelope.Incoming.t * Block_time.t)
+  type subscriptions =
+    { new_states: External_transition.Stable.V1.t Subscription.t
+    ; transaction_pool_diffs: Transaction_pool_diff.Stable.V1.t Subscription.t
+    ; snark_pool_diffs: Snark_pool_diff.Stable.V1.t Subscription.t }
+
+  type pipes =
+    { new_states:
+        (External_transition.Stable.V1.t Envelope.Incoming.t * Block_time.t)
         Strict_pipe.Reader.t
     ; transaction_pool_diffs:
-        Transaction_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
+        Transaction_pool_diff.Stable.V1.t Envelope.Incoming.t
+        Strict_pipe.Reader.t
     ; snark_pool_diffs:
-        Snark_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
+        Snark_pool_diff.Stable.V1.t Envelope.Incoming.t Strict_pipe.Reader.t }
+
+  type t =
+    { net2: Coda_net2.net
+    ; config: Config.t
+    ; logger: Logger.t
+    ; trust_system: Trust_system.t
+    ; subscriptions: subscriptions
+    ; pipes: pipes
     ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
     ; first_received_message: unit Ivar.t }
   [@@deriving fields]
+
+  let transaction_pool_diffs t = t.pipes.transaction_pool_diffs
+
+  let snark_pool_diffs t = t.pipes.snark_pool_diffs
+
+  let states t = t.pipes.new_states
 
   let offline_time =
     Block_time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_ms
@@ -550,12 +569,75 @@ module Make (Inputs : Inputs_intf) = struct
     |> Deferred.ignore |> don't_wait_for ;
     online_reader
 
-  let wrap_rpc_data_in_envelope conn data =
-    let inet_addr = Unix.Inet_addr.of_string conn.Host_and_port.host in
-    let sender = Envelope.Sender.Remote inet_addr in
+  let wrap_rpc_data_in_envelope (conn : Network_peer.Peer.t) data =
+    let sender = Envelope.Sender.Remote (conn.host, conn.peer_id) in
     Envelope.Incoming.wrap ~data ~sender
 
-  let net2 t = Gossip_net.net2 t.gossip_net
+  let net2 t = t.net2
+
+  let create_libp2p (config : Config.t) =
+    let fail m = failwithf "Failed to connect to Kademlia process: %s" m () in
+    match%bind
+      Monitor.try_with (fun () ->
+          trace "coda_net2" (fun () ->
+              Coda_net2.create ~logger:config.logger
+                ~conf_dir:(config.conf_dir ^/ "coda_net2") ) )
+    with
+    | Ok (Ok net2) -> (
+        let open Coda_net2 in
+        (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
+        let%bind me =
+          match config.keypair with
+          | Some kp ->
+              return kp
+          | None ->
+              Keypair.random net2
+        in
+        let peerid = Keypair.to_peer_id me |> Peer.Id.to_string in
+        Logger.info config.logger "libp2p peer ID this session is $peer_id"
+          ~location:__LOC__ ~module_:__MODULE__
+          ~metadata:[("peer_id", `String peerid)] ;
+        let initializing_libp2p_result : unit Deferred.Or_error.t =
+          let open Deferred.Or_error.Let_syntax in
+          let%bind () =
+            configure net2 ~me ~maddrs:[]
+              ~external_maddr:
+                (Multiaddr.of_string
+                   (sprintf "/ip4/%s/tcp/%d"
+                      (Unix.Inet_addr.to_string
+                         config.addrs_and_ports.external_ip)
+                      (Option.value_exn config.addrs_and_ports.peer).libp2p_port))
+              ~network_id:"libp2p phase3 test network"
+              ~on_new_peer:(Fn.const ())
+          in
+          (* TODO: chain ID as network ID. *)
+          let%map _ =
+            listen_on net2
+              (Multiaddr.of_string
+                 (sprintf "/ip4/%s/tcp/%d"
+                    (config.addrs_and_ports.bind_ip |> Unix.Inet_addr.to_string)
+                    (Option.value_exn config.addrs_and_ports.peer).libp2p_port))
+          in
+          Deferred.ignore
+            (Deferred.bind
+               ~f:(fun _ -> Coda_net2.begin_advertising net2)
+               (* TODO: timeouts here in addition to the libp2p side? *)
+               (Deferred.all
+                  (List.map ~f:(Coda_net2.add_peer net2) config.peers)))
+          |> don't_wait_for ;
+          ()
+        in
+        match%map initializing_libp2p_result with
+        | Ok () ->
+            Some net2
+        | Error e ->
+            fail (Error.to_string_hum e) )
+    | Ok (Error e) ->
+        fail (Error.to_string_hum e)
+    | Error e ->
+        fail (Exn.to_string e)
+
+  let rpc_transport_proto = "coda/rpc/0.0.1"
 
   let create (config : Config.t)
       ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
@@ -653,7 +735,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let get_ancestry_rpc conn ~version:_ query =
       Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
-        "Sending root proof to peer with IP %s" conn.Host_and_port.host ;
+        "Sending root proof to peer with IP %s"
+        (Unix.Inet_addr.to_string conn.Peer.host) ;
       let action_msg = "Get_ancestry query: $query" in
       let msg_args = [("query", Rpcs.Get_ancestry.query_to_yojson query)] in
       let%bind result, sender =
@@ -663,7 +746,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let get_bootstrappable_best_tip_rpc conn ~version:_ query =
       Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
-        "Sending best_tip to peer with IP %s" conn.Host_and_port.host ;
+        "Sending best_tip to peer with IP %s"
+        (Unix.Inet_addr.to_string conn.Peer.host) ;
       let action_msg = "Get_bootstrappable_best_tip query: $query" in
       let msg_args =
         [("query", Rpcs.Get_bootstrappable_best_tip.query_to_yojson query)]
@@ -677,7 +761,7 @@ module Make (Inputs : Inputs_intf) = struct
     let get_transition_chain_proof_rpc conn ~version:_ query =
       Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
         "Sending transition_chain_proof to peer with IP %s"
-        conn.Host_and_port.host ;
+        (Unix.Inet_addr.to_string conn.Peer.host) ;
       let action_msg = "Get_transition_chain_proof query: $query" in
       let msg_args =
         [("query", Rpcs.Get_transition_chain_proof.query_to_yojson query)]
@@ -690,7 +774,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let get_transition_chain_rpc conn ~version:_ query =
       Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
-        "Sending transition_chain to peer with IP %s" conn.Host_and_port.host ;
+        "Sending transition_chain to peer with IP %s"
+        (Unix.Inet_addr.to_string conn.Peer.host) ;
       let action_msg = "Get_transition_chain query: $query" in
       let msg_args =
         [("query", Rpcs.Get_transition_chain.query_to_yojson query)]
@@ -706,13 +791,13 @@ module Make (Inputs : Inputs_intf) = struct
       Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
         "Node banned by peer $peer until $ban_until"
         ~metadata:
-          [ ("peer", `String conn.Host_and_port.host)
+          [ ("peer", `String (Unix.Inet_addr.to_string conn.Peer.host))
           ; ( "ban_until"
             , `String (Time.to_string_abs ~zone:Time.Zone.utc ban_until) ) ] ;
       (* no computation to do; we're just getting notification *)
       Deferred.unit
     in
-    let implementations =
+    let _implementations =
       List.concat
         [ Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
           .implement_multi
@@ -729,110 +814,137 @@ module Make (Inputs : Inputs_intf) = struct
         ; Consensus.Hooks.Rpcs.implementations ~logger:config.logger
             ~local_state:config.consensus_local_state ]
     in
-    let%map gossip_net =
-      Gossip_net.create config.gossip_net_params implementations
-    in
+    let%bind net2 = create_libp2p config >>| fun x -> Option.value_exn x in
+    (* TODO: after we've meshed, make sure we managed to actually connect to a peer *)
     don't_wait_for
-      (let%map () = Ivar.read @@ Gossip_net.first_connect gossip_net in
-       (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
-       let initial_peers = Gossip_net.peers gossip_net in
-       if List.is_empty initial_peers then (
-         Logger.fatal config.logger "Failed to connect to any initial peers"
-           ~module_:__MODULE__ ~location:__LOC__ ;
-         raise No_initial_peers )) ;
+      (let%map () = Deferred.return () in
+       raise No_initial_peers) ;
     (* TODO: Think about buffering:
        I.e., what do we do when too many messages are coming in, or going out.
        For example, some things you really want to not drop (like your outgoing
        block announcment).
     *)
-    let received_gossips, online_notifier =
-      Strict_pipe.Reader.Fork.two (Gossip_net.received gossip_net)
+    let online_notifier, bump_online =
+      Strict_pipe.create ~name:"online notifier"
+        (Buffered (`Capacity 1, `Overflow Drop_head))
     in
+    (* TODO: replace this online_broadcaster pipe with an externally driven state machine *)
     let online_status =
       online_broadcaster config.time_controller online_notifier
     in
     let first_received_message = Ivar.create () in
-    let states, snark_pool_diffs, transaction_pool_diffs =
-      Strict_pipe.Reader.partition_map3 received_gossips ~f:(fun envelope ->
-          Ivar.fill_if_empty first_received_message () ;
-          match Envelope.Incoming.data envelope with
-          | New_state state ->
-              Perf_histograms.add_span ~name:"external_transition_latency"
-                (Core.Time.abs_diff
-                   Block_time.(now config.time_controller |> to_time)
-                   ( External_transition.protocol_state state
-                   |> Protocol_state.blockchain_state
-                   |> Blockchain_state.timestamp |> Block_time.to_time )) ;
-              if config.gossip_net_params.log_gossip_heard.new_state then
-                Logger.debug config.logger ~module_:__MODULE__
-                  ~location:__LOC__ "Received a block $block from $sender"
-                  ~metadata:
-                    [ ("block", External_transition.to_yojson state)
-                    ; ( "sender"
-                      , Envelope.(Sender.to_yojson (Incoming.sender envelope))
-                      ) ] ;
-              `Fst
-                ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
-                , Block_time.now config.time_controller )
-          | Snark_pool_diff diff ->
-              if config.gossip_net_params.log_gossip_heard.snark_pool_diff then
-                Logger.debug config.logger ~module_:__MODULE__
-                  ~location:__LOC__
-                  "Received Snark-pool diff $work from $sender"
-                  ~metadata:
-                    [ ("work", Snark_pool_diff.compact_json diff)
-                    ; ( "sender"
-                      , Envelope.(Sender.to_yojson (Incoming.sender envelope))
-                      ) ] ;
-              Coda_metrics.(
-                Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
-              `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff))
-          | Transaction_pool_diff diff ->
-              if
-                config.gossip_net_params.log_gossip_heard.transaction_pool_diff
-              then
-                Logger.debug config.logger ~module_:__MODULE__
-                  ~location:__LOC__
-                  "Received transaction-pool diff $txns from $sender"
-                  ~metadata:
-                    [ ("txns", Transaction_pool_diff.to_yojson diff)
-                    ; ( "sender"
-                      , Envelope.(Sender.to_yojson (Incoming.sender envelope))
-                      ) ] ;
-              `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff)) )
+    (* *)
+    let%bind new_states =
+      Coda_net2.Pubsub.subscribe_encode net2 "coda/blocks/0.0.1"
+        ~should_forward_message:(fun ~sender:_ ~data:_ -> Deferred.return true)
+        ~bin_prot:External_transition.Stable.V1.bin_t
+        ~on_decode_failure:`Ignore
+      (*TODO: trust *)
+      >>| Or_error.ok_exn
     in
-    { gossip_net
-    ; logger= config.logger
-    ; trust_system= config.gossip_net_params.trust_system
-    ; states
-    ; snark_pool_diffs= Strict_pipe.Reader.to_linear_pipe snark_pool_diffs
-    ; transaction_pool_diffs=
-        Strict_pipe.Reader.to_linear_pipe transaction_pool_diffs
-    ; online_status
-    ; first_received_message }
+    let%bind snark_pool_diffs =
+      Coda_net2.Pubsub.subscribe_encode net2 "coda/snark-pool/0.0.1"
+        ~should_forward_message:(fun ~sender:_ ~data:_ -> Deferred.return true)
+        ~bin_prot:Snark_pool_diff.Stable.V1.bin_t ~on_decode_failure:`Ignore
+      >>| Or_error.ok_exn
+    in
+    let%bind transaction_pool_diffs =
+      Coda_net2.Pubsub.subscribe_encode net2 "coda/txn-pool/0.0.1"
+        ~should_forward_message:(fun ~sender:_ ~data:_ -> Deferred.return true)
+        ~bin_prot:Transaction_pool_diff.Stable.V1.bin_t
+        ~on_decode_failure:`Ignore
+      >>| Or_error.ok_exn
+    in
+    let annotate_with_log ~name ~field ~to_yojson ~metadata_name ~map =
+      let msg = sprintf "Received %s from $sender" name in
+      fun envelope ->
+        Strict_pipe.Writer.write bump_online () ;
+        if field config.log_gossip_heard then
+          Logger.debug config.logger "%s" msg ~module_:__MODULE__
+            ~location:__LOC__
+            ~metadata:
+              [ (metadata_name, to_yojson (Envelope.Incoming.data envelope))
+              ; ( "sender"
+                , Envelope.(Sender.to_yojson (Incoming.sender envelope)) ) ] ;
+        map envelope
+    in
+    let states_pipe =
+      Strict_pipe.Reader.map
+        (Coda_net2.Pubsub.Subscription.message_pipe new_states)
+        ~f:
+          (annotate_with_log ~name:"block" ~field:Config.new_state
+             ~to_yojson:External_transition.to_yojson ~metadata_name:"block"
+             ~map:(fun envelope ->
+               let state = Envelope.Incoming.data envelope in
+               Perf_histograms.add_span ~name:"external_transition_latency"
+                 (Core.Time.abs_diff
+                    Block_time.(now config.time_controller |> to_time)
+                    ( External_transition.protocol_state state
+                    |> Protocol_state.blockchain_state
+                    |> Blockchain_state.timestamp |> Block_time.to_time )) ;
+               (envelope, Block_time.now config.time_controller) ))
+    in
+    let snark_pool_pipe =
+      Strict_pipe.Reader.map
+        (Coda_net2.Pubsub.Subscription.message_pipe snark_pool_diffs)
+        ~f:
+          (annotate_with_log ~name:"Snark-pool diff"
+             ~field:Config.snark_pool_diff
+             ~to_yojson:Snark_pool_diff.compact_json ~metadata_name:"work"
+             ~map:(fun envelope ->
+               Coda_metrics.(
+                 Counter.inc_one
+                   Snark_work.completed_snark_work_received_gossip) ;
+               envelope ))
+    in
+    let transaction_pool_pipe =
+      Strict_pipe.Reader.map
+        (Coda_net2.Pubsub.Subscription.message_pipe transaction_pool_diffs)
+        ~f:
+          (annotate_with_log ~name:"transaction-pool diff"
+             ~field:Config.transaction_pool_diff
+             ~to_yojson:Transaction_pool_diff.to_yojson ~metadata_name:"work"
+             ~map:Fn.id)
+    in
+    Deferred.return
+      { net2
+      ; config
+      ; logger= config.logger
+      ; trust_system= config.trust_system
+      ; subscriptions= {new_states; snark_pool_diffs; transaction_pool_diffs}
+      ; pipes=
+          { new_states= states_pipe
+          ; snark_pool_diffs= snark_pool_pipe
+          ; transaction_pool_diffs= transaction_pool_pipe }
+      ; online_status
+      ; first_received_message }
 
   let first_message {first_received_message; _} = first_received_message
 
-  let first_connection {gossip_net; _} = Gossip_net.first_connect gossip_net
+  (* TODO: what should this be? fulfilled after first gossip? *)
+  let first_connection _net =
+    let iv = Ivar.create () in
+    don't_wait_for (after (Time.Span.of_sec 30.) >>| fun () -> Ivar.fill iv ()) ;
+    iv
 
-  let high_connectivity {gossip_net; _} =
-    Gossip_net.high_connectivity_signal gossip_net
+  let high_connectivity _net =
+    let iv = Ivar.create () in
+    don't_wait_for (after (Time.Span.of_sec 45.) >>| fun () -> Ivar.fill iv ()) ;
+    iv
 
-  (* TODO: Have better pushback behavior *)
-  let broadcast t msg =
-    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("message", Message.msg_to_yojson msg)]
-      !"Broadcasting %s over gossip net"
-      (Message.summary msg) ;
-    Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) msg
-
-  let broadcast_state t state = broadcast t (Message.New_state state)
+  (* TODO: log these broadcasts? *)
+  let broadcast_state t state =
+    Coda_net2.Pubsub.Subscription.publish t.subscriptions.new_states state
+    |> don't_wait_for
 
   let broadcast_transaction_pool_diff t diff =
-    broadcast t (Message.Transaction_pool_diff diff)
+    Coda_net2.Pubsub.Subscription.publish
+      t.subscriptions.transaction_pool_diffs diff
+    |> don't_wait_for
 
   let broadcast_snark_pool_diff t diff =
-    broadcast t (Message.Snark_pool_diff diff)
+    Coda_net2.Pubsub.Subscription.publish t.subscriptions.snark_pool_diffs diff
+    |> don't_wait_for
 
   (* TODO: This is kinda inefficient *)
   let find_map xs ~f =
@@ -864,31 +976,129 @@ module Make (Inputs : Inputs_intf) = struct
     in
     Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
 
-  let peers t = Gossip_net.peers t.gossip_net
+  let peers t = Coda_net2.peers t.net2
 
-  let initial_peers t = Gossip_net.initial_peers t.gossip_net
+  let random_peers t n =
+    let%map peers = peers t >>| Array.of_list in
+    Array.permute peers ;
+    List.take (Array.to_list peers) n
 
-  let ban_notification_reader t =
-    Gossip_net.ban_notification_reader t.gossip_net
+  let initial_peers (t : t) = t.config.peers
+
+  let ban_notification_reader _t =
+    (* TODO: make bans and surface them *)
+    let reader, _really_bad_leak = Linear_pipe.create () in
+    reader
 
   let online_status t = t.online_status
 
-  let random_peers {gossip_net; _} = Gossip_net.random_peers gossip_net
+  type ('q, 'r) dispatch =
+    Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
 
-  let random_peers_except {gossip_net; _} n ~(except : Peer.Hash_set.t) =
-    Gossip_net.random_peers_except gossip_net n ~except
+  let try_call_rpc :
+        'r 'q.    t -> Unix.Inet_addr.t -> string Pipe.Reader.t
+        -> string Pipe.Writer.t -> ('r, 'q) dispatch -> 'r
+        -> 'q Deferred.Or_error.t =
+   fun t addr rd wr dispatch query ->
+    let call () =
+      Monitor.try_with (fun () ->
+          Async_rpc_kernel.Rpc.Connection.with_close
+            ~connection_state:(fun _ -> ())
+            ~dispatch_queries:(fun conn ->
+              Versioned_rpc.Connection_with_menu.create conn
+              >>=? fun conn' -> dispatch conn' query )
+            Async_rpc_kernel.Pipe_transport.(create Kind.string rd wr)
+            ~on_handshake_error:
+              (`Call
+                (fun exn ->
+                  let%map () =
+                    Trust_system.(
+                      record t.trust_system t.logger addr
+                        Actions.
+                          ( Outgoing_connection_error
+                          , Some
+                              ( "Handshake error: $exn"
+                              , [("exn", `String (Exn.to_string exn))] ) ))
+                  in
+                  Or_error.error_string "handshake error" )) )
+      >>= function
+      | Ok (Ok result) ->
+          (* call succeeded, result is valid *)
+          Deferred.return (Ok result)
+      | Ok (Error err) -> (
+          (* call succeeded, result is an error *)
+          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+            "RPC call error: $error, same error in machine format: \
+             $machine_error"
+            ~metadata:
+              [ ("error", `String (Error.to_string_hum err))
+              ; ("machine_error", `String (Error.to_string_mach err)) ] ;
+          match (Error.to_exn err, Error.sexp_of_t err) with
+          | ( _
+            , Sexp.List
+                [ Sexp.List
+                    [ Sexp.Atom "rpc_error"
+                    ; Sexp.List [Sexp.Atom "Connection_closed"; _] ]
+                ; _connection_description
+                ; _rpc_tag
+                ; _rpc_version ] ) ->
+              let%map () =
+                Trust_system.(
+                  record t.trust_system t.logger addr
+                    Actions.
+                      ( Outgoing_connection_error
+                      , Some ("Closed connection", []) ))
+              in
+              Error err
+          | _ ->
+              let%map () =
+                Trust_system.(
+                  record t.trust_system t.logger addr
+                    Actions.
+                      ( Violated_protocol
+                      , Some
+                          ( "RPC call failed, reason: $exn"
+                          , [("exn", `String (Error.to_string_hum err))] ) ))
+              in
+              Error err )
+      | Error monitor_exn -> (
+          (* call itself failed *)
+          (* TODO: learn what other exceptions are raised here *)
+          let exn = Monitor.extract_exn monitor_exn in
+          match exn with
+          | _ ->
+              Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                "RPC call raised an exception: $exn"
+                ~metadata:[("exn", `String (Exn.to_string exn))] ;
+              Deferred.return (Or_error.of_exn exn) )
+    in
+    call ()
 
-  let make_rpc_request ~rpc_dispatch ~label t peer input =
+  let query_peer t (peer : Peer.Id.t) rpc rpc_input =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind stream =
+      Coda_net2.open_stream t.net2 ~protocol:rpc_transport_proto peer
+    in
+    let rd, wr = Coda_net2.Stream.pipes stream in
+    let peer = Coda_net2.Stream.remote_peer stream in
+    try_call_rpc t peer.host rd wr rpc rpc_input
+    >>| fun data -> Envelope.Incoming.wrap_peer ~data ~sender:peer
+
+  let make_rpc_request ~(rpc_dispatch : ('a, 'b option) dispatch) ~label : _ -> _ -> _ -> 'b Envelope.Incoming.t Deferred.Or_error.t =
     let open Deferred.Let_syntax in
-    match%map Gossip_net.query_peer t.gossip_net peer rpc_dispatch input with
-    | Ok (Some response) ->
-        Ok response
-    | Ok None ->
-        Or_error.errorf
-          !"Peer %{sexp:Network_peer.Peer.t} doesn't have the requested %s"
-          peer label
-    | Error e ->
-        Error e
+    fun t peer input ->
+      match%map query_peer t peer rpc_dispatch input with
+      | Ok resp -> (
+        match resp.data with
+        | Some data ->
+            Ok (Envelope.Incoming.wrap ~data ~sender:resp.sender)
+        | None ->
+            Or_error.errorf
+              !"Peer %{sexp:Network_peer.Peer.Id.t} doesn't have the
+                requested %s"
+              peer label )
+      | Error e ->
+          Error e
 
   let get_transition_chain_proof =
     make_rpc_request
@@ -905,19 +1115,10 @@ module Make (Inputs : Inputs_intf) = struct
       ~label:"best tip"
 
   let ban_notify t peer banned_until =
-    Gossip_net.query_peer t.gossip_net peer Rpcs.Ban_notify.dispatch_multi
-      banned_until
+      query_peer t peer.Peer.peer_id Rpcs.Ban_notify.dispatch_multi
+        banned_until
 
-  let query_peer :
-         t
-      -> Network_peer.Peer.t
-      -> (Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t)
-      -> 'q
-      -> 'r Deferred.Or_error.t =
-   fun t peer rpc rpc_input ->
-    Gossip_net.query_peer t.gossip_net peer rpc rpc_input
-
-  let try_non_preferred_peers t input peers ~rpc =
+  let try_non_preferred_peers (type b) t input peers ~(rpc : (_, b option) dispatch) : b Envelope.Incoming.t Deferred.Or_error.t =
     let max_current_peers = 8 in
     let rec loop peers num_peers =
       if num_peers > max_current_peers then
@@ -928,10 +1129,12 @@ module Make (Inputs : Inputs_intf) = struct
         let current_peers, remaining_peers = List.split_n peers num_peers in
         find_map' current_peers ~f:(fun peer ->
             let%bind response_or_error =
-              Gossip_net.query_peer t.gossip_net peer rpc input
+              query_peer t peer.Peer.peer_id rpc input
             in
             match response_or_error with
-            | Ok (Some response) ->
+            | Ok envelope ->
+              (match envelope.data with
+              | Some data ->
                 let%bind () =
                   Trust_system.(
                     record t.trust_system t.logger peer.host
@@ -940,70 +1143,55 @@ module Make (Inputs : Inputs_intf) = struct
                         , Some ("Nonpreferred peer returned valid response", [])
                         ))
                 in
-                return (Ok response)
-            | Ok None ->
-                loop remaining_peers (2 * num_peers)
+                return (Ok (Envelope.Incoming.map envelope ~f:(Fn.const data)))
+              | None -> loop remaining_peers (2 * num_peers))
             | Error _ ->
                 loop remaining_peers (2 * num_peers) )
     in
     loop peers 1
 
-  let peers_by_ip t = Gossip_net.peers_by_ip t.gossip_net
-
-  let try_preferred_peer t inet_addr input ~rpc =
-    let peers_at_addr = peers_by_ip t inet_addr in
-    (* if there's a single peer at inet_addr, call it the preferred peer *)
-    match peers_at_addr with
-    | [peer] -> (
-        let get_random_peers () =
-          let max_peers = 15 in
-          let except = Peer.Hash_set.of_list [peer] in
-          random_peers_except t max_peers ~except
+  let rpc_peer_then_random (type b) t peer_id input ~(rpc : ('a, b option) dispatch) : b Envelope.Incoming.t Deferred.Or_error.t =
+    match%bind query_peer t peer_id rpc input with
+    | Ok envelope ->
+      (match envelope.data with
+      | Some response ->
+        let%bind () = (match envelope.Envelope.Incoming.sender with
+        | Local -> return ()
+        | Remote (sender, _) ->
+          Trust_system.(
+            record t.trust_system t.logger sender
+              Actions.
+                ( Fulfilled_request
+                , Some ("Preferred peer returned valid response", []) )))
         in
-        let%bind response =
-          Gossip_net.query_peer t.gossip_net peer rpc input
-        in
-        match response with
-        | Ok (Some data) ->
-            let%bind () =
-              Trust_system.(
-                record t.trust_system t.logger peer.host
-                  Actions.
-                    ( Fulfilled_request
-                    , Some ("Preferred peer returned valid response", []) ))
-            in
-            return (Ok data)
-        | Ok None ->
-            let%bind () =
-              Trust_system.(
-                record t.trust_system t.logger peer.host
-                  Actions.
-                    ( Violated_protocol
-                    , Some ("When querying preferred peer, got no response", [])
-                    ))
-            in
-            let peers = get_random_peers () in
-            try_non_preferred_peers t input peers ~rpc
-        | Error _ ->
-            (* TODO: determine what punishments apply here *)
-            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-              !"get error from %{sexp: Peer.t}"
-              peer ;
-            let peers = get_random_peers () in
-            try_non_preferred_peers t input peers ~rpc )
-    | _ ->
-        (* no preferred peer *)
-        let max_peers = 16 in
-        let peers = random_peers t max_peers in
+        return (Ok (Envelope.Incoming.map envelope ~f:(Fn.const response)))
+      | None  ->
+        let%bind () = (
+          match envelope.sender with
+          | Remote (sender, _) -> Trust_system.(
+            record t.trust_system t.logger sender
+              Actions.
+                ( Violated_protocol
+                , Some ("When querying preferred peer, got no response", []) ))
+          | Local -> return ()
+        ) in
+        let%bind peers = random_peers t 8 in
+        try_non_preferred_peers t input peers ~rpc)
+    | Error _ ->
+        (* TODO: determine what punishments apply here *)
+        Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+          !"get error from %{sexp: Peer.Id.t}"
+          peer_id ;
+        let%bind peers = random_peers t 8 in
         try_non_preferred_peers t input peers ~rpc
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
-    try_preferred_peer t inet_addr input
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash t peer input =
+    rpc_peer_then_random t peer input
       ~rpc:
         Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.dispatch_multi
 
-  let get_ancestry t inet_addr input =
-    try_preferred_peer t inet_addr input ~rpc:Rpcs.Get_ancestry.dispatch_multi
+  let get_ancestry t peer input =
+    rpc_peer_then_random t peer input ~rpc:Rpcs.Get_ancestry.dispatch_multi
 
   let glue_sync_ledger t query_reader response_writer =
     (* We attempt to query 3 random peers, retry_max times. We keep track of the
@@ -1013,9 +1201,7 @@ module Make (Inputs : Inputs_intf) = struct
     let retry_interval = Core.Time.Span.of_ms 200. in
     let rec answer_query ctr peers_tried query =
       O1trace.trace_event "ask sync ledger query" ;
-      let peers =
-        Gossip_net.random_peers_except t.gossip_net 3 ~except:peers_tried
-      in
+      let%bind peers = random_peers t 3 in
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         !"SL: Querying the following peers %{sexp: Peer.t list}"
         peers ;
@@ -1026,10 +1212,12 @@ module Make (Inputs : Inputs_intf) = struct
                 Ledger_hash.t}"
               peer (fst query) ;
             match%map
-              Gossip_net.query_peer t.gossip_net peer
+              query_peer t peer.peer_id
                 Rpcs.Answer_sync_ledger_query.dispatch_multi query
             with
-            | Ok (Ok answer) ->
+            | Ok response ->
+            (match response.data with
+            | Ok answer ->
                 Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
                   !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
                     %{sexp: Ledger_hash.t}"
@@ -1040,14 +1228,14 @@ module Make (Inputs : Inputs_intf) = struct
                 let inet_addr = peer.host in
                 Some
                   (Envelope.Incoming.wrap ~data:answer
-                     ~sender:(Envelope.Sender.Remote inet_addr))
-            | Ok (Error e) ->
+                     ~sender:(Envelope.Sender.Remote (inet_addr, peer.peer_id)))
+            | Error e ->
                 Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                   "Peer $peer didn't have enough information to answer \
                    ledger_hash query. See error for more details: $error"
                   ~metadata:[("error", `String (Error.to_string_hum e))] ;
                 Hash_set.add peers_tried peer ;
-                None
+                None)
             | Error err ->
                 Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
                   "Network error: %s" (Error.to_string_mach err) ;

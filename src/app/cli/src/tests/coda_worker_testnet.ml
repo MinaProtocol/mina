@@ -428,8 +428,8 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test ?is_archive_node logger n proposers snark_work_public_keys
-    work_selection_method ~max_concurrent_connections =
+let test ?is_archive_node ~name logger n proposers snark_work_public_keys
+    work_selection_method =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
   let acceptable_delay =
@@ -440,11 +440,11 @@ let test ?is_archive_node logger n proposers snark_work_public_keys
   Coda_processes.init () ;
   let configs =
     Coda_processes.local_configs n ~proposal_interval ~program_dir ~proposers
-      ~acceptable_delay
+      ~chain_id:("coda test" ^ name) ~acceptable_delay
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
       ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections ?is_archive_node
+      ?is_archive_node
   in
   let%map workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in

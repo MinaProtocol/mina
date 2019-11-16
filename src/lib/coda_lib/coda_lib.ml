@@ -11,6 +11,8 @@ open Signature_lib
 open Coda_state
 open O1trace
 open Otp_lib
+open Network_peer
+
 module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 module Config = Config
 module Subscriptions = Coda_subscriptions
@@ -76,7 +78,7 @@ let peek_frontier frontier_broadcast_pipe =
 
 let client_port t =
   let {Node_addrs_and_ports.client_port; _} =
-    t.config.net_config.gossip_net_params.addrs_and_ports
+    t.config.net_config.addrs_and_ports
   in
   client_port
 
@@ -150,7 +152,7 @@ module Snark_worker = struct
           ~module_:__MODULE__ ~location:__LOC__ ;
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
-            t.config.net_config.gossip_net_params.addrs_and_ports.client_port
+            t.config.net_config.addrs_and_ports.client_port
             kill_ivar
         in
         Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -403,6 +405,8 @@ let external_transition_database t = t.config.external_transition_database
 let snark_pool t = t.components.snark_pool
 
 let peers t = Coda_networking.peers t.components.net
+
+let get_peer_id t = Coda_networking.net2 t.components.net |> Coda_net2.me |> Deferred.map ~f:Coda_net2.Keypair.to_peer_id
 
 let initial_peers t = Coda_networking.initial_peers t.components.net
 
@@ -727,10 +731,14 @@ let create (config : Config.t) =
             Network_pool.Transaction_pool.Resource_pool.make_config
               ~trust_system:config.trust_system
           in
+          let incoming_diffs, incoming_diffs_writer = Linear_pipe.create () in
+          don't_wait_for (
+            Strict_pipe.Reader.iter (Coda_networking.transaction_pool_diffs net) ~f:(Linear_pipe.write incoming_diffs_writer)
+          ) ;
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
               ~logger:config.logger
-              ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
+              ~incoming_diffs
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
@@ -831,11 +839,15 @@ let create (config : Config.t) =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
           in
+          let incoming_diffs, incoming_diffs_writer = Linear_pipe.create () in
+          don't_wait_for (
+            Strict_pipe.Reader.iter (Coda_networking.snark_pool_diffs net) ~f:(Linear_pipe.write incoming_diffs_writer)
+          ) ;
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~config:snark_pool_config
               ~logger:config.logger
               ~disk_location:config.snark_pool_disk_location
-              ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
+              ~incoming_diffs
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let%bind wallets =

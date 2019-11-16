@@ -19,27 +19,44 @@ let main () =
       ~acceptable_delay ~snark_worker_public_keys:None
       ~proposers:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections:None
+      ~chain_id:name
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
-  let _, expected_peers = Coda_processes.net_configs n in
+  let all_configs = Coda_processes.net_configs n in
+  let expected_peers_per_peer =
+    List.init n ~f:(fun i -> List.filteri all_configs ~f:(fun j _ -> i <> j))
+  in
   let%bind _ = after (Time.Span.of_sec 10.) in
   let%bind () =
     Deferred.all_unit
-      (List.map2_exn workers expected_peers ~f:(fun worker expected_peers ->
+      (List.map2_exn workers expected_peers_per_peer
+         ~f:(fun worker expected_peers ->
            let%map peers = Coda_process.peers_exn worker in
+           let expected_ports_and_ips =
+             Host_and_port.Set.of_list
+               (List.map
+                  ~f:(fun p ->
+                    Host_and_port.create
+                      ~host:(Unix.Inet_addr.to_string p.bind_ip)
+                      ~port:p.libp2p_port )
+                  expected_peers)
+           in
+           let actual_ports_and_ips =
+             Host_and_port.Set.of_list
+               (List.map
+                  ~f:(fun p ->
+                    Host_and_port.create
+                      ~host:(Unix.Inet_addr.to_string p.Network_peer.Peer.host)
+                      ~port:p.libp2p_port )
+                  peers)
+           in
            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
              !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: \
-               Host_and_port.t list}\n"
+               Node_addrs_and_ports.t list}\n"
              peers expected_peers ;
-           let module S = Host_and_port.Set in
            assert (
-             S.equal
-               (S.of_list
-                  ( peers
-                  |> List.map ~f:Network_peer.Peer.to_discovery_host_and_port
-                  ))
-               (S.of_list expected_peers) ) ))
+             Host_and_port.Set.equal expected_ports_and_ips
+               actual_ports_and_ips ) ))
   in
   Deferred.List.iter workers ~f:(Coda_process.disconnect ~logger)
 
