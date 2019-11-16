@@ -1,0 +1,54 @@
+digraph G {
+  rankdir=LR;
+
+  // Protocol Aspects
+  {
+    node [color=blue, shape=rectangle];
+    ScanSize [label="Scan State Size (+)"];
+    SlotTime [label="Slot Time (-)"];
+  }
+
+  // Actionable Dependencies
+  {
+    node [shape=rectangle];
+    ELSync [label="Epoch Ledger Sync Time (-)"];
+    ELMem [label="Epoch Ledger Memory (-)"];
+    StLDiffApp [label="Staged Ledger Diff Application Time (-)"];
+    SnLCommit [label="Snarked Ledger Commit Time (-)"];
+    ScanSyncTime [label="Scan State Sync Time (-)"];
+    ScanMem [label="Scan State Memory (-)"];
+    ScanSyncSlotDivorce [label="Scan State Sync Slot Divorce"];
+    HashTime [label="Poseidon Hash Time (-)"];
+    VRFTime [label="VRF Time (-)"];
+  }
+
+  // Goals
+  {
+    rank=same;
+    node [shape=oval];
+    NumAccs [label="# of Accounts"];
+    TPS [label="TPS"];
+    Latency [label="Block Latency"];
+    Delegation [label="# of Delegators on one Account"];
+  };
+
+  // Positive Arcs
+  {
+    edge [color=black];
+    {ScanSyncTime, ScanSyncSlotDivorce, HashTime} -> ScanSize
+    {StLDiffApp, ScanSyncSlotDivorce, HashTime} -> SlotTime;
+    HashTime -> StLDiffApp;
+    ScanSize -> SnLCommit;
+    {ELSync, ELMem, SnLCommit} -> NumAccs;
+    {ScanSize, ScanMem, SlotTime} -> TPS;
+    SlotTime -> Latency;
+    VRFTime -> Delegation;
+  }
+
+  // Negative Arcs
+  {
+    edge [color=red];
+    ScanSize -> {StLDiffApp, Latency};
+    SlotTime -> Delegation;
+  }
+}
