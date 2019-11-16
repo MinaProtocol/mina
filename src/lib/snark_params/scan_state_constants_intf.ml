@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 module type S = sig
   (** Log of the capacity of transactions per transition. 1 will only work if we don't have prover fees. 2 will work with prover fees, but not if we want a transaction included in every block. At least 3 ensures a transaction per block and the staged-ledger unit tests pass. *)

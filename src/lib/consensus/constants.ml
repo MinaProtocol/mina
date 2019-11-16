@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 [%%inject
 "genesis_state_timestamp_string", genesis_state_timestamp]

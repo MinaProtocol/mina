@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 (* versioned_types.ml -- static enforcement of versioned types via ppx *)
 

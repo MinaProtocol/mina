@@ -107,6 +107,9 @@ jobs:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
             - run:
+                  name: Check ppx_optcomp preprocessor_deps
+                  command: ./scripts/lint_preprocessor_deps.sh
+            - run:
                   name: Check CODEOWNERS file format
                   command: ./scripts/lint_codeowners.sh
             - run:
