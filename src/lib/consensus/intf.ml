@@ -131,7 +131,6 @@ module type Protocol_state_intf = sig
     end
 
     type var = (blockchain_state_var, consensus_state_var) Poly.Stable.Latest.t
-    [@@deriving sexp, to_yojson]
   end
 
   module Value : sig
