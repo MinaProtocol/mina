@@ -666,17 +666,16 @@ module Helper = struct
     let lines = Process.stdout subprocess |> Reader.lines in
     Pipe.iter errlines ~f:(fun line ->
         (* TODO: the log messages are JSON, parse them and log at the appropriate level *)
-        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-          "log message from libp2p_helper: $line"
-          ~metadata:[("line", `String line)] ;
+        if line <> "" then
+          Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+            "libp2p stderr line: $line"
+            ~metadata:[("line", `String line)] ;
         Deferred.unit )
     |> don't_wait_for ;
     Pipe.iter lines ~f:(fun line ->
         let open Yojson.Safe.Util in
         let v = Yojson.Safe.from_string line in
-        Logger.trace logger "handling line from helper: $line"
-          ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("line", `String line)] ;
+        Logger.spam logger "libp2p line" ~metadata:[("line", `String line)] ;
         ( match
             if member "upcall" v = `Null then handle_response t v
             else handle_upcall t v
