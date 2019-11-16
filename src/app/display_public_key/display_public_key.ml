@@ -5,7 +5,7 @@ let main privkey_path =
   let%map {public_key; _} =
     Secrets.Keypair.Terminal_stdin.read_exn privkey_path
   in
-  printf "%s\n%!" (Public_key.to_base58_check_compressed public_key)
+  printf "%s\n%!" (Public_key.to_base58_check public_key)
 
 let cmd =
   Command.async
