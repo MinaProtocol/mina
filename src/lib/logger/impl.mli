@@ -11,7 +11,7 @@ end
 type t = Stable.V1.t
 
 module Level : sig
-  type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
+  type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal | Spam
   [@@deriving sexp, compare, yojson, show {with_path= false}, enumerate]
 
   val of_string : string -> (t, string) result
@@ -131,6 +131,13 @@ val info : _ log_function
 val warn : _ log_function
 
 val error : _ log_function
+
+(** spam is a special log level that omits location information *)
+val spam :
+     t
+  -> ?metadata:(string, Yojson.Safe.json) List.Assoc.t
+  -> ('a, unit, string, unit) format4
+  -> 'a
 
 val faulty_peer : _ log_function [@@deprecated "use Trust_system.record"]
 

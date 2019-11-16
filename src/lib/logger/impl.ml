@@ -2,7 +2,7 @@ open Core
 open Async
 
 module Level = struct
-  type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
+  type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal | Spam
   [@@deriving sexp, compare, show {with_path= false}, enumerate]
 
   let of_string str =
@@ -123,7 +123,16 @@ module Processor = struct
 
     let create () = ()
 
-    let process () msg = Some (Yojson.Safe.to_string (Message.to_yojson msg))
+    let process () msg =
+      let msg_json_fields =
+        Message.to_yojson msg |> Yojson.Safe.Util.to_assoc
+      in
+      let json =
+        if Level.compare msg.level Spam = 0 then
+          `Assoc (List.filter msg_json_fields ~f:(fun (k, _) -> k <> "source"))
+        else `Assoc msg_json_fields
+      in
+      Some (Yojson.Safe.to_string json)
   end
 
   module Pretty = struct
@@ -344,6 +353,8 @@ let error = log ~level:Error
 let fatal = log ~level:Fatal
 
 let faulty_peer_without_punishment = log ~level:Faulty_peer
+
+let spam = log ~level:Spam ~module_:"" ~location:""
 
 (* deprecated, use Trust_system.record instead *)
 let faulty_peer = faulty_peer_without_punishment
