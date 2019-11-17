@@ -32,6 +32,6 @@ let repeaterFeeAmount =
   getEnv(~default=Int64.to_string(feeAmount), "REPEATER_FEE_AMOUNT")
   |> Int64.of_string;
 
-let faucetAmount = Int64.of_int(100);
+let faucetAmount = getEnv(~default="100", "FAUCET_AMOUNT") |> Int64.of_string;
 let cooldownTimeMs = 1000. *. 60. *. 60. *. 3.; // 3 hrs
 let repeatTimeMs = 1000 * 60 * 3; // 3 mins

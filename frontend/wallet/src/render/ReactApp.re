@@ -15,6 +15,8 @@ let make = () => {
   let (isOnboarding, _) as onboardingValue =
     OnboardingProvider.createContext();
   let dispatch = CodaProcess.useHook();
+  let toastValue = ToastProvider.createContext();
+  
   let (locale, _) = intlReducer->React.useReducer(initialState);
 
   <AddressBookProvider value=settingsValue>
@@ -26,11 +28,11 @@ let make = () => {
             messages={locale->Locale.translations->Locale.translationsToDict}>
             {isOnboarding
                ? <Onboarding />
-               : <>
-                   <Header />
-                   <Main> <SideBar /> <Router /> </Main>
-                   <Footer />
-                 </>}
+               : <ToastProvider value=toastValue>
+                 <Header />
+                 <Main> <SideBar /> <Router /> </Main>
+                 <Footer />
+               </ToastProvider>}
           </ReactIntl.IntlProvider>
         </ReasonApollo.Provider>
       </ProcessDispatchProvider>

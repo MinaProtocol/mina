@@ -85,7 +85,9 @@ let schedule_user_command t (txn : User_command.t) account_opt :
 let get_account t (addr : Public_key.Compressed.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in
-  Ledger.location_of_key ledger addr |> Option.bind ~f:(Ledger.get ledger)
+  let open Option.Let_syntax in
+  let%bind loc = Ledger.location_of_key ledger addr in
+  Ledger.get ledger loc
 
 let get_accounts t =
   let open Participating_state.Let_syntax in
@@ -401,7 +403,7 @@ let get_status ~flag t =
   in
   let addrs_and_ports =
     Kademlia.Node_addrs_and_ports.to_display
-      (Coda_lib.config t).net_config.gossip_net_params.addrs_and_ports
+      (Coda_lib.config t).gossip_net_params.addrs_and_ports
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status

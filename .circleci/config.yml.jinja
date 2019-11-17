@@ -62,7 +62,7 @@ jobs:
     build-archive:
         docker:
             - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
-              environment: 
+              environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
             - image: postgres:12
@@ -165,15 +165,6 @@ jobs:
                 command: |
                     sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
                     df -h
-            # Attach workspace from prior linux build
-            - attach_workspace:
-                at: /tmp/workspace
-            - run:
-                name: Unpack Workspace PV Keys
-                command: |
-                    sudo mkdir -p /var/lib/coda
-                    sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
-                    sudo rm /tmp/workspace/coda*.bz2
             - checkout
             - run:
                   name: Update submodules
@@ -229,13 +220,6 @@ jobs:
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     nix-env -iA cachix -f https://cachix.org/api/v1/install
             - run:
-                name: Build kademlia using cachix
-                command: |
-                    . ~/.nix-profile/etc/profile.d/nix.sh
-                    cachix use codaprotocol
-                    cd src/app/kademlia-haskell
-                    nix-build release2.nix
-            - run:
                 name: Build libp2p_helper using cachix
                 command: |
                     . ~/.nix-profile/etc/profile.d/nix.sh
@@ -249,17 +233,16 @@ jobs:
                 command: |
                     bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 1h
+                # We want the build to fail here if we generated PVkeys so no
+                # rebuild after a regen causes the build to exit
             - run:
                 name: Collect PV Keys
                 command: |
                     mkdir -p package/keys
-                    cp /var/lib/coda/* package/keys/.
+                    cp /tmp/s3_cache_dir/* package/keys/.
             - run:
-                name: Collect and rewrite aux binaries (kademlia + libp2p_helper + logproc)
+                name: Collect and rewrite aux binaries (libp2p_helper + logproc)
                 command: |
-                    cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
-                    chmod +w package/kademlia
-                    ./scripts/librewrite-macos.sh package/kademlia
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
                     ./scripts/librewrite-macos.sh package/coda-libp2p_helper
@@ -281,10 +264,6 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - store_artifacts:
                   path: package
-            - run:
-                name: Publish to Artifactory
-                command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
-                when: on_success
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
@@ -309,13 +288,25 @@ jobs:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
             - run:
-                  name: Download candidate stable PV keys
-                  environment:
-                    DUNE_PROFILE: {{profile}}
-                  command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
+                  name: Install awscli
+                  command: sudo pip install awscli
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  environment:
+                    DUNE_PROFILE: {{profile}}
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
+            - run:
+                  name: Upload generated keys
+                  command: |
+                    ./scripts/skip_if_only_frontend.sh bash -c 'ls -l /tmp/coda_cache_dir/ && \
+                      aws s3 sync --acl public-read /tmp/coda_cache_dir/ s3://snark-keys.o1test.net/ && \
+                      sleep 10'
+            - run:
+                  name: Rebuild for pvkey changes
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
                   environment:
                     DUNE_PROFILE: {{profile}}
                   {%- if profile in medium_curve_profiles %}
@@ -340,9 +331,6 @@ jobs:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             {%- if profile in medium_curve_profiles %}
-            - persist_to_workspace:
-                root: /tmp/artifacts
-                paths: coda_pvkeys*
             - store_artifacts:
                   path: /tmp/artifacts
             {%- endif %}
@@ -463,10 +451,7 @@ workflows:
             - tracetool
             - build-wallet
             - build-archive
-            - build-macos:
-                # only run AFTER linux build
-                requires:
-                    - build-artifacts--testnet_postake_medium_curves
+            - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}

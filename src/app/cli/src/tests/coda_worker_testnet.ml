@@ -266,7 +266,11 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
                 , `List
                     ( Hash_set.to_list hashes_in_common
                     |> List.map ~f:State_hash.Stable.Latest.to_yojson ) )
-              ; ("chains", chains_json ()) ]
+              ; ("chains", chains_json ())
+              ; ( "root_lengths"
+                , `List
+                    ( List.map ~f:(fun l -> `Int l)
+                    @@ Array.to_list testnet.root_lengths ) ) ]
     | None ->
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
           "Empty list of online chains, OK if we're still starting the network"
@@ -314,75 +318,73 @@ type user_cmd_status =
   {snapshots: int option array; passed_root: bool array; result: unit Ivar.t}
 
 let start_payment_check logger root_pipe (testnet : Api.t) =
-  Linear_pipe.iter root_pipe ~f:(function
-      | `Root
-          ( worker_id
-          , Transition_frontier.Diff.Root_diff.{user_commands; root_length} )
-      ->
-      Option.fold root_length ~init:Deferred.unit ~f:(fun _ length ->
-          match testnet.status.(worker_id) with
-          | `On (`Synced user_cmds_under_inspection) ->
-              testnet.root_lengths.(worker_id) <- length ;
-              Array.iteri testnet.restart_signals ~f:(fun i -> function
-                | None ->
-                    ()
-                | Some (`Bootstrap, signal) ->
-                    if
-                      testnet.root_lengths.(i)
-                      + (2 * Consensus.Constants.k)
-                      + Consensus.Constants.delta
-                      < length - 2
-                    then (
-                      Ivar.fill signal () ;
-                      testnet.restart_signals.(i) <- None )
-                    else ()
-                | Some (`Catchup, signal) ->
-                    if
-                      testnet.root_lengths.(i) + (Consensus.Constants.k / 2)
-                      < length - 1
-                    then (
-                      Logger.info logger !"Filled catchup ivar"
-                        ~module_:__MODULE__ ~location:__LOC__ ;
-                      Ivar.fill signal () ;
-                      testnet.restart_signals.(i) <- None )
-                    else () ) ;
-              let earliest_user_cmd =
-                List.min_elt (Hashtbl.to_alist user_cmds_under_inspection)
-                  ~compare:(fun (_user_cmd1, status1) (_user_cmd2, status2) ->
-                    Int.compare status1.expected_deadline
-                      status2.expected_deadline )
-              in
-              Option.iter earliest_user_cmd
-                ~f:(fun (user_cmd, {expected_deadline; _}) ->
-                  if expected_deadline < length then (
-                    Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                      ~metadata:
-                        [ ("worker_id", `Int worker_id)
-                        ; ("user_cmd", User_command.to_yojson user_cmd) ]
-                      "Transaction $user_cmd took too long to get into the \
-                       root of node $worker_id. Length expected: %d got: %d"
-                      expected_deadline length ;
-                    exit 9 |> ignore ) ) ;
-              List.iter user_commands ~f:(fun user_cmd ->
-                  Hashtbl.change user_cmds_under_inspection user_cmd
-                    ~f:(function
-                    | Some {passed_root; _} ->
-                        Ivar.fill passed_root () ;
-                        Logger.info logger ~module_:__MODULE__
-                          ~location:__LOC__
-                          ~metadata:
-                            [ ("user_cmd", User_command.to_yojson user_cmd)
-                            ; ("worker_id", `Int worker_id)
-                            ; ("length", `Int length) ]
-                          "Transaction $user_cmd finally gets into the root \
-                           of node $worker_id, when root length is $length" ;
-                        None
-                    | None ->
-                        None ) ) ;
-              Deferred.unit
-          | _ ->
-              Deferred.unit ) )
-  |> don't_wait_for
+  don't_wait_for
+    (Linear_pipe.iter root_pipe ~f:(function
+         | `Root
+             ( worker_id
+             , {Coda_lib.Root_diff.Stable.V1.user_commands; root_length} )
+         ->
+         ( match testnet.status.(worker_id) with
+         | `On (`Synced user_cmds_under_inspection) ->
+             testnet.root_lengths.(worker_id) <- root_length ;
+             Array.iteri testnet.restart_signals ~f:(fun i -> function
+               | None ->
+                   ()
+               | Some (`Bootstrap, signal) ->
+                   if
+                     testnet.root_lengths.(i)
+                     + (2 * Consensus.Constants.k)
+                     + Consensus.Constants.delta
+                     < root_length - 2
+                   then (
+                     Ivar.fill signal () ;
+                     testnet.restart_signals.(i) <- None )
+                   else ()
+               | Some (`Catchup, signal) ->
+                   if
+                     testnet.root_lengths.(i) + (Consensus.Constants.k / 2)
+                     < root_length - 1
+                   then (
+                     Logger.info logger !"Filled catchup ivar"
+                       ~module_:__MODULE__ ~location:__LOC__ ;
+                     Ivar.fill signal () ;
+                     testnet.restart_signals.(i) <- None )
+                   else () ) ;
+             let earliest_user_cmd =
+               List.min_elt (Hashtbl.to_alist user_cmds_under_inspection)
+                 ~compare:(fun (_user_cmd1, status1) (_user_cmd2, status2) ->
+                   Int.compare status1.expected_deadline
+                     status2.expected_deadline )
+             in
+             Option.iter earliest_user_cmd
+               ~f:(fun (user_cmd, {expected_deadline; _}) ->
+                 if expected_deadline < root_length then (
+                   Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                     ~metadata:
+                       [ ("worker_id", `Int worker_id)
+                       ; ("user_cmd", User_command.to_yojson user_cmd) ]
+                     "Transaction $user_cmd took too long to get into the \
+                      root of node $worker_id. Length expected: %d got: %d"
+                     expected_deadline root_length ;
+                   exit 9 |> ignore ) ) ;
+             List.iter user_commands ~f:(fun user_cmd ->
+                 Hashtbl.change user_cmds_under_inspection user_cmd
+                   ~f:(function
+                   | Some {passed_root; _} ->
+                       Ivar.fill passed_root () ;
+                       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                         ~metadata:
+                           [ ("user_cmd", User_command.to_yojson user_cmd)
+                           ; ("worker_id", `Int worker_id)
+                           ; ("length", `Int root_length) ]
+                         "Transaction $user_cmd finally gets into the root of \
+                          node $worker_id, when root length is $length" ;
+                       None
+                   | None ->
+                       None ) ) ;
+             Deferred.unit
+         | _ ->
+             Deferred.unit ) ))
 
 let events workers start_reader =
   let event_r, event_w = Linear_pipe.create () in
@@ -405,7 +407,8 @@ let events workers start_reader =
               (let ms_to_catchup =
                  (Consensus.Constants.c + Consensus.Constants.delta)
                  * Consensus.Constants.block_window_duration_ms
-                 + 16_000
+                 + 60_000
+                 (* time for peer discovery *)
                  |> Float.of_int
                in
                let%map () = after (Time.Span.of_ms ms_to_catchup) in
@@ -418,8 +421,8 @@ let events workers start_reader =
 let start_checks logger (workers : Coda_process.t array) start_reader testnet
     ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
-  start_prefix_check logger workers event_reader testnet ~acceptable_delay
-  |> don't_wait_for ;
+  don't_wait_for
+    (start_prefix_check logger workers event_reader testnet ~acceptable_delay) ;
   start_payment_check logger root_reader testnet
 
 (* note: this is very declarative, maybe this should be more imperative? *)
@@ -464,7 +467,7 @@ module Delegation : sig
 end = struct
   let delegate_stake ?acceptable_delay:(delay = 7) (testnet : Api.t) ~node
       ~delegator ~delegatee =
-    let fee = Currency.Fee.of_int 1 in
+    let fee = User_command.minimum_fee in
     let worker = testnet.workers.(node) in
     let%bind _ =
       let open Deferred.Option.Let_syntax in
@@ -515,7 +518,7 @@ end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
-    let fee = Currency.Fee.of_int 1 in
+    let fee = User_command.minimum_fee in
     let%bind (_ : unit option list) =
       Deferred.List.init n ~f:(fun _ ->
           let open Deferred.Option.Let_syntax in
@@ -567,7 +570,7 @@ end = struct
   let send_batch_consecutive_payments (testnet : Api.t) ~node ~sender
       ~(keypairs : Keypair.t list) ~n =
     let amount = Currency.Amount.of_int 10 in
-    let fee = Currency.Fee.of_int 1 in
+    let fee = User_command.minimum_fee in
     let%bind new_payment_readers =
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
           let pk = Public_key.(compress @@ of_private_key_exn sender) in

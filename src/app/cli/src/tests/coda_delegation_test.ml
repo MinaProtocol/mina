@@ -16,7 +16,7 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger num_proposers Option.some
-      snark_work_public_keys Cli_lib.Arg_type.Sequence
+      snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Started test net" ;
