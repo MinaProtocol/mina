@@ -1632,9 +1632,6 @@ module Data = struct
               @@ Global_sub_window.sub next_global_sub_window
                    prev_global_sub_window)
           in
-          let prev_sub_window_densities =
-            List.to_array prev_sub_window_densities
-          in
           let n = Array.length prev_sub_window_densities in
           let new_sub_window_densities =
             Array.init n ~f:(fun i ->
@@ -1651,8 +1648,10 @@ module Data = struct
           in
           new_sub_window_densities.(n - 1)
           <- Length.succ new_sub_window_densities.(n - 1) ;
-          (min_window_density, Array.to_list new_sub_window_densities)
+          (min_window_density, new_sub_window_densities)
 
+        (* converting the input for actual implementation to the input required by the
+           reference implementation *)
         let actual_to_reference ~prev_global_slot ~prev_sub_window_densities =
           let prev_global_sub_window =
             Global_sub_window.of_global_slot prev_global_slot
@@ -1661,7 +1660,8 @@ module Data = struct
             Sub_window.to_int
             @@ Global_sub_window.sub_window prev_global_sub_window
           in
-          List.drop prev_sub_window_densities prev_relative_sub_window
+          List.to_array
+          @@ List.drop prev_sub_window_densities prev_relative_sub_window
           @ List.take prev_sub_window_densities prev_relative_sub_window
           @ [List.nth_exn prev_sub_window_densities prev_relative_sub_window]
 
