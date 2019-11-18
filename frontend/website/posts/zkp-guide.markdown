@@ -61,26 +61,33 @@ author: O(1) Labs
     a.customLink {  
         display: inline-block;
         font-weight:600;
+        text-decoration: underline !important;
+        text-decoration-color: rgb(45, 158, 219);
         margin-bottom:15px;
-        margin-right:-60px;
         margin-top: 20px;
+        border-bottom: none !important;
     }
     
     .customLink1 {
         display: inline-block;
         font-weight:600;
+        text-decoration: underline !important;
+        text-decoration-color: rgb(45, 158, 219);
         margin-bottom:15px;
         margin-top: 20px;
         margin-right: 0px;
         margin-bottom: 0px;
+        border-bottom: none !important;
     }
     
     .customLink2 {
         display: inline-block;
         font-weight:600;
+        text-decoration: underline !important;
+        text-decoration-color: rgb(45, 158, 219);
         margin-bottom:15px;
-        margin-right:-60px;
         margin-top: 0px;
+        border-bottom: none !important;
     }
     
     main { position: relative; }
