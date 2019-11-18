@@ -18,9 +18,9 @@ PVKEYHASH=$(./default/app/cli/src/coda.exe internal snark-hashes | sort | md5sum
 PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 
 if [ "$GITBRANCH" == "master" ]; then
-    VERSION="$GITTAG-${GITHASH}"
+    VERSION="${GITTAG}-${GITHASH}"
 else
-    VERSION="$GITTAG-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+    VERSION="${GITTAG}+${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
 fi
 
 # Export variables for use with downstream steps
