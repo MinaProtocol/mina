@@ -1,6 +1,6 @@
 {
   "name": "coda-wallet",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "",
   "main": "./lib/js/src/main/App.js",
   "dependencies": {
@@ -69,7 +69,7 @@
       "bundle/**/*",
       "public/**/*"
     ],
-    "productName": "CodaWallet",
+    "productName": "Coda Wallet",
     "compression": "store",
     "dmg": {
       "contents": [

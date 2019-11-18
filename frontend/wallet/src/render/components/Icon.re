@@ -12,7 +12,8 @@ type kind =
   | BackArrow
   | Locked
   | Unlocked
-  | Cross;
+  | Cross
+  | Copy;
 
 [@react.component]
 let make = (~kind) =>
@@ -97,6 +98,12 @@ let make = (~kind) =>
          fillRule="evenodd"
          clipRule="evenodd"
          d="M6.55558 5L5.00002 6.55546L10.4449 12L5 17.4446L6.55556 19.0001L12.0005 13.5555L17.4445 18.9992L19 17.4437L13.556 12L19 6.55636L17.4444 5.00089L12.0005 10.4446L6.55558 5Z"
+       />
+     | Copy =>
+       <path
+         fillRule="evenodd"
+         clipRule="evenodd"
+         d="M4.13793 3.42857V4.02685V16.5907H8.7516V15.3941H5.29323V4.62513H13.7654V6.21275H14.9207V3.42857H4.13793ZM9.90689 7.4093V8.00758V20.5714H20.6897V7.4093H9.90689ZM19.5344 8.60586H11.0622V19.3749H19.5344V8.60586Z"
        />
      }}
   </svg>;

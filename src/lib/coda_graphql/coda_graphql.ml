@@ -392,44 +392,40 @@ module Types = struct
             ~resolve:(fun _ ledger -> Amount.to_uint64 @@ total_currency ledger)
         ] )
 
-  module Make_epoch_data (Lock_checkpoint : sig
-    type t
+  module type Epoch_data_intf =
+    Consensus.Epoch_data_intf
+    with type ledger := Consensus.Data.Epoch_ledger.Value.t
+     and type seed := Consensus.Data.Epoch_seed.t
+     and type lock_checkpoint := State_hash.t
 
-    type epoch_data
-
-    val field : string -> f:(epoch_data -> t) -> (Coda_lib.t, epoch_data) field
-  end)
-  (Epoch_data : Consensus.Epoch_data_intf
-                with type ledger := Consensus.Data.Epoch_ledger.Value.t
-                 and type seed := Consensus.Data.Epoch_seed.t
-                 and type lock_checkpoint := Lock_checkpoint.t
-                 and type Value.t := Lock_checkpoint.epoch_data) (Name : sig
-      val t : string
-  end) =
-  struct
-    let typ =
-      obj Name.t ~fields:(fun _ ->
-          [ field "ledger" ~typ:(non_null epoch_ledger)
-              ~args:Arg.[]
-              ~resolve:(fun _ epoch_data -> Epoch_data.ledger epoch_data)
-          ; field "seed" ~typ:(non_null string)
-              ~args:Arg.[]
-              ~resolve:(fun _ epoch_data ->
-                Consensus.Data.Epoch_seed.to_base58_check
-                @@ Epoch_data.seed epoch_data )
-          ; field "startCheckpoint" ~typ:(non_null string)
-              ~args:Arg.[]
-              ~resolve:(fun _ epoch_data ->
-                Stringable.State_hash.to_base58_check
-                @@ Epoch_data.start_checkpoint epoch_data )
-          ; Lock_checkpoint.field "lockCheckpoint"
-              ~f:Epoch_data.lock_checkpoint
-          ; field "epochLength" ~typ:(non_null uint32)
-              ~args:Arg.[]
-              ~resolve:(fun _ epoch_data ->
-                Coda_numbers.Length.to_uint32
-                @@ Epoch_data.epoch_length epoch_data ) ] )
-  end
+  let epoch_data_typ (type t)
+      (module Epoch_data : Epoch_data_intf with type Value.t = t) ~name =
+    let lock_checkpoint name ~f =
+      field name ~typ:(non_null string)
+        ~args:Arg.[]
+        ~resolve:(fun _ epoch_data ->
+          Stringable.State_hash.to_base58_check @@ f epoch_data )
+    in
+    obj name ~fields:(fun _ ->
+        [ field "ledger" ~typ:(non_null epoch_ledger)
+            ~args:Arg.[]
+            ~resolve:(fun _ epoch_data -> Epoch_data.ledger epoch_data)
+        ; field "seed" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun _ epoch_data ->
+              Consensus.Data.Epoch_seed.to_base58_check
+              @@ Epoch_data.seed epoch_data )
+        ; field "startCheckpoint" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun _ epoch_data ->
+              Stringable.State_hash.to_base58_check
+              @@ Epoch_data.start_checkpoint epoch_data )
+        ; lock_checkpoint "lockCheckpoint" ~f:Epoch_data.lock_checkpoint
+        ; field "epochLength" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ epoch_data ->
+              Coda_numbers.Length.to_uint32
+              @@ Epoch_data.epoch_length epoch_data ) ] )
 
   let staking_epoch_data name ~f =
     field name ~typ:(non_null string)
@@ -437,40 +433,19 @@ module Types = struct
       ~resolve:(fun _ state_hash ->
         Stringable.State_hash.to_base58_check @@ f state_hash )
 
-  module Staking_epoch_data =
-    Make_epoch_data (struct
-        type t = State_hash.t
+  module Staking_epoch_data = struct
+    let typ =
+      epoch_data_typ
+        (module Consensus.Data.Epoch_data.Staking)
+        ~name:"StakingEpochData"
+  end
 
-        type epoch_data = Consensus.Data.Epoch_data.Staking.Value.t
-
-        let field name ~f =
-          field name ~typ:(non_null string)
-            ~args:Arg.[]
-            ~resolve:(fun _ epoch_data ->
-              Stringable.State_hash.to_base58_check @@ f epoch_data )
-      end)
-      (Consensus.Data.Epoch_data.Staking)
-      (struct
-        let t = "StakingEpochData"
-      end)
-
-  module Next_epoch_data =
-    Make_epoch_data (struct
-        type t = State_hash.t option
-
-        type epoch_data = Consensus.Data.Epoch_data.Next.Value.t
-
-        let field name ~f =
-          field name ~typ:string
-            ~args:Arg.[]
-            ~resolve:(fun _ epoch_data ->
-              Option.map ~f:Stringable.State_hash.to_base58_check
-              @@ f epoch_data )
-      end)
-      (Consensus.Data.Epoch_data.Next)
-      (struct
-        let t = "NextEpochData"
-      end)
+  module Next_epoch_data = struct
+    let typ =
+      epoch_data_typ
+        (module Consensus.Data.Epoch_data.Next)
+        ~name:"NextEpochData"
+  end
 
   let consensus_state =
     let open Consensus.Data.Consensus_state in
