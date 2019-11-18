@@ -215,12 +215,7 @@ module Ledger_inner = struct
 
   let create_new_account_exn t pk account =
     let action, _ = get_or_create_account_exn t pk account in
-    if action = `Existed then
-      eprintf
-        !"FAILED TO ADD DUPLICATE KEY: %{sexp: Public_key.Compressed.t}\n%!"
-        pk
-
-  (* assert (action = `Added) *)
+    assert (action = `Added)
 
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
