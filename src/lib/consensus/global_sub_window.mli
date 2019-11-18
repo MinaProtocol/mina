@@ -28,8 +28,6 @@ module Checked : sig
 
   val add : t -> t -> t
 
-  val sub : t -> t -> field Integer.t
-
   val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
 
   val of_global_slot : Global_slot.Checked.t -> (t, _) Checked.t

@@ -55,7 +55,5 @@ module Checked = struct
 
   let add a b = Integer.add ~m a b
 
-  let sub a b = Integer.sub ~m a b
-
   let ( >= ) a b = make_checked (fun () -> Integer.gte ~m a b)
 end

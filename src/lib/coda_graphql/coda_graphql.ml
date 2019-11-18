@@ -459,10 +459,10 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ (t : Value.t) ->
               Coda_numbers.Length.to_uint32 @@ epoch_count t )
-        ; field "minWindowLength" ~typ:(non_null uint32)
+        ; field "minWindowDensity" ~typ:(non_null uint32)
             ~args:Arg.[]
             ~resolve:(fun _ (t : Value.t) ->
-              Coda_numbers.Length.to_uint32 @@ min_window_length t )
+              Coda_numbers.Length.to_uint32 @@ min_window_density t )
         ; field "lastVrfOutput" ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun _ (t : Value.t) ->
