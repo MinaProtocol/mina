@@ -319,10 +319,9 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Artifacts
+                  name: Artifacts Path
                   command: |
                       mkdir -p /tmp/artifacts
-                      touch /tmp/artifacts/coda_pvkeys_dummy
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
@@ -338,11 +337,8 @@ jobs:
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves_10k_ledger
             - run:
-                  name: Upload generated keys
-                  command: |
-                      ls -l /tmp/coda_cache_dir/
-                      aws s3 sync --acl public-read /tmp/coda_cache_dir/ s3://snark-keys.o1test.net/
-                      sleep 10
+                  name: Upload generated PV keys
+                  command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
             - run:
                   name: Rebuild for pvkey changes
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
