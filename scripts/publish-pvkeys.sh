@@ -8,7 +8,7 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run"
 else
     # Only publish if there are generated files in place.
-    shopt -s nullglob dotglob
+    shopt -s nullglob dotglob  # check for empty or dotfiles
     genfiles=("${KEYDIR}"*)
     if [ ${#genfiles[@]} -gt 0 ]; then
         ls -l ${KEYDIR}
