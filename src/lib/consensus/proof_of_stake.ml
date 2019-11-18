@@ -1682,7 +1682,7 @@ module Data = struct
           let sub_window_diff =
             UInt32.(
               to_int
-              @@ min Constants.sub_windows_per_window
+              @@ min (succ Constants.sub_windows_per_window)
               @@ Global_sub_window.sub next_global_sub_window
                    prev_global_sub_window)
           in
@@ -1705,7 +1705,7 @@ module Data = struct
           in
           new_sub_window_densities.(n - 1)
           <- Length.succ new_sub_window_densities.(n - 1) ;
-          (min_window_density, new_sub_window_densities)
+          (min_window_density, Array.to_list new_sub_window_densities)
 
         let actual_to_reference ~prev_global_slot ~prev_sub_window_densities =
           let prev_global_sub_window =
@@ -1719,19 +1719,33 @@ module Data = struct
           @ List.take prev_sub_window_densities prev_relative_sub_window
           @ [List.nth_exn prev_sub_window_densities prev_relative_sub_window]
 
-        let gen_global_slots =
-          let open Quickcheck.Generator in
-          let open Quickcheck.Generator.Let_syntax in
-          let%bind prev_global_slot = small_positive_int in
-          let%bind slot_diff = small_non_negative_int in
-          return
-            ( Global_slot.of_int @@ prev_global_slot
-            , Global_slot.of_int @@ (prev_global_slot + slot_diff) )
-
         let slots_per_sub_window = UInt32.to_int Constants.slots_per_sub_window
 
         let sub_windows_per_window =
           UInt32.to_int Constants.sub_windows_per_window
+
+        let gen_slot_diff =
+          let open Quickcheck.Generator in
+          Quickcheck.Generator.weighted_union
+          @@ List.init (2 * sub_windows_per_window) ~f:(fun i ->
+                 ( 100.0 /. (Float.of_int (i + 1) ** 2.)
+                 , Core.Int.gen_incl (i * slots_per_sub_window)
+                     ((i + 1) * slots_per_sub_window) ) )
+
+        let gen_global_slots =
+          let open Quickcheck.Generator in
+          let open Quickcheck.Generator.Let_syntax in
+          let%bind prev_global_slot = small_positive_int in
+          let%bind slot_diffs = Core.List.gen_with_length 5 gen_slot_diff in
+          let _, global_slots =
+            List.fold slot_diffs ~init:(prev_global_slot, [])
+              ~f:(fun (prev_global_slot, acc) slot_diff ->
+                let next_global_slot = prev_global_slot + slot_diff in
+                (next_global_slot, next_global_slot :: acc) )
+          in
+          return
+            ( Global_slot.of_int prev_global_slot
+            , List.map global_slots ~f:Global_slot.of_int |> List.rev )
 
         let gen_length =
           Quickcheck.Generator.union
@@ -1755,19 +1769,61 @@ module Data = struct
         let gen =
           Quickcheck.Generator.tuple2 gen_global_slots gen_min_window_density
 
+        let update_several_times ~f ~prev_global_slot ~next_global_slots
+            ~prev_sub_window_densities ~prev_min_window_density =
+          List.fold next_global_slots
+            ~init:
+              ( prev_global_slot
+              , prev_sub_window_densities
+              , prev_min_window_density )
+            ~f:(fun ( prev_global_slot
+                    , prev_sub_window_densities
+                    , prev_min_window_density )
+               next_global_slot
+               ->
+              let min_window_density, sub_window_densities =
+                f ~prev_global_slot ~next_global_slot
+                  ~prev_sub_window_densities ~prev_min_window_density
+              in
+              (next_global_slot, sub_window_densities, min_window_density) )
+
+        let update_several_times_checked ~f ~prev_global_slot
+            ~next_global_slots ~prev_sub_window_densities
+            ~prev_min_window_density =
+          let open Tick.Checked in
+          let open Tick.Checked.Let_syntax in
+          List.fold next_global_slots
+            ~init:
+              ( prev_global_slot
+              , prev_sub_window_densities
+              , prev_min_window_density )
+            ~f:(fun ( prev_global_slot
+                    , prev_sub_window_densities
+                    , prev_min_window_density )
+               next_global_slot
+               ->
+              let%bind min_window_density, sub_window_densities =
+                f ~prev_global_slot ~next_global_slot
+                  ~prev_sub_window_densities ~prev_min_window_density
+              in
+              return
+                (next_global_slot, sub_window_densities, min_window_density) )
+
         let%test_unit "the actual implementation is equivalent to the \
                        reference implementation" =
           Quickcheck.test ~trials:100 gen
-            ~f:(fun ( (prev_global_slot, next_global_slot)
+            ~f:(fun ( (prev_global_slot, next_global_slots)
                     , (prev_min_window_density, prev_sub_window_densities) )
                ->
-              let min_window_density1, _ =
-                update_min_window_density ~prev_global_slot ~next_global_slot
+              let _, _, min_window_density1 =
+                update_several_times ~f:update_min_window_density
+                  ~prev_global_slot ~next_global_slots
                   ~prev_sub_window_densities ~prev_min_window_density
               in
-              let min_window_density2, _ =
-                update_min_window_density_reference_implementation
-                  ~prev_global_slot ~next_global_slot
+              let _, _, min_window_density2 =
+                update_several_times
+                  ~f:update_min_window_density_reference_implementation
+                  ~prev_global_slot ~next_global_slots
                   ~prev_sub_window_densities:
                     (actual_to_reference ~prev_global_slot
                        ~prev_sub_window_densities)
@@ -1778,25 +1834,28 @@ module Data = struct
 
         let%test_unit "Inside snark computation is equivalent to outside \
                        snark computation" =
-          Quickcheck.test ~trials:10 gen
+          Quickcheck.test ~trials:100 gen
             ~f:
               (Test_util.test_equal
                  (Typ.tuple2
-                    (Typ.tuple2 Global_slot.typ Global_slot.typ)
+                    (Typ.tuple2 Global_slot.typ
+                       (Typ.list ~length:5 Global_slot.typ))
                     (Typ.tuple2 Length.typ
                        (Typ.list ~length:sub_windows_per_window Length.typ)))
-                 (Typ.tuple2 Length.typ
-                    (Typ.list ~length:sub_windows_per_window Length.typ))
-                 (fun ( (prev_global_slot, next_global_slot)
+                 (Typ.tuple3 Global_slot.typ
+                    (Typ.list ~length:sub_windows_per_window Length.typ)
+                    Length.typ)
+                 (fun ( (prev_global_slot, next_global_slots)
                       , (prev_min_window_density, prev_sub_window_densities) ) ->
-                   Checked.update_min_window_density ~prev_global_slot
-                     ~next_global_slot ~prev_sub_window_densities
+                   update_several_times_checked
+                     ~f:Checked.update_min_window_density ~prev_global_slot
+                     ~next_global_slots ~prev_sub_window_densities
                      ~prev_min_window_density )
-                 (fun ( (prev_global_slot, next_global_slot)
+                 (fun ( (prev_global_slot, next_global_slots)
                       , (prev_min_window_density, prev_sub_window_densities) ) ->
-                   update_min_window_density ~prev_global_slot
-                     ~next_global_slot ~prev_sub_window_densities
-                     ~prev_min_window_density ))
+                   update_several_times ~f:update_min_window_density
+                     ~prev_global_slot ~next_global_slots
+                     ~prev_sub_window_densities ~prev_min_window_density ))
       end )
   end
 
