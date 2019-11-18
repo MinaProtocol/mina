@@ -198,20 +198,8 @@ module Key = struct
   let empty = Account.empty.public_key
 
   let gen_keys num_keys =
-    (* TODO : the Quickcheck generator for Public_key.Compressed produces duplicates
-       as a workaround, we generate extra keys, remove duplicates, and take as many as needed
-       Issue #1078 notes the problem with the generators
-     *)
-    let num_to_gen = num_keys + (num_keys / 4) in
-    let more_than_enough_keys =
-      Quickcheck.random_value
-        (Quickcheck.Generator.list_with_length num_to_gen gen)
-    in
-    let unique_keys =
-      List.dedup_and_sort ~compare:Stable.Latest.compare more_than_enough_keys
-    in
-    assert (List.length unique_keys >= num_keys) ;
-    List.take unique_keys num_keys
+    Quickcheck.random_value
+      (Quickcheck.Generator.list_with_length num_keys gen)
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
