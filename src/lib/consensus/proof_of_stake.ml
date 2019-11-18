@@ -11,6 +11,7 @@ open Snark_params
 open Bitstring_lib
 module Time = Coda_base.Block_time
 module Run = Snark_params.Tick.Run
+module Graphql_base_types = Graphql_lib.Base_types
 
 let m = Snark_params.Tick.m
 
@@ -537,6 +538,20 @@ module Data = struct
       type t = Stable.Latest.t [@@deriving sexp, compare, hash, to_yojson]
     end
 
+    let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
+      let open Graphql_async in
+      let open Schema in
+      obj "epochLedger" ~fields:(fun _ ->
+          [ field "hash" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ {Poly.hash; _} ->
+                Coda_base.Frozen_ledger_hash.to_string hash )
+          ; field "totalCurrency"
+              ~typ:(non_null @@ Graphql_base_types.uint64 ())
+              ~args:Arg.[]
+              ~resolve:(fun _ {Poly.total_currency; _} ->
+                Amount.to_uint64 total_currency ) ] )
+
     let to_input ({hash; total_currency} : Value.t) =
       let open Snark_params.Tick in
       { Random_oracle.Input.field_elements= [|(hash :> Field.t)|]
@@ -587,10 +602,6 @@ module Data = struct
       lazy
         { Poly.hash= Lazy.force genesis_ledger_hash
         ; total_currency= Lazy.force genesis_ledger_total_currency }
-
-    let hash (t : Value.t) = t.hash
-
-    let total_currency (t : Value.t) = t.total_currency
   end
 
   module Vrf = struct
@@ -1189,6 +1200,12 @@ module Data = struct
 
       val typ : (Coda_base.State_hash.var, t) Typ.t
 
+      type graphql_type
+
+      val graphql_type : unit -> ('ctx, graphql_type) Graphql_async.Schema.typ
+
+      val resolve : t -> graphql_type
+
       val to_input :
         t -> (Snark_params.Tick.Field.t, bool) Random_oracle.Input.t
 
@@ -1237,6 +1254,33 @@ module Data = struct
           ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
 
+      let graphql_type name =
+        let open Graphql_async in
+        let open Schema in
+        obj name ~fields:(fun _ ->
+            [ field "ledger"
+                ~typ:(non_null @@ Epoch_ledger.graphql_type ())
+                ~args:Arg.[]
+                ~resolve:(fun _ {Poly.ledger; _} -> ledger)
+            ; field "seed" ~typ:(non_null string)
+                ~args:Arg.[]
+                ~resolve:(fun _ {Poly.seed; _} ->
+                  Epoch_seed.to_base58_check seed )
+            ; field "startCheckpoint" ~typ:(non_null string)
+                ~args:Arg.[]
+                ~resolve:(fun _ {Poly.start_checkpoint; _} ->
+                  Coda_base.State_hash.to_base58_check start_checkpoint )
+            ; field "lockCheckpoint"
+                ~typ:(Lock_checkpoint.graphql_type ())
+                ~args:Arg.[]
+                ~resolve:(fun _ {Poly.lock_checkpoint; _} ->
+                  Lock_checkpoint.resolve lock_checkpoint )
+            ; field "epochLength"
+                ~typ:(non_null @@ Graphql_base_types.uint32 ())
+                ~args:Arg.[]
+                ~resolve:(fun _ {Poly.epoch_length; _} ->
+                  Coda_numbers.Length.to_uint32 epoch_length ) ] )
+
       let to_input
           ({ledger; seed; start_checkpoint; lock_checkpoint; epoch_length} :
             Value.t) =
@@ -1276,20 +1320,27 @@ module Data = struct
           ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
           ; lock_checkpoint= Lock_checkpoint.null
           ; epoch_length= Length.of_int 1 }
-
-      [%%define_locally
-      Poly.(ledger, seed, start_checkpoint, lock_checkpoint, epoch_length)]
     end
 
     module Staking = Make (struct
+      open Graphql_async
+      open Schema
       include Coda_base.State_hash
 
       let to_input (t : t) = Random_oracle.Input.field (t :> Tick.Field.t)
 
       let null = Coda_base.State_hash.(of_hash zero)
+
+      type graphql_type = string
+
+      let graphql_type () = non_null string
+
+      let resolve = to_base58_check
     end)
 
     module Next = Make (struct
+      open Graphql_async
+      open Schema
       include Optional_state_hash
 
       let to_input (t : t) =
@@ -1297,6 +1348,12 @@ module Data = struct
           (Option.value ~default:Optional_state_hash.none t :> Tick.Field.t)
 
       let null = None
+
+      type graphql_type = string option
+
+      let graphql_type () = string
+
+      let resolve = Option.map ~f:Coda_base.State_hash.to_base58_check
     end)
 
     let next_to_staking next =
@@ -1542,8 +1599,7 @@ module Data = struct
             ; next_epoch_data: 'next_epoch_data
             ; has_ancestor_in_same_checkpoint_window: 'bool
             ; checkpoints: 'checkpoints }
-          [@@deriving
-            sexp, bin_io, eq, compare, hash, to_yojson, version, fields]
+          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
         end
       end]
 
@@ -1575,7 +1631,7 @@ module Data = struct
         ; next_epoch_data: 'next_epoch_data
         ; has_ancestor_in_same_checkpoint_window: 'bool
         ; checkpoints: 'checkpoints }
-      [@@deriving sexp, compare, hash, to_yojson, fields]
+      [@@deriving sexp, compare, hash, to_yojson]
     end
 
     module Value = struct
@@ -2092,17 +2148,71 @@ module Data = struct
 
     let global_slot (t : Value.t) = Global_slot.to_uint32 t.curr_global_slot
 
-    [%%define_locally
-    Poly.
-      ( blockchain_length
-      , epoch_count
-      , min_epoch_length
-      , last_vrf_output
-      , total_currency
-      , staking_epoch_data
-      , next_epoch_data
-      , has_ancestor_in_same_checkpoint_window
-      , checkpoints )]
+    let blockchain_length {Poly.blockchain_length; _} = blockchain_length
+
+    let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
+      let open Graphql_async in
+      let open Schema in
+      let uint32, uint64 =
+        (Graphql_base_types.uint32 (), Graphql_base_types.uint64 ())
+      in
+      obj "ConsensusState" ~fields:(fun _ ->
+          [ field "blockchainLength" ~typ:(non_null uint32)
+              ~doc:"Length of the blockchain at this block"
+              ~args:Arg.[]
+              ~resolve:(fun _ {Poly.blockchain_length; _} ->
+                Coda_numbers.Length.to_uint32 blockchain_length )
+          ; field "epochCount" ~typ:(non_null uint32)
+              ~args:Arg.[]
+              ~resolve:(fun _ {Poly.epoch_count; _} ->
+                Coda_numbers.Length.to_uint32 epoch_count )
+          ; field "minEpochLength" ~typ:(non_null uint32)
+              ~args:Arg.[]
+              ~resolve:(fun _ {Poly.min_epoch_length; _} ->
+                Coda_numbers.Length.to_uint32 min_epoch_length )
+          ; field "lastVrfOutput" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:
+                (fun (_ : 'ctx resolve_info) {Poly.last_vrf_output; _} ->
+                Vrf.Output.Truncated.to_base58_check last_vrf_output )
+          ; field "totalCurrency"
+              ~doc:"Total currency in circulation at this block"
+              ~typ:(non_null uint64)
+              ~args:Arg.[]
+              ~resolve:(fun _ {Poly.total_currency; _} ->
+                Amount.to_uint64 total_currency )
+          ; field "stakingEpochData"
+              ~typ:
+                (non_null @@ Epoch_data.Staking.graphql_type "StakingEpochData")
+              ~args:Arg.[]
+              ~resolve:
+                (fun (_ : 'ctx resolve_info) {Poly.staking_epoch_data; _} ->
+                staking_epoch_data )
+          ; field "nextEpochData"
+              ~typ:(non_null @@ Epoch_data.Next.graphql_type "NextEpochData")
+              ~args:Arg.[]
+              ~resolve:
+                (fun (_ : 'ctx resolve_info) {Poly.next_epoch_data; _} ->
+                next_epoch_data )
+          ; field "hasAncestorInSameCheckpointWindow" ~typ:(non_null bool)
+              ~args:Arg.[]
+              ~resolve:
+                (fun _ {Poly.has_ancestor_in_same_checkpoint_window; _} ->
+                has_ancestor_in_same_checkpoint_window )
+          ; field "checkpoints" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ {Poly.checkpoints; _} ->
+                Checkpoints.(Hash.to_base58_check @@ hash @@ checkpoints) )
+          ; field "slot" ~doc:"Slot in which this block was created"
+              ~typ:(non_null uint32)
+              ~args:Arg.[]
+              ~resolve:(fun _ {Poly.curr_global_slot; _} ->
+                Global_slot.slot curr_global_slot )
+          ; field "epoch" ~doc:"Epoch in which this block was created"
+              ~typ:(non_null uint32)
+              ~args:Arg.[]
+              ~resolve:(fun _ {Poly.curr_global_slot; _} ->
+                Global_slot.epoch curr_global_slot ) ] )
   end
 
   module Prover_state = struct
@@ -2303,6 +2413,15 @@ module Hooks = struct
     if in_next_epoch || not epoch_is_finalized then
       (`Curr, !local_state.Data.next_epoch_snapshot)
     else (`Last, !local_state.staking_epoch_snapshot)
+
+  let get_epoch_ledger ~(consensus_state : Consensus_state.Value.t)
+      ~local_state =
+    let _, snapshot =
+      select_epoch_snapshot ~consensus_state
+        ~epoch:(Data.Consensus_state.curr_epoch consensus_state)
+        ~local_state
+    in
+    Data.Local_state.Snapshot.ledger snapshot
 
   type local_state_sync =
     { snapshot_id: Local_state.snapshot_identifier

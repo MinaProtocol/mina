@@ -501,12 +501,8 @@ let staking_ledger t =
     Transition_frontier.Breadcrumb.consensus_state
       (Transition_frontier.best_tip transition_frontier)
   in
-  let epoch = Consensus.Data.Consensus_state.curr_epoch consensus_state in
   let local_state = t.config.consensus_local_state in
-  let _, snapshot =
-    Consensus.Hooks.select_epoch_snapshot ~consensus_state ~epoch ~local_state
-  in
-  Consensus.Data.Local_state.Snapshot.ledger snapshot
+  Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
 
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier

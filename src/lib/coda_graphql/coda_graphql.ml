@@ -100,57 +100,11 @@ end
 
 module Types = struct
   open Schema
+  open Graphql_lib.Base_types
 
-  module Stringable = struct
-    (** string representation of IPv4 or IPv6 address *)
-    let ip_address = Unix.Inet_addr.to_string
+  let public_key = public_key ()
 
-    (** Unix form of time, which is the number of milliseconds that elapsed from January 1, 1970 *)
-    let date = Time.to_string
-
-    (** string representation of Trust_system.Banned_status *)
-    let banned_status = function
-      | Trust_system.Banned_status.Unbanned ->
-          None
-      | Banned_until tm ->
-          Some (date tm)
-
-    module State_hash = Codable.Make_base58_check (struct
-      include State_hash.Stable.V1
-
-      let description = "State hash"
-    end)
-
-    module Ledger_hash = Codable.Make_base58_check (struct
-      include Ledger_hash.Stable.V1
-
-      let description = "Ledger hash"
-    end)
-
-    module Frozen_ledger_hash = Codable.Make_base58_check (struct
-      include Frozen_ledger_hash.Stable.V1
-
-      let description = "Frozen ledger hash"
-    end)
-  end
-
-  let unsigned_scalar_scalar ~to_string typ_name =
-    scalar typ_name
-      ~doc:
-        (Core.sprintf
-           !"String representing a %s number in base 10"
-           (String.lowercase typ_name))
-      ~coerce:(fun num -> `String (to_string num))
-
-  let public_key =
-    scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
-      ~coerce:(fun key -> `String (Public_key.Compressed.to_base58_check key))
-
-  let uint32 =
-    unsigned_scalar_scalar ~to_string:Unsigned.UInt32.to_string "UInt32"
-
-  let uint64 =
-    unsigned_scalar_scalar ~to_string:Unsigned.UInt64.to_string "UInt64"
+  let uint64 = uint64 ()
 
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
@@ -324,12 +278,12 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the source ledger"
             ~args:Arg.[]
             ~resolve:(fun _ {Transaction_snark.Statement.source; _} ->
-              Stringable.Frozen_ledger_hash.to_base58_check source )
+              Frozen_ledger_hash.to_string source )
         ; field "targetLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the target ledger"
             ~args:Arg.[]
             ~resolve:(fun _ {Transaction_snark.Statement.target; _} ->
-              Stringable.Frozen_ledger_hash.to_base58_check target )
+              Frozen_ledger_hash.to_string target )
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
@@ -368,160 +322,14 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:
               (fun _ {Coda_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
-              Stringable.Frozen_ledger_hash.to_base58_check snarked_ledger_hash
-              )
+              Frozen_ledger_hash.to_string snarked_ledger_hash )
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
             ~resolve:
               (fun _ {Coda_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
-              Stringable.Ledger_hash.to_base58_check
+              Coda_base.Ledger_hash.to_string
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
-
-  module Consensus_state = struct end
-
-  let epoch_ledger =
-    let open Consensus.Data.Epoch_ledger in
-    obj "epochLedger" ~fields:(fun _ ->
-        [ field "hash" ~typ:(non_null string)
-            ~args:Arg.[]
-            ~resolve:(fun _ (ledger : Value.t) ->
-              Frozen_ledger_hash.to_string @@ hash ledger )
-        ; field "totalCurrency" ~typ:(non_null uint64)
-            ~args:Arg.[]
-            ~resolve:(fun _ ledger -> Amount.to_uint64 @@ total_currency ledger)
-        ] )
-
-  module Make_epoch_data (Lock_checkpoint : sig
-    type t
-
-    type epoch_data
-
-    val field : string -> f:(epoch_data -> t) -> (Coda_lib.t, epoch_data) field
-  end)
-  (Epoch_data : Consensus.Epoch_data_intf
-                with type ledger := Consensus.Data.Epoch_ledger.Value.t
-                 and type seed := Consensus.Data.Epoch_seed.t
-                 and type lock_checkpoint := Lock_checkpoint.t
-                 and type Value.t := Lock_checkpoint.epoch_data) (Name : sig
-      val t : string
-  end) =
-  struct
-    let typ =
-      obj Name.t ~fields:(fun _ ->
-          [ field "ledger" ~typ:(non_null epoch_ledger)
-              ~args:Arg.[]
-              ~resolve:(fun _ epoch_data -> Epoch_data.ledger epoch_data)
-          ; field "seed" ~typ:(non_null string)
-              ~args:Arg.[]
-              ~resolve:(fun _ epoch_data ->
-                Consensus.Data.Epoch_seed.to_base58_check
-                @@ Epoch_data.seed epoch_data )
-          ; field "startCheckpoint" ~typ:(non_null string)
-              ~args:Arg.[]
-              ~resolve:(fun _ epoch_data ->
-                Stringable.State_hash.to_base58_check
-                @@ Epoch_data.start_checkpoint epoch_data )
-          ; Lock_checkpoint.field "lockCheckpoint"
-              ~f:Epoch_data.lock_checkpoint
-          ; field "epochLength" ~typ:(non_null uint32)
-              ~args:Arg.[]
-              ~resolve:(fun _ epoch_data ->
-                Coda_numbers.Length.to_uint32
-                @@ Epoch_data.epoch_length epoch_data ) ] )
-  end
-
-  let staking_epoch_data name ~f =
-    field name ~typ:(non_null string)
-      ~args:Arg.[]
-      ~resolve:(fun _ state_hash ->
-        Stringable.State_hash.to_base58_check @@ f state_hash )
-
-  module Staking_epoch_data =
-    Make_epoch_data (struct
-        type t = State_hash.t
-
-        type epoch_data = Consensus.Data.Epoch_data.Staking.Value.t
-
-        let field name ~f =
-          field name ~typ:(non_null string)
-            ~args:Arg.[]
-            ~resolve:(fun _ epoch_data ->
-              Stringable.State_hash.to_base58_check @@ f epoch_data )
-      end)
-      (Consensus.Data.Epoch_data.Staking)
-      (struct
-        let t = "StakingEpochData"
-      end)
-
-  module Next_epoch_data =
-    Make_epoch_data (struct
-        type t = State_hash.t option
-
-        type epoch_data = Consensus.Data.Epoch_data.Next.Value.t
-
-        let field name ~f =
-          field name ~typ:string
-            ~args:Arg.[]
-            ~resolve:(fun _ epoch_data ->
-              Option.map ~f:Stringable.State_hash.to_base58_check
-              @@ f epoch_data )
-      end)
-      (Consensus.Data.Epoch_data.Next)
-      (struct
-        let t = "NextEpochData"
-      end)
-
-  let consensus_state =
-    let open Consensus.Data.Consensus_state in
-    obj "ConsensusState" ~fields:(fun _ ->
-        [ field "blockchainLength" ~typ:(non_null uint32)
-            ~doc:"Length of the blockchain at this block"
-            ~args:Arg.[]
-            ~resolve:(fun _ (t : Value.t) ->
-              Coda_numbers.Length.to_uint32 @@ blockchain_length t )
-        ; field "epochCount" ~typ:(non_null uint32)
-            ~args:Arg.[]
-            ~resolve:(fun _ (t : Value.t) ->
-              Coda_numbers.Length.to_uint32 @@ epoch_count t )
-        ; field "minEpochLength" ~typ:(non_null uint32)
-            ~args:Arg.[]
-            ~resolve:(fun _ (t : Value.t) ->
-              Coda_numbers.Length.to_uint32 @@ min_epoch_length t )
-        ; field "lastVrfOutput" ~typ:(non_null string)
-            ~args:Arg.[]
-            ~resolve:(fun _ (t : Value.t) ->
-              Consensus.Data.Vrf.Output.Truncated.to_base58_check
-              @@ last_vrf_output t )
-        ; field "totalCurrency"
-            ~doc:"Total currency in circulation at this block"
-            ~typ:(non_null uint64)
-            ~args:Arg.[]
-            ~resolve:(fun _ t -> Amount.to_uint64 @@ total_currency t)
-        ; field "stakingEpochData"
-            ~typ:(non_null Staking_epoch_data.typ)
-            ~args:Arg.[]
-            ~resolve:(fun _ t -> staking_epoch_data t)
-        ; field "nextEpochData"
-            ~typ:(non_null Next_epoch_data.typ)
-            ~args:Arg.[]
-            ~resolve:(fun _ t -> next_epoch_data t)
-        ; field "hasAncestorInSameCheckpointWindow" ~typ:(non_null bool)
-            ~args:Arg.[]
-            ~resolve:(fun _ t -> has_ancestor_in_same_checkpoint_window t)
-        ; field "checkpoints" ~typ:(non_null string)
-            ~args:Arg.[]
-            ~resolve:(fun _ t ->
-              Consensus.Data.Checkpoints.(
-                Hash.to_base58_check @@ hash @@ checkpoints t) )
-        ; field "slot" ~doc:"Slot in which this block was created"
-            ~typ:(non_null uint32)
-            ~args:Arg.[]
-            ~resolve:(fun _ t -> curr_slot t)
-        ; field "epoch" ~doc:"Epoch in which this block was created"
-            ~typ:(non_null uint32)
-            ~args:Arg.[]
-            ~resolve:(fun _ t -> curr_epoch t) ] )
 
   let protocol_state =
     let open Filtered_external_transition.Protocol_state in
@@ -530,7 +338,7 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the previous state"
             ~args:Arg.[]
             ~resolve:(fun _ t ->
-              Stringable.State_hash.to_base58_check t.previous_state_hash )
+              State_hash.to_base58_check t.previous_state_hash )
         ; field "blockchainState"
             ~doc:"State which is agnostic of a particular consensus algorithm"
             ~typ:(non_null blockchain_state)
@@ -540,7 +348,7 @@ module Types = struct
             ~doc:
               "State specific to the Codaboros Proof of Stake consensus \
                algorithm"
-            ~typ:(non_null consensus_state)
+            ~typ:(non_null @@ Consensus.Data.Consensus_state.graphql_type ())
             ~args:Arg.[]
             ~resolve:(fun _ t -> t.consensus_state) ] )
 
@@ -955,7 +763,7 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the state after this block"
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.hash; _} ->
-              Stringable.State_hash.to_base58_check hash )
+              State_hash.to_base58_check hash )
         ; field "stateHashField" ~typ:(non_null string)
             ~doc:"Bigint field-element representation of stateHash"
             ~args:Arg.[]
@@ -1052,20 +860,25 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
+    let string_of_banned_status = function
+      | Trust_system.Banned_status.Unbanned ->
+          None
+      | Banned_until tm ->
+          Some (Time.to_string tm)
+
     let trust_status =
       obj "TrustStatusPayload" ~fields:(fun _ ->
           let open Trust_system.Peer_status in
           [ field "ip_addr" ~typ:(non_null string) ~doc:"IP address"
               ~args:Arg.[]
-              ~resolve:(fun (_ : Coda_lib.t resolve_info) (ip_addr, _) ->
-                Unix.Inet_addr.to_string ip_addr )
+              ~resolve:(fun _ (ip_addr, _) -> Unix.Inet_addr.to_string ip_addr)
           ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
               ~args:Arg.[]
               ~resolve:(fun _ (_, {trust; _}) -> trust)
           ; field "banned_status" ~typ:string ~doc:"Banned status"
               ~args:Arg.[]
               ~resolve:(fun _ (_, {banned; _}) ->
-                Stringable.banned_status banned ) ] )
+                string_of_banned_status banned ) ] )
 
     let send_payment =
       obj "SendPaymentPayload" ~fields:(fun _ ->
@@ -1538,11 +1351,11 @@ module Types = struct
         module Cursor = struct
           type t = State_hash.t
 
-          let serialize = Stringable.State_hash.to_base58_check
+          let serialize = State_hash.to_base58_check
 
           let deserialize ?error data =
             result_of_or_error
-              (Stringable.State_hash.of_base58_check data)
+              (State_hash.of_base58_check data)
               ~error:(Option.value error ~default:"Invalid state hash data")
 
           let doc = Doc.bin_prot "Opaque pagination cursor for a block"
