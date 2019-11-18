@@ -148,10 +148,6 @@ jobs:
                     nix-build default.nix
 
     build-macos:
-      # only run when there's a 'release' tag
-      # filters:
-      #   tags:
-      #      only: /^release.*/
         macos:
             xcode: "10.2.1"
         resource_class: large
@@ -169,6 +165,7 @@ jobs:
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
+            ### homebrew
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
@@ -184,7 +181,7 @@ jobs:
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
-
+            ### opam
             - run:
                 name: Create opam cache signature file
                 command: |
@@ -213,6 +210,7 @@ jobs:
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
+            ### nix/cachix
             - run:
                 name: Install nix and cachix
                 command: |
@@ -226,32 +224,30 @@ jobs:
                     cachix use codaprotocol
                     cd src/app/libp2p_helper
                     nix-build default.nix
+            ### dune
             - run:
                 name: Build ocaml
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                 command: |
                     bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
-                no_output_timeout: 1h
-                # We want the build to fail here if we generated PVkeys so no
-                # rebuild after a regen causes the build to exit
+                no_output_timeout: 20m
+            ### collection
             - run:
-                name: Collect PV Keys
+                name: Collect Keys and Binaries
                 command: |
                     mkdir -p package/keys
+                    echo 'keys'
                     cp /tmp/s3_cache_dir/* package/keys/.
-            - run:
-                name: Collect and rewrite aux binaries (libp2p_helper + logproc)
-                command: |
+                    echo 'coda'
+                    cp src/_build/default/app/cli/src/coda.exe package/coda
+                    echo 'libp2p_helper'
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
                     ./scripts/librewrite-macos.sh package/coda-libp2p_helper
+                    echo 'coda-logproc'
                     cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
-            - run:
-                name: Collect coda binary
-                command: |
-                    cp src/_build/default/app/cli/src/coda.exe package/coda
             - run:
                 name: Build homebrew package
                 command: |
@@ -271,10 +267,9 @@ jobs:
         steps:
             - checkout
             - run:
-                  name: Artifacts
+                  name: Artifacts Path
                   command: |
                       mkdir -p /tmp/artifacts
-                      touch /tmp/artifacts/coda_pvkeys_dummy
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
@@ -291,11 +286,8 @@ jobs:
                     DUNE_PROFILE: testnet_postake_medium_curves
                   no_output_timeout: 20m
             - run:
-                  name: Upload generated keys
-                  command: |
-                      ls -l /tmp/coda_cache_dir/
-                      aws s3 sync --acl public-read /tmp/coda_cache_dir/ s3://snark-keys.o1test.net/
-                      sleep 10
+                  name: Upload generated PV keys
+                  command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
             - run:
                   name: Rebuild for pvkey changes
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
