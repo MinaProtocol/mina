@@ -40,13 +40,22 @@ module Spec : sig
     -> 'a t
 end
 
-(** A Semigroup for tracking the "dirty bit" of whether or not we've generated
+(** A monoid for tracking the "dirty bit" of whether or not we've generated
  * something or only received cache hits *)
 module Track_generated : sig
   type t = [`Generated_something | `Cache_hit]
+
+  val empty : t
 
   (** Generated_something overrides caches hits *)
   val ( + ) : t -> t -> t
 end
 
-val run : 'a Spec.t -> ('a * Track_generated.t) Deferred.t
+module With_track_generated : sig
+  type 'a t = {data: 'a; dirty: Track_generated.t}
+end
+
+module Deferred_with_track_generated :
+  Monad.S with type 'a t = 'a With_track_generated.t Deferred.t
+
+val run : 'a Spec.t -> 'a Deferred_with_track_generated.t
