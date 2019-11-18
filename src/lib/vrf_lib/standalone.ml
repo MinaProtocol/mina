@@ -17,7 +17,7 @@ module Evaluation = struct
         end
       end]
 
-      type 'scalar t = 'scalar Stable.V1.t = {c: 'scalar; s: 'scalar}
+      type 'scalar t = 'scalar Stable.Latest.t = {c: 'scalar; s: 'scalar}
       [@@deriving sexp]
     end
   end
@@ -32,7 +32,7 @@ module Evaluation = struct
       end
     end]
 
-    type ('group, 'dleq) t = ('group, 'dleq) Stable.V1.t =
+    type ('group, 'dleq) t = ('group, 'dleq) Stable.Latest.t =
       {discrete_log_equality: 'dleq; scaled_message_hash: 'group}
     [@@deriving sexp]
   end
