@@ -7,7 +7,12 @@ module Styles = {
       color(textColor),
       display(`flex),
       borderRadius(`px(3)),
-      padding4(~top=`rem(0.25), ~right=`rem(0.75), ~bottom=`rem(0.25), ~left=`rem(0.5)),
+      padding4(
+        ~top=`rem(0.25),
+        ~right=`rem(0.75),
+        ~bottom=`rem(0.25),
+        ~left=`rem(0.5),
+      ),
     ]);
 
   let text = Theme.Text.Body.semiBold;

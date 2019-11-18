@@ -36,6 +36,10 @@ module Scan_state : sig
 
   val partition_if_overflowing : t -> Space_partition.t
 
+  val target_merkle_root : t -> Frozen_ledger_hash.t option
+
+  val staged_transactions : t -> Transaction.t list Or_error.t
+
   val all_work_statements : t -> Transaction_snark_work.Statement.t list
 
   val work_statements_for_new_diff :
@@ -107,13 +111,6 @@ val apply_diff_unchecked :
        * [`Pending_coinbase_data of bool * Currency.Amount.t]
      , Staged_ledger_error.t )
      Deferred.Result.t
-
-module For_tests : sig
-  val materialized_snarked_ledger_hash :
-       t
-    -> expected_target:Frozen_ledger_hash.t
-    -> Frozen_ledger_hash.t Or_error.t
-end
 
 val current_ledger_proof : t -> Ledger_proof.t option
 

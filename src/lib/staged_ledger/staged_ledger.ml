@@ -92,7 +92,13 @@ module T = struct
             "Verification in apply_diff for work $work_id took $time ms" ;
           Deferred.return b
       | Error e ->
-          log_error (Error.to_string_hum e) ~metadata:[]
+          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("statement", Transaction_snark.Statement.to_yojson statement)
+              ; ("error", `String (Error.to_string_hum e)) ]
+            "Verifier error when checking transaction snark for statement \
+             $statement: $error" ;
+          exit 21
 
   let verify ~logger ~verifier ~message job proof prover =
     let open Deferred.Let_syntax in
@@ -171,47 +177,6 @@ module T = struct
           ~error_prefix ~ledger_hash_end:ledger
           ~ledger_hash_begin:(Some (get_target proof))
 
-  (* TODO: Remove this. This is deprecated *)
-  let materialized_snarked_ledger_hash :
-         t
-      -> expected_target:Frozen_ledger_hash.t
-      -> Frozen_ledger_hash.t Or_error.t =
-   fun {ledger; scan_state; _} ~expected_target ->
-    let open Or_error.Let_syntax in
-    let txns_still_being_worked_on = Scan_state.staged_undos scan_state in
-    let snarked_ledger = Ledger.register_mask ledger (Ledger.Mask.create ()) in
-    let res =
-      let%bind () =
-        Scan_state.Staged_undos.apply txns_still_being_worked_on snarked_ledger
-      in
-      let snarked_ledger_hash =
-        Ledger.merkle_root snarked_ledger |> Frozen_ledger_hash.of_ledger_hash
-      in
-      if not (Frozen_ledger_hash.equal snarked_ledger_hash expected_target)
-      then
-        Or_error.errorf
-          !"Error materializing the snarked ledger with hash \
-            %{sexp:Frozen_ledger_hash.t} got %{sexp:Frozen_ledger_hash.t}: "
-          expected_target snarked_ledger_hash
-      else
-        match Scan_state.latest_ledger_proof scan_state with
-        | None ->
-            return snarked_ledger_hash
-        | Some proof ->
-            let target = get_target proof in
-            if Frozen_ledger_hash.equal snarked_ledger_hash target then
-              return snarked_ledger_hash
-            else
-              Or_error.errorf
-                !"Last snarked ledger (%{sexp: Frozen_ledger_hash.t}) is \
-                  different from the one being requested ((%{sexp: \
-                  Frozen_ledger_hash.t}))"
-                target expected_target
-    in
-    (* Make sure we don't leak this mask. *)
-    Ledger.unregister_mask_exn ledger snarked_ledger |> ignore ;
-    res
-
   let statement_exn t =
     let open Deferred.Let_syntax in
     match%map Statement_scanner.scan_statement t.scan_state ~verifier:() with
@@ -225,17 +190,6 @@ module T = struct
   let of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash ~ledger
       ~scan_state ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
-    let verify_snarked_ledger t snarked_ledger_hash =
-      match
-        materialized_snarked_ledger_hash t ~expected_target:snarked_ledger_hash
-      with
-      | Ok _ ->
-          Ok ()
-      | Error e ->
-          Or_error.error_string
-            ( "Error verifying snarked ledger hash from the ledger.\n"
-            ^ Error.to_string_hum e )
-    in
     let t = {ledger; scan_state; pending_coinbase_collection} in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants scan_state
@@ -244,9 +198,6 @@ module T = struct
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
-    in
-    let%bind () =
-      Deferred.return (verify_snarked_ledger t snarked_ledger_hash)
     in
     return t
 
@@ -341,7 +292,9 @@ module T = struct
   let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
     match t with
     | Coinbase c ->
-        Pending_coinbase.Stack.push current_stack c
+        if Coda_compile_config.pending_coinbase_hack then
+          Pending_coinbase.Stack.empty
+        else Pending_coinbase.Stack.push current_stack c
     | _ ->
         current_stack
 
@@ -374,14 +327,14 @@ module T = struct
     let open Deferred.Let_syntax in
     let public_keys = function
       | Transaction.Fee_transfer t ->
-          Fee_transfer.receivers t
+          Fee_transfer.receivers t |> One_or_two.to_list
       | User_command t ->
           let t = (t :> User_command.t) in
           User_command.accounts_accessed t
       | Coinbase c ->
           let ft_receivers =
             Option.value_map c.fee_transfer ~default:[] ~f:(fun ft ->
-                Fee_transfer.receivers (Fee_transfer.of_single ft) )
+                Fee_transfer.receivers (`One ft) |> One_or_two.to_list )
           in
           c.proposer :: ft_receivers
     in
@@ -720,32 +673,44 @@ module T = struct
     , `Staged_ledger new_staged_ledger
     , `Pending_coinbase_data (is_new_stack, coinbase_amount) )
 
+  let update_metrics (t : t) (witness : Staged_ledger_diff.t) =
+    let open Or_error.Let_syntax in
+    let user_commands = Staged_ledger_diff.user_commands witness in
+    let work = Staged_ledger_diff.completed_works witness in
+    let%bind total_txn_fee = sum_fees user_commands ~f:User_command.fee in
+    let%bind total_snark_fee = sum_fees work ~f:Transaction_snark_work.fee in
+    let%bind () = Scan_state.update_metrics t.scan_state in
+    Or_error.try_with (fun () ->
+        let open Coda_metrics in
+        Gauge.set Scan_state_metrics.snark_fee_per_block
+          (Int.to_float @@ Fee.to_int total_snark_fee) ;
+        Gauge.set Scan_state_metrics.transaction_fees_per_block
+          (Int.to_float @@ Fee.to_int total_txn_fee) ;
+        Gauge.set Scan_state_metrics.purchased_snark_work_per_block
+          (Float.of_int @@ List.length work) ;
+        Gauge.set Scan_state_metrics.snark_work_required
+          (Float.of_int
+             (List.length (Scan_state.all_work_pairs_exn t.scan_state))) )
+
   let apply t witness ~logger ~verifier =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
-    Coda_metrics.(
-      Gauge.set Snark_work.completed_snark_work_last_block
-        (Float.of_int @@ List.length work)) ;
     let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
       @@ Pre_diff_info.get witness
       |> Deferred.return
     in
-    let%map res = apply_diff t prediff ~logger in
-    let _, _, `Staged_ledger new_staged_ledger, _ = res in
+    let%map ((_, _, `Staged_ledger new_staged_ledger, __) as res) =
+      apply_diff t prediff ~logger
+    in
     let () =
-      try
-        Coda_metrics.(
-          Gauge.set Snark_work.scan_state_snark_work
-            (Float.of_int
-               (List.length
-                  (Scan_state.all_work_pairs_exn new_staged_ledger.scan_state))))
-      with exn ->
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("error", `String (Exn.to_string exn))]
-          !"Error when getting all work pairs from scan state: $error" ;
-        Exn.reraise exn "Error when getting all work pairs from scan state"
+      Or_error.iter_error (update_metrics new_staged_ledger witness)
+        ~f:(fun e ->
+          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("error", `String (Error.to_string_hum e))]
+            !"Error updating metrics after applying staged_ledger diff: $error"
+      )
     in
     res
 
@@ -1282,10 +1247,6 @@ module T = struct
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self
     ; state_body_hash }
-
-  module For_tests = struct
-    let materialized_snarked_ledger_hash = materialized_snarked_ledger_hash
-  end
 end
 
 include T
@@ -1514,21 +1475,6 @@ let%test_module "test" =
             List.length @@ Staged_ledger_diff.user_commands diff
           in
           iter_cmds_acc (List.drop cmds cmds_applied_count) counts_rest acc' f
-
-    (** Same as iter_cmds_acc but with no accumulator. *)
-    let iter_cmds :
-           User_command.With_valid_signature.t list
-        -> int option list
-        -> (   User_command.With_valid_signature.t list
-            -> int option
-            -> User_command.With_valid_signature.t Sequence.t
-            -> Staged_ledger_diff.t Deferred.t)
-        -> unit Deferred.t =
-     fun cmds cmd_iters f ->
-      iter_cmds_acc cmds cmd_iters ()
-        (fun cmds_left count_opt cmds_this_iter () ->
-          let%map diff = f cmds_left count_opt cmds_this_iter in
-          (diff, ()) )
 
     (** Generic test framework. *)
     let test_simple :
@@ -1817,34 +1763,6 @@ let%test_module "test" =
               in
               (*Note: if this fails, try increasing the number of trials*)
               assert checked ) )
-
-    let%test_unit "Snarked ledger" =
-      let logger = Logger.null () in
-      let pids = Child_processes.Termination.create_pid_table () in
-      Quickcheck.test (gen_below_capacity ()) ~trials:20
-        ~f:(fun (ledger_init_state, cmds, iters) ->
-          async_with_ledgers ledger_init_state (fun sl _test_mask ->
-              iter_cmds cmds iters (fun _cmds_left _count_opt cmds_this_iter ->
-                  let%map proof_opt, diff =
-                    create_and_apply sl logger pids cmds_this_iter
-                      stmt_to_work_random_prover
-                  in
-                  ( match proof_opt with
-                  | None ->
-                      ()
-                  | Some proof ->
-                      let last_snarked_ledger_hash =
-                        (Ledger_proof.statement (fst proof)).target
-                      in
-                      let materialized_snarked_ledger_hash =
-                        Or_error.ok_exn
-                        @@ Sl.For_tests.materialized_snarked_ledger_hash !sl
-                             ~expected_target:last_snarked_ledger_hash
-                      in
-                      assert (
-                        Frozen_ledger_hash.equal last_snarked_ledger_hash
-                          materialized_snarked_ledger_hash ) ) ;
-                  diff ) ) )
 
     let stmt_to_work_restricted work_list provers
         (stmts : Transaction_snark_work.Statement.t) :

@@ -63,7 +63,10 @@ module Statement = struct
         ; supply_increase: Currency.Amount.Stable.V1.t
         ; pending_coinbase_stack_state:
             Pending_coinbase_stack_state.Stable.V1.t
-        ; fee_excess: Currency.Fee.Signed.Stable.V1.t
+        ; fee_excess:
+            ( Currency.Fee.Stable.V1.t
+            , Sgn.Stable.V1.t )
+            Currency.Signed.Stable.V1.t
         ; proof_type: Proof_type.Stable.V1.t }
       [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -72,12 +75,12 @@ module Statement = struct
   end]
 
   type t = Stable.Latest.t =
-    { source: Frozen_ledger_hash.Stable.V1.t
-    ; target: Frozen_ledger_hash.Stable.V1.t
-    ; supply_increase: Currency.Amount.Stable.V1.t
+    { source: Frozen_ledger_hash.t
+    ; target: Frozen_ledger_hash.t
+    ; supply_increase: Currency.Amount.t
     ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-    ; fee_excess: Currency.Fee.Signed.Stable.V1.t
-    ; proof_type: Proof_type.Stable.V1.t }
+    ; fee_excess: Currency.Fee.Signed.t
+    ; proof_type: Proof_type.t }
   [@@deriving sexp, hash, compare, yojson]
 
   let option lab =
@@ -133,7 +136,8 @@ module Stable = struct
       ; proof_type: Proof_type.Stable.V1.t
       ; supply_increase: Amount.Stable.V1.t
       ; pending_coinbase_stack_state: Pending_coinbase_stack_state.Stable.V1.t
-      ; fee_excess: Amount.Signed.Stable.V1.t
+      ; fee_excess:
+          (Amount.Stable.V1.t, Sgn.Stable.V1.t) Currency.Signed.Stable.V1.t
       ; sok_digest: Sok_message.Digest.Stable.V1.t
       ; proof: Proof.Stable.V1.t }
     [@@deriving compare, fields, sexp, version]
@@ -156,14 +160,14 @@ module Stable = struct
 end]
 
 type t = Stable.Latest.t =
-  { source: Frozen_ledger_hash.Stable.V1.t
-  ; target: Frozen_ledger_hash.Stable.V1.t
-  ; proof_type: Proof_type.Stable.V1.t
-  ; supply_increase: Amount.Stable.V1.t
+  { source: Frozen_ledger_hash.t
+  ; target: Frozen_ledger_hash.t
+  ; proof_type: Proof_type.t
+  ; supply_increase: Amount.t
   ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-  ; fee_excess: Amount.Signed.Stable.V1.t
-  ; sok_digest: Sok_message.Digest.Stable.V1.t
-  ; proof: Proof.Stable.V1.t }
+  ; fee_excess: (Amount.t, Sgn.t) Currency.Signed.t
+  ; sok_digest: Sok_message.Digest.t
+  ; proof: Proof.t }
 [@@deriving fields, sexp]
 
 let to_yojson = Stable.Latest.to_yojson
@@ -295,7 +299,7 @@ module Base = struct
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
   let%snarkydef apply_tagged_transaction (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-      root pending_coinbase_stack_before state_body_hash
+      root pending_coinbase_stack_before pending_coinbase_after state_body_hash
       ({sender; signature; payload} : Transaction_union.var) =
     let nonce = payload.common.nonce in
     let tag = payload.body.tag in
@@ -315,7 +319,7 @@ module Base = struct
     let%bind sender_compressed = Public_key.compress_var sender in
     let proposer = payload.body.public_key in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
-    let%bind pending_coinbase_stack_after =
+    let%bind computed_pending_coinbase_stack_after =
       let coinbase = (proposer, payload.body.amount, state_body_hash) in
       let%bind stack' =
         Pending_coinbase.Stack.Checked.push pending_coinbase_stack_before
@@ -323,6 +327,16 @@ module Base = struct
       in
       Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
         ~else_:pending_coinbase_stack_before
+    in
+    let%bind () =
+      let%bind correct_coinbase_stack =
+        if Coda_compile_config.pending_coinbase_hack then
+          Checked.return Boolean.true_
+        else
+          Pending_coinbase.Stack.equal_var
+            computed_pending_coinbase_stack_after pending_coinbase_after
+      in
+      Boolean.Assert.is_true correct_coinbase_stack
     in
     let%bind root =
       let%bind is_writeable =
@@ -391,7 +405,7 @@ module Base = struct
           in
           {account with balance; delegate; public_key= receiver} )
     in
-    (root, pending_coinbase_stack_after, excess, supply_increase)
+    (root, excess, supply_increase)
 
   (* Someday:
    write the following soundness tests:
@@ -436,13 +450,18 @@ module Base = struct
       exists' Pending_coinbase.Stack.typ ~f:(fun s ->
           (Prover_state.pending_coinbase_stack_state s).source )
     in
+    let%bind pending_coinbase_after =
+      exists' Pending_coinbase.Stack.typ ~f:(fun s ->
+          (Prover_state.pending_coinbase_stack_state s).target )
+    in
     let%bind state_body_hash =
       exists' State_body_hash.typ ~f:Prover_state.state_body_hash
     in
-    let%bind root_after, pending_coinbase_after, fee_excess, supply_increase =
+    let%bind root_after, fee_excess, supply_increase =
       apply_tagged_transaction
         (module Shifted)
-        root_before pending_coinbase_before state_body_hash t
+        root_before pending_coinbase_before pending_coinbase_after
+        state_body_hash t
     in
     let%map () =
       with_label __LOC__
@@ -496,10 +515,12 @@ module Base = struct
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Keypair.vk
+        Cached.component ~label:"transaction_snark_base_verification"
+          ~f:Keypair.vk
           (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+        Cached.component ~label:"transaction_snark_base_proving" ~f:Keypair.pk
+          (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -507,6 +528,7 @@ module Base = struct
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
       ~brew_install_path:Cache_dir.brew_install_path
+      ~s3_install_path:Cache_dir.s3_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(tick_input ()) main))
@@ -785,10 +807,12 @@ module Merge = struct
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Keypair.vk
+        Cached.component ~label:"transaction_snark_merge_verification"
+          ~f:Keypair.vk
           (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+        Cached.component ~label:"transaction_snark_merge_proving" ~f:Keypair.pk
+          (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -796,6 +820,7 @@ module Merge = struct
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
       ~brew_install_path:Cache_dir.brew_install_path
+      ~s3_install_path:Cache_dir.s3_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(input ()) main))
@@ -1033,10 +1058,12 @@ struct
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Keypair.vk
+        Cached.component ~label:"transaction_snark_wrap_verification"
+          ~f:Keypair.vk
           (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+        Cached.component ~label:"transaction_snark_wrap_proving" ~f:Keypair.pk
+          (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -1044,6 +1071,7 @@ struct
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
       ~brew_install_path:Cache_dir.brew_install_path
+      ~s3_install_path:Cache_dir.s3_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:wrap_input main))
@@ -1338,7 +1366,7 @@ module Keys = struct
     module Location = Per_snark_location
 
     let checksum ~base ~merge ~wrap =
-      checksum ~prefix:"verification" ~base ~merge ~wrap
+      checksum ~prefix:"transaction_snark_verification" ~base ~merge ~wrap
 
     let load ({merge; base; wrap} : Location.t) =
       let open Storage in
@@ -1373,7 +1401,7 @@ module Keys = struct
     module Location = Per_snark_location
 
     let checksum ~base ~merge ~wrap =
-      checksum ~prefix:"proving" ~base ~merge ~wrap
+      checksum ~prefix:"transaction_snark_proving" ~base ~merge ~wrap
 
     let load ({merge; base; wrap} : Location.t) =
       let open Storage in
@@ -1442,7 +1470,7 @@ module Keys = struct
 
   let cached () =
     let paths path = Cache_dir.possible_paths (Filename.basename path) in
-    let open Async in
+    let open Cached.Deferred_with_track_generated.Let_syntax in
     let%bind base_vk, base_pk = Cached.run Base.cached in
     let%bind merge_vk, merge_pk = Cached.run Merge.cached in
     let%map wrap_vk, wrap_pk =

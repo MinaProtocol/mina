@@ -120,12 +120,8 @@ let jobOpenings = [|
     "platform-engineer",
     "Senior Platform Engineer (Frontend Product) (San Francisco)",
   ),
-  (
-    "marketing-and-communications-manager",
-    "Marketing and Communications Manager (San Francisco)",
-  ),
+  ("visual-motion-designer", "Visual & Motion Designer (San Francisco)"),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)"),
-  ("cryptography-engineer", "Cryptography Engineer (San Francisco)"),
 |];
 
 Rimraf.sync("site");

@@ -15,7 +15,9 @@ module Database = struct
     end]
   end
 
-  include Rocksdb.Serializable.Make (State_hash.Stable.V1) (Value.Stable.V1)
+  include Rocksdb.Serializable.Make
+            (State_hash.Stable.Latest)
+            (Value.Stable.Latest)
 end
 
 module Pagination =

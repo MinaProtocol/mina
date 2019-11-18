@@ -1,9 +1,6 @@
 open Core_kernel
 open Ppxlib
-
-let mk_loc ~loc txt = {Location.loc; txt}
-
-let map_loc ~f {Location.loc; txt} = {Location.loc; txt= f txt}
+open Versioned_util
 
 let parse_opt = Ast_pattern.parse ~on_error:(fun () -> None)
 
@@ -165,7 +162,7 @@ let version_type version stri =
                       buf ~pos_ref
                   in
                   (* sanity check *)
-                  assert (Int.equal read_version version) ;
+                  assert (Core_kernel.Int.equal read_version version) ;
                   t]]]
     ; [%stri
         let __bin_read_t__ =
@@ -178,7 +175,7 @@ let version_type version stri =
                       buf ~pos_ref i
                   in
                   (* sanity check *)
-                  assert (Int.equal read_version version) ;
+                  assert (Core_kernel.Int.equal read_version version) ;
                   t]]]
     ; [%stri
         let bin_size_t =
@@ -255,11 +252,8 @@ let convert_module_stri last_version stri =
           "Expected a statement of the form `module Vn = struct ... end`." )
       (fun name str -> (name, str))
   in
-  Versioned.validate_module_version name.txt name.loc ;
-  let version =
-    String.sub name.txt ~pos:1 ~len:(String.length name.txt - 1)
-    |> int_of_string
-  in
+  validate_module_version name.txt name.loc ;
+  let version = version_of_versioned_module_name name.txt in
   Option.iter last_version ~f:(fun last_version ->
       if version = last_version then
         (* Mimic wording of the equivalent OCaml error. *)
@@ -351,8 +345,8 @@ let convert_modbody ~loc body =
               let open Core_kernel in
               let pos_ref = ref 0 in
               (* Rely on layout, assume that the first element of the record is
-           the first data in the buffer.
-        *)
+                 the first data in the buffer.
+              *)
               let version = Bin_prot.Std.bin_read_int ~pos_ref buf in
               Array.find_map versions ~f:(fun (i, f) ->
                   if Int.equal i version then Some (f buf) else None )]
@@ -363,12 +357,6 @@ let convert_modbody ~loc body =
         rev_str
   in
   List.rev rev_str
-
-let check_modname ~loc name =
-  if name = "Stable" then name
-  else
-    Location.raise_errorf ~loc
-      "Expected a module named Stable, but got a module named %s." name
 
 let version_module ~loc ~path:_ modname modbody =
   Printexc.record_backtrace true ;
@@ -383,17 +371,165 @@ let version_module ~loc ~path:_ modname modbody =
     Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
     raise exn
 
+(* code for module declarations in signatures
+
+   - add deriving bin_io, version to list of deriving items for the type "t" in versioned modules
+   - add "module Latest = Vn" to Stable module
+   - if Stable.Latest.t has no parameters, add signature items for "versions" and "deserialize_binary_opt"
+ *)
+
+(* parameterless_t means the type t in the module type has no parameters *)
+type sig_accum = {sigitems: signature; parameterless_t: bool}
+
+let convert_module_type_signature_item {sigitems; parameterless_t} sigitem :
+    sig_accum =
+  match sigitem.psig_desc with
+  | Psig_type
+      ( recflag
+      , [ ( {ptype_name= {txt= "t"; loc}; ptype_attributes; ptype_params; _} as
+          type_ ) ] ) ->
+      let ptype_attributes' = add_deriving ~loc ptype_attributes in
+      let psig_desc =
+        Psig_type (recflag, [{type_ with ptype_attributes= ptype_attributes'}])
+      in
+      let parameterless_t = List.is_empty ptype_params in
+      {sigitems= {sigitem with psig_desc} :: sigitems; parameterless_t}
+  | _ ->
+      {sigitems= sigitem :: sigitems; parameterless_t}
+
+let convert_module_type_signature signature : sig_accum =
+  List.fold signature
+    ~init:{sigitems= []; parameterless_t= false}
+    ~f:convert_module_type_signature_item
+
+type module_type_with_convertible =
+  {module_type: module_type; convertible: bool}
+
+(* add deriving items to type t in module type *)
+let convert_module_type mod_ty =
+  match mod_ty.pmty_desc with
+  | Pmty_signature signature ->
+      let {sigitems; parameterless_t} =
+        convert_module_type_signature signature
+      in
+      { module_type= {mod_ty with pmty_desc= Pmty_signature (List.rev sigitems)}
+      ; convertible= parameterless_t }
+  | _ ->
+      Location.raise_errorf ~loc:mod_ty.pmty_loc
+        "Expected versioned module type to be a signature"
+
+(* latest is the name of the module to be equated with Latest
+   last is the last module seen in the fold
+   convertible is true if the latest module's type t has no parameters
+   sigitems are the signature for the module, in reverse order
+ *)
+type module_accum =
+  { latest: string option
+  ; last: int option
+  ; convertible: bool
+  ; sigitems: signature }
+
+(* convert modules Vn ... V1 contained in Stable *)
+let convert_module_decls ~loc:_ signature =
+  let init = {latest= None; last= None; convertible= false; sigitems= []} in
+  let f {latest; last; convertible; sigitems} sigitem =
+    match sigitem.psig_desc with
+    | Psig_module ({pmd_name; pmd_type; _} as pmd) ->
+        validate_module_version pmd_name.txt pmd_name.loc ;
+        let version = version_of_versioned_module_name pmd_name.txt in
+        Option.iter last ~f:(fun n ->
+            if Int.equal version n then
+              Location.raise_errorf ~loc:pmd_name.loc
+                "Duplicate versions in versioned modules" ;
+            if Int.( > ) version n then
+              Location.raise_errorf ~loc:pmd_name.loc
+                "Versioned modules must be listed in decreasing order" ) ;
+        let in_latest = Option.is_none latest in
+        let latest = if in_latest then Some pmd_name.txt else latest in
+        let {module_type; convertible= module_convertible} =
+          convert_module_type pmd_type
+        in
+        let psig_desc' = Psig_module {pmd with pmd_type= module_type} in
+        let sigitem' = {sigitem with psig_desc= psig_desc'} in
+        (* use current convertible if in latest module, else the accumulated convertible *)
+        let convertible =
+          if in_latest then module_convertible else convertible
+        in
+        { latest
+        ; last= Some version
+        ; convertible
+        ; sigitems= sigitem' :: sigitems }
+    | _ ->
+        Location.raise_errorf ~loc:sigitem.psig_loc
+          "Expected versioned module declaration"
+  in
+  List.fold signature ~init ~f
+
+let version_module_decl ~loc ~path:_ modname signature =
+  Printexc.record_backtrace true ;
+  try
+    let open Ast_helper in
+    let modname = map_loc ~f:(check_modname ~loc:modname.loc) modname in
+    let {txt= {latest; sigitems; convertible; _}; _} =
+      map_loc ~f:(convert_module_decls ~loc:signature.loc) signature
+    in
+    let mk_module_decl name ty_desc =
+      Sig.mk ~loc (Psig_module (Md.mk ~loc name (Mty.mk ~loc ty_desc)))
+    in
+    let signature =
+      match latest with
+      | None ->
+          List.rev sigitems
+      | Some vn ->
+          let module E = Ppxlib.Ast_builder.Make (struct
+            let loc = loc
+          end) in
+          let open E in
+          let latest =
+            mk_module_decl {txt= "Latest"; loc}
+              (Pmty_alias {txt= Lident vn; loc})
+          in
+          let defs =
+            if convertible then
+              [%sig:
+                val versions :
+                  (int * (Core_kernel.Bigstring.t -> Latest.t)) array
+
+                val deserialize_binary_opt :
+                  Bin_prot.Common.buf -> Latest.t option]
+            else []
+          in
+          List.rev sigitems @ (latest :: defs)
+    in
+    mk_module_decl modname (Pmty_signature signature)
+  with exn ->
+    Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
+    raise exn
+
 let () =
-  let ast_pattern =
+  let module_ast_pattern =
     Ast_pattern.(
       pstr
         ( pstr_module (module_binding ~name:__' ~expr:(pmod_structure __'))
         ^:: nil ))
   in
-  let extension =
+  let module_extension =
     Extension.(
-      declare "versioned" Context.structure_item ast_pattern version_module)
+      declare "versioned" Context.structure_item module_ast_pattern
+        version_module)
   in
-  let rule = Context_free.Rule.extension extension in
-  let rules = [rule] in
+  let module_decl_ast_pattern =
+    Ast_pattern.(
+      psig
+        ( psig_module (module_declaration ~name:__' ~type_:(pmty_signature __'))
+        ^:: nil ))
+  in
+  let module_decl_extension =
+    Extension.(
+      declare "versioned" Context.signature_item module_decl_ast_pattern
+        version_module_decl)
+  in
+  let module_rule = Context_free.Rule.extension module_extension in
+  let module_decl_rule = Context_free.Rule.extension module_decl_extension in
+  let rules = [module_rule; module_decl_rule] in
   Driver.register_transformation "ppx_coda/versioned_module" ~rules

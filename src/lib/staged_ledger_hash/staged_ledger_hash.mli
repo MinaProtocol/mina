@@ -26,8 +26,6 @@ module Stable : sig
   module V1 : sig
     type nonrec t = t
     [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-
-    include Hashable_binable with type t := t
   end
 
   module Latest : module type of V1

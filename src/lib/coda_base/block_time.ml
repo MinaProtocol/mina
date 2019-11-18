@@ -8,33 +8,25 @@ open Tick
 open Unsigned_extended
 open Snark_bits
 open Fold_lib
-open Module_version
 
 module Time = struct
   (* Milliseconds since epoch *)
+  [%%versioned
   module Stable = struct
     module V1 = struct
+      type t = UInt64.Stable.V1.t [@@deriving sexp, compare, eq, hash, yojson]
+
+      let to_latest = Fn.id
+
       module T = struct
-        type t = UInt64.t
-        [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
+        type typ = t [@@deriving sexp, compare, hash]
+
+        type t = typ [@@deriving sexp, compare, hash]
       end
 
-      include T
       include Hashable.Make (T)
-      include Registration.Make_latest_version (T)
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "block_time"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   module Controller = struct
     [%%if
@@ -69,7 +61,6 @@ module Time = struct
     [%%endif]
   end
 
-  (* DO NOT add bin_io the deriving list *)
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   module B = Bits
@@ -84,27 +75,14 @@ module Time = struct
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 
   module Span = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t = UInt64.t [@@deriving bin_io, sexp, compare, version]
-        end
+        type t = UInt64.Stable.V1.t [@@deriving sexp, compare]
 
-        include T
-        include Registration.Make_latest_version (T)
+        let to_latest = Fn.id
       end
-
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "block_time_span"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
+    end]
 
     type t = Stable.Latest.t [@@deriving sexp, compare]
 
