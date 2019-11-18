@@ -9,7 +9,7 @@ open Module_version
 let parity y = Tick.Bigint.(test_bit (of_field y) 0)
 
 let gen_uncompressed =
-  Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
+  Quickcheck.Generator.filter_map Tick.Field.gen_uniform ~f:(fun x ->
       let open Option.Let_syntax in
       let%map y = Tick.Inner_curve.find_y x in
       (x, y) )
