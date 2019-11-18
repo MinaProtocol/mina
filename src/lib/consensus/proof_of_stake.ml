@@ -1707,6 +1707,18 @@ module Data = struct
           <- Length.succ new_sub_window_densities.(n - 1) ;
           (min_window_density, new_sub_window_densities)
 
+        let actual_to_reference ~prev_global_slot ~prev_sub_window_densities =
+          let prev_global_sub_window =
+            Global_sub_window.of_global_slot prev_global_slot
+          in
+          let prev_relative_sub_window =
+            Sub_window.to_int
+            @@ Global_sub_window.sub_window prev_global_sub_window
+          in
+          List.drop prev_sub_window_densities prev_relative_sub_window
+          @ List.take prev_sub_window_densities prev_relative_sub_window
+          @ [List.nth_exn prev_sub_window_densities prev_relative_sub_window]
+
         let gen_global_slots =
           let open Quickcheck.Generator in
           let open Quickcheck.Generator.Let_syntax in
@@ -1742,6 +1754,27 @@ module Data = struct
 
         let gen =
           Quickcheck.Generator.tuple2 gen_global_slots gen_min_window_density
+
+        let%test_unit "the actual implementation is equivalent to the \
+                       reference implementation" =
+          Quickcheck.test ~trials:100 gen
+            ~f:(fun ( (prev_global_slot, next_global_slot)
+                    , (prev_min_window_density, prev_sub_window_densities) )
+               ->
+              let min_window_density1, _ =
+                update_min_window_density ~prev_global_slot ~next_global_slot
+                  ~prev_sub_window_densities ~prev_min_window_density
+              in
+              let min_window_density2, _ =
+                update_min_window_density_reference_implementation
+                  ~prev_global_slot ~next_global_slot
+                  ~prev_sub_window_densities:
+                    (actual_to_reference ~prev_global_slot
+                       ~prev_sub_window_densities)
+                  ~prev_min_window_density
+              in
+              assert (Length.(equal min_window_density1 min_window_density2))
+          )
 
         let%test_unit "Inside snark computation is equivalent to outside \
                        snark computation" =
