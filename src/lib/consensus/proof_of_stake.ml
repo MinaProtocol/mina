@@ -1724,14 +1724,27 @@ module Data = struct
         let sub_windows_per_window =
           UInt32.to_int Constants.sub_windows_per_window
 
+        (* slot_diff are generated in such a way so that we can test different cases
+           in the update function, I use a weighted union to generate it.
+           weight | range of the slot diff
+           1      | [0*slots_per_sub_window, 1*slots_per_sub_window)
+           1/4    | [1*slots_per_sub_window, 2*slots_per_sub_window)
+           1/9    | [2*slots_per_sub_window, 3*slots_per_sub_window)
+           ...
+           1/n^2  | [n*slots_per_sub_window, (n+1)*slots_per_sub_window)
+         *)
         let gen_slot_diff =
           let open Quickcheck.Generator in
           Quickcheck.Generator.weighted_union
           @@ List.init (2 * sub_windows_per_window) ~f:(fun i ->
-                 ( 100.0 /. (Float.of_int (i + 1) ** 2.)
+                 ( 1.0 /. (Float.of_int (i + 1) ** 2.)
                  , Core.Int.gen_incl (i * slots_per_sub_window)
                      ((i + 1) * slots_per_sub_window) ) )
 
+        (* generate an initial global_slot and a list of successive global_slot following
+           the initial slot. The length of the list is fixed because this same list would
+           also passed into a snarky computation, and the *Typ* of the list requires a
+           fixed length. *)
         let gen_global_slots =
           let open Quickcheck.Generator in
           let open Quickcheck.Generator.Let_syntax in
