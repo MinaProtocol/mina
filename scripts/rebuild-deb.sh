@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../src/_build"
+cd "${SCRIPTPATH}/../_build"
 
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
@@ -13,7 +13,7 @@ GITTAG=$(git describe --abbrev=0)
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
-PVKEYHASH=$(./default/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
+PVKEYHASH=$(./default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 
@@ -55,8 +55,8 @@ cat "${BUILDDIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
-cp ./default/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
+cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
+cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -67,7 +67,7 @@ rsync -Huav ../config/* "${BUILDDIR}/etc/coda/build_config/."
 # Identify actual keys used in build
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
-compile_keys=$(./default/app/cli/src/coda.exe internal snark-hashes)
+compile_keys=$(./default/src/app/cli/src/coda.exe internal snark-hashes)
 for key in $compile_keys
 do
     echo -n "Looking for keys matching: ${key} -- "
