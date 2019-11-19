@@ -123,6 +123,7 @@ let make = (~nextStep, ~prevStep) => {
                <>
                  <Button
                    label="Create"
+                   style=Button.HyperlinkBlue
                    disabled={
                      switch (result) {
                      | Loading => true

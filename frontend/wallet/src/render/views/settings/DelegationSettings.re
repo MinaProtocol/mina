@@ -15,6 +15,7 @@ module Styles = {
       Theme.Text.Body.semiBold,
       style([color(Theme.Colors.hyperlink), marginBottom(`rem(2.3))]),
     ]);
+  let fields = style([maxWidth(`rem(40.))]);
 };
 
 type feeSelection =
@@ -113,32 +114,36 @@ let make = (~publicKey) => {
            {React.string("Delegate Participation To")}
          </div>
          <Spacer height=1. />
-         <TextField
-           label="Key"
-           value={
-             Option.map(~f=PublicKey.toString, state.delegate)
-             |> Option.withDefault(~default="")
-           }
-           mono=true
-           onChange={value =>
-             changeState(_ =>
-               {
-                 delegate: Some(PublicKey.ofStringExn(value)),
-                 fee: state.fee,
-               }
-             )
-           }
-         />
+         <div className=Styles.fields>
+           <TextField
+             label="Key"
+             value={
+               Option.map(~f=PublicKey.toString, state.delegate)
+               |> Option.withDefault(~default="")
+             }
+             mono=true
+             onChange={value =>
+               changeState(_ =>
+                 {
+                   delegate: Some(PublicKey.ofStringExn(value)),
+                   fee: state.fee,
+                 }
+               )
+             }
+           />
+         </div>
          <Spacer height=1. />
          <div>
            <div className=Styles.label>
              {React.string("Transaction fee")}
            </div>
-           <ToggleButton
-             options=[|"Standard: 5 Coda", "Custom Amount"|]
-             selected=feeSelectedValue
-             onChange=onChangeFee
-           />
+           <div className=Styles.fields>
+             <ToggleButton
+               options=[|"Standard: 5 Coda", "Custom Amount"|]
+               selected=feeSelectedValue
+               onChange=onChangeFee
+             />
+           </div>
            {switch (state.fee) {
             | DefaultAmount => React.null
             | Custom(feeAmount) =>
