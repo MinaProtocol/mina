@@ -1,26 +1,14 @@
-let extraHeaders = () =>
-  <>
-    <script src="https://apis.google.com/js/api.js" />
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/marked/0.7.0/marked.min.js"
-      integrity="sha256-0Ed5s/n37LIeAWApZmZUhY9icm932KvYkTVdJzUBiI4="
-      crossOrigin="anonymous"
-    />
-  </>;
-
 module Styles = {
   open Css;
   let page =
+    style([marginLeft(`auto), marginRight(`auto), maxWidth(`rem(72.))]);
+
+  let lineBreak =
     style([
-      selector(
-        "hr",
-        [
-          height(px(4)),
-          borderTop(px(1), `dashed, Style.Colors.marine),
-          borderLeft(`zero, solid, transparent),
-          borderBottom(px(1), `dashed, Style.Colors.marine),
-        ],
-      ),
+      height(px(4)),
+      borderTop(px(1), `dashed, Style.Colors.marine),
+      borderLeft(`zero, solid, transparent),
+      borderBottom(px(1), `dashed, Style.Colors.marine),
     ]);
 
   let header =
@@ -33,30 +21,6 @@ module Styles = {
       margin2(~v=rem(3.5), ~h=`zero),
     ]);
 
-  let content =
-    style([
-      display(`flex),
-      flexDirection(`columnReverse),
-      justifyContent(`center),
-      width(`percent(100.)),
-      marginBottom(`rem(1.5)),
-      media(Style.MediaQuery.somewhatLarge, [flexDirection(`row)]),
-    ]);
-
-  let rowStyles = [
-    display(`grid),
-    gridColumnGap(rem(1.5)),
-    gridTemplateColumns([rem(1.), rem(5.5), rem(5.5), rem(2.5)]),
-    media(
-      Style.MediaQuery.notMobile,
-      [
-        width(`percent(100.)),
-        gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(2.5)]),
-      ],
-    ),
-  ];
-
-  let row = style(rowStyles);
   let heroRow =
     style([
       display(`flex),
@@ -81,15 +45,13 @@ module Styles = {
           gridTemplateRows([`repeat((`num(1), `rem(10.0)))]),
         ],
       ),
-      
-       media(
+      media(
         "(min-width: 50rem)",
         [
           gridTemplateColumns([`repeat((`num(2), `rem(23.0)))]),
           gridTemplateRows([`repeat((`num(2), `rem(11.0)))]),
         ],
       ),
-       
       media(
         "(min-width: 75rem)",
         [
@@ -123,7 +85,7 @@ let make = () => {
         <br />
       </div>
     </div>
-    <hr />
+    <hr className=Styles.lineBreak />
     <div>
       <div className=Styles.buttonRow>
         <HoverCard
@@ -138,19 +100,20 @@ let make = () => {
           text={React.string(
             "Receive funding to work on Coda related projects and research.",
           )}
-          href="https://bit.ly/CodaDiscord"
+          href="https://github.com/CodaProtocol/coda-grants"
         />
         <HoverCard
-          heading={React.string({js| Developer Docs  |js})}
+          heading={React.string({js| Developer Docs |js})}
           text={React.string(
-            "Contribute to the Coda protocol source code and core products. Read more on how to get involved.",
+            "Contribute to Coda source code and core products.",
           )}
           href="/docs/developers/"
         />
+        // TODO: Put SDK waitlist link here
         <HoverCard
-          heading={React.string({js| Coda SDK  |js})}
+          heading={React.string({js| Coda SDK |js})}
           text={React.string(
-            "Use the Coda SDK to integrate digital payments into your app. Sign up for the waitlist.",
+            "Sign up for the Coda SDK waitlist to integrate digital payments into your app.",
           )}
           href="https://docs.google.com/forms/d/e/1FAIpQLScQRGW0-xGattPmr5oT-yRb9aCkPE6yIKXSfw1LRmNx1oh6AA/viewform"
         />

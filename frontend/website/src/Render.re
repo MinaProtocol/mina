@@ -203,8 +203,7 @@ Router.(
         File(
           "developers",
           name =>
-            <Page
-              page=`Developers name extraHeaders={Developers.extraHeaders()}>
+            <Page page=`Developers name>
               <Wrapped> <Developers /> </Wrapped>
             </Page>,
         ),

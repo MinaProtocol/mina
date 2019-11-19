@@ -56,10 +56,13 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~icon, ~heading, ~text, ~href) => {
+let make = (~icon=?, ~heading, ~text, ~href) => {
   <a href className=Styles.ctaButton>
     <div className=Styles.ctaContent>
-      <p className=Styles.ctaIcon> icon </p>
+      {switch (icon) {
+       | Some(icon) => <p className=Styles.ctaIcon> icon </p>
+       | None => React.null
+       }}
       <div className=Styles.ctaText>
         <h2 className=Styles.ctaHeading> heading </h2>
         <h4 className=Styles.ctaBody> text </h4>

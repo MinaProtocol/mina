@@ -365,23 +365,17 @@ module SimpleButton = {
 let make = (~page) => {
   <NavWrapper keepAnnouncementBar=true>
     [|
-      <SimpleButton name="Blog" link="/blog" activePage={page == `Blog} />,
-      <SimpleButton name="Docs" link="/docs" activePage={page == `Docs} />,
-      <SimpleButton name="Careers" link="/jobs" activePage={page == `Jobs} />,
-      <SimpleButton
-        name="GitHub"
-        link="https://github.com/CodaProtocol/coda"
-        target="_blank"
-      />,
-      <SimpleButton
-        name="Testnet"
-        link="/testnet"
-        activePage={page == `Testnet}
-      />,
       <SimpleButton
         name="Developers"
         link="/developers"
         activePage={page == `Developers}
+      />,
+      <SimpleButton name="Blog" link="/blog" activePage={page == `Blog} />,
+      <SimpleButton name="Careers" link="/jobs" activePage={page == `Jobs} />,
+      <SimpleButton
+        name="Testnet"
+        link="/testnet"
+        activePage={page == `Testnet}
       />,
     |]
   </NavWrapper>;

@@ -8,7 +8,7 @@ module Colors = {
       Printf.sprintf("hsla(%d,%d%%,%d%%,%f)", h, s, l, a);
 
   let fadedBlue = `rgb((111, 167, 197));
-  let lightBlue = `rgba((71, 137, 196, 0.1));
+  let lightBlue = a => `rgba((71, 137, 196, a));
   let white = Css.white;
   let whiteAlpha = a => `rgba((255, 255, 255, a));
   let hyperlink = `hsl((201, 71, 52));
