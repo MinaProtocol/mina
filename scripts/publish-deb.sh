@@ -37,6 +37,10 @@ else
             ls coda-*.deb
             set -x
             ${DEBS3} --codename ${CODENAME} --component main coda-*.deb
+            echo "Exporting Variables: "
+            # Export Variables for Downstream Steps
+            echo "export CODA_DEB_REPO=$CODENAME" >> /tmp/DOCKER_DEPLOY_ENV
+            echo "export CODA_WAS_PUBLISHED=true" >> /tmp/DOCKER_DEPLOY_ENV
             set +x
             ;;
         *)
