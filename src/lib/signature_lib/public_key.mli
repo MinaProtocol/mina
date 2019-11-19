@@ -114,3 +114,5 @@ val compress_var : var -> (Compressed.var, _) Checked.t
 val decompress_var : Compressed.var -> (var, _) Checked.t
 
 val to_base58_check : t -> string
+
+val of_base58_check : string -> t Base.Or_error.t
