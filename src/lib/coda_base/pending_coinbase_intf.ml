@@ -179,7 +179,7 @@ module type S = sig
   (** The stack that corresponds to the next ledger proof that is to be generated*)
   val oldest_stack : t -> Stack.t Or_error.t
 
-  (** Hash of the auxilliary data (everything except the merkle tree)*)
+  (** Hash of the auxiliary data (everything except the merkle root (Hash.t))*)
   val hash_extra : t -> string
 
   module Checked : sig

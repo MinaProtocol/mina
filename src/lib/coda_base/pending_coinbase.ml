@@ -11,16 +11,12 @@ open Fold_lib
 
 (* A pending coinbase is basically a Merkle tree of "stacks", each of which contains two hashes. The first hash
    is computed from the components in the coinbase via a "push" operation. The second hash, a protocol
-   state hash, is computed from the state *body* hash in the coinbase, and a previous protocol state hash.
+   state hash, is computed from the state *body* hash in the coinbase.
    The "add_coinbase" operation takes a coinbase, retrieves the latest stack, or creates a new one, and does
    a push.
 
    A pending coinbase also contains a stack id, used to determine the chronology of stacks, so we can know
    which is the oldest, and which is the newest stack.
-
-   Also, a pending coinbase contains a "previous protocol state hash", which is updated whenever we add a
-   coinbase. When we add a coinbase to a new stack, which contains a dummy state hash, we insert the previous state
-   hash to that stack before a push, so that the state hashes in stacks are always computed from an existing state hash.
 
    The name "stack" here is a misnomer: see issue #3226
  *)
