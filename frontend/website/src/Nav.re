@@ -378,6 +378,11 @@ let make = (~page) => {
         link="/testnet"
         activePage={page == `Testnet}
       />,
+      <SimpleButton
+        name="Developers"
+        link="/developers"
+        activePage={page == `Developers}
+      />,
     |]
   </NavWrapper>;
 };
