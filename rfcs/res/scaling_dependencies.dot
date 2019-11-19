@@ -3,7 +3,7 @@ digraph G {
 
   // Protocol Aspects
   {
-    node [color=blue, shape=rectangle];
+    node [color=blue, shape=square, width=2.2, fixedsize=true];
     ScanSize [label="Scan State Size (+)"];
     SlotTime [label="Slot Time (-)"];
   }
@@ -36,9 +36,8 @@ digraph G {
   {
     edge [color=black];
     {ScanSyncTime, ScanSyncSlotDivorce, HashTime} -> ScanSize
-    {StLDiffApp, ScanSyncSlotDivorce, HashTime} -> SlotTime;
+    {StLDiffApp, ScanSyncSlotDivorce, SnLCommit, HashTime} -> SlotTime;
     HashTime -> StLDiffApp;
-    ScanSize -> SnLCommit;
     {ELSync, ELMem, SnLCommit} -> NumAccs;
     {ScanSize, ScanMem, SlotTime} -> TPS;
     SlotTime -> Latency;
@@ -48,7 +47,7 @@ digraph G {
   // Negative Arcs
   {
     edge [color=red];
-    ScanSize -> {StLDiffApp, Latency};
+    ScanSize -> {SnLCommit, StLDiffApp, Latency};
     SlotTime -> Delegation;
   }
 }

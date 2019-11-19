@@ -14,9 +14,13 @@ There are a number of scaling goals which we would like to achieve, and a number
 |-----------------------|------------------------------|
 | Black Circle Nodes    | Scaling Goals                |
 | Black Rectangle Nodes | Actionable Dependencies      |
-| Blue Rectangle Nodes  | Protocol Aspect Dependencies |
+| Blue Square Nodes     | Protocol Aspect Dependencies |
 | Black Arcs            | Positive Correlation         |
 | Red Arcs              | Negative Correlation         |
+
+#### [Notion Table](https://www.notion.so/codaprotocol/bea78f9f670b4cef9c4e557bdd38981b?v=609389a5e4844fb9b3aa2777d735da06)
+
+The notion table summarizes the dependencies in this graph with priorities. Priorities on the table should remain in sync with the priorities listed in this document.
 
 ## Scaling Goals
 [scaling]: #scaling
@@ -69,14 +73,14 @@ There are multiple potential fixes that need to be weighed and compared for impl
 - content addressed storage system (see @enolan's RFC for details)
 ##### Child RFC: &#x1F534;
 
-### Reduce Scan Statement Memory Usage
-##### Priority: ?
+### Reduce Scan State Memory Usage
+##### Priority: 3
 ##### Why this Priority?
-TODO
+This is important and will cause issues at some point, but it looks like this will show itself as a bottleneck later than most of the other scaling dependencies.
 ##### Why is it important?
-TODO
+At high parameterization, the scan state will use an increadible amount of memory. The memory usage needs to be before we can significantly turn up the scan state's size.
 ##### Proposed Fix
-TODO
+Don't persist completed work in the trees, throw out completed trees from the tree ring as we go. Use content addressed storage to share references to memory across transaction witnesses (which potentially saves a lot of duplicate intermediate hashes from being stored).
 ##### Child RFC: &#x1F534;
 
 ### Reduce Scan State Synchronization Time
@@ -110,13 +114,13 @@ TODO
 ##### Child RFC: &#x1F534;
 
 ### Optimize Snarked Ledger Commit
-##### Priority: 3
+##### Priority: 2
 ##### Why this Priority?
-TODO
+As the ledger size increases, snarked ledger commit will likely become the main bottleneck for slot time in addition to staged ledger diff application. Making the slot time too long is not much of an option, so this will instead become the primary bottleneck for the number of accounts in the system.
 ##### Why is it important?
-TODO
+It's important that the amount of time it takes for a new snarked ledger to be commited to the root snarked ledger must be short enough that all nodes can realistically do it 1 time within a slot while still handling the multiple staged ledger diff applications it also must perform within the same time frame. Snarked ledger commit time increases as the scan state increases and as the spread of txns across accounts diversifies. The scan state being large means there are more transactions included in every snarked ledger commit, and there is more information to commit to the root snarked ledger as the number of accounts mutated by the full set of transactions included increases.
 ##### Proposed Fix
-TODO
+Tightly optimize the bulk writes to the rocksdb database. Perform mask hashing in parallel (if poseidon hashing can be parallelized out of process well) when constructing the mask to be committed to the database. Potentially split I/O out to separate process if it makes sense (data transfer to the other process might be too high though). If all of this is not enough, then we need to divorce the requirement that the snarked ledger commit happense in one slot. This is doable, but is tricky, as it involves keeping a mask in memory on top of the persisted root snarked ledger, querying that mask while it is active instead of the underlying database, and periodically writing (and invalidating) some information from the mask asynchronously. This will be rather tricky as it needs to be done in a way that is fault tolerant and blocks asynchronous reads as little as possible.
 ##### Child RFC: &#x1F534;
 
 ### Poseidon Hashing Time
