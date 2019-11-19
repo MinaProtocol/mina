@@ -328,7 +328,7 @@ jobs:
                     fi
             - store_artifacts:
                   path: /tmp/artifacts
-    build-artifacts--testnet_postake_medium_curves_10k_ledger:
+    build-artifacts--net_10k:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
@@ -351,7 +351,7 @@ jobs:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves_10k_ledger
+                    DUNE_PROFILE: net_10k
             - run:
                   name: Upload generated PV keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
@@ -359,12 +359,12 @@ jobs:
                   name: Rebuild for pvkey changes
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
                   environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves_10k_ledger
+                    DUNE_PROFILE: net_10k
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves_10k_ledger
+                    DUNE_PROFILE: net_10k
             - run:
                   name: Store genesis public/private keypairs
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
@@ -768,7 +768,7 @@ workflows:
             - build-archive
             - build-macos
             - build-artifacts--testnet_postake_medium_curves
-            - build-artifacts--testnet_postake_medium_curves_10k_ledger
+            - build-artifacts--net_10k
             - test-unit--test_postake_snarkless_unittest
             - test-unit--dev
             - test--fake_hash

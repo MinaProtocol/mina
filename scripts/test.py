@@ -11,7 +11,7 @@ from itertools import chain
 
 build_artifact_profiles = [
     'testnet_postake_medium_curves',
-    'testnet_postake_medium_curves_10k_ledger'
+    'net_10k'
 ]
 
 unit_test_profiles = ['test_postake_snarkless_unittest', 'dev']
