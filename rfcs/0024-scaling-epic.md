@@ -32,7 +32,7 @@ We need to scale the number of accounts in the ledger that the network can handl
 The network needs to support a reasonable TPS value. At minimum, TPS should be at least 2.
 
 ### Block Latency
-Optimizing block latency helps increase the usability of the cryptocurrency by decreasing the amount of time until a wallet can probalisitically display to the user that their transactions have gone through/funds have been received. Decreasing block latency reduced the delay for changes in the stake distribution to take effect with respect to VRF evaluations, and delegation.
+Block latency refers to how long it takes for blocks to be added to the blockchain. Optimizing block latency helps increase the usability of the cryptocurrency by decreasing the amount of time until a wallet can probabilistically display to the user that their transactions have gone through/funds have been received. Decreasing block latency reduces the delay for changes in the stake distribution to take effect with respect to VRF evaluations, and delegation.
 
 ### Number of Delegators on one Account
 Increasing the maximum number of delegators on one account allows for larget delegation pools to exist, which is important for usability of delegation since changes in delegation take a long time to take effect. If there is a low cap on the maximum number of delegators to a single account, delegation pools will need to be split up, and if a pool is overloaded and needs to offload onto another account, it will remain overloaded for a long time.
@@ -62,7 +62,7 @@ Synchronize the Epoch Ledger using the same Syncable Ledger abstraction we use f
 ##### Child RFC: &#x1F534;
 
 ### Reduce Epoch Ledger Memory Usage
-##### Priority: 2
+##### Priority: 3
 ##### Why this Priority?
 Less important than optimizing epoch ledger synchronization time/bandwidth usage.
 ##### Why is it important?
@@ -80,7 +80,7 @@ This is important and will cause issues at some point, but it looks like this wi
 ##### Why is it important?
 At high parameterization, the scan state will use an increadible amount of memory. The memory usage needs to be before we can significantly turn up the scan state's size.
 ##### Proposed Fix
-Don't persist completed work in the trees, throw out completed trees from the tree ring as we go. Use content addressed storage to share references to memory across transaction witnesses (which potentially saves a lot of duplicate intermediate hashes from being stored).
+Use content addressed storage to share references to memory across transaction witnesses (which potentially saves a lot of duplicate intermediate hashes from being stored).
 ##### Child RFC: &#x1F534;
 
 ### Reduce Scan State Synchronization Time
