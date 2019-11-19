@@ -249,12 +249,12 @@ jobs:
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
                     ./scripts/librewrite-macos.sh package/coda-libp2p_helper
-                    cp _build/default/app/logproc/logproc.exe package/coda-logproc
+                    cp _build/default/src/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
             - run:
                 name: Collect coda binary
                 command: |
-                    cp _build/default/app/cli/src/coda.exe package/coda
+                    cp _build/default/src/app/cli/src/coda.exe package/coda
             - run:
                 name: Build homebrew package
                 command: |
